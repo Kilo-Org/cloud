@@ -305,22 +305,52 @@ describe('organizations.kiloclaw.getNavState', () => {
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: false });
+    expect(result).toEqual({ hasActiveInstance: false, hasCurrentSubscription: false });
   });
 
-  it('returns active organization instance presence', async () => {
+  it('returns active organization instance and subscription presence', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-nav-present-${Math.random()}@example.com`,
     });
     const organization = await createOrganization('Org KiloClaw Nav Present Test', user.id);
-    await createActiveOrgInstance(user.id, organization.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+    });
     const caller = await createCallerForUser(user.id);
 
     const result = await caller.organizations.kiloclaw.getNavState({
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: true });
+    expect(result).toEqual({ hasActiveInstance: true, hasCurrentSubscription: true });
+  });
+
+  it('treats an active Stripe-funded organization subscription as current', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-stripe-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Stripe Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'stripe',
+      stripe_subscription_id: `sub_${crypto.randomUUID()}`,
+    });
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: true, hasCurrentSubscription: true });
   });
 
   it('does not leak a personal instance into organization nav state', async () => {
@@ -340,15 +370,22 @@ describe('organizations.kiloclaw.getNavState', () => {
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: false });
+    expect(result).toEqual({ hasActiveInstance: false, hasCurrentSubscription: false });
   });
 
-  it('ignores destroyed organization instances', async () => {
+  it('does not treat canceled destroyed organization history as current', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-nav-destroyed-${Math.random()}@example.com`,
     });
     const organization = await createOrganization('Org KiloClaw Nav Destroyed Test', user.id);
     const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'canceled',
+      payment_source: 'credits',
+    });
     await db
       .update(kiloclaw_instances)
       .set({ destroyed_at: '2026-05-29T00:00:00.000Z' })
@@ -359,7 +396,7 @@ describe('organizations.kiloclaw.getNavState', () => {
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: false });
+    expect(result).toEqual({ hasActiveInstance: false, hasCurrentSubscription: false });
   });
 });
 
@@ -444,6 +481,58 @@ describe('organization kiloclaw destroy', () => {
 describe('organizations.kiloclaw.provision trial entitlement gate', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
+  });
+
+  it('rejects organizations without a current KiloClaw subscription before provisioning', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-provision-no-subscription-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization(
+      'Org KiloClaw Provision No Subscription Test',
+      user.id
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.provision({
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'A current KiloClaw subscription is required to provision an instance.',
+    });
+    expect(kiloclawClientMock.__provisionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects canceled organization subscription history before provisioning', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-provision-canceled-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization(
+      'Org KiloClaw Provision Canceled Subscription Test',
+      user.id
+    );
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'canceled',
+      payment_source: 'credits',
+    });
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-05-29T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instanceId));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.provision({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'A current KiloClaw subscription is required to provision an instance.',
+    });
+    expect(kiloclawClientMock.__provisionMock).not.toHaveBeenCalled();
   });
 
   it('rejects hard-expired unentitled organizations before provisioning', async () => {
@@ -538,6 +627,18 @@ describe('organizations.kiloclaw.provision trial entitlement gate', () => {
       google_user_email: `org-kiloclaw-provision-conflict-${crypto.randomUUID()}@example.com`,
     });
     const organization = await createOrganization('Org KiloClaw Provision Conflict Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+    });
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-05-29T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instanceId));
     kiloclawClientMock.__provisionMock.mockRejectedValueOnce(
       new MockKiloClawApiError(
         409,

@@ -178,7 +178,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   });
 
   it('applies complete catalog settings for variant xhigh (distinct from max)', async () => {
-    // Claude catalog: xhigh → effort xhigh + verbosity xhigh; max → effort xhigh + verbosity max
+    // Claude catalog: xhigh → effort xhigh + verbosity xhigh; max → effort max + verbosity max
     const claudeModel = 'anthropic/claude-sonnet-5';
     const xhighResult = await resolveAutoModel(
       {
@@ -219,7 +219,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       kind: 'ok',
       resolved: {
         model: claudeModel,
-        reasoning: { enabled: true, effort: 'xhigh' },
+        reasoning: { enabled: true, effort: 'max' },
         verbosity: 'max',
       },
     });
@@ -246,7 +246,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       kind: 'ok',
       resolved: {
         model: claudeModel,
-        reasoning: { enabled: true, effort: 'xhigh' },
+        reasoning: { enabled: true, effort: 'max' },
         verbosity: 'max',
       },
     });
@@ -419,7 +419,10 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: { model: 'stepfun/step-3.7-flash:free' },
+      resolved: {
+        model: 'stepfun/step-3.7-flash:free',
+        reasoning: { enabled: true, effort: 'high' },
+      },
     });
     expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
   });

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { APP_URL } from '@/lib/constants';
-import { getKeyInventoryCounts } from '@/lib/coding-plans';
+import { getCodingPlanAvailabilityIntentCounts, getKeyInventoryCounts } from '@/lib/coding-plans';
 import { getCodingPlanCatalog } from '@/lib/coding-plans/pricing';
 import {
   sendAdminSlackNotification,
@@ -15,12 +15,18 @@ export type CodingPlanInventoryCount = {
   count: number;
 };
 
+export type CodingPlanWaitlistCount = {
+  planId: string;
+  count: number;
+};
+
 type InventoryPlanSummary = {
   providerId: string;
   providerName: string;
   planId: string;
   displayName: string;
   loaded: number;
+  waitlist: number;
   statusCounts: Record<string, number>;
 };
 
@@ -28,6 +34,7 @@ export type CodingPlanInventoryTotals = {
   loaded: number;
   assigned: number;
   available: number;
+  waitlist: number;
   revocationPending: number;
   revocationFailed: number;
   revoked: number;
@@ -79,6 +86,7 @@ function summarizeInventory(counts: CodingPlanInventoryCount[]): InventoryPlanSu
       planId: item.planId,
       displayName: catalogPlan?.name ?? item.planId,
       loaded: 0,
+      waitlist: 0,
       statusCounts: {},
     };
 
@@ -98,12 +106,47 @@ function summarizeInventory(counts: CodingPlanInventoryCount[]): InventoryPlanSu
   });
 }
 
+function addWaitlistCounts(
+  summaries: InventoryPlanSummary[],
+  counts: CodingPlanWaitlistCount[]
+): InventoryPlanSummary[] {
+  const catalog = getCodingPlanCatalog();
+  const catalogByPlanId = new Map<string, (typeof catalog)[number]>(
+    catalog.map(plan => [plan.planId, plan])
+  );
+  const summariesByPlanId = new Map(summaries.map(summary => [summary.planId, summary]));
+
+  for (const item of counts) {
+    const existing = summariesByPlanId.get(item.planId);
+    if (existing) {
+      existing.waitlist = item.count;
+      continue;
+    }
+
+    const catalogPlan = catalogByPlanId.get(item.planId);
+    const summary: InventoryPlanSummary = {
+      providerId: catalogPlan?.providerId ?? 'unknown',
+      providerName: catalogPlan?.providerName ?? 'Unknown provider',
+      planId: item.planId,
+      displayName: catalogPlan?.name ?? item.planId,
+      loaded: 0,
+      waitlist: item.count,
+      statusCounts: {},
+    };
+    summariesByPlanId.set(item.planId, summary);
+    summaries.push(summary);
+  }
+
+  return summaries;
+}
+
 function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventoryTotals {
   return summaries.reduce<CodingPlanInventoryTotals>(
     (totals, summary) => ({
       loaded: totals.loaded + summary.loaded,
       assigned: totals.assigned + statusCount(summary, 'assigned'),
       available: totals.available + statusCount(summary, 'available'),
+      waitlist: totals.waitlist + summary.waitlist,
       revocationPending: totals.revocationPending + statusCount(summary, 'revocation_pending'),
       revocationFailed: totals.revocationFailed + statusCount(summary, 'revocation_failed'),
       revoked: totals.revoked + statusCount(summary, 'revoked'),
@@ -112,6 +155,7 @@ function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventory
       loaded: 0,
       assigned: 0,
       available: 0,
+      waitlist: 0,
       revocationPending: 0,
       revocationFailed: 0,
       revoked: 0,
@@ -120,7 +164,7 @@ function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventory
 }
 
 function formatInventoryTotals(totals: CodingPlanInventoryTotals): string {
-  return `*Total* · Available ${formatCount(totals.available)} · Assigned ${formatCount(totals.assigned)} · Loaded ${formatCount(totals.loaded)}`;
+  return `*Total* · Available ${formatCount(totals.available)} · Assigned ${formatCount(totals.assigned)} · Loaded ${formatCount(totals.loaded)} · Waitlist ${formatCount(totals.waitlist)}`;
 }
 
 function groupSummariesByProvider(
@@ -140,7 +184,7 @@ function groupSummariesByProvider(
 function formatProviderSummary(providerName: string, summaries: InventoryPlanSummary[]): string {
   const planLines = summaries.map(
     summary =>
-      `${escapeSlackLabel(summary.displayName)} · Available ${formatCount(statusCount(summary, 'available'))} · Assigned ${formatCount(statusCount(summary, 'assigned'))} · Loaded ${formatCount(summary.loaded)}`
+      `${escapeSlackLabel(summary.displayName)} · Available ${formatCount(statusCount(summary, 'available'))} · Assigned ${formatCount(statusCount(summary, 'assigned'))} · Loaded ${formatCount(summary.loaded)} · Waitlist ${formatCount(summary.waitlist)}`
   );
 
   return [`*${escapeSlackLabel(providerName)}*`, ...planLines].join('\n');
@@ -182,9 +226,10 @@ function formatSnapshotTime(timestamp: Date): string {
 
 export function buildCodingPlanInventorySlackNotification(
   counts: CodingPlanInventoryCount[],
+  waitlistCounts: CodingPlanWaitlistCount[] = [],
   timestamp = new Date()
 ): { notification: AdminSlackNotification; totals: CodingPlanInventoryTotals } {
-  const summaries = summarizeInventory(counts);
+  const summaries = addWaitlistCounts(summarizeInventory(counts), waitlistCounts);
   const totals = inventoryTotals(summaries);
   const needsAttention = totals.revocationFailed + totals.revocationPending;
   const providerNames = Array.from(new Set(summaries.map(summary => summary.providerName)));
@@ -192,7 +237,7 @@ export function buildCodingPlanInventorySlackNotification(
   const planAvailability = summaries
     .map(
       summary =>
-        `${summary.providerName} ${summary.displayName}: ${formatCount(statusCount(summary, 'available'))} available, ${formatCount(statusCount(summary, 'assigned'))} assigned, ${formatCount(summary.loaded)} loaded`
+        `${summary.providerName} ${summary.displayName}: ${formatCount(statusCount(summary, 'available'))} available, ${formatCount(statusCount(summary, 'assigned'))} assigned, ${formatCount(summary.loaded)} loaded, ${formatCount(summary.waitlist)} waitlist`
     )
     .join('. ');
   const attentionFallback = [
@@ -206,7 +251,7 @@ export function buildCodingPlanInventorySlackNotification(
     .filter((value): value is string => value !== null)
     .join(', ');
   const text = [
-    `Coding Plans inventory: ${formatCount(totals.available)} available, ${formatCount(totals.assigned)} assigned, ${formatCount(totals.loaded)} loaded`,
+    `Coding Plans inventory: ${formatCount(totals.available)} available, ${formatCount(totals.assigned)} assigned, ${formatCount(totals.loaded)} loaded, ${formatCount(totals.waitlist)} waitlisted`,
     attentionFallback || null,
     planAvailability || 'No inventory recorded',
   ]
@@ -226,12 +271,14 @@ export function buildCodingPlanInventorySlackNotification(
     { type: 'divider' },
   ];
 
-  if (summaries.length === 0) {
+  if (counts.length === 0) {
     blocks.push({
       type: 'section',
       text: { type: 'mrkdwn', text: 'No Coding Plans inventory is currently recorded.' },
     });
-  } else {
+  }
+
+  if (summaries.length > 0) {
     blocks.push({
       type: 'section',
       text: { type: 'mrkdwn', text: formatInventoryTotals(totals) },
@@ -278,15 +325,20 @@ export function buildCodingPlanInventorySlackNotification(
 
 type InventorySummaryDependencies = {
   getCounts?: typeof getKeyInventoryCounts;
+  getWaitlistCounts?: typeof getCodingPlanAvailabilityIntentCounts;
   sendNotification?: typeof sendAdminSlackNotification;
 };
 
 export async function sendCodingPlanInventorySlackSummary({
   getCounts = getKeyInventoryCounts,
+  getWaitlistCounts = getCodingPlanAvailabilityIntentCounts,
   sendNotification = sendAdminSlackNotification,
 }: InventorySummaryDependencies = {}): Promise<CodingPlanInventoryTotals> {
-  const counts = await getCounts();
-  const { notification, totals } = buildCodingPlanInventorySlackNotification(counts);
+  const [counts, waitlistCounts] = await Promise.all([getCounts(), getWaitlistCounts()]);
+  const { notification, totals } = buildCodingPlanInventorySlackNotification(
+    counts,
+    waitlistCounts
+  );
   await sendNotification(notification);
   return totals;
 }

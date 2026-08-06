@@ -24,6 +24,7 @@ import { errorMessage } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -62,6 +63,13 @@ export function LoginScreen() {
     },
     [signIn]
   );
+
+  useEffect(() => {
+    if (sessionEnded) {
+      // id dedupes the toast if the login route remounts while still signed out
+      announcingToast.warning('Your session ended. Please sign in again.', { id: 'session-ended' });
+    }
+  }, [sessionEnded]);
 
   useEffect(() => {
     if (status === 'approved' && token) {
@@ -186,16 +194,7 @@ export function LoginScreen() {
               recovering only on relaunch — so these branches render without
               animation; status swaps are instant. */}
           <View className="w-full max-w-sm gap-3">
-            {status === 'idle' && (
-              <View className="w-full gap-3">
-                {sessionEnded && (
-                  <Text className="text-center text-sm text-muted-foreground">
-                    Your session ended. Please sign in again.
-                  </Text>
-                )}
-                <IdleAuth start={start} />
-              </View>
-            )}
+            {status === 'idle' && <IdleAuth start={start} />}
 
             {status === 'pending' && code && (
               <View className="w-full items-center gap-4">

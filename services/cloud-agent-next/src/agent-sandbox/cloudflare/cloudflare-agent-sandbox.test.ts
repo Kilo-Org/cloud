@@ -368,6 +368,35 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
+  it('passes kiloServerEnv through when KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS is set', async () => {
+    const bootstrapSession = {};
+    const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const ensureBootstrapWrapper = vi
+      .spyOn(WrapperClient, 'ensureBootstrapWrapper')
+      .mockResolvedValueOnce({ client: {} as WrapperClient });
+    const sandbox = new CloudflareAgentSandbox(
+      { KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '120000' } as unknown as Env,
+      metadata(),
+      {
+        resolveSandbox: () =>
+          ({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' }),
+            createSession,
+          }) as unknown as SandboxInstance,
+      }
+    );
+
+    await expect(sandbox.ensureWrapper(ensureRequest())).resolves.toMatchObject({
+      status: 'wrapper-running',
+    });
+    expect(ensureBootstrapWrapper).toHaveBeenCalledWith(expect.anything(), bootstrapSession, {
+      agentSessionId: 'agent_cloudflare',
+      userId: 'user_cloudflare',
+      kiloServerEnv: { KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '120000' },
+    });
+    ensureBootstrapWrapper.mockRestore();
+  });
+
   it('activates containment before probing a sandbox with Kilo-only containment', async () => {
     const bootstrapSession = {};
     const setOutboundHandler = vi.fn().mockResolvedValue(undefined);

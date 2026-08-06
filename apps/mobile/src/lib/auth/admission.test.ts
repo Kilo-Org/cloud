@@ -5,7 +5,11 @@ import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync } from 'expo-c
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { ADMISSION_CHALLENGE_FAILED, hasAttestationCapability } from './admission';
+import {
+  ADMISSION_CHALLENGE_FAILED,
+  clearAttestKeyOnRefusal,
+  hasAttestationCapability,
+} from './admission';
 import { ATTEST_KEY_ID_KEY } from '@/lib/storage-keys';
 
 /**
@@ -235,5 +239,22 @@ describe('getAdmission', () => {
 
   it('exports ADMISSION_CHALLENGE_FAILED as a constant for caller catch blocks', () => {
     expect(ADMISSION_CHALLENGE_FAILED).toBe('admission_challenge_failed');
+  });
+
+  describe('clearAttestKeyOnRefusal', () => {
+    it('drops the stored key id so the next attempt re-attests', async () => {
+      // The server refuses an assertion for a key it never persisted. Without
+      // the clear, the device asserts against that key forever.
+      await clearAttestKeyOnRefusal('ADMISSION_REQUIRED');
+
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(ATTEST_KEY_ID_KEY);
+    });
+
+    it('keeps the key id for any other error code', async () => {
+      await clearAttestKeyOnRefusal('INVALID_CODE');
+      await clearAttestKeyOnRefusal(undefined);
+
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
   });
 });

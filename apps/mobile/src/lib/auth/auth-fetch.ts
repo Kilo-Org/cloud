@@ -1,9 +1,14 @@
 import { API_BASE_URL } from '@/lib/config';
+import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import { parseAuthErrorCode } from '@/lib/auth/native-auth-contract';
 
 /**
  * Minimal fetch helper for auth endpoints. Returns success with parsed body
  * or failure with an optional error code.
+ *
+ * Every native auth POST routes through here, so this is also where a refused
+ * admission drops the stored App Attest key id. Putting it here rather than at
+ * each caller means a new sign-in path cannot forget it.
  */
 export async function postAuth(
   path: string,
@@ -24,7 +29,9 @@ export async function postAuth(
     }
 
     if (!response.ok) {
-      return { ok: false, errorCode: parseAuthErrorCode(json) };
+      const errorCode = parseAuthErrorCode(json);
+      await clearAttestKeyOnRefusal(errorCode);
+      return { ok: false, errorCode };
     }
 
     return { ok: true, data: json };

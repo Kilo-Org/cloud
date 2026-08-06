@@ -5,9 +5,16 @@ import { type ToolDiffModel } from '../tool-diff-model';
 import { WriteToolCard, WriteToolCardBody } from './write-tool-card';
 import * as React from 'react';
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
 vi.mock('lucide-react-native', () => ({ FilePlus: 'FilePlus' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return {
+    Text: 'Text',
+    TextClassContext: createContext<string | undefined>(undefined),
+  };
+});
 vi.mock('../bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));
@@ -20,6 +27,9 @@ vi.mock('react', async importOriginal => {
     default: actual,
     ...actual,
     useMemo: <T>(fn: () => T): T => fn(),
+    // `SelectableText` is invoked directly by the pure walker, outside a React
+    // render, so the real `useContext` would throw on the null dispatcher.
+    useContext: () => undefined,
   };
 });
 
@@ -267,7 +277,7 @@ describe('WriteToolCardBody — diff preview routing', () => {
     }) as unknown as React.ReactElement;
     const texts = findAll(
       root,
-      el => el.type === 'Text' && (el.props as { children?: string }).children === 'write failed'
+      el => el.type === 'TextInput' && (el.props as { value?: string }).value === 'write failed'
     );
     expect(texts).toHaveLength(1);
   });
@@ -280,7 +290,7 @@ describe('WriteToolCardBody — diff preview routing', () => {
     }) as unknown as React.ReactElement;
     const texts = findAll(
       root,
-      el => el.type === 'Text' && (el.props as { children?: string }).children === 'write error'
+      el => el.type === 'TextInput' && (el.props as { value?: string }).value === 'write error'
     );
     expect(texts).toHaveLength(1);
   });

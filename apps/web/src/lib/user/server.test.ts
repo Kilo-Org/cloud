@@ -11,6 +11,7 @@ import {
   isBlockedTLD,
   parseLinkedInProfileName,
   parseAnacondaProfile,
+  profileProvesEmailOwnership,
   authOptions,
   getUserUUID,
   uuidSchema,
@@ -275,6 +276,32 @@ describe('Anaconda OAuth provider', () => {
       checks: ['pkce', 'state', 'nonce'],
       client: { token_endpoint_auth_method: 'client_secret_post' },
     });
+  });
+});
+
+describe('profileProvesEmailOwnership', () => {
+  test('accepts a boolean true email_verified claim', () => {
+    expect(profileProvesEmailOwnership({ email_verified: true })).toBe(true);
+  });
+
+  test('accepts the string "true" email_verified claim (Apple)', () => {
+    expect(profileProvesEmailOwnership({ email_verified: 'true' })).toBe(true);
+  });
+
+  test('rejects a boolean false email_verified claim', () => {
+    expect(profileProvesEmailOwnership({ email_verified: false })).toBe(false);
+  });
+
+  test('rejects the string "false" email_verified claim', () => {
+    expect(profileProvesEmailOwnership({ email_verified: 'false' })).toBe(false);
+  });
+
+  test('rejects a profile without the email_verified claim', () => {
+    expect(profileProvesEmailOwnership({})).toBe(false);
+  });
+
+  test('rejects undefined', () => {
+    expect(profileProvesEmailOwnership(undefined)).toBe(false);
   });
 });
 

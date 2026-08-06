@@ -293,6 +293,7 @@ export type KiloPassHostingRecoveryReason =
   | 'credits_not_settled'
   | 'enrollment_failed'
   | 'requires_reprovision'
+  | 'signup_unavailable'
   | 'missing_instance'
   | 'destroyed_instance'
   | 'stale_intent'
@@ -339,6 +340,16 @@ export function getKiloPassHostingRecoveryCopy(reason: KiloPassHostingRecoveryRe
         destinationLabel: null,
         canRetry: false,
         showSupport: true,
+      };
+    case 'signup_unavailable':
+      return {
+        title: 'New KiloClaw instances are unavailable',
+        description:
+          'Your Kilo Pass credits are ready, but a current KiloClaw subscription is required to provision an instance.',
+        destination: '/profile',
+        destinationLabel: 'Go to profile',
+        canRetry: false,
+        showSupport: false,
       };
     case 'missing_instance':
       return {
@@ -436,6 +447,10 @@ export function planPriceLabel(plan: ClawPlan, priceVersion?: string): string {
 export type ClawBillingStatus = {
   hasAccess: boolean;
   accessReason: 'trial' | 'subscription' | 'earlybird' | null;
+  /** Whether this user has any canonical personal KiloClaw subscription history. */
+  hasExistingPersonalSubscription: boolean;
+  /** Whether this user has a current personal subscription that permits replacement provisioning. */
+  hasCurrentPersonalSubscription: boolean;
   trialEligible: boolean;
 
   /** User's credit balance in microdollars (null when not fetched). */

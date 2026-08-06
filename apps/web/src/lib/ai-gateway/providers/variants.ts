@@ -64,6 +64,12 @@ export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
 } as const;
 
+export const REASONING_VARIANTS_NONE_MEDIUM_HIGH = {
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  none: { reasoning: { enabled: false, effort: 'none' } },
+} as const;
+
 export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
   max: { reasoning: { enabled: true, effort: 'max' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
@@ -72,7 +78,7 @@ export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
 } as const;
 
 const REASONING_VARIANTS_CLAUDE = {
-  max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+  max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
   high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
   medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
@@ -94,6 +100,9 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   if (isDeepseekModel(model)) {
     return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
   }
+  if (model.includes('gemma')) {
+    return REASONING_VARIANTS_BINARY;
+  }
   if (isGeminiModel(model)) {
     return REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH;
   }
@@ -105,6 +114,12 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   }
   if (isKimiModel(model)) {
     return REASONING_VARIANTS_MAX_HIGH_LOW_NONE;
+  }
+  if (model.includes('laguna')) {
+    return REASONING_VARIANTS_BINARY;
+  }
+  if (model.includes('ling-')) {
+    return REASONING_VARIANTS_BINARY;
   }
   if (model.includes('mercury')) {
     return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
@@ -121,10 +136,14 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   if (isMuseModel(model)) {
     return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH;
   }
+  if (model.includes('nemotron')) {
+    return REASONING_VARIANTS_NONE_MEDIUM_HIGH;
+  }
   if (isOpenAiModel(model)) {
     return Object.fromEntries(
       ReasoningEffortSchema.options
         .filter(e => e !== 'minimal')
+        .reverse()
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }

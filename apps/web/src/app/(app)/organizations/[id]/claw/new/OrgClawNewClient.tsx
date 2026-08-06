@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
+import { useOrgKiloClawNavState, useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
+import { KiloClawSignupUnavailable } from '@/components/subscriptions/kiloclaw/KiloClawSignupUnavailable';
 import {
   ClawOnboardingFlow,
   type ClawOnboardingMode,
@@ -33,6 +34,7 @@ export function OrgClawNewClient({
 
 function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
   const statusQuery = useOrgKiloClawStatus(organizationId);
+  const navStateQuery = useOrgKiloClawNavState(organizationId);
   const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
   const [setupFailed, setSetupFailed] = useState(false);
   const [hasSettledStatus, setHasSettledStatus] = useState(false);
@@ -50,6 +52,38 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
       setHasSettledStatus(true);
     }
   }, [statusQuery.data, statusQuery.error, statusQuery.isFetching]);
+
+  if (navStateQuery.isLoading) {
+    return (
+      <ClawOnboardingWithBoundary
+        statusQuery={{ data: undefined, isLoading: true, error: null }}
+        mode="post-provisioning"
+        organizationId={organizationId}
+        createFlowStarted={false}
+        setupFailed={false}
+        onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
+      />
+    );
+  }
+
+  if (navStateQuery.isError) {
+    return (
+      <div className="container m-auto flex min-h-[50vh] w-full max-w-[1140px] items-center justify-center p-4 md:p-6">
+        <p className="text-destructive text-sm">
+          Unable to load KiloClaw eligibility. Please refresh the page or try again later.
+        </p>
+      </div>
+    );
+  }
+
+  if (navStateQuery.data?.hasCurrentSubscription !== true) {
+    return (
+      <div className="container m-auto flex min-h-[50vh] w-full max-w-[1140px] items-center justify-center p-4 md:p-6">
+        <KiloClawSignupUnavailable />
+      </div>
+    );
+  }
 
   if (createFlowStartedAt !== null) {
     const createStatus =

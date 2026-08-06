@@ -167,7 +167,9 @@ type KiloPassCaller = {
     } | null;
     isEligibleForFirstMonthPromo: boolean;
   }>;
-  getAverageMonthlyUsageLast3Months: () => Promise<{ averageMonthlyUsageUsd: number }>;
+  getAverageMonthlyUsageLast3Months: () => Promise<{
+    averageMonthlyUsageUsd: number;
+  }>;
   getCheckoutReturnState: (input: { sessionId: string }) => Promise<{
     subscription: {
       stripeSubscriptionId: string | null;
@@ -199,6 +201,7 @@ type KiloPassCaller = {
           | 'missing_instance'
           | 'destroyed_instance'
           | 'requires_reprovision'
+          | 'signup_unavailable'
           | 'insufficient_credits'
           | 'expired_commit'
           | 'unexpected_error';
@@ -661,7 +664,9 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
 
       await expect(
-        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+        })
       ).rejects.toThrow('We could not verify this App Store purchase. Please try again.');
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
     });
@@ -720,7 +725,9 @@ describe('kiloPassRouter', () => {
       const trackingMock = getPosthogTrackingMock();
       const user = await insertTestUser();
       verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
-        appStorePurchaseFixture({ appAccountToken: user.app_store_account_token })
+        appStorePurchaseFixture({
+          appAccountToken: user.app_store_account_token,
+        })
       );
       completionMock.completeStoreKiloPassPurchase.mockResolvedValue({
         subscriptionId: 'sub-test-id',
@@ -753,7 +760,9 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
 
       await expect(
-        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+        })
       ).rejects.toThrow('App Store purchase account token does not match the signed-in user.');
       expect(completionMock.completeStoreKiloPassPurchase).not.toHaveBeenCalled();
       expect(sentryMock.captureException).not.toHaveBeenCalled();
@@ -771,7 +780,9 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
 
       await expect(
-        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+        })
       ).rejects.toThrow(
         "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again."
       );
@@ -798,17 +809,23 @@ describe('kiloPassRouter', () => {
       const sentryMock = getSentryMock();
       const user = await insertTestUser();
       verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
-        appStorePurchaseFixture({ appAccountToken: user.app_store_account_token })
+        appStorePurchaseFixture({
+          appAccountToken: user.app_store_account_token,
+        })
       );
       completionMock.completeStoreKiloPassPurchase.mockRejectedValue(new Error(internalMessage));
 
       const caller = await createCallerForUser(user.id);
 
       await expect(
-        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+        })
       ).rejects.toThrow(safeMessage);
       await expect(
-        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+        })
       ).rejects.not.toThrow(internalMessage);
       expect(sentryMock.captureException).toHaveBeenCalled();
     });
@@ -2338,7 +2355,9 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getCheckoutReturnState({ sessionId: 'cs_no_credits' });
+      const result = await caller.kiloPass.getCheckoutReturnState({
+        sessionId: 'cs_no_credits',
+      });
 
       expect(result.creditsAwarded).toBe(false);
       expect(result.welcomePromoIneligibleDueToReusedFingerprint).toBe(false);
@@ -2422,7 +2441,9 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getCheckoutReturnState({ sessionId: 'cs_credits' });
+      const result = await caller.kiloPass.getCheckoutReturnState({
+        sessionId: 'cs_credits',
+      });
 
       expect(result.creditsAwarded).toBe(true);
       expect(result.welcomePromoIneligibleDueToReusedFingerprint).toBe(false);
@@ -2455,7 +2476,9 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getCheckoutReturnState({ sessionId: 'cs_reused_card' });
+      const result = await caller.kiloPass.getCheckoutReturnState({
+        sessionId: 'cs_reused_card',
+      });
 
       expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_reused_card');
       expect(result.creditsAwarded).toBe(true);
@@ -2464,6 +2487,64 @@ describe('kiloPassRouter', () => {
   });
 
   describe('activateCheckoutHosting', () => {
+    it('does not let a completed stale checkout create a first KiloClaw subscription', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-stale-first-kiloclaw@example.com',
+        total_microdollars_acquired: 199_000_000,
+      });
+      const instanceId = crypto.randomUUID();
+      await db.insert(kiloclaw_instances).values({
+        id: instanceId,
+        user_id: user.id,
+        sandbox_id: `test-${instanceId}`,
+      });
+      const { id: kiloPassSubscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_stale_first_kiloclaw',
+        tier: KiloPassTier.Tier199,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId: kiloPassSubscriptionId,
+        kiloUserId: user.id,
+      });
+
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        status: 'complete',
+        subscription: 'sub_stale_first_kiloclaw',
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          kiloclawHostingPlan: 'standard',
+          kiloclawInstanceId: instanceId,
+          kiloclawPriceVersion: '2026-05-10',
+        },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_stale_first_kiloclaw',
+        created: Math.floor(new Date('2026-06-10T15:00:00.000Z').getTime() / 1000),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_stale_first_kiloclaw',
+        })
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'signup_unavailable',
+      });
+
+      const hostingRows = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(hostingRows).toHaveLength(0);
+    });
+
     it('preserves canceled legacy lineage and requires reprovision after Kilo Pass credits settle', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-canceled-legacy-hosting@example.com',
@@ -2748,7 +2829,9 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(
-        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_stale_hosting_intent' })
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_stale_hosting_intent',
+        })
       ).resolves.toEqual({
         outcome: 'action_required',
         hostingIntent: 'standard',
@@ -2786,7 +2869,9 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(
-        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_invalid_hosting_price_version' })
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_invalid_hosting_price_version',
+        })
       ).resolves.toEqual({
         outcome: 'action_required',
         hostingIntent: 'standard',
@@ -2829,7 +2914,9 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(
-        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_missing_hosting_instance' })
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_missing_hosting_instance',
+        })
       ).resolves.toEqual({
         outcome: 'action_required',
         hostingIntent: 'standard',
@@ -2887,7 +2974,9 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(
-        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_destroyed_hosting_anchor' })
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_destroyed_hosting_anchor',
+        })
       ).resolves.toEqual({
         outcome: 'action_required',
         hostingIntent: 'standard',
@@ -2951,7 +3040,9 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(
-        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_qualified_commit_hosting' })
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_qualified_commit_hosting',
+        })
       ).resolves.toEqual({ outcome: 'activated', hostingIntent: 'commit' });
 
       const [hosting] = await db
@@ -2987,7 +3078,9 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(
-        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_expired_commit_hosting' })
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_expired_commit_hosting',
+        })
       ).resolves.toEqual({
         outcome: 'action_required',
         hostingIntent: 'expired_commit',
@@ -3479,7 +3572,9 @@ describe('kiloPassRouter', () => {
     it('keeps an overdue change pending while the Stripe schedule remains active', async () => {
       freezeKiloPassClock('2026-07-14T12:00:00.000Z');
       const stripeMock = getStripeMock();
-      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'active' });
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+        status: 'active',
+      });
       const { user, scheduleId, scheduledChangeId } = await insertPendingScheduledChange({
         email: 'kilo-pass-scheduled-read-active@example.com',
         effectiveAt: '2026-07-14T11:00:00.000Z',
@@ -3502,7 +3597,9 @@ describe('kiloPassRouter', () => {
       KiloPassScheduledChangeStatus.Completed,
     ])('reconciles an overdue change when Stripe reports %s', async providerStatus => {
       freezeKiloPassClock('2026-07-14T12:00:00.000Z');
-      getStripeMock().subscriptionSchedules.retrieve.mockResolvedValue({ status: providerStatus });
+      getStripeMock().subscriptionSchedules.retrieve.mockResolvedValue({
+        status: providerStatus,
+      });
       const { user, scheduledChangeId } = await insertPendingScheduledChange({
         email: `kilo-pass-scheduled-read-${providerStatus}@example.com`,
         effectiveAt: '2026-07-14T11:00:00.000Z',
@@ -4008,7 +4105,9 @@ describe('kiloPassRouter', () => {
       stripeMock.subscriptionSchedules.release.mockRejectedValue(
         new Error('The subscription schedule is already released')
       );
-      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'released' });
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+        status: 'released',
+      });
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-cancel-already-released@example.com',
       });
@@ -4049,7 +4148,9 @@ describe('kiloPassRouter', () => {
     it('restores the pending row when release fails and Stripe remains active', async () => {
       const stripeMock = getStripeMock();
       stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe unavailable'));
-      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'active' });
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+        status: 'active',
+      });
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-cancel-still-active@example.com',
       });
@@ -4391,10 +4492,16 @@ describe('kiloPassRouter', () => {
         'Kilo Pass base credits (tier_19, monthly)',
       ]);
       expect(
-        result.entries.map(entry => ({ amountUsd: entry.amountUsd, kind: entry.kind }))
+        result.entries.map(entry => ({
+          amountUsd: entry.amountUsd,
+          kind: entry.kind,
+        }))
       ).toEqual([
         { amountUsd: 49, kind: KiloPassIssuanceItemKind.Base },
-        { amountUsd: -4.75, kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct },
+        {
+          amountUsd: -4.75,
+          kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        },
         { amountUsd: -9.5, kind: KiloPassIssuanceItemKind.Bonus },
         { amountUsd: -9.5, kind: KiloPassIssuanceItemKind.Base },
         { amountUsd: 19, kind: KiloPassIssuanceItemKind.Base },

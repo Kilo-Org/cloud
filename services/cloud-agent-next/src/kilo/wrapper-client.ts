@@ -32,6 +32,7 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperSessionReadySuccessResponse,
 } from '../shared/wrapper-bootstrap.js';
+import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../shared/kilo-server-env.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../shared/tool-cgroup-env.js';
 import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js';
 
@@ -82,6 +83,12 @@ export type EnsureRunningOptions = {
    * included — see MEMORY_CGROUPS_PLAN.md (W4).
    */
   toolCgroupEnv?: ToolCgroupEnv;
+  /**
+   * Worker-owned `KILO_*` knobs (e.g. the experimental bash default timeout)
+   * forwarded into the wrapper process env so the Kilo server inherits them.
+   * Not org-gated — only keys set in the Worker environment are included.
+   */
+  kiloServerEnv?: KiloServerEnv;
 };
 
 export type EnsureWrapperOptions = {
@@ -96,6 +103,8 @@ export type EnsureWrapperOptions = {
   devcontainer?: DevContainerHandle;
   /** See {@link EnsureRunningOptions.toolCgroupEnv}. */
   toolCgroupEnv?: ToolCgroupEnv;
+  /** See {@link EnsureRunningOptions.kiloServerEnv}. */
+  kiloServerEnv?: KiloServerEnv;
   /**
    * Force the wrapper to listen on this exact port instead of a random one.
    * Used by the devcontainer flow because the port has to be chosen *before*
@@ -113,6 +122,8 @@ export type EnsureBootstrapWrapperOptions = {
   leasedInstance?: WrapperInstanceLease;
   /** See {@link EnsureRunningOptions.toolCgroupEnv}. */
   toolCgroupEnv?: ToolCgroupEnv;
+  /** See {@link EnsureRunningOptions.kiloServerEnv}. */
+  kiloServerEnv?: KiloServerEnv;
 };
 
 export type SessionBinding = {
@@ -252,6 +263,13 @@ const ERROR_STATUS_CODES: Record<string, number> = {
 /** Max attempts for port allocation in ensureWrapper (retry with new random port on failure) */
 const MAX_PORT_ATTEMPTS = 3;
 const TOOL_CGROUP_ENV_KEY_SET = new Set<string>(TOOL_CGROUP_ENV_KEYS);
+const KILO_SERVER_ENV_KEY_SET = new Set<string>(KILO_SERVER_ENV_KEYS);
+/**
+ * Default shell-tool timeout (ms) for the Kilo server in cloud-agent
+ * sandboxes. Keeps stalled commands well inside the 330 s wrapper no-output
+ * liveness deadline; the `kiloServerEnv` passthrough overrides it when set.
+ */
+const KILO_BASH_DEFAULT_TIMEOUT_MS = '240000';
 
 function healthMatchesLease(
   health: WrapperHealthResponse,
@@ -621,6 +639,7 @@ export class WrapperClient {
       runtimeEnv,
       devcontainer,
       toolCgroupEnv,
+      kiloServerEnv,
     } = options;
 
     // First, try to check health
@@ -656,12 +675,17 @@ export class WrapperClient {
     const validToolCgroupEnv = validShellEnvEntries(toolCgroupEnv ?? {}).filter(([key]) =>
       TOOL_CGROUP_ENV_KEY_SET.has(key)
     );
+    const validKiloServerEnv = validShellEnvEntries(kiloServerEnv ?? {}).filter(([key]) =>
+      KILO_SERVER_ENV_KEY_SET.has(key)
+    );
     const wrapperEnv: Record<string, string | undefined> = {
       WRAPPER_PORT: String(this.port),
       WORKSPACE_PATH: innerWorkspacePath,
       WRAPPER_LOG_PATH: wrapperLogPath,
       KILO_SESSION_RETRY_LIMIT: '5',
       KILO_CLOUD_AGENT: '1',
+      // Later spreads (toolCgroupEnv, kiloServerEnv) override this default.
+      KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: KILO_BASH_DEFAULT_TIMEOUT_MS,
       ...(leasedInstance
         ? {
             WRAPPER_INSTANCE_ID: leasedInstance.instanceId,
@@ -669,6 +693,7 @@ export class WrapperClient {
           }
         : {}),
       ...Object.fromEntries(validToolCgroupEnv),
+      ...Object.fromEntries(validKiloServerEnv),
     };
     const commandEnvParts = [
       `WRAPPER_PORT=${this.port}`,
@@ -676,6 +701,8 @@ export class WrapperClient {
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
       `KILO_SESSION_RETRY_LIMIT=5`,
       `KILO_CLOUD_AGENT=1`,
+      // Later entries (toolCgroupEnv, kiloServerEnv) override this default.
+      `KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=${KILO_BASH_DEFAULT_TIMEOUT_MS}`,
       // Environment markers let pre-lease wrapper bundles launch during a rolling deploy.
       ...(leasedInstance
         ? [
@@ -684,6 +711,7 @@ export class WrapperClient {
           ]
         : []),
       ...validToolCgroupEnv.map(([key, value]) => `${key}=${shellQuote(value)}`),
+      ...validKiloServerEnv.map(([key, value]) => `${key}=${shellQuote(value)}`),
       ...dockerEnvParts,
     ];
     const devContainerSessionHome =

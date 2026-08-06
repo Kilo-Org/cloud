@@ -2,9 +2,9 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { sql } from 'drizzle-orm';
 import { format } from 'date-fns';
 
-type ExaPartitionDb = Pick<typeof defaultDb, 'execute'>;
+type UsagePartitionDb = Pick<typeof defaultDb, 'execute'>;
 
-export type ExaUsageLogPartitionProvisioningResult = {
+export type UsagePartitionProvisioningResult = {
   created: string[];
   errors: Array<{ name: string; error: unknown }>;
 };
@@ -79,9 +79,9 @@ export function buildExaUsageLogPartitionIndexDefinitions(
  * failed partition as fatal after calling this best-effort helper.
  */
 export async function provisionExaUsageLogPartitions(
-  fromDb: ExaPartitionDb,
+  fromDb: UsagePartitionDb,
   now: Date = new Date()
-): Promise<ExaUsageLogPartitionProvisioningResult> {
+): Promise<UsagePartitionProvisioningResult> {
   const created: string[] = [];
   const errors: Array<{ name: string; error: unknown }> = [];
 
@@ -112,5 +112,31 @@ export async function provisionExaUsageLogPartitions(
     }
   }
 
+  return { created, errors };
+}
+
+/** Keeps the metered-compute debit ledger writable through the current and next two months. */
+export async function provisionComputeUsageChargePartitions(
+  fromDb: UsagePartitionDb,
+  now: Date = new Date()
+): Promise<UsagePartitionProvisioningResult> {
+  const created: string[] = [];
+  const errors: Array<{ name: string; error: unknown }> = [];
+
+  for (let offset = 0; offset <= 2; offset++) {
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const nextMonth = new Date(target.getFullYear(), target.getMonth() + 1, 1);
+    const name = `compute_usage_charge_${format(target, 'yyyy_MM')}`;
+    try {
+      await fromDb.execute(
+        sql.raw(
+          `CREATE TABLE IF NOT EXISTS "public"."${name}" PARTITION OF "public"."compute_usage_charge" FOR VALUES FROM ('${format(target, 'yyyy-MM-dd')}') TO ('${format(nextMonth, 'yyyy-MM-dd')}')`
+        )
+      );
+      created.push(name);
+    } catch (error) {
+      errors.push({ name, error });
+    }
+  }
   return { created, errors };
 }

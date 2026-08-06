@@ -175,7 +175,7 @@ describe('isFreeModel', () => {
 
       for (const candidate of autoFreeModels) {
         if (!candidate.model.includes('laguna')) {
-          expect(candidate.weight).toBe(3);
+          expect(candidate.weight).toBe(9);
         }
       }
     });

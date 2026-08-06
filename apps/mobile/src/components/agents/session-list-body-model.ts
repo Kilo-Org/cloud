@@ -24,7 +24,12 @@
  *         "Clear filters"), while a no-query error shows only Retry.
  *      2. No query, error → retry-capable error empty state.
  *      3. No query, no error → compact "No past sessions" + New coding
- *         task CTA.
+ *         task CTA. When stored rows ARE loaded but the active set
+ *         excludes every one, the honest "All sessions are active" body
+ *         (`all-active`, no CTA) replaces the false "No past sessions";
+ *         while more history pages remain the body stays `render-list` so
+ *         it never claims the history is exhausted (the bounded backfill
+ *         is in flight or its bound is reached).
  *  - `showInlineError` mirrors the prior inline header ("Couldn't refresh.
  *    Pull down to try again.") and is ADDITIONALLY driven by the
  *    active-only failure flag (`activeIsError`) so the tray's non-blocking
@@ -49,6 +54,11 @@ export type SessionListBodyModel =
       showInlineError: boolean;
     }
   | {
+      kind: 'all-active';
+      primaryAction: 'none';
+      showInlineError: boolean;
+    }
+  | {
       kind: 'no-past-sessions';
       primaryAction: 'new-task';
       showInlineError: boolean;
@@ -57,6 +67,20 @@ export type SessionListBodyModel =
 type SessionListBodyModelInputs = {
   /** True when rendered history sections contain at least one row. */
   hasHistoryContent: boolean;
+  /**
+   * True when at least one stored row is loaded, including rows excluded
+   * from the sections by the active set. Callers compute it as
+   * `storedSessions.length > 0`; it is the "history exists but is
+   * currently hidden" signal behind the `all-active` state.
+   */
+  hasStoredSessions: boolean;
+  /**
+   * True when the stored pagination reports more pages
+   * (`hasNextPage === true`). While true, an empty history never claims
+   * the history is exhausted — the bounded backfill is in flight or its
+   * bound is reached, so the body stays `render-list`.
+   */
+  hasMoreHistory: boolean;
   /**
    * True when the pinned "Active now" tray is non-empty. A populated tray
    * suppresses the full-screen QueryError (the screen-level first-use
@@ -88,6 +112,8 @@ export function selectSessionListBodyModel(
 ): SessionListBodyModel {
   const {
     hasHistoryContent,
+    hasStoredSessions,
+    hasMoreHistory,
     hasPinnedActive,
     hasActiveQuery,
     isSearching,
@@ -140,6 +166,22 @@ export function selectSessionListBodyModel(
       secondaryAction: 'none',
       showInlineError,
     };
+  }
+
+  // Every loaded stored row is excluded by the server-confirmed active set.
+  // While more history pages remain, make no claim: the bounded backfill is
+  // in flight or has reached its bound, and manual scroll pagination takes
+  // over (the tray fills the viewport in this state, so `onEndReached` is
+  // still reachable by scrolling).
+  if (hasPinnedActive && hasStoredSessions && hasMoreHistory) {
+    return { kind: 'render-list', primaryAction: 'none', showInlineError };
+  }
+
+  // Honest all-pinned body, distinct from "No past sessions": sessions DO
+  // exist — every one is pinned above. No creation CTA: the screen already
+  // offers creation through the tray, the FAB, and the header action.
+  if (hasPinnedActive && hasStoredSessions) {
+    return { kind: 'all-active', primaryAction: 'none', showInlineError };
   }
 
   return {

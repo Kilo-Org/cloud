@@ -15,7 +15,7 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { readDb, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type OrganizationPolicySubject =
   | {
@@ -70,7 +70,7 @@ function parsePolicies(
  * that could disagree with it.
  */
 async function resolveOrganization(
-  client: typeof db | DrizzleTransaction,
+  client: DrizzleTransaction,
   params: { organizationId: string; organization?: Organization }
 ): Promise<Organization> {
   if (params.organization) {
@@ -105,12 +105,12 @@ export async function getOrganizationGroupPolicyContext(params: {
   tx?: DrizzleTransaction;
 }): Promise<OrganizationGroupPolicyContext> {
   if (!params.tx) {
-    return await db.transaction(
+    return await readDb.transaction(
       async tx => await getOrganizationGroupPolicyContext({ ...params, tx }),
       { isolationLevel: 'repeatable read', accessMode: 'read only' }
     );
   }
-  const client = params.tx ?? db;
+  const client = params.tx;
   const organization = await resolveOrganization(client, params);
 
   let isDirectMember = false;

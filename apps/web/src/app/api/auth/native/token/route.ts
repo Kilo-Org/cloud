@@ -189,7 +189,8 @@ export async function POST(request: NextRequest) {
       provider_account_id: verified.sub,
       display_name: null,
     };
-    autoLinkToExistingUser = false;
+    // Verified id token enforces email_verified, so the credential proves the email.
+    autoLinkToExistingUser = true;
   } else if (data.provider === 'google') {
     let verified;
     try {
@@ -232,7 +233,8 @@ export async function POST(request: NextRequest) {
       provider_account_id: verified.sub,
       display_name: null,
     };
-    autoLinkToExistingUser = false;
+    // Verified id token enforces email_verified, so the credential proves the email.
+    autoLinkToExistingUser = true;
   } else {
     // Email sign-in code path: reserve → settle → commit.
     const existingUser = await findUserByNormalizedEmail(data.email);

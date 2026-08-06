@@ -360,6 +360,17 @@ export function parseLinkedInProfileName(profile: {
   );
 }
 
+/**
+ * An OAuth/OIDC sign-in proves ownership of its email only when the provider
+ * asserts the `email_verified` claim in the raw profile. Apple delivers the
+ * claim as the string "true"; treat that as verified. Providers without the
+ * claim (GitHub, GitLab, Discord) never prove the email here.
+ */
+export function profileProvesEmailOwnership(profile: unknown): boolean {
+  const emailVerified = (profile as { email_verified?: unknown } | undefined)?.email_verified;
+  return emailVerified === true || emailVerified === 'true';
+}
+
 function createEmailAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
@@ -855,9 +866,12 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Check if this is an account linking operation
-        // For email (magic link) auth, we auto-link to existing users since magic link
-        // is verified by email ownership
-        const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
+        // Auto-link only when the credential proves ownership of the email:
+        // a magic link consumes an inbox token; fake-login is dev-only; an
+        // OAuth profile proves it via the provider's email_verified claim.
+        // Methods without proof keep the DIFFERENT-OAUTH refusal.
+        const autoLinkToExistingUser =
+          isEmailAuth || isFakeLogin || profileProvesEmailOwnership(profile);
         if (isAccountLinking) {
           logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
             provider: accountInfo.provider,

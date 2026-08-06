@@ -21,6 +21,7 @@ import { useInvalidateKiloClawBilling } from './useKiloClawBillingQueries';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
+import { KiloClawSignupUnavailable } from './KiloClawSignupUnavailable';
 import { KiloClawSubscribeCard } from './KiloClawSubscribeCard';
 import {
   formatDateLabel,
@@ -57,6 +58,10 @@ export function KiloClawGroup({
   const subscriptions = query.data?.subscriptions ?? [];
   const commitPlanAvailable =
     query.data?.commitPlanAvailable ?? summaryQuery.data?.commitPlanAvailable ?? false;
+  const hasCurrentPersonalSubscription = summaryQuery.data?.hasCurrentPersonalSubscription === true;
+  const isLoading = query.isLoading || summaryQuery.isLoading;
+  const isError = query.isError || summaryQuery.isError;
+  const error = query.error ?? summaryQuery.error;
 
   const visibleSubscriptions = subscriptions.filter(
     subscription => !isKiloclawTerminal(subscription.status) || showTerminal
@@ -99,10 +104,12 @@ export function KiloClawGroup({
       title="KiloClaw"
       description="View hosting subscriptions for your personal KiloClaw instances."
       headerIcon={<KiloCrabIcon className="size-5" />}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      error={query.error}
-      onRetry={() => void query.refetch()}
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      onRetry={() => {
+        void Promise.all([query.refetch(), summaryQuery.refetch()]);
+      }}
       accordionValue={accordionValue}
       hideHeader={hideHeader}
       unframed={hideHeader}
@@ -195,7 +202,9 @@ export function KiloClawGroup({
             );
           })}
         </div>
-      ) : nonTerminalSubscriptions.length === 0 ? (
+      ) : subscriptions.length === 0 && !hasCurrentPersonalSubscription ? (
+        <KiloClawSignupUnavailable />
+      ) : subscriptions.length === 0 || nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard
           standardCostMicrodollars={
             summaryQuery.data?.creditEnrollmentPreview.standard.costMicrodollars

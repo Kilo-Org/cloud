@@ -78,7 +78,7 @@ containment flags.
 > driver silently hits the wrong Worker/fake-LLM and every scenario fails
 > at connection. See the env-var table below for the full list.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.3.54`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.4.20`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts

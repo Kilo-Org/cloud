@@ -194,6 +194,30 @@ export type CoreUsageWithMetaData = {
 
 export type BalanceUpdateResult = { newMicrodollarsUsed: number } | null;
 
+/**
+ * Identity of a persisted `microdollar_usage` row, as reported by the write.
+ *
+ * This lives here rather than in `processUsage.ts` because
+ * `usage-record-client.ts` needs it while `processUsage.ts` imports that client:
+ * declaring it there makes the two modules mutually dependent, which the
+ * `dependency-cycle-check` script rejects even for type-only imports.
+ */
+export type UsageRecordInsertResult = {
+  usageId: string;
+  createdAt: string;
+  newMicrodollarsUsed: number | null;
+};
+
+/**
+ * A write outcome that also says whether this delivery is the one that inserted
+ * the row. `wasRedelivery` is true when the identity was recovered from a row a
+ * previous delivery had already committed, which is the signal callers need to
+ * keep once-per-usage side effects at once per usage. It stays on the writing
+ * side: the wire contract intentionally does not carry it, because every side
+ * effect is decided where the write runs.
+ */
+export type UsageRecordWriteOutcome = UsageRecordInsertResult & { wasRedelivery: boolean };
+
 export type UsageMetaData = {
   id: string;
   message_id: string;

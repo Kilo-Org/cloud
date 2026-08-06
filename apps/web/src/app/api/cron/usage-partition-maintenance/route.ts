@@ -2,18 +2,21 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { CRON_SECRET } from '@/lib/config.server';
-import { provisionExaUsageLogPartitions } from '@/lib/exa-usage-partitions';
+import {
+  provisionComputeUsageChargePartitions,
+  provisionExaUsageLogPartitions,
+} from '@/lib/usage-partitions';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
 }
 
 /**
- * Exa Usage Log Partition Maintenance
+ * Usage Ledger Partition Maintenance
  *
  * Run monthly. Creates the next two months' partitions (idempotent).
- * Old partitions are retained indefinitely — the recompute balance
- * functions depend on the full exa_usage_log history.
+ * Old partitions are retained indefinitely because balance recomputation
+ * depends on the full history of each usage ledger.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -21,18 +24,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { created, errors: partitionErrors } = await provisionExaUsageLogPartitions(db);
+  const [
+    { created: exaCreated, errors: exaErrors },
+    { created: chargeCreated, errors: chargeErrors },
+  ] = await Promise.all([
+    provisionExaUsageLogPartitions(db),
+    provisionComputeUsageChargePartitions(db),
+  ]);
+  const created = [...exaCreated, ...chargeCreated];
+  const partitionErrors = [...exaErrors, ...chargeErrors];
   const errors: string[] = [];
 
   for (const { name, error } of partitionErrors) {
     const msg = `Failed to create partition ${name}: ${error instanceof Error ? error.message : String(error)}`;
-    console.error(`[exa-partition-maintenance] ${msg}`);
-    captureException(error, { tags: { source: 'exa-partition-maintenance', partition: name } });
+    console.error(`[usage-partition-maintenance] ${msg}`);
+    captureException(error, { tags: { source: 'usage-partition-maintenance', partition: name } });
     errors.push(msg);
   }
 
   console.log(
-    `[exa-partition-maintenance] created=[${created.join(', ')}] errors=${errors.length}`
+    `[usage-partition-maintenance] created=[${created.join(', ')}] errors=${errors.length}`
   );
 
   return NextResponse.json({

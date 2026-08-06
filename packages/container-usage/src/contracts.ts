@@ -128,6 +128,7 @@ export const recordStartFailureCodeSchema = z.enum([
   'sku_not_found',
   'sku_unit_mismatch',
   'sku_not_accepting_new_usage',
+  'insufficient_credits',
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
 
@@ -147,16 +148,31 @@ export const recordStartResultSchema = z.discriminatedUnion('success', [
 ]);
 export type RecordStartResult = z.infer<typeof recordStartResultSchema>;
 
-export const budgetVerdictSchema = z
-  .object({
-    verdict: z.enum(['continue', 'warn', 'stop']),
-    remaining: z.number().finite().optional(),
-  })
-  .strict();
+export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
+  z.object({ verdict: z.literal('continue'), remaining: z.number().int().optional() }).strict(),
+  z
+    .object({
+      verdict: z.literal('warn'),
+      remainingMicrodollars: z.number().int().optional(),
+      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      // Retained while already-deployed producers complete their protocol rollout.
+      remaining: z.number().int().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      verdict: z.literal('stop'),
+      remainingMicrodollars: z.number().int().optional(),
+      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remaining: z.number().int().optional(),
+    })
+    .strict(),
+]);
 export type BudgetVerdict = z.infer<typeof budgetVerdictSchema>;
 
 export const heartbeatAckSchema = recordAckSchema
   .extend({
+    billingMode: z.enum(['shadow', 'paid']).optional(),
     budget: budgetVerdictSchema,
   })
   .strict();

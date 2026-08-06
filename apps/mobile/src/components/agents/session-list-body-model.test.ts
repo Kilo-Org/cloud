@@ -5,6 +5,8 @@ import { selectSessionListBodyModel } from './session-list-body-model';
 function model(overrides: Partial<Parameters<typeof selectSessionListBodyModel>[0]> = {}) {
   return selectSessionListBodyModel({
     hasHistoryContent: false,
+    hasStoredSessions: false,
+    hasMoreHistory: false,
     hasPinnedActive: false,
     hasActiveQuery: false,
     isSearching: false,
@@ -172,6 +174,51 @@ describe('selectSessionListBodyModel', () => {
 
     it('returns no-past-sessions even when the tray is empty (first-use is handled by the caller)', () => {
       expect(model({ hasHistoryContent: false })).toEqual({
+        kind: 'no-past-sessions',
+        primaryAction: 'new-task',
+        showInlineError: false,
+      });
+    });
+  });
+
+  describe('all-pinned body (tray populated, stored rows fully excluded)', () => {
+    it('returns all-active with no CTA when every stored row is active and history is exhausted', () => {
+      expect(
+        model({
+          hasPinnedActive: true,
+          hasStoredSessions: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: false });
+    });
+
+    it('keeps the list rendered while more history pages exist (backfill in flight or bound reached)', () => {
+      expect(
+        model({
+          hasPinnedActive: true,
+          hasStoredSessions: true,
+          hasMoreHistory: true,
+        })
+      ).toEqual({ kind: 'render-list', primaryAction: 'none', showInlineError: false });
+    });
+
+    it('error takes precedence over all-active (Retry still wins)', () => {
+      expect(
+        model({
+          hasPinnedActive: true,
+          hasStoredSessions: true,
+          hasMoreHistory: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'none',
+        showInlineError: true,
+      });
+    });
+
+    it('a populated tray with no stored rows stays no-past-sessions (CLI-only live sessions)', () => {
+      expect(model({ hasPinnedActive: true, hasStoredSessions: false })).toEqual({
         kind: 'no-past-sessions',
         primaryAction: 'new-task',
         showInlineError: false,

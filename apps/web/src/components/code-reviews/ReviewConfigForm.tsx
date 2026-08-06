@@ -65,10 +65,7 @@ import {
 } from './RepositoryModelOverrides';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import {
-  getAvailableThinkingEfforts,
-  thinkingEffortLabel,
-} from '@/lib/code-reviews/core/model-variants';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Select,
@@ -296,8 +293,8 @@ export function ReviewConfigForm({
 
   // Available thinking effort variants for the selected model
   const availableVariants = useMemo(
-    () => getAvailableThinkingEfforts(selectedModel),
-    [selectedModel]
+    () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
+    [modelOptions, selectedModel]
   );
 
   const selectableRepositories = useMemo(
@@ -325,10 +322,11 @@ export function ReviewConfigForm({
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
+    if (isLoadingModels) return;
     if (thinkingEffort && !availableVariants.includes(thinkingEffort)) {
       setThinkingEffort(null);
     }
-  }, [availableVariants, thinkingEffort]);
+  }, [availableVariants, isLoadingModels, thinkingEffort]);
 
   // Mutation for regenerating webhook secret. The org path is billing-gated
   // (owner/billing_manager only); the personal path is self-gated. The

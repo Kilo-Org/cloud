@@ -77,9 +77,19 @@ function validStop(): RecordStopInput {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(applyStart).mockResolvedValue({ kind: 'applied', dedup: false });
-  vi.mocked(applyHeartbeat).mockResolvedValue({ kind: 'applied', dedup: false });
-  vi.mocked(applyStop).mockResolvedValue({ kind: 'applied', dedup: false });
+  vi.mocked(applyStart).mockResolvedValue({ kind: 'applied', dedup: false, billingMode: 'shadow' });
+  vi.mocked(applyHeartbeat).mockResolvedValue({
+    kind: 'applied',
+    dedup: false,
+    billingMode: 'shadow',
+    budget: { verdict: 'continue' },
+  });
+  vi.mocked(applyStop).mockResolvedValue({
+    kind: 'applied',
+    dedup: false,
+    billingMode: 'shadow',
+    budget: { verdict: 'continue' },
+  });
 });
 
 describe('ContainerUsageMeter', () => {
@@ -94,7 +104,8 @@ describe('ContainerUsageMeter', () => {
       validStart(),
       'cloud-agent-next:instance-1:123',
       expect.stringMatching(/^[a-f0-9]{64}$/),
-      expect.any(Number)
+      expect.any(Number),
+      expect.objectContaining({ enabled: false })
     );
     expect(log).toHaveBeenCalledWith(
       JSON.stringify({
@@ -132,6 +143,7 @@ describe('ContainerUsageMeter', () => {
       intervalId: 'cloud-agent-next:instance-1:123',
       durable: 'pg',
       dedup: false,
+      billingMode: 'shadow',
       budget: { verdict: 'continue' },
     });
     expect(applyHeartbeat).toHaveBeenCalledOnce();

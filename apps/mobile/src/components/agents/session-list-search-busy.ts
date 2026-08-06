@@ -17,7 +17,7 @@ export function selectAwaitingCommit(params: {
 }
 
 /**
- * True when the "Searching…" indicator should be visible.
+ * True when the in-field search spinner should replace the search icon.
  *
  * Covers three windows:
  * - debounce window (typed text not yet committed) — `awaitingCommit`

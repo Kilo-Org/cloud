@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   modelRetainsPrompts,
   modelTrains,
+  withWorstProviderDataPolicy,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { OpenRouterSearchResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
@@ -18,6 +19,76 @@ const baseModel = {
 };
 
 describe('model data policy', () => {
+  test('reports prompt retention when a provider offers both standard and ZDR routes', () => {
+    const response = OpenRouterSearchResponse.parse({
+      data: {
+        models: [
+          {
+            ...baseModel,
+            endpoint: {
+              provider_display_name: 'SpaceXAI (ZDR)',
+              is_free: false,
+              pricing: { prompt: '0.000002', completion: '0.000006' },
+              data_policy: {
+                training: false,
+                retainsPrompts: false,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const model = response.data.models[0];
+    if (!model) throw new Error('expected model');
+    const normalizedModel = withWorstProviderDataPolicy(model, {
+      training: false,
+      retainsPrompts: true,
+    });
+
+    expect(normalizedModel.endpoint?.data_policy).toEqual({
+      training: false,
+      retainsPrompts: true,
+    });
+    expect(model.endpoint?.data_policy).toEqual({
+      training: false,
+      retainsPrompts: false,
+    });
+  });
+
+  test('preserves data collection reported by a model route', () => {
+    const response = OpenRouterSearchResponse.parse({
+      data: {
+        models: [
+          {
+            ...baseModel,
+            endpoint: {
+              provider_display_name: 'Test Provider',
+              is_free: false,
+              pricing: { prompt: '0.000002', completion: '0.000006' },
+              data_policy: {
+                training: true,
+                retainsPrompts: true,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const model = response.data.models[0];
+    if (!model) throw new Error('expected model');
+    const normalizedModel = withWorstProviderDataPolicy(model, {
+      training: false,
+      retainsPrompts: false,
+    });
+
+    expect(normalizedModel.endpoint?.data_policy).toEqual({
+      training: true,
+      retainsPrompts: true,
+    });
+  });
+
   test('preserves and uses model endpoint policy overrides', () => {
     const response = OpenRouterSearchResponse.parse({
       data: {

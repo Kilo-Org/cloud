@@ -641,6 +641,180 @@ describe('User', () => {
       expect(result.user.id).toBe(existing.id);
       expect(result.isNew).toBe(false);
     });
+
+    it('links a magic-link sign-in to an existing user with a google provider', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'link-email@example.com',
+        google_user_name: 'Google First',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'link-email@example.com',
+          google_user_name: 'Google First',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: 'link-email@example.com',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      expect(result.isNew).toBe(false);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(providerRows.some(row => row.provider === 'email')).toBe(true);
+    });
+
+    it('links a google sign-in to an existing magic-link user', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'link-google@example.com',
+        google_user_name: 'Email First',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'email',
+        provider_account_id: 'link-google@example.com',
+        email: 'link-google@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'link-google@example.com',
+          google_user_name: 'Email First',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-link-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      expect(result.isNew).toBe(false);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(
+        providerRows.some(
+          row => row.provider === 'google' && row.provider_account_id === 'google-link-new'
+        )
+      ).toBe(true);
+    });
+
+    it('refuses to auto-link when the credential does not prove the email', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'no-proof@example.com',
+        google_user_name: 'No Proof',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-proof@example.com',
+          google_user_name: 'No Proof',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-no-proof',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+    });
+
+    it('refuses a same-provider different-account sign-in even with proof', async () => {
+      await insertTestUserAndGoogleAuth({
+        google_user_email: 'same-provider@example.com',
+        google_user_name: 'Same Provider',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'same-provider@example.com',
+          google_user_name: 'Same Provider',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-other-sub',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+    });
+
+    it('keeps the dev-only upgrade path: any provider links to a user whose only provider is fake-login', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'fake-upgrade@example.com',
+        google_user_name: 'Fake Upgrade',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'fake-login',
+        provider_account_id: 'fake-fake-upgrade@example.com',
+        email: 'fake-upgrade@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: '@@fake@@',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'fake-upgrade@example.com',
+          google_user_name: 'Fake Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-fake-upgrade',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(providerRows.some(row => row.provider === 'github')).toBe(true);
+    });
   });
 
   describe('softDeleteUser', () => {

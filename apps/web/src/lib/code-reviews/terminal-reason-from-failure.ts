@@ -32,6 +32,7 @@ const WORKSPACE_SUBTYPE_REASONS = {
   sandbox_storage_full: 'workspace_capacity',
   git_clone_timeout: 'repository_clone_failed',
   git_checkout_timeout: 'repository_clone_failed',
+  git_rate_limited: 'repository_clone_failed',
   git_network_failed: 'repository_clone_failed',
   git_authentication_failed: 'repository_auth_failed',
   git_pack_corrupt: 'repository_checkout_failed',

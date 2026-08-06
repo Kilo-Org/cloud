@@ -1121,6 +1121,98 @@ describe('WrapperClient', () => {
       expect(options.env).not.toHaveProperty('BAD;touch /tmp/pwned');
     });
 
+    it('defaults KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS to 240000 without kiloServerEnv', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      const options = startProcessCall[1] as { env?: Record<string, string> };
+      expect(command).toContain('KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=240000');
+      expect(options.env).toEqual(
+        expect.objectContaining({
+          KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '240000',
+        })
+      );
+    });
+
+    it('passes kiloServerEnv through to both the process env and the inlined command env', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        kiloServerEnv: { KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '120000' },
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      const options = startProcessCall[1] as { env?: Record<string, string> };
+      expect(command).toContain('KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=');
+      expect(options.env).toEqual(
+        expect.objectContaining({
+          KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '120000',
+        })
+      );
+    });
+
+    it('filters invalid kiloServerEnv keys before shell interpolation', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+      const kiloServerEnv: Record<string, string> = {
+        KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '120000',
+        PATH: '/tmp/pwned',
+        'BAD;touch /tmp/pwned': 'x',
+      };
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        kiloServerEnv,
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      const options = startProcessCall[1] as { env?: Record<string, string> };
+      expect(command).toContain('KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=');
+      expect(command).not.toContain('/tmp/pwned');
+      expect(command).not.toContain('BAD;touch');
+      expect(options.env).toEqual(
+        expect.objectContaining({
+          KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS: '120000',
+        })
+      );
+      expect(options.env).not.toHaveProperty('PATH');
+      expect(options.env).not.toHaveProperty('BAD;touch /tmp/pwned');
+    });
+
     it('throws WrapperNotReadyError after exhausting all retry attempts', async () => {
       // Health check fails (not running)
       const session = createMockSession(createCurlError(7, 'Connection refused'));
@@ -1544,7 +1636,7 @@ describe('WrapperClient', () => {
 
       expect(session.startProcess).toHaveBeenCalledWith(
         expect.stringMatching(
-          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
+          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=240000 DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
         ),
         expect.objectContaining({ cwd: '/workspace' })
       );

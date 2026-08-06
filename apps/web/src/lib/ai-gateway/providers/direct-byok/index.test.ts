@@ -124,7 +124,7 @@ describe('getDirectByokModel', () => {
     });
   });
 
-  test('falls back to model-name variants when synced variants are unavailable', async () => {
+  test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
     const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
     const { getFallbackModelVariants } = await import('@/lib/ai-gateway/providers/variants');
@@ -139,8 +139,7 @@ describe('getDirectByokModel', () => {
     expect(models[0].opencode.variants).toEqual({
       high: { reasoning: { enabled: true, effort: 'high' } },
     });
-    expect(models[1].opencode.variants).toBe(fallback);
-    expect(getFallbackModelVariants).toHaveBeenCalledTimes(1);
-    expect(getFallbackModelVariants).toHaveBeenCalledWith('chutes-byok/non-reasoning-model');
+    expect(models[1].opencode.variants).toBeUndefined();
+    expect(getFallbackModelVariants).not.toHaveBeenCalled();
   });
 });

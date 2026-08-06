@@ -196,7 +196,7 @@ export function parseModelsDevProviderModels(
       const aiSdkProvider = getAiSdkProvider(modelId, providerId);
       const variants =
         modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []) ??
-        getFallbackModelVariants(modelId);
+        (model.reasoning ? getFallbackModelVariants(modelId) : undefined);
       return {
         id: model.id,
         name: shortenDisplayName(model.name),

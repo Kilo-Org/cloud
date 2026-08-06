@@ -80,7 +80,7 @@ describe('parseModelsDevProviderModels', () => {
             reasoning_options: [{ type: 'toggle' }],
           },
           beta: {
-            id: 'beta',
+            id: 'claude-beta',
             status: 'beta',
             reasoning: false,
           },
@@ -130,7 +130,7 @@ describe('parseModelsDevProviderModels', () => {
         },
       },
       {
-        id: 'beta',
+        id: 'claude-beta',
         name: undefined,
         context_length: undefined,
         max_completion_tokens: undefined,

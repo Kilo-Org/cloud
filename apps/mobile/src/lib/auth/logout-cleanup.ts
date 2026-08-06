@@ -1,8 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 
-import { deviceSessionIdFromToken } from '@/lib/auth/device-session-claim';
-import { getActiveToken } from '@/lib/auth/token-owner';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
@@ -10,10 +8,16 @@ import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
 
 /**
- * Safe-retry tombstone for failed remote logout cleanup (DEC-01). Exactly ONE
- * pending cleanup is supported: a later failed logout overwrites an earlier
- * tombstone (recorded accepted limitation — the overwritten account's refresh
- * token was already destroyed locally and its access token expires within 1 h).
+ * Safe-retry tombstone for a failed push-token unregister (DEC-01). Exactly
+ * ONE pending cleanup is supported: a later failed logout overwrites an
+ * earlier tombstone.
+ *
+ * A failed device-session revoke is NOT retried. The device already destroyed
+ * the refresh token locally, and the access token expires within 1 h, so the
+ * orphaned row is dead — it only lingers in the session list until then. A
+ * push token is different: an unregistered device keeps receiving
+ * notifications for the signed-out account until the row is gone, which the
+ * user sees.
  *
  * The tombstone is written directly with `SecureStore.setItemAsync`,
  * deliberately NOT epoch-fenced: it must survive sign-out by design, and
@@ -22,24 +26,12 @@ import { trpcClient } from '@/lib/trpc';
 export type LogoutCleanupTombstone = {
   /** getMe cache identity at logout, or null when the query had not resolved. */
   userId: string | null;
-  /** `deviceSessionId` claim from the access token, or null when absent. */
-  deviceSessionId: string | null;
   /** Device push token at logout; null when lookup failed or permission missing. */
   pushToken: string | null;
-  needsSessionRevoke: boolean;
   needsPushUnregister: boolean;
   /** Epoch ms of the failed logout; reconciliation discards past 30 days. */
   failedAt: number;
 };
-
-/** A tRPC rejection whose error code is NOT_FOUND (either surface). */
-export function isNotFoundTrpcError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) {
-    return false;
-  }
-  const candidate = error as { code?: unknown; data?: { code?: unknown } };
-  return candidate.code === 'NOT_FOUND' || candidate.data?.code === 'NOT_FOUND';
-}
 
 /**
  * Runtime guard for a persisted tombstone. Every field is validated so a
@@ -53,9 +45,7 @@ function isLogoutCleanupTombstone(value: unknown): value is LogoutCleanupTombsto
   const record = value as Record<string, unknown>;
   return (
     (record.userId === null || typeof record.userId === 'string') &&
-    (record.deviceSessionId === null || typeof record.deviceSessionId === 'string') &&
     (record.pushToken === null || typeof record.pushToken === 'string') &&
-    typeof record.needsSessionRevoke === 'boolean' &&
     typeof record.needsPushUnregister === 'boolean' &&
     typeof record.failedAt === 'number' &&
     Number.isFinite(record.failedAt)
@@ -99,14 +89,12 @@ async function writeLogoutCleanupTombstone(tombstone: LogoutCleanupTombstone): P
  *
  * - Revokes the current device session and unregisters the device push token
  *   concurrently, bounded at 15 s each by the tRPC client's `deadlineFetch`.
- * - Maps the settled results to exactly two flags and writes a tombstone only
- *   when at least one part is outstanding; a fully successful cleanup deletes
- *   any existing tombstone. A fulfilled part is never retried later.
+ * - A failed revoke is not recorded: see the tombstone type for why. A failed
+ *   push unregister writes a tombstone; a successful one deletes any existing
+ *   tombstone, and is never retried later.
  */
 export async function runLogoutCleanup(): Promise<void> {
   try {
-    const token = getActiveToken()?.token;
-    const deviceSessionId = token ? deviceSessionIdFromToken(token) : null;
     const userId = readCachedUserId(queryClient);
 
     // Push token outcome: 'none' → nothing to unregister; 'lookup-failed' →
@@ -133,16 +121,7 @@ export async function runLogoutCleanup(): Promise<void> {
         : Promise.resolve(),
     ]);
 
-    const revoke = results[0];
     const unregister = results[1];
-
-    // Exact flag mapping: fulfilled (any outcome, including
-    // `no_identifiable_session`) and the owner-side NOT_FOUND are done; any
-    // other rejection keeps the part for reconciliation.
-    let needsSessionRevoke = false;
-    if (revoke.status === 'rejected' && !isNotFoundTrpcError(revoke.reason)) {
-      needsSessionRevoke = true;
-    }
 
     let needsPushUnregister = false;
     if (pushLookupFailed) {
@@ -152,19 +131,17 @@ export async function runLogoutCleanup(): Promise<void> {
     }
 
     try {
-      await (!needsSessionRevoke && !needsPushUnregister
-        ? deleteLogoutCleanupTombstone()
-        : writeLogoutCleanupTombstone({
+      await (needsPushUnregister
+        ? writeLogoutCleanupTombstone({
             userId,
-            deviceSessionId,
             pushToken,
-            needsSessionRevoke,
             needsPushUnregister,
             failedAt: Date.now(),
-          }));
+          })
+        : deleteLogoutCleanupTombstone());
     } catch (error) {
       // A tombstone write failure is reported but never blocks logout: the
-      // orphaned session stays revocable server-side until its token expires.
+      // push row stays removable on the next successful unregister.
       Sentry.captureException(error);
     }
   } catch (error) {

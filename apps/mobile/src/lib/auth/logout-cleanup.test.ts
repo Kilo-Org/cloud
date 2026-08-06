@@ -50,7 +50,7 @@ function makeToken(payload: unknown): string {
   return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
 }
 
-const TOKEN_WITH_SESSION = makeToken({ sub: 'u1', deviceSessionId: 'session-1' });
+const TOKEN_WITH_SESSION = makeToken({ sub: 'u1' });
 
 function seedUser(userId: string | null): void {
   if (userId === null) {
@@ -114,9 +114,7 @@ describe('runLogoutCleanup', () => {
     const tombstone = await readLogoutCleanupTombstone();
     expect(tombstone).toEqual({
       userId: 'u1',
-      deviceSessionId: 'session-1',
       pushToken: 'push-1',
-      needsSessionRevoke: true,
       needsPushUnregister: true,
       failedAt: expect.any(Number),
     });
@@ -132,24 +130,8 @@ describe('runLogoutCleanup', () => {
     const tombstone = await readLogoutCleanupTombstone();
     expect(tombstone).toMatchObject({
       userId: 'u1',
-      deviceSessionId: 'session-1',
       pushToken: 'push-1',
-      needsSessionRevoke: false,
       needsPushUnregister: true,
-    });
-  });
-
-  it('writes only the session flag when only the revoke rejects', async () => {
-    pushOutcome('token');
-    trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
-    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
-
-    await runLogoutCleanup();
-
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
-      needsSessionRevoke: true,
-      needsPushUnregister: false,
     });
   });
 
@@ -173,7 +155,6 @@ describe('runLogoutCleanup', () => {
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     const tombstone = await readLogoutCleanupTombstone();
     expect(tombstone).toMatchObject({
-      needsSessionRevoke: false,
       needsPushUnregister: true,
       pushToken: null,
     });
@@ -187,25 +168,6 @@ describe('runLogoutCleanup', () => {
 
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
-  });
-
-  it('writes a tombstone with a null deviceSessionId when the token carries no claim', async () => {
-    vi.mocked(getActiveToken).mockReturnValue({
-      token: makeToken({ sub: 'u1' }),
-      expiresAtMs: null,
-    });
-    pushOutcome('none');
-    trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
-
-    await runLogoutCleanup();
-
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
-      userId: 'u1',
-      deviceSessionId: null,
-      needsSessionRevoke: true,
-      needsPushUnregister: false,
-    });
   });
 
   it('still resolves when a tombstone write fails and reports it to Sentry', async () => {
@@ -249,10 +211,8 @@ describe('runLogoutCleanup', () => {
       LOGOUT_CLEANUP_TOMBSTONE_KEY,
       JSON.stringify({
         userId: 'u1',
-        deviceSessionId: 'session-1',
         pushToken: null,
-        needsSessionRevoke: 'yes',
-        needsPushUnregister: false,
+        needsPushUnregister: 'yes',
         failedAt: Date.now(),
       })
     );
@@ -265,9 +225,7 @@ describe('runLogoutCleanup', () => {
       LOGOUT_CLEANUP_TOMBSTONE_KEY,
       JSON.stringify({
         userId: null,
-        deviceSessionId: null,
         pushToken: null,
-        needsSessionRevoke: false,
         needsPushUnregister: false,
         failedAt: 'soon',
       })
@@ -279,9 +237,7 @@ describe('runLogoutCleanup', () => {
   it('accepts a fully valid persisted tombstone', async () => {
     const valid = {
       userId: 'u1',
-      deviceSessionId: 'session-1',
       pushToken: null,
-      needsSessionRevoke: true,
       needsPushUnregister: false,
       failedAt: Date.now(),
     };
@@ -295,9 +251,7 @@ describe('runLogoutCleanup', () => {
       LOGOUT_CLEANUP_TOMBSTONE_KEY,
       JSON.stringify({
         userId: null,
-        deviceSessionId: 'session-1',
         pushToken: 'push-1',
-        needsSessionRevoke: true,
         needsPushUnregister: true,
         failedAt: Date.now(),
       })
@@ -305,6 +259,6 @@ describe('runLogoutCleanup', () => {
 
     const tombstone = await readLogoutCleanupTombstone();
     expect(tombstone?.userId).toBeNull();
-    expect(tombstone?.deviceSessionId).toBe('session-1');
+    expect(tombstone?.pushToken).toBe('push-1');
   });
 });

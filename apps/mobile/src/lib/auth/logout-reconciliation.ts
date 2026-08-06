@@ -1,7 +1,6 @@
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   deleteLogoutCleanupTombstone,
-  isNotFoundTrpcError,
   type LogoutCleanupTombstone,
   readLogoutCleanupTombstone,
 } from '@/lib/auth/logout-cleanup';
@@ -9,14 +8,13 @@ import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { trpcClient } from '@/lib/trpc';
 
 /**
- * Reconciliation for failed remote logout cleanup ("next authenticated
+ * Reconciliation for a failed push-token unregister ("next authenticated
  * opportunity"). The `(app)` layout mounts the trigger: once `user.getMe` has
  * resolved and on each AppState return to `active` while authenticated.
  *
  * A tombstone older than the refresh-token lifetime (30 days) is discarded
- * without a network call: the orphaned session is unusable past it. For a
- * current user the outstanding parts are retried and completed parts are
- * never repeated; for a different known user nothing is attempted.
+ * without a network call. For a current user the unregister is retried; for a
+ * different known user nothing is attempted.
  *
  * The tombstone is deleted only when the attempt is still authoritative: the
  * auth epoch has not moved (no sign-out or sign-in advanced it) and the
@@ -84,14 +82,12 @@ async function runReconciliation(userId: string): Promise<ReconciliationAttemptO
     return deleted ? { kind: 'expired-discarded' } : { kind: 'expired-retained' };
   }
   if (tombstone.userId !== null && tombstone.userId !== userId) {
-    // Different known user: no attempt. Their token cannot revoke the prior
-    // user's session; the tombstone stays until ownership or the 30-day
-    // expiry removes it. Residual risk is bounded: the prior refresh token
-    // was destroyed locally and its access token expires within 1 h.
+    // Different known user: no attempt. The tombstone stays until ownership
+    // or the 30-day expiry removes it.
     return { kind: 'different-user-skipped' };
   }
 
-  const allDone = await reconcileOutstandingParts(tombstone);
+  const allDone = await reconcilePushUnregister(tombstone);
   if (allDone) {
     const deleted = await deleteTombstoneIfUnchanged(tombstone, epoch);
     return { kind: 'attempted', tombstoneDeleted: deleted };
@@ -102,9 +98,7 @@ async function runReconciliation(userId: string): Promise<ReconciliationAttemptO
 function tombstonesEqual(a: LogoutCleanupTombstone, b: LogoutCleanupTombstone): boolean {
   return (
     a.userId === b.userId &&
-    a.deviceSessionId === b.deviceSessionId &&
     a.pushToken === b.pushToken &&
-    a.needsSessionRevoke === b.needsSessionRevoke &&
     a.needsPushUnregister === b.needsPushUnregister &&
     a.failedAt === b.failedAt
   );
@@ -148,65 +142,40 @@ async function deleteTombstoneIfUnchanged(
 }
 
 /**
- * Attempts exactly the outstanding parts. Returns true when every part is
- * done. A part is done only on a server-authoritative completion; retryable
- * failures (network, 5xx, deadline) keep the part and the tombstone.
+ * Attempts the outstanding push unregister. Returns true when it is done. A
+ * retryable failure (network, 5xx, deadline) keeps the part and the tombstone.
  */
-async function reconcileOutstandingParts(tombstone: LogoutCleanupTombstone): Promise<boolean> {
-  let sessionDone = !tombstone.needsSessionRevoke;
-  let pushDone = !tombstone.needsPushUnregister;
-
-  if (tombstone.needsSessionRevoke) {
-    if (tombstone.deviceSessionId === null) {
-      // A null id is terminal: nothing actionable.
-      sessionDone = true;
-    } else {
-      try {
-        await trpcClient.user.revokeDeviceSessionById.mutate({
-          sessionId: tombstone.deviceSessionId,
-        });
-        // A resolved mutate is authoritative: NOT_FOUND throws, and the only
-        // other outcomes ('revoked', 'already_revoked') complete the part.
-        sessionDone = true;
-      } catch (error) {
-        // The owner's NOT_FOUND is authoritative (missing or already gone).
-        // For an identity-unknown tombstone NOT_FOUND is ambiguous (missing
-        // vs. owned by someone else), so it is NOT terminal there.
-        if (tombstone.userId !== null && isNotFoundTrpcError(error)) {
-          sessionDone = true;
-        }
-      }
-    }
+async function reconcilePushUnregister(tombstone: LogoutCleanupTombstone): Promise<boolean> {
+  if (!tombstone.needsPushUnregister) {
+    return true;
   }
 
-  if (tombstone.needsPushUnregister) {
-    let pushToken = tombstone.pushToken;
-    if (pushToken === null) {
-      // The device push token is stable per device: re-read what the device
-      // holds now and unregister that value.
-      try {
-        const outcome = await getDevicePushTokenOutcome();
-        if (outcome.kind === 'token') {
-          pushToken = outcome.token;
-        } else if (outcome.kind === 'none') {
-          // The device holds no token: nothing actionable, terminal for the
-          // part (recorded residual, bounded by the 30-day expiry).
-          pushDone = true;
-        }
-        // 'lookup-failed' keeps the part for the next attempt.
-      } catch {
-        // Defensive: keeps the part.
+  let pushToken = tombstone.pushToken;
+  if (pushToken === null) {
+    // The device push token is stable per device: re-read what the device
+    // holds now and unregister that value.
+    try {
+      const outcome = await getDevicePushTokenOutcome();
+      if (outcome.kind === 'token') {
+        pushToken = outcome.token;
+      } else if (outcome.kind === 'none') {
+        // The device holds no token: nothing actionable, terminal for the
+        // part (recorded residual, bounded by the 30-day expiry).
+        return true;
       }
-    }
-    if (pushToken !== null) {
-      try {
-        await trpcClient.user.unregisterPushToken.mutate({ token: pushToken });
-        pushDone = true;
-      } catch {
-        // Retryable failure keeps the part.
-      }
+      // 'lookup-failed' keeps the part for the next attempt.
+    } catch {
+      // Defensive: keeps the part.
     }
   }
-
-  return sessionDone && pushDone;
+  if (pushToken === null) {
+    return false;
+  }
+  try {
+    await trpcClient.user.unregisterPushToken.mutate({ token: pushToken });
+    return true;
+  } catch {
+    // Retryable failure keeps the part.
+    return false;
+  }
 }

@@ -15,7 +15,6 @@ const cleanupMock = vi.hoisted(() => ({
 }));
 
 const trpcMock = vi.hoisted(() => ({
-  revokeDeviceSessionById: { mutate: vi.fn() },
   unregisterPushToken: { mutate: vi.fn() },
 }));
 
@@ -43,9 +42,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function makeTombstone(overrides: Partial<LogoutCleanupTombstone> = {}): LogoutCleanupTombstone {
   return {
     userId: 'u1',
-    deviceSessionId: 'session-1',
-    pushToken: null,
-    needsSessionRevoke: true,
+    pushToken: 'push-stored',
     needsPushUnregister: true,
     failedAt: Date.now(),
     ...overrides,
@@ -63,7 +60,7 @@ describe('attemptLogoutReconciliation', () => {
   it('returns no-tombstone and makes no network call when nothing is pending', async () => {
     const outcome = await attemptLogoutReconciliation('u1');
     expect(outcome).toEqual({ kind: 'no-tombstone' });
-    expect(trpcMock.revokeDeviceSessionById.mutate).not.toHaveBeenCalled();
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 
@@ -76,7 +73,7 @@ describe('attemptLogoutReconciliation', () => {
 
     expect(outcome).toEqual({ kind: 'expired-discarded' });
     expect(cleanupMock.deleteLogoutCleanupTombstone).toHaveBeenCalledTimes(1);
-    expect(trpcMock.revokeDeviceSessionById.mutate).not.toHaveBeenCalled();
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 
@@ -87,12 +84,11 @@ describe('attemptLogoutReconciliation', () => {
 
     expect(outcome).toEqual({ kind: 'different-user-skipped' });
     expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
-    expect(trpcMock.revokeDeviceSessionById.mutate).not.toHaveBeenCalled();
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 
-  it('completes every outstanding part for the owner and deletes the tombstone', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone());
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'revoked' });
+  it('re-reads the device token for the owner and deletes the tombstone', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone({ pushToken: null }));
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
       kind: 'token',
       token: 'push-9',
@@ -102,52 +98,13 @@ describe('attemptLogoutReconciliation', () => {
     const outcome = await attemptLogoutReconciliation('u1');
 
     expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
-    expect(trpcMock.revokeDeviceSessionById.mutate).toHaveBeenCalledWith({
-      sessionId: 'session-1',
-    });
     expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledWith({ token: 'push-9' });
     expect(cleanupMock.deleteLogoutCleanupTombstone).toHaveBeenCalledTimes(1);
   });
 
-  it('treats an already_revoked owner result as done', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsPushUnregister: false })
-    );
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'already_revoked' });
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
-  });
-
-  it('treats an owner NOT_FOUND as done (authoritative)', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsPushUnregister: false })
-    );
-    trpcMock.revokeDeviceSessionById.mutate.mockRejectedValue({
-      data: { code: 'NOT_FOUND' },
-    });
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
-  });
-
-  it('keeps the tombstone on a retryable revoke failure', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsPushUnregister: false })
-    );
-    trpcMock.revokeDeviceSessionById.mutate.mockRejectedValue(new Error('network down'));
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
-    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
-  });
-
   it('uses the stored push token when one exists instead of re-reading the device', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsSessionRevoke: false, pushToken: 'push-stored' })
+      makeTombstone({ pushToken: 'push-stored' })
     );
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
 
@@ -159,9 +116,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('treats a re-read none outcome as terminal for the push part', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsSessionRevoke: false, pushToken: null })
-    );
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone({ pushToken: null }));
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -171,9 +126,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('keeps the push part when the re-read lookup fails', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsSessionRevoke: false, pushToken: null })
-    );
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone({ pushToken: null }));
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'lookup-failed' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -184,7 +137,7 @@ describe('attemptLogoutReconciliation', () => {
 
   it('keeps the push part when the unregister rejects', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ needsSessionRevoke: false, pushToken: 'push-stored' })
+      makeTombstone({ pushToken: 'push-stored' })
     );
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
 
@@ -193,45 +146,9 @@ describe('attemptLogoutReconciliation', () => {
     expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
   });
 
-  it('treats a null deviceSessionId as terminal for the session part', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ deviceSessionId: null, needsPushUnregister: false })
-    );
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
-    expect(trpcMock.revokeDeviceSessionById.mutate).not.toHaveBeenCalled();
-  });
-
-  it('does NOT treat NOT_FOUND as terminal for an identity-unknown tombstone', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ userId: null, needsPushUnregister: false })
-    );
-    trpcMock.revokeDeviceSessionById.mutate.mockRejectedValue({
-      data: { code: 'NOT_FOUND' },
-    });
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
-    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
-  });
-
-  it('completes the session part for an identity-unknown tombstone on revoked', async () => {
-    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
-      makeTombstone({ userId: null, needsPushUnregister: false })
-    );
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'revoked' });
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
-  });
-
   it('skips a second attempt within the 60 s spacing window', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone());
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const first = await attemptLogoutReconciliation('u1');
@@ -250,7 +167,7 @@ describe('attemptLogoutReconciliation', () => {
       await readGate;
       return makeTombstone();
     });
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const first = attemptLogoutReconciliation('u1');
@@ -265,8 +182,8 @@ describe('attemptLogoutReconciliation', () => {
   it('regression: retains the tombstone when a newer tombstone replaced it during the attempt', async () => {
     cleanupMock.readLogoutCleanupTombstone
       .mockResolvedValueOnce(makeTombstone())
-      .mockResolvedValueOnce(makeTombstone({ deviceSessionId: 'newer-session' }));
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'revoked' });
+      .mockResolvedValueOnce(makeTombstone({ pushToken: 'push-newer' }));
+    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -281,18 +198,17 @@ describe('attemptLogoutReconciliation', () => {
   it('regression: retains the tombstone when the auth epoch moves during the attempt', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone());
     const gate = { release: null as (() => void) | null };
-    const revokeGate = new Promise<void>(resolve => {
+    const unregisterGate = new Promise<void>(resolve => {
       gate.release = resolve;
     });
-    trpcMock.revokeDeviceSessionById.mutate.mockImplementation(async () => {
-      await revokeGate;
-      return { outcome: 'revoked' };
+    trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
+      await unregisterGate;
+      return { success: true };
     });
-    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const attempt = attemptLogoutReconciliation('u1');
     await vi.waitFor(() => {
-      expect(trpcMock.revokeDeviceSessionById.mutate).toHaveBeenCalled();
+      expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalled();
     });
 
     // A sign-out (or sign-in) advanced the epoch while the attempt was in
@@ -308,7 +224,7 @@ describe('attemptLogoutReconciliation', () => {
 
   it('regression: a tombstone deletion rejection is retained and does not reject the attempt', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone());
-    trpcMock.revokeDeviceSessionById.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
     cleanupMock.deleteLogoutCleanupTombstone.mockRejectedValueOnce(new Error('secure store down'));
 
@@ -335,7 +251,7 @@ describe('attemptLogoutReconciliation', () => {
       .mockResolvedValueOnce(
         makeTombstone({ failedAt: Date.now() - TOMBSTONE_MAX_AGE_MS - DAY_MS })
       )
-      .mockResolvedValueOnce(makeTombstone({ deviceSessionId: 'newer-session' }));
+      .mockResolvedValueOnce(makeTombstone({ pushToken: 'push-newer' }));
 
     const outcome = await attemptLogoutReconciliation('u1');
 

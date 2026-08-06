@@ -138,6 +138,11 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
         if (!file) {
           // No readable image. A caller with an always-present paste control
           // accepts text, so a text clipboard pastes instead of toasting.
+          //
+          // This path leaves `consumedRef` alone on purpose. That flag
+          // suppresses the hint for an image already read, and an unreadable
+          // image must stay retryable: the user can grant the permission or
+          // copy the image again.
           const addText = addTextRef.current;
           const text = addText ? await readClipboardText() : '';
           if (addText && text !== '') {

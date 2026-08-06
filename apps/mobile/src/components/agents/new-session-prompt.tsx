@@ -187,6 +187,13 @@ export function NewSessionPrompt({
       await onPrefillAttachments([file]);
     },
     addText: text => {
+      // The hook calls the latest render's callback, so this sees a create or
+      // a voice session that started during the clipboard read. Neither may
+      // take a draft mutation. `NewSessionPrompt` holds no submit lock, so the
+      // button's own disabled rule is the authority.
+      if (!control.inputEditable) {
+        return;
+      }
       promptSelectionRef.current = pasteTextIntoComposer(text, {
         input: promptInputRef.current,
         draft: promptRef.current,

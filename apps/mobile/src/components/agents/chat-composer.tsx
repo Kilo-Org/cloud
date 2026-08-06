@@ -345,7 +345,9 @@ export function ChatComposer({
       // Same-render race guard, as in `handleSelectSlashCommand`: the button is
       // disabled while sending, but a press committed before that render — or
       // during the clipboard read — must not mutate a draft being submitted.
-      if (sendLockRef.current.isLocked()) {
+      // `inputEditable` adds the voice session, which the send lock does not
+      // cover and whose next transcript would overwrite the pasted text.
+      if (sendLockRef.current.isLocked() || !control.inputEditable) {
         return;
       }
       selectionRef.current = pasteTextIntoComposer(text, {

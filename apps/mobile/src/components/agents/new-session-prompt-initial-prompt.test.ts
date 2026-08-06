@@ -73,12 +73,14 @@ vi.mock('@/components/agents/use-text-height', () => ({
   }),
 }));
 
+const controlState = vi.hoisted(() => ({ inputEditable: true }));
+
 vi.mock('@/components/agents/new-session-prompt-state', () => ({
   resolveNewSessionPromptControlState: () => ({
     createDisabled: false,
     hasPrompt: false,
     inputAccessibilityDisabled: false,
-    inputEditable: true,
+    inputEditable: controlState.inputEditable,
     paperclipDisabled: false,
     voiceDisabled: false,
   }),
@@ -264,6 +266,23 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     clipboardHintOptions.current?.addText?.('really ');
 
     expect(onChangeTextMock).toHaveBeenCalledWith('fix really the bug');
+  });
+
+  it('drops a paste that resolves after the input stopped accepting text', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    onChangeTextMock.mockClear();
+    controlState.inputEditable = false;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      NewSessionPrompt({ ...defaultProps(), initialPrompt: 'fix the bug' });
+
+      clipboardHintOptions.current?.addText?.('really ');
+    } finally {
+      controlState.inputEditable = true;
+    }
+
+    expect(onChangeTextMock).not.toHaveBeenCalled();
   });
 
   it('renders the paste button wired to the clipboard hint paste path', async () => {

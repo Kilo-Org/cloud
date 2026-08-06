@@ -18,9 +18,11 @@ import {
   buildCreateRemoteSessionInput,
   type CreateRemoteSessionInput,
   type CreateSessionOutcome,
+  type CreateSessionSpawnOptions,
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
+import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,
@@ -162,9 +164,18 @@ export function useRemoteSpawnDispatch({
   // inherit by calling `useRemoteInstanceSpawn()` with no arg).
   const remoteSpawn: {
     status: RemoteInstanceSpawnStatus;
-    spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+    spawn: (
+      connectionId: string,
+      opts?: CreateRemoteSessionInput,
+      options?: CreateSessionSpawnOptions
+    ) => Promise<CreateSessionOutcome>;
   } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
+  // P1-A-08b: one `operationKey` per spawn intent, hoisted so a retryable
+  // failure keeps the key (the relay dedupes the retry) and rotated on a
+  // terminal outcome (`ready` or a typed non-retryable rejection). The
+  // fingerprint covers the target instance and every create field.
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)
   // outlives a single render; a plain closure over `runOnInstance` would
@@ -209,9 +220,20 @@ export function useRemoteSpawnDispatch({
       variant: fields.variant,
       organizationId: fields.organizationId,
     });
+    const operationKey = getKey(
+      JSON.stringify({
+        connectionId: selectedConnectionId,
+        mode: fields.mode,
+        model: fields.model,
+        variant: fields.variant,
+        organizationId: fields.organizationId,
+      })
+    );
     void (async () => {
-      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput);
+      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, { operationKey });
       if (outcome.status === 'ready') {
+        // The spawn settled; the next submit is a fresh intent.
+        rotateKey();
         const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
         if (submitPayload === null) {
           router.replace(spawnedPath);
@@ -224,6 +246,8 @@ export function useRemoteSpawnDispatch({
         return;
       }
       if (outcome.status === 'nonRetryable') {
+        // A typed non-retryable rejection ends the intent.
+        rotateKey();
         toast.error(REMOTE_SPAWN_NON_RETRYABLE_TOAST);
         return;
       }
@@ -271,6 +295,8 @@ export function useRemoteSpawnDispatch({
     router,
     runOnInstance,
     setRunOnInstance,
+    getKey,
+    rotateKey,
   ]);
 
   const onChangeRunOnInstance = useCallback(

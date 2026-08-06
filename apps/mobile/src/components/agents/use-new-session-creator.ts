@@ -7,8 +7,10 @@ import { toast } from 'sonner-native';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
+import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
+import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import {
   type AgentAttachmentWire,
   type useAgentAttachmentUpload,
@@ -51,6 +53,12 @@ export function useNewSessionCreator({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const promptRef = useRef('');
+  // P1-A-08b: one `operationKey` per submit intent, hoisted so a retry of the
+  // same intent reuses the key (the ledger dedupes/reconciles instead of
+  // spawning a second session) and rotated on success or a typed terminal
+  // rejection. The fingerprint covers every intent-defining input, so a
+  // changed draft/selection becomes a fresh intent with a fresh key.
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   const createSessionFromDraft = useCallback(async () => {
     // Read the live, post-settlement draft (see `settleVoiceInputBeforeSubmit`
@@ -71,6 +79,16 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    const intentFingerprint = JSON.stringify({
+      prompt,
+      mode,
+      model,
+      variant: variant || undefined,
+      repo: selectedRepo,
+      organizationId: organizationId ?? null,
+    });
+    const operationKey = getKey(intentFingerprint);
+
     try {
       const initialMessageId = generateMessageId();
       const baseInput: {
@@ -82,6 +100,7 @@ export function useNewSessionCreator({
         githubRepo: string;
         autoCommit: boolean;
         autoInitiate: boolean;
+        operationKey: string;
         attachments?: AgentAttachmentWire;
       } = {
         prompt,
@@ -92,6 +111,7 @@ export function useNewSessionCreator({
         githubRepo: selectedRepo,
         autoCommit: true,
         autoInitiate: true,
+        operationKey,
       };
       const wireAttachments = attachments.toWirePayload();
       if (wireAttachments) {
@@ -104,6 +124,10 @@ export function useNewSessionCreator({
             organizationId,
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
+
+      // The intent settled (the ledger now owns the create); the next submit
+      // is a fresh intent with a fresh key.
+      rotateKey();
 
       captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
       await invalidateAgentSessionQueries(queryClient, trpc);
@@ -124,6 +148,11 @@ export function useNewSessionCreator({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create session';
       toast.error(message);
+      // A typed terminal rejection ends the intent; retryable failures
+      // (transport and `creation_in_progress`) keep the key.
+      if (!isCloudPrepareRetryableError(error)) {
+        rotateKey();
+      }
     } finally {
       setIsCreating(false);
     }
@@ -139,6 +168,8 @@ export function useNewSessionCreator({
     navigation,
     attachments,
     setIsCreating,
+    getKey,
+    rotateKey,
   ]);
 
   return { createSessionFromDraft, promptRef };

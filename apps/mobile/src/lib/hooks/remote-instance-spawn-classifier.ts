@@ -206,13 +206,25 @@ export function mergeSpawnOrganizationId(
 // ---------------------------------------------------------------------------
 
 /**
+ * Options for one `spawn` attempt. `operationKey` is the caller's stable
+ * per-user-intent key, forwarded to the SDK as `mutationId` so the relay's
+ * UserConnectionDO dedupes duplicate sends and replays the durable terminal
+ * result under the same key.
+ */
+export type CreateSessionSpawnOptions = {
+  /** Stable per-user-intent key; becomes the SDK `mutationId` on the wire. */
+  operationKey?: string;
+};
+
+/**
  * Stable per-spawner identity (UUID v4). Generated once at spawner creation.
  *
- * v1 does NOT use `creationKey` for server-side dedup — the relay/CLI has no
- * idempotency layer for `create_session` and an existing connection's race
- * is a real (but small) possibility. The key exists purely as a stable
- * per-attempt identifier for in-hook bookkeeping and tests; do not build a
- * dedupe layer on top of it without revisiting the contract.
+ * Server-side dedup for `create_session` rides the caller's per-intent
+ * `operationKey`, which the spawner forwards to the SDK as `mutationId`
+ * (the relay's UserConnectionDO dedupes by it; see `CreateSessionSpawnOptions`).
+ * `creationKey` is NOT that key: it remains a stable per-spawner identifier
+ * for in-hook bookkeeping and tests only. Do not build a dedupe layer on top
+ * of `creationKey`.
  */
 export type CreateSessionSpawner = {
   readonly creationKey: string;
@@ -220,7 +232,11 @@ export type CreateSessionSpawner = {
    * Attempt a `create_session` against the given CLI connection. Returns
    * the classified outcome — never throws.
    */
-  spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+  spawn: (
+    connectionId: string,
+    opts?: CreateRemoteSessionInput,
+    options?: CreateSessionSpawnOptions
+  ) => Promise<CreateSessionOutcome>;
 };
 
 function generateCreationKey(): string {
@@ -249,9 +265,13 @@ export function createSessionSpawner(
   const creationKey = generateCreationKey();
   return {
     creationKey,
-    async spawn(connectionId, opts) {
+    async spawn(connectionId, opts, options) {
+      const input: CreateRemoteSessionInput = {
+        ...opts,
+        ...(options?.operationKey !== undefined ? { mutationId: options.operationKey } : {}),
+      };
       try {
-        const raw = await createRemoteSessionOnConnection(connection, connectionId, opts);
+        const raw = await createRemoteSessionOnConnection(connection, connectionId, input);
         return classifyCreateSessionResult({ status: 'fulfilled', value: raw });
       } catch (error) {
         return classifyCreateSessionResult({ status: 'rejected', reason: error });

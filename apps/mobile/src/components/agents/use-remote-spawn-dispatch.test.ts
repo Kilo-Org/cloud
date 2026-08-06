@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- spawn input-chain suite pins key reuse/rotation in one coherent run. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,7 +8,11 @@ import {
   peekSharePayload,
   type SharePayload,
 } from '@/lib/share-payload';
-import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import {
+  buildCreateRemoteSessionInput,
+  type CreateSessionOutcome,
+} from '@/lib/hooks/remote-instance-spawn-classifier';
 
 import {
   RemoteSpawnInheritanceProvider,
@@ -15,13 +20,19 @@ import {
 } from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
-  vi.fn(async () => {
-    await Promise.resolve();
-    return {
-      status: 'ready' as const,
-      sessionID: 'ses_12345678901234567890123456',
-    };
-  })
+  vi.fn(
+    async (
+      _connectionId: string,
+      _opts?: unknown,
+      _options?: unknown
+    ): Promise<CreateSessionOutcome> => {
+      await Promise.resolve();
+      return {
+        status: 'ready',
+        sessionID: 'ses_12345678901234567890123456' as KiloSessionId,
+      };
+    }
+  )
 );
 
 const useRemoteInstanceSpawnMock = vi.hoisted(() =>
@@ -41,7 +52,15 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 
-vi.mock('expo-crypto', () => ({ randomUUID: () => 'share-id-fixed' }));
+vi.mock('expo-crypto', () => {
+  let n = 0;
+  return {
+    randomUUID: () => {
+      n += 1;
+      return `uuid-${n}`;
+    },
+  };
+});
 
 vi.mock('expo-file-system/legacy', () => ({
   cacheDirectory: null,
@@ -206,11 +225,15 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(spawnMock).toHaveBeenCalled();
     });
 
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
-      agent: 'plan',
-      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient', variant: 'medium' },
-      orgId: 'org-xyz',
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      'conn-abc',
+      {
+        agent: 'plan',
+        model: { providerID: 'kilo', modelID: 'kilo-auto/efficient', variant: 'medium' },
+        orgId: 'org-xyz',
+      },
+      { operationKey: expect.any(String) }
+    );
   });
 
   it('onStart without inheritance yields org-only input — empty context regression', async () => {
@@ -224,7 +247,11 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(spawnMock).toHaveBeenCalled();
     });
 
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', { orgId: 'org-xyz' });
+    expect(spawnMock).toHaveBeenCalledWith(
+      'conn-abc',
+      { orgId: 'org-xyz' },
+      { operationKey: expect.any(String) }
+    );
   });
 
   it('explicit mode/model/variant args win over empty context', async () => {
@@ -247,7 +274,8 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         mode: 'code',
         model: 'anthropic/claude-sonnet-4',
         variant: 'high',
-      })
+      }),
+      { operationKey: expect.any(String) }
     );
   });
 
@@ -274,10 +302,14 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(spawnMock).toHaveBeenCalled();
     });
 
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
-      agent: 'code',
-      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      'conn-abc',
+      {
+        agent: 'code',
+        model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+      },
+      { operationKey: expect.any(String) }
+    );
   });
 
   it('ready path stages the press-time payload and navigates with shareId + autoSend', async () => {
@@ -292,14 +324,16 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(routerReplace).toHaveBeenCalled();
     });
 
-    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
-    expect(calledWith).toContain('shareId=share-id-fixed');
+    expect(calledWith).toMatch(/shareId=uuid-\d+/);
     expect(calledWith).toContain('autoSend=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
 
-    const stored = peekSharePayload('share-id-fixed');
+    const shareIdMatch = /shareId=([^&]+)/.exec(calledWith);
+    expect(shareIdMatch).not.toBeNull();
+    const stored = peekSharePayload(decodeURIComponent(shareIdMatch?.[1] ?? ''));
     expect(stored).not.toBeNull();
     expect(stored?.text).toBe('hello');
   });
@@ -316,7 +350,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(routerReplace).toHaveBeenCalled();
     });
 
-    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
@@ -335,11 +369,93 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       expect(routerReplace).toHaveBeenCalled();
     });
 
-    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
+  });
+
+  it('reuses the same operationKey across retryable spawn outcomes', async () => {
+    const retryable = {
+      status: 'retryable' as const,
+      reason: 'Connection destroyed',
+      cause: new Error('Connection destroyed'),
+    };
+    spawnMock.mockResolvedValueOnce(retryable).mockResolvedValueOnce(retryable);
+    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+    });
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+    });
+
+    const first = spawnMock.mock.calls[0]?.[2] as { operationKey?: string } | undefined;
+    const second = spawnMock.mock.calls[1]?.[2] as { operationKey?: string } | undefined;
+    expect(first?.operationKey).toBeDefined();
+    expect(second?.operationKey).toBe(first?.operationKey);
+  });
+
+  it('rotates the operationKey after a ready outcome', async () => {
+    const retryable = {
+      status: 'retryable' as const,
+      reason: 'Connection destroyed',
+      cause: new Error('Connection destroyed'),
+    };
+    spawnMock
+      .mockResolvedValueOnce(retryable)
+      .mockResolvedValueOnce({
+        status: 'ready',
+        sessionID: 'ses_12345678901234567890123456' as KiloSessionId,
+      })
+      .mockResolvedValueOnce(retryable);
+    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+    });
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+    });
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(3);
+    });
+
+    const keys = spawnMock.mock.calls.map(
+      call => (call[2] as { operationKey?: string } | undefined)?.operationKey
+    );
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it('rotates the operationKey after a nonRetryable outcome', async () => {
+    const nonRetryable = {
+      status: 'nonRetryable' as const,
+      reason: 'CLI_UPGRADE_REQUIRED',
+      cause: new Error('CLI_UPGRADE_REQUIRED'),
+    };
+    spawnMock.mockResolvedValueOnce(nonRetryable).mockResolvedValueOnce(nonRetryable);
+    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+    });
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+    });
+
+    const first = spawnMock.mock.calls[0]?.[2] as { operationKey?: string } | undefined;
+    const second = spawnMock.mock.calls[1]?.[2] as { operationKey?: string } | undefined;
+    expect(second?.operationKey).not.toBe(first?.operationKey);
   });
 });
 

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cloud prepare and remote spawn key rotation stay in the one continue hook. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
@@ -15,6 +16,7 @@ import {
   resolveContinueRemoteModel,
 } from '@/components/agents/continuation-seed';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
@@ -31,6 +33,7 @@ import {
   buildCreateRemoteSessionInput,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
+import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,
@@ -67,9 +70,24 @@ export function useContinueSession(args: {
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);
+  // P1-A-08b: one hoisted `operationKey` per submit intent for each
+  // destination family. Cloud prepares and remote spawns are different
+  // intents, so they never share a key; each is kept across retryable
+  // failures and rotated on success or a typed terminal rejection.
+  const cloudOperationKey = useHoistedOperationKey();
+  const remoteOperationKey = useHoistedOperationKey();
 
   const runCloudCreate = useCallback(
     async (seed: string, dest: { repo: string; model: string; variant: string }, mode: string) => {
+      const intentFingerprint = JSON.stringify({
+        seed,
+        repo: dest.repo,
+        model: dest.model,
+        variant: dest.variant || undefined,
+        mode,
+        organizationId: args.organizationId ?? null,
+      });
+      const operationKey = cloudOperationKey.getKey(intentFingerprint);
       const initialMessageId = generateMessageId();
       const baseInput = {
         prompt: seed,
@@ -80,19 +98,31 @@ export function useContinueSession(args: {
         githubRepo: dest.repo,
         autoCommit: true,
         autoInitiate: true,
+        operationKey,
       };
-      const result = args.organizationId
-        ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...baseInput,
-            organizationId: args.organizationId,
-          })
-        : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
-      captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-      await invalidateAgentSessionQueries(queryClient, trpc);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.push(getAgentSessionPath(result.kiloSessionId, args.organizationId));
+      try {
+        const result = args.organizationId
+          ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
+              ...baseInput,
+              organizationId: args.organizationId,
+            })
+          : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
+        // The intent settled; the next submit is a fresh intent.
+        cloudOperationKey.rotateKey();
+        captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
+        await invalidateAgentSessionQueries(queryClient, trpc);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push(getAgentSessionPath(result.kiloSessionId, args.organizationId));
+      } catch (error) {
+        // A typed terminal rejection ends the intent; retryable failures
+        // (transport and `creation_in_progress`) keep the key.
+        if (!isCloudPrepareRetryableError(error)) {
+          cloudOperationKey.rotateKey();
+        }
+        throw error;
+      }
     },
-    [args.organizationId, queryClient, router, trpc]
+    [args.organizationId, queryClient, router, trpc, cloudOperationKey]
   );
 
   const execute = useCallback(
@@ -113,6 +143,16 @@ export function useContinueSession(args: {
           return;
         }
         const remoteModel = resolveContinueRemoteModel(fields.model, fields.variant, args.models);
+        const remoteOperationKeyValue = remoteOperationKey.getKey(
+          JSON.stringify({
+            connectionId: dest.instance.connectionId,
+            seed,
+            model: remoteModel.model || undefined,
+            variant: remoteModel.variant || undefined,
+            mode: fields.mode,
+            organizationId: args.organizationId ?? null,
+          })
+        );
         const outcome = await spawn(
           dest.instance.connectionId,
           buildCreateRemoteSessionInput({
@@ -120,9 +160,12 @@ export function useContinueSession(args: {
             model: remoteModel.model,
             variant: remoteModel.variant,
             organizationId: args.organizationId,
-          })
+          }),
+          { operationKey: remoteOperationKeyValue }
         );
         if (outcome.status === 'ready') {
+          // The spawn settled; the next submit is a fresh intent.
+          remoteOperationKey.rotateKey();
           const shareId = putSharePayload({ text: seed, files: [], failedFiles: [] });
           router.push(
             appendShareParams(
@@ -138,12 +181,17 @@ export function useContinueSession(args: {
             ? REMOTE_SPAWN_RETRYABLE_TOAST
             : REMOTE_SPAWN_NON_RETRYABLE_TOAST
         );
+        // A typed non-retryable spawn rejection ends the intent; retryable
+        // outcomes keep the key so a same-key retry dedupes on the relay.
+        if (outcome.status === 'nonRetryable') {
+          remoteOperationKey.rotateKey();
+        }
       } finally {
         busyRef.current = false;
         setIsContinuing(false);
       }
     },
-    [args.organizationId, args.models, router, runCloudCreate, spawn]
+    [args.organizationId, args.models, router, runCloudCreate, spawn, remoteOperationKey]
   );
 
   const fallback = useCallback(

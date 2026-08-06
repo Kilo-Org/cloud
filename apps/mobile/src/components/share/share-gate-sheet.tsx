@@ -19,6 +19,7 @@ import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
@@ -64,6 +65,12 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const { spawn } = useRemoteInstanceSpawn();
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
+  // P1-A-08b: one `operationKey` per share-spawn intent (share + instance),
+  // hoisted so a retryable failure keeps the key (the relay dedupes the
+  // retry) and rotated on a terminal outcome (`ready` navigation or a typed
+  // non-retryable rejection). Uses the share flow's own key, never the
+  // new-session or continue flows' keys.
+  const { getKey, rotateKey } = useHoistedOperationKey();
   // Per-attempt token so a stale spawn's finally cannot clear a newer lock
   // (share replace mid-flight, or same-connection re-tap after replace).
   const spawnAttemptRef = useRef(0);
@@ -271,8 +278,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         spawnAttemptRef.current += 1;
         const attempt = spawnAttemptRef.current;
         setSpawningConnectionId(instance.connectionId);
+        const operationKey = getKey(
+          JSON.stringify({ connectionId: instance.connectionId, shareId })
+        );
         try {
-          const outcome = await spawn(instance.connectionId);
+          const outcome = await spawn(instance.connectionId, undefined, { operationKey });
           // Gate has no "Run on" selection; ignore selection-reset flags.
           const action = resolveRemoteSubmitOutcome({
             outcome,
@@ -289,6 +299,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
             ) {
               return;
             }
+            // The spawn settled; the next share attempt is a fresh intent.
+            rotateKey();
             commit(
               appendShareParams(getSpawnedAgentSessionPath(action.sessionID) as string, shareId)
             );
@@ -305,6 +317,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
             return;
           }
 
+          // A typed non-retryable rejection ends the intent.
+          rotateKey();
           toast.error(action.toast);
         } finally {
           // Only the attempt that still owns the lock may clear it.
@@ -314,7 +328,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         }
       })();
     },
-    [commit, commitEnabled, isSpawning, payload, refetchInstances, shareId, spawn, validation]
+    [
+      commit,
+      commitEnabled,
+      getKey,
+      isSpawning,
+      payload,
+      refetchInstances,
+      rotateKey,
+      shareId,
+      spawn,
+      validation,
+    ]
   );
 
   const handleRetry = useCallback(() => {

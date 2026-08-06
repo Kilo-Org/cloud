@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- fetchSession NOT_FOUND retry helpers stay with the manager (M1). */
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 import {
@@ -63,6 +64,46 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
     return top;
   }
   return undefined;
+}
+
+/**
+ * tRPC codes that are transient enough to keep the same cloud-prepare
+ * `operationKey` across a retry. The operation ledger admits/reconciles a
+ * same-key retry instead of re-executing, so these must never rotate the
+ * key. Everything else with a typed tRPC code (BAD_REQUEST, FORBIDDEN,
+ * UNAUTHORIZED, NOT_FOUND, PAYMENT_REQUIRED, PRECONDITION_FAILED, ...) is a
+ * typed terminal rejection: the key must rotate so the next submit is a
+ * fresh intent and cannot replay the settled failure.
+ */
+const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
+  'INTERNAL_SERVER_ERROR',
+  'BAD_GATEWAY',
+  'SERVICE_UNAVAILABLE',
+  'GATEWAY_TIMEOUT',
+  'TIMEOUT',
+  'TOO_MANY_REQUESTS',
+]);
+
+/** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
+export const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
+
+/**
+ * True when a `prepareSession` failure may be retried with the SAME
+ * `operationKey`. Keeps the key across `creation_in_progress` and transient
+ * transport/5xx failures; a typed terminal rejection (or an error with no
+ * code, which is treated as transport) is the only rotation signal.
+ */
+export function isCloudPrepareRetryableError(error: unknown): boolean {
+  const code = readFetchSessionErrorCode(error);
+  if (code === undefined) {
+    // Transport/network failure — retrying under the same key is safe and
+    // lets the ledger reconcile an ambiguous prior attempt.
+    return true;
+  }
+  if (code === 'CONFLICT') {
+    return error instanceof Error && error.message === CLOUD_PREPARE_IN_PROGRESS_MESSAGE;
+  }
+  return CLOUD_PREPARE_TRANSIENT_CODES.has(code);
 }
 
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
@@ -137,6 +178,13 @@ export function createMobileAgentSessionManager({
   userWebConnection,
   organizationId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
+  // One per-intent operation key for ledger-guarded cloud creates. Attached
+  // only when the prepared input carries `autoInitiate: true`; the SDK's
+  // `PrepareInput` never sets it today, so this branch stays dormant (the
+  // split prepare/initiate flow is a recorded plan exclusion) and preserves
+  // legacy behavior until a future caller supplies it.
+  let cloudPrepareOperationKey: string | undefined = undefined;
+
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
@@ -309,24 +357,46 @@ export function createMobileAgentSessionManager({
     },
     prepare: async input => {
       const prepared = await withCloudAgentDiagnostics('prepare', organizationId, async () => {
+        const effectiveAutoInitiate = (input as { autoInitiate?: boolean }).autoInitiate === true;
+        let usedOperationKey = false;
+        if (effectiveAutoInitiate) {
+          cloudPrepareOperationKey ??= Crypto.randomUUID();
+          usedOperationKey = true;
+        }
         const castInput = {
           ...input,
+          ...(usedOperationKey && cloudPrepareOperationKey !== undefined
+            ? { operationKey: cloudPrepareOperationKey }
+            : {}),
           initialPayload: input.initialPayload
             ? normalizeTransportPayload(input.initialPayload)
             : undefined,
           mode: input.mode as AgentMode,
         };
-        const result = organizationId
-          ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
-              { ...castInput, organizationId },
-              skipBatchOptions
-            )
-          : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput, skipBatchOptions);
-        return {
-          cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
-          kiloSessionId: result.kiloSessionId as KiloSessionId,
-        };
+        try {
+          const result = organizationId
+            ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
+                { ...castInput, organizationId },
+                skipBatchOptions
+              )
+            : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput, skipBatchOptions);
+          return {
+            cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
+            kiloSessionId: result.kiloSessionId as KiloSessionId,
+          };
+        } catch (error) {
+          // A typed terminal rejection ends the intent: the next submit is a
+          // fresh intent with a fresh key. Retryable failures (transport and
+          // `creation_in_progress`) keep the key so the ledger dedupes or
+          // reconciles the retry instead of spawning a second session.
+          if (usedOperationKey && !isCloudPrepareRetryableError(error)) {
+            cloudPrepareOperationKey = undefined;
+          }
+          throw error;
+        }
       });
+      // Success: the intent settled; the next submit is a fresh intent.
+      cloudPrepareOperationKey = undefined;
       return prepared;
     },
     initiate: async input => {

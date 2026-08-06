@@ -190,6 +190,26 @@ export function describeDatabaseError(error: unknown): DatabaseErrorDescription 
   return { name, code: null, constraint: null, table: null, routine: null };
 }
 
+/**
+ * The frames of `error`'s stack under a caller-supplied header.
+ *
+ * V8 renders `error.stack` as `${name}: ${message}` followed by the frames, so
+ * copying a stack verbatim onto a redacted error re-embeds the message it was
+ * redacting — for this path, ~30KB of interpolated statement including prompt
+ * prefixes and the client IP. Dropping the header keeps the throw site, which
+ * `Error.captureStackTrace` on the replacement would lose.
+ *
+ * Frames themselves are `at fn (chunk:line:col)` and carry no request data.
+ */
+export function stackFramesUnderHeader(error: unknown, header: string): string {
+  if (!(error instanceof Error) || typeof error.stack !== 'string') return header;
+  // The message is multi-line for a drizzle failure, so anchor on the first frame
+  // rather than assuming the header occupies a single line.
+  const firstFrame = error.stack.search(/^\s+at\s/m);
+  if (firstFrame === -1) return header;
+  return `${header}\n${error.stack.slice(firstFrame)}`;
+}
+
 /** PostgreSQL `unique_violation`. */
 const UNIQUE_VIOLATION = '23505';
 

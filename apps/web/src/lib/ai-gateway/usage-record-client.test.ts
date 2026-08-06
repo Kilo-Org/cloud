@@ -190,6 +190,23 @@ describe('recordUsageInPrimaryRegion', () => {
     expect(mockedCaptureException).toHaveBeenCalledTimes(1);
   });
 
+  // A 2xx with an unreadable body is the same hazard as a schema mismatch: the
+  // write may have committed, so it must fall back rather than re-send.
+  test('does not retry an unreadable response body', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    });
+
+    const outcome = await recordUsageInPrimaryRegion(payload);
+
+    expect(outcome).toEqual({ kind: 'unavailable', reason: 'unreadable_response' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   // A malformed response may mean the write committed, so retrying risks nothing
   // (the receiver dedupes) but is pointless; the caller must reconcile instead.
   test('does not retry a malformed response body', async () => {

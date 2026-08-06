@@ -10,6 +10,7 @@ import {
   isUsageRowConflict,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
+  stackFramesUnderHeader,
 } from './usage-record-diagnostics';
 
 /** Shape of the drizzle wrapper: a message carrying the statement, plus a cause. */
@@ -85,6 +86,50 @@ describe('describeDatabaseError', () => {
   test('does not throw on null or a primitive', () => {
     expect(describeDatabaseError(null).code).toBeNull();
     expect(describeDatabaseError('nope').code).toBeNull();
+  });
+});
+
+describe('stackFramesUnderHeader', () => {
+  // The regression this exists to prevent: `error.stack` opens with
+  // `name: message`, so copying it verbatim onto a redacted error puts the
+  // interpolated statement straight back into the Sentry event.
+  test('drops the original header, which contains the statement', () => {
+    const stack = stackFramesUnderHeader(
+      drizzleError({ code: '23505', table: 'microdollar_usage' }),
+      'Error: insertUsageRecord failed (code=23505)'
+    );
+    expect(stack).not.toContain('You are Kilo');
+    expect(stack).not.toContain('134.82.68.167');
+    expect(stack).not.toContain('microdollar_usage_ins');
+    expect(stack).not.toContain('params:');
+    expect(stack).not.toContain('Failed query');
+  });
+
+  test('keeps the frames, so the throw site survives redaction', () => {
+    const error = new Error('secret message');
+    error.stack = 'Error: secret message\n    at inner (chunk.js:1:1)\n    at outer (chunk.js:2:2)';
+    expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe(
+      'Error: redacted\n    at inner (chunk.js:1:1)\n    at outer (chunk.js:2:2)'
+    );
+  });
+
+  test('anchors on the first frame even when the message spans lines', () => {
+    const error = new Error('line one\nline two\nparams: secret');
+    error.stack = 'Error: line one\nline two\nparams: secret\n    at inner (chunk.js:1:1)';
+    expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe(
+      'Error: redacted\n    at inner (chunk.js:1:1)'
+    );
+  });
+
+  test('falls back to the header alone when there are no frames', () => {
+    const error = new Error('boom');
+    error.stack = 'Error: boom';
+    expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe('Error: redacted');
+  });
+
+  test('returns the header for a non-error', () => {
+    expect(stackFramesUnderHeader('nope', 'Error: redacted')).toBe('Error: redacted');
+    expect(stackFramesUnderHeader(null, 'Error: redacted')).toBe('Error: redacted');
   });
 });
 

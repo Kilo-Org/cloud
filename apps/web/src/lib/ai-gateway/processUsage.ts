@@ -1,7 +1,11 @@
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
-import { describeDatabaseError, isUsageRowConflict } from './usage-record-diagnostics';
+import {
+  describeDatabaseError,
+  isUsageRowConflict,
+  stackFramesUnderHeader,
+} from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -721,14 +725,14 @@ export async function insertUsageRecord(
       return alreadyRecorded;
     }
     // Report the redacted description rather than `error`, whose message carries
-    // the interpolated statement and its parameters. The stack is preserved on the
-    // replacement so the failing call site is still identifiable.
+    // the interpolated statement and its parameters. Only the original stack's
+    // frames are carried over: `error.stack` begins with `name: message`, so
+    // copying it verbatim would put the message straight back into the event.
     const described = describeDatabaseError(error);
     console.error('insertUsageRecord failed', { usageId: coreUsageFields.id, error: described });
-    const redacted = new Error(
-      `insertUsageRecord failed (code=${described.code ?? 'unknown'} constraint=${described.constraint ?? 'none'})`
-    );
-    if (error instanceof Error && error.stack) redacted.stack = error.stack;
+    const summary = `insertUsageRecord failed (code=${described.code ?? 'unknown'} constraint=${described.constraint ?? 'none'})`;
+    const redacted = new Error(summary);
+    redacted.stack = stackFramesUnderHeader(error, `Error: ${summary}`);
     captureException(redacted, {
       tags: {
         source: 'insertUsageRecord',

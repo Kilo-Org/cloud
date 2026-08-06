@@ -100,7 +100,19 @@ export async function recordUsageInPrimaryRegion(
         lastReason = `http_${response.status}`;
         if (!isRetryableStatus(response.status)) break;
       } else {
-        const parsed = UsageRecordResponseSchema.safeParse(await response.json());
+        // Read the body inside its own guard. A truncated or non-JSON body throws
+        // here, and the outer catch would treat that as a retryable transport
+        // failure — but the status was already 2xx, so the write may have
+        // committed, exactly like the schema mismatch below. Both must fall back
+        // rather than re-send and manufacture a redelivery.
+        let payload: unknown;
+        try {
+          payload = await response.json();
+        } catch {
+          lastReason = 'unreadable_response';
+          break;
+        }
+        const parsed = UsageRecordResponseSchema.safeParse(payload);
         if (!parsed.success) {
           // A malformed response is not safe to retry: the write may well have
           // committed. Fall back so the caller can reconcile on `core.id`.

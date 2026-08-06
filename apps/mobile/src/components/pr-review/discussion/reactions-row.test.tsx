@@ -129,9 +129,9 @@ describe('ReactionsRow picker dismissal focus', () => {
     }
     pressNode(backdrop);
 
-    // The native Modal is still presented while the exit animation plays, so
-    // focus must not move to the trigger yet.
-    expect(getModalProps(renderer.root).visible).toBe(true);
+    // `visible` flips at once — the platform animates the dismissal — but the
+    // Modal is still presented, so focus must not move to the trigger yet.
+    expect(getModalProps(renderer.root).visible).toBe(false);
     expect(moveFocus).not.toHaveBeenCalled();
 
     // Native dismissal completes: onDismiss fires and focus returns.
@@ -140,10 +140,11 @@ describe('ReactionsRow picker dismissal focus', () => {
     });
     expect(moveFocus).toHaveBeenCalledTimes(1);
 
+    // No timer runs on iOS, so nothing can restore focus a second time.
     act(() => {
-      vi.advanceTimersByTime(250);
+      vi.advanceTimersByTime(500);
     });
-    expect(getModalProps(renderer.root).visible).toBe(false);
+    expect(moveFocus).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -207,27 +208,24 @@ describe('ReactionsRow picker dismissal focus', () => {
     pressNode(addReaction);
     expect(getModalProps(renderer.root).visible).toBe(true);
 
-    // Android back button answers through onRequestClose; the sheet starts
-    // its exit animation and keeps the native Modal presented.
+    // Android back button answers through onRequestClose; `visible` flips at
+    // once and the platform animates the slide-out.
     act(() => {
       (getModalProps(renderer.root).onRequestClose as () => void)();
-    });
-    expect(getModalProps(renderer.root).visible).toBe(true);
-    expect(moveFocus).not.toHaveBeenCalled();
-
-    // Exit animation completes (200ms): the native Modal leaves the tree, but
-    // Android never fires Modal.onDismiss, so focus must wait out the
-    // post-dismiss settle beat before the background tree is reachable.
-    act(() => {
-      vi.advanceTimersByTime(200);
     });
     expect(getModalProps(renderer.root).visible).toBe(false);
     expect(moveFocus).not.toHaveBeenCalled();
 
-    // The settle beat (100ms) fires the Android fallback callback, which
-    // finally restores focus to the trigger exactly once.
+    // Android never fires Modal.onDismiss, so focus waits out the platform's
+    // slide-out; part-way through, the background tree is still unreachable.
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(299);
+    });
+    expect(moveFocus).not.toHaveBeenCalled();
+
+    // The settle delay elapses and focus returns to the trigger exactly once.
+    act(() => {
+      vi.advanceTimersByTime(1);
     });
     expect(moveFocus).toHaveBeenCalledTimes(1);
 
@@ -257,10 +255,10 @@ describe('ReactionsRow picker dismissal focus', () => {
     expect(moveFocus).not.toHaveBeenCalled();
 
     // The row (and its trigger) unmount before the Modal finishes dismissing;
-    // the pending exit timer is cleared and onDismiss never fires.
+    // the pending settle timer is cleared and onDismiss never fires.
     renderer.unmount();
     act(() => {
-      vi.advanceTimersByTime(250);
+      vi.advanceTimersByTime(500);
     });
     expect(moveFocus).not.toHaveBeenCalled();
   });

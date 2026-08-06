@@ -2,20 +2,18 @@
 // Pattern-copied from kilo-chat's message-reaction-picker-sheet, then
 // converted to a native transparent Modal (D5): the Modal isolates the
 // background on both platforms, `onRequestClose` answers the Android back
-// button, and Reanimated keeps the fade/slide motion inside. A native Modal
-// dismisses the moment `visible` flips, so the sheet owns presentation: it
-// mounts the animated content on open (entering plays) and defers its own
-// dismissal until the exiting animations finish.
+// button, and `animationType="slide"` gives the sheet its motion. Letting the
+// platform animate keeps `visible` the single source of truth — nothing here
+// has to stay in sync with an animation duration.
 //
 // Focus restore after dismissal: `Modal.onDismiss` is iOS-only in React
-// Native, so on Android a delayed post-close callback fires instead. Both
-// paths run through one guard so the parent's `onDismiss` handler fires
-// exactly once, never while the native Modal is still presented.
+// Native, so on Android a delayed callback fires instead. Both paths run
+// through one guard so the parent's `onDismiss` handler fires exactly once,
+// never while the native Modal is still presented.
 
 import { X } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, type Text as RNText, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef } from 'react';
+import { Modal, Platform, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
@@ -28,14 +26,10 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { cn } from '@/lib/utils';
 
-// The longest exiting animation is SlideOutDown (180ms); FadeOut (150ms)
-// finishes earlier. Keep the native Modal presented a tick past it so both
-// exits are fully visible before the Modal is dismissed.
-const EXIT_ANIMATION_MS = 200;
-// Android never fires `Modal.onDismiss` (iOS-only in React Native). This is
-// the extra beat after the native Modal unmounts before the focus-restore
-// callback runs, so the background accessibility tree is reachable again.
-const POST_DISMISS_SETTLE_MS = 100;
+// Android never fires `Modal.onDismiss` (iOS-only in React Native), so the
+// focus-restore callback waits out the platform's own slide-out before the
+// background accessibility tree is reachable again.
+const ANDROID_DISMISS_SETTLE_MS = 300;
 
 type ReactionPickerSheetProps = {
   readonly visible: boolean;
@@ -60,20 +54,13 @@ export function ReactionPickerSheet({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const titleRef = useRef<RNText | null>(null);
-  // The native Modal and the Reanimated content are controlled separately:
-  // opening mounts the content (entering animations play), closing unmounts
-  // it first (exiting animations play) and only then dismisses the Modal.
-  // `visible` stays the parent-owned source of truth on every close path.
-  const [nativeVisible, setNativeVisible] = useState(false);
-  const [contentVisible, setContentVisible] = useState(false);
   const wasVisibleRef = useRef(visible);
   // Focus restore after dismissal: `Modal.onDismiss` fires on iOS only, so
-  // Android relies on the delayed post-close callback below. Both paths go
-  // through `notifyDismissed`, whose guard lets the parent's focus handler
-  // run exactly once per dismissal no matter which path wins.
+  // Android relies on the delayed callback below. Both paths go through
+  // `notifyDismissed`, whose guard lets the parent's focus handler run exactly
+  // once per dismissal no matter which path wins.
   const dismissedRef = useRef(false);
   const onDismissRef = useRef(onDismiss);
-  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onDismissRef.current = onDismiss;
@@ -92,28 +79,15 @@ export function ReactionPickerSheet({
     wasVisibleRef.current = visible;
     if (visible) {
       dismissedRef.current = false;
-      setNativeVisible(true);
-      setContentVisible(true);
       return undefined;
     }
-    if (!wasVisible) {
+    if (!wasVisible || Platform.OS === 'ios') {
+      // iOS gets the native `onDismiss`, so it needs no timer at all.
       return undefined;
     }
-    setContentVisible(false);
-    const timer = setTimeout(() => {
-      setNativeVisible(false);
-      // Android never receives the native Modal's `onDismiss`, so schedule
-      // the focus-restore callback a beat after the native Modal has left the
-      // tree — never while it is still presented. On iOS the native
-      // `onDismiss` normally wins the race and the guard skips this fallback.
-      fallbackTimerRef.current = setTimeout(notifyDismissed, POST_DISMISS_SETTLE_MS);
-    }, EXIT_ANIMATION_MS);
+    const timer = setTimeout(notifyDismissed, ANDROID_DISMISS_SETTLE_MS);
     return () => {
       clearTimeout(timer);
-      if (fallbackTimerRef.current != null) {
-        clearTimeout(fallbackTimerRef.current);
-        fallbackTimerRef.current = null;
-      }
     };
   }, [visible, notifyDismissed]);
 
@@ -126,9 +100,9 @@ export function ReactionPickerSheet({
 
   return (
     <Modal
-      visible={nativeVisible}
+      visible={visible}
       transparent
-      animationType="none"
+      animationType="slide"
       // Best-effort focus after native presentation; moveA11yFocus is a no-op
       // when the title handle is not mounted yet, so no retry loop is needed.
       onShow={() => {
@@ -141,61 +115,53 @@ export function ReactionPickerSheet({
       onDismiss={notifyDismissed}
       onRequestClose={onClose}
     >
-      {contentVisible ? (
-        <Animated.View
-          entering={FadeIn.duration(150)}
-          exiting={FadeOut.duration(150)}
-          className="flex-1 justify-end bg-black/40"
+      <View className="flex-1 justify-end bg-black/40">
+        <Pressable className="flex-1" accessibilityLabel="Close reactions" onPress={onClose} />
+        <View
+          accessibilityViewIsModal
+          className="gap-4 rounded-t-3xl bg-card px-5 pt-4"
+          style={{ paddingBottom: insets.bottom + 24 }}
         >
-          <Pressable className="flex-1" accessibilityLabel="Close reactions" onPress={onClose} />
-          <Animated.View
-            entering={SlideInDown.duration(220)}
-            exiting={SlideOutDown.duration(180)}
-            accessibilityViewIsModal
-            className="gap-4 rounded-t-3xl bg-card px-5 pt-4"
-            style={{ paddingBottom: insets.bottom + 24 }}
-          >
-            <View className="flex-row items-center justify-between">
-              <Text
-                ref={titleRef}
-                accessibilityRole="header"
-                className="text-base font-semibold text-foreground"
-              >
-                Reactions
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close reactions"
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-                onPress={onClose}
-              >
-                <X size={18} color={colors.foreground} />
-              </Pressable>
-            </View>
-            <View className="flex-row flex-wrap gap-2">
-              {REVIEW_REACTION_CONTENTS.map(content => {
-                const isReacted = reacted.has(content);
-                return (
-                  <Pressable
-                    key={content}
-                    accessibilityRole="button"
-                    accessibilityLabel={REACTION_LABEL[content]}
-                    className={cn(
-                      'h-11 w-11 items-center justify-center rounded-full active:opacity-75',
-                      isReacted ? 'bg-accent-soft' : 'bg-muted'
-                    )}
-                    onPress={() => {
-                      onPick(content);
-                    }}
-                  >
-                    <Text className="text-xl">{REACTION_EMOJI[content]}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </Animated.View>
-        </Animated.View>
-      ) : null}
+          <View className="flex-row items-center justify-between">
+            <Text
+              ref={titleRef}
+              accessibilityRole="header"
+              className="text-base font-semibold text-foreground"
+            >
+              Reactions
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close reactions"
+              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+              onPress={onClose}
+            >
+              <X size={18} color={colors.foreground} />
+            </Pressable>
+          </View>
+          <View className="flex-row flex-wrap gap-2">
+            {REVIEW_REACTION_CONTENTS.map(content => {
+              const isReacted = reacted.has(content);
+              return (
+                <Pressable
+                  key={content}
+                  accessibilityRole="button"
+                  accessibilityLabel={REACTION_LABEL[content]}
+                  className={cn(
+                    'h-11 w-11 items-center justify-center rounded-full active:opacity-75',
+                    isReacted ? 'bg-accent-soft' : 'bg-muted'
+                  )}
+                  onPress={() => {
+                    onPick(content);
+                  }}
+                >
+                  <Text className="text-xl">{REACTION_EMOJI[content]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 }

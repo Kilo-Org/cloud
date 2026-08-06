@@ -1474,6 +1474,10 @@ export class SessionService {
           createdOnPlatform,
           commandPolicy: commandGuardPolicy.policyName,
           deniedCommandPatterns: commandGuardPolicy.denied.length,
+          // The workspace path is the root of the external_directory allowlist
+          // below, so record it: a wrong root denies every tool call that
+          // resolves outside it, and the CLI-side denial never reaches us.
+          workspacePath,
         })
         .info('Enabled read-only command guard policy');
     }

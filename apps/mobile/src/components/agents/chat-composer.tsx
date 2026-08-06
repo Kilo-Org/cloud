@@ -15,6 +15,7 @@ import {
   type LayoutChangeEvent,
   Platform,
   type TextInput,
+  type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -33,6 +34,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { insertPastedText } from '@/components/agents/composer-paste-text';
 import {
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   resolveComposerTextContentWidth,
@@ -158,6 +160,11 @@ export function ChatComposer({
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
+  // Last caret the input reported. Paste inserts here so the button behaves
+  // like the platform paste. ponytail: a caret the input never reported (a
+  // programmatic text swap that emits no selection event) clamps to the
+  // draft's end; track selection in `handleChangeText` too if that shows up.
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,6 +252,7 @@ export function ChatComposer({
       text: draft,
       selection: { start: draft.length, end: draft.length },
     });
+    selectionRef.current = { start: draft.length, end: draft.length };
     setHasText(draft.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(draft));
     measureRef.current.setText(draft);
@@ -335,12 +343,18 @@ export function ChatComposer({
       await upload.addCandidates([file]);
     },
     addText: text => {
-      applyVoiceDraftToInput({
-        input: inputRef.current,
-        draft: textRef.current + text,
+      const pasted = insertPastedText({
+        draft: textRef.current,
+        selection: selectionRef.current,
+        text,
         maxLength: 4000,
-        onChangeText: handleChangeText,
       });
+      inputRef.current?.setNativeProps({
+        text: pasted.draft,
+        selection: { start: pasted.caret, end: pasted.caret },
+      });
+      selectionRef.current = { start: pasted.caret, end: pasted.caret };
+      handleChangeText(pasted.draft);
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -572,6 +586,10 @@ export function ChatComposer({
     }
   }
 
+  function handleSelectionChange(event: TextInputSelectionChangeEvent) {
+    selectionRef.current = event.nativeEvent.selection;
+  }
+
   function handleSelectSlashCommand(command: SlashCommandInfo) {
     // Same-render race guard: a suggestion row rendered before the send started
     // can be tapped while the lock is held. Because the lock is the authority
@@ -589,6 +607,7 @@ export function ChatComposer({
       text: value,
       selection: { start: value.length, end: value.length },
     });
+    selectionRef.current = { start: value.length, end: value.length };
     inputRef.current?.focus();
   }
 
@@ -751,6 +770,7 @@ export function ChatComposer({
               setIsFocused(true);
             }}
             onInputLayout={handleInputLayout}
+            onSelectionChange={handleSelectionChange}
             onStop={handleStop}
             onSubmit={() => {
               void submit();

@@ -6,6 +6,10 @@ import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 
 const onChangeTextMock = vi.fn();
 const pasteClipboardImageMock = vi.hoisted(() => vi.fn());
+/** Captures the options the composer hands the clipboard hint. */
+const clipboardHintOptions = vi.hoisted(() => ({
+  current: null as { addText?: (text: string) => void } | null,
+}));
 
 // ── React hooks (real useEffect needs rendering context, so mock all hooks) ──
 vi.mock('react', async () => {
@@ -99,11 +103,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
-  useClipboardImageHint: () => ({
-    visible: false,
-    refresh: vi.fn(),
-    paste: pasteClipboardImageMock,
-  }),
+  useClipboardImageHint: (options: { addText?: (text: string) => void }) => {
+    clipboardHintOptions.current = options;
+    return {
+      visible: false,
+      refresh: vi.fn(),
+      paste: pasteClipboardImageMock,
+    };
+  },
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
@@ -236,6 +243,27 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textInputProps).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(textInputProps!.defaultValue).toBeUndefined();
+  });
+
+  it('pastes clipboard text at the reported caret, not at the draft end', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    onChangeTextMock.mockClear();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt({
+      ...defaultProps(),
+      initialPrompt: 'fix the bug',
+    }) as Node;
+
+    const textInputProps = findElementByType(element, 'TextInput') ?? {};
+    const reportSelection = textInputProps.onSelectionChange as (event: {
+      nativeEvent: { selection: { start: number; end: number } };
+    }) => void;
+    reportSelection({ nativeEvent: { selection: { start: 4, end: 4 } } });
+
+    clipboardHintOptions.current?.addText?.('really ');
+
+    expect(onChangeTextMock).toHaveBeenCalledWith('fix really the bug');
   });
 
   it('renders the paste button wired to the clipboard hint paste path', async () => {

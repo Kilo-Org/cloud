@@ -146,7 +146,7 @@ describe('resolveChatComposerControlState', () => {
     expect(resolveChatComposerControlState(base).showToolbar).toBe(false);
   });
 
-  it('disables the paperclip when at or above the attachment cap', () => {
+  it('disables the paperclip at the attachment cap but keeps paste live', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 5,
       attachmentMax: 5,
@@ -159,7 +159,9 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.paperclipDisabled).toBe(true);
-    expect(state.pasteButtonDisabled).toBe(true);
+    // A full attachment list must not block a text paste; the upload
+    // pipeline owns the over-cap toast for an image paste.
+    expect(state.pasteButtonDisabled).toBe(false);
   });
 
   it('disables the paperclip while the composer is in a toolbar-disabled state', () => {

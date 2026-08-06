@@ -5,6 +5,7 @@ import {
   Pressable,
   TextInput as RNTextInput,
   type TextInput,
+  type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -13,6 +14,7 @@ import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
+import { insertPastedText } from '@/components/agents/composer-paste-text';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -112,6 +114,11 @@ export function NewSessionPrompt({
   const promptRef = useRef(initialPrompt ?? '');
   const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
+  // Last caret the input reported. Paste inserts here so the button behaves
+  // like the platform paste. ponytail: a caret the input never reported clamps
+  // to the draft's end; track selection in `handlePromptChange` too if that
+  // shows up.
+  const promptSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -180,12 +187,18 @@ export function NewSessionPrompt({
       await onPrefillAttachments([file]);
     },
     addText: text => {
-      applyVoiceDraftToInput({
-        input: promptInputRef.current,
-        draft: promptRef.current + text,
+      const pasted = insertPastedText({
+        draft: promptRef.current,
+        selection: promptSelectionRef.current,
+        text,
         maxLength: PROMPT_INPUT_MAX_CHARS,
-        onChangeText: handlePromptChange,
       });
+      promptInputRef.current?.setNativeProps({
+        text: pasted.draft,
+        selection: { start: pasted.caret, end: pasted.caret },
+      });
+      promptSelectionRef.current = { start: pasted.caret, end: pasted.caret };
+      handlePromptChange(pasted.draft);
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -195,6 +208,10 @@ export function NewSessionPrompt({
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
+  }
+
+  function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
+    promptSelectionRef.current = event.nativeEvent.selection;
   }
 
   function handlePaperclipPress() {
@@ -232,6 +249,7 @@ export function NewSessionPrompt({
               : undefined,
           ]}
           onChangeText={handlePromptChange}
+          onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
           scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
           editable={control.inputEditable}
@@ -255,7 +273,9 @@ export function NewSessionPrompt({
             >
               <Paperclip size={18} color={colors.mutedForeground} />
             </Pressable>
-            <ComposerPasteButton onPress={pasteClipboard} disabled={paperclipDisabled} />
+            {/* Follows the input, not the paperclip: a full attachment list
+                still allows a text paste. */}
+            <ComposerPasteButton onPress={pasteClipboard} disabled={!control.inputEditable} />
           </View>
           {voiceInput.available ? (
             <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">

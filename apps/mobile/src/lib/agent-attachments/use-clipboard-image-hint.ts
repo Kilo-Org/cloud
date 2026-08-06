@@ -123,6 +123,11 @@ export function useClipboardImageHint(
       refreshEpochRef.current += 1;
       setHasImage(false);
       try {
+        // Image first: a composer that takes attachments should attach a
+        // copied screenshot, not paste its file path.
+        // ponytail: a text clipboard runs the image read first, so iOS 16 can
+        // raise its paste prompt twice. Probe `hasClipboardImage()` before the
+        // read if a device run shows a second prompt.
         const file = await readClipboardImageFile();
         if (!file) {
           // No readable image. A caller with an always-present paste control

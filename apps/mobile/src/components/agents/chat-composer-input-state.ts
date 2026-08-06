@@ -21,7 +21,9 @@ type ChatComposerControlState = {
   paperclipDisabled: boolean;
   /** Attachment capability: the paste button renders only when attachments are enabled. */
   pasteButtonVisible: boolean;
-  /** Mirrors `paperclipDisabled` for the paste button. */
+  /** The paste button follows the input, not the paperclip: a full attachment
+   *  list still allows a text paste, and the upload pipeline owns the
+   *  over-cap toast for an image paste. */
   pasteButtonDisabled: boolean;
   /** Toolbar (mode/variant/model row) visibility. */
   showToolbar: boolean;
@@ -68,7 +70,7 @@ export function resolveChatComposerControlState(
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,
     paperclipDisabled,
-    pasteButtonDisabled: paperclipDisabled,
+    pasteButtonDisabled: !inputEditable,
     pasteButtonVisible: attachmentsEnabled,
     showToolbar,
     toolbarDisabled,

@@ -30,6 +30,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
@@ -801,6 +802,10 @@ export function SessionDetailContent({
                 onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
               }
             : {})}
+        />
+        <SessionConnectionIndicator
+          activeSessionType={activeSessionType}
+          agentStatusType={agentStatus.type}
         />
         {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 

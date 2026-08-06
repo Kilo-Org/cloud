@@ -7,8 +7,11 @@ import { ReactionsRow } from './reactions-row';
 
 const { moveFocus } = vi.hoisted(() => ({ moveFocus: vi.fn() }));
 
+const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
+
 vi.mock('react-native', () => ({
   Modal: 'Modal',
+  Platform: mockedPlatform,
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -92,6 +95,7 @@ describe('ReactionsRow picker dismissal focus', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     moveFocus.mockClear();
+    mockedPlatform.OS = 'ios';
   });
 
   afterEach(() => {
@@ -181,6 +185,51 @@ describe('ReactionsRow picker dismissal focus', () => {
     act(() => {
       vi.advanceTimersByTime(250);
     });
+
+    renderer.unmount();
+  });
+
+  it('moves focus only after the Android fallback delay on the back-button close path', async () => {
+    mockedPlatform.OS = 'android';
+    const onToggle = vi.fn<() => void>();
+    const renderer = await render(
+      createElement(ReactionsRow, { reactions: baseReactions, onToggle })
+    );
+
+    const addReaction = findNode(
+      renderer.root,
+      'Pressable',
+      p => p.accessibilityLabel === 'Add reaction'
+    );
+    if (!addReaction) {
+      throw new Error('Add reaction button not found');
+    }
+    pressNode(addReaction);
+    expect(getModalProps(renderer.root).visible).toBe(true);
+
+    // Android back button answers through onRequestClose; the sheet starts
+    // its exit animation and keeps the native Modal presented.
+    act(() => {
+      (getModalProps(renderer.root).onRequestClose as () => void)();
+    });
+    expect(getModalProps(renderer.root).visible).toBe(true);
+    expect(moveFocus).not.toHaveBeenCalled();
+
+    // Exit animation completes (200ms): the native Modal leaves the tree, but
+    // Android never fires Modal.onDismiss, so focus must wait out the
+    // post-dismiss settle beat before the background tree is reachable.
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(getModalProps(renderer.root).visible).toBe(false);
+    expect(moveFocus).not.toHaveBeenCalled();
+
+    // The settle beat (100ms) fires the Android fallback callback, which
+    // finally restores focus to the trigger exactly once.
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(moveFocus).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

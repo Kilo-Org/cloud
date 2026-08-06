@@ -89,8 +89,8 @@ export function ReactionsRow({
           }}
           hitSlop={ADD_REACTION_HIT_SLOP}
           className={cn(
-            'rounded-full border border-border bg-card p-1.5 active:opacity-70',
-            isDisabled && 'opacity-50'
+            'rounded-full border bg-card p-1.5 active:opacity-70',
+            isDisabled ? 'border-hair-soft' : 'border-border'
           )}
         >
           <SmilePlus size={16} color={colors.mutedForeground} />
@@ -130,7 +130,13 @@ function ReactionPill({
   // Reacted pills get the accent-soft fill (same as the rest of the
   // product's "active toggle" surface) so they read as selected in
   // both light and dark themes. Unreacted pills use a flat border
-  // so the row stays calm when the user hasn't engaged.
+  // so the row stays calm when the user hasn't engaged. Disabled
+  // pills swap the border for hair-soft as the non-color cue while
+  // keeping the selected fill and full-contrast content readable.
+  let borderClass = viewerHasReacted ? 'border-primary' : 'border-border';
+  if (disabled) {
+    borderClass = 'border-hair-soft';
+  }
   return (
     <Pressable
       {...reactionPillA11y({ emoji, count, viewerHasReacted, disabled })}
@@ -139,7 +145,8 @@ function ReactionPill({
       hitSlop={REACTION_PILL_HIT_SLOP}
       className={cn(
         'flex-row items-center gap-1 rounded-full border px-2 py-1 active:opacity-70',
-        viewerHasReacted ? 'border-primary bg-accent-soft' : 'border-border bg-card'
+        viewerHasReacted ? 'bg-accent-soft' : 'bg-card',
+        borderClass
       )}
     >
       <Text className="text-base leading-none">{emoji}</Text>

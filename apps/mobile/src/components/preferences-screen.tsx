@@ -28,9 +28,7 @@ function PreferenceRow({
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   return (
-    <View
-      className={`min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${disabled ? 'opacity-40' : ''}`}
-    >
+    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
         <Text className="text-sm font-medium">{title}</Text>

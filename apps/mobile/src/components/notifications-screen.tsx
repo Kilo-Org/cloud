@@ -162,9 +162,7 @@ function CategoryRow({
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   const isDisabled = disabled || !editable;
   return (
-    <View
-      className={`min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${isDisabled ? 'opacity-40' : ''}`}
-    >
+    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
         <Text className="text-sm font-medium">{meta.title}</Text>
@@ -448,9 +446,7 @@ export function NotificationsScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Push
           </Text>
-          <View
-            className={`flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${masterLeading === 'off' ? 'opacity-50' : ''}`}
-          >
+          <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
             {masterLeading === 'neutral' && <Skeleton className="h-[18px] w-[18px] rounded" />}
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
@@ -490,6 +486,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
+                  accessibilityLabel="Notifications enabled"
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {

@@ -64,14 +64,17 @@ function MethodPicker({
               accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
               className={cn(
                 'min-h-8 items-center justify-center rounded-full border px-2.5 py-1 active:opacity-70',
-                active ? 'border-primary bg-primary' : 'border-border bg-secondary',
-                isDisabled && 'opacity-50'
+                active && 'border-primary bg-primary',
+                !active && isDisabled && 'border-hair-soft bg-secondary',
+                !active && !isDisabled && 'border-border bg-secondary'
               )}
             >
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  active ? 'text-primary-foreground' : 'text-foreground'
+                  active && 'text-primary-foreground',
+                  !active && isDisabled && 'text-muted-foreground',
+                  !active && !isDisabled && 'text-foreground'
                 )}
               >
                 {shortLabel}

@@ -307,14 +307,17 @@ function ReviewEventChips(props: {
               {...radioItemA11y({ label: option.label, checked: active, disabled: props.disabled })}
               className={cn(
                 'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
-                active ? 'border-primary bg-primary' : 'border-border bg-secondary',
-                props.disabled && 'opacity-50'
+                active && 'border-primary bg-primary',
+                !active && props.disabled && 'border-hair-soft bg-secondary',
+                !active && !props.disabled && 'border-border bg-secondary'
               )}
             >
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  active ? 'text-primary-foreground' : 'text-foreground'
+                  active && 'text-primary-foreground',
+                  !active && props.disabled && 'text-muted-foreground',
+                  !active && !props.disabled && 'text-foreground'
                 )}
               >
                 {option.label}

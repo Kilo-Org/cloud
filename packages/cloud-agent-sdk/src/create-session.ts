@@ -15,7 +15,11 @@
 import { createSessionResponseV1Schema } from './schemas';
 import type { CreateRemoteSessionInput } from './transport';
 import type { KiloSessionId } from './types';
-import { CommandDeliveredError, type UserWebConnection } from './user-web-connection';
+import {
+  CommandDeliveredError,
+  UserWebCommandError,
+  type UserWebConnection,
+} from './user-web-connection';
 
 export { createSessionResponseV1Schema } from './schemas';
 export type { CreateSessionResponseV1 } from './schemas';
@@ -130,4 +134,90 @@ export async function createRemoteSessionOnConnection(
     }
     throw error;
   }
+}
+
+/**
+ * Exact-match literal for the relay's "instance disconnected" string
+ * (`UserConnectionDO`). Special-cased to `retryable` because semantically the
+ * instance disconnected, which is the same recovery path as a transport
+ * failure.
+ */
+export const SESSION_OWNER_NOT_FOUND_LITERAL = 'Session owner not found';
+
+export type CreateSessionOutcome =
+  | { status: 'ready'; sessionID: KiloSessionId }
+  | { status: 'retryable'; reason: string; cause: unknown }
+  | { status: 'nonRetryable'; reason: string; cause: unknown };
+
+/**
+ * Classify the resolved-or-rejected outcome of `createRemoteSessionOnConnection`
+ * into the spawn flow's state space:
+ *
+ *   - `ready`        — a fresh `KiloSessionId` was provisioned by the CLI
+ *   - `retryable`    — either a transport-level failure (timeout, destroyed
+ *                      connection, socket gone) OR the relay-emitted literal
+ *                      `'Session owner not found'`
+ *   - `nonRetryable` — anything else: a malformed response envelope, a
+ *                      delivered CLI string error, or any structured
+ *                      `UserWebCommandError`
+ *
+ * A durable D8 replay of a terminal envelope carries exactly the live
+ * envelope's shape under the retry request's id, so a replayed envelope must
+ * classify identically to the original live delivery.
+ *
+ * The `cause` field preserves the original error for callers that want to
+ * surface or log it; `reason` is a short, user-safe string intended for UI.
+ */
+export function classifyCreateSessionResult(
+  result: PromiseSettledResult<unknown>
+): CreateSessionOutcome {
+  if (result.status === 'fulfilled') {
+    const parsed = parseCreateSessionResponse(result.value);
+    if (parsed.ok) {
+      return { status: 'ready', sessionID: parsed.kiloSessionId };
+    }
+    return {
+      status: 'nonRetryable',
+      reason: 'unexpected response shape',
+      cause: result.value,
+    };
+  }
+
+  // result.status === 'rejected'
+  const cause: unknown = result.reason;
+
+  // Structured relay error: keep `.code` available; the classifier still
+  // intentionally maps all such errors to `nonRetryable`.
+  if (cause instanceof UserWebCommandError) {
+    return {
+      status: 'nonRetryable',
+      reason: cause.message || cause.code,
+      cause,
+    };
+  }
+
+  // Delivered bare-string error: special-case the relay's vanished-connection
+  // literal to `retryable` (see `SESSION_OWNER_NOT_FOUND_LITERAL`).
+  if (cause instanceof CommandDeliveredError) {
+    if (cause.message === SESSION_OWNER_NOT_FOUND_LITERAL) {
+      return {
+        status: 'retryable',
+        reason: SESSION_OWNER_NOT_FOUND_LITERAL,
+        cause,
+      };
+    }
+    return {
+      status: 'nonRetryable',
+      reason: cause.message,
+      cause,
+    };
+  }
+
+  // Anything else (plain `Error` from timeout / destroyed connection /
+  // socket gone) is a transport failure: retryable.
+  return {
+    status: 'retryable',
+    reason: cause instanceof Error ? cause.message : 'transport failure',
+    cause,
+  };
 }

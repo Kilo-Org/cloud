@@ -1,4 +1,5 @@
 import {
+  classifyCreateSessionResult,
   createRemoteSessionOnConnection,
   createSessionResponseV1Schema,
   parseCreateSessionResponse,
@@ -439,10 +440,9 @@ describe('createRemoteSessionOnConnection', () => {
       agent: 'code',
     });
 
-    expect(parseCreateSessionResponse(replayed)).toEqual(parseCreateSessionResponse(live));
-    expect(parseCreateSessionResponse(replayed)).toEqual({
-      ok: true,
-      kiloSessionId: VALID_SESSION_ID,
-    });
+    const liveOutcome = classifyCreateSessionResult({ status: 'fulfilled', value: live });
+    const replayedOutcome = classifyCreateSessionResult({ status: 'fulfilled', value: replayed });
+    expect(replayedOutcome).toEqual(liveOutcome);
+    expect(replayedOutcome).toEqual({ status: 'ready', sessionID: VALID_SESSION_ID });
   });
 });

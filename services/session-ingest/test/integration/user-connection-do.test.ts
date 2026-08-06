@@ -102,6 +102,10 @@ describe('UserConnectionDO integration', () => {
     const webWs1 = await connectWs(stub, `/web?connectionId=web-1`);
     const web1 = collectMessages(webWs1);
 
+    // Track every socket the test opens so the cleanup below closes each one
+    // deterministically, including the post-hibernation socket.
+    const sockets: WebSocket[] = [cliWs, webWs1];
+
     try {
       // Connection-scoped create_session with the extended wire identity.
       webWs1.send(
@@ -180,6 +184,7 @@ describe('UserConnectionDO integration', () => {
       // terminal envelope without re-forwarding to the CLI.
       webWs1.close(1000, 'hibernation drop');
       const webWs2 = await connectWs(stub, `/web?connectionId=web-2`);
+      sockets.push(webWs2);
       const web2 = collectMessages(webWs2);
 
       webWs2.send(
@@ -207,8 +212,9 @@ describe('UserConnectionDO integration', () => {
       // The durable replay never re-forwards to the CLI.
       expect(cli.count(message => message.type === 'command')).toBe(1);
     } finally {
-      cliWs.close(1000, 'test complete');
-      webWs1.close(1000, 'test complete');
+      for (const ws of sockets) {
+        ws.close(1000, 'test complete');
+      }
     }
   });
 });

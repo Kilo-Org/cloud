@@ -16,6 +16,7 @@ import type {
   UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import type { MobileRouter, inferRouterOutputs } from '@kilocode/trpc/mobile';
+import { rememberToolImage } from './agent-tool-images';
 import { getCloudAgentWsUrl } from './cloud-agent-config';
 
 /** Flat 1s cadence — same budget as the session-detail route's spawned retry. */
@@ -378,6 +379,9 @@ export function createExtensionAgentSessionManager({
     },
 
     lifecycleHooks: createBrowserLifecycleHooks(),
+
+    // Tool attachment bytes are stripped before storage; keep the images here.
+    onToolAttachment: rememberToolImage,
 
     // ---- prepare ----
     prepare: async input => {

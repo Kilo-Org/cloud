@@ -166,7 +166,9 @@ describe('runWorkflow function', () => {
     expect(result.ok).toBe(false);
     /* eslint-disable jest/no-conditional-in-test, jest/no-conditional-expect -- Discriminated union narrowing with preceding runtime assertion. */
     if (!result.ok) {
-      expect(result.error).toBe('Workflow script returned an invalid value.');
+      expect(result.error).toBe(
+        'Workflow script returned an invalid value: {"something":"else"}. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.'
+      );
       expect(result.pageUrl).toBe('https://shop.example.com/page');
     }
     /* eslint-enable jest/no-conditional-in-test, jest/no-conditional-expect */
@@ -182,7 +184,9 @@ describe('runWorkflow function', () => {
     expect(result.ok).toBe(false);
     /* eslint-disable jest/no-conditional-in-test, jest/no-conditional-expect -- Discriminated union narrowing with preceding runtime assertion. */
     if (!result.ok) {
-      expect(result.error).toBe('Workflow script returned an invalid value.');
+      expect(result.error).toBe(
+        'Workflow script returned an invalid value: null. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.'
+      );
     }
     /* eslint-enable jest/no-conditional-in-test, jest/no-conditional-expect */
   });
@@ -218,7 +222,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Navigation target is outside the workflow scope.',
+      error:
+        'Navigation target https://other.example.com/page is outside the workflow scope https://shop.example.com. Navigate only within the scope, or save the workflow with a wider scope.',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -234,7 +239,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Tab is outside the workflow scope.',
+      error:
+        'Tab is at https://malicious.example.com/hijack, but this workflow only runs on https://shop.example.com. Navigate the tab there first, or save the workflow with a startUrl so runs navigate automatically.',
       ok: false,
       pageUrl: 'https://malicious.example.com/hijack',
     });
@@ -245,7 +251,11 @@ describe('runWorkflow function', () => {
     const deps = createDeps();
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
-    expect(result).toStrictEqual({ error: 'Workflow script is not approved.', ok: false });
+    expect(result).toStrictEqual({
+      error:
+        'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
+      ok: false,
+    });
   });
 
   it('fails for approval hash mismatch', async () => {
@@ -256,7 +266,11 @@ describe('runWorkflow function', () => {
     const deps = createDeps();
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
-    expect(result).toStrictEqual({ error: 'Workflow script is not approved.', ok: false });
+    expect(result).toStrictEqual({
+      error:
+        'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
+      ok: false,
+    });
   });
 
   it('fails when page limit is exceeded', async () => {
@@ -280,7 +294,7 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow exceeded the page limit.',
+      error: 'Workflow exceeded the page limit (20 pages). Check the script for a navigation loop.',
       ok: false,
     });
   });
@@ -359,7 +373,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow startUrl is outside the workflow scope.',
+      error:
+        'Workflow startUrl https://other.example.com/evil is outside the workflow scope https://shop.example.com. Update the workflow so startUrl matches the scope.',
       ok: false,
     });
     expect(deps.navigateUrls).toStrictEqual([]);
@@ -489,7 +504,8 @@ describe('runWorkflow function', () => {
     const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
     expect(result).toStrictEqual({
       dryRunActions: [],
-      error: 'Workflow script is not approved.',
+      error:
+        'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
       ok: false,
     });
   });
@@ -502,7 +518,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an unparseable value.',
+      error:
+        'Workflow script returned an invalid value: "just a string". Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -541,7 +558,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -564,7 +582,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -590,7 +609,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });
@@ -613,7 +633,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow script returned an invalid value.',
+      error:
+        'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
       ok: false,
       pageUrl: 'https://shop.example.com/page',
     });

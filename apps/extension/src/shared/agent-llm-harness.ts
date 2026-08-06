@@ -177,13 +177,14 @@ export const createWorkflowToolDefinitions = ({
     {
       function: {
         description:
-          "Search the workflows scoped to the selected tab's site. Returns id, name, description, and scope for each matching workflow.",
+          "Search saved workflows. Without a query, lists workflows for the selected tab's site. With a query, searches every site — use this when the user names a workflow that may belong to another site. Each result has id, name, description, params, scope, startUrl, and inScope for the selected tab.",
         name: 'search_workflows',
         parameters: {
           additionalProperties: false,
           properties: {
             query: {
-              description: 'Optional plain text to filter workflows by name or description.',
+              description:
+                'Plain text matched against workflow names, descriptions, and scopes across all sites. Omit to list workflows for the current site only.',
               type: 'string',
             },
           },

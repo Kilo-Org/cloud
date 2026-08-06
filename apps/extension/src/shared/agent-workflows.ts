@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Single domain module for workflow types, validation, search, and formatting; splitting would scatter the contract. */
 import { z } from 'zod';
 import { sanitizeTabContextText } from './tab-context-sanitize';
 
@@ -179,25 +180,27 @@ const formatWorkflowScope = (workflow: Pick<AgentWorkflow, 'scopeOrigin' | 'path
   workflow.scopeOrigin + (workflow.pathPrefix ?? '');
 
 /**
- * Search workflows scoped to currentUrl, filtered by an optional query.
- * Case-insensitive substring match on name, description, scopeOrigin, pathPrefix.
- * Capped at WORKFLOW_SEARCH_RESULT_COUNT.
+ * Search workflows, filtered by an optional query.
+ * Without a query: workflows scoped to currentUrl, newest first.
+ * With a query: case-insensitive substring match on name, description,
+ * scopeOrigin, and pathPrefix across ALL workflows — a workflow saved for
+ * another site is still findable (its startUrl lets it run from anywhere).
+ * In-scope matches rank first. Capped at WORKFLOW_SEARCH_RESULT_COUNT.
  */
 export const searchAgentWorkflows = (
   workflows: readonly AgentWorkflow[],
   currentUrl: string,
   query?: string
 ): AgentWorkflow[] => {
-  const inScope = workflows.filter(workflow => matchesWorkflowScope(workflow, currentUrl));
-  const sorted = sortByUpdatedAtDesc(inScope);
-
   const trimmedQuery = (query ?? '').trim();
+
   if (trimmedQuery.length === 0) {
-    return sorted.slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
+    const inScope = workflows.filter(workflow => matchesWorkflowScope(workflow, currentUrl));
+    return sortByUpdatedAtDesc(inScope).slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
   }
 
   const lowerQuery = trimmedQuery.toLowerCase();
-  const matches = sorted.filter(workflow => {
+  const matches = workflows.filter(workflow => {
     const corpus = [
       workflow.name,
       workflow.description,
@@ -209,7 +212,13 @@ export const searchAgentWorkflows = (
     return corpus.includes(lowerQuery);
   });
 
-  return matches.slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
+  const ranked = matches.toSorted((left, right) => {
+    const leftInScope = matchesWorkflowScope(left, currentUrl) ? 0 : 1;
+    const rightInScope = matchesWorkflowScope(right, currentUrl) ? 0 : 1;
+    return leftInScope - rightInScope || right.updatedAt - left.updatedAt;
+  });
+
+  return ranked.slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
 };
 
 /**

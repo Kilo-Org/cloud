@@ -439,7 +439,7 @@ test('workflow refused when tab origin does not match scope', async () => {
       await expect(sidePanel.getByText('run_workflow failed')).toBeVisible();
       const scopeDetails = sidePanel.locator('details').filter({ hasText: 'run_workflow' });
       await scopeDetails.locator('summary').click();
-      await expect(scopeDetails.getByText('Tab is outside the workflow scope.')).toBeVisible();
+      await expect(scopeDetails.getByText(/but this workflow only runs on/u)).toBeVisible();
     } finally {
       await otherServer.close();
     }

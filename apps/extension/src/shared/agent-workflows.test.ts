@@ -455,3 +455,48 @@ describe('workflow params in the index and error formatting', () => {
     });
   });
 });
+
+describe('cross-site workflow search', () => {
+  const flights = workflow({
+    description: 'Search Google Flights for one-way flights',
+    id: 'flights',
+    name: 'Google Flights Search',
+    scopeOrigin: 'https://www.google.com',
+    script: '1',
+    updatedAt: 50,
+  });
+  const local = workflow({
+    description: 'Reads the cart',
+    id: 'cart',
+    name: 'Cart reader',
+    scopeOrigin: 'https://shop.example.com',
+    script: '1',
+    updatedAt: 100,
+  });
+
+  it('finds workflows on other sites when a query is given', () => {
+    const results = searchAgentWorkflows(
+      [flights, local],
+      'https://shop.example.com/page',
+      'flights'
+    );
+    expect(results.map(entry => entry.id)).toStrictEqual(['flights']);
+  });
+
+  it('ranks in-scope matches before out-of-scope matches', () => {
+    const both = searchAgentWorkflows([flights, local], 'https://shop.example.com/page', 'reads');
+    expect(both.map(entry => entry.id)).toStrictEqual(['cart']);
+
+    const searchAll = searchAgentWorkflows(
+      [flights, local],
+      'https://shop.example.com/page',
+      'search'
+    );
+    expect(searchAll.map(entry => entry.id)).toStrictEqual(['flights']);
+  });
+
+  it('still lists only in-scope workflows without a query', () => {
+    const results = searchAgentWorkflows([flights, local], 'https://shop.example.com/page');
+    expect(results.map(entry => entry.id)).toStrictEqual(['cart']);
+  });
+});

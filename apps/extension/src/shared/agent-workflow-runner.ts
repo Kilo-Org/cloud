@@ -153,6 +153,28 @@ const resultWithActions = (
 
 const isRunStopped = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
+const formatWorkflowScopeText = (
+  workflow: Pick<AgentWorkflow, 'scopeOrigin' | 'pathPrefix'>
+): string => workflow.scopeOrigin + (workflow.pathPrefix ?? '');
+
+/**
+ * Echo a short preview of an invalid script return value so the caller can
+ * see what the script actually produced, plus the two valid shapes.
+ */
+const invalidValueError = (value: unknown): string => {
+  let preview = '';
+  try {
+    preview = JSON.stringify(value) ?? String(value);
+  } catch {
+    preview = String(value);
+  }
+  if (preview.length > 200) {
+    preview = `${preview.slice(0, 200)}…`;
+  }
+
+  return `Workflow script returned an invalid value: ${preview}. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.`;
+};
+
 type NavigationValidationResult =
   | { kind: 'ok'; navigateUrl: string; nextState: Record<string, unknown> }
   | { kind: 'error'; errorResult: WorkflowRunResult };
@@ -175,7 +197,8 @@ const validateNavigationState = (
   ) {
     return {
       errorResult: {
-        error: 'Workflow script returned an invalid value.',
+        error:
+          'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
         ok: false,
         pageUrl: url,
       },
@@ -216,7 +239,7 @@ const validateNavigationState = (
   if (!matchesWorkflowScope(workflow, navigateUrl)) {
     return {
       errorResult: {
-        error: 'Navigation target is outside the workflow scope.',
+        error: `Navigation target ${navigateUrl} is outside the workflow scope ${formatWorkflowScopeText(workflow)}. Navigate only within the scope, or save the workflow with a wider scope.`,
         ok: false,
         pageUrl: url,
       },
@@ -249,7 +272,15 @@ export const runWorkflow = async (
 
   // 1. Approval gate — also applies to dry runs.
   if (!(await isWorkflowApproved(workflow))) {
-    return resultWithActions({ error: 'Workflow script is not approved.', ok: false }, dryRun, []);
+    return resultWithActions(
+      {
+        error:
+          'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
+        ok: false,
+      },
+      dryRun,
+      []
+    );
   }
 
   // 2a. Input shape gate — before any navigation.
@@ -284,7 +315,10 @@ export const runWorkflow = async (
   if (workflow.startUrl !== undefined && workflow.startUrl !== '') {
     if (!matchesWorkflowScope(workflow, workflow.startUrl)) {
       return resultWithActions(
-        { error: 'Workflow startUrl is outside the workflow scope.', ok: false },
+        {
+          error: `Workflow startUrl ${workflow.startUrl} is outside the workflow scope ${formatWorkflowScopeText(workflow)}. Update the workflow so startUrl matches the scope.`,
+          ok: false,
+        },
         dryRun,
         []
       );
@@ -327,7 +361,11 @@ export const runWorkflow = async (
     }
     if (!matchesWorkflowScope(workflow, url)) {
       return resultWithActions(
-        { error: 'Tab is outside the workflow scope.', ok: false, pageUrl: url },
+        {
+          error: `Tab is at ${url}, but this workflow only runs on ${formatWorkflowScopeText(workflow)}. Navigate the tab there first, or save the workflow with a startUrl so runs navigate automatically.`,
+          ok: false,
+          pageUrl: url,
+        },
         dryRun,
         dryRunActions
       );
@@ -356,7 +394,7 @@ export const runWorkflow = async (
     const envelope = scriptEnvelopeSchema.safeParse(evalResult.value);
     if (!envelope.success) {
       return resultWithActions(
-        { error: 'Workflow script returned an unparseable value.', ok: false, pageUrl: url },
+        { error: invalidValueError(evalResult.value), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
@@ -380,7 +418,7 @@ export const runWorkflow = async (
 
     if (innerValue === null || innerValue === undefined || typeof innerValue !== 'object') {
       return resultWithActions(
-        { error: 'Workflow script returned an invalid value.', ok: false, pageUrl: url },
+        { error: invalidValueError(innerValue), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
@@ -412,7 +450,7 @@ export const runWorkflow = async (
 
     // Anything else is invalid.
     return resultWithActions(
-      { error: 'Workflow script returned an invalid value.', ok: false, pageUrl: url },
+      { error: invalidValueError(innerValue), ok: false, pageUrl: url },
       dryRun,
       dryRunActions
     );
@@ -420,7 +458,10 @@ export const runWorkflow = async (
 
   // 5. Loop exhausted.
   return resultWithActions(
-    { error: 'Workflow exceeded the page limit.', ok: false },
+    {
+      error: `Workflow exceeded the page limit (${String(MAX_WORKFLOW_PAGES_PER_RUN)} pages). Check the script for a navigation loop.`,
+      ok: false,
+    },
     dryRun,
     dryRunActions
   );

@@ -55,7 +55,7 @@ describe('search_workflows', () => {
     const result = await executeWorkflowToolCall(createToolCall('search_workflows'), ctx);
     expect(result).toStrictEqual({
       ok: true,
-      value: { message: 'No workflows for this site.', results: [] },
+      value: { message: 'No workflows saved yet. Use save_workflow to create one.', results: [] },
     });
   });
 
@@ -289,7 +289,8 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
-      error: 'Workflow not found.',
+      error:
+        'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
       ok: false,
     });
   });
@@ -464,7 +465,8 @@ describe('run_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
-      error: 'Workflows are disabled in safe mode. The user can enable them in settings.',
+      error:
+        'Workflow runs are disabled in safe mode. Ask the user to enable "Allow workflows in safe mode" in settings, or to switch this conversation to dangerous mode.',
       ok: false,
     });
   });
@@ -546,7 +548,10 @@ describe('run_workflow', () => {
       createToolCall('run_workflow', { workflowId: 'nonexistent' }),
       ctx
     );
-    expect(result).toStrictEqual({ error: 'Workflow not found.', ok: false });
+    expect(result).toStrictEqual({
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    });
   });
 });
 

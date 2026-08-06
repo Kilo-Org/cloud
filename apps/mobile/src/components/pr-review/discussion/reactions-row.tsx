@@ -82,6 +82,7 @@ export function ReactionsRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Add reaction"
+          accessibilityState={{ disabled: isDisabled }}
           disabled={isDisabled}
           onPress={() => {
             void Haptics.selectionAsync();

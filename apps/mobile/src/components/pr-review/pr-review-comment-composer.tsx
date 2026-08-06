@@ -19,6 +19,7 @@ import {
   composerRangeLabel,
   ContextPreview,
 } from '@/components/pr-review/pr-review-comment-composer-parts';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
@@ -81,6 +82,10 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
   >(null);
+  // True when `inlineError` is a local empty-body validation error (no
+  // mutation toast owns it), so it must announce through AccessibleStatus;
+  // mutation-classified errors are toast-owned and stay visual-only.
+  const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
 
   const isSubmitting = !isEdit && createComment.isPending;
   const lineRangeLabel = composerRangeLabel(line, startLine);
@@ -93,6 +98,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     const display = mutationErrorDisplay('composer', classification, createComment.error);
     setInlineError(display.message);
     setInlineErrorKind(display.kind);
+    setInlineErrorIsLocal(false);
   }, [createComment.error, isEdit]);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
@@ -114,6 +120,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (inlineErrorKind === 'bad-request') {
       setInlineError(null);
       setInlineErrorKind(null);
+      setInlineErrorIsLocal(false);
     }
   }
 
@@ -130,10 +137,12 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     const body = bodyRef.current;
     if (body.trim().length === 0) {
       setInlineError('Comment body cannot be empty.');
+      setInlineErrorIsLocal(true);
       return;
     }
     setInlineError(null);
     setInlineErrorKind(null);
+    setInlineErrorIsLocal(false);
     pending.addComment({
       id: Crypto.randomUUID(),
       path,
@@ -155,10 +164,12 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (body.trim().length === 0) {
       setInlineError('Comment body cannot be empty.');
       setInlineErrorKind('bad-request');
+      setInlineErrorIsLocal(true);
       return;
     }
     setInlineError(null);
     setInlineErrorKind(null);
+    setInlineErrorIsLocal(false);
     try {
       await createComment.mutateAsync({
         owner,
@@ -293,7 +304,16 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
           </View>
           {inlineError && inlineErrorKind !== 'reconnect' ? (
             <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
-              <Text className="text-xs text-destructive">{inlineError}</Text>
+              {/* Local empty-body validation has no toast owner, so
+                  AccessibleStatus announces it on both platforms.
+                  Mutation-classified errors are toast-owned
+                  (announcingToast), so the inline text stays visual-only
+                  and never double-announces. */}
+              {inlineErrorIsLocal ? (
+                <AccessibleStatus message={inlineError} tone="error" className="text-xs" />
+              ) : (
+                <Text className="text-xs text-destructive">{inlineError}</Text>
+              )}
             </View>
           ) : null}
           {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}

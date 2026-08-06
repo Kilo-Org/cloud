@@ -78,7 +78,7 @@ function chipBody(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
   );
 }
 
-/** The non-accessible chip container — identified by its size/position classes. */
+/** The non-accessible outer wrapper — identified by its position/spacing classes. */
 function chipContainer(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   return root.find(
     node =>
@@ -133,27 +133,23 @@ const CHIP_DIMS = {
 
 type Rect = { left: number; top: number; right: number; bottom: number };
 
-function controlVisibleRect(className: string, dims: { width: number; height: number }): Rect {
-  // `-1` insets the button from the left/top edge; the mirror side is the
-  // chip dimension minus the inset and the button size.
+// Runtime target of one control: the visible 28pt button (`-1` insets it
+// from the chip edge) expanded by the 8pt `hitSlop` on every side. The
+// controls live OUTSIDE the overflow-hidden chip surface (asserted in
+// `assertDistinctTargets`), so this full 44pt rect is the effective touch
+// target at runtime — no parent cuts it off.
+function runtimeTargetRect(className: string, dims: { width: number; height: number }): Rect {
   const left = className.includes('left-1')
-    ? BUTTON_INSET
-    : dims.width - BUTTON_INSET - BUTTON_SIZE;
-  const top = className.includes('top-1') ? BUTTON_INSET : dims.height - BUTTON_INSET - BUTTON_SIZE;
+    ? BUTTON_INSET - HIT_SLOP.left
+    : dims.width - BUTTON_INSET - BUTTON_SIZE - HIT_SLOP.right;
+  const top = className.includes('top-1')
+    ? BUTTON_INSET - HIT_SLOP.top
+    : dims.height - BUTTON_INSET - BUTTON_SIZE - HIT_SLOP.bottom;
   return {
     left,
     top,
-    right: left + BUTTON_SIZE,
-    bottom: top + BUTTON_SIZE,
-  };
-}
-
-function expandByHitSlop(rect: Rect): Rect {
-  return {
-    left: rect.left - HIT_SLOP.left,
-    top: rect.top - HIT_SLOP.top,
-    right: rect.right + HIT_SLOP.right,
-    bottom: rect.bottom + HIT_SLOP.bottom,
+    right: left + BUTTON_SIZE + HIT_SLOP.left + HIT_SLOP.right,
+    bottom: top + BUTTON_SIZE + HIT_SLOP.top + HIT_SLOP.bottom,
   };
 }
 
@@ -337,9 +333,22 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     expect(retry.props.hitSlop).toEqual(HIT_SLOP);
     expect(remove.props.hitSlop).toEqual(HIT_SLOP);
 
+    // Final finding — parent clipping: the chip body's immediate parent is
+    // the overflow-hidden surface, and neither control lives inside it, so
+    // no ancestor of the controls clips their hitSlop at runtime.
+    const surface = chipBody(renderer.root).parent;
+    expect(surface?.props.className).toContain('overflow-hidden');
+    expect(surface?.findAll(node => node === retry || node === remove)).toHaveLength(0);
+
+    // Runtime bounds: `runtimeTargetRect` is the full 44pt effective target
+    // (28pt button + 8pt hitSlop per side), unreduced by any clip parent.
     const dims = CHIP_DIMS[kind];
-    const retryRect = expandByHitSlop(controlVisibleRect(String(retry.props.className), dims));
-    const removeRect = expandByHitSlop(controlVisibleRect(String(remove.props.className), dims));
+    const retryRect = runtimeTargetRect(String(retry.props.className), dims);
+    const removeRect = runtimeTargetRect(String(remove.props.className), dims);
+    expect([retryRect.right - retryRect.left, retryRect.bottom - retryRect.top]).toEqual([44, 44]);
+    expect([removeRect.right - removeRect.left, removeRect.bottom - removeRect.top]).toEqual([
+      44, 44,
+    ]);
     expect(intersects(retryRect, removeRect), `${kind} chip hit slops must not overlap`).toBe(
       false
     );
@@ -347,7 +356,7 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     renderer.unmount();
   }
 
-  it('keeps Retry and Remove in distinct corners with non-overlapping 44pt effective targets', async () => {
+  it('keeps Retry and Remove in distinct corners with unclipped 44pt runtime targets', async () => {
     await assertDistinctTargets('image');
     await assertDistinctTargets('document');
   });

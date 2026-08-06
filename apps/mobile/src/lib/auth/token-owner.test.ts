@@ -29,6 +29,7 @@ import {
   getAuthTokenForRequest,
   publishActiveTokenExpiry,
   setActiveToken,
+  setSignOutTeardownActive,
 } from './token-owner';
 /* eslint-enable import/first */
 
@@ -45,6 +46,7 @@ describe('token-owner', () => {
     vi.clearAllMocks();
     store.clear();
     clearActiveToken();
+    setSignOutTeardownActive(false);
   });
 
   it('returns null when no token is held', () => {
@@ -124,6 +126,45 @@ describe('token-owner', () => {
       await expect(pending).resolves.toBe('newer-token');
       // The stale read did not overwrite the newer owner or erase its expiry.
       expect(getActiveToken()).toEqual({ token: 'newer-token', expiresAtMs: 9999 });
+    });
+
+    it('keeps serving the in-memory token during sign-out teardown (remote cleanup auth)', async () => {
+      setActiveToken('mem-token', 1234);
+      setSignOutTeardownActive(true);
+      await expect(getAuthTokenForRequest()).resolves.toBe('mem-token');
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('returns no token and does not warm the owner when sign-out teardown is active', async () => {
+      store.set(AUTH_TOKEN_KEY, 'stored-token');
+      setSignOutTeardownActive(true);
+
+      await expect(getAuthTokenForRequest()).resolves.toBeNull();
+      // The cold read never rewarmed the owner from credentials that are
+      // scheduled for deletion.
+      expect(getActiveToken()).toBeNull();
+    });
+
+    it('returns no token and does not warm the owner when sign-out teardown starts mid-read', async () => {
+      store.set(AUTH_TOKEN_KEY, 'stored-token');
+      let releaseRead = undefined as (() => void) | undefined;
+      const readGate = new Promise<void>(resolve => {
+        releaseRead = resolve;
+      });
+      vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+        await readGate;
+        await Promise.resolve();
+        return store.get(AUTH_TOKEN_KEY) ?? null;
+      });
+
+      const pending = getAuthTokenForRequest();
+      // Sign-out begins while the cold read is in flight (the epoch has not
+      // bumped yet, so only the teardown guard can stop the warm).
+      setSignOutTeardownActive(true);
+      releaseRead?.();
+
+      await expect(pending).resolves.toBeNull();
+      expect(getActiveToken()).toBeNull();
     });
   });
 

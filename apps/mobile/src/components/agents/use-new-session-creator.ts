@@ -144,13 +144,16 @@ type UseRemoteSpawnDraftCleanupInput = {
 /**
  * Owns the new-session draft's fate when the screen leaves after a remote
  * spawn attempt. The spawn dispatch consumes the outcome internally — a
- * success replaces the screen, a failure toasts and stays — so the route's
- * only observable signal is the attempt marker plus the unmount itself: a
- * successful spawn is the one path that unmounts the screen with an attempt
- * recorded. The leaving route therefore clears the consumed `agent-composer:new`
- * entry (the prompt must not reappear on the next new-session visit) instead
- * of flushing it. Without an attempt the unmount flushes the pending debounce,
- * preserving the draft for a normal leave (back button).
+ * success replaces the screen, a failure toasts and stays — and the route
+ * arms the attempt marker only once the dispatch admits the spawn (voice
+ * settlement and remote admission passed). The route's observable signal is
+ * therefore the attempt marker plus the unmount itself: a successful spawn is
+ * the one path that unmounts the screen with an attempt recorded. The leaving
+ * route clears the consumed `agent-composer:new` entry (the prompt must not
+ * reappear on the next new-session visit) instead of flushing it. Without an
+ * attempt the unmount flushes the pending debounce, preserving the draft for
+ * a normal leave (back button) or a tap that stopped before any spawn attempt
+ * (blocked admission, cancelled voice submit).
  *
  * Boundary: a failed spawn followed by a manual leave also clears the draft.
  * The failed spawn itself never clears — the screen stays mounted, so the

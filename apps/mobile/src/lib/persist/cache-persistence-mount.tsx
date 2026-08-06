@@ -84,10 +84,19 @@ export function CachePersistenceMount() {
     }
 
     // Record the identity hint for the next cold start. `writeAccountMetadata`
-    // fences the write on the auth epoch; sign-out deletes it.
-    void writeAccountMetadata(ACTIVE_USER_ID_KEY, async () => {
-      await SecureStore.setItemAsync(ACTIVE_USER_ID_KEY, userId);
-    });
+    // fences the write on the auth epoch; sign-out deletes it. The write is
+    // best effort and its rejection is swallowed so a SecureStore failure can
+    // never escape as an unhandled rejection (a failed hint only costs a
+    // future warm start).
+    void (async () => {
+      try {
+        await writeAccountMetadata(ACTIVE_USER_ID_KEY, async () => {
+          await SecureStore.setItemAsync(ACTIVE_USER_ID_KEY, userId);
+        });
+      } catch {
+        // Best effort: a failed identity hint only costs a future warm start.
+      }
+    })();
 
     const persister = createReadCachePersister({ kv, queryClient, userId, epoch });
     // Subscribe-only persistence: the root layout already performed the single

@@ -186,6 +186,37 @@ describe('CachePersistenceMount', () => {
     });
   });
 
+  it('regression: a failed identity-hint write never escapes as an unhandled rejection', async () => {
+    bindReadCacheKv(kvMock);
+    const unhandled: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    try {
+      identityMock.value = { userId: 'u1', isLoading: false, isError: false };
+      secureStoreMock.setItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
+      const renderer = mount();
+      await flushMicrotasks();
+
+      // The hint write was still attempted even though SecureStore rejects.
+      expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY, 'u1');
+      // Give the runtime a turn to flag an unhandled rejection if the mount
+      // ever fires the write without containing it.
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(unhandled).toEqual([]);
+
+      act(() => {
+        renderer.unmount();
+      });
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+    }
+  });
+
   it('does nothing while identity is loading', () => {
     bindReadCacheKv(kvMock);
     identityMock.value = { userId: undefined, isLoading: true, isError: false };

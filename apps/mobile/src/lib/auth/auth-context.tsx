@@ -22,7 +22,13 @@ import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { clearActiveToken, setActiveToken } from '@/lib/auth/token-owner';
+import {
+  clearActiveToken,
+  isSignOutTeardownActive,
+  setActiveToken,
+  setSignOutTeardownActive,
+} from '@/lib/auth/token-owner';
+import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -206,9 +212,18 @@ export async function performRefresh(): Promise<RefreshOutcome> {
 
 async function doRefresh(): Promise<RefreshOutcome> {
   const sessionVersion = currentAuthEpoch();
+  // A refresh is superseded when the session moved or sign-out teardown
+  // began: it must then neither read the old refresh token nor publish a new
+  // credential pair, so the auth-transition queue never waits on a stale
+  // rotation during the teardown gap.
+  const superseded = (): boolean =>
+    !isCurrentAuthEpoch(sessionVersion) || isSignOutTeardownActive();
+  if (superseded()) {
+    return { ok: false, refused: false, superseded: true };
+  }
   try {
     const storedRefreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-    if (!isCurrentAuthEpoch(sessionVersion)) {
+    if (superseded()) {
       return { ok: false, refused: false, superseded: true };
     }
     if (!storedRefreshToken) {
@@ -216,13 +231,20 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { ok: false, refused: true };
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/native/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: storedRefreshToken }),
+    // Bound the refresh network I/O at the control-plane deadline so a hung
+    // backend can never leave the refresh (or a sign-out queueing behind its
+    // credential write) waiting forever.
+    const response = await withDeadline(CONTROL_PLANE_DEADLINE_MS, async signal => {
+      const res = await fetch(`${API_BASE_URL}/api/auth/native/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: storedRefreshToken }),
+        signal,
+      });
+      return res;
     });
 
-    if (!isCurrentAuthEpoch(sessionVersion)) {
+    if (superseded()) {
       return { ok: false, refused: false, superseded: true };
     }
 
@@ -243,7 +265,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { ok: false, refused: false };
     }
 
-    if (!isCurrentAuthEpoch(sessionVersion)) {
+    if (superseded()) {
       return { ok: false, refused: false, superseded: true };
     }
 
@@ -350,6 +372,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         }
         // Clear the guard so a later refused refresh can sign out again.
         isSignedOutReference.current = false;
+        // Credentials published on the winning epoch: the teardown window
+        // ends, so refresh may rotate the new session and request-token cold
+        // reads may warm the owner again.
+        setSignOutTeardownActive(false);
         setSessionEnded(false);
         // Credentials published on the winning epoch: the sign-out fence opens
         // so the read-cache mount can subscribe for the new session.
@@ -373,6 +399,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
       isSignedOutReference.current = true;
+      // Close the teardown guard synchronously, before the first await: a
+      // refresh or request-token cold read must not touch the old credentials
+      // while the remote cleanup runs and the deletion batch is queued. The
+      // in-memory owner still serves the cleanup's auth headers until the
+      // epoch bump below.
+      setSignOutTeardownActive(true);
       // Close the cache publication fence synchronously, before the epoch
       // bump and before any await, so a write can never land in the scope
       // that the cleanup below clears. The reactive state flips in the same

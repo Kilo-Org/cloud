@@ -29,6 +29,10 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * Every asynchronous write (debounced timer, flush, clear) is caught at this
  * boundary: a storage failure is reported to Sentry and swallowed, so the
  * fire-and-forget `void` call sites can never leak an unhandled rejection.
+ *
+ * Serialization is contained before any timer exists: a value that cannot be
+ * JSON-serialized (a circular reference, or a top-level undefined) is
+ * reported to Sentry and skipped without scheduling a write.
  */
 
 export const DRAFT_DEBOUNCE_MS = 500;
@@ -209,28 +213,46 @@ async function evictOldestBeyondCap(scope: string): Promise<void> {
 /**
  * Schedules a debounced save of one JSON-serializable draft value, keyed on
  * the full storage key. Values over 64 KB are skipped (never written
- * partially; a previously stored draft stays untouched). Returns nothing —
- * the write is fire-and-forget; use {@link flushDraft} to force it.
+ * partially; a previously stored draft stays untouched). Unserializable
+ * values (circular references, top-level undefined) are reported to Sentry
+ * and skipped. Returns nothing — the write is fire-and-forget; use
+ * {@link flushDraft} to force it.
  */
 export function saveDraft(userId: string, entityKey: string, value: unknown): void {
   if (!userId) {
     return;
   }
-  const serialized = JSON.stringify(value);
-  if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
+  // JSON.stringify produces no string for these top-level values, so reject
+  // them before the byte-cap check, which requires a string.
+  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
+    reportDraftWriteFailure(
+      new TypeError('draft value cannot be serialized to JSON'),
+      userId,
+      entityKey
+    );
     return;
   }
-  const key = fullKey(userId, entityKey);
-  const previous = pendingSaves.get(key);
-  if (previous) {
-    clearTimeout(previous.timer);
+  try {
+    const serialized = JSON.stringify(value);
+    if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
+      return;
+    }
+    const key = fullKey(userId, entityKey);
+    const previous = pendingSaves.get(key);
+    if (previous) {
+      clearTimeout(previous.timer);
+    }
+    const epoch = currentAuthEpoch();
+    const timer = setTimeout(() => {
+      pendingSaves.delete(key);
+      void writeDraftSafely({ epoch, userId, entityKey, serialized });
+    }, DRAFT_DEBOUNCE_MS);
+    pendingSaves.set(key, { timer, epoch, userId, entityKey, serialized });
+  } catch (error) {
+    // Serialization and byte sizing run before any timer exists; contain
+    // every failure here so saveDraft never throws synchronously.
+    reportDraftWriteFailure(error, userId, entityKey);
   }
-  const epoch = currentAuthEpoch();
-  const timer = setTimeout(() => {
-    pendingSaves.delete(key);
-    void writeDraftSafely({ epoch, userId, entityKey, serialized });
-  }, DRAFT_DEBOUNCE_MS);
-  pendingSaves.set(key, { timer, epoch, userId, entityKey, serialized });
 }
 
 /**

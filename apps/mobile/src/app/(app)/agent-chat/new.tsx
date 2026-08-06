@@ -156,8 +156,12 @@ function NewSessionScreenBody() {
   }, [userId]);
 
   // Remote spawn success lives inside the spawn dispatch (it replaces the
-  // screen); the route records the attempt here and clears the consumed draft
-  // when the screen unmounts — a failed spawn keeps the screen mounted.
+  // screen). The route arms the attempt marker only after the dispatch
+  // admits the spawn — voice settlement and remote admission already
+  // passed — and clears the consumed draft when the screen unmounts. A
+  // failed spawn keeps the screen mounted (draft preserved for retry); a
+  // blocked admission or cancelled voice submit never arms the marker, so
+  // the unmount flush preserves the draft.
   const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({ userId });
 
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
@@ -199,6 +203,9 @@ function NewSessionScreenBody() {
     instanceList,
     promptRef,
     attachments: attachments.attachments,
+    // Arms the draft-clearing marker only when the dispatch admits the spawn:
+    // a blocked admission or cancelled voice submit never clears the draft.
+    onSpawnAdmitted: markRemoteSpawnAttempted,
   });
 
   const handleModelSelect = useCallback(
@@ -271,7 +278,6 @@ function NewSessionScreenBody() {
 
   const handleStartSession = useCallback(() => {
     if (runOnInstance !== null) {
-      markRemoteSpawnAttempted();
       void submitWithVoiceSettled(async () => {
         remoteSpawn.onStart();
         await Promise.resolve();
@@ -279,13 +285,7 @@ function NewSessionScreenBody() {
       return;
     }
     void submitWithVoiceSettled(createSessionFromDraft);
-  }, [
-    createSessionFromDraft,
-    markRemoteSpawnAttempted,
-    remoteSpawn,
-    runOnInstance,
-    submitWithVoiceSettled,
-  ]);
+  }, [createSessionFromDraft, remoteSpawn, runOnInstance, submitWithVoiceSettled]);
 
   return (
     <View className="flex-1 bg-background">

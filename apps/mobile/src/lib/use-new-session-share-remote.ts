@@ -19,6 +19,12 @@ type UseNewSessionShareRemoteArgs = {
   promptRef: RefObject<string>;
   /** Live attachment list owned by `useAgentAttachmentUpload`. */
   attachments: AgentAttachment[];
+  /**
+   * Invoked when a remote spawn passes voice settlement and admission and
+   * commits to a spawn attempt; forwarded to `useRemoteSpawnDispatch`. The
+   * route uses it to arm draft clearing.
+   */
+  onSpawnAdmitted?: () => void;
 };
 
 /**
@@ -34,6 +40,7 @@ export function useNewSessionShareRemote({
   instanceList,
   promptRef,
   attachments,
+  onSpawnAdmitted,
 }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
@@ -57,6 +64,7 @@ export function useNewSessionShareRemote({
     refetchInstances,
     instanceList,
     getSubmitPayload,
+    onSpawnAdmitted,
   });
 
   return { remoteSpawn, handleRunOnInstanceChange: remoteSpawn.onChangeRunOnInstance };

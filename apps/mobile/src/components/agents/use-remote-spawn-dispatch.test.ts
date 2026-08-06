@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- spawn-input chain, ready-path navigation, and admission-gating suites share this file */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +14,7 @@ import {
   RemoteSpawnInheritanceProvider,
   useRemoteSpawnDispatch,
 } from './use-remote-spawn-dispatch';
+import { REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST } from '@/lib/remote-spawn-admission';
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(async () => {
@@ -32,13 +34,14 @@ const useRemoteInstanceSpawnMock = vi.hoisted(() =>
 );
 
 const routerReplace = vi.hoisted(() => vi.fn());
+const toastErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: routerReplace }),
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: toastErrorMock },
 }));
 
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'share-id-fixed' }));
@@ -82,6 +85,20 @@ const INSTANCE: InstancePickerInstance = {
 /** Stub payload for the ready-path-with-payload case. */
 const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
 
+/** Stub payload that admission denies on an instance without attachments. */
+const filesPayload: SharePayload = {
+  text: '',
+  files: [
+    {
+      name: 'report.pdf',
+      uri: 'file:///tmp/report.pdf',
+      mimeType: 'application/pdf',
+      size: 1024,
+    },
+  ],
+  failedFiles: [],
+};
+
 /**
  * Minimal React hook runner. Mirrors the fake-dispatcher pattern in
  * `use-interaction-handlers.test.ts` so we can exercise
@@ -98,6 +115,10 @@ function runHookWithProvider(args: {
   providerModel?: string;
   providerVariant?: string;
   getSubmitPayload?: () => SharePayload | null;
+  /** Invoked by `onStart` only once a spawn attempt is admitted. */
+  onSpawnAdmitted?: () => void;
+  /** Override the selected instance (defaults to `INSTANCE`). */
+  runOnInstance?: InstancePickerInstance | null;
 }) {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
@@ -170,13 +191,14 @@ function runHookWithProvider(args: {
       mode: args.mode,
       model: args.model,
       variant: args.variant,
-      runOnInstance: INSTANCE,
+      runOnInstance: args.runOnInstance === undefined ? INSTANCE : args.runOnInstance,
       // eslint-disable-next-line no-empty-function -- no-op setter for harness
       setRunOnInstance: (_next: InstancePickerInstance | null) => {},
       // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
       refetchInstances: () => Promise.resolve({ data: { instances: [INSTANCE] } }),
       instanceList: [INSTANCE],
       getSubmitPayload: args.getSubmitPayload,
+      onSpawnAdmitted: args.onSpawnAdmitted,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -189,6 +211,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     spawnMock.mockClear();
     useRemoteInstanceSpawnMock.mockClear();
     routerReplace.mockClear();
+    toastErrorMock.mockClear();
     __resetSharePayloadStoreForTests();
   });
 
@@ -340,6 +363,60 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
+  });
+
+  it('arms the spawn-admitted callback only after admission allows the payload', async () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHookWithProvider({
+      organizationId: 'org-xyz',
+      withProvider: false,
+      getSubmitPayload: () => samplePayload,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalled();
+    });
+
+    expect(onSpawnAdmitted).toHaveBeenCalledTimes(1);
+  });
+
+  it('never arms the callback nor spawns when admission denies files on an incapable instance', () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHookWithProvider({
+      organizationId: 'org-xyz',
+      withProvider: false,
+      getSubmitPayload: () => filesPayload,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith(REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST);
+  });
+
+  it('never arms the callback when no instance is selected (defensive guard)', () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHookWithProvider({
+      organizationId: 'org-xyz',
+      withProvider: false,
+      runOnInstance: null,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 });
 

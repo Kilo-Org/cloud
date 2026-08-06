@@ -106,7 +106,7 @@ import {
   REFRESH_TOKEN_KEY,
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
-import { clearActiveToken, getActiveToken } from '@/lib/auth/token-owner';
+import { clearActiveToken, getActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import * as SecureStore from 'expo-secure-store';
 /* eslint-enable import/first */
 
@@ -116,11 +116,17 @@ async function flushMicrotasks(): Promise<void> {
   });
 }
 
+// Suppress Node.js 24 unhandledRejection from AbortController.abort() with a
+// non-DOMException reason during fake-timer tests.
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+function swallowUnhandledRejection(): void {}
+
 describe('performRefresh', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
     invalidateRefreshSession();
+    setSignOutTeardownActive(false);
   });
 
   it('returns refused when no refresh token is stored', async () => {
@@ -310,6 +316,111 @@ describe('performRefresh', () => {
     expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('newer-refresh');
   });
+
+  it('does not read the old refresh token when a refresh starts after sign-out begins', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    setSignOutTeardownActive(true);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('must not be called'));
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('does not read the old refresh token after the epoch bump while the deletion is still queued', async () => {
+    // Post-cleanup teardown: the epoch has moved but the queued deletion has
+    // not yet removed the old refresh token.
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    invalidateRefreshSession();
+    setSignOutTeardownActive(true);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('must not be called'));
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+    fetchSpy.mockRestore();
+  });
+
+  it('does not publish a pair when sign-out begins while the refresh fetch is in flight', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    let resolveResponse = undefined as ((response: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        resolve();
+      });
+      return new Promise<Response>(resolve => {
+        resolveResponse = resolve;
+      });
+    });
+
+    const refresh = performRefresh();
+    await vi.waitFor(() => {
+      expect(resolveResponse).toBeTypeOf('function');
+    });
+    // Sign-out begins while the fetch is in flight: the epoch has not bumped
+    // yet (remote cleanup still runs), so only the teardown guard can stop
+    // the stale pair from being published.
+    setSignOutTeardownActive(true);
+    resolveResponse?.(
+      Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
+    );
+
+    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+    expect(getActiveToken()).toBeNull();
+  });
+
+  it('times out the refresh fetch at the control-plane deadline and returns transient', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    // The backend hangs unless the deadline signal aborts it.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async
+      (_url, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (signal?.aborted) {
+            reject(signal.reason as Error);
+            return;
+          }
+          const id = setTimeout(() => {
+            reject(new Error('never'));
+          }, 60_000);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(id);
+            reject(signal.reason as Error);
+          });
+        })
+    );
+    // Suppress Node.js 24 unhandledRejection from AbortController.abort()
+    // with a non-DOMException reason during fake-timer tests.
+    process.on('unhandledRejection', swallowUnhandledRejection);
+    vi.useFakeTimers();
+    try {
+      const promise = performRefresh();
+      // Let the SecureStore read resolve so the deadline timer registers.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(15_001);
+
+      // A timed-out refresh is transient: the old credentials stay untouched.
+      await expect(promise).resolves.toEqual({ ok: false, refused: false });
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeDefined();
+    } finally {
+      process.off('unhandledRejection', swallowUnhandledRejection);
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
 });
 
 describe('persistSignInCredentials', () => {
@@ -318,6 +429,7 @@ describe('persistSignInCredentials', () => {
     store.clear();
     releaseCredentialWrites();
     clearActiveToken();
+    setSignOutTeardownActive(false);
   });
 
   it('clears a prior refresh pair for a token-only sign-in', async () => {

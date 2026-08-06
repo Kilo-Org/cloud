@@ -599,6 +599,28 @@ describe('stale sign-in continuation', () => {
 
     unmount();
   });
+
+  it('regression: sign-out sets the teardown guard and a published sign-in clears it', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+    const { isSignOutTeardownActive } = await import('@/lib/auth/token-owner');
+
+    expect(isSignOutTeardownActive()).toBe(false);
+
+    await act(async () => {
+      await getCtx().signOut();
+    });
+    // The guard stays closed after teardown until a sign-in publishes.
+    expect(isSignOutTeardownActive()).toBe(true);
+
+    await act(async () => {
+      await getCtx().signIn('new-token');
+    });
+    // The published sign-in ends the teardown window: refresh may rotate the
+    // new session again.
+    expect(isSignOutTeardownActive()).toBe(false);
+
+    unmount();
+  });
 });
 
 describe('bootstrap and foreground race fencing', () => {

@@ -308,6 +308,49 @@ describe('size cap', () => {
   });
 });
 
+describe('unsupported serialization boundary', () => {
+  it('does not throw and reports Sentry for a circular value without scheduling a write', async () => {
+    vi.useFakeTimers();
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => {
+      saveDraft('u1', 'k', circular);
+    }).not.toThrow();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+      })
+    );
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+  });
+
+  it('does not throw and reports Sentry for an undefined value without scheduling a write', async () => {
+    vi.useFakeTimers();
+    expect(() => {
+      saveDraft('u1', 'k', undefined);
+    }).not.toThrow();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+      })
+    );
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+  });
+
+  it('leaves a previously stored draft untouched when serialization fails', async () => {
+    seedStoredValue('draft:u1', 'k', '"old"');
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    saveDraft('u1', 'k', circular);
+    await flushDraft('u1', 'k');
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBe('old');
+  });
+});
+
 describe('corrupt read', () => {
   it('loads null and reports Sentry for a value that is not valid JSON', async () => {
     seedStoredValue('draft:u1', 'k', 'not-json{{{');

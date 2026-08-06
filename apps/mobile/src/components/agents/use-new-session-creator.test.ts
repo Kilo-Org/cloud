@@ -468,8 +468,11 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     vi.mocked(flushDraft).mockClear();
   });
 
-  it('clears agent-composer:new when the screen unmounts after a remote spawn attempt', async () => {
+  it('clears agent-composer:new when the screen unmounts after an admitted remote spawn', async () => {
     const { renderer, resultRef } = mountRemoteSpawnDraftCleanup('u1');
+    // The route arms the marker only once the dispatch admits the spawn
+    // (voice settlement + admission passed); an admitted attempt means the
+    // spawn was committed to.
     act(() => {
       resultRef.current?.markRemoteSpawnAttempted();
     });
@@ -487,8 +490,11 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     expect(vi.mocked(flushDraft)).not.toHaveBeenCalledWith('u1', 'agent-composer:new');
   });
 
-  it('flushes (never clears) the draft when the screen unmounts without an attempt', async () => {
+  it('flushes (never clears) the draft when the screen unmounts after a blocked admission or cancelled voice submit — the marker was never armed', async () => {
     const { renderer } = mountRemoteSpawnDraftCleanup('u1');
+    // No `markRemoteSpawnAttempted` call: the tap stopped before any spawn
+    // attempt (denied admission, voice settle aborted, or a plain back
+    // leave), so the unmount must preserve the typed prompt.
     act(() => {
       renderer?.unmount();
     });

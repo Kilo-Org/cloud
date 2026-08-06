@@ -113,6 +113,7 @@ describe('workflow settings view selection', () => {
           id: 'newer',
           isApproved: false,
           name: 'Newer',
+          params: [],
           scope: 'https://example.com',
         },
         {
@@ -122,6 +123,7 @@ describe('workflow settings view selection', () => {
           id: 'older',
           isApproved: false,
           name: 'Older',
+          params: [],
           scope: 'https://example.com',
         },
       ],

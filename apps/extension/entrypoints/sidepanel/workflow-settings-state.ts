@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { AgentWorkflow } from '@/src/shared/agent-workflows';
+import type { AgentWorkflow, AgentWorkflowParam } from '@/src/shared/agent-workflows';
 
 export type WorkflowSettingsView =
   | { kind: 'loading' }
@@ -15,6 +15,7 @@ export interface WorkflowSettingsListItem {
   dateLabel: string;
   isApproved: boolean;
   deleteAriaLabel: string;
+  params: readonly AgentWorkflowParam[];
 }
 
 export interface WorkflowRunDisabledReason {
@@ -43,6 +44,7 @@ export const toWorkflowSettingsListItem = (workflow: AgentWorkflow): WorkflowSet
   id: workflow.id,
   isApproved: workflow.approvedScriptHash !== undefined,
   name: workflow.name,
+  params: workflow.params ?? [],
   scope: workflow.scopeOrigin + (workflow.pathPrefix ?? ''),
 });
 

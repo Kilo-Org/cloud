@@ -1,6 +1,5 @@
 import { storage } from '#imports';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { Play, Trash2 } from 'lucide-react';
 import type { JSX } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { runningConversationIdsAtom } from './agent-chat-atoms';
@@ -9,22 +8,15 @@ import {
   loadWorkflowSettings,
   saveWorkflowSettings,
 } from '@/src/shared/agent-workflows-storage';
+import type { AgentWorkflowSettings } from '@/src/shared/agent-workflows';
 import { useAgentWorkflows } from './use-agent-workflows';
-import { WorkflowRunPrompt } from './workflow-run-prompt';
-import {
-  deriveWorkflowRunDisabledReason,
-  deriveWorkflowSettingsView,
-  workflowRunRequestAtom,
-} from './workflow-settings-state';
-import type { WorkflowSettingsListItem } from './workflow-settings-state';
+import { WorkflowRow } from './workflow-row';
+import { deriveWorkflowSettingsView, workflowRunRequestAtom } from './workflow-settings-state';
 import {
   activeConversationIdAtom,
   conversationModeAtom,
   settingsDialogOpenAtom,
 } from './settings-dialog-state';
-
-type AgentWorkflowSettings = Awaited<ReturnType<typeof loadWorkflowSettings>>;
-type StoredWorkflow = Parameters<typeof WorkflowRunPrompt>[0]['workflow'];
 
 const EMPTY_MESSAGE =
   'No workflows yet. Ask Kilo to save one — for example "Create a workflow that checks the price of this item" — or repeat steps on a site and Kilo offers to save them.';
@@ -32,93 +24,6 @@ const LOAD_ERROR_MESSAGE = "Couldn't load workflows. Try again.";
 
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
-
-const WorkflowRow = ({
-  activeConversationRunning,
-  allowWorkflowsInSafeMode,
-  isDangerousMode,
-  item,
-  onDelete,
-  onRun,
-}: {
-  activeConversationRunning: boolean;
-  allowWorkflowsInSafeMode: boolean;
-  isDangerousMode: boolean;
-  item: WorkflowSettingsListItem;
-  onDelete: (id: string) => void;
-  onRun: (id: string) => void;
-}): JSX.Element => {
-  const disabledReason = deriveWorkflowRunDisabledReason({
-    activeConversationRunning,
-    allowWorkflowsInSafeMode,
-    isApproved: item.isApproved,
-    isDangerousMode,
-  });
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-
-  return (
-    <li
-      className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface-background p-2"
-      key={item.id}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="type-body truncate font-medium text-foreground" title={item.name}>
-          {item.name}
-        </p>
-        {item.description !== '' && (
-          <p className="type-label mt-0.5 line-clamp-2 text-foreground-muted">{item.description}</p>
-        )}
-        <p className="type-label mt-0.5 text-foreground-muted">
-          {item.scope}
-          {' · '}
-          {item.dateLabel}
-          {item.isApproved ? null : (
-            <>
-              {' · '}
-              <span className="text-status-yellow-400">needs approval</span>
-            </>
-          )}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          aria-label={`Run workflow "${item.name}"`}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:border-brand-primary/50 hover:bg-brand-primary/10 hover:text-brand-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface-overlay disabled:hover:text-foreground-on-secondary"
-          disabled={disabledReason !== undefined}
-          onClick={() => {
-            onRun(item.id);
-          }}
-          title={disabledReason?.label}
-          type="button"
-        >
-          <Play aria-hidden="true" className="size-3.5" />
-        </button>
-        <button
-          aria-label={confirmingDelete ? `Confirm delete "${item.name}"` : item.deleteAriaLabel}
-          className={
-            confirmingDelete
-              ? 'flex size-8 shrink-0 items-center justify-center rounded-md border border-status-red-500 bg-status-red-500/20 text-status-red-300 transition hover:bg-status-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background'
-              : 'flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:border-status-red-500/50 hover:bg-status-red-500/10 hover:text-status-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background'
-          }
-          onBlur={() => {
-            setConfirmingDelete(false);
-          }}
-          onClick={() => {
-            if (confirmingDelete) {
-              onDelete(item.id);
-              return;
-            }
-            setConfirmingDelete(true);
-          }}
-          title={confirmingDelete ? 'Click again to delete' : undefined}
-          type="button"
-        >
-          <Trash2 aria-hidden="true" className="size-3.5" />
-        </button>
-      </div>
-    </li>
-  );
-};
 
 export const WorkflowSettings = (): JSX.Element => {
   const { isLoaded, loadError, reload, workflows } = useAgentWorkflows();
@@ -188,31 +93,12 @@ export const WorkflowSettings = (): JSX.Element => {
     void deleteAgentWorkflow(storage, id);
   }, []);
 
-  const [runPromptWorkflow, setRunPromptWorkflow] = useState<StoredWorkflow | undefined>();
-
   const handleRun = useCallback(
-    (id: string) => {
-      const workflow = workflows.find(candidate => candidate.id === id);
-      if (workflow !== undefined && (workflow.params ?? []).length > 0) {
-        setRunPromptWorkflow(workflow);
-        return;
-      }
-      setRunRequest({ workflowId: id });
+    (id: string, input?: Record<string, string>) => {
+      setRunRequest({ workflowId: id, ...(input === undefined ? {} : { input }) });
       setIsSettingsOpen(false);
     },
-    [workflows, setRunRequest, setIsSettingsOpen]
-  );
-
-  const handlePromptRun = useCallback(
-    (input: Record<string, string>) => {
-      if (runPromptWorkflow === undefined) {
-        return;
-      }
-      setRunRequest({ input, workflowId: runPromptWorkflow.id });
-      setRunPromptWorkflow(undefined);
-      setIsSettingsOpen(false);
-    },
-    [runPromptWorkflow, setRunRequest, setIsSettingsOpen]
+    [setRunRequest, setIsSettingsOpen]
   );
 
   return (
@@ -284,16 +170,6 @@ export const WorkflowSettings = (): JSX.Element => {
           ))}
         </ul>
       ) : null}
-
-      {runPromptWorkflow !== undefined && (
-        <WorkflowRunPrompt
-          onCancel={() => {
-            setRunPromptWorkflow(undefined);
-          }}
-          onRun={handlePromptRun}
-          workflow={runPromptWorkflow}
-        />
-      )}
     </section>
   );
 };

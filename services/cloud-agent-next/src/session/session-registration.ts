@@ -946,7 +946,15 @@ async function reconcileLedgerCreate(
         canonical.initialMessageId
       );
     }
-    // Stale ownership row removed → re-execute with fresh IDs under the row.
+    // Stale ownership row removed → confirm the DO never registered BEFORE
+    // re-executing: a single null metadata read is NOT proof of no
+    // registration (a transient read or a pending deletion intent can hide
+    // committed metadata). Re-read the DO state; only a second absent read
+    // authorizes a fresh create, otherwise stay in-progress conservatively.
+    const confirmedAbsent = await readSessionMetadata(ctx, doId);
+    if (confirmedAbsent) {
+      throw creationInProgressError();
+    }
     return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
   }
 

@@ -796,6 +796,73 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     expect(result.cloudAgentSessionId).toBe(CLOUD_AGENT_SESSION_ID);
   });
 
+  it('(c-cleared) re-reads DO metadata before re-creating and creates fresh only after a confirmed absent read', async () => {
+    // A single null metadata read must never authorize the fresh create: the
+    // ladder re-reads the DO state after the stale ownership row is removed
+    // and only re-executes when the second read is also absent.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    // First: ownership present. Second (after delete): ownership gone. Third: user email.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({
+      getMetadata: vi.fn().mockResolvedValue(null),
+    });
+    const ctx = makeContext(doStub);
+
+    const result = await createSessionWithLedger(
+      makeRequest({ options: { operationKey: OPERATION_KEY } }),
+      ctx,
+      takeoverOptions
+    );
+
+    expect(deleteCliSessionMock).toHaveBeenCalledTimes(1);
+    // The initial read and the confirmation re-read both returned absent.
+    expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(result.cloudAgentSessionId).toBe(CLOUD_AGENT_SESSION_ID);
+  });
+
+  it('(c-cleared) stays in-progress when the post-delete re-read proves the session registered', async () => {
+    // The initial metadata read was absent (which triggered the stale-row
+    // cleanup), but the confirmation re-read proves the DO DID register: the
+    // ladder must NOT re-create a second session. It returns in-progress
+    // conservatively; a later same-key retry reconciles through the
+    // ownership-absent ladder.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    // First: ownership present. Second (after delete): ownership gone.
+    getPgDbMock.mockReturnValue(makeDb([[{ sessionId: KILO_SESSION_ID }], []]));
+    const doStub = makeDoStub({
+      getMetadata: vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          identity: { sessionId: CLOUD_AGENT_SESSION_ID },
+        } as SessionMetadata),
+    });
+    const ctx = makeContext(doStub);
+
+    await expect(
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      )
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+
+    expect(deleteCliSessionMock).toHaveBeenCalledTimes(1);
+    expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it('(c-keep) confirms the live session only after authoritative metadata and admission', async () => {
     admitOperationMock.mockResolvedValueOnce({
       admission: 'takeover',

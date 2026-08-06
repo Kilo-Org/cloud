@@ -530,9 +530,11 @@ async function repairOrgMemberRemove(args: {
   organizationId: string;
   memberId: string;
 }): Promise<SuccessResult<{ updated: string; replayed: true }>> {
+  const distinctId = args.user.google_user_email || args.user.id;
   const [membership] = await db
-    .select({ id: organization_memberships.id })
+    .select({ id: organization_memberships.id, isBot: kilocode_users.is_bot })
     .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
       and(
         eq(organization_memberships.organization_id, args.organizationId),
@@ -545,6 +547,24 @@ async function repairOrgMemberRemove(args: {
     const completed = await completeOrgMemberRemoval(args);
     return { ...completed, replayed: true };
   }
+
+  // Preserve the service-account guard on the takeover repair: a bot member
+  // that is still present must never be removed by the read-back repair path.
+  // Refuse exactly like the first-time path (settle failed + FORBIDDEN) so a
+  // later same-key retry replays the typed rejection instead of re-running
+  // the removal helper.
+  if (membership.isBot) {
+    await settleOrgMemberRemovalFailed({
+      row: args.row,
+      distinctId,
+      outcomeCode: 'bot_removal_refused',
+    });
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Service account users cannot be removed',
+    });
+  }
+
   const completed = await executeOrgMemberRemove(args);
   return { ...completed, replayed: true };
 }

@@ -154,8 +154,8 @@ beforeEach(() => {
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
   mockCheckDependabotAlertsAvailability.mockResolvedValue([]);
-  mockRecordOperationAcceptance.mockResolvedValue({});
-  mockMarkReconcilePending.mockResolvedValue({});
+  mockRecordOperationAcceptance.mockResolvedValue({ status: 'admitted' });
+  mockMarkReconcilePending.mockResolvedValue({ status: 'reconcile_pending' });
   mockSettleOperation.mockResolvedValue({ settled: true });
 });
 
@@ -919,6 +919,75 @@ describe('security operation ledger (P1-A-08e)', () => {
       })
     );
     mockMarkReconcilePending.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'We could not record this action. Please try again later.',
+    });
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('never returns a success receipt when the acceptance returns no durable row (null)', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+    // `recordOperationAcceptance` returns null when the row is missing or
+    // terminal: no `provider_ref`/`canonical_result` was durably recorded, so
+    // a success receipt would be a false retry-safe claim.
+    mockRecordOperationAcceptance.mockResolvedValue(null);
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'The action completed, but we could not record the result. Please try again.',
+    });
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the persistence error when the reconcile-pending mark returns no durable row (null)', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+    mockSubmitManualSecuritySync.mockRejectedValue(
+      new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: 'Could not reach the security sync service. Try again.',
+      })
+    );
+    // The row vanished: no reconcile_pending state exists, so the ambiguous
+    // CONFLICT (which promises same-key dedupe/reconcile) must not surface.
+    mockMarkReconcilePending.mockResolvedValue(null);
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'We could not record this action. Please try again later.',
+    });
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the persistence error when the reconcile-pending mark is a no-op (row not admitted)', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+    mockSubmitManualSecuritySync.mockRejectedValue(
+      new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: 'Could not reach the security sync service. Try again.',
+      })
+    );
+    // The helper returns the stored row without transitioning it (the CAS did
+    // not match because the row is not `admitted`): durable reconcile_pending
+    // state does not exist, so the ambiguous CONFLICT must not be surfaced.
+    mockMarkReconcilePending.mockResolvedValue({ status: 'admitted' });
 
     await expect(
       createHandlers().triggerSync.handler({

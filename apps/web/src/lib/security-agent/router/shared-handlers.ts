@@ -389,7 +389,7 @@ async function recordSecurityAcceptance(
   accepted: { commandId: string; runId: string; messageId: string }
 ): Promise<void> {
   try {
-    await recordOperationAcceptance(db, {
+    const updated = await recordOperationAcceptance(db, {
       rowId: row.id,
       providerRef: accepted.messageId,
       canonicalResult: {
@@ -398,6 +398,12 @@ async function recordSecurityAcceptance(
         messageId: accepted.messageId,
       },
     });
+    if (updated === null) {
+      // The row is missing or already terminal: the acceptance was NOT
+      // durably recorded. Never return a success receipt for an un-recorded
+      // row — surface the retryable server error instead.
+      throw new Error('recordOperationAcceptance did not update the ledger row');
+    }
   } catch (error) {
     console.error(
       `Failed to record security operation acceptance: ${error instanceof Error ? error.message : String(error)}`
@@ -423,7 +429,7 @@ async function markSecurityRowReconcilePending(args: {
   startedAt: number;
 }): Promise<void> {
   try {
-    await markReconcilePending(db, {
+    const updated = await markReconcilePending(db, {
       rowId: args.row.id,
       outboxEvent: securitySettledOutboxEvent({
         distinctId: args.distinctId,
@@ -432,6 +438,13 @@ async function markSecurityRowReconcilePending(args: {
         startedAt: args.startedAt,
       }),
     });
+    if (!updated || updated.status !== 'reconcile_pending') {
+      // The row is missing or was not `admitted` (for example already
+      // terminal): the reconcile-pending guarantee does not hold, so the
+      // ambiguous CONFLICT must never be surfaced. Throw the distinct
+      // non-retryable persistence error instead.
+      throw new Error('markReconcilePending did not leave the row reconcile_pending');
+    }
   } catch (error) {
     console.error(
       `Failed to mark security operation ledger row reconcile-pending: ${error instanceof Error ? error.message : String(error)}`

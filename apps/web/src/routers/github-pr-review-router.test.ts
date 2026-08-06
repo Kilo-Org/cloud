@@ -21,11 +21,13 @@ jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({
 const mockAdmitOperation = jest.fn();
 const mockSettleOperation = jest.fn();
 const mockMarkReconcilePending = jest.fn();
+const mockRecordOperationAcceptance = jest.fn();
 
 jest.mock('@kilocode/db/operation-ledger', () => ({
   admitOperation: (...args: unknown[]) => mockAdmitOperation(...args),
   settleOperation: (...args: unknown[]) => mockSettleOperation(...args),
   markReconcilePending: (...args: unknown[]) => mockMarkReconcilePending(...args),
+  recordOperationAcceptance: (...args: unknown[]) => mockRecordOperationAcceptance(...args),
 }));
 
 jest.mock('@/lib/drizzle', () => ({
@@ -1201,6 +1203,8 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     mockAdmitOperation.mockReset();
     mockSettleOperation.mockReset();
     mockMarkReconcilePending.mockReset();
+    mockRecordOperationAcceptance.mockReset();
+    mockRecordOperationAcceptance.mockResolvedValue(ledgerRow());
     mockSettleOperation.mockResolvedValue({ settled: true });
     mockMarkReconcilePending.mockResolvedValue(ledgerRow({ status: 'reconcile_pending' }));
   });
@@ -1326,9 +1330,11 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
       canonicalResult: Record<string, unknown>;
       outboxEvent: { properties: Record<string, unknown> };
     };
-    // Only opaque provider ids enter the canonical result — the body and the
-    // inline comment text never do.
-    expect(settleCall.canonicalResult).toEqual({ reviewId: 99, nodeId: 'N_99' });
+    // Only opaque provider ids and the confirmed GitHub enum enter the
+    // canonical result — the body and the inline comment text never do. The
+    // `state` is carried so a replayed submitReview keeps the client's
+    // required response shape.
+    expect(settleCall.canonicalResult).toEqual({ reviewId: 99, nodeId: 'N_99', state: 'APPROVE' });
     const serialized = JSON.stringify({
       canonical: settleCall.canonicalResult,
       properties: settleCall.outboxEvent.properties,
@@ -1336,6 +1342,37 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     expect(serialized).not.toContain('lgtm!!!');
     expect(serialized).not.toContain('fix me');
     expect(serialized).not.toContain('octocat/hello#1');
+  });
+
+  it('replays a settled submitReview with the state field the client requires', async () => {
+    // The confirmed `state` lives in the canonical result, so a same-key
+    // replay returns the exact response shape the client reads on first
+    // execution (`{ reviewId, nodeId, state }`), not a state-less receipt.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        intent: 'submit_review',
+        resource_key: reviewResourceKey,
+        status: 'completed',
+        canonical_result: { reviewId: 99, nodeId: 'N_99', state: 'APPROVE' },
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    const result = await caller.submitReview({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      event: 'APPROVE',
+      body: 'lgtm!!!',
+      commitSha: '0'.repeat(40),
+      comments: [{ path: 'src/foo.ts', line: 5, side: 'RIGHT', body: 'fix me' }],
+      operationKey: 'key-review-1',
+    });
+
+    expect(result).toEqual({ reviewId: 99, nodeId: 'N_99', state: 'APPROVE', replayed: true });
+    expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 
   it('returns CONFLICT operation_in_progress for a live same-key duplicate without touching GitHub', async () => {
@@ -1866,6 +1903,24 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
         canonicalResult: { commentId: 42, nodeId: 'N_42' },
       })
     );
+    // …and the committed write is NEVER settled `failed` from the settle
+    // failure (a `failed` row would falsely claim the action did not
+    // complete and would drop the reconciliation evidence).
+    expect(mockSettleOperation).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'failed' })
+    );
+    // The canonical evidence is preserved on the non-terminal row so a
+    // same-key retry can reconcile by re-reading comment 42 instead of
+    // re-executing the write or losing the outcome.
+    expect(mockRecordOperationAcceptance).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        providerRef: '42',
+        canonicalResult: { commentId: 42, nodeId: 'N_42' },
+      })
+    );
     // …and no ambiguous/conflict marker leaked from the failure path.
     expect(mockMarkReconcilePending).not.toHaveBeenCalled();
   });
@@ -1893,6 +1948,30 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     expect(mockMarkReconcilePending).toHaveBeenCalledTimes(1);
     // The ambiguous CONFLICT must never replace the hidden persistence failure,
     // and the row must never be settled from a failed mark.
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the distinct persistence error when markReconcilePending returns no durable reconcile_pending row', async () => {
+    // The ambiguous marker promises same-key dedupe/reconcile, which only
+    // holds while the row is durably `reconcile_pending`. A null return (row
+    // missing) or a no-op return (row not `admitted`) leaves the guarantee
+    // unmet, so the distinct non-retryable persistence error is surfaced
+    // instead of the ambiguous CONFLICT.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'admitted', row: ledgerRow() });
+    mockMarkReconcilePending.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.createReviewComment.mockRejectedValueOnce({
+      status: 503,
+      message: 'Service unavailable',
+    });
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+    });
+    expect(mockMarkReconcilePending).toHaveBeenCalledTimes(1);
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 

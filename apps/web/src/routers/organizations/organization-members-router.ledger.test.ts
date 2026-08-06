@@ -130,9 +130,16 @@ beforeEach(() => {
         return query;
       },
       innerJoin: () => ({
-        where: () => ({
-          then: (resolve: (value: unknown) => void) => resolve(mockDbState.removeTargetMember),
-        }),
+        where: () => {
+          const query = {
+            limit: async () =>
+              mockDbState.removeTargetMember.length > 0
+                ? mockDbState.removeTargetMember
+                : mockDbState.memberReadBack,
+            then: (resolve: (value: unknown) => void) => resolve(mockDbState.removeTargetMember),
+          };
+          return query;
+        },
       }),
     }),
   }));
@@ -678,6 +685,40 @@ describe('organizations members ledger (P1-A-08e)', () => {
         tx,
         expect.objectContaining({ rowId: 'org-ledger-row-id', status: 'completed' })
       );
+    });
+
+    it('refuses to remove a service account during takeover repair (settles failed)', async () => {
+      // The member is still present and is a bot: the read-back repair must
+      // retain the service-account guard instead of re-running the removal
+      // helper, and the refusal settles the row failed so a later same-key
+      // retry replays the typed rejection instead of taking over past the
+      // guard.
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'takeover',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: true }];
+      mockDbState.memberReadBack = [{ id: MEMBER_ID, isBot: true }];
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Service account users cannot be removed',
+      });
+
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'bot_removal_refused',
+        })
+      );
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
     });
   });
 });

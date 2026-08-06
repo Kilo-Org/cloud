@@ -11,6 +11,7 @@ import { kilocode_users, type OperationLedgerRow } from '@kilocode/db/schema';
 import {
   admitOperation,
   markReconcilePending,
+  recordOperationAcceptance,
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
@@ -823,13 +824,25 @@ async function bestEffortLedgerWrite(work: () => Promise<unknown>): Promise<void
   }
 }
 
+/** The PR provider reference for reconciliation, derived from the canonical result. */
+function prProviderRefFromCanonical(canonical: Record<string, unknown>): string | null {
+  if (typeof canonical.commentId === 'number') return String(canonical.commentId);
+  if (typeof canonical.reviewId === 'number') return String(canonical.reviewId);
+  return null;
+}
+
 /**
  * Durably settles a provider-confirmed outcome as `completed` (P1-A-08c). The
  * GitHub effect committed, so a settle that fails must never be swallowed:
  * the row would stay `admitted` while the caller receives a success receipt —
- * a false "retry-safe" claim. Throws a retryable server error instead; a
- * same-key retry reconciles the committed provider outcome and settles the
- * row, and the caller never sees a success for an un-recorded row.
+ * a false "retry-safe" claim. The caller is NOT told success; instead the
+ * canonical provider evidence is preserved on the non-terminal row (atomic
+ * `provider_ref` + `canonical_result`, best-effort — the error below is the
+ * durable signal) so a same-key retry can reconcile by re-fetching the
+ * recorded reference, and a retryable server error is thrown. A committed
+ * write is never settled `failed` from this path: that would falsely tell a
+ * same-key retry the action did not complete and lose the reconciliation
+ * evidence.
  */
 async function settleCompletedPrRow(args: {
   rowId: string;
@@ -845,6 +858,13 @@ async function settleCompletedPrRow(args: {
       outboxEvent: args.outboxEvent,
     });
   } catch (error) {
+    await bestEffortLedgerWrite(() =>
+      recordOperationAcceptance(db, {
+        rowId: args.rowId,
+        providerRef: prProviderRefFromCanonical(args.canonicalResult),
+        canonicalResult: args.canonicalResult,
+      })
+    );
     console.error(
       `Failed to settle completed PR operation ledger row: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -868,10 +888,17 @@ async function markPrRowReconcilePendingDurably(args: {
   outboxEvent: OutboxEventInput;
 }): Promise<void> {
   try {
-    await markReconcilePending(db, {
+    const updated = await markReconcilePending(db, {
       rowId: args.rowId,
       outboxEvent: args.outboxEvent,
     });
+    if (!updated || updated.status !== 'reconcile_pending') {
+      // The row is missing or was not `admitted` (for example already
+      // terminal): the reconcile-pending guarantee does not hold, so the
+      // ambiguous marker must never be surfaced. Throw the distinct
+      // non-retryable persistence error instead.
+      throw new Error('markReconcilePending did not leave the row reconcile_pending');
+    }
   } catch (error) {
     console.error(
       `Failed to mark PR operation ledger row reconcile-pending: ${error instanceof Error ? error.message : String(error)}`
@@ -1080,25 +1107,12 @@ async function executePrWriteWithLedger<T>(args: {
   runWrite: (octokit: ReturnType<typeof createGitHubPrReviewOctokit>) => Promise<PrWriteOutcome<T>>;
 }): Promise<T> {
   const distinctId = await resolvePrDistinctId(args.userId);
+  let outcome: PrWriteOutcome<T>;
   try {
-    const outcome = await withGitHubUserTokenRetry({
+    outcome = await withGitHubUserTokenRetry({
       kiloUserId: args.userId,
       call: args.runWrite,
     });
-    if (outcome.kind === 'no_settle') {
-      return outcome.response;
-    }
-    await settleCompletedPrRow({
-      rowId: args.row.id,
-      canonicalResult: outcome.canonical,
-      outboxEvent: prSettledOutboxEvent({
-        distinctId,
-        intent: args.intent,
-        outcome: 'completed',
-        startedAt: args.startedAt,
-      }),
-    });
-    return outcome.response;
   } catch (error) {
     if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
       await markPrRowReconcilePending({
@@ -1139,6 +1153,26 @@ async function executePrWriteWithLedger<T>(args: {
     );
     throw error;
   }
+  if (outcome.kind === 'no_settle') {
+    return outcome.response;
+  }
+  // The write committed: settle completed at the committed-effect boundary.
+  // A settle failure must NEVER be caught by the write-failure path above
+  // (which settles the row `failed` — a false "did not complete" for a
+  // committed write). `settleCompletedPrRow` preserves the canonical evidence
+  // and surfaces the retryable persistence error; a same-key retry reconciles
+  // the committed outcome by the preserved reference.
+  await settleCompletedPrRow({
+    rowId: args.row.id,
+    canonicalResult: outcome.canonical,
+    outboxEvent: prSettledOutboxEvent({
+      distinctId,
+      intent: args.intent,
+      outcome: 'completed',
+      startedAt: args.startedAt,
+    }),
+  });
+  return outcome.response;
 }
 
 /**
@@ -1861,11 +1895,18 @@ export const githubPrReviewRouter = createTRPCRouter({
               comments: input.comments,
             });
             const response = await octokit.pulls.createReview(params);
-            const canonical = { reviewId: response.data.id, nodeId: response.data.node_id };
+            // The confirmed `state` is part of the canonical result (a bounded
+            // GitHub enum, not free text) so a replayed submitReview carries
+            // the same shape the client requires on first execution.
+            const canonical = {
+              reviewId: response.data.id,
+              nodeId: response.data.node_id,
+              state: response.data.state,
+            };
             return {
               kind: 'settle',
               canonical,
-              response: { ...canonical, state: response.data.state },
+              response: { ...canonical },
             };
           },
         }),
@@ -1884,8 +1925,12 @@ export const githubPrReviewRouter = createTRPCRouter({
               pull_number: input.number,
               review_id: providerId,
             });
-            const canonical = { reviewId: response.data.id, nodeId: response.data.node_id };
-            return { canonical, response: { ...canonical, state: response.data.state } };
+            const canonical = {
+              reviewId: response.data.id,
+              nodeId: response.data.node_id,
+              state: response.data.state,
+            };
+            return { canonical, response: { ...canonical } };
           },
         }),
     });

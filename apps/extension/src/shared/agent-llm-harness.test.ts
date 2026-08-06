@@ -33,7 +33,7 @@ describe('agent LLM harness', () => {
     expect(createEvalToolDefinition()).toStrictEqual({
       function: {
         description:
-          'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read.',
+          'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read. This is plain JavaScript with DOM access — workflow page helpers like page.click or page.fill do not exist here; use document.querySelector and native DOM calls.',
         name: 'eval',
         parameters: {
           additionalProperties: false,

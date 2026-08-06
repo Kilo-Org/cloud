@@ -161,7 +161,7 @@ const formatWorkflowScopeText = (
  * Echo a short preview of an invalid script return value so the caller can
  * see what the script actually produced, plus the two valid shapes.
  */
-const invalidValueError = (value: unknown): string => {
+const invalidValueError = (value: unknown, dryRun: boolean): string => {
   let preview = '';
   try {
     preview = JSON.stringify(value) ?? String(value);
@@ -172,7 +172,11 @@ const invalidValueError = (value: unknown): string => {
     preview = `${preview.slice(0, 200)}…`;
   }
 
-  return `Workflow script returned an invalid value: ${preview}. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.`;
+  const dryRunHint = dryRun
+    ? ' This was a dry run: clicks and fills are recorded, not performed, so content they would produce never appears — return early (e.g. after page.exists checks) instead of reading absent results.'
+    : '';
+
+  return `Workflow script returned an invalid value: ${preview}. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.${dryRunHint}`;
 };
 
 type NavigationValidationResult =
@@ -394,7 +398,7 @@ export const runWorkflow = async (
     const envelope = scriptEnvelopeSchema.safeParse(evalResult.value);
     if (!envelope.success) {
       return resultWithActions(
-        { error: invalidValueError(evalResult.value), ok: false, pageUrl: url },
+        { error: invalidValueError(evalResult.value, dryRun), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
@@ -418,7 +422,7 @@ export const runWorkflow = async (
 
     if (innerValue === null || innerValue === undefined || typeof innerValue !== 'object') {
       return resultWithActions(
-        { error: invalidValueError(innerValue), ok: false, pageUrl: url },
+        { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
@@ -450,7 +454,7 @@ export const runWorkflow = async (
 
     // Anything else is invalid.
     return resultWithActions(
-      { error: invalidValueError(innerValue), ok: false, pageUrl: url },
+      { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
       dryRun,
       dryRunActions
     );

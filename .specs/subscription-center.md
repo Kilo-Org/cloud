@@ -31,6 +31,7 @@ Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
 Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
 Updated 2026-08-05 -- closed fresh KiloClaw instance provisioning surfaces.
+Updated 2026-08-06 -- BytePlus Coding Plan quota integration.
 
 ## Conventions
 
@@ -77,6 +78,13 @@ capitals, as shown here.
   source. Price labels MUST use a dollar sign and billing cadence (e.g.
   "$20 /month"). Credit-funded products MUST display "Credits" as their
   payment source separately from their USD price.
+- **Provider Management Credential**: A server-only credential controlled by Kilo
+  for calling an upstream provider control-plane API. It MUST NOT be exposed to
+  subscribers or used as an inference credential.
+- **Upstream Usage ID**: A provider-issued identifier that ties an assigned
+  inventory credential to its quota subject. For BytePlus Coding Plans, this is
+  the resolved `SeatID`; it is not a subscriber identity or customer-facing
+  subscription field.
 
 ## Overview
 
@@ -311,14 +319,17 @@ Commit names, prices, invoices, and credit deductions.
     - Traffic routing information (Kilo Gateway through the ordinary BYOK
       setup for the subscription's provider)
     - Current Upstream Provider quota for an `active` or `past_due` Coding Plan
-      when available, authorized through the retained Managed Plan Credential
-      without exposing it to the client
+      when available, authorized either directly through the retained Managed
+      Plan Credential or through a scoped Provider Management Credential plus
+      the assigned inventory row's Upstream Usage ID, without exposing either
+      credential or identifier to the client
     - Inline billing history showing credit transactions with amounts in USD
       (see Billing History rules)
 
     Current quota state and Installed BYOK Configuration routing state MUST be
     presented separately. For an active or `past_due` plan, quota lookup MUST be
-    authorized through the retained assigned Managed Plan Credential rather
+    authorized through the retained assigned Managed Plan Credential or the
+    scoped Provider Management Credential plus its Upstream Usage ID, rather
     than through the Installed BYOK Configuration. Cloud MUST normalize current
     provider quota into an ordered set of windows owned by that subscription.
     Each window MUST include a stable semantic ID, remaining percentage, reset
@@ -504,6 +515,11 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-08-06 -- BytePlus Coding Plan quota integration
+
+- Added server-only Provider Management Credential and Upstream Usage ID definitions for control-plane quota lookup.
+- Clarified that BytePlus usage readiness requires a verified seat mapping and configured management credential while customer responses contain only normalized windows.
 
 ### 2026-08-05 -- Coding Plan quota summary
 

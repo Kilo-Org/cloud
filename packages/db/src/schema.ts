@@ -8523,6 +8523,7 @@ export const coding_plan_key_inventory = pgTable(
     plan_id: text().notNull(),
     provider_id: text().notNull(),
     upstream_plan_id: text().notNull(),
+    upstream_usage_id: text(),
     encrypted_api_key: jsonb().$type<EncryptedData>(),
     credential_fingerprint: text().notNull(),
     status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),
@@ -8542,6 +8543,9 @@ export const coding_plan_key_inventory = pgTable(
   },
   table => [
     uniqueIndex('UQ_coding_plan_key_inv_fingerprint').on(table.credential_fingerprint),
+    uniqueIndex('UQ_coding_plan_key_inv_provider_usage_id')
+      .on(table.provider_id, table.upstream_usage_id)
+      .where(sql`${table.upstream_usage_id} IS NOT NULL`),
     index('IDX_coding_plan_key_inv_plan_status').on(table.plan_id, table.status),
     index('IDX_coding_plan_key_inv_available')
       .on(table.plan_id)

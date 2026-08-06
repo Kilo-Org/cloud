@@ -1,4 +1,5 @@
-import { getAssignedCodingPlanApiKey } from '@/lib/coding-plans';
+import { getAssignedCodingPlanApiKey, getAssignedCodingPlanUsageContext } from '@/lib/coding-plans';
+import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
 import { getMiniMaxUsage } from '@/lib/coding-plans/minimax-usage';
 import {
   canQueryCodingPlanUsage,
@@ -8,8 +9,16 @@ import {
 import { CodingPlanUsageError, type CodingPlanUsageSnapshot } from './usage-contract';
 import { redisClient } from '@/lib/redis';
 
+jest.mock('@/lib/config.server', () => ({
+  BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
+  BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
+}));
 jest.mock('@/lib/coding-plans', () => ({
   getAssignedCodingPlanApiKey: jest.fn(),
+  getAssignedCodingPlanUsageContext: jest.fn(),
+}));
+jest.mock('@/lib/coding-plans/byteplus-usage', () => ({
+  getBytePlusUsage: jest.fn(),
 }));
 jest.mock('@/lib/coding-plans/minimax-usage', () => ({
   getMiniMaxUsage: jest.fn(),
@@ -45,6 +54,8 @@ const snapshot: CodingPlanUsageSnapshot = {
 };
 
 const mockedGetAssignedCodingPlanApiKey = jest.mocked(getAssignedCodingPlanApiKey);
+const mockedGetAssignedCodingPlanUsageContext = jest.mocked(getAssignedCodingPlanUsageContext);
+const mockedGetBytePlusUsage = jest.mocked(getBytePlusUsage);
 const mockedGetMiniMaxUsage = jest.mocked(getMiniMaxUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
@@ -53,6 +64,11 @@ const mockedRedisDel = jest.mocked(redisClient.del);
 beforeEach(() => {
   mockedGetAssignedCodingPlanApiKey.mockResolvedValue('managed-api-key');
   mockedGetMiniMaxUsage.mockResolvedValue(snapshot);
+  mockedGetBytePlusUsage.mockResolvedValue(snapshot);
+  mockedGetAssignedCodingPlanUsageContext.mockResolvedValue({
+    providerId: 'byteplus-coding',
+    seatId: 'seat-id',
+  });
   mockedRedisGet.mockResolvedValue(null);
   mockedRedisSet.mockResolvedValue('OK');
   mockedRedisDel.mockResolvedValue(1);
@@ -156,6 +172,24 @@ describe('Coding Plan usage cache', () => {
 });
 
 describe('Coding Plan usage capability', () => {
+  it('selects BytePlus for Lite and Pro and requires a resolved seat', () => {
+    const byteplus = {
+      id: 'byteplus-subscription-id',
+      planId: 'byteplus-coding-plan-team-lite',
+      providerId: 'byteplus-coding',
+      status: 'active',
+      keyInventoryId: 'byteplus-inventory-id',
+      hasUpstreamUsageId: true,
+    };
+
+    expect(canQueryCodingPlanUsage(byteplus)).toBe(true);
+    expect(canQueryCodingPlanUsage({ ...byteplus, planId: 'byteplus-coding-plan-team-pro' })).toBe(
+      true
+    );
+    expect(canQueryCodingPlanUsage({ ...byteplus, hasUpstreamUsageId: false })).toBe(false);
+    expect(canQueryCodingPlanUsage({ ...byteplus, keyInventoryId: null })).toBe(false);
+  });
+
   it('requires a live subscription, retained assignment, and registered adapter', () => {
     expect(canQueryCodingPlanUsage(subscription)).toBe(true);
     expect(canQueryCodingPlanUsage({ ...subscription, status: 'canceled' })).toBe(false);
@@ -167,5 +201,38 @@ describe('Coding Plan usage capability', () => {
         providerId: 'byteplus-coding',
       })
     ).toBe(false);
+  });
+
+  it('uses only the BytePlus seat context and keeps the inventory-based cache key', async () => {
+    const byteplusSubscription = {
+      id: 'byteplus-subscription-id',
+      planId: 'byteplus-coding-plan-team-lite',
+      providerId: 'byteplus-coding',
+      status: 'active',
+      keyInventoryId: 'byteplus-inventory-id',
+      hasUpstreamUsageId: true,
+    };
+
+    await expect(
+      getCodingPlanUsageResponse('user-id', byteplusSubscription)
+    ).resolves.toMatchObject({
+      subscription: {
+        id: byteplusSubscription.id,
+        windows: snapshot.windows,
+      },
+    });
+    expect(mockedGetAssignedCodingPlanUsageContext).toHaveBeenCalledWith({
+      inventoryId: 'byteplus-inventory-id',
+      userId: 'user-id',
+      planId: 'byteplus-coding-plan-team-lite',
+      providerId: 'byteplus-coding',
+    });
+    expect(mockedGetAssignedCodingPlanApiKey).not.toHaveBeenCalled();
+    expect(mockedGetBytePlusUsage).toHaveBeenCalledWith('seat-id');
+    expect(mockedRedisSet).toHaveBeenCalledWith(
+      'coding-plan-usage:v1:user-id:byteplus-subscription-id:byteplus-coding-plan-team-lite:byteplus-coding:byteplus-inventory-id',
+      JSON.stringify(snapshot),
+      { ex: 60 }
+    );
   });
 });

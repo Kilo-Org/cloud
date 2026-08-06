@@ -44,7 +44,13 @@ export const CodingPlanUsageSnapshotSchema = z.object({
 
 export type CodingPlanUsageSnapshot = z.infer<typeof CodingPlanUsageSnapshotSchema>;
 
-export type CodingPlanUsageErrorCode = 'network' | 'http' | 'invalid_response' | 'application';
+export type CodingPlanUsageErrorCode =
+  | 'configuration'
+  | 'network'
+  | 'timeout'
+  | 'http'
+  | 'invalid_response'
+  | 'application';
 
 // Thrown by provider usage adapters. The message is a safe generic user-facing
 // string; `code` is a non-secret failure category for logging.

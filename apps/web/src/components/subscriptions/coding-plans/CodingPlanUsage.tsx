@@ -34,7 +34,7 @@ export function CodingPlanUsage({
 
   if (usageQuery.isError || !usageQuery.data) {
     if (variant === 'compact') {
-      return <p className="text-muted-foreground text-sm">Current quota unavailable</p>;
+      return <p className="text-muted-foreground text-sm">Current quota unavailable.</p>;
     }
 
     return (
@@ -70,7 +70,7 @@ export function CodingPlanUsage({
     return (
       <section aria-label="Current quota" className="space-y-3">
         <h4 className="text-sm font-medium">Current quota</h4>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {windows.map(window => (
             <CodingPlanQuotaWindowView key={window.id} window={window} compact />
           ))}
@@ -89,7 +89,7 @@ export function CodingPlanUsage({
         <CardDescription>Provider-reported quota for this managed plan.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {windows.map(window => (
             <CodingPlanQuotaWindowView key={window.id} window={window} />
           ))}
@@ -137,8 +137,8 @@ function CodingPlanQuotaWindowView({
 
 function CodingPlanUsageSkeleton({ variant }: { variant: 'compact' | 'full' }) {
   const content = (
-    <div className="grid gap-4 sm:grid-cols-2" aria-hidden="true">
-      {[0, 1].map(index => (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+      {[0, 1, 2].map(index => (
         <div key={index} className="space-y-2">
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-7 w-28" />

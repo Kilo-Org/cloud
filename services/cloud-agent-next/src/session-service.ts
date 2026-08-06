@@ -146,7 +146,9 @@ function isRetryableKiloCapabilityIssuanceFailure(reason: string): boolean {
   );
 }
 
-// Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
+// This file is the only copy of the code-review sandbox command guard; the
+// review orchestrator (services/code-review-infra) no longer carries its own
+// allowlist, so there is nothing to mirror these patterns into.
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
   'ls',
@@ -180,6 +182,11 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'glab api --method POST *merge_requests/*/notes*',
   'glab api --method PUT *merge_requests/*/notes/*',
   'glab api --method POST *merge_requests/*/discussions*',
+  // Same three endpoint+method combinations as above, spelled with the -X
+  // short flag models commonly emit instead of --method.
+  'glab api -X POST *merge_requests/*/notes*',
+  'glab api -X PUT *merge_requests/*/notes/*',
+  'glab api -X POST *merge_requests/*/discussions*',
   'whoami',
   'date',
   'stat',
@@ -190,6 +197,81 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'cd',
   'mkdir',
   'touch',
+];
+
+// Step 1 of the GitLab review prompt fetches existing MR discussions for
+// de-duplication with a plain `glab api <url>` GET; no allowed pattern
+// admitted it, so reviews concluded the discussions endpoint was blocked
+// and posted nothing. These live in exactAllowed deliberately: exactAllowed
+// entries get no trailing "cmd *" variant, so nothing may follow the URL and
+// the command stays a read-only GET (glab api defaults to GET). The quoted
+// variants match the prompt's quoted URL.
+const CODE_REVIEW_EXACT_ALLOWED_COMMANDS = [
+  'glab api projects/*/merge_requests/*/discussions',
+  'glab api "projects/*/merge_requests/*/discussions"',
+  "glab api 'projects/*/merge_requests/*/discussions'",
+];
+
+// GitLab returns 20 discussions per page by default, so a bare GET silently
+// truncates the de-duplication read on busy MRs and the review re-posts
+// findings it already made. `--paginate` is the only flag that fixes that
+// without a query string, and it cannot change the HTTP method. It is admitted
+// after the denies so the flag denies below still apply to it.
+const CODE_REVIEW_ALLOWED_AFTER_DENIED_COMMANDS = [
+  'glab api projects/*/merge_requests/*/discussions --paginate',
+  'glab api "projects/*/merge_requests/*/discussions" --paginate',
+  "glab api 'projects/*/merge_requests/*/discussions' --paginate",
+];
+
+// The permission matcher expands `*` to `.*`, which also matches spaces, so an
+// endpoint pattern otherwise absorbs whole extra arguments. Without these
+// denies, `glab api projects/x/merge_requests/1/notes/5 -X DELETE
+// -F a=y/merge_requests/2/discussions` still starts with `glab api projects/`
+// and still ends with `/discussions`, which turned the read-only allow into
+// arbitrary authenticated GitLab writes (and `--hostname` into an outbound
+// token leak). Likewise a second method flag after an allowed
+// `--method POST`/`-X POST` prefix overrides the method glab actually sends.
+// So: no method, body, parameter, or hostname flag may appear anywhere in a
+// `glab api` review command beyond the pinned method prefix it was allowed
+// with.
+//
+// `-H`/`--header` is denied on reads for the same spanning reason even though a
+// header cannot itself write: it takes a value, so it can carry the
+// `/merge_requests/N/discussions` suffix the allow requires while the real
+// endpoint is the first positional argument, e.g.
+// `glab api projects/x/variables -H X:/merge_requests/1/discussions` reads CI
+// variables. It is the last value-taking flag `glab api` has, so denying it
+// closes the carrier: the remaining unlisted read flags (-i, --silent,
+// --paginate) are booleans and cannot hold the suffix. Reads never need a
+// header; the writes that legitimately send `-H "Content-Type: application/json"`
+// match the write prefixes below, not the read prefixes, so they are unaffected.
+const GITLAB_API_UNSAFE_FLAGS = [
+  '-X',
+  '--method',
+  '-F',
+  '--field',
+  '-f',
+  '--raw-field',
+  '--form',
+  '--input',
+  '--hostname',
+  '-H',
+  '--header',
+];
+const GITLAB_API_METHOD_OVERRIDE_FLAGS = ['-X', '--method', '--hostname'];
+const GITLAB_API_READ_COMMAND_PREFIXES = [
+  'glab api projects/*',
+  'glab api "projects/*',
+  "glab api 'projects/*",
+];
+const GITLAB_API_WRITE_COMMAND_PREFIXES = ['glab api --method *', 'glab api -X *'];
+const CODE_REVIEW_GITLAB_API_FLAG_DENIES = [
+  ...GITLAB_API_READ_COMMAND_PREFIXES.flatMap(prefix =>
+    GITLAB_API_UNSAFE_FLAGS.map(flag => `${prefix} ${flag}*`)
+  ),
+  ...GITLAB_API_WRITE_COMMAND_PREFIXES.flatMap(prefix =>
+    GITLAB_API_METHOD_OVERRIDE_FLAGS.map(flag => `${prefix} ${flag}*`)
+  ),
 ];
 
 const BITBUCKET_CODE_REVIEW_SHELL_SYNTAX_DENIES = [
@@ -508,7 +590,11 @@ export function getCommandGuardPolicy(
     return {
       policyName: 'code-review-read-only',
       allowed: CODE_REVIEW_ALLOWED_COMMANDS,
+      exactAllowed: CODE_REVIEW_EXACT_ALLOWED_COMMANDS,
       denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
+      allowedAfterDenied: CODE_REVIEW_ALLOWED_AFTER_DENIED_COMMANDS,
+      // Terminal so they also override the paginated read allow above.
+      terminalDenied: CODE_REVIEW_GITLAB_API_FLAG_DENIES,
     };
   }
 

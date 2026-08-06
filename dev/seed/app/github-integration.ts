@@ -43,8 +43,14 @@ type GitHubIntegrationOptions = {
 };
 
 function takeFlagValue(args: string[], index: number, flag: string): string {
-  const inline = args[index].slice(flag.length + 1).trim();
-  if (inline) return inline;
+  const arg = args[index];
+  if (arg.length > flag.length && arg[flag.length] === '=') {
+    const inline = arg.slice(flag.length + 1).trim();
+    if (!inline) {
+      throw new Error(`${flag} requires a value`);
+    }
+    return inline;
+  }
 
   const next = args[index + 1];
   if (next === undefined || next.startsWith('--')) {

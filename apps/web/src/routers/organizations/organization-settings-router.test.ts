@@ -591,16 +591,19 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.default_model).toBe('any-model');
     });
 
-    it('keeps custom LLM defaults exempt from Enterprise model restrictions', async () => {
-      const caller = await createCallerForUser(owner.id);
+    it.each(['kilo-auto/balanced', 'kilo-internal/private-model'])(
+      'keeps %s defaults exempt from Enterprise model restrictions',
+      async modelId => {
+        const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.settings.updateDefaultModel({
-        organizationId: orgWithModelDenyList.id,
-        default_model: 'kilo-internal/private-model',
-      });
+        const result = await caller.organizations.settings.updateDefaultModel({
+          organizationId: orgWithModelDenyList.id,
+          default_model: modelId,
+        });
 
-      expect(result.settings.default_model).toBe('kilo-internal/private-model');
-    });
+        expect(result.settings.default_model).toBe(modelId);
+      }
+    );
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {
       const caller = await createCallerForUser(member.id);

@@ -76,7 +76,7 @@ describe('effective organization model access', () => {
     expect(decision).toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it.each(['kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
       const policy = evaluateEffectiveModelAccessPolicy(context());

@@ -1,5 +1,9 @@
 import 'server-only';
-import { CUSTOM_LLM_PREFIX, normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import {
+  CUSTOM_LLM_PREFIX,
+  KILO_AUTO_MODEL_PREFIX,
+  normalizeModelId,
+} from '@/lib/ai-gateway/model-utils';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
@@ -14,7 +18,12 @@ export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 export async function isModelRestrictionExempt(modelId: string): Promise<boolean> {
   const requestedModelId = modelId.trim().toLowerCase();
-  if (requestedModelId.startsWith(CUSTOM_LLM_PREFIX)) return true;
+  if (
+    requestedModelId.startsWith(CUSTOM_LLM_PREFIX) ||
+    requestedModelId.startsWith(KILO_AUTO_MODEL_PREFIX)
+  ) {
+    return true;
+  }
   const directByokModel = await getDirectByokModel(requestedModelId);
   return directByokModel.provider !== null && directByokModel.model !== null;
 }

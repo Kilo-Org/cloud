@@ -75,7 +75,7 @@ describe('model access predicates', () => {
     await expect(isAllowed('x-ai/grok-4.6')).resolves.toBe(true);
   });
 
-  test.each(['kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from Enterprise model restrictions',
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(

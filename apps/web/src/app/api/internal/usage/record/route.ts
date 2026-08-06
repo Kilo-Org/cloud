@@ -81,27 +81,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { core, metadata, prior_microdollar_usage, posthog_distinct_id } = parsed.data;
 
   // Redelivery is handled inside the write, not by a lookup here.
-  //
-  // There used to be a `SELECT id FROM microdollar_usage WHERE id = $1` at this
-  // point to short-circuit a redelivery that had already committed. It cost a pool
-  // connection on every single request, and the in-process pool — capped at 10 per
-  // instance — is the endpoint's binding constraint: the timing signal shows
-  // `idle == 0` on 96-98% of sampled requests with up to 245 queued, so that
-  // sub-millisecond indexed lookup was measured at a p50 of 1.1-4.5s of pure
-  // acquire wait. For the common path (organization usage, or any user with prior
-  // usage, where `isFirstUsage` short-circuits without querying) it was one of only
-  // two acquisitions per request.
-  //
-  // `insertUsageRecord` already produces the identical outcome via
-  // `findAlreadyRecordedUsage`, and since the primary-key conflict became
-  // non-retryable it does so without burning attempts. Post-commit side effects are
-  // suppressed by the same `wasRedelivery` flag that this route reads. So the
-  // lookup bought a guaranteed acquire on 100% of requests to save a rolled-back
-  // insert on the few percent that collide.
-  //
-  // The overlap case is unchanged: a redelivery arriving while the first is still
-  // open could never see the uncommitted row, so it always relied on the conflict
-  // path.
   const result = await saveUsageRelatedDataLocally(
     core,
     metadata,

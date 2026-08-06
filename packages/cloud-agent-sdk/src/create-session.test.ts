@@ -323,4 +323,126 @@ describe('createRemoteSessionOnConnection', () => {
       expectedConnectionId: 'cli-owner-1',
     });
   });
+
+  it('forwards the caller mutationId as the extended wire identity (`${key}:ext`)', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'spawn-key-1:ext',
+    });
+  });
+
+  it('uses the distinct bare identity (`${key}:bare`) for the old-CLI retry', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(1, {
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'spawn-key-1:ext',
+    });
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(2, {
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'spawn-key-1:bare',
+    });
+    expect(parseCreateSessionResponse(result)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
+    });
+  });
+
+  it('keeps the extended and bare identities stable and distinct across attempts', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID })
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    const mutationIds = connection.sendCommandToConnection.mock.calls.map(
+      call => (call[0] as { mutationId?: string }).mutationId
+    );
+    // Same key, same attempt → identical wire identity across calls.
+    expect(mutationIds).toEqual([
+      'spawn-key-1:ext',
+      'spawn-key-1:bare',
+      'spawn-key-1:ext',
+      'spawn-key-1:bare',
+    ]);
+    // The two durable identities must never collide.
+    expect(new Set(mutationIds).size).toBe(2);
+  });
+
+  it('omits mutationId on both attempts when the caller provides none', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', { agent: 'code' });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    for (const call of connection.sendCommandToConnection.mock.calls) {
+      expect(call[0]).not.toHaveProperty('mutationId');
+    }
+  });
+
+  it('classifies a durable-replayed envelope identically to a live envelope', async () => {
+    // A D8 durable 'done' entry replays the exact stored envelope under the
+    // retry request's id. The classifier must produce the same output for the
+    // replayed envelope as for the original live delivery.
+    const envelope = { protocolVersion: 1, sessionID: VALID_SESSION_ID };
+
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue(envelope);
+    const live = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    connection.sendCommandToConnection.mockResolvedValue(envelope);
+    const replayed = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    expect(parseCreateSessionResponse(replayed)).toEqual(parseCreateSessionResponse(live));
+    expect(parseCreateSessionResponse(replayed)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
+    });
+  });
 });

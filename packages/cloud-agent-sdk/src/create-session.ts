@@ -51,6 +51,25 @@ export function parseCreateSessionResponse(raw: unknown): CreateSessionParseResu
  */
 export type CreateRemoteSessionRawResult = unknown;
 
+/** Durable identity suffix for the extended `create_session` attempt. */
+const EXTENDED_MUTATION_ID_SUFFIX = ':ext';
+
+/** Durable identity suffix for the old-CLI bare `create_session` retry. */
+const BARE_MUTATION_ID_SUFFIX = ':bare';
+
+/**
+ * Derive the wire mutationId for one create attempt from the caller's stable
+ * key. The two attempts MUST NOT share a durable identity: the UserConnectionDO
+ * dedupes by mutationId, so a bare retry under the extended attempt's id would
+ * replay the stored `invalid create_session command` error instead of reaching
+ * the CLI. Appending a per-attempt suffix keeps both identities stable and
+ * distinct. `undefined` input keeps the legacy byte-identical wire (no
+ * mutationId).
+ */
+function attemptMutationId(key: string | undefined, suffix: string): string | undefined {
+  return key !== undefined ? `${key}${suffix}` : undefined;
+}
+
 /**
  * Connection-scoped `create_session` for the `kilo remote` process-per-session
  * spawn flow. Unlike the session-scoped `createSession` in
@@ -58,6 +77,12 @@ export type CreateRemoteSessionRawResult = unknown;
  * this helper targets a specific CLI viewer connection and omits any
  * `sessionId` on the wire — the CLI is expected to provision a fresh
  * `KiloSessionId` for the new cloud-agent session.
+ *
+ * When `input.mutationId` is supplied it is forwarded on the wire as a durable
+ * dedupe identity (D8): the extended attempt uses `${key}:ext` and the old-CLI
+ * bare retry uses `${key}:bare`, so the two durable identities cannot collide
+ * (see `attemptMutationId`). When omitted, the wire carries no mutationId and
+ * the relay falls back to a per-wire random correlation id.
  *
  * The returned promise resolves with the raw reply; the caller is responsible
  * for parsing the response shape. A delivered error response (string or
@@ -79,11 +104,13 @@ export async function createRemoteSessionOnConnection(
   };
   const hasExtendedFields =
     data.agent !== undefined || data.model !== undefined || data.orgId !== undefined;
+  const extendedMutationId = attemptMutationId(input?.mutationId, EXTENDED_MUTATION_ID_SUFFIX);
   try {
     return await connection.sendCommandToConnection({
       command: 'create_session',
       data,
       expectedConnectionId: connectionId,
+      ...(extendedMutationId !== undefined ? { mutationId: extendedMutationId } : {}),
     });
   } catch (error) {
     // Only bare-retry when extended fields made the original wire differ from
@@ -93,10 +120,12 @@ export async function createRemoteSessionOnConnection(
       error instanceof CommandDeliveredError &&
       error.message === INVALID_CREATE_SESSION_COMMAND
     ) {
+      const bareMutationId = attemptMutationId(input?.mutationId, BARE_MUTATION_ID_SUFFIX);
       return connection.sendCommandToConnection({
         command: 'create_session',
         data: { protocolVersion: 1 },
         expectedConnectionId: connectionId,
+        ...(bareMutationId !== undefined ? { mutationId: bareMutationId } : {}),
       });
     }
     throw error;

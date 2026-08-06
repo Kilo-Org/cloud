@@ -164,7 +164,16 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
           {gutterText ? ` ${gutterText}` : ''}
         </RNText>
       </View>
-      <View className="flex-1" style={codeContainerStyle} accessibilityLabel={accessibilityLabel}>
+      {/* `accessible` exposes the label on iOS: without it the container is
+          not an accessibility element and VoiceOver announces only the
+          selectable code text. In the pressable path the wrapping Pressable
+          groups this subtree, so the flag only surfaces on read-only rows. */}
+      <View
+        className="flex-1"
+        style={codeContainerStyle}
+        accessible
+        accessibilityLabel={accessibilityLabel}
+      >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for code */}
         <RNText
           maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}

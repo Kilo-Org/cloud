@@ -75,7 +75,7 @@ const rows: React.ReactNode[][][] = [[['Row 1']]];
 type RenderedElement = {
   type: string;
   props: Record<string, unknown> & {
-    children?: RenderedElement | RenderedElement[];
+    children?: React.ReactNode;
   };
 };
 
@@ -101,6 +101,60 @@ function findClosePressable(element: unknown): RenderedElement | null {
   return null;
 }
 
+/** Depth-first list of every rendered element, flattening nested array children. */
+function walkElements(root: unknown): RenderedElement[] {
+  const result: RenderedElement[] = [];
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        walk(item);
+      }
+      return;
+    }
+    const element = node as RenderedElement;
+    result.push(element);
+    const children = element.props.children;
+    if (children) {
+      const list = Array.isArray(children) ? children : [children];
+      for (const child of list) {
+        walk(child);
+      }
+    }
+  };
+  walk(root);
+  return result;
+}
+
+/** Walk the element tree for a Pressable with accessibilityLabel="View table". */
+function findTriggerPressable(element: unknown): RenderedElement | null {
+  return (
+    walkElements(element).find(
+      node => node.type === 'Pressable' && node.props.accessibilityLabel === 'View table'
+    ) ?? null
+  );
+}
+
+/** Walk the element tree for a Text node rendering exactly the summary string. */
+function findSummaryText(element: unknown, summary: string): RenderedElement | null {
+  return (
+    walkElements(element).find(node => node.type === 'Text' && node.props.children === summary) ??
+    null
+  );
+}
+
+/** Every ScrollView node in tree order. */
+function collectScrollViews(element: unknown): RenderedElement[] {
+  return walkElements(element).filter(node => node.type === 'ScrollView');
+}
+
+/** Whether `node` appears anywhere inside `ancestor`'s subtree. */
+function isDescendant(ancestor: RenderedElement, node: RenderedElement): boolean {
+  return walkElements(ancestor).includes(node);
+}
+
 describe('MarkdownTable close button', () => {
   it('renders a close Pressable with accessibilityLabel "Close table" and hitSlop 8', () => {
     // eslint-disable-next-line new-cap
@@ -114,5 +168,58 @@ describe('MarkdownTable close button', () => {
     expect(closeButton.props.accessibilityLabel).toBe('Close table');
     expect(closeButton.props.accessibilityRole).toBe('button');
     expect(closeButton.props.hitSlop).toBe(8);
+  });
+});
+
+describe('MarkdownTable trigger and two-axis modal', () => {
+  it('renders the "View table" trigger Pressable', () => {
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({ palette: mockPalette, header, rows });
+    const trigger = findTriggerPressable(element);
+
+    expect(trigger).not.toBeNull();
+    if (!trigger) {
+      throw new Error('trigger should not be null');
+    }
+    expect(trigger.props.accessibilityRole).toBe('button');
+  });
+
+  it('summarizes the existing 1-by-1 fixture as "1 column · 1 row"', () => {
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({ palette: mockPalette, header, rows });
+
+    expect(findSummaryText(element, '1 column · 1 row')).not.toBeNull();
+  });
+
+  it('summarizes a 2-by-3 fixture as "2 columns · 3 rows"', () => {
+    const twoByThreeHeader: React.ReactNode[][] = [['A'], ['B']];
+    const twoByThreeRows: React.ReactNode[][][] = [
+      [['1'], ['2']],
+      [['3'], ['4']],
+      [['5'], ['6']],
+    ];
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({
+      palette: mockPalette,
+      header: twoByThreeHeader,
+      rows: twoByThreeRows,
+    });
+
+    expect(findSummaryText(element, '2 columns · 3 rows')).not.toBeNull();
+  });
+
+  it('renders exactly two axis ScrollViews, inner horizontal nested in outer vertical', () => {
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({ palette: mockPalette, header, rows });
+    const scrollViews = collectScrollViews(element);
+
+    expect(scrollViews).toHaveLength(2);
+    const [outerScrollView, innerScrollView] = scrollViews;
+    if (!outerScrollView || !innerScrollView) {
+      throw new Error('expected exactly two ScrollViews');
+    }
+    expect(outerScrollView.props.horizontal).toBeUndefined();
+    expect(innerScrollView.props.horizontal).toBe(true);
+    expect(isDescendant(outerScrollView, innerScrollView)).toBe(true);
   });
 });

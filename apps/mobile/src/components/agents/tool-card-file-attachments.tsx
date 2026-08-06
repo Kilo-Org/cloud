@@ -84,14 +84,20 @@ export function ToolCardFileAttachments({ part }: Readonly<{ part: ToolPart }>) 
     return null;
   }
 
+  // Render only the first non-image attachment: the cache keeps the first
+  // attachment's bytes per part id (see tool-card-image-cache.ts). A second
+  // chip would share the first file's bytes under the second file's name and
+  // would duplicate the unavailable row on a cache miss.
+  const first = attachments[0];
+  if (!first) {
+    return null;
+  }
+
+  const label = first.filename ?? 'File';
+
   return (
     <View className="gap-2">
-      {attachments.map(attachment => {
-        const label = attachment.filename ?? 'File';
-        return (
-          <FileChip key={attachment.id} label={label} mime={attachment.mime} partId={part.id} />
-        );
-      })}
+      <FileChip label={label} mime={first.mime} partId={part.id} />
     </View>
   );
 }

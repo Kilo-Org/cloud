@@ -8,6 +8,7 @@ import {
   loadWorkflowSettings,
   saveWorkflowSettings,
 } from '@/src/shared/agent-workflows-storage';
+import { DEFAULT_WORKFLOW_SETTINGS } from '@/src/shared/agent-workflows';
 import type { AgentWorkflowSettings } from '@/src/shared/agent-workflows';
 import { useAgentWorkflows } from './use-agent-workflows';
 import { WorkflowRow } from './workflow-row';
@@ -44,7 +45,7 @@ export const WorkflowSettings = (): JSX.Element => {
       : runningConversationIds.includes(activeConversationId);
 
   const [settings, setSettings] = useState<AgentWorkflowSettings>({
-    allowWorkflowsInSafeMode: false,
+    ...DEFAULT_WORKFLOW_SETTINGS,
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -54,7 +55,7 @@ export const WorkflowSettings = (): JSX.Element => {
 
   useEffect(() => {
     void (async () => {
-      let loaded: AgentWorkflowSettings = { allowWorkflowsInSafeMode: false };
+      let loaded: AgentWorkflowSettings = { ...DEFAULT_WORKFLOW_SETTINGS };
       try {
         loaded = await loadWorkflowSettings(storage);
       } catch {
@@ -73,6 +74,7 @@ export const WorkflowSettings = (): JSX.Element => {
     const prior = settings;
     setSettingsSaving(true);
     const next: AgentWorkflowSettings = {
+      ...DEFAULT_WORKFLOW_SETTINGS,
       allowWorkflowsInSafeMode: !prior.allowWorkflowsInSafeMode,
     };
     setSettings(next);

@@ -1,4 +1,4 @@
-/* eslint-disable capitalized-comments, id-length, init-declarations, jest/no-hooks, jest/no-untyped-mock-factory, jest/no-conditional-expect, jest/no-conditional-in-test, max-lines, no-unused-expressions, sort-keys, vitest/prefer-import-in-mock, vitest/prefer-called-times -- test fixture constraints */
+/* eslint-disable capitalized-comments, id-length, init-declarations, jest/no-hooks, jest/no-untyped-mock-factory, jest/no-conditional-expect, jest/no-conditional-in-test, max-dependencies, max-lines, no-unused-expressions, sort-keys, vitest/prefer-import-in-mock, vitest/prefer-called-times -- test fixture constraints */
 /* eslint-disable import/first */
 // @vitest-environment jsdom
 
@@ -33,6 +33,7 @@ vi.mock('#imports', () => ({
 }));
 
 import { useAgentWorkflows } from './use-agent-workflows';
+import { DEFAULT_WORKFLOW_SETTINGS } from '@/src/shared/agent-workflows';
 import {
   deleteAgentWorkflow,
   loadWorkflowSettings,
@@ -82,7 +83,10 @@ describe('workflow settings', () => {
 
   it('renders the toggle heading and saved workflows label', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
 
     const { getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -96,7 +100,10 @@ describe('workflow settings', () => {
 
   it('shows empty state when no workflows', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
 
     const { getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -112,7 +119,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       isLoaded: false,
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
 
     const { getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -126,7 +136,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       loadError: true,
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
 
     const { getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -143,7 +156,10 @@ describe('workflow settings', () => {
       loadError: true,
       reload,
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
 
     const { getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -162,7 +178,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
 
     const { getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -178,7 +197,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: true });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
     store.set(runningConversationIdsAtom, []);
     store.set(settingsDialogOpenAtom, true);
 
@@ -204,7 +226,10 @@ describe('workflow settings', () => {
 
   it('sets the toggle on click and persists the change', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
     mockSaveWorkflowSettings.mockResolvedValue();
 
     const { getByLabelText } = render(createElement(WorkflowSettings), {
@@ -222,6 +247,7 @@ describe('workflow settings', () => {
 
     await waitFor(() => {
       expect(mockSaveWorkflowSettings).toHaveBeenCalledWith(expect.anything(), {
+        ...DEFAULT_WORKFLOW_SETTINGS,
         allowWorkflowsInSafeMode: true,
       });
       if (toggle instanceof HTMLButtonElement) {
@@ -232,7 +258,10 @@ describe('workflow settings', () => {
 
   it('rolls back toggle state when save fails', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
     mockSaveWorkflowSettings.mockRejectedValue(new Error('Storage write failed'));
 
     const { getByLabelText } = render(createElement(WorkflowSettings), {
@@ -278,7 +307,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
     mockDeleteAgentWorkflow.mockResolvedValue();
 
     const { getByLabelText } = render(createElement(WorkflowSettings), {
@@ -318,7 +350,10 @@ describe('workflow settings', () => {
         },
       ],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: true });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
 
     const { getByLabelText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
@@ -337,7 +372,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
     store.set(conversationModeAtom, 'safe');
 
     const { getByLabelText } = render(createElement(WorkflowSettings), {
@@ -358,7 +396,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: false });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
     store.set(conversationModeAtom, 'dangerous');
     store.set(activeConversationIdAtom, 'conversation-1');
     store.set(runningConversationIdsAtom, []);
@@ -380,7 +421,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: true });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
     store.set(conversationModeAtom, 'safe');
     store.set(activeConversationIdAtom, 'conversation-1');
     store.set(runningConversationIdsAtom, ['conversation-1']);
@@ -403,7 +447,10 @@ describe('workflow settings', () => {
       ...emptyResult,
       workflows: [approvedWorkflow],
     });
-    mockLoadWorkflowSettings.mockResolvedValue({ allowWorkflowsInSafeMode: true });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
     store.set(conversationModeAtom, 'safe');
     store.set(activeConversationIdAtom, 'conversation-1');
     store.set(runningConversationIdsAtom, ['conversation-2']);

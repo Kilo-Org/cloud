@@ -172,9 +172,9 @@ describe('BytePlus control-plane client', () => {
           ShortTermUsage: 12.5,
           WeeklyUsage: 55,
           MonthlyUsage: 101,
-          ShortTermResetMilestone: 1_781_280_000_000,
-          WeeklyResetMilestone: 1_781_884_800_000,
-          MonthlyResetMilestone: 1_783_000_000_000,
+          ShortTermResetMilestone: 1_781_280_000,
+          WeeklyResetMilestone: 1_781_884_800,
+          MonthlyResetMilestone: 1_783_000_000,
           unknown: 'strip me',
         },
       })
@@ -185,9 +185,9 @@ describe('BytePlus control-plane client', () => {
       shortTermUsage: 12.5,
       weeklyUsage: 55,
       monthlyUsage: 101,
-      shortTermResetMilestone: 1_781_280_000_000,
-      weeklyResetMilestone: 1_781_884_800_000,
-      monthlyResetMilestone: 1_783_000_000_000,
+      shortTermResetMilestone: 1_781_280_000,
+      weeklyResetMilestone: 1_781_884_800,
+      monthlyResetMilestone: 1_783_000_000,
     });
     expect(JSON.stringify(result)).not.toContain('seat-user');
     expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({ SeatID: 'seat-123' });

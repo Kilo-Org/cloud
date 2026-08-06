@@ -103,9 +103,7 @@ describe('workflow settings', () => {
     });
 
     await waitFor(() => {
-      expect(
-        getByText('No workflows yet. Kilo offers to save one when you repeat steps on a site.')
-      ).toBeDefined();
+      expect(getByText(/No workflows yet. Ask Kilo to save one/u)).toBeDefined();
     });
   });
 
@@ -294,6 +292,17 @@ describe('workflow settings', () => {
     const deleteButton = getByLabelText('Delete workflow "Order pizza"');
     if (deleteButton instanceof HTMLButtonElement) {
       deleteButton.click();
+    }
+
+    // First click only arms the confirmation.
+    expect(mockDeleteAgentWorkflow).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(getByLabelText('Confirm delete "Order pizza"')).toBeDefined();
+    });
+    const confirmButton = getByLabelText('Confirm delete "Order pizza"');
+    if (confirmButton instanceof HTMLButtonElement) {
+      confirmButton.click();
     }
 
     expect(mockDeleteAgentWorkflow).toHaveBeenCalledWith(expect.anything(), 'wf-1');

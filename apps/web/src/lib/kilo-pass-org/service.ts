@@ -15,6 +15,7 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import {
   KiloPassOrgAgreementState,
   KiloPassOrgBonusMode,
@@ -643,7 +644,7 @@ async function issue(
       .where(
         and(
           eq(organization_memberships.organization_id, row.agreement.parent_organization_id),
-          inArray(organization_memberships.role, ['owner', 'billing_manager'])
+          inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
         )
       );
     const recipientIds = new Set(recipients.map(recipient => recipient.userId));
@@ -1343,7 +1344,7 @@ async function agreementRecipientUserId(
     .where(
       and(
         eq(organization_memberships.organization_id, parentOrganizationId),
-        inArray(organization_memberships.role, ['owner', 'billing_manager'])
+        inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
       )
     )
     .orderBy(asc(organization_memberships.joined_at))

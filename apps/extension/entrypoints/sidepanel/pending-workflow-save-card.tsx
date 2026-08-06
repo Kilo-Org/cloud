@@ -158,7 +158,7 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
       className="fixed inset-0 z-[25] flex items-center justify-center bg-black/50 p-4"
       role="dialog"
     >
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
+      <div className="flex max-h-full w-full max-w-sm flex-col rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
         {view.kind === 'loadError' ? (
           <div className="flex flex-col gap-3">
             <p className="type-body text-status-red-400">{view.message}</p>
@@ -183,48 +183,89 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
         ) : null}
 
         {pendingDraft && view.kind !== 'loadError' && (
-          <div className="flex flex-col gap-3">
-            <div className="space-y-1">
-              <p className="type-label text-foreground-muted">Name</p>
-              <p className="type-body text-foreground">{pendingDraft.name}</p>
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-3">
+                <div className="space-y-1">
+                  <p className="type-body font-semibold text-foreground">
+                    {isUpdate ? 'Update this workflow?' : 'Save this workflow?'}
+                  </p>
+                  <p className="type-label text-foreground-muted">
+                    Kilo can only run the version you approve.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="type-body font-medium text-foreground">{pendingDraft.name}</p>
+                  {pendingDraft.description !== '' && (
+                    <p className="type-label text-foreground-muted">{pendingDraft.description}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <p className="type-label text-foreground-muted">Runs on</p>
+                  <p className="type-body break-all text-foreground">
+                    {pendingDraft.scopeOrigin}
+                    {pendingDraft.pathPrefix !== undefined && pendingDraft.pathPrefix !== ''
+                      ? pendingDraft.pathPrefix
+                      : ''}
+                  </p>
+                </div>
+
+                {pendingDraft.startUrl !== undefined && pendingDraft.startUrl !== '' && (
+                  <div className="space-y-1">
+                    <p className="type-label text-foreground-muted">Starts at</p>
+                    <p className="type-body break-all text-foreground">{pendingDraft.startUrl}</p>
+                  </div>
+                )}
+
+                {pendingDraft.params !== undefined && pendingDraft.params.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="type-label text-foreground-muted">Inputs</p>
+                    <ul className="flex flex-col gap-1">
+                      {pendingDraft.params.map(param => (
+                        <li className="type-label text-foreground" key={param.name}>
+                          <span className="font-mono">{param.name}</span>
+                          {param.required === true ? (
+                            <span className="text-foreground-muted"> (required)</span>
+                          ) : null}
+                          <span className="text-foreground-muted"> — {param.description}</span>
+                          {param.example !== undefined && param.example !== '' ? (
+                            <span className="text-foreground-subtle"> e.g. {param.example}</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {isUpdate && storedWorkflow !== undefined ? (
+                  <>
+                    <div className="space-y-1">
+                      <p className="type-label text-foreground-muted">Approved script</p>
+                      <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
+                        <CollapsibleCodeBlock code={storedWorkflow.script} forceExpanded={false} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="type-label text-foreground-muted">New script (replaces it)</p>
+                      <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
+                        <CollapsibleCodeBlock code={pendingDraft.script} forceExpanded={false} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="type-label text-foreground-muted">Script</p>
+                    <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
+                      <CollapsibleCodeBlock code={pendingDraft.script} forceExpanded={false} />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <p className="type-label text-foreground-muted">Scope</p>
-              <p className="type-body text-foreground">
-                {pendingDraft.scopeOrigin}
-                {pendingDraft.pathPrefix !== undefined && pendingDraft.pathPrefix !== ''
-                  ? pendingDraft.pathPrefix
-                  : ''}
-              </p>
-            </div>
-
-            {pendingDraft.startUrl !== undefined && pendingDraft.startUrl !== '' && (
-              <div className="space-y-1">
-                <p className="type-label text-foreground-muted">Start URL</p>
-                <p className="type-body break-all text-foreground">{pendingDraft.startUrl}</p>
-              </div>
-            )}
-
-            {isUpdate && storedWorkflow !== undefined ? (
-              <>
-                <div className="space-y-1">
-                  <p className="type-label text-foreground-muted">Stored script</p>
-                  <CollapsibleCodeBlock code={storedWorkflow.script} forceExpanded={false} />
-                </div>
-                <div className="space-y-1">
-                  <p className="type-label text-foreground-muted">New script</p>
-                  <CollapsibleCodeBlock code={pendingDraft.script} forceExpanded={false} />
-                </div>
-              </>
-            ) : (
-              <div className="space-y-1">
-                <p className="type-label text-foreground-muted">Script</p>
-                <CollapsibleCodeBlock code={pendingDraft.script} forceExpanded={false} />
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
+            <div className="mt-3 flex shrink-0 justify-end gap-2">
               <button
                 className={secondaryButtonClass}
                 disabled={isSaving}
@@ -246,7 +287,7 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
                 {isSaving ? 'Saving...' : 'Approve and save'}
               </button>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

@@ -13,7 +13,7 @@ import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
-  organizationOwnerMutationProcedure,
+  organizationAdminMutationProcedure,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -337,7 +337,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return result;
     }),
 
-  updateAllowLists: organizationOwnerMutationProcedure
+  updateAllowLists: organizationAdminMutationProcedure
     .input(UpdateAllowListsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -406,7 +406,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  updateDefaultModel: organizationOwnerMutationProcedure
+  updateDefaultModel: organizationAdminMutationProcedure
     .input(UpdateDefaultModelInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -476,7 +476,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  setOrganizationAutoRoute: organizationOwnerMutationProcedure
+  setOrganizationAutoRoute: organizationAdminMutationProcedure
     .input(SetOrganizationAutoRouteInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -544,7 +544,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  clearOrganizationAutoRoute: organizationOwnerMutationProcedure
+  clearOrganizationAutoRoute: organizationAdminMutationProcedure
     .input(ClearOrganizationAutoRouteInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -598,7 +598,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  configureOrganizationDefaultBehavior: organizationOwnerMutationProcedure
+  configureOrganizationDefaultBehavior: organizationAdminMutationProcedure
     .input(ConfigureOrganizationDefaultBehaviorInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -892,7 +892,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
   // Owners-only: toggle the weekly enterprise recommendations digest email.
   // Enterprise-gated and owner-only (matching the recommendations dismiss/restore
   // permission model). When on, the digest is emailed to the org's owners.
-  updateRecommendationsDigest: organizationOwnerMutationProcedure
+  updateRecommendationsDigest: organizationAdminMutationProcedure
     .input(UpdateRecommendationsDigestInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {

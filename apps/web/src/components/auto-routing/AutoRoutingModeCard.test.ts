@@ -973,9 +973,11 @@ describe('error messages', () => {
 describe('readonly org member controls', () => {
   it('billing-manager edit permission is isolated from page-level canEdit', () => {
     // Mirrors OrganizationProvidersAndModelsPage derivation.
+    const canManageOrganization = (role: string) => role === 'owner' || role === 'admin';
     const derive = (role: string, isKiloAdmin = false) => {
-      const canEdit = isKiloAdmin || role === 'owner';
-      const canEditAutoRouting = isKiloAdmin || role === 'owner' || role === 'billing_manager';
+      const canEdit = isKiloAdmin || canManageOrganization(role);
+      const canEditAutoRouting =
+        isKiloAdmin || canManageOrganization(role) || role === 'billing_manager';
       return { canEdit, canEditAutoRouting };
     };
 
@@ -988,6 +990,10 @@ describe('readonly org member controls', () => {
       canEditAutoRouting: false,
     });
     expect(derive('owner')).toEqual({
+      canEdit: true,
+      canEditAutoRouting: true,
+    });
+    expect(derive('admin')).toEqual({
       canEdit: true,
       canEditAutoRouting: true,
     });

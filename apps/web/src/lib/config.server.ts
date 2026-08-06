@@ -87,6 +87,16 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 export const CODING_PLANS_PURCHASE_ENABLED =
   getEnvVariable('CODING_PLANS_PURCHASE_ENABLED') === 'true';
 
+// Optional at module initialization so unrelated web processes can start
+// without BytePlus control-plane credentials. BytePlus operations fail closed
+// when either value is absent.
+export const BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID = getEnvVariable(
+  'BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID'
+);
+export const BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY = getEnvVariable(
+  'BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY'
+);
+
 export function isLocalCodeReviewDevelopmentEnabled(): boolean {
   return (
     !!getEnvVariable('DEBUG_SHOW_DEV_UI') &&

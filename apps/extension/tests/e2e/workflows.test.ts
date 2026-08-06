@@ -439,7 +439,7 @@ test('workflow refused when tab origin does not match scope', async () => {
       await expect(sidePanel.getByText('run_workflow failed')).toBeVisible();
       const scopeDetails = sidePanel.locator('details').filter({ hasText: 'run_workflow' });
       await scopeDetails.locator('summary').click();
-      await expect(scopeDetails.getByText('Tab is outside the workflow scope.')).toBeVisible();
+      await expect(scopeDetails.getByText(/but this workflow only runs on/u)).toBeVisible();
     } finally {
       await otherServer.close();
     }
@@ -723,4 +723,140 @@ test('memory and workflow can be used together', async () => {
       await priceFixture.close();
     }
   });
+});
+
+// ── Scenario 7: parameterized workflow — manual run form, waitFor, missing-input error ──
+
+test('parameterized workflow: manual run form, waitFor, missing-input error', async () => {
+  test.setTimeout(60_000);
+
+  const PARAM_SCRIPT = `
+  await page.fill('#origin', input.origin);
+  await page.fill('#destination', input.destination);
+  await page.click('#search');
+  await page.waitFor('.result', 5000);
+  return { done: true, result: { trip: input.origin + '-' + input.destination, price: page.text('.result .price') } };
+`;
+
+  const asyncBody = `
+<input id="origin" /><input id="destination" />
+<button id="search" type="button">Search</button>
+<div id="results"></div>
+<script>
+document.getElementById('search').addEventListener('click', function () {
+  setTimeout(function () {
+    document.getElementById('results').innerHTML =
+      '<div class="result"><span class="price">$412</span></div>';
+  }, 400);
+});
+</script>`;
+
+  const paramsFixture = await startFixtureServer({ bodyHtml: asyncBody, title: 'Params fixture' });
+  const launched = await launchExtensionContext();
+  try {
+    const { context, extensionId } = launched;
+    const runWithoutInputEvents: unknown[] = [
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  function: { arguments: '', name: 'run_workflow' },
+                  id: 'call_no_input_1',
+                  index: 0,
+                  type: 'function',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ];
+
+    await mockKiloApi(context, {
+      // Turn 1 (manual run): narrate the injected tool result.
+      firstCompletionEvents: contentOnlyCompletion('Found flights for your trip.'),
+      // Turn 2: the agent calls run_workflow without input.
+      secondCompletionEvents: runWithoutInputEvents,
+      // Turn 2 continuation after the error result.
+      thirdCompletionEvents: contentOnlyCompletion('The workflow needs origin and destination.'),
+      toolNames: [...safeToolNames, 'run_workflow'],
+    });
+
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+
+    const page = await context.newPage();
+    await page.goto(paramsFixture.url);
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Params fixture');
+
+    // Seed an approved parameterized workflow.
+    const script = PARAM_SCRIPT;
+    const workflowId = crypto.randomUUID();
+    const workflow = {
+      approvedScriptHash: hashScript(script),
+      createdAt: Date.now() - 60_000,
+      description: 'Search flights between two airports.',
+      id: workflowId,
+      name: 'Flight search',
+      params: [
+        { description: 'Origin airport', example: 'ZRH', name: 'origin', required: true },
+        { description: 'Destination airport', example: 'NRT', name: 'destination', required: true },
+      ],
+      scopeOrigin: new URL(paramsFixture.url).origin,
+      script,
+      updatedAt: Date.now() - 60_000,
+    };
+    await setExtensionStorage(sidePanel, { [AGENT_WORKFLOWS_KEY]: [workflow] });
+
+    await enableWorkflowsInSafeMode(sidePanel);
+
+    // Manual run: the params form gates on required values.
+    await openSettings(sidePanel);
+    await sidePanel.getByLabel(`Run workflow "Flight search"`).click();
+    const runPrompt = sidePanel.getByRole('dialog', { name: 'Run workflow "Flight search"' });
+    await expect(runPrompt).toBeVisible();
+    await expect(runPrompt.getByText('Origin airport')).toBeVisible();
+    await expect(runPrompt.getByRole('button', { exact: true, name: 'Run' })).toBeDisabled();
+
+    await runPrompt.getByPlaceholder('ZRH').fill('ZRH');
+    await runPrompt.getByPlaceholder('NRT').fill('NRT');
+    await expect(runPrompt.getByRole('button', { exact: true, name: 'Run' })).toBeEnabled();
+    await runPrompt.getByRole('button', { exact: true, name: 'Run' }).click();
+
+    // The run executes with the collected input; waitFor bridges the async results.
+    await expect(sidePanel.getByText('run_workflow completed')).toBeVisible({ timeout: 15_000 });
+    const runDetails = sidePanel.locator('details').filter({ hasText: 'run_workflow' });
+    await runDetails.locator('summary').click();
+    const runText = await runDetails.textContent();
+    expect(runText).toContain('ZRH-NRT');
+    expect(runText).toContain('$412');
+    await expect(sidePanel.getByText('Found flights for your trip.')).toBeVisible();
+
+    // Agent-side missing input: actionable error names the params.
+    (
+      runWithoutInputEvents[0] as {
+        choices: { delta: { tool_calls: { function: { arguments: string } }[] } }[];
+      }
+    ).choices[0]!.delta.tool_calls[0]!.function.arguments = JSON.stringify({ workflowId });
+
+    await sidePanel.getByLabel('Message agent').fill('Run the flight search again');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    await expect(sidePanel.getByText('run_workflow failed')).toBeVisible({ timeout: 15_000 });
+    const failedDetails = sidePanel
+      .locator('details')
+      .filter({ hasText: 'run_workflow failed' })
+      .last();
+    await failedDetails.locator('summary').click();
+    const failedText = await failedDetails.textContent();
+    expect(failedText).toContain('Missing required input');
+    expect(failedText).toContain('"origin"');
+    expect(failedText).toContain('"destination"');
+    expect(failedText).toContain('Call run_workflow again with input');
+  } finally {
+    await launched.context.close();
+    await paramsFixture.close();
+    await rm(launched.userDataDir, { force: true, recursive: true });
+  }
 });

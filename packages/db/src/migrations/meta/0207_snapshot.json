@@ -1,5 +1,5 @@
 {
-  "id": "afe21e97-3b89-4992-b3e4-640bd335d704",
+  "id": "842cbaeb-5310-48ce-9754-188d66b53e57",
   "prevId": "eca7ddd9-47a4-4f6d-8664-f232fd0ae81b",
   "version": "7",
   "dialect": "postgresql",
@@ -1231,132 +1231,6 @@
           "value": "(\n        (\"agent_environment_profiles\".\"owned_by_user_id\" IS NOT NULL AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NULL) OR\n        (\"agent_environment_profiles\".\"owned_by_user_id\" IS NULL AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.analytics_event_outbox": {
-      "name": "analytics_event_outbox",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "event_uuid": {
-          "name": "event_uuid",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_name": {
-          "name": "event_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "distinct_id": {
-          "name": "distinct_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "properties": {
-          "name": "properties",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claimed_at": {
-          "name": "claimed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "delivered_at": {
-          "name": "delivered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "UQ_analytics_event_outbox_event_uuid": {
-          "name": "UQ_analytics_event_outbox_event_uuid",
-          "columns": [
-            {
-              "expression": "event_uuid",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_analytics_event_outbox_status_next_attempt_at": {
-          "name": "IDX_analytics_event_outbox_status_next_attempt_at",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_attempt_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.api_kind": {
@@ -7562,6 +7436,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "upstream_usage_id": {
+          "name": "upstream_usage_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "encrypted_api_key": {
           "name": "encrypted_api_key",
           "type": "jsonb",
@@ -7645,6 +7525,28 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_coding_plan_key_inv_provider_usage_id": {
+          "name": "UQ_coding_plan_key_inv_provider_usage_id",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "upstream_usage_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"coding_plan_key_inventory\".\"upstream_usage_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -25991,182 +25893,6 @@
           "value": "\"native_attested_keys\".\"platform\" IN ('ios', 'android')"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.operation_ledgers": {
-      "name": "operation_ledgers",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "operation_key": {
-          "name": "operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "domain": {
-          "name": "domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "intent": {
-          "name": "intent",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resource_key": {
-          "name": "resource_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_ref": {
-          "name": "provider_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "taxonomy": {
-          "name": "taxonomy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'admitted'"
-        },
-        "outcome_code": {
-          "name": "outcome_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "canonical_result": {
-          "name": "canonical_result",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "admitted_at": {
-          "name": "admitted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "settled_at": {
-          "name": "settled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lease_expires_at": {
-          "name": "lease_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "UQ_operation_ledgers_kilo_user_id_domain_operation_key": {
-          "name": "UQ_operation_ledgers_kilo_user_id_domain_operation_key",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "domain",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_operation_ledgers_status_expires_at": {
-          "name": "IDX_operation_ledgers_status_expires_at",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_operation_ledgers_provider_ref": {
-          "name": "IDX_operation_ledgers_provider_ref",
-          "columns": [
-            {
-              "expression": "provider_ref",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.organization_audit_logs": {

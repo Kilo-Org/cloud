@@ -1,6 +1,7 @@
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { signInUrlWithCallbackPath } from '@/lib/user/server';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { redirect } from 'next/navigation';
 
 export default async function WelcomeLayout({
@@ -12,7 +13,7 @@ export default async function WelcomeLayout({
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  const result = await getAuthorizedOrgContext(organizationId, ['owner', 'billing_manager']);
+  const result = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES);
   if (!result.success) {
     const href =
       result.nextResponse.status === 401 ? await signInUrlWithCallbackPath() : '/profile';

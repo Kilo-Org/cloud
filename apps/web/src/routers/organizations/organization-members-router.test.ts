@@ -32,6 +32,8 @@ let adminUser: User;
 let memberUser: User;
 let billingManagerUser: User;
 let nonMemberUser: User;
+// Holds the `admin` organization role (distinct from `adminUser`, who is Kilo staff).
+let orgAdminUser: User;
 let testOrganization: Organization;
 
 describe('organizations members trpc router', () => {
@@ -67,12 +69,19 @@ describe('organizations members trpc router', () => {
       is_admin: false,
     });
 
+    orgAdminUser = await insertTestUser({
+      google_user_email: 'org-admin-members@example.com',
+      google_user_name: 'Org Admin Members User',
+      is_admin: false,
+    });
+
     // Create test organization using the CRUD method
     testOrganization = await createOrganization('Test Members Organization', regularUser.id);
 
     // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
     await addUserToOrganization(testOrganization.id, billingManagerUser.id, 'billing_manager');
+    await addUserToOrganization(testOrganization.id, orgAdminUser.id, 'admin');
   });
 
   describe('listPublic procedure', () => {
@@ -180,6 +189,82 @@ describe('organizations members trpc router', () => {
           role: 'member',
         })
       ).rejects.toThrow('You cannot change your own role');
+    });
+
+    it('lets an organization admin update a member role, matching owner authority', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-update.example.com`,
+        google_user_name: 'Org Admin Update Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      const result = await caller.organizations.members.update({
+        organizationId: testOrganization.id,
+        memberId: targetUser.id,
+        role: 'billing_manager',
+      });
+
+      expect(result).toEqual({ success: true, updated: 'role and limit' });
+    });
+
+    it('lets an organization admin grant the admin role', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-grant-admin.example.com`,
+        google_user_name: 'Org Admin Grant Admin Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      const result = await caller.organizations.members.update({
+        organizationId: testOrganization.id,
+        memberId: targetUser.id,
+        role: 'admin',
+      });
+
+      expect(result).toEqual({ success: true, updated: 'role and limit' });
+    });
+
+    it('rejects an organization admin granting the owner role', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-promote.example.com`,
+        google_user_name: 'Org Admin Promote Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+          role: 'owner',
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
+    });
+
+    it('rejects an organization admin changing an existing owner role', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-demote.example.com`,
+        google_user_name: 'Org Admin Demote Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'owner');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+          role: 'member',
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
     });
 
     it('should throw FORBIDDEN error when non-owner tries to assign owner role', async () => {
@@ -603,6 +688,42 @@ describe('organizations members trpc router', () => {
       ).rejects.toThrow('You do not have access to this organization');
     });
 
+    it('lets an organization admin remove a non-owner member', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-remove-member.example.com`,
+        google_user_name: 'Org Admin Remove Member Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      const result = await caller.organizations.members.remove({
+        organizationId: testOrganization.id,
+        memberId: targetUser.id,
+      });
+
+      expect(result).toEqual({ success: true, updated: targetUser.id });
+    });
+
+    it('rejects an organization admin removing an owner', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@org-admin-remove-owner.example.com`,
+        google_user_name: 'Org Admin Remove Owner Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'owner');
+
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.remove({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
+    });
+
     it('should reject billing managers removing owners', async () => {
       const caller = await createCallerForUser(billingManagerUser.id);
 
@@ -652,6 +773,30 @@ describe('organizations members trpc router', () => {
 
       expect(result).toHaveProperty('acceptInviteUrl');
       expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
+    });
+
+    it('should allow an organization admin to invite an admin', async () => {
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: `${crypto.randomUUID()}@org-admin-invite-admin.example.com`,
+        role: 'admin',
+      });
+
+      expect(result).toHaveProperty('acceptInviteUrl');
+    });
+
+    it('should reject an organization admin inviting an owner', async () => {
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: `${crypto.randomUUID()}@org-admin-invite-owner.example.com`,
+          role: 'owner',
+        })
+      ).rejects.toThrow('Only an organization owner can manage owners');
     });
 
     it('should allow system admin to invite any role', async () => {

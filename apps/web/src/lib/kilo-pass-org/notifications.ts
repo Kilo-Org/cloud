@@ -8,6 +8,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
@@ -90,7 +91,7 @@ export async function dispatchOrganizationPassBlockedNotifications(
     .where(
       and(
         inArray(kilo_pass_org_notification_deliveries.id, claimedIds),
-        inArray(organization_memberships.role, ['owner', 'billing_manager'])
+        inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
       )
     );
 

@@ -21,7 +21,7 @@ const CodePre = ({
   readonly children: string;
   readonly languageClassName: string | undefined;
 }): JSX.Element => (
-  <pre>
+  <pre className="min-w-0 overflow-x-hidden break-words whitespace-pre-wrap">
     <code className={languageClassName}>{children}</code>
   </pre>
 );

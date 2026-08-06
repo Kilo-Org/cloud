@@ -3,7 +3,17 @@
 import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
-import { AlertTriangle, Bot, History, Plus, Search, WifiOff } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bot,
+  Cloud,
+  History,
+  Plus,
+  Search,
+  TerminalSquare,
+  WifiOff,
+} from 'lucide-react';
+import { displayRepoName, relativeTime } from './agents-format';
 import { useExtensionAgents } from './agents-provider';
 
 // ---------------------------------------------------------------------------
@@ -22,11 +32,25 @@ const sessionSearchQueryKey = (organizationId: string | null, query: string) =>
 // Exported for focused test coverage.
 export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey };
 
+/**
+ * Input for `activeSessions.list`. Both the Active section and the History
+ * section observe this query; an identical key plus input means React Query
+ * serves them from one request.
+ */
+const activeSessionsListInput = (
+  organizationId: string | null
+): { organizationId: string | null; includeCloudAgentSessions: boolean } => ({
+  includeCloudAgentSessions: true,
+  organizationId,
+});
+
 const HISTORY_PAGE_LIMIT = 30;
 const SEARCH_LIMIT = 50;
 const MIN_SEARCH_LENGTH = 2;
 const ACTIVE_POLL_CONNECTED_MS = 30_000;
 const ACTIVE_POLL_DISCONNECTED_MS = 10_000;
+/** Suppress the Offline pill during the initial dial and transient blips. */
+const OFFLINE_PILL_GRACE_MS = 5000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,20 +115,31 @@ export function mapHistorySessionRow(params: {
 // Status badge classifier
 // ---------------------------------------------------------------------------
 
+/**
+ * Map a wire status to one badge vocabulary. The wire carries `busy` for a
+ * cloud agent and `running` for a CLI session; both mean the same thing to a
+ * reader, so they render the same label.
+ */
 export const sessionStatusBadge = (
   status: string | null
 ): { label: string; className: string } | null => {
-  if (status === null) {
+  if (status === null || status === '') {
     return null;
   }
   const lowerStatus = status.toLowerCase();
   if (lowerStatus === 'question' || lowerStatus === 'permission') {
     return { className: 'bg-status-yellow-500/15 text-status-yellow-500', label: 'Needs input' };
   }
-  if (lowerStatus === 'running') {
+  if (lowerStatus === 'running' || lowerStatus === 'busy') {
     return { className: 'bg-status-green-500/15 text-status-green-500', label: 'Running' };
   }
-  return { className: 'bg-surface-selected text-foreground-muted', label: status };
+  if (lowerStatus === 'retry') {
+    return { className: 'bg-status-yellow-500/15 text-status-yellow-500', label: 'Retrying' };
+  }
+  return {
+    className: 'bg-surface-selected text-foreground-muted',
+    label: lowerStatus.charAt(0).toUpperCase() + lowerStatus.slice(1),
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -121,6 +156,7 @@ const ActiveSessionsSection = ({
   const { trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(() => userWebConnection.isConnected());
+  const [showOffline, setShowOffline] = useState(false);
 
   useEffect(() => {
     const unsubscribe = userWebConnection.onConnectionChange((connectedStatus: boolean) => {
@@ -128,6 +164,20 @@ const ActiveSessionsSection = ({
     });
     return unsubscribe;
   }, [userWebConnection]);
+
+  // Show the pill only after the connection stays down past the grace period.
+  useEffect(() => {
+    if (connected) {
+      setShowOffline(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowOffline(true);
+    }, OFFLINE_PILL_GRACE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [connected]);
 
   // Subscribe UserWeb events → invalidate active list
   useEffect(() => {
@@ -151,17 +201,8 @@ const ActiveSessionsSection = ({
     };
   }, [userWebConnection, queryClient, organizationId]);
 
-  const listInput = useMemo(
-    () =>
-      ({
-        includeCloudAgentSessions: true,
-        organizationId,
-      }) satisfies { organizationId: string | null; includeCloudAgentSessions: boolean },
-    [organizationId]
-  );
-
   const { data, error, isError, isLoading, refetch, isRefetching } = useQuery({
-    queryFn: () => trpcClient.activeSessions.list.query(listInput),
+    queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
     queryKey: activeSessionsQueryKey(organizationId),
     refetchInterval: connected ? ACTIVE_POLL_CONNECTED_MS : ACTIVE_POLL_DISCONNECTED_MS,
   });
@@ -218,12 +259,12 @@ const ActiveSessionsSection = ({
       <div className="flex items-center gap-2">
         <Bot className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">Active</span>
-        {connected ? null : (
+        {showOffline ? (
           <span className="flex items-center gap-1 rounded-full bg-surface-selected px-1.5 py-0.5 type-label text-foreground-muted">
             <WifiOff className="size-3" />
             Offline
           </span>
-        )}
+        ) : null}
       </div>
       {isError ? (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-raised p-2">
@@ -247,6 +288,14 @@ const ActiveSessionsSection = ({
         <div className="space-y-0.5">
           {sessions.map(session => {
             const badge = sessionStatusBadge(session.status);
+            const PlatformIcon = session.isCloudAgent ? Cloud : TerminalSquare;
+            const platformLabel = session.isCloudAgent ? 'Cloud agent' : 'CLI';
+            const repoLine = [
+              session.repository === null ? null : displayRepoName(session.repository),
+              session.gitBranch,
+            ]
+              .filter(Boolean)
+              .join(' · ');
             return (
               <button
                 className="w-full rounded-md px-2 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
@@ -257,8 +306,17 @@ const ActiveSessionsSection = ({
                 type="button"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-foreground">
-                    {session.title ?? 'Unnamed session'}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <PlatformIcon
+                      aria-label={platformLabel}
+                      className="size-3.5 shrink-0 text-foreground-muted"
+                      role="img"
+                    >
+                      <title>{platformLabel}</title>
+                    </PlatformIcon>
+                    <span className="truncate text-foreground">
+                      {session.title ?? 'Untitled session'}
+                    </span>
                   </span>
                   {badge ? (
                     <span
@@ -268,19 +326,11 @@ const ActiveSessionsSection = ({
                     </span>
                   ) : null}
                 </div>
-                {session.repository === null && session.gitBranch === null ? null : (
-                  <div className="mt-0.5 flex items-center gap-1.5 truncate type-label text-foreground-muted">
-                    {session.repository === null ? null : <span>{session.repository}</span>}
-                    {session.gitBranch === null ? null : <span>{session.gitBranch}</span>}
-                  </div>
+                {repoLine === '' ? null : (
+                  <p className="mt-0.5 truncate pl-5 type-label text-foreground-muted">
+                    {repoLine}
+                  </p>
                 )}
-                {session.isCloudAgent ? (
-                  <div className="mt-0.5">
-                    <span className="rounded-full bg-surface-selected px-1.5 py-0.5 type-label text-foreground-muted">
-                      Cloud
-                    </span>
-                  </div>
-                ) : null}
               </button>
             );
           })}
@@ -294,29 +344,6 @@ const ActiveSessionsSection = ({
 // History sessions section
 // ---------------------------------------------------------------------------
 
-const relativeTime = (dateStr: string): string => {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) {
-    return 'Just now';
-  }
-  if (diffMin < 60) {
-    return `${diffMin}m ago`;
-  }
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) {
-    return `${diffDays}d ago`;
-  }
-  const diffMonths = Math.floor(diffDays / 30);
-  return `${diffMonths}mo ago`;
-};
-
 const HistorySessionsSection = ({
   onOpenSession,
   organizationId,
@@ -327,6 +354,18 @@ const HistorySessionsSection = ({
   const { trpcClient } = useExtensionAgents();
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Live sessions already have a row in the Active section. Observing the same
+  // Query (identical key + input) costs no extra request and keeps the two
+  // Sections consistent on every refetch.
+  const { data: activeData } = useQuery({
+    queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
+    queryKey: activeSessionsQueryKey(organizationId),
+  });
+  const activeIds = useMemo(
+    () => new Set((activeData?.sessions ?? []).map(session => session.id)),
+    [activeData]
+  );
 
   // Debounce search input so we don't request on every keystroke.
   useEffect(() => {
@@ -421,8 +460,10 @@ const HistorySessionsSection = ({
     }
   };
   const isRefetching = isSearching ? isSearchRefetching : isHistoryRefetching;
-  const rows = isSearching ? searchRows : allHistoryRows;
+  const rows = isSearching ? searchRows : allHistoryRows.filter(row => !activeIds.has(row.id));
   const hasNoResults = !isLoading && !hasError && rows.length === 0;
+  // Hide the search box when there is nothing to search and no query typed.
+  const showSearch = inputValue !== '' || isLoading || hasError || rows.length > 0;
 
   return (
     <div className="space-y-2 px-4 py-3">
@@ -432,19 +473,21 @@ const HistorySessionsSection = ({
       </div>
 
       {/* Search box */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-muted" />
-        <input
-          aria-label="Search sessions"
-          className="h-8 w-full rounded-md border border-border bg-input-bg pl-7.5 pr-2 type-body text-foreground placeholder:text-foreground-muted outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-          onChange={changeEvent => {
-            setInputValue(changeEvent.currentTarget.value);
-          }}
-          placeholder="Search sessions…"
-          type="search"
-          value={inputValue}
-        />
-      </div>
+      {showSearch ? (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-muted" />
+          <input
+            aria-label="Search sessions"
+            className="h-8 w-full rounded-md border border-border bg-input-bg pl-7.5 pr-2 type-body text-foreground placeholder:text-foreground-muted outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+            onChange={changeEvent => {
+              setInputValue(changeEvent.currentTarget.value);
+            }}
+            placeholder="Search sessions…"
+            type="search"
+            value={inputValue}
+          />
+        </div>
+      ) : null}
 
       {/* Error state */}
       {hasError ? (
@@ -452,7 +495,10 @@ const HistorySessionsSection = ({
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-red-400" />
             <div className="min-w-0 flex-1">
-              <p className="type-label text-status-red-400">{errorMessage}</p>
+              <p className="type-label text-status-red-400">
+                {isSearching ? 'Search failed' : 'Failed to load sessions'}
+              </p>
+              <p className="type-label mt-0.5 break-words text-foreground-muted">{errorMessage}</p>
             </div>
             <button
               className="h-8 shrink-0 rounded-md border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
@@ -484,7 +530,7 @@ const HistorySessionsSection = ({
           <p className="type-body text-foreground-muted">
             {isSearching
               ? 'No sessions match your search.'
-              : 'No sessions yet. Create your first cloud session!'}
+              : 'No sessions yet. Start your first session above.'}
           </p>
         </div>
       ) : null}
@@ -502,7 +548,11 @@ const HistorySessionsSection = ({
               type="button"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-foreground">{session.title ?? 'New session'}</span>
+                <span
+                  className={`truncate ${session.title === null ? 'text-foreground-muted' : 'text-foreground'}`}
+                >
+                  {session.title ?? 'Untitled session'}
+                </span>
                 <span className="shrink-0 type-label text-foreground-muted">
                   {relativeTime(session.updatedAt)}
                 </span>

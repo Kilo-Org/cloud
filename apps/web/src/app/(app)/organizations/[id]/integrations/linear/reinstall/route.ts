@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    await ensureOrganizationAccess({ user }, id, ['owner', 'billing_manager']);
+    await ensureOrganizationAccess({ user }, id, ORGANIZATION_BILLING_ROLES);
     await requireActiveSubscriptionOrTrial(id);
   } catch {
     return NextResponse.redirect(new URL('/integrations?error=unauthorized', request.url));

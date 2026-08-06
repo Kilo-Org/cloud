@@ -41,14 +41,16 @@ export const AgentsComposer = ({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+      if (event.nativeEvent.isComposing) {
+        return;
+      }
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        if (!isStreaming) {
-          submit();
-        }
+        // Sending stays available while the agent runs — the message queues.
+        submit();
       }
     },
-    [isStreaming, submit]
+    [submit]
   );
 
   if (isReadOnly) {

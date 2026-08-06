@@ -185,6 +185,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Encryption & Secrets
 
 - `BYOK_ENCRYPTION_KEY` - Base64 encryption key for Bring-Your-Own-Key encryption of sensitive app data. `[SECRET]`
+- `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`
+- `BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY` - Server-only BytePlus secret access key for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY`. `[SECRET]`
 - `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Encryption key for credit category labels/values. `[SECRET]`
 - `AGENT_ENV_VARS_PUBLIC_KEY` - RSA public key (base64) used to encrypt agent environment variables. [SERVER]
 - `AGENT_ENV_VARS_PRIVATE_KEY` - Legacy alias for the above — the actual private key used to decrypt agent env vars (kept server-side). `[SECRET]`

@@ -12,7 +12,7 @@ import { Readable } from 'node:stream';
 // extract it ("Error 79 - Inappropriate file type or format").
 export const maxDuration = 800;
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 25;
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -128,6 +128,45 @@ export async function GET(request: NextRequest) {
   }
 
   const archive = archiver('zip', { zlib: { level: 6 } });
+  let totalAppendedEntries = 0;
+  let totalProcessedEntries = 0;
+
+  archive.on('entry', () => {
+    totalProcessedEntries += 1;
+  });
+
+  const waitForEntries = (target: number) => {
+    if (totalProcessedEntries >= target) return Promise.resolve();
+    if (archive.destroyed) {
+      return Promise.reject(new Error('Archive closed before all entries were processed'));
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        archive.off('entry', onEntry);
+        archive.off('error', onError);
+        archive.off('close', onClose);
+      };
+      const onEntry = () => {
+        if (totalProcessedEntries >= target) {
+          cleanup();
+          resolve();
+        }
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const onClose = () => {
+        cleanup();
+        reject(new Error('Archive closed before all entries were processed'));
+      };
+
+      archive.on('entry', onEntry);
+      archive.once('error', onError);
+      archive.once('close', onClose);
+    });
+  };
 
   // Fetch and archive rows in batches using cursor-based pagination to
   // avoid loading the entire result set into memory at once.
@@ -150,18 +189,21 @@ export async function GET(request: NextRequest) {
         const requestExt = isJson(row.request) ? 'json' : 'txt';
         const requestContent = tryFormatJson(row.request);
         if (requestContent) {
+          totalAppendedEntries += 1;
           archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
         }
 
         const responseExt = isJson(row.response) ? 'json' : 'txt';
         const responseContent = tryFormatJson(row.response);
         if (responseContent) {
+          totalAppendedEntries += 1;
           archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
         }
 
         if (row.error !== null && row.error !== undefined) {
           const errorContent = tryFormatJson(row.error);
           if (errorContent) {
+            totalAppendedEntries += 1;
             archive.append(errorContent, { name: `${ts}_${id}_error.json` });
           }
         }
@@ -169,17 +211,10 @@ export async function GET(request: NextRequest) {
 
       cursor = rows[rows.length - 1].id;
 
-      // Yield between batches while the archive's readable buffer is above
-      // its high-water mark, so we don't buffer unbounded data in memory.
-      // Polling via setImmediate rather than waiting on a single 'drain'
-      // event: archiver's internal queue pauses once it's out of entries, so
-      // after we stop appending its writable side may never go back above
-      // HWM and 'drain' would never fire again - listening for it would
-      // deadlock the stream.
-      const hwm = archive.readableHighWaterMark ?? 16 * 1024;
-      while (archive.readableLength > hwm) {
-        await new Promise<void>(resolve => setImmediate(resolve));
-      }
+      // Archiver maintains its own input queue, which is not reflected by the
+      // readable stream's high-water mark. Wait until this batch is emitted so
+      // large exports remain bounded even when compression is slower than DB reads.
+      await waitForEntries(totalAppendedEntries);
     }
 
     await archive.finalize();

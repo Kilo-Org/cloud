@@ -397,3 +397,50 @@ describe('agent workflows storage', () => {
     expect(reverted).toStrictEqual({ allowWorkflowsInSafeMode: false });
   });
 });
+
+describe('workflow params storage', () => {
+  const params = [
+    {
+      description: 'City or airport to fly to',
+      example: 'SFO',
+      name: 'destination',
+      required: true,
+    },
+    { description: 'Cabin class', name: 'cabin' },
+  ];
+
+  it('persists params through create and load', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, { params });
+
+    expect(created.params).toStrictEqual(params);
+    const loaded = await loadAgentWorkflows(storage);
+    expect(loaded[0]?.params).toStrictEqual(params);
+  });
+
+  it('omits the params field when the list is empty', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, { params: [] });
+    expect(created.params).toBeUndefined();
+  });
+
+  it('replaces params on update and clears them with an empty array', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, { params });
+
+    const replaced = await updateAgentWorkflow(storage, created.id, {
+      params: [{ description: 'Only one', name: 'only' }],
+    });
+    expect(replaced.params).toStrictEqual([{ description: 'Only one', name: 'only' }]);
+
+    const cleared = await updateAgentWorkflow(storage, created.id, { params: [] });
+    expect(cleared.params).toBeUndefined();
+  });
+
+  it('keeps existing params when the update does not mention them', async () => {
+    const storage = createStorage();
+    const created = await baseCreate(storage, { params });
+    const updated = await updateAgentWorkflow(storage, created.id, { name: 'Renamed' });
+    expect(updated.params).toStrictEqual(params);
+  });
+});

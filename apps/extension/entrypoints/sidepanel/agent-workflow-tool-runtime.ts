@@ -6,6 +6,8 @@ import {
   MAX_WORKFLOW_COUNT,
   MAX_WORKFLOW_NAME_LENGTH,
   MAX_WORKFLOW_SCRIPT_LENGTH,
+  agentWorkflowParamSchema,
+  MAX_WORKFLOW_PARAM_COUNT,
   searchAgentWorkflows,
   matchesWorkflowScope,
 } from '@/src/shared/agent-workflows';
@@ -42,6 +44,7 @@ export interface WorkflowToolContext {
 const saveWorkflowArgsSchema = z.object({
   description: z.string().max(300),
   name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
+  params: z.array(agentWorkflowParamSchema).max(MAX_WORKFLOW_PARAM_COUNT).optional(),
   pathPrefix: z.string().optional(),
   scopeOrigin: z.string(),
   script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
@@ -74,6 +77,58 @@ const saveMemoryArgsSchema = z.object({
 
 // ---------- helpers ----------
 
+/**
+ * Format a zod failure into a field-level message the model can act on.
+ */
+const formatArgsError = (toolName: string, error: z.ZodError): string => {
+  const details = error.issues
+    .slice(0, 5)
+    .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .join('; ');
+
+  return `Invalid arguments for ${toolName} — ${details}.`;
+};
+
+/**
+ * Resolve a relative startUrl (e.g. "/" or "/travel/flights") against the
+ * workflow scope. Models reasonably pass a path; accept it instead of failing.
+ * Returns the input unchanged when it is already absolute or unresolvable.
+ */
+export const resolveWorkflowStartUrl = (
+  startUrl: string | undefined,
+  scopeOrigin: string
+): string | undefined => {
+  if (startUrl === undefined || URL.canParse(startUrl)) {
+    return startUrl;
+  }
+  if (!startUrl.startsWith('/')) {
+    return startUrl;
+  }
+  try {
+    return new URL(startUrl, scopeOrigin).toString();
+  } catch {
+    return startUrl;
+  }
+};
+
+/**
+ * Explain an empty search without inviting the same call again.
+ * A query already covers every site, so a query that matched nothing must not
+ * suggest searching again with a query.
+ */
+export const formatEmptySearchMessage = (savedCount: number, query: string | undefined): string => {
+  if (savedCount === 0) {
+    return 'No workflows saved yet. Use save_workflow to create one.';
+  }
+
+  const trimmedQuery = (query ?? '').trim();
+  if (trimmedQuery.length > 0) {
+    return `No saved workflow matches "${trimmedQuery}". This search already covered every site, and ${String(savedCount)} workflow(s) are saved. Call search_workflows with no query to list the ones for this site, ask the user which workflow they mean, or save a new one.`;
+  }
+
+  return `No workflows for this site. ${String(savedCount)} workflow(s) are saved for other sites — call search_workflows with a query to find them.`;
+};
+
 const validateWorkflowInput = (
   args: z.infer<typeof saveWorkflowArgsSchema>
 ): string | undefined => {
@@ -98,9 +153,16 @@ const validateWorkflowInput = (
     return 'pathPrefix must start with /.';
   }
 
+  if (args.params !== undefined) {
+    const names = args.params.map(param => param.name);
+    if (new Set(names).size !== names.length) {
+      return 'params must not contain duplicate names.';
+    }
+  }
+
   if (args.startUrl !== undefined) {
     if (!URL.canParse(args.startUrl)) {
-      return 'startUrl is not a valid URL.';
+      return `startUrl must be an absolute URL inside the scope, e.g. "${args.scopeOrigin}/path", or a path starting with "/". Received: ${args.startUrl}`;
     }
     if (
       !matchesWorkflowScope(
@@ -139,8 +201,14 @@ const approvalOutcomeToToolResult = (
 
 /**
  * Map a WorkflowRunResult to an EvalTabResult.
+ * The workflow name rides along so the transcript and the model can say
+ * which workflow produced the result or the failure.
  */
-const runResultToToolResult = (result: WorkflowRunResult, dryRun: boolean): EvalTabResult => {
+const runResultToToolResult = (
+  result: WorkflowRunResult,
+  dryRun: boolean,
+  workflowName: string
+): EvalTabResult => {
   if (result.ok) {
     const extra: Record<string, unknown> = {};
     if (dryRun) {
@@ -155,16 +223,17 @@ const runResultToToolResult = (result: WorkflowRunResult, dryRun: boolean): Eval
       value: {
         pagesVisited: result.pagesVisited,
         result: result.result,
+        workflowName,
         ...extra,
       },
     };
   }
 
-  const error =
+  const withPage =
     result.pageUrl === undefined ? result.error : `${result.error} (page: ${result.pageUrl})`;
 
   return {
-    error,
+    error: `Workflow "${workflowName}" failed: ${withPage}`,
     ok: false,
   };
 };
@@ -177,7 +246,7 @@ const executeSearchWorkflows = async (
 ): Promise<EvalTabResult> => {
   const parsed = searchWorkflowsArgsSchema.safeParse(toolCall.arguments);
   if (!parsed.success) {
-    return { error: 'Invalid arguments for search_workflows.', ok: false };
+    return { error: formatArgsError('search_workflows', parsed.error), ok: false };
   }
 
   const workflows = await loadAgentWorkflows(ctx.storage);
@@ -186,7 +255,10 @@ const executeSearchWorkflows = async (
   if (results.length === 0) {
     return {
       ok: true,
-      value: { message: 'No workflows for this site.', results: [] },
+      value: {
+        message: formatEmptySearchMessage(workflows.length, parsed.data.query),
+        results: [],
+      },
     };
   }
 
@@ -196,9 +268,12 @@ const executeSearchWorkflows = async (
       results: results.map(item => ({
         description: item.description,
         id: item.id,
+        inScope: matchesWorkflowScope(item, ctx.selectedTabUrl),
         name: item.name,
+        params: item.params ?? [],
         pathPrefix: item.pathPrefix,
         scopeOrigin: item.scopeOrigin,
+        startUrl: item.startUrl,
       })),
     },
   };
@@ -210,14 +285,17 @@ const executeGetWorkflow = async (
 ): Promise<EvalTabResult> => {
   const parsed = getWorkflowArgsSchema.safeParse(toolCall.arguments);
   if (!parsed.success) {
-    return { error: 'Invalid arguments for get_workflow.', ok: false };
+    return { error: formatArgsError('get_workflow', parsed.error), ok: false };
   }
 
   const workflows = await loadAgentWorkflows(ctx.storage);
   const workflow = workflows.find(item => item.id === parsed.data.workflowId);
 
   if (workflow === undefined) {
-    return { error: 'Workflow not found.', ok: false };
+    return {
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    };
   }
 
   return { ok: true, value: workflow };
@@ -227,17 +305,29 @@ const executeSaveWorkflow = async (
   toolCall: WorkflowToolCallEvent,
   ctx: WorkflowToolContext
 ): Promise<EvalTabResult> => {
-  const parsed = saveWorkflowArgsSchema.safeParse(toolCall.arguments);
-  if (!parsed.success) {
-    return { error: 'Invalid arguments for save_workflow.', ok: false };
+  const rawParsed = saveWorkflowArgsSchema.safeParse(toolCall.arguments);
+  if (!rawParsed.success) {
+    return { error: formatArgsError('save_workflow', rawParsed.error), ok: false };
   }
+
+  const resolvedStartUrl = resolveWorkflowStartUrl(
+    rawParsed.data.startUrl,
+    rawParsed.data.scopeOrigin
+  );
+  const parsed = {
+    data: {
+      ...rawParsed.data,
+      ...(resolvedStartUrl === undefined ? {} : { startUrl: resolvedStartUrl }),
+    },
+  };
 
   const validationError = validateWorkflowInput(parsed.data);
   if (validationError !== undefined) {
     return { error: validationError, ok: false };
   }
 
-  const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId } = parsed.data;
+  const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId, params } =
+    parsed.data;
 
   // For a Create (no workflowId), check store fullness first.
   if (workflowId === undefined) {
@@ -255,7 +345,11 @@ const executeSaveWorkflow = async (
     // For an Update, verify the workflow exists.
     const workflows = await loadAgentWorkflows(ctx.storage);
     if (!workflows.some(item => item.id === workflowId)) {
-      return { error: 'Workflow not found.', ok: false };
+      return {
+        error:
+          'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
+        ok: false,
+      };
     }
   }
 
@@ -267,13 +361,16 @@ const executeSaveWorkflow = async (
     script,
     ...(workflowId === undefined
       ? {
+          ...(params === undefined || params.length === 0 ? {} : { params }),
           ...(pathPrefix === undefined ? {} : { pathPrefix }),
           ...(startUrl === undefined ? {} : { startUrl }),
         }
       : {
           // Update: always include so the card and storage can carry a clear intent.
           // Empty string is the "cleared" sentinel — it survives JSON serialization
-          // (unlike undefined) but is never a valid real value.
+          // (unlike undefined) but is never a valid real value. Params use the
+          // Empty array the same way.
+          params: params ?? [],
           pathPrefix: pathPrefix ?? '',
           startUrl: startUrl ?? '',
           workflowId,
@@ -291,14 +388,15 @@ const executeRunWorkflow = async (
   // Safe mode gate.
   if (ctx.mode === 'safe' && !ctx.allowWorkflowsInSafeMode) {
     return {
-      error: 'Workflows are disabled in safe mode. The user can enable them in settings.',
+      error:
+        'Workflow runs are disabled in safe mode. Ask the user to enable "Allow workflows in safe mode" in settings, or to switch this conversation to dangerous mode.',
       ok: false,
     };
   }
 
   const parsed = runWorkflowArgsSchema.safeParse(toolCall.arguments);
   if (!parsed.success) {
-    return { error: 'Invalid arguments for run_workflow.', ok: false };
+    return { error: formatArgsError('run_workflow', parsed.error), ok: false };
   }
 
   const { workflowId, dryRun = false, input } = parsed.data;
@@ -307,7 +405,10 @@ const executeRunWorkflow = async (
   const workflow = workflows.find(item => item.id === workflowId);
 
   if (workflow === undefined) {
-    return { error: 'Workflow not found.', ok: false };
+    return {
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    };
   }
 
   const result = await runWorkflow(
@@ -328,7 +429,7 @@ const executeRunWorkflow = async (
     }
   );
 
-  return runResultToToolResult(result, dryRun);
+  return runResultToToolResult(result, dryRun, workflow.name);
 };
 
 const executeDeleteWorkflow = async (
@@ -345,7 +446,7 @@ const executeDeleteWorkflow = async (
 
   const parsed = deleteWorkflowArgsSchema.safeParse(toolCall.arguments);
   if (!parsed.success) {
-    return { error: 'Invalid arguments for delete_workflow.', ok: false };
+    return { error: formatArgsError('delete_workflow', parsed.error), ok: false };
   }
 
   await deleteAgentWorkflow(ctx.storage, parsed.data.workflowId);
@@ -359,7 +460,7 @@ const executeSaveMemory = async (
 ): Promise<EvalTabResult> => {
   const parsed = saveMemoryArgsSchema.safeParse(toolCall.arguments);
   if (!parsed.success) {
-    return { error: 'Invalid arguments for save_memory.', ok: false };
+    return { error: formatArgsError('save_memory', parsed.error), ok: false };
   }
 
   const { text, note } = parsed.data;

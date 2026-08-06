@@ -35,6 +35,7 @@ import {
   modelRetainsPrompts,
   modelTrains,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type Props = {
   organizationId: string;
@@ -95,11 +96,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const { assumedRole } = useRoleTesting();
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
   const currentRole = (isKiloAdmin ? 'owner' : assumedRole) ?? role;
-  const canEdit = isKiloAdmin || currentRole === 'owner';
-  // Auto routing card: owners, billing managers, and platform admins may edit.
+  const canEdit = isKiloAdmin || canManageOrganization(currentRole);
+  // Auto routing card: owners, admins, billing managers, and platform admins may edit.
   // Do not widen page-level canEdit (provider allow-list stays owner/admin only).
   const canEditAutoRouting =
-    isKiloAdmin || currentRole === 'owner' || currentRole === 'billing_manager';
+    isKiloAdmin || canManageOrganization(currentRole) || currentRole === 'billing_manager';
 
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 

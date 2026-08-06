@@ -1,9 +1,10 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 import {
   cancelCodingPlanSubscription,
+  CodingPlanInventoryUploadError,
   getAvailableCodingPlanIds,
   getCodingPlanAvailabilityIntentCounts,
   getCodingPlanAvailabilityIntentPlanIds,
@@ -18,11 +19,13 @@ import {
   CodingPlanUsageError,
 } from '@/lib/coding-plans/usage-contract';
 import {
+  canQueryCodingPlanUsage,
   CodingPlanUsageEligibilityError,
   getCodingPlanUsageResponse,
 } from '@/lib/coding-plans/usage';
 import {
   listManualCredentialRevocations,
+  ManualCredentialReplacementError,
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
   requeueManualCredentialRevocation,
@@ -40,6 +43,7 @@ import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init
 import {
   coding_plan_subscriptions,
   coding_plan_terms,
+  coding_plan_key_inventory,
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -82,6 +86,14 @@ const codingPlanSubscriptionColumns = {
   canceledAt: coding_plan_subscriptions.canceled_at,
   cancellationReason: coding_plan_subscriptions.cancellation_reason,
   createdAt: coding_plan_subscriptions.created_at,
+  hasAssignedInventory: sql<boolean>`coalesce(
+    ${coding_plan_key_inventory.status} = 'assigned'
+    AND ${coding_plan_key_inventory.assigned_to_user_id} = ${coding_plan_subscriptions.user_id}
+    AND ${coding_plan_key_inventory.plan_id} = ${coding_plan_subscriptions.plan_id}
+    AND ${coding_plan_key_inventory.provider_id} = ${coding_plan_subscriptions.provider_id},
+    false
+  )`,
+  hasUpstreamUsageId: sql<boolean>`coalesce(${coding_plan_key_inventory.upstream_usage_id} IS NOT NULL, false)`,
 };
 
 type CodingPlanSubscriptionRow = Awaited<ReturnType<typeof listOwnedSubscriptions>>[number];
@@ -106,6 +118,10 @@ async function listOwnedSubscriptions(userId: string) {
   return db
     .select(codingPlanSubscriptionColumns)
     .from(coding_plan_subscriptions)
+    .leftJoin(
+      coding_plan_key_inventory,
+      eq(coding_plan_key_inventory.id, coding_plan_subscriptions.key_inventory_id)
+    )
     .where(eq(coding_plan_subscriptions.user_id, userId));
 }
 
@@ -113,6 +129,10 @@ async function getOwnedSubscription(userId: string, subscriptionId: string) {
   const [subscription] = await db
     .select(codingPlanSubscriptionColumns)
     .from(coding_plan_subscriptions)
+    .leftJoin(
+      coding_plan_key_inventory,
+      eq(coding_plan_key_inventory.id, coding_plan_subscriptions.key_inventory_id)
+    )
     .where(
       and(
         eq(coding_plan_subscriptions.id, subscriptionId),
@@ -141,6 +161,7 @@ function toCodingPlanSubscriptionView(subscription: CodingPlanSubscriptionRow) {
     providerId: subscription.providerId,
     routeLabel: `${providerName} via Kilo Gateway`,
     features: plan?.features ?? [],
+    canQueryUsage: canQueryCodingPlanUsage(subscription),
     hasInstalledByokKey: subscription.installedByokKeyId !== null,
     status: subscription.status,
     billingPeriodDays: subscription.billingPeriodDays,
@@ -191,6 +212,10 @@ export const codingPlansRouter = createTRPCRouter({
       })
       .from(coding_plan_subscriptions)
       .innerJoin(kilocode_users, eq(kilocode_users.id, coding_plan_subscriptions.user_id))
+      .leftJoin(
+        coding_plan_key_inventory,
+        eq(coding_plan_key_inventory.id, coding_plan_subscriptions.key_inventory_id)
+      )
       .orderBy(desc(coding_plan_subscriptions.created_at));
 
     return subscriptions.map(subscription => ({
@@ -355,13 +380,19 @@ export const codingPlansRouter = createTRPCRouter({
         const message = error instanceof Error ? error.message : String(error);
         if (
           message.includes('<api key>::<upstream plan id>') ||
+          message.includes('<api key>::<assigned BytePlus username>') ||
           message.includes('does not match provider') ||
           message.includes('failed validation') ||
-          message.includes('already present in inventory')
+          message.includes('already present in inventory') ||
+          message.includes('BytePlus seats are already attached')
         ) {
           throw new TRPCError({ code: 'BAD_REQUEST', message });
         }
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+        const safeMessage =
+          error instanceof CodingPlanInventoryUploadError
+            ? error.message
+            : 'Unable to upload Coding Plan inventory.';
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: safeMessage });
       }
     }),
 
@@ -416,7 +447,10 @@ export const codingPlansRouter = createTRPCRouter({
       try {
         await replaceManualCredentialRevocation(input.inventoryKeyId, input.apiKey);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message =
+          error instanceof ManualCredentialReplacementError
+            ? error.message
+            : 'Unable to replace the credential.';
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
       }
     }),

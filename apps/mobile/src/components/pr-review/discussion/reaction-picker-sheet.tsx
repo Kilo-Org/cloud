@@ -6,9 +6,14 @@
 // dismisses the moment `visible` flips, so the sheet owns presentation: it
 // mounts the animated content on open (entering plays) and defers its own
 // dismissal until the exiting animations finish.
+//
+// Focus restore after dismissal: `Modal.onDismiss` is iOS-only in React
+// Native, so on Android a delayed post-close callback fires instead. Both
+// paths run through one guard so the parent's `onDismiss` handler fires
+// exactly once, never while the native Modal is still presented.
 
 import { X } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +32,10 @@ import { cn } from '@/lib/utils';
 // finishes earlier. Keep the native Modal presented a tick past it so both
 // exits are fully visible before the Modal is dismissed.
 const EXIT_ANIMATION_MS = 200;
+// Android never fires `Modal.onDismiss` (iOS-only in React Native). This is
+// the extra beat after the native Modal unmounts before the focus-restore
+// callback runs, so the background accessibility tree is reachable again.
+const POST_DISMISS_SETTLE_MS = 100;
 
 type ReactionPickerSheetProps = {
   readonly visible: boolean;
@@ -58,11 +67,31 @@ export function ReactionPickerSheet({
   const [nativeVisible, setNativeVisible] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
   const wasVisibleRef = useRef(visible);
+  // Focus restore after dismissal: `Modal.onDismiss` fires on iOS only, so
+  // Android relies on the delayed post-close callback below. Both paths go
+  // through `notifyDismissed`, whose guard lets the parent's focus handler
+  // run exactly once per dismissal no matter which path wins.
+  const dismissedRef = useRef(false);
+  const onDismissRef = useRef(onDismiss);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  const notifyDismissed = useCallback(() => {
+    if (dismissedRef.current) {
+      return;
+    }
+    dismissedRef.current = true;
+    onDismissRef.current?.();
+  }, []);
 
   useEffect(() => {
     const wasVisible = wasVisibleRef.current;
     wasVisibleRef.current = visible;
     if (visible) {
+      dismissedRef.current = false;
       setNativeVisible(true);
       setContentVisible(true);
       return undefined;
@@ -73,11 +102,20 @@ export function ReactionPickerSheet({
     setContentVisible(false);
     const timer = setTimeout(() => {
       setNativeVisible(false);
+      // Android never receives the native Modal's `onDismiss`, so schedule
+      // the focus-restore callback a beat after the native Modal has left the
+      // tree — never while it is still presented. On iOS the native
+      // `onDismiss` normally wins the race and the guard skips this fallback.
+      fallbackTimerRef.current = setTimeout(notifyDismissed, POST_DISMISS_SETTLE_MS);
     }, EXIT_ANIMATION_MS);
     return () => {
       clearTimeout(timer);
+      if (fallbackTimerRef.current != null) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
     };
-  }, [visible]);
+  }, [visible, notifyDismissed]);
 
   const reacted = new Set<string>();
   for (const r of reactions) {
@@ -97,9 +135,10 @@ export function ReactionPickerSheet({
         moveA11yFocus(titleRef);
       }}
       // Focus restore back to the trigger belongs to the parent via this
-      // callback: it fires only after the native Modal is fully dismissed,
-      // when the background accessibility tree is reachable again.
-      onDismiss={onDismiss}
+      // callback: it fires only after the native Modal is fully dismissed
+      // (native on iOS, delayed post-close callback on Android), when the
+      // background accessibility tree is reachable again.
+      onDismiss={notifyDismissed}
       onRequestClose={onClose}
     >
       {contentVisible ? (

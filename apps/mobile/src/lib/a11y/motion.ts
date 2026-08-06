@@ -20,12 +20,14 @@ import {
 
 /**
  * Pure mapper from the library's action-sheet options to the reduced-motion
- * list model. Destructive and cancel flags come from their indices; item order
- * is preserved so the cancel entry stays where each caller put it (last).
- * Arbitrary option counts map 1:1 — `Alert.alert` was rejected because Android
- * caps alerts at three buttons (D6 revised). `onSelect` is the library's
- * selection callback (the same one `showActionSheetWithOptions` receives):
- * it reports the chosen item index, or the cancel index on dismissal.
+ * list model. Destructive and cancel flags come from their indices; the
+ * library types `destructiveButtonIndex` as a single index or an array, and
+ * both map 1:1. Item order is preserved so the cancel entry stays where each
+ * caller put it (last). Arbitrary option counts map 1:1 — `Alert.alert` was
+ * rejected because Android caps alerts at three buttons (D6 revised).
+ * `onSelect` is the library's selection callback (the same one
+ * `showActionSheetWithOptions` receives): it reports the chosen item index,
+ * or the cancel index on dismissal.
  */
 export function actionSheetToListModel(
   options: ActionSheetOptions,
@@ -38,7 +40,11 @@ export function actionSheetToListModel(
     items: options.options.map((label, index) => ({
       label,
       index,
-      destructive: destructiveButtonIndex === index,
+      destructive:
+        destructiveButtonIndex != null &&
+        (Array.isArray(destructiveButtonIndex)
+          ? destructiveButtonIndex.includes(index)
+          : destructiveButtonIndex === index),
       cancel: cancelButtonIndex === index,
     })),
     onSelect: index => {

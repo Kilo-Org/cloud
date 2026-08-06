@@ -124,6 +124,13 @@ export function QuestionCard({
 
   function selectCustomOption(questionIndex: number, multiple: boolean | undefined) {
     if (customSelected[questionIndex]) {
+      // Multiple choice: re-activating the checked custom answer unchecks it
+      // and clears its text so the checkbox and input stay consistent.
+      // Single choice behaves like a radio and stays selected.
+      if (multiple) {
+        customInputRefs.current[questionIndex]?.clear();
+        handleCustomTextChange(questionIndex, '');
+      }
       return;
     }
     if (!multiple) {
@@ -136,12 +143,15 @@ export function QuestionCard({
   function handleCustomTextChange(questionIndex: number, text: string) {
     customInputs.current[questionIndex] = text;
     const hasText = text.trim().length > 0;
-    setCustomHasText(prev =>
-      prev[questionIndex] === hasText ? prev : { ...prev, [questionIndex]: hasText }
-    );
-    // Auto-select custom when the user starts typing
-    if (text.trim().length > 0 && !customSelected[questionIndex]) {
+    // Force a re-render on every keystroke so `allQuestionsAnswered` (derived
+    // from the customInputs ref) stays in sync.
+    setCustomHasText(prev => ({ ...prev, [questionIndex]: hasText }));
+    // Auto-select custom when the user starts typing; clearing the text
+    // unchecks it so it never reads as selected with no content.
+    if (hasText && !customSelected[questionIndex]) {
       selectCustomOption(questionIndex, questions[questionIndex]?.multiple);
+    } else if (!hasText && customSelected[questionIndex]) {
+      setCustomSelected(prev => ({ ...prev, [questionIndex]: false }));
     }
   }
 
@@ -285,9 +295,6 @@ export function QuestionCard({
                           customInputRefs.current[qIndex] = node;
                         }}
                         defaultValue=""
-                        onFocus={() => {
-                          selectCustomOption(qIndex, question.multiple);
-                        }}
                         onChangeText={text => {
                           handleCustomTextChange(qIndex, text);
                         }}

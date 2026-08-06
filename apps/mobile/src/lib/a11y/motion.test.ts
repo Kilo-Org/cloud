@@ -23,7 +23,8 @@ import {
 // - Android without reduce motion and iOS: the library sheet is delegated to
 //   unchanged, so native presentation and callbacks stay identical.
 // - The pure mapper preserves option order, arbitrary option counts, and the
-//   destructive/cancel indices; dismissal reports the cancel index.
+//   destructive/cancel indices — `destructiveButtonIndex` as a single index
+//   or an array; dismissal reports the cancel index.
 
 const platformMock = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 const reduceMotionMock = vi.hoisted(() => ({ current: true }));
@@ -137,6 +138,20 @@ describe('actionSheetToListModel', () => {
     expect(model.items.map(item => item.label)).toEqual(['Cancel', 'Save']);
     expect(model.items[0]?.cancel).toBe(true);
     expect(model.items[1]?.cancel).toBe(false);
+  });
+
+  it('marks every index in a destructive array as destructive', () => {
+    const model = actionSheetToListModel(
+      {
+        options: ['Edit', 'Delete', 'Remove', 'Cancel'],
+        cancelButtonIndex: 3,
+        destructiveButtonIndex: [1, 2],
+      },
+      vi.fn()
+    );
+
+    expect(model.items.map(item => item.destructive)).toEqual([false, true, true, false]);
+    expect(model.items.map(item => item.cancel)).toEqual([false, false, false, true]);
   });
 
   it('omits title and message when the caller passes none', () => {

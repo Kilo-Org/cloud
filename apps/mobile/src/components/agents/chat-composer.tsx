@@ -23,7 +23,6 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
@@ -322,6 +321,7 @@ export function ChatComposer({
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
+    attachmentsEnabled,
     disabled,
     hasText,
     isFocused,
@@ -329,7 +329,7 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
-  const hint = useClipboardImageHint({
+  const { paste: pasteClipboardImage } = useClipboardImageHint({
     enabled: attachmentsEnabled && !control.paperclipDisabled,
     addFile: async file => {
       await upload.addCandidates([file]);
@@ -689,6 +689,8 @@ export function ChatComposer({
             modelOptions={modelOptions}
             onModelSelect={onModelSelect}
             disabled={control.toolbarDisabled}
+            onPasteImage={control.pasteButtonVisible ? pasteClipboardImage : undefined}
+            pasteImageDisabled={control.pasteButtonDisabled}
           />
         </Animated.View>
       ) : null}
@@ -698,14 +700,6 @@ export function ChatComposer({
           attachments={upload.attachments}
           onRemove={removeAttachment}
           onRetry={retryAttachment}
-        />
-      ) : null}
-
-      {hint.visible ? (
-        <AttachmentPasteHint
-          onPress={() => {
-            hint.paste();
-          }}
         />
       ) : null}
 
@@ -747,7 +741,6 @@ export function ChatComposer({
             onInputFocus={() => {
               inputFocusedRef.current = true;
               setIsFocused(true);
-              hint.refresh();
             }}
             onInputLayout={handleInputLayout}
             onStop={handleStop}

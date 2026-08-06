@@ -1,6 +1,8 @@
 type ChatComposerControlInput = {
   attachmentsCount: number;
   attachmentMax: number;
+  /** Attachment capability; the paste button renders only when true. */
+  attachmentsEnabled: boolean;
   disabled: boolean;
   hasText: boolean;
   isFocused: boolean;
@@ -17,6 +19,10 @@ type ChatComposerControlState = {
   inputAccessibilityDisabled: boolean;
   /** Drives the attachment picker. */
   paperclipDisabled: boolean;
+  /** Attachment capability: the paste button renders only when attachments are enabled. */
+  pasteButtonVisible: boolean;
+  /** Mirrors `paperclipDisabled` for the paste button. */
+  pasteButtonDisabled: boolean;
   /** Toolbar (mode/variant/model row) visibility. */
   showToolbar: boolean;
   /** Latches the toolbar's mode/model controls while send, stream, or disabled. */
@@ -39,6 +45,7 @@ export function resolveChatComposerControlState(
   const {
     attachmentsCount,
     attachmentMax,
+    attachmentsEnabled,
     disabled,
     hasText,
     isFocused,
@@ -61,6 +68,8 @@ export function resolveChatComposerControlState(
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,
     paperclipDisabled,
+    pasteButtonDisabled: paperclipDisabled,
+    pasteButtonVisible: attachmentsEnabled,
     showToolbar,
     toolbarDisabled,
     voiceDisabled,

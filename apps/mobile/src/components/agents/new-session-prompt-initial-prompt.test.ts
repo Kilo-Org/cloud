@@ -2,8 +2,10 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 
 const onChangeTextMock = vi.fn();
+const pasteClipboardImageMock = vi.hoisted(() => vi.fn());
 
 // ── React hooks (real useEffect needs rendering context, so mock all hooks) ──
 vi.mock('react', async () => {
@@ -38,6 +40,7 @@ vi.mock('react-native-reanimated', () => ({
 
 // ── icons ──────────────────────────────────────────────────────────
 vi.mock('lucide-react-native', () => ({
+  ClipboardPaste: () => null,
   Paperclip: () => null,
 }));
 
@@ -51,10 +54,6 @@ vi.mock('sonner-native', () => ({
 // ── sub-components ─────────────────────────────────────────────────
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
   AttachmentPreviewStrip: () => null,
-}));
-
-vi.mock('@/components/agents/attachment-paste-hint', () => ({
-  AttachmentPasteHint: () => null,
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
@@ -103,7 +102,7 @@ vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
   useClipboardImageHint: () => ({
     visible: false,
     refresh: vi.fn(),
-    paste: vi.fn(),
+    paste: pasteClipboardImageMock,
   }),
 }));
 
@@ -130,19 +129,20 @@ vi.mock('@/lib/voice-input/voice-input-draft', () => ({
 
 // ── helpers ────────────────────────────────────────────────────────
 type Node = { props?: Record<string, unknown> } | null | undefined | string | number | boolean;
+type ElementType = string | ((...args: never[]) => unknown);
 
-function findElementByType(node: Node, typeName: string): Record<string, unknown> | null {
+function findElementByType(node: Node, target: ElementType): Record<string, unknown> | null {
   if (node === null || typeof node !== 'object') {
     return null;
   }
   const props = node.props ?? {};
   const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type === typeName) {
+  const nodeType = (node as { type?: unknown }).type;
+  if (nodeType === target) {
     return node.props ?? {};
   }
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementByType(child as Node, typeName);
+    const found = findElementByType(child as Node, target);
     if (found) {
       return found;
     }
@@ -236,5 +236,18 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textInputProps).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(textInputProps!.defaultValue).toBeUndefined();
+  });
+
+  it('renders the paste button wired to the clipboard hint paste path', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt(defaultProps()) as Node;
+
+    const pasteButtonProps = findElementByType(element, ComposerPasteButton);
+    expect(pasteButtonProps).not.toBeNull();
+    const props = pasteButtonProps ?? {};
+    expect(props.onPress).toBe(pasteClipboardImageMock);
+    expect(props.disabled).toBe(false);
   });
 });

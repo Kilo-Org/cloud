@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 
+import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type AgentMode, ModeSelector } from '@/components/agents/mode-selector';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -17,6 +18,10 @@ type ChatToolbarProps = {
   disabled?: boolean;
   isLoadingModels?: boolean;
   order?: ChatToolbarOrder;
+  /** When set, an always-present paste button renders at the row's trailing edge. */
+  onPasteImage?: () => void;
+  /** Disabled state for the paste button; the composer's paperclip rule owns it. */
+  pasteImageDisabled?: boolean;
   className?: string;
 };
 
@@ -30,6 +35,8 @@ export function ChatToolbar({
   disabled = false,
   isLoadingModels = false,
   order = 'mode-first',
+  onPasteImage,
+  pasteImageDisabled = false,
   className,
 }: Readonly<ChatToolbarProps>) {
   const modeSelector = <ModeSelector value={mode} onChange={onModeChange} disabled={disabled} />;
@@ -54,6 +61,14 @@ export function ChatToolbar({
     >
       {order === 'model-first' ? modelSelector : modeSelector}
       {order === 'model-first' ? modeSelector : modelSelector}
+      {onPasteImage ? (
+        <ComposerPasteButton
+          size="sm"
+          onPress={onPasteImage}
+          disabled={pasteImageDisabled}
+          className="ml-auto"
+        />
+      ) : null}
     </View>
   );
 }

@@ -12,7 +12,7 @@ import { Paperclip } from 'lucide-react-native';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
+import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -174,7 +174,7 @@ export function NewSessionPrompt({
 
   const paperclipDisabled = control.paperclipDisabled;
 
-  const hint = useClipboardImageHint({
+  const { paste: pasteClipboardImage } = useClipboardImageHint({
     enabled: !paperclipDisabled,
     addFile: async file => {
       await onPrefillAttachments([file]);
@@ -204,13 +204,6 @@ export function NewSessionPrompt({
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
       />
-      {hint.visible ? (
-        <AttachmentPasteHint
-          onPress={() => {
-            hint.paste();
-          }}
-        />
-      ) : null}
       <View className="px-2 pt-2">
         {promptMeasure.measureElement}
         <RNTextInput
@@ -237,25 +230,25 @@ export function NewSessionPrompt({
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
-          onFocus={() => {
-            hint.refresh();
-          }}
         />
         <View className="flex-row items-center justify-between pb-2">
-          <Pressable
-            onPress={handlePaperclipPress}
-            disabled={paperclipDisabled}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className={cn(
-              'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-              paperclipDisabled && 'opacity-50'
-            )}
-            accessibilityRole="button"
-            accessibilityLabel="Add attachment"
-            accessibilityState={{ disabled: paperclipDisabled }}
-          >
-            <Paperclip size={18} color={colors.mutedForeground} />
-          </Pressable>
+          <View className="flex-row items-center gap-1">
+            <Pressable
+              onPress={handlePaperclipPress}
+              disabled={paperclipDisabled}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              className={cn(
+                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+                paperclipDisabled && 'opacity-50'
+              )}
+              accessibilityRole="button"
+              accessibilityLabel="Add attachment"
+              accessibilityState={{ disabled: paperclipDisabled }}
+            >
+              <Paperclip size={18} color={colors.mutedForeground} />
+            </Pressable>
+            <ComposerPasteButton onPress={pasteClipboardImage} disabled={paperclipDisabled} />
+          </View>
           {voiceInput.available ? (
             <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
               <VoiceInputStatus status={voiceInput.status} />

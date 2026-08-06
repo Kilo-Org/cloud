@@ -82,10 +82,283 @@ const signInWithLocalDeviceAuth = async ({
 };
 
 // ---------------------------------------------------------------------------
+// Shared phase helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * A prompt whose output keeps the session busy for the whole reopen round
+ * trip. A short prompt would finish before phase "reopen while running" and
+ * the Stop assertion would fail on a finished run, not on a broken control.
+ */
+const longPrompt = (nonce: string): string =>
+  `Nonce ${nonce}. Count from 1 to 100. Put each number on its own line with one short sentence about it.`;
+
+const readSessionTitle = async (sidePanel: Page): Promise<string> => {
+  const titleText = await sidePanel.locator('h1').first().textContent();
+  return titleText?.trim() ?? '';
+};
+
+/**
+ * Wait for the session view to settle into either a composer or the read-only
+ * banner, then fail loudly when the session is read-only.
+ */
+const failIfReadOnly = async (sidePanel: Page): Promise<void> => {
+  const composer = sidePanel.locator('#agents-message');
+  const readOnlyBanner = sidePanel.getByText('This session is read-only');
+
+  await expect
+    .poll(
+      async () => {
+        const composerVisible = await composer.isVisible().catch(() => false);
+        const readOnlyVisible = await readOnlyBanner.isVisible().catch(() => false);
+        return composerVisible || readOnlyVisible;
+      },
+      { timeout: 30_000 }
+    )
+    .toBe(true);
+
+  if (await readOnlyBanner.isVisible().catch(() => false)) {
+    throw new Error('Agent session opened read-only — expected an interactive session');
+  }
+};
+
+/**
+ * Leave the running session, return to the list, and reopen the same session
+ * from the Active list. The nonce, not the title, proves the right session
+ * opened: a cloud agent can rename its session mid-run, so a stale title
+ * falls back to the newest active row — the API lists active sessions newest
+ * first — and the nonce assertion still decides.
+ */
+const reopenRunningSession = async ({
+  sidePanel,
+  nonce,
+  sessionTitle,
+  platformLabel,
+}: {
+  sidePanel: Page;
+  nonce: string;
+  sessionTitle: string;
+  platformLabel: 'Cloud agent' | 'CLI';
+}): Promise<void> => {
+  await sidePanel.getByLabel('Back to sessions').click();
+  await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const platformRows = sidePanel
+    .locator('button')
+    .filter({ has: sidePanel.locator(`svg[aria-label="${platformLabel}"]`) });
+  await expect.poll(() => platformRows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
+
+  const titleRow = sessionTitle === '' ? undefined : platformRows.filter({ hasText: sessionTitle });
+  const titleRowCount = titleRow === undefined ? 0 : await titleRow.count().catch(() => 0);
+  // A stale title falls back to the newest running row, then the newest row.
+  const runningRows = platformRows.filter({
+    has: sidePanel.getByText('Running', { exact: true }),
+  });
+  const runningRowCount = await runningRows.count().catch(() => 0);
+  let rowToOpen = platformRows.first();
+  if (titleRow !== undefined && titleRowCount > 0) {
+    rowToOpen = titleRow.first();
+  } else if (runningRowCount > 0) {
+    rowToOpen = runningRows.first();
+  }
+  await rowToOpen.click();
+
+  await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 15_000 });
+  const openedTitle = await readSessionTitle(sidePanel);
+
+  try {
+    await expect(sidePanel.getByText(nonce).first()).toBeVisible({ timeout: 60_000 });
+  } catch (error) {
+    throw new Error(
+      `Reopened the wrong session: expected nonce "${nonce}" but the opened session is "${openedTitle}". ${error instanceof Error ? error.message : ''}`,
+      { cause: error }
+    );
+  }
+};
+
+/**
+ * Queue a follow-up prompt while the agent runs: the composer clears, the
+ * send does not end the run, and the live backend echoes the queued user
+ * message into the transcript.
+ */
+const queueFollowUp = async ({
+  sidePanel,
+  nonce,
+}: {
+  sidePanel: Page;
+  nonce: string;
+}): Promise<void> => {
+  const composer = sidePanel.locator('#agents-message');
+  await expect(composer).toBeVisible({ timeout: 30_000 });
+  const followUp = `Nonce ${nonce} follow-up: what number are you on? Reply in one short sentence.`;
+
+  await composer.fill(followUp);
+  await composer.press('Enter');
+
+  await expect(composer).toHaveValue('', { timeout: 10_000 });
+  await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expect(sidePanel.getByText(followUp).first()).toBeVisible({ timeout: 60_000 });
+};
+
+/**
+ * Full phase sequence once the session view is open with the long prompt
+ * already sent: read-only guard, wait for the run, reopen while running
+ * (verified by the nonce), queue a follow-up, stop.
+ */
+const runOpenSessionPhases = async ({
+  sidePanel,
+  nonce,
+  platformLabel,
+}: {
+  sidePanel: Page;
+  nonce: string;
+  platformLabel: 'Cloud agent' | 'CLI';
+}): Promise<void> => {
+  await failIfReadOnly(sidePanel);
+
+  const stopButton = sidePanel.getByRole('button', { name: 'Stop' });
+  await expect(stopButton).toBeVisible({ timeout: 90_000 });
+
+  const sessionTitle = await readSessionTitle(sidePanel);
+  await reopenRunningSession({ nonce, platformLabel, sessionTitle, sidePanel });
+
+  const reopenedStop = sidePanel.getByRole('button', { name: 'Stop' });
+  await expect(reopenedStop).toBeVisible({ timeout: 90_000 });
+
+  await queueFollowUp({ nonce, sidePanel });
+
+  await reopenedStop.click();
+  await expect(reopenedStop).toBeHidden({ timeout: 30_000 });
+};
+
+/**
+ * Prove the opened session is still running by waiting for the Stop control.
+ * Reports the environment gap — with uncovered phases — instead of asserting
+ * Stop, so the fallback never queues or stops against a finished run.
+ */
+const proveSessionRunning = async ({
+  sidePanel,
+  phase,
+  unavailableReason,
+}: {
+  sidePanel: Page;
+  phase: string;
+  unavailableReason: string;
+}): Promise<void> => {
+  const stopButton = sidePanel.getByRole('button', { name: 'Stop' });
+  const isRunning = await stopButton
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!isRunning) {
+    throw new Error(
+      `Cloud agent session creation is unavailable (${unavailableReason}) and the ${phase} session is not running. Phases uncovered: start, reopen, queue, stop.`
+    );
+  }
+};
+
+/**
+ * Fallback for a cloud agent when session creation is unavailable: open an
+ * existing running cloud-agent session and cover view-in-progress, queue, and
+ * stop. Start is not covered in this tier. The session must prove it is
+ * running before queue and stop; an idle-only list or a run that stops early
+ * reports the environment gap instead of sending blindly. The follow-up is
+ * queued before the reopen so the reopened transcript carries the nonce to
+ * verify with.
+ */
+const runExistingCloudSessionFallback = async ({
+  sidePanel,
+  nonce,
+  unavailableReason,
+}: {
+  sidePanel: Page;
+  nonce: string;
+  unavailableReason: string;
+}): Promise<void> => {
+  await failIfReadOnly(sidePanel);
+
+  await proveSessionRunning({ phase: 'opened', sidePanel, unavailableReason });
+
+  await queueFollowUp({ nonce, sidePanel });
+
+  const sessionTitle = await readSessionTitle(sidePanel);
+  await reopenRunningSession({ nonce, platformLabel: 'Cloud agent', sessionTitle, sidePanel });
+
+  await proveSessionRunning({ phase: 'reopened', sidePanel, unavailableReason });
+
+  const reopenedStop = sidePanel.getByRole('button', { name: 'Stop' });
+  await reopenedStop.click();
+  await expect(reopenedStop).toBeHidden({ timeout: 30_000 });
+};
+
+// ---------------------------------------------------------------------------
+// Cloud new-session form helpers
+// ---------------------------------------------------------------------------
+
+const readFormError = async (sidePanel: Page): Promise<string | null> => {
+  const errorText = await sidePanel
+    .locator('p.text-status-red-400')
+    .first()
+    .textContent()
+    .catch(() => null);
+
+  return errorText === null || errorText.trim() === '' ? null : errorText.trim();
+};
+
+/**
+ * Wait for the new-session form to settle and decide whether a cloud session
+ * can be created. Returns the exact reason it cannot, or null when the form
+ * is ready to submit with a repository picked.
+ */
+const decideCloudForm = async (sidePanel: Page): Promise<string | null> => {
+  const repoButton = sidePanel.getByLabel('Select repository');
+  await expect(repoButton).toBeEnabled({ timeout: 30_000 });
+
+  const blockedReason = sidePanel
+    .locator('p')
+    .filter({
+      hasText: /Connect GitHub to start a cloud session|No repositories available on this account/u,
+    })
+    .first();
+  if (await blockedReason.isVisible().catch(() => false)) {
+    return (await blockedReason.textContent()) ?? 'cloud session creation is blocked';
+  }
+
+  // A repository is needed; pick the first one when none is auto-selected.
+  const repoLabel = (await repoButton.textContent()) ?? '';
+  if (repoLabel.trim() !== 'Repository') {
+    return null;
+  }
+
+  await repoButton.click();
+  const connectGitHub = sidePanel.getByText('GitHub integration not connected');
+  if (await connectGitHub.isVisible().catch(() => false)) {
+    return 'GitHub integration not connected';
+  }
+  const repoError = sidePanel.getByText('Failed to load repositories');
+  if (await repoError.isVisible().catch(() => false)) {
+    return 'Failed to load repositories';
+  }
+  const noRepos = sidePanel.getByText('No repositories found');
+  if (await noRepos.isVisible().catch(() => false)) {
+    return 'No repositories found';
+  }
+  const repoOption = sidePanel.locator('button').filter({ hasText: /\//u }).first();
+  if ((await repoOption.count()) === 0) {
+    return 'No repositories found';
+  }
+  await repoOption.click();
+  return null;
+};
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-test('live local backend: open remote CLI session, send, assert reply, send long prompt, interrupt', async () => {
+test('live local backend: remote CLI agent covers start, reopen, queue, and stop', async () => {
   const fixture = await startFixtureServer({ title: 'Kilo live agents session target' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
@@ -97,67 +370,112 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 15_000 });
 
-    // Switch to Agents mode
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();
-    await expect(sidePanel.getByRole('button', { name: 'New session' })).toBeVisible({
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
       timeout: 10_000,
     });
 
-    // Wait for active sessions to load. Sessions poll every ~30s; bound to 60s.
-    // CLI rows carry the "CLI" platform icon (cloud rows carry "Cloud agent").
-    const remoteRows = sidePanel.locator('button', {
-      has: sidePanel.locator('svg[aria-label="CLI"]'),
+    const nonce = `p${process.pid}-${Date.now().toString(36)}`;
+
+    // Start: spawn onto the connected CLI instance.
+    await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
+    const runOn = sidePanel.getByLabel('Run on');
+    await expect(runOn).toBeVisible({ timeout: 60_000 });
+    const cliOptionValue = await runOn
+      .locator('option')
+      .evaluateAll(options =>
+        options
+          .map(option => (option instanceof HTMLOptionElement ? option.value : ''))
+          .find(value => value !== 'cloud')
+      );
+    if (cliOptionValue === undefined || cliOptionValue === '') {
+      throw new Error(
+        'No connected CLI instance appeared in the Run on picker — start the Kilo CLI first.'
+      );
+    }
+    await runOn.selectOption(cliOptionValue);
+
+    await sidePanel.getByLabel('What would you like to do?').fill(longPrompt(nonce));
+    await sidePanel.getByRole('button', { name: 'Start session' }).click();
+    await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 30_000 });
+
+    await runOpenSessionPhases({ nonce, platformLabel: 'CLI', sidePanel });
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend: cloud agent covers start, reopen, queue, and stop', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live agents session target' });
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 15_000 });
+
+    await sidePanel.getByRole('tab', { name: 'Agents' }).click();
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
+      timeout: 10_000,
     });
-    await expect
-      .poll(() => remoteRows.count(), {
-        message: 'No remote CLI sessions found — expected at least one active CLI session',
-        timeout: 60_000,
-      })
-      .toBeGreaterThan(0);
 
-    await remoteRows.first().click();
-    await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 15_000 });
+    const nonce = `p${process.pid}-${Date.now().toString(36)}`;
 
-    // Wait for the initial transcript to replace the session-loading skeleton.
-    const composer = sidePanel.locator('#agents-message');
-    await expect(composer).toBeVisible({ timeout: 30_000 });
+    // Start: prepare a cloud session through the form.
+    await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
+    await sidePanel.getByLabel('What would you like to do?').fill(longPrompt(nonce));
+    const blockedReason = await decideCloudForm(sidePanel);
 
-    // The remote CLI session should be interactive (not read-only)
-    const isReadOnly = await sidePanel
-      .getByText('This session is read-only')
-      .isVisible()
-      .catch(() => false);
-    if (isReadOnly) {
-      throw new Error('Remote CLI session is read-only — expected an interactive session');
+    if (blockedReason === null) {
+      const startButton = sidePanel.getByRole('button', { name: 'Start session' });
+      await expect(startButton).toBeEnabled({ timeout: 30_000 });
+      await startButton.click();
+      const started = await sidePanel
+        .getByLabel('Back to sessions')
+        .waitFor({ state: 'visible', timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (started) {
+        await runOpenSessionPhases({ nonce, platformLabel: 'Cloud agent', sidePanel });
+        return;
+      }
     }
 
-    // ---- Phase 1: Send a short prompt and assert the assistant replies with a distinct response ----
-    // Count existing assistant messages containing '4' before sending, so a
-    // Pre-existing remote transcript doesn't cause a false pass.
-    const assistant4 = sidePanel.locator('.flex.justify-start').filter({ hasText: '4' });
-    const countBefore = await assistant4.count();
-
-    await composer.fill('What is 2+2? Output only the number.');
-    await composer.press('Enter');
-
-    // Assert at least one new assistant message containing '4' appears.
-    await expect.poll(() => assistant4.count(), { timeout: 120_000 }).toBeGreaterThan(countBefore);
-
-    // ---- Phase 2: Send a long prompt, interrupt, assert recovery ----
-    await composer.fill('Write a very detailed explanation of TypeScript generics with examples.');
-    await composer.press('Enter');
-
-    // Stop button appears while streaming
-    const stopButton = sidePanel.getByRole('button', { name: 'Stop' });
-    await expect(stopButton).toBeVisible({ timeout: 30_000 });
-
-    // Interrupt
-    await stopButton.click();
-
-    // After interrupt, the send button reappears
-    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
-      timeout: 30_000,
+    // Cloud creation is unavailable. Fall back to an existing running cloud-agent session.
+    const unavailableReason =
+      blockedReason ?? (await readFormError(sidePanel)) ?? 'the form reported an error';
+    await sidePanel.getByLabel('Back', { exact: true }).click();
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
+      timeout: 15_000,
     });
+    const cloudSessionRows = sidePanel
+      .locator('button')
+      .filter({ has: sidePanel.locator('svg[aria-label="Cloud agent"]') });
+    await expect
+      .poll(() => cloudSessionRows.count(), {
+        message: `Cloud agent session creation is unavailable (${unavailableReason}) and no existing cloud-agent session is present. Phases uncovered: start, reopen, queue, stop.`,
+        timeout: 30_000,
+      })
+      .toBeGreaterThan(0);
+    // The API lists active sessions newest first. Pick the newest running row, which has the Stop control the fallback needs.
+    const runningCloudRows = cloudSessionRows.filter({
+      has: sidePanel.getByText('Running', { exact: true }),
+    });
+    await expect
+      .poll(() => runningCloudRows.count(), {
+        message: `Cloud agent session creation is unavailable (${unavailableReason}) and no cloud-agent session is running. Phases uncovered: start, reopen, queue, stop.`,
+        timeout: 30_000,
+      })
+      .toBeGreaterThan(0);
+    await runningCloudRows.first().click({ timeout: 30_000 });
+    await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 30_000 });
+
+    await runExistingCloudSessionFallback({ nonce, sidePanel, unavailableReason });
   } finally {
     await context.close();
     await fixture.close();

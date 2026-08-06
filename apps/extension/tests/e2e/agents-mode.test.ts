@@ -201,6 +201,51 @@ test('Agents opens a cloud session and streams the transcript', async () => {
   }
 });
 
+test('Agents transcript renders tool, reasoning, and code with the browser components', async () => {
+  const { cleanup, getSidePanel } = await setupAgentsTest();
+  try {
+    const sidePanel = await getSidePanel();
+    await navigateToAgentsMode(sidePanel);
+    await sidePanel.getByText('Fix login bug').click();
+    await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 10_000 });
+
+    // The synthetic snapshot progress part must never render.
+    await expect(sidePanel.getByText('Initializing snapshot')).toBeHidden({ timeout: 10_000 });
+
+    // The tool and reasoning panels use the shared browser markup.
+    const readPanel = sidePanel
+      .locator('details.bg-surface-inset')
+      .filter({ hasText: 'read completed' });
+    await expect(readPanel).toBeVisible({ timeout: 10_000 });
+    await expect(
+      sidePanel.locator('details.bg-surface-inset').filter({ hasText: 'thinking' })
+    ).toBeVisible();
+
+    // The 20-line assistant code fence renders through the shared
+    // CollapsibleCodeBlock with its collapse control.
+    const showMore = sidePanel.getByRole('button', { name: 'Show more (20 lines)' });
+    await expect(showMore).toBeVisible({ timeout: 10_000 });
+    await expect(showMore).toHaveAttribute('aria-expanded', 'false');
+
+    // Expanding the tool panel shows Arguments, the tool's title, and Result.
+    await readPanel.locator('summary').click();
+    await expect(readPanel.getByText('Arguments')).toBeVisible();
+    await expect(readPanel.getByText('src/auth.ts').first()).toBeVisible();
+    await expect(readPanel.getByText('Result')).toBeVisible();
+
+    // The screenshot tool renders the remembered image bytes as an <img>.
+    const shotPanel = sidePanel
+      .locator('details.bg-surface-inset')
+      .filter({ hasText: 'browser_screenshot completed' });
+    await expect(shotPanel).toBeVisible({ timeout: 10_000 });
+    await expect(shotPanel.locator('img')).toHaveAttribute('src', /^data:image\/png;base64,/u);
+    // The image replaced the tool's text output, so the panel never shows it.
+    await expect(shotPanel).not.toContainText('captured');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('Agents can send a message on a cloud session', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest();
   try {
@@ -215,8 +260,8 @@ test('Agents can send a message on a cloud session', async () => {
     await composer.press('Enter');
     await expect(composer).toHaveValue('');
 
-    // After stream completes, composer reverts to Send
-    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+    // After the stream completes the run ends: Stop must be gone.
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeHidden({
       timeout: 10_000,
     });
   } finally {
@@ -241,8 +286,8 @@ test('Agents can interrupt a running cloud session', async () => {
     // Click Stop
     await stopButton.click();
 
-    // After interrupt, composer reverts to Send message
-    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+    // After interrupt the run ends: Stop must be gone.
+    await expect(stopButton).toBeHidden({
       timeout: 10_000,
     });
 
@@ -642,11 +687,15 @@ test('Agents composer queues a send while the agent runs', async () => {
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible({
       timeout: 15_000,
     });
+    // Parity: the Send control stays reachable while the run streams.
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
     await composer.fill('Also update the changelog');
     await composer.press('Enter');
 
     // The draft clears and the send reaches the API despite the run.
     await expect(composer).toHaveValue('', { timeout: 10_000 });
+    // The queued send did not end the run: Stop is still present.
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     await expect
       .poll(
         () => mockResult.calledProcedures.filter(call => call.proc.includes('sendMessage')).length,

@@ -13,12 +13,13 @@
 
 import * as Haptics from 'expo-haptics';
 import { SmilePlus } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
 import { reactionPillA11y } from '@/components/pr-review/discussion/reaction-pill-a11y';
 import { Text } from '@/components/ui/text';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, selectReactionPills } from '@/lib/pr-review/discussion/reaction-pills';
 import { type ReviewReactionContent } from '@/lib/pr-review/discussion/review-discussion-types';
@@ -54,10 +55,22 @@ export function ReactionsRow({
 }: Readonly<ReactionsRowProps>) {
   const colors = useThemeColors();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const addReactionRef = useRef<View>(null);
   const pills = selectReactionPills(reactions);
   const isDisabled = Boolean(disabled);
   const isReadOnly = Boolean(readOnly);
   const pillDisabled = isDisabled || isReadOnly;
+
+  // Centralized close: every picker close path (close button, backdrop,
+  // Android back via `onRequestClose`, and picking a reaction) flips the
+  // sheet's `visible` off. Screen-reader focus is NOT restored here: the
+  // native Modal stays presented for the exit animations (~200ms), and while
+  // it is up the background accessibility tree (including the "Add reaction"
+  // trigger) is unreachable. The sheet fires `onDismiss` only after the
+  // native Modal fully dismisses, and that handler moves focus back.
+  function closePicker() {
+    setPickerOpen(false);
+  }
 
   if (pills.length === 0 && isReadOnly) {
     return null;
@@ -80,6 +93,7 @@ export function ReactionsRow({
       ))}
       {isReadOnly ? null : (
         <Pressable
+          ref={addReactionRef}
           accessibilityRole="button"
           accessibilityLabel="Add reaction"
           accessibilityState={{ disabled: isDisabled }}
@@ -100,13 +114,14 @@ export function ReactionsRow({
       <ReactionPickerSheet
         visible={pickerOpen}
         reactions={reactions}
-        onClose={() => {
-          setPickerOpen(false);
-        }}
+        onClose={closePicker}
         onPick={content => {
           void Haptics.selectionAsync();
           onToggle(content);
-          setPickerOpen(false);
+          closePicker();
+        }}
+        onDismiss={() => {
+          moveA11yFocus(addReactionRef);
         }}
       />
     </View>

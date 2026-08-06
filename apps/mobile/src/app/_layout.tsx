@@ -32,6 +32,8 @@ import { toast } from 'sonner-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { hiddenSlotA11yProps } from '@/lib/a11y/hidden-route';
 import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
@@ -497,6 +499,7 @@ function RootLayoutNav() {
   const needsAppRedirect = token != null && inAuthGroup;
   const hasUserBootstrapError = token != null && userIdError;
   const hasConsentBootstrapError = token != null && consentCheckError !== null;
+  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
   const consentLoading =
     token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
   const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
@@ -514,6 +517,43 @@ function RootLayoutNav() {
     !hasUserBootstrapError &&
     !hasConsentBootstrapError &&
     (isLoading || needsRedirect || consentLoading);
+
+  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
+  // both accessibility trees via `hiddenSlotA11yProps`. On the hidden →
+  // visible transition, `announceForA11y` is the deterministic entry context
+  // for screen-reader users, and the wrapper focus is best-effort
+  // (`moveA11yFocus` returns false when the platform declines — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
+  //
+  // The transition is skipped while a bootstrap error is shown: the wrapper
+  // is unmounted then (the error screen replaces it), so "Content ready"
+  // would be a false announcement and the wrapper focus has no target. The
+  // deferred focus is also cancelled when the reveal is interrupted (hidden
+  // again, bootstrap error, or unmount) — the rAF callback re-checks a
+  // render-fresh guard so a pending frame can never focus a stale wrapper.
+  const wrapperRef = useRef<View>(null);
+  const wasHiddenRef = useRef(hidden);
+  const revealFocusBlockedRef = useRef(hidden || hasBootstrapError);
+  revealFocusBlockedRef.current = hidden || hasBootstrapError;
+  useEffect(() => {
+    const wasHidden = wasHiddenRef.current;
+    wasHiddenRef.current = hidden;
+    if (!wasHidden || hidden || hasBootstrapError) {
+      return undefined;
+    }
+    announceForA11y('Content ready');
+    const frame = requestAnimationFrame(() => {
+      if (revealFocusBlockedRef.current) {
+        return;
+      }
+      moveA11yFocus(wrapperRef);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [hidden, hasBootstrapError]);
 
   if (hasUserBootstrapError) {
     return (
@@ -554,6 +594,8 @@ function RootLayoutNav() {
 
   return (
     <View
+      ref={wrapperRef}
+      {...hiddenSlotA11yProps(hidden)}
       className={`flex-1 ${hidden ? 'opacity-0' : 'opacity-100'}`}
       pointerEvents={hidden ? 'none' : 'auto'}
     >

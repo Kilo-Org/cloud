@@ -523,6 +523,19 @@ async function executeOrgMemberRemove(args: {
  * settling — complete the record (audit + settle + outbox + side effects) and
  * replay without re-running the helper (avoiding the NOT_FOUND trap).
  * Otherwise re-run the helper under the same row.
+ *
+ * RECORDED REJECTION (Kilobot absent-member takeover finding, round 2): the
+ * finding claims an absent read-back can settle `completed` for a
+ * never-executed row (the member absent for an unrelated reason) and write a
+ * false success audit. The approved plan (P1-A-08e item 7) explicitly accepts
+ * this outcome for member removal: on takeover, "the membership row is absent
+ * → settle `completed` (`already_applied`)", and item 10 tests the takeover
+ * read-back "for an already-removed member (no NOT_FOUND)". The taxonomy is
+ * `reconcile-first` for `member_remove`, so a same-key takeover means a prior
+ * attempt held the lease and the absent read-back is treated as the committed
+ * removal. Adding a committed-write progress signal would deviate from the
+ * approved plan, so this finding is rejected and the behavior is unchanged.
+ * The role-change twin at `repairOrgRoleChange` follows the same decision.
  */
 async function repairOrgMemberRemove(args: {
   row: OperationLedgerRow;

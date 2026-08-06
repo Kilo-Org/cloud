@@ -877,11 +877,14 @@ async function readSessionMetadata(
  *   a. No progress IDs → nothing external happened → fresh create under the row.
  *   b. IDs recorded, ownership row absent → the DO never registered → fresh
  *      create under the row.
- *   c. Ownership row present, DO metadata absent → the DO never committed
- *      registration → `onlyIfEmpty` delete of the stale ownership row, then a
- *      fresh create; if the delete refused (row not empty), the session is
- *      live only when the DO authoritatively re-proves registration, and the
- *      ladder falls through to (d) on that re-read.
+ *   c. Ownership row present, DO metadata absent → perform an authoritative
+ *      SECOND metadata read BEFORE touching the ownership row (a single null
+ *      read is not proof of no registration). If the second read returns
+ *      metadata, the DO committed registration → reconcile initial admission
+ *      and settle/replay WITHOUT deleting the ownership row. Only when BOTH
+ *      reads are absent is the ownership row stale: delete it (`onlyIfEmpty`).
+ *      If the delete refused (row not empty), stay reconcile-pending; if the
+ *      row is gone, the DO never registered → fresh create under the row.
  *   d. Metadata present → completion requires the recorded `initialMessageId`
  *      to be admitted. Admitted → settle completed (+ outbox) and replay.
  *      Not admitted / not determinable → `CONFLICT` `creation_in_progress`.
@@ -916,25 +919,15 @@ async function reconcileLedgerCreate(
   const metadata = await readSessionMetadata(ctx, doId);
 
   if (!metadata) {
-    const sessionService = new SessionService();
-    try {
-      await sessionService.deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
-        onlyIfEmpty: true,
-      });
-    } catch {
-      throw creationInProgressError();
-    }
-    const afterDelete = await findCliSessionOwnershipRow(db, ctx.userId, kiloSessionId);
-    if (afterDelete) {
-      // The delete refused: the row has real content. Completion still requires
-      // authoritative DO registration: `getMessageResult` reports
-      // `session-not-found` whenever metadata is absent, so admission can only
-      // prove a live session after the DO re-proves registration. A second
-      // absent read means the session is not live → stay reconcile-pending.
-      const registered = await readSessionMetadata(ctx, doId);
-      if (!registered) {
-        throw creationInProgressError();
-      }
+    // A single null metadata read is NOT proof of no registration (a transient
+    // read or a pending deletion intent can hide committed metadata). Perform
+    // an authoritative second metadata read BEFORE deleting the stale
+    // ownership row: if the DO committed concurrently, deleting the row would
+    // orphan a live registered session and a fresh create would double-admit
+    // the initial turn. When the second read returns metadata, reconcile
+    // initial admission and settle/replay; never delete the ownership row.
+    const secondRead = await readSessionMetadata(ctx, doId);
+    if (secondRead) {
       return confirmInitialMessageAdmitted(
         input,
         ctx,
@@ -946,13 +939,24 @@ async function reconcileLedgerCreate(
         canonical.initialMessageId
       );
     }
-    // Stale ownership row removed → confirm the DO never registered BEFORE
-    // re-executing: a single null metadata read is NOT proof of no
-    // registration (a transient read or a pending deletion intent can hide
-    // committed metadata). Re-read the DO state; only a second absent read
-    // authorizes a fresh create, otherwise stay in-progress conservatively.
-    const confirmedAbsent = await readSessionMetadata(ctx, doId);
-    if (confirmedAbsent) {
+
+    // Both reads absent → the ownership row is stale; remove it (empty-only).
+    const sessionService = new SessionService();
+    try {
+      await sessionService.deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
+        onlyIfEmpty: true,
+      });
+    } catch {
+      throw creationInProgressError();
+    }
+    // Re-read ownership and continue conservatively. If the delete refused,
+    // the row has real content but the DO never registered (both reads absent)
+    // → stay reconcile-pending: `getMessageResult` reports `session-not-found`
+    // whenever metadata is absent, so admission cannot prove a live session. If
+    // the row is gone, the DO never registered → a fresh create under the row
+    // is safe.
+    const afterDelete = await findCliSessionOwnershipRow(db, ctx.userId, kiloSessionId);
+    if (afterDelete) {
       throw creationInProgressError();
     }
     return executeLedgerCreate(input, ctx, options, db, row, 'takeover');

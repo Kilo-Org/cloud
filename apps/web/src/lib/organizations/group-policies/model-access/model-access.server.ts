@@ -8,6 +8,7 @@ import { desc, eq } from 'drizzle-orm';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { isModelRestrictionExempt } from '@/lib/model-allow.server';
 import { db } from '@/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/organizations/organization-group-policy-context.server';
 
 export type EffectiveOrganizationModelPolicy = {
+  requireModelInCurrentSnapshot: boolean;
   organizationModelDenyList: string[];
   organizationProviderCeiling?: string[];
   memberGrant:
@@ -47,9 +49,12 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
+  const requireModelInCurrentSnapshot =
+    organizationModelDenyList.length > 0 || organizationProviderCeiling !== undefined;
 
   if (!organizationRestrictionsEnabled) {
     return {
+      requireModelInCurrentSnapshot: false,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -63,6 +68,7 @@ export function evaluateEffectiveModelAccessPolicy(
     .filter(policy => policy.type === 'model_access');
   if (policies.length === 0 || policies.some(policy => policy.data.mode === 'all')) {
     return {
+      requireModelInCurrentSnapshot,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -73,6 +79,7 @@ export function evaluateEffectiveModelAccessPolicy(
 
   const selectedPolicies = policies.filter(policy => policy.data.mode === 'selected');
   return {
+    requireModelInCurrentSnapshot,
     organizationModelDenyList,
     organizationProviderCeiling,
     memberGrant: {
@@ -105,7 +112,16 @@ export async function getEffectiveModelDecision(
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
+  if (await isModelRestrictionExempt(modelId)) {
+    return { allowed: true };
+  }
   if (policy.organizationModelDenyList.includes(normalizedModelId)) {
+    return { allowed: false, denialSource: 'organization_model' };
+  }
+  const currentModelProviders = policy.requireModelInCurrentSnapshot
+    ? await providerLookup(normalizedModelId)
+    : undefined;
+  if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
   }
   const organizationRoutes = policy.organizationProviderCeiling
@@ -114,9 +130,9 @@ export async function getEffectiveModelDecision(
 
   async function decisionWithinOrganizationCeiling(): Promise<EffectiveModelDecision> {
     if (!organizationRoutes) return { allowed: true };
-    const modelProviders = await providerLookup(normalizedModelId);
+    const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
     if (modelProviders.size === 0) {
-      return { allowed: true, eligibleProviderRoutes: organizationRoutes };
+      return { allowed: false, denialSource: 'organization_model' };
     }
     const eligibleProviderRoutes = new Set(
       [...modelProviders].filter(provider => organizationRoutes.has(provider))
@@ -135,7 +151,7 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.providerAllowList.length === 0) {
     return { allowed: false, denialSource: 'no_grant' };
   }
-  const modelProviders = await providerLookup(normalizedModelId);
+  const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
   if (modelProviders.size === 0) {
     return { allowed: false, denialSource: 'group_provider' };
   }

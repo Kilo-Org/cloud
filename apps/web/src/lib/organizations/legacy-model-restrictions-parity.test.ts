@@ -121,7 +121,7 @@ describe('legacy organization restrictions with no groups or policies', () => {
       'denied/model': false,
       'allowed/model': true,
       'blocked-provider/model': false,
-      'unknown-routes/model': true,
+      'unknown-routes/model': false,
     });
 
     // Reading policy must not materialize a settings row or invent a revision.
@@ -141,6 +141,7 @@ describe('legacy organization restrictions with no groups or policies', () => {
     const { legacy } = await expectParityWithLegacyPredicate(organization, owner.id);
     expect(legacy['denied/model']).toBe(false);
     expect(legacy['blocked-provider/model']).toBe(true);
+    expect(legacy['unknown-routes/model']).toBe(false);
   });
 
   it('matches the pre-groups predicate for a provider allow list only', async () => {

@@ -53,11 +53,40 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
   });
 
-  test('provider allow list permits models without OpenRouter provider metadata', async () => {
+  test('provider allow list denies models missing from the current snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
 
-    await expect(isAllowed('custom-llm-id')).resolves.toBe(true);
+    await expect(isAllowed('grok-4.5')).resolves.toBe(false);
   });
+
+  test('enterprise deny lists require models to exist in the current snapshot', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        modelDenyList: ['x-ai/grok-4.5'],
+      },
+      lookup({ 'x-ai/grok-4.6': ['x-ai'] })
+    );
+
+    await expect(isAllowed('grok-4.5')).resolves.toBe(false);
+    await expect(isAllowed('x-ai/grok-4.6')).resolves.toBe(true);
+  });
+
+  test.each(['kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+    'keeps %s exempt from Enterprise model restrictions',
+    async modelId => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        {
+          requireModelInCurrentSnapshot: true,
+          providerAllowList: [],
+          modelDenyList: [modelId],
+        },
+        lookup({})
+      );
+
+      await expect(isAllowed(modelId)).resolves.toBe(true);
+    }
+  );
 
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(

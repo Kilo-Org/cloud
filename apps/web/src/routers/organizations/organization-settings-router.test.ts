@@ -85,6 +85,15 @@ const mockedIsPublicIdExperimented = isPublicIdExperimented as unknown as jest.M
 describe('organizations settings trpc router', () => {
   beforeEach(() => {
     mockedGetProviderSlugsForModel.mockReset();
+    mockedGetProviderSlugsForModel.mockImplementation(async modelId => {
+      const provider = {
+        'anthropic/claude-3-opus': 'anthropic',
+        'gpt-3.5-turbo': 'openai',
+        'gpt-4': 'openai',
+        'openai/gpt-4o': 'openai',
+      }[modelId];
+      return provider ? new Set([provider]) : new Set();
+    });
     mockedGetEnhancedOpenRouterModels.mockReset();
     mockedIsPublicIdExperimented.mockReset();
     mockedIsPublicIdExperimented.mockResolvedValue(false);
@@ -580,6 +589,17 @@ describe('organizations settings trpc router', () => {
       });
 
       expect(result.settings.default_model).toBe('any-model');
+    });
+
+    it('keeps custom LLM defaults exempt from Enterprise model restrictions', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateDefaultModel({
+        organizationId: orgWithModelDenyList.id,
+        default_model: 'kilo-internal/private-model',
+      });
+
+      expect(result.settings.default_model).toBe('kilo-internal/private-model');
     });
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {

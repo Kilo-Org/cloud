@@ -43,7 +43,7 @@ const autoModelCards: AutoModelCard[] = [
     icon: Scale,
     iconBg: 'bg-blue-500/20',
     iconColor: 'text-blue-400',
-    cost: 1,
+    cost: 2,
     performance: 2,
     performanceDotColor: 'bg-blue-400',
   },

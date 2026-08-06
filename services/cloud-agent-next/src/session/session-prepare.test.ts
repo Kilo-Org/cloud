@@ -638,6 +638,29 @@ describe('createSessionWithLedger admission ladder', () => {
 
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
+
+  it('returns CONFLICT creation_in_progress when another retry holds the reconciliation lease', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_in_progress',
+      row: makeLedgerRow({ status: 'reconcile_pending' }),
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await expect(
+      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
+        operationKey: OPERATION_KEY,
+        startedAt: 1_700_000_000_000,
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+
+    // The in-progress retry must not run the effect, reconcile, or settle.
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(markReconcilePendingMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('createSessionWithLedger takeover reconciliation ladder', () => {
@@ -935,6 +958,53 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
+  });
+
+  it('regression: concurrent reconcile retries run the effect once and report creation_in_progress to the rest', async () => {
+    // The first retry atomically claimed the reconciliation lease and may
+    // reconcile; every concurrent retry sees the live lease and must not.
+    admitOperationMock
+      .mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({ canonical_result: canonicalIds }),
+      })
+      .mockResolvedValue({
+        admission: 'duplicate_reconcile_in_progress',
+        row: makeLedgerRow({ status: 'reconcile_pending' }),
+      });
+    // Claim winner: ownership lookup, then the distinct-id lookup for the settle.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const [winner, loser] = await Promise.all([
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      ),
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      ).then(
+        () => null,
+        (error: unknown) => error
+      ),
+    ]);
+
+    expect(winner).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(loser).toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    // Exactly one retry reconciled: the ladder read the DO state once.
+    expect(doStub.getMessageResult).toHaveBeenCalledTimes(1);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(1);
   });
 
   it('regression: fresh allocation under reconcile_pending persists IDs so the next retry reconciles instead of allocating a third session', async () => {

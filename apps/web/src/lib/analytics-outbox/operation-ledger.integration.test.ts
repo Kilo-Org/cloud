@@ -51,7 +51,7 @@ async function admitSession(userId = 'ledger-user', operationKey: string = rando
   return admitOperation(db, {
     userId,
     domain: SESSION_DOMAIN,
-    intent: 'create',
+    intent: 'create_cloud',
     operationKey,
     taxonomy: 'safe-retry',
     leaseSeconds: 60,
@@ -92,7 +92,7 @@ describe('operation ledger (integration)', () => {
         admitOperation(db, {
           userId: 'concurrent-user',
           domain: SESSION_DOMAIN,
-          intent: 'create',
+          intent: 'create_cloud',
           operationKey: 'concurrent-key',
           taxonomy: 'safe-retry',
           leaseSeconds: 60,
@@ -322,6 +322,62 @@ describe('operation ledger (integration)', () => {
     expect(lateReconcile?.status).toBe('completed');
   });
 
+  it('serializes concurrent reconcile retries behind exactly one lease claim', async () => {
+    const admitted = await admitSession('concurrent-reconcile-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    // The transition makes the reconciliation lease immediately claimable.
+    await markReconcilePending(db, { rowId });
+
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        admitSession('concurrent-reconcile-user', admitted.row.operation_key)
+      )
+    );
+
+    // Exactly one retry holds the reconciliation lease and may run the effect.
+    expect(results.filter(r => r.admission === 'duplicate_reconcile_pending')).toHaveLength(1);
+    // Every other retry sees the live reconciliation lease and must not run it.
+    expect(results.filter(r => r.admission === 'duplicate_reconcile_in_progress')).toHaveLength(
+      results.length - 1
+    );
+
+    const claim = results.find(r => r.admission === 'duplicate_reconcile_pending');
+    expect(claim).toBeDefined();
+    expect(new Date(claim?.row.lease_expires_at ?? 0).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('takes over an expired reconciliation lease after a crashed reconciler', async () => {
+    const admitted = await admitSession('reconcile-takeover-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    await markReconcilePending(db, { rowId });
+
+    // The first retry atomically claims the claimable lease and reconciles.
+    const claim = await admitSession('reconcile-takeover-user', admitted.row.operation_key);
+    expect(claim.admission).toBe('duplicate_reconcile_pending');
+    if (claim.admission !== 'duplicate_reconcile_pending') return;
+
+    // While the reconciler holds the lease, a retry reports in-progress.
+    const inProgress = await admitSession('reconcile-takeover-user', admitted.row.operation_key);
+    expect(inProgress.admission).toBe('duplicate_reconcile_in_progress');
+
+    // The reconciler crashes; its lease expires.
+    await db
+      .update(operation_ledgers)
+      .set({ lease_expires_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(operation_ledgers.id, rowId));
+
+    // A later retry takes over the expired reconciliation lease and may reconcile.
+    const takeover = await admitSession('reconcile-takeover-user', admitted.row.operation_key);
+    expect(takeover.admission).toBe('duplicate_reconcile_pending');
+    if (takeover.admission !== 'duplicate_reconcile_pending') return;
+    expect(takeover.row.id).toBe(rowId);
+    expect(new Date(takeover.row.lease_expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
+
   it('records fresh allocation progress on a reconcile_pending row', async () => {
     const admitted = await admitSession('reconcile-progress-user');
     if (admitted.admission !== 'admitted') return;
@@ -357,10 +413,11 @@ describe('operation ledger (integration)', () => {
     });
     expect(row?.canonical_result).not.toHaveProperty('pad');
 
-    // The next same-key admit reports the recorded IDs for reconciliation.
+    // A retry within the live reconciliation lease reports in-progress; the
+    // row still carries the recorded IDs for the later reconciliation.
     const retry = await admitSession('reconcile-progress-user', admitted.row.operation_key);
-    expect(retry.admission).toBe('duplicate_reconcile_pending');
-    if (retry.admission !== 'duplicate_reconcile_pending') return;
+    expect(retry.admission).toBe('duplicate_reconcile_in_progress');
+    if (retry.admission !== 'duplicate_reconcile_in_progress') return;
     expect(retry.row.canonical_result).toMatchObject({
       cloudAgentSessionId: 'agent_allocated',
       kiloSessionId: 'ses_allocated',

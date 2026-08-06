@@ -652,6 +652,8 @@ export async function startNewSession(
  *   reconcile-pending on an unknown transport outcome.
  * - `duplicate_settled`: replay the canonical result with `replayed: true`.
  * - `duplicate_in_flight`: `CONFLICT` `creation_in_progress`.
+ * - `duplicate_reconcile_in_progress`: another retry holds the reconciliation
+ *   lease; `CONFLICT` `creation_in_progress`.
  * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
  */
 export async function createSessionWithLedger(
@@ -676,6 +678,7 @@ export async function createSessionWithLedger(
     case 'duplicate_settled':
       return replaySettledCreate(admission.row);
     case 'duplicate_in_flight':
+    case 'duplicate_reconcile_in_progress':
       throw creationInProgressError();
     case 'takeover':
     case 'duplicate_reconcile_pending':

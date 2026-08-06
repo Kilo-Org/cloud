@@ -3,7 +3,11 @@
  *
  * One row per `(kilo_user_id, domain, operation_key)` identity. Admission is
  * concurrent-safe: exactly one caller admits, the rest receive the typed
- * duplicate/takeover outcome and never re-execute the effect. Terminal settles
+ * duplicate/takeover outcome and never re-execute the effect. Reconciliation
+ * of a `reconcile_pending` row is serialized by the same `lease_expires_at`
+ * column: exactly one retry atomically claims the lease and reconciles, the
+ * rest receive `duplicate_reconcile_in_progress`, and an expired
+ * reconciliation lease can be claimed by a later retry. Terminal settles
  * are CAS from `admitted | reconcile_pending`; a second settle is a no-op.
  * The analytics outbox row is written in the same transaction as the settle,
  * so settle-plus-outbox is atomic, and ONLY the helpers in this file insert
@@ -131,7 +135,8 @@ export type AdmitOperationResult =
   | { admission: 'duplicate_settled'; row: OperationLedgerRow }
   | { admission: 'duplicate_in_flight'; row: OperationLedgerRow }
   | { admission: 'takeover'; row: OperationLedgerRow }
-  | { admission: 'duplicate_reconcile_pending'; row: OperationLedgerRow };
+  | { admission: 'duplicate_reconcile_pending'; row: OperationLedgerRow }
+  | { admission: 'duplicate_reconcile_in_progress'; row: OperationLedgerRow };
 
 /** Terminal outbox event input, correlated by event name. */
 export type OutboxEventInput = {
@@ -203,7 +208,10 @@ function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperat
  * row (`expires_at` past, any status) is deleted and re-inserted in one
  * transaction. A live-lease `admitted` row is `duplicate_in_flight`; an
  * expired-lease `admitted` row is a compare-and-set `takeover` that renews
- * the lease.
+ * the lease. A `reconcile_pending` row with an expired/claimable lease is
+ * claimed by exactly one retry (`duplicate_reconcile_pending`); concurrent
+ * retries during the live reconciliation lease receive
+ * `duplicate_reconcile_in_progress` and must not run the effect.
  */
 export async function admitOperation(
   database: LedgerDatabase,
@@ -317,7 +325,28 @@ async function evaluateExistingRow(
   }
 
   if (row.status === 'reconcile_pending') {
-    return { admission: 'duplicate_reconcile_pending', row };
+    // A live reconciliation lease means another retry already claimed it and
+    // is reconciling; the caller must surface an in-progress response and must
+    // not run the effect.
+    if (new Date(row.lease_expires_at).getTime() > now.getTime()) {
+      return { admission: 'duplicate_reconcile_in_progress', row };
+    }
+    // Compare-and-set lease claim: reconcile only while the lease is still
+    // claimable. The row lock serializes concurrent claims; the CAS guards a
+    // claim renewed between the read and the update.
+    const claimedLease = new Date(now.getTime() + input.leaseSeconds * 1000).toISOString();
+    const [claimed] = await tx
+      .update(operation_ledgers)
+      .set({ lease_expires_at: claimedLease })
+      .where(
+        and(
+          eq(operation_ledgers.id, row.id),
+          eq(operation_ledgers.status, 'reconcile_pending'),
+          sql`${operation_ledgers.lease_expires_at} <= ${now.toISOString()}::timestamptz`
+        )
+      )
+      .returning();
+    return { admission: 'duplicate_reconcile_pending', row: claimed ?? row };
   }
 
   return { admission: 'duplicate_settled', row };
@@ -469,8 +498,11 @@ async function settleOperationInTransaction(
 /**
  * Marks a row `reconcile_pending`, CAS from `admitted`. May emit an
  * `outcome: 'ambiguous'` outbox event (a ledger state change, not an HTTP
- * receipt). Returns the stored row when the CAS did not match (missing or not
- * `admitted`).
+ * receipt). The transition also makes the reconciliation lease immediately
+ * claimable (`lease_expires_at` set to now), so the next same-key retry can
+ * atomically claim it and reconcile instead of waiting out the original
+ * admitted lease. Returns the stored row when the CAS did not match (missing
+ * or not `admitted`).
  */
 export async function markReconcilePending(
   database: LedgerDatabase,
@@ -495,9 +527,13 @@ export async function markReconcilePending(
       await insertOutboxEvent(tx, { rowId: row.id, event: input.outboxEvent });
     }
 
+    const now = new Date();
     const [updated] = await tx
       .update(operation_ledgers)
-      .set({ status: 'reconcile_pending' })
+      .set({
+        status: 'reconcile_pending',
+        lease_expires_at: now.toISOString(),
+      })
       .where(and(eq(operation_ledgers.id, row.id), eq(operation_ledgers.status, 'admitted')))
       .returning();
     return updated ?? row;

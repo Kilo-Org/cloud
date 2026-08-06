@@ -7,6 +7,7 @@ import {
   SessionDetailContent,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-content';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { QueryError } from '@/components/query-error';
@@ -95,6 +96,7 @@ export default function SessionDetailScreen() {
             />
           }
         />
+        <SessionConnectionIndicator />
         <SessionSkeletonMessages />
       </View>
     );
@@ -108,6 +110,7 @@ export default function SessionDetailScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Session" />
+        <SessionConnectionIndicator />
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
             variant={notFound ? 'not-found' : 'server'}

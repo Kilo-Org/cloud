@@ -7,8 +7,7 @@ import {
 } from '@/lib/trpc/init';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
-import { isEligibleForPlatformAdmin } from '@/lib/admin/platform-admin';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
@@ -1586,8 +1585,9 @@ export const adminRouter = createTRPCRouter({
       };
     }),
 
-    // Server-filtered so results only ever contain non-admin, exact-eligibility
-    // kilocode.ai users. Filtering here is a UX convenience, not a security
+    // Server-filtered so results only ever contain non-admin users matching an
+    // exact platform-admin email and hosted-domain pair. Filtering here is a UX
+    // convenience, not a security
     // boundary: setPlatformAdminAccess independently re-validates eligibility
     // against freshly locked rows before granting.
     searchPlatformAdminCandidates: superadminProcedure
@@ -1601,10 +1601,16 @@ export const adminRouter = createTRPCRouter({
           .where(
             and(
               eq(kilocode_users.is_admin, false),
-              eq(kilocode_users.hosted_domain, hosted_domain_specials.kilocode_admin),
               // Case-sensitive suffix match — `like` (not `ilike`) so search
               // eligibility cannot disagree with isEligibleForPlatformAdmin.
-              like(kilocode_users.google_user_email, `%@${hosted_domain_specials.kilocode_admin}`),
+              or(
+                ...platformAdminDomains.map(domain =>
+                  and(
+                    eq(kilocode_users.hosted_domain, domain),
+                    like(kilocode_users.google_user_email, `%@${domain}`)
+                  )
+                )
+              ),
               or(
                 ilike(kilocode_users.google_user_email, `%${escaped}%`),
                 ilike(kilocode_users.google_user_name, `%${escaped}%`),

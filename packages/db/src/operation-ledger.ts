@@ -326,11 +326,14 @@ async function evaluateExistingRow(
 // ----- progress and provider reference ------------------------------------------
 
 /**
- * Merges allocated identifiers into `canonical_result` while the row stays
- * `admitted`. Returns the updated row, or null when the row is missing or no
- * longer admitted (the CAS did not match). The merged result is bounded at
- * `MAX_CANONICAL_RESULT_BYTES` serialized bytes: an oversized merge throws
- * `CanonicalResultTooLargeError` and leaves the row unchanged.
+ * Merges allocated identifiers into `canonical_result` while the row is
+ * non-terminal (`admitted` or `reconcile_pending`). A fresh takeover
+ * allocation under a reconcile-pending row must record its new IDs so the next
+ * same-key retry reconciles them instead of allocating a third time. Returns
+ * the updated row, or null when the row is missing or terminal (the CAS did
+ * not match). The merged result is bounded at `MAX_CANONICAL_RESULT_BYTES`
+ * serialized bytes: an oversized merge throws `CanonicalResultTooLargeError`
+ * and leaves the row unchanged.
  */
 export async function recordOperationProgress(
   database: LedgerDatabase,
@@ -344,7 +347,7 @@ export async function recordOperationProgress(
       .where(eq(operation_ledgers.id, rowId))
       .for('update');
 
-    if (!row || row.status !== 'admitted') {
+    if (!row || isTerminalOperationStatus(row.status)) {
       return null;
     }
 
@@ -358,7 +361,12 @@ export async function recordOperationProgress(
     const [updated] = await tx
       .update(operation_ledgers)
       .set({ canonical_result: merged })
-      .where(and(eq(operation_ledgers.id, row.id), eq(operation_ledgers.status, 'admitted')))
+      .where(
+        and(
+          eq(operation_ledgers.id, row.id),
+          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES)
+        )
+      )
       .returning();
     return updated ?? null;
   });

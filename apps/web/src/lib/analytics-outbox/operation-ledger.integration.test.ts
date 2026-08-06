@@ -322,6 +322,51 @@ describe('operation ledger (integration)', () => {
     expect(lateReconcile?.status).toBe('completed');
   });
 
+  it('records fresh allocation progress on a reconcile_pending row', async () => {
+    const admitted = await admitSession('reconcile-progress-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    await markReconcilePending(db, { rowId });
+    const replay = await admitSession('reconcile-progress-user', admitted.row.operation_key);
+    expect(replay.admission).toBe('duplicate_reconcile_pending');
+
+    // A fresh takeover allocation under the reconcile_pending row must persist
+    // its new IDs: the next retry reconciles them instead of allocating again.
+    const progress = await recordOperationProgress(db, rowId, {
+      cloudAgentSessionId: 'agent_allocated',
+      kiloSessionId: 'ses_allocated',
+    });
+    expect(progress?.status).toBe('reconcile_pending');
+    expect(progress?.canonical_result).toMatchObject({
+      cloudAgentSessionId: 'agent_allocated',
+      kiloSessionId: 'ses_allocated',
+    });
+
+    // The 4096 serialized-byte bound still applies to progress on the row.
+    const oversized: Record<string, unknown> = { pad: 'x'.repeat(5000) };
+    await expect(recordOperationProgress(db, rowId, oversized)).rejects.toBeInstanceOf(
+      CanonicalResultTooLargeError
+    );
+
+    const [row] = await db.select().from(operation_ledgers).where(eq(operation_ledgers.id, rowId));
+    expect(row?.status).toBe('reconcile_pending');
+    expect(row?.canonical_result).toMatchObject({
+      cloudAgentSessionId: 'agent_allocated',
+      kiloSessionId: 'ses_allocated',
+    });
+    expect(row?.canonical_result).not.toHaveProperty('pad');
+
+    // The next same-key admit reports the recorded IDs for reconciliation.
+    const retry = await admitSession('reconcile-progress-user', admitted.row.operation_key);
+    expect(retry.admission).toBe('duplicate_reconcile_pending');
+    if (retry.admission !== 'duplicate_reconcile_pending') return;
+    expect(retry.row.canonical_result).toMatchObject({
+      cloudAgentSessionId: 'agent_allocated',
+      kiloSessionId: 'ses_allocated',
+    });
+  });
+
   it('merges recordOperationProgress into canonical_result while admitted', async () => {
     const admitted = await admitSession('progress-user');
     if (admitted.admission !== 'admitted') return;

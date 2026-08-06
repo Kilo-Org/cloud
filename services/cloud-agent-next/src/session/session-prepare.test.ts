@@ -936,4 +936,96 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       replayed: true,
     });
   });
+
+  it('regression: fresh allocation under reconcile_pending persists IDs so the next retry reconciles instead of allocating a third session', async () => {
+    // The row is already reconcile-pending from an earlier unknown-transport
+    // outcome whose recorded IDs are stale (the ownership row is gone). The
+    // ladder must allocate fresh IDs and record them even though the row is
+    // `reconcile_pending`, not `admitted`.
+    admitOperationMock
+      .mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({
+          status: 'reconcile_pending',
+          canonical_result: {
+            cloudAgentSessionId: 'agent_stale_a',
+            kiloSessionId: 'ses_stale_a',
+            initialMessageId: 'msg_stale_a',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({
+          status: 'reconcile_pending',
+          canonical_result: canonicalIds,
+        }),
+      });
+
+    // Attempt 1: stale-A ownership lookup is absent (fresh create), then the
+    // distinct-id lookup for the fresh create. Attempt 2: fresh-B ownership
+    // lookup is present, then the distinct-id lookup for the settle.
+    getPgDbMock.mockReturnValue(
+      makeDb([
+        [],
+        [{ email: 'test@example.com' }],
+        [{ sessionId: KILO_SESSION_ID }],
+        [{ email: 'test@example.com' }],
+      ])
+    );
+
+    // Unknown transport on the fresh allocation's DO call; any hypothetical
+    // third allocation would hit the default stub and fail the call-count
+    // assertions below.
+    const doStub = makeDoStub({
+      createSessionWithInitialAdmission: vi.fn().mockRejectedValueOnce(new Error('rpc timed out')),
+    });
+    const ctx = makeContext(doStub);
+
+    // First retry: fresh allocation, then unknown transport.
+    await expect(
+      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
+        operationKey: OPERATION_KEY,
+        startedAt: 1_700_000_000_000,
+      })
+    ).rejects.toThrow('rpc timed out');
+
+    // The fresh allocation recorded its new IDs on the reconcile_pending row
+    // and the unknown transport kept the row reconcile-pending.
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+    });
+    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), {
+      rowId: ROW_ID,
+    });
+
+    // Second retry: reconciles the freshly recorded IDs; no third allocation.
+    const result = await createSessionWithLedger(
+      makeRequest({ options: { operationKey: OPERATION_KEY } }),
+      ctx,
+      { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 }
+    );
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+  });
 });

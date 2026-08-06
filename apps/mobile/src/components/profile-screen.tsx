@@ -13,6 +13,7 @@ import {
   MessageSquare,
   ShieldCheck,
   SlidersHorizontal,
+  Smartphone,
   Trash2,
 } from 'lucide-react-native';
 import { Alert, Platform, View } from 'react-native';
@@ -302,9 +303,18 @@ export function ProfileScreen() {
             title="Preferences"
             subtitle="Thinking and screen behavior"
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Smartphone}
+            title="Device sessions"
+            subtitle="Review and sign out other devices"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/device-sessions' as Href);
             }}
           />
         </View>

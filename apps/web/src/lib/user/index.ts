@@ -817,18 +817,22 @@ export async function linkAccountToExistingUser(
   });
 
   if (!linkResult.success) {
-    captureException(new Error(`Account linking failed: ${linkResult.error}`), {
-      tags: {
-        operation: 'account_linking',
-        provider: authProviderData.provider,
-      },
-      extra: {
-        existing_user_id: existingKiloUserId,
-        provider_email: authProviderData.google_user_email,
-        provider_account_id: authProviderData.provider_account_id,
-        error_code: linkResult.error,
-      },
-    });
+    // ACCOUNT-ALREADY-LINKED and PROVIDER-ALREADY-LINKED are expected user
+    // errors; only LINKING-FAILED indicates a system failure worth Sentry.
+    if (linkResult.error === 'LINKING-FAILED') {
+      captureException(new Error(`Account linking failed: ${linkResult.error}`), {
+        tags: {
+          operation: 'account_linking',
+          provider: authProviderData.provider,
+        },
+        extra: {
+          existing_user_id: existingKiloUserId,
+          provider_email: authProviderData.google_user_email,
+          provider_account_id: authProviderData.provider_account_id,
+          error_code: linkResult.error,
+        },
+      });
+    }
 
     return linkResult;
   }

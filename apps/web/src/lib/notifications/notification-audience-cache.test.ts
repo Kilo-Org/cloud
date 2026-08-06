@@ -1,15 +1,16 @@
 import { redisClient } from '@/lib/redis';
 import { executeSnowflakeStatement, resolveSnowflakeConfig } from '@/lib/snowflake';
 import {
+  getAutoModelsForUser,
   getByokProvidersForUser,
-  getDeprecatedAutoModelsForUser,
-  groupDeprecatedAutoModelsByUser,
+  groupAutoModelsByUser,
   groupProvidersByUser,
-  parseDeprecatedAutoModelRows,
+  parseAutoModelRows,
+  syncAutoModelNotificationsToRedis,
   syncByokProviderNotificationsToRedis,
-  syncDeprecatedAutoModelNotificationsToRedis,
+  syncNotificationAudiencesToRedis,
+  type AutoModelRow,
   type ByokProviderRow,
-  type DeprecatedAutoModelRow,
 } from './notification-audience-cache';
 
 type PipelineSet = { key: string; value: string; opts?: { ex?: number } };
@@ -120,50 +121,51 @@ describe('syncByokProviderNotificationsToRedis', () => {
   });
 });
 
-describe('deprecated auto model audience', () => {
+describe('Auto model audience', () => {
   it('parses, groups, and de-duplicates Snowflake rows', () => {
-    const rows = parseDeprecatedAutoModelRows([
-      ['user_a', 'kilo-auto/balanced'],
-      ['user_a', 'kilo-auto/balanced'],
-      ['user_b', 'kilo-auto/balanced'],
+    const rows = parseAutoModelRows([
+      ['user_a', '["kilo-auto/balanced","kilo-auto/frontier"]'],
+      ['user_a', '["kilo-auto/frontier"]'],
+      ['user_b', '["kilo-auto/efficient"]'],
     ]);
 
-    const grouped = groupDeprecatedAutoModelsByUser(rows);
+    const grouped = groupAutoModelsByUser(rows);
 
-    expect(grouped.get('user_a')).toEqual(['kilo-auto/balanced']);
-    expect(grouped.get('user_b')).toEqual(['kilo-auto/balanced']);
+    expect(grouped.get('user_a')).toEqual(['kilo-auto/balanced', 'kilo-auto/frontier']);
+    expect(grouped.get('user_b')).toEqual(['kilo-auto/efficient']);
   });
 
-  it('rejects unexpected Snowflake model ids', () => {
-    expect(() => parseDeprecatedAutoModelRows([['user_a', 'kilo-auto/frontier']])).toThrow(
-      'Failed to parse deprecated auto model rows'
+  it('rejects malformed or empty Snowflake model arrays', () => {
+    expect(() => parseAutoModelRows([['user_a', 'not-json']])).toThrow(
+      'Failed to parse Auto model rows'
     );
+    expect(() => parseAutoModelRows([['user_a', '[]']])).toThrow('Failed to parse Auto model rows');
   });
 
   it('writes one entry per user with the model array and a 7-day TTL', async () => {
-    const rows: DeprecatedAutoModelRow[] = [
-      { userId: 'user_a', modelId: 'kilo-auto/balanced' },
-      { userId: 'user_b', modelId: 'kilo-auto/balanced' },
+    const rows: AutoModelRow[] = [
+      { userId: 'user_a', modelIds: ['kilo-auto/balanced', 'kilo-auto/frontier'] },
+      { userId: 'user_b', modelIds: ['kilo-auto/efficient'] },
     ];
 
-    const result = await syncDeprecatedAutoModelNotificationsToRedis(async () => rows);
+    const result = await syncAutoModelNotificationsToRedis(async () => rows);
 
     expect(result).toEqual({ rowCount: 2, userCount: 2 });
     expect(mockPipelineSets).toEqual([
       {
-        key: 'notification:deprecated-auto-models:user_a',
-        value: JSON.stringify(['kilo-auto/balanced']),
+        key: 'notification:auto-models:user_a',
+        value: JSON.stringify(['kilo-auto/balanced', 'kilo-auto/frontier']),
         opts: { ex: SEVEN_DAYS_SECONDS },
       },
       {
-        key: 'notification:deprecated-auto-models:user_b',
-        value: JSON.stringify(['kilo-auto/balanced']),
+        key: 'notification:auto-models:user_b',
+        value: JSON.stringify(['kilo-auto/efficient']),
         opts: { ex: SEVEN_DAYS_SECONDS },
       },
     ]);
   });
 
-  it('queries recent successful usage from Snowflake with the deprecated model bindings', async () => {
+  it('queries all recent successful Auto model usage from Snowflake', async () => {
     const config = {
       accountHost: 'account.snowflakecomputing.com',
       jwtAccountIdentifier: 'account',
@@ -176,18 +178,20 @@ describe('deprecated auto model audience', () => {
       publicKeyFingerprint: 'SHA256:fingerprint',
     };
     mockedResolveSnowflakeConfig.mockReturnValueOnce(config);
-    mockedExecuteSnowflakeStatement.mockResolvedValueOnce([['user_a', 'kilo-auto/balanced']]);
+    mockedExecuteSnowflakeStatement.mockResolvedValueOnce([
+      ['user_a', '["kilo-auto/balanced","kilo-auto/frontier"]'],
+      ['user_b', '["kilo-auto/efficient"]'],
+    ]);
 
-    await expect(syncDeprecatedAutoModelNotificationsToRedis()).resolves.toEqual({
-      rowCount: 1,
-      userCount: 1,
+    await expect(syncAutoModelNotificationsToRedis()).resolves.toEqual({
+      rowCount: 2,
+      userCount: 2,
     });
     expect(mockedExecuteSnowflakeStatement).toHaveBeenCalledWith({
       config,
       statement: expect.stringMatching(
-        /from microdollar_usage_daily[\s\S]*usage_date >= dateadd\(week, -1, current_date\(\)\)[\s\S]*auto_model in \(\?\)[\s\S]*total_output_tokens > 0/
+        /array_agg\(distinct auto_model\)[\s\S]*from microdollar_usage_daily[\s\S]*auto_model is not null[\s\S]*group by kilo_user_id/
       ),
-      bindings: [{ type: 'TEXT', value: 'kilo-auto/balanced' }],
       timeoutSeconds: 60,
     });
   });
@@ -195,10 +199,76 @@ describe('deprecated auto model audience', () => {
   it('fails when Snowflake is not configured', async () => {
     mockedResolveSnowflakeConfig.mockReturnValueOnce(null);
 
-    await expect(syncDeprecatedAutoModelNotificationsToRedis()).rejects.toThrow(
+    await expect(syncAutoModelNotificationsToRedis()).rejects.toThrow(
       'Snowflake is not configured'
     );
     expect(mockedExecuteSnowflakeStatement).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncNotificationAudiencesToRedis', () => {
+  it('returns both audience results after both syncs complete', async () => {
+    await expect(
+      syncNotificationAudiencesToRedis({
+        byokProviders: async () => ({ rowCount: 3, userCount: 2 }),
+        autoModels: async () => ({ rowCount: 4, userCount: 3 }),
+      })
+    ).resolves.toEqual({
+      byokProviders: { rowCount: 3, userCount: 2 },
+      autoModels: { rowCount: 4, userCount: 3 },
+    });
+  });
+
+  it('waits for the other audience before reporting an aggregated failure', async () => {
+    let finishByokSync: ((result: { rowCount: number; userCount: number }) => void) | undefined;
+    let reportAutoFailure: (() => void) | undefined;
+    const byokSync = new Promise<{ rowCount: number; userCount: number }>(resolve => {
+      finishByokSync = resolve;
+    });
+    const autoFailureReported = new Promise<void>(resolve => {
+      reportAutoFailure = resolve;
+    });
+    const syncPromise = syncNotificationAudiencesToRedis({
+      byokProviders: () => byokSync,
+      autoModels: async () => {
+        reportAutoFailure?.();
+        throw new Error('Snowflake unavailable');
+      },
+    });
+    let rejected = false;
+    void syncPromise.catch(() => {
+      rejected = true;
+    });
+
+    await autoFailureReported;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(rejected).toBe(false);
+
+    finishByokSync?.({ rowCount: 3, userCount: 2 });
+    await expect(syncPromise).rejects.toMatchObject({
+      name: 'AggregateError',
+      message: 'Failed to sync notification audiences: autoModels',
+    });
+  });
+
+  it('aggregates all failed audience names and reasons', async () => {
+    const byokError = new Error('PostHog unavailable');
+    const autoModelsError = new Error('Snowflake unavailable');
+
+    await expect(
+      syncNotificationAudiencesToRedis({
+        byokProviders: async () => {
+          throw byokError;
+        },
+        autoModels: async () => {
+          throw autoModelsError;
+        },
+      })
+    ).rejects.toMatchObject({
+      name: 'AggregateError',
+      message: 'Failed to sync notification audiences: byokProviders, autoModels',
+      errors: [byokError, autoModelsError],
+    });
   });
 });
 
@@ -223,23 +293,29 @@ describe('getByokProvidersForUser', () => {
   });
 });
 
-describe('getDeprecatedAutoModelsForUser', () => {
+describe('getAutoModelsForUser', () => {
   it('returns the parsed model array for the user', async () => {
-    mockedRedisGet.mockResolvedValueOnce(JSON.stringify(['kilo-auto/balanced']));
+    mockedRedisGet.mockResolvedValueOnce(
+      JSON.stringify(['kilo-auto/balanced', 'kilo-auto/frontier', 'kilo-auto/efficient'])
+    );
 
-    await expect(getDeprecatedAutoModelsForUser('user_a')).resolves.toEqual(['kilo-auto/balanced']);
-    expect(mockedRedisGet).toHaveBeenCalledWith('notification:deprecated-auto-models:user_a');
+    await expect(getAutoModelsForUser('user_a')).resolves.toEqual([
+      'kilo-auto/balanced',
+      'kilo-auto/frontier',
+      'kilo-auto/efficient',
+    ]);
+    expect(mockedRedisGet).toHaveBeenCalledWith('notification:auto-models:user_a');
   });
 
   it('returns an empty array when there is no cached entry', async () => {
     mockedRedisGet.mockResolvedValueOnce(null);
 
-    await expect(getDeprecatedAutoModelsForUser('user_a')).resolves.toEqual([]);
+    await expect(getAutoModelsForUser('user_a')).resolves.toEqual([]);
   });
 
   it('fails open to an empty array when the cached value is malformed', async () => {
-    mockedRedisGet.mockResolvedValueOnce(JSON.stringify(['kilo-auto/frontier']));
+    mockedRedisGet.mockResolvedValueOnce(JSON.stringify(['kilo-auto/frontier', 42]));
 
-    await expect(getDeprecatedAutoModelsForUser('user_a')).resolves.toEqual([]);
+    await expect(getAutoModelsForUser('user_a')).resolves.toEqual([]);
   });
 });

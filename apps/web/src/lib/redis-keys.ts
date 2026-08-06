@@ -56,9 +56,9 @@ export const codingPlanUsageRedisKey = (input: {
     `coding-plan-usage:v1:${input.userId}:${input.subscriptionId}:${input.planId}:${input.providerId}:${input.inventoryId}`
   );
 
-/** Per-user list of deprecated Auto model ids used recently. */
-export const deprecatedAutoModelsNotificationRedisKey = (userId: string) =>
-  redisKey(`notification:deprecated-auto-models:${userId}`);
+/** Per-user list of Auto model ids used recently. */
+export const autoModelsNotificationRedisKey = (userId: string) =>
+  redisKey(`notification:auto-models:${userId}`);
 
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'

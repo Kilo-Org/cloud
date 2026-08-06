@@ -3,8 +3,8 @@ import * as z from 'zod';
 import { posthogQuery } from '@/lib/posthog-query';
 import { redisClient } from '@/lib/redis';
 import {
+  autoModelsNotificationRedisKey,
   byokProvidersNotificationRedisKey,
-  deprecatedAutoModelsNotificationRedisKey,
   type RedisKey,
 } from '@/lib/redis-keys';
 import {
@@ -118,15 +118,17 @@ group by u.id, ev.properties.apiProvider
 limit 5e5
 `;
 
-export const DEPRECATED_AUTO_MODEL_IDS = ['kilo-auto/balanced'] as const;
-
-const DEPRECATED_AUTO_MODELS_QUERY = `
-select distinct kilo_user_id, auto_model
+const AUTO_MODELS_QUERY = `
+select
+  kilo_user_id,
+  to_json(array_agg(distinct auto_model) within group (order by auto_model)) as auto_models
 from microdollar_usage_daily
 where usage_date >= dateadd(week, -1, current_date())
-  and auto_model in (?)
+  and auto_model is not null
+  and auto_model != ''
   and total_output_tokens > 0
   and kilo_user_id is not null
+group by kilo_user_id
 limit 500000
 `;
 
@@ -135,19 +137,26 @@ const byokProviderRowsSchema = z.array(
 );
 
 const cachedProvidersSchema = z.array(z.string());
-const deprecatedAutoModelIdSchema = z.enum(DEPRECATED_AUTO_MODEL_IDS);
-const deprecatedAutoModelRowsSchema = z.array(
+const autoModelIdsSchema = z.array(z.string().min(1)).min(1);
+const serializedAutoModelIdsSchema = z.preprocess(value => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}, autoModelIdsSchema);
+const autoModelRowsSchema = z.array(
   z
-    .tuple([z.string().min(1), deprecatedAutoModelIdSchema])
-    .transform(([userId, modelId]) => ({ userId, modelId }))
+    .tuple([z.string().min(1), serializedAutoModelIdsSchema])
+    .transform(([userId, modelIds]) => ({ userId, modelIds }))
 );
-const cachedDeprecatedAutoModelsSchema = z.array(deprecatedAutoModelIdSchema);
+const cachedAutoModelsSchema = autoModelIdsSchema;
 
 export type ByokProviderRow = { userId: string; provider: string };
 export type ByokProviderRowsFetcher = () => Promise<ByokProviderRow[]>;
-export type DeprecatedAutoModelId = z.infer<typeof deprecatedAutoModelIdSchema>;
-export type DeprecatedAutoModelRow = { userId: string; modelId: DeprecatedAutoModelId };
-export type DeprecatedAutoModelRowsFetcher = () => Promise<DeprecatedAutoModelRow[]>;
+export type AutoModelRow = { userId: string; modelIds: string[] };
+export type AutoModelRowsFetcher = () => Promise<AutoModelRow[]>;
 
 export function getByokProviderNotificationLabel(provider: string): string | undefined {
   return BYOK_PROVIDER_NOTIFICATION_LABELS[provider];
@@ -166,15 +175,15 @@ const fetchByokProviderRowsFromPosthog: ByokProviderRowsFetcher = async () => {
   return parsed.data;
 };
 
-export function parseDeprecatedAutoModelRows(rows: SnowflakeRow[]): DeprecatedAutoModelRow[] {
-  const parsed = deprecatedAutoModelRowsSchema.safeParse(rows);
+export function parseAutoModelRows(rows: SnowflakeRow[]): AutoModelRow[] {
+  const parsed = autoModelRowsSchema.safeParse(rows);
   if (!parsed.success) {
-    throw new Error(`Failed to parse deprecated auto model rows: ${z.prettifyError(parsed.error)}`);
+    throw new Error(`Failed to parse Auto model rows: ${z.prettifyError(parsed.error)}`);
   }
   return parsed.data;
 }
 
-const fetchDeprecatedAutoModelRowsFromSnowflake: DeprecatedAutoModelRowsFetcher = async () => {
+const fetchAutoModelRowsFromSnowflake: AutoModelRowsFetcher = async () => {
   const config = resolveSnowflakeConfig();
   if (!config) {
     throw new Error('Snowflake is not configured');
@@ -182,12 +191,11 @@ const fetchDeprecatedAutoModelRowsFromSnowflake: DeprecatedAutoModelRowsFetcher 
 
   const rows = await executeSnowflakeStatement({
     config,
-    statement: DEPRECATED_AUTO_MODELS_QUERY,
-    bindings: DEPRECATED_AUTO_MODEL_IDS.map(value => ({ type: 'TEXT' as const, value })),
+    statement: AUTO_MODELS_QUERY,
     timeoutSeconds: 60,
   });
 
-  return parseDeprecatedAutoModelRows(rows);
+  return parseAutoModelRows(rows);
 };
 
 export function groupProvidersByUser(rows: ByokProviderRow[]): Map<string, string[]> {
@@ -205,17 +213,14 @@ export function groupProvidersByUser(rows: ByokProviderRow[]): Map<string, strin
   return byUser;
 }
 
-export function groupDeprecatedAutoModelsByUser(
-  rows: DeprecatedAutoModelRow[]
-): Map<string, DeprecatedAutoModelId[]> {
-  const byUser = new Map<string, DeprecatedAutoModelId[]>();
-  for (const { userId, modelId } of rows) {
-    const existing = byUser.get(userId);
-    if (existing) {
+export function groupAutoModelsByUser(rows: AutoModelRow[]): Map<string, string[]> {
+  const byUser = new Map<string, string[]>();
+  for (const { userId, modelIds } of rows) {
+    const existing = byUser.get(userId) ?? [];
+    for (const modelId of modelIds) {
       if (!existing.includes(modelId)) existing.push(modelId);
-    } else {
-      byUser.set(userId, [modelId]);
     }
+    byUser.set(userId, existing);
   }
   return byUser;
 }
@@ -252,31 +257,52 @@ export async function syncByokProviderNotificationsToRedis(
   return { rowCount: rows.length, userCount: byUser.size };
 }
 
-export async function syncDeprecatedAutoModelNotificationsToRedis(
-  fetchRows: DeprecatedAutoModelRowsFetcher = fetchDeprecatedAutoModelRowsFromSnowflake
+export async function syncAutoModelNotificationsToRedis(
+  fetchRows: AutoModelRowsFetcher = fetchAutoModelRowsFromSnowflake
 ): Promise<SyncNotificationAudienceResult> {
   const rows = await fetchRows();
-  const byUser = groupDeprecatedAutoModelsByUser(rows);
-  await writeNotificationAudienceEntries(
-    [...byUser.entries()],
-    deprecatedAutoModelsNotificationRedisKey
-  );
+  const byUser = groupAutoModelsByUser(rows);
+  await writeNotificationAudienceEntries([...byUser.entries()], autoModelsNotificationRedisKey);
 
   return { rowCount: rows.length, userCount: byUser.size };
 }
 
 export type SyncNotificationAudiencesResult = {
   byokProviders: SyncNotificationAudienceResult;
-  deprecatedAutoModels: SyncNotificationAudienceResult;
+  autoModels: SyncNotificationAudienceResult;
 };
 
-export async function syncNotificationAudiencesToRedis(): Promise<SyncNotificationAudiencesResult> {
-  const [byokProviders, deprecatedAutoModels] = await Promise.all([
-    syncByokProviderNotificationsToRedis(),
-    syncDeprecatedAutoModelNotificationsToRedis(),
+type NotificationAudienceSyncers = {
+  byokProviders: () => Promise<SyncNotificationAudienceResult>;
+  autoModels: () => Promise<SyncNotificationAudienceResult>;
+};
+
+export async function syncNotificationAudiencesToRedis(
+  syncers: NotificationAudienceSyncers = {
+    byokProviders: syncByokProviderNotificationsToRedis,
+    autoModels: syncAutoModelNotificationsToRedis,
+  }
+): Promise<SyncNotificationAudiencesResult> {
+  const [byokProviders, autoModels] = await Promise.allSettled([
+    Promise.resolve().then(() => syncers.byokProviders()),
+    Promise.resolve().then(() => syncers.autoModels()),
   ]);
 
-  return { byokProviders, deprecatedAutoModels };
+  if (byokProviders.status === 'fulfilled' && autoModels.status === 'fulfilled') {
+    return { byokProviders: byokProviders.value, autoModels: autoModels.value };
+  }
+
+  const failures: { audience: keyof NotificationAudienceSyncers; reason: unknown }[] = [];
+  if (byokProviders.status === 'rejected') {
+    failures.push({ audience: 'byokProviders', reason: byokProviders.reason });
+  }
+  if (autoModels.status === 'rejected') {
+    failures.push({ audience: 'autoModels', reason: autoModels.reason });
+  }
+  throw new AggregateError(
+    failures.map(failure => failure.reason),
+    `Failed to sync notification audiences: ${failures.map(failure => failure.audience).join(', ')}`
+  );
 }
 
 // Returns [] for a missing or malformed entry, so callers fail open and skip
@@ -293,14 +319,12 @@ export async function getByokProvidersForUser(userId: string): Promise<string[]>
   }
 }
 
-export async function getDeprecatedAutoModelsForUser(
-  userId: string
-): Promise<DeprecatedAutoModelId[]> {
-  const cached = await redisClient.get<string>(deprecatedAutoModelsNotificationRedisKey(userId));
+export async function getAutoModelsForUser(userId: string): Promise<string[]> {
+  const cached = await redisClient.get<string>(autoModelsNotificationRedisKey(userId));
   if (cached === null) return [];
 
   try {
-    const parsed = cachedDeprecatedAutoModelsSchema.safeParse(JSON.parse(cached));
+    const parsed = cachedAutoModelsSchema.safeParse(JSON.parse(cached));
     return parsed.success ? parsed.data : [];
   } catch {
     return [];

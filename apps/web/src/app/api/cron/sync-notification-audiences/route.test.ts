@@ -41,7 +41,7 @@ describe('GET /api/cron/sync-notification-audiences', () => {
   it('runs the sync and reports counts on success', async () => {
     mockedSync.mockResolvedValueOnce({
       byokProviders: { rowCount: 3, userCount: 2 },
-      deprecatedAutoModels: { rowCount: 4, userCount: 3 },
+      autoModels: { rowCount: 4, userCount: 3 },
     });
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
@@ -50,7 +50,7 @@ describe('GET /api/cron/sync-notification-audiences', () => {
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.byokProviders).toEqual({ rowCount: 3, userCount: 2 });
-    expect(body.deprecatedAutoModels).toEqual({ rowCount: 4, userCount: 3 });
+    expect(body.autoModels).toEqual({ rowCount: 4, userCount: 3 });
     expect(body.timestamp).toEqual(expect.any(String));
     expect(mockedSync).toHaveBeenCalledTimes(1);
   });

@@ -7,9 +7,9 @@ import type { UserOrganizationWithSeats } from '@/lib/organizations/organization
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
 import {
+  getAutoModelsForUser,
   getByokProviderNotificationLabel,
   getByokProvidersForUser,
-  getDeprecatedAutoModelsForUser,
 } from '@/lib/notifications/notification-audience-cache';
 
 import { fromMicrodollars } from '@/lib/utils';
@@ -39,6 +39,12 @@ export type KiloNotification = {
   // its axios User-Agent. Used to target end-of-life notices at legacy-extension users.
   showOnlyOnLegacyExtension?: boolean;
 };
+
+const DEPRECATED_AUTO_MODEL_IDS: ReadonlySet<string> = new Set(['kilo-auto/balanced']);
+
+export function hasDeprecatedAutoModel(models: string[]): boolean {
+  return models.some(model => DEPRECATED_AUTO_MODEL_IDS.has(model));
+}
 
 /**
  * Decide whether a legacy-targeted notification should be shown to a client.
@@ -352,8 +358,8 @@ async function generateDeprecatedAutoModelsNotification(
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
   try {
-    const models = await getDeprecatedAutoModelsForUser(user.id);
-    if (models.length === 0) return [];
+    const models = await getAutoModelsForUser(user.id);
+    if (!hasDeprecatedAutoModel(models)) return [];
 
     return [
       {

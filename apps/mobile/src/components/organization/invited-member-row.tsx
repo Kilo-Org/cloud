@@ -1,8 +1,8 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { Alert, Pressable, Share, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
+import { useAppActionSheet } from '@/lib/a11y/motion';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
 import { cn, formatDate, parseTimestamp } from '@/lib/utils';
@@ -32,7 +32,7 @@ export function InvitedMemberRow({
   last,
 }: Readonly<InvitedMemberRowProps>) {
   const { bottom } = useSafeAreaInsets();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const { showActionSheetWithOptions } = useAppActionSheet();
   const mutations = useOrganizationMutations(organizationId);
   const dateLabel = inviteDateLabel(invite.inviteDate);
 

@@ -6,6 +6,7 @@ import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
+import { ReducedMotionSheetHost } from '@/components/ui/reduced-motion-sheet';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { OrganizationProvider } from '@/lib/organization-context';
@@ -27,6 +28,10 @@ export function AppRootProviders({ children }: { readonly children: ReactNode })
                 <>
                   {children}
                   <PortalHost />
+                  {/* Reduced-motion sheet host sits beside ActionSheetProvider so
+                      Android Reduce Motion can show a non-animated option list
+                      (D21). Native Modal renders above every sibling when open. */}
+                  <ReducedMotionSheetHost />
                   {/*
                     Toaster mounts last so it renders above PortalHost overlays (sheets/dropdowns
                     built on @rn-primitives/portal) — last sibling wins for overlapping overlays.

@@ -1,4 +1,3 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react-native';
@@ -10,6 +9,7 @@ import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useAppActionSheet } from '@/lib/a11y/motion';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
@@ -25,7 +25,7 @@ type CreditsCardProps = {
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const { showActionSheetWithOptions } = useAppActionSheet();
   const { bottom } = useSafeAreaInsets();
   const { organizationId, setOrganizationId } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;

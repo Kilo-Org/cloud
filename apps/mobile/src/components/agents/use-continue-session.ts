@@ -1,7 +1,6 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from 'jotai';
 import { toast } from 'sonner-native';
@@ -25,6 +24,7 @@ import {
   getSpawnedAgentSessionPath,
 } from '@/components/agents/session-detail-routes';
 import { type useSessionManager } from '@/components/agents/session-provider';
+import { useAppActionSheet } from '@/lib/a11y/motion';
 import { putSharePayload } from '@/lib/share-payload';
 import { appendShareParams } from '@/lib/share-navigation';
 import {
@@ -63,7 +63,7 @@ export function useContinueSession(args: {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const store = useStore();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const { showActionSheetWithOptions } = useAppActionSheet();
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);

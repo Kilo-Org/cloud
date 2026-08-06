@@ -1,4 +1,3 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { formatDollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
@@ -6,6 +5,7 @@ import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
+import { useAppActionSheet } from '@/lib/a11y/motion';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
@@ -37,7 +37,7 @@ export function MemberRow({
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const { showActionSheetWithOptions } = useAppActionSheet();
   const mutations = useOrganizationMutations(organizationId);
   const displayName = firstNonEmpty(member.name, member.email);
 

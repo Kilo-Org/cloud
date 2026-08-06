@@ -31,12 +31,11 @@ export function UserWebConnectionProvider({ children }: Readonly<UserWebConnecti
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
   });
 
-  useEffect(() => {
-    const connection = connectionRef.current;
-    return () => {
-      connection?.destroy();
-    };
-  }, []);
+  // Retain the connection for the provider lifetime. The retain return value
+  // IS the release, so the effect cleanup releases it; zero retains stops the
+  // socket reversibly. An effect replay (StrictMode development double-mount)
+  // re-retains and reconnects instead of destroying the connection.
+  useEffect(() => connectionRef.current?.retain(), []);
 
   return (
     <UserWebConnectionContext.Provider value={connectionRef.current}>

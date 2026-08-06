@@ -5,6 +5,7 @@ import {
   assistantMessage,
   findElementByType,
   findText,
+  pressableProps,
   renderBubble,
   userMessage,
 } from './message-bubble-test-utils';
@@ -226,6 +227,32 @@ describe('MessageBubble in-bubble text selection context', () => {
     const provider = findProvider(tree, InMessageBubbleContext.Provider);
     expect(provider).not.toBeNull();
     expect(provider?.props.value).toBe(true);
+  });
+});
+
+describe('MessageBubble row rhythm', () => {
+  // Spacing class contract: two parts of one assistant message sit gap-2
+  // apart; two adjacent messages sit py-1 + py-1 apart, the same value; the
+  // user wrapper carries the same py-1, so user/assistant boundaries keep the
+  // rhythm. One value, three class assertions.
+  it('applies the uniform row-rhythm class contract', async () => {
+    // Two visible parts in one assistant message: the parts container spaces
+    // them with gap-2.
+    const multiPart = assistantMessage('rhythm-a');
+    multiPart.parts = [
+      { id: 'rhythm-a-1', sessionID: 'ses_1', messageID: 'rhythm-a', type: 'text', text: 'one' },
+      { id: 'rhythm-a-2', sessionID: 'ses_1', messageID: 'rhythm-a', type: 'text', text: 'two' },
+    ] as typeof multiPart.parts;
+    const assistantTree = await renderBubble(multiPart);
+    const parts = findElementByType(assistantTree, 'View', p => p.className === 'gap-2');
+    expect(parts).not.toBeNull();
+
+    const assistantPressable = pressableProps(assistantTree);
+    expect(assistantPressable?.className).toBe('px-4 py-1');
+
+    const userTree = await renderBubble(userMessage('rhythm-b'));
+    const userPressable = pressableProps(userTree);
+    expect(userPressable?.className).toBe('px-4 py-1');
   });
 });
 

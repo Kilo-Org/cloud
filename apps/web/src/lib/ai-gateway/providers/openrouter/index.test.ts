@@ -223,6 +223,42 @@ describe('auto models', () => {
   });
 });
 
+describe('reasoning variants', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('only adds fallback variants when reasoning is supported', async () => {
+    const unsupportedId = 'anthropic/claude-without-reasoning';
+    const supportedId = 'anthropic/claude-with-reasoning';
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              buildModel({
+                id: unsupportedId,
+                supported_parameters: ['max_tokens', 'tools'],
+              }),
+              buildModel({
+                id: supportedId,
+                supported_parameters: ['max_tokens', 'tools', 'reasoning'],
+              }),
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(
+      models.data.find(model => model.id === unsupportedId)?.opencode?.variants
+    ).toBeUndefined();
+    expect(models.data.find(model => model.id === supportedId)?.opencode?.variants).toBeDefined();
+  });
+});
+
 describe('disabled paid Kilo-exclusive model fallback', () => {
   beforeEach(() => {
     kiloExclusiveModels.push(disabledPaidModel);

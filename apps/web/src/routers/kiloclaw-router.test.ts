@@ -59,7 +59,9 @@ jest.mock('@/lib/stripe-client', () => {
       release: jest.fn(),
       retrieve: jest.fn(),
     },
-    checkout: { sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() } },
+    checkout: {
+      sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() },
+    },
     billingPortal: { sessions: { create: jest.fn() } },
     invoices: { list: jest.fn() },
   };
@@ -149,7 +151,10 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 // fetch/verify/kilo-chat path (covered by install-dispatch.test.ts).
 jest.mock('@/lib/kiloclaw/install-dispatch', () => {
   const dispatchInstallFromSource = jest.fn();
-  return { dispatchInstallFromSource, __dispatchInstallFromSource: dispatchInstallFromSource };
+  return {
+    dispatchInstallFromSource,
+    __dispatchInstallFromSource: dispatchInstallFromSource,
+  };
 });
 
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
@@ -227,12 +232,13 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
   // Method syntax (bivariant params) so the real caller's narrower
   // `source: 'byte'` input stays assignable while tests can pass an arbitrary
   // string for the input-validation case.
-  installFromSource(input: {
-    source: string;
-    slug: string;
-    signature: string;
-  }): Promise<
-    | { ok: true; conversationId: string; messageId: string; conversationCreated: boolean }
+  installFromSource(input: { source: string; slug: string; signature: string }): Promise<
+    | {
+        ok: true;
+        conversationId: string;
+        messageId: string;
+        conversationCreated: boolean;
+      }
     | { ok: false; code: 'no_instance' }
   >;
 };
@@ -256,7 +262,10 @@ async function createActivePersonalInstance(userId: string): Promise<string> {
 }
 
 function wttrFormat3Response(text: string, status = 200): Response {
-  return new Response(text, { status, headers: { 'Content-Type': 'text/plain' } });
+  return new Response(text, {
+    status,
+    headers: { 'Content-Type': 'text/plain' },
+  });
 }
 
 const WTTR_SERVICE_UNAVAILABLE_MESSAGE =
@@ -308,7 +317,9 @@ describe('kiloclawRouter validateWeatherLocation', () => {
       );
     const caller = createCaller({ user });
 
-    const result = await caller.validateWeatherLocation({ location: ' Amsterdam ' });
+    const result = await caller.validateWeatherLocation({
+      location: ' Amsterdam ',
+    });
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(fetchSpy).toHaveBeenNthCalledWith(
@@ -349,7 +360,9 @@ describe('kiloclawRouter validateWeatherLocation', () => {
       );
     const caller = createCaller({ user });
 
-    const result = await caller.validateWeatherLocation({ location: '53.2167,6.5667' });
+    const result = await caller.validateWeatherLocation({
+      location: '53.2167,6.5667',
+    });
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
@@ -396,7 +409,9 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-timeout-test-${Math.random()}@example.com`,
     });
-    const timeoutError = Object.assign(new Error('timeout'), { name: 'TimeoutError' });
+    const timeoutError = Object.assign(new Error('timeout'), {
+      name: 'TimeoutError',
+    });
     fetchSpy.mockRejectedValue(timeoutError);
     const caller = createCaller({ user });
 
@@ -574,7 +589,9 @@ describe('kiloclawRouter latestVersion', () => {
     });
 
     const caller = createCaller({ user });
-    const result = await caller.latestVersion({ currentImageTag: 'current-tag' });
+    const result = await caller.latestVersion({
+      currentImageTag: 'current-tag',
+    });
 
     expect(result).toEqual({ imageTag: 'anonymous-tag' });
     expect(kiloclawClientMock.__getLatestVersionMock).toHaveBeenCalledWith();
@@ -627,12 +644,15 @@ describe('kiloclawRouter getNavState', () => {
 
     const result = await caller.getNavState();
 
-    expect(result).toEqual({ hasActiveInstance: false });
+    expect(result).toEqual({
+      hasActiveInstance: false,
+      hasCurrentPersonalSubscription: false,
+    });
     expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
     expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
   });
 
-  it('returns active personal instance presence without requiring subscription access', async () => {
+  it('returns active personal instance and canonical subscription presence without worker access', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-nav-present-${Math.random()}@example.com`,
     });
@@ -642,16 +662,26 @@ describe('kiloclawRouter getNavState', () => {
       user_id: user.id,
       sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
     });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+    });
     const caller = createCaller({ user });
 
     const result = await caller.getNavState();
 
-    expect(result).toEqual({ hasActiveInstance: true });
+    expect(result).toEqual({
+      hasActiveInstance: true,
+      hasCurrentPersonalSubscription: true,
+    });
     expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
     expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
   });
 
-  it('ignores destroyed personal instances', async () => {
+  it('ignores destroyed personal instances without subscription history', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-nav-destroyed-${Math.random()}@example.com`,
     });
@@ -666,7 +696,38 @@ describe('kiloclawRouter getNavState', () => {
 
     const result = await caller.getNavState();
 
-    expect(result).toEqual({ hasActiveInstance: false });
+    expect(result).toEqual({
+      hasActiveInstance: false,
+      hasCurrentPersonalSubscription: false,
+    });
+  });
+
+  it('does not expose KiloClaw navigation for canceled personal subscription history', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-canceled-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      destroyed_at: '2026-05-29T00:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'canceled',
+      payment_source: 'credits',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({
+      hasActiveInstance: false,
+      hasCurrentPersonalSubscription: false,
+    });
   });
 });
 
@@ -799,9 +860,15 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
         current_period_end: '2026-06-01T00:00:00.000Z',
         credit_renewal_at: '2026-06-01T00:00:00.000Z',
       })
-      .returning({ id: kiloclaw_subscriptions.id, instanceId: kiloclaw_subscriptions.instance_id });
+      .returning({
+        id: kiloclaw_subscriptions.id,
+        instanceId: kiloclaw_subscriptions.instance_id,
+      });
 
-    return { subscriptionId: subscription.id, instanceId: subscription.instanceId ?? instanceId };
+    return {
+      subscriptionId: subscription.id,
+      instanceId: subscription.instanceId ?? instanceId,
+    };
   }
 
   async function insertAppliedReferralReward(params: {
@@ -870,7 +937,9 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
       sourcePaymentId: `kiloclaw-subscription:${instanceId}:2026-04`,
     });
 
-    const billing = await createCaller({ user }).getActivePersonalBillingStatus();
+    const billing = await createCaller({
+      user,
+    }).getActivePersonalBillingStatus();
 
     expect(billing.subscription?.referralRewards).toEqual({
       totalAppliedMonths: 1,
@@ -901,7 +970,9 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
       sourcePaymentId: `kiloclaw-subscription:${instanceId}:other-user`,
     });
 
-    const billing = await createCaller({ user }).getActivePersonalBillingStatus();
+    const billing = await createCaller({
+      user,
+    }).getActivePersonalBillingStatus();
 
     expect(billing.subscription?.referralRewards).toEqual({
       totalAppliedMonths: 0,
@@ -921,7 +992,9 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
       sourcePaymentId: `kiloclaw-subscription:${instanceId}:detail`,
     });
 
-    const detail = await createCaller({ user }).getSubscriptionDetail({ instanceId });
+    const detail = await createCaller({ user }).getSubscriptionDetail({
+      instanceId,
+    });
 
     expect(detail.referralRewards).toEqual({
       totalAppliedMonths: 1,
@@ -1321,9 +1394,9 @@ describe('kiloclawRouter destroy', () => {
 });
 
 describe('kiloclawRouter installFromSource', () => {
-  const installDispatchMock = jest.requireMock<{ __dispatchInstallFromSource: AnyMock }>(
-    '@/lib/kiloclaw/install-dispatch'
-  );
+  const installDispatchMock = jest.requireMock<{
+    __dispatchInstallFromSource: AnyMock;
+  }>('@/lib/kiloclaw/install-dispatch');
 
   beforeEach(async () => {
     await cleanupDbForTest();
@@ -1355,7 +1428,11 @@ describe('kiloclawRouter installFromSource', () => {
     const caller = createCaller({ user });
 
     await expect(
-      caller.installFromSource({ source: 'byte', slug: 'deep-research', signature: 'sig' })
+      caller.installFromSource({
+        source: 'byte',
+        slug: 'deep-research',
+        signature: 'sig',
+      })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
   });
@@ -1421,7 +1498,11 @@ describe('kiloclawRouter installFromSource', () => {
     const caller = createCaller({ user });
 
     await expect(
-      caller.installFromSource({ source: 'hacker', slug: 'deep-research', signature: 'sig' })
+      caller.installFromSource({
+        source: 'hacker',
+        slug: 'deep-research',
+        signature: 'sig',
+      })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
   });

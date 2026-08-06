@@ -1,7 +1,8 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { createOperationCoordinator } from '@/components/agents/use-history-backfill';
 import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
 import {
   buildActiveSessionsTrayInput,
@@ -40,6 +41,16 @@ type UseAgentSessionsOptions = {
    * care (e.g. Home's session surface) keep the legacy behavior bit-for-bit.
    */
   sortBy?: AgentSessionSortBy;
+  /**
+   * Native window-focus (OS app foreground) refetch for the stored-sessions
+   * query. Defaults to React Query's native behavior (`true`) so Home and
+   * the Share Gate keep their foreground refresh. The Agents list passes
+   * `false`: its screen drives app-foreground refresh through an AppState
+   * callback that runs the wrapped `refetch` behind the shared operation
+   * coordinator, so the native query lifecycle must not start a stored
+   * refetch that bypasses that queue (see `buildStoredSessionsQueryOptions`).
+   */
+  refetchOnWindowFocus?: boolean;
 };
 
 type UseRecentAgentRepositoriesOptions = {
@@ -78,16 +89,33 @@ function getUpdatedSince(days: number): string {
 
 // ── Queries ──────────────────────────────────────────────────────────
 
+/**
+ * Build the stored-sessions infinite-query options shared by every stored
+ * refetch path on the Agents screen (focus return, pull-to-refresh, retry,
+ * departure trigger, backfill). Kept as a pure builder so the query options
+ * are executable-tested without mounting the hook.
+ */
+export function buildStoredSessionsQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  options?: UseAgentSessionsOptions
+) {
+  return trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
+    staleTime: 30_000,
+    enabled: options?.enabled,
+    getNextPageParam: lastPage => lastPage.nextCursor,
+    // Native window-focus refetch stays on by default so Home and the Share
+    // Gate keep their OS-foreground refresh. The Agents list opts out: its
+    // screen runs an AppState 'active' callback through the wrapped refetch,
+    // so the native query lifecycle must not start a stored refetch that
+    // bypasses the operation coordinator shared with backfill and departure.
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
+  });
+}
+
 function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
 
-  return useInfiniteQuery(
-    trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
-      staleTime: 30_000,
-      enabled: options?.enabled,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-    })
-  );
+  return useInfiniteQuery(buildStoredSessionsQueryOptions(trpc, options));
 }
 
 function useActiveSessions(options?: UseAgentSessionsOptions) {
@@ -175,6 +203,24 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const stored = useStoredSessions(options);
   const active = useActiveSessions(options);
 
+  // One coordinator per hook instance, shared by the stored list's next-page
+  // fetch and every stored refetch (focus return, pull-to-refresh, retry,
+  // departure trigger). The backfill selector's `isFetching` gate only sees
+  // the previous render, so the backfill effect and the focus effect can fire
+  // in the same commit; serializing both operations guarantees they never
+  // overlap the same infinite query. The query methods are aliased because
+  // React Query memoizes them, and listing the object itself would rebuild the
+  // callbacks every render (the backfill effect depends on their stability).
+  const enqueueStoredOperation = useMemo(() => createOperationCoordinator(), []);
+  const storedRefetchFn = stored.refetch;
+  const storedFetchNextPage = stored.fetchNextPage;
+  const storedRefetch = useCallback(async () => {
+    await enqueueStoredOperation(storedRefetchFn);
+  }, [enqueueStoredOperation, storedRefetchFn]);
+  const fetchNextPage = useCallback(async () => {
+    await enqueueStoredOperation(storedFetchNextPage);
+  }, [enqueueStoredOperation, storedFetchNextPage]);
+
   // A session can repeat across pages when it is updated while older pages
   // load (the cursor follows the selected sort field). Dedupe by session_id
   // using the shared collection helper.
@@ -213,7 +259,6 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // transition (first poll) is ignored, and the initial mount with a non-empty
   // set is ignored (no "before" to compare against).
   const previousActiveIdsRef = useRef<Set<string> | null>(null);
-  const refetch = stored.refetch;
   useEffect(() => {
     const previous = previousActiveIdsRef.current;
     previousActiveIdsRef.current = activeSessionIds;
@@ -228,9 +273,9 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
       }
     }
     if (departedId) {
-      void refetch();
+      void storedRefetch();
     }
-  }, [activeSessionIds, refetch]);
+  }, [activeSessionIds, storedRefetch]);
 
   return {
     storedSessions,
@@ -247,13 +292,23 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // vs "keep showing stale data") should use these instead of `isError`.
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
+    // Any stored-list fetch in flight (initial load, refetch, next page),
+    // used by the backfill selector to serialize automatic fetches behind
+    // user- or focus-driven refetches on the same infinite query. The selector
+    // only observes the previous render, so `createOperationCoordinator`
+    // closes the same-commit gap where the backfill effect and a focus
+    // refetch fire before these flags update.
+    storedIsFetching: stored.isFetching,
+    // Loaded stored pages; the backfill bound is `data.pages.length`, not the
+    // rendered row count, because active-set exclusion can hide whole pages.
+    storedLoadedPageCount: stored.data?.pages.length ?? 0,
     activeIsError: active.isError,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
-    fetchNextPage: stored.fetchNextPage,
+    fetchNextPage,
     refetch: async () => {
       await Promise.all([
-        stored.refetch(),
+        storedRefetch(),
         (async () => {
           // The live-sync owner writes and cancels this same query key, so a
           // plain refetch alone can be swallowed by it. Drive the owner when

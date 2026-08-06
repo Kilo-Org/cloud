@@ -1157,6 +1157,75 @@ describe('logMicrodollarUsage', () => {
     expect(memberUsage?.microdollarUsage).toBe(300);
   });
 
+  // A redelivery of the same usage id can reach the write while, or after, the
+  // first delivery commits: `recordUsageInPrimaryRegion` retries a 10s attempt
+  // timeout, and after exhausting its retries the SFO caller falls back to
+  // writing locally with the same `core.id`. The row is billed exactly once, so
+  // the second write must report the identity rather than a failure — otherwise
+  // the caller treats billed usage as unrecorded and skips dependent writes.
+  test('insertUsageRecord reports a redelivered usage id as recorded and bills it once', async () => {
+    const user = await insertTestUser({
+      id: 'test-usage-redelivery-user',
+      microdollars_used: 0,
+      google_user_email: 'usage-redelivery@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+    const usage = { ...core, kilo_user_id: user.id, cost: 700 };
+
+    const first = await insertUsageRecord(usage, metadata);
+    expect(first).toMatchObject({ usageId: usage.id, newMicrodollarsUsed: 700 });
+
+    const redelivery = await insertUsageRecord(usage, metadata);
+    expect(redelivery).toMatchObject({ usageId: usage.id, createdAt: usage.created_at });
+
+    const rows = await db
+      .select({ id: microdollar_usage.id })
+      .from(microdollar_usage)
+      .where(eq(microdollar_usage.kilo_user_id, user.id));
+    expect(rows).toHaveLength(1);
+    expect((await findUserById(user.id))?.microdollars_used).toBe(700);
+  });
+
+  // The same redelivery can also arrive while the first write is still open: the
+  // client's attempt timeout fires long before the database gives up. One
+  // transaction then loses on the primary key (or is picked as a deadlock victim
+  // and retried into that collision), and the surviving caller must still learn
+  // the identity of the single billed row.
+  test('insertUsageRecord bills a concurrent redelivery once and reports the identity', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const user = await insertTestUser({
+        id: 'test-usage-concurrent-redelivery-user',
+        microdollars_used: 0,
+        google_user_email: 'usage-concurrent-redelivery@example.com',
+      });
+      const { core, metadata } = await defineMicrodollarUsage();
+      const usage = { ...core, kilo_user_id: user.id, cost: 900 };
+
+      const outcomes = await Promise.all([
+        insertUsageRecord(usage, metadata),
+        insertUsageRecord(usage, metadata),
+      ]);
+
+      // Neither caller may be told the usage was lost: the row is committed, so
+      // both must be able to attach dependent writes to it. Only `usageId` is
+      // asserted because the winning transaction reports the database's own
+      // `created_at` rendering, which `logMicrodollarUsage` discards in favour of
+      // the ISO 8601 value it constructed.
+      for (const outcome of outcomes) {
+        expect(outcome?.usageId).toBe(usage.id);
+      }
+      const rows = await db
+        .select({ id: microdollar_usage.id })
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(rows).toHaveLength(1);
+      expect((await findUserById(user.id))?.microdollars_used).toBe(900);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {
     const user = await insertTestUser({
       id: 'test-daily-zero-cost-user',

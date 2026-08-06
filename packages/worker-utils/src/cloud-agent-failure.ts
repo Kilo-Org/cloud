@@ -41,6 +41,7 @@ export const WORKSPACE_FAILURE_SUBTYPES = [
   'git_clone_timeout',
   'git_checkout_timeout',
   'git_authentication_failed',
+  'git_rate_limited',
   'git_network_failed',
   'git_pack_corrupt',
   'git_checkout_conflict',
@@ -155,6 +156,8 @@ function classifyWorkspaceFailure(
       return classified('user', 'setup_command');
     case 'sandbox_storage_full':
       return classified('platform', 'sandbox_capacity');
+    case 'git_rate_limited':
+      return classified('platform', 'rate_limited');
     case 'git_clone_timeout':
     case 'git_checkout_timeout':
     case 'git_network_failed':

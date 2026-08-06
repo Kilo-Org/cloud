@@ -2339,7 +2339,7 @@ export async function drainAll(): Promise<void> {
   // No nudging — agents complete naturally (call gt_done, go idle, etc.).
   // The TownDO's draining flag blocks new dispatch so no new work starts.
   // We just give them time to wrap up, then Phase 3 force-saves stragglers.
-  const DRAIN_WAIT_MS = 5 * 60 * 1000;
+  const DRAIN_WAIT_MS = 120_000;
   const pollInterval = 5000;
   const start = Date.now();
 

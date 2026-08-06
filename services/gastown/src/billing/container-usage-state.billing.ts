@@ -133,6 +133,26 @@ function openIntervalBillingState(
   return 'running';
 }
 
+function budgetBalance(budget: BudgetVerdict | undefined): { remaining?: number } {
+  if (!budget) return {};
+  if (budget.verdict === 'continue') {
+    return budget.remaining === undefined ? {} : { remaining: budget.remaining };
+  }
+  const remaining = budget.remainingMicrodollars ?? budget.remaining;
+  return remaining === undefined ? {} : { remaining };
+}
+
+function budgetMinimum(
+  budget: BudgetVerdict | undefined,
+  legacyMinimum: number | undefined
+): { minimumRequired?: number } {
+  if (!budget || budget.verdict === 'continue') {
+    return legacyMinimum === undefined ? {} : { minimumRequired: legacyMinimum };
+  }
+  const minimumRequired = budget.minimumRequiredMicrodollars ?? legacyMinimum;
+  return minimumRequired === undefined ? {} : { minimumRequired };
+}
+
 export function toBillingStatus(
   enabled: boolean,
   state: StoredUsageState,
@@ -150,9 +170,7 @@ export function toBillingStatus(
       state: idleBillingState(state, runPolicy),
       runPolicy,
       ...(payer ? { payer } : {}),
-      ...(state.latestBudget?.remaining === undefined
-        ? {}
-        : { remaining: state.latestBudget.remaining }),
+      ...budgetBalance(state.latestBudget),
       ...(state.lastRun?.estimatedCharge === undefined
         ? {}
         : { estimatedRunCharge: state.lastRun.estimatedCharge }),
@@ -184,10 +202,8 @@ export function toBillingStatus(
     state: publicState,
     runPolicy,
     payer,
-    ...(state.latestBudget?.remaining === undefined
-      ? {}
-      : { remaining: state.latestBudget.remaining }),
-    ...(state.minimumRequired === undefined ? {} : { minimumRequired: state.minimumRequired }),
+    ...budgetBalance(state.latestBudget),
+    ...budgetMinimum(state.latestBudget, state.minimumRequired),
     ...(state.estimatedHourlyCharge === undefined
       ? {}
       : { estimatedHourlyCharge: state.estimatedHourlyCharge }),

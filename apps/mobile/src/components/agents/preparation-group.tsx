@@ -145,6 +145,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
                 content={step.outputTail}
                 containerClassName="rounded bg-secondary p-2"
                 textClassName="text-foreground"
+                inTranscript
               />
             </>
           ) : null}

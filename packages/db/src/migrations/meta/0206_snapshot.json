@@ -1,5 +1,5 @@
 {
-  "id": "a6b75a66-2b36-4805-b00d-01ab4ac62515",
+  "id": "eca7ddd9-47a4-4f6d-8664-f232fd0ae81b",
   "prevId": "608de91d-8833-4991-b4e2-e32402f69d60",
   "version": "7",
   "dialect": "postgresql",
@@ -1231,132 +1231,6 @@
           "value": "(\n        (\"agent_environment_profiles\".\"owned_by_user_id\" IS NOT NULL AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NULL) OR\n        (\"agent_environment_profiles\".\"owned_by_user_id\" IS NULL AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.analytics_event_outbox": {
-      "name": "analytics_event_outbox",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "event_uuid": {
-          "name": "event_uuid",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_name": {
-          "name": "event_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "distinct_id": {
-          "name": "distinct_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "properties": {
-          "name": "properties",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claimed_at": {
-          "name": "claimed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "delivered_at": {
-          "name": "delivered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "UQ_analytics_event_outbox_event_uuid": {
-          "name": "UQ_analytics_event_outbox_event_uuid",
-          "columns": [
-            {
-              "expression": "event_uuid",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_analytics_event_outbox_status_next_attempt_at": {
-          "name": "IDX_analytics_event_outbox_status_next_attempt_at",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_attempt_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.api_kind": {
@@ -8158,6 +8032,192 @@
       },
       "isRLSEnabled": false
     },
+    "public.compute_usage_charge": {
+      "name": "compute_usage_charge",
+      "schema": "",
+      "columns": {
+        "usage_source": {
+          "name": "usage_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usage_source_id": {
+          "name": "usage_source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_billing_sku_id": {
+          "name": "cloud_billing_sku_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric(24, 12)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settled_quantity_after": {
+          "name": "settled_quantity_after",
+          "type": "numeric(24, 12)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_cents_per_unit": {
+          "name": "rate_cents_per_unit",
+          "type": "numeric(24, 12)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_microdollars": {
+          "name": "amount_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "IDX_compute_usage_charge_user_created": {
+          "name": "IDX_compute_usage_charge_user_created",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_compute_usage_charge_organization_created": {
+          "name": "IDX_compute_usage_charge_organization_created",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "compute_usage_charge_user_id_kilocode_users_id_fk": {
+          "name": "compute_usage_charge_user_id_kilocode_users_id_fk",
+          "tableFrom": "compute_usage_charge",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "compute_usage_charge_organization_id_organizations_id_fk": {
+          "name": "compute_usage_charge_organization_id_organizations_id_fk",
+          "tableFrom": "compute_usage_charge",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "compute_usage_charge_cloud_billing_sku_id_cloud_billing_sku_id_fk": {
+          "name": "compute_usage_charge_cloud_billing_sku_id_cloud_billing_sku_id_fk",
+          "tableFrom": "compute_usage_charge",
+          "tableTo": "cloud_billing_sku",
+          "columnsFrom": [
+            "cloud_billing_sku_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "compute_usage_charge_usage_source_usage_source_id_created_at_pk": {
+          "name": "compute_usage_charge_usage_source_usage_source_id_created_at_pk",
+          "columns": [
+            "usage_source",
+            "usage_source_id",
+            "created_at"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "compute_usage_charge_exactly_one_payer": {
+          "name": "compute_usage_charge_exactly_one_payer",
+          "value": "(\"compute_usage_charge\".\"user_id\" IS NULL) <> (\"compute_usage_charge\".\"organization_id\" IS NULL)"
+        },
+        "compute_usage_charge_quantity_positive": {
+          "name": "compute_usage_charge_quantity_positive",
+          "value": "\"compute_usage_charge\".\"quantity\" > 0"
+        },
+        "compute_usage_charge_settled_quantity_positive": {
+          "name": "compute_usage_charge_settled_quantity_positive",
+          "value": "\"compute_usage_charge\".\"settled_quantity_after\" IS NULL OR \"compute_usage_charge\".\"settled_quantity_after\" > 0"
+        },
+        "compute_usage_charge_rate_positive": {
+          "name": "compute_usage_charge_rate_positive",
+          "value": "\"compute_usage_charge\".\"rate_cents_per_unit\" > 0"
+        },
+        "compute_usage_charge_amount_positive": {
+          "name": "compute_usage_charge_amount_positive",
+          "value": "\"compute_usage_charge\".\"amount_microdollars\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.container_usage_interval": {
       "name": "container_usage_interval",
       "schema": "",
@@ -8249,6 +8309,26 @@
         },
         "confirmed_seconds": {
           "name": "confirmed_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "billing_mode": {
+          "name": "billing_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'shadow'"
+        },
+        "rate_cents_per_unit": {
+          "name": "rate_cents_per_unit",
+          "type": "numeric(24, 12)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "settled_billable_seconds": {
+          "name": "settled_billable_seconds",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -8403,6 +8483,14 @@
           "name": "container_usage_interval_status",
           "value": "\"container_usage_interval\".\"status\" IN ('open', 'closed')"
         },
+        "container_usage_interval_billing_mode": {
+          "name": "container_usage_interval_billing_mode",
+          "value": "\"container_usage_interval\".\"billing_mode\" IN ('shadow', 'paid')"
+        },
+        "container_usage_interval_paid_rate": {
+          "name": "container_usage_interval_paid_rate",
+          "value": "(\"container_usage_interval\".\"billing_mode\" = 'shadow' AND \"container_usage_interval\".\"rate_cents_per_unit\" IS NULL) OR (\"container_usage_interval\".\"billing_mode\" = 'paid' AND \"container_usage_interval\".\"rate_cents_per_unit\" > 0)"
+        },
         "container_usage_interval_open_closed_shape": {
           "name": "container_usage_interval_open_closed_shape",
           "value": "(\"container_usage_interval\".\"status\" = 'open' AND \"container_usage_interval\".\"stopped_at\" IS NULL AND \"container_usage_interval\".\"close_reason\" IS NULL) OR (\"container_usage_interval\".\"status\" = 'closed' AND \"container_usage_interval\".\"stopped_at\" IS NOT NULL AND \"container_usage_interval\".\"close_reason\" IS NOT NULL)"
@@ -8418,6 +8506,10 @@
         "container_usage_interval_confirmed_seconds_nonnegative": {
           "name": "container_usage_interval_confirmed_seconds_nonnegative",
           "value": "\"container_usage_interval\".\"confirmed_seconds\" >= 0"
+        },
+        "container_usage_interval_settled_billable_seconds_nonnegative": {
+          "name": "container_usage_interval_settled_billable_seconds_nonnegative",
+          "value": "\"container_usage_interval\".\"settled_billable_seconds\" >= 0 AND \"container_usage_interval\".\"settled_billable_seconds\" <= \"container_usage_interval\".\"confirmed_seconds\""
         },
         "container_usage_interval_final_stop_seq_positive": {
           "name": "container_usage_interval_final_stop_seq_positive",
@@ -25773,182 +25865,6 @@
           "value": "\"native_attested_keys\".\"platform\" IN ('ios', 'android')"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.operation_ledgers": {
-      "name": "operation_ledgers",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "operation_key": {
-          "name": "operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "domain": {
-          "name": "domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "intent": {
-          "name": "intent",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resource_key": {
-          "name": "resource_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_ref": {
-          "name": "provider_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "taxonomy": {
-          "name": "taxonomy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'admitted'"
-        },
-        "outcome_code": {
-          "name": "outcome_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "canonical_result": {
-          "name": "canonical_result",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "admitted_at": {
-          "name": "admitted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "settled_at": {
-          "name": "settled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lease_expires_at": {
-          "name": "lease_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "UQ_operation_ledgers_kilo_user_id_domain_operation_key": {
-          "name": "UQ_operation_ledgers_kilo_user_id_domain_operation_key",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "domain",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_operation_ledgers_status_expires_at": {
-          "name": "IDX_operation_ledgers_status_expires_at",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_operation_ledgers_provider_ref": {
-          "name": "IDX_operation_ledgers_provider_ref",
-          "columns": [
-            {
-              "expression": "provider_ref",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.organization_audit_logs": {

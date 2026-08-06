@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { db } from '../drizzle';
+import { db, isUSRegion } from '../drizzle';
+import { recordUsageInPrimaryRegion } from './usage-record-client';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -17,7 +18,7 @@ import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
@@ -56,6 +57,8 @@ import type {
   OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
+  UsageRecordInsertResult,
+  UsageRecordWriteOutcome,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import {
@@ -127,12 +130,6 @@ const extractMessageTextContent = (m: Message) =>
       : '';
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
-
-export type UsageRecordInsertResult = {
-  usageId: string;
-  createdAt: string;
-  newMicrodollarsUsed: number | null;
-};
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
@@ -297,18 +294,67 @@ export async function logMicrodollarUsage(
   return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
+/**
+ * Dispatches the usage write to whichever side of the Atlantic the PostgreSQL
+ * primary is on.
+ *
+ * `kilocode-global-app` executes in both Frankfurt and SFO while the primary is
+ * Frankfurt-only. This write holds row locks on `kilocode_users`,
+ * `organizations` and `organization_user_usage` across several sequential
+ * statements, so from SFO the lock hold is dominated by transatlantic round
+ * trips rather than by database work — which is what turns a contended counter
+ * row into a queue and, downstream, exhausts the connection pool.
+ *
+ * Frankfurt instances keep writing directly: a Frankfurt-to-Frankfurt HTTP hop
+ * would be pure overhead and a pointless new failure mode.
+ */
 async function saveUsageRelatedData(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null
 ): Promise<UsageRecordInsertResult | null> {
+  if (isUSRegion()) {
+    const outcome = await recordUsageInPrimaryRegion({
+      core: coreUsageFields,
+      metadata: metadataFields,
+      prior_microdollar_usage,
+      posthog_distinct_id,
+    });
+    // On `unavailable` fall through to the local write. It is slow from here,
+    // but a slow billing record beats a lost one. `recordUsageInPrimaryRegion`
+    // has already reported the failure.
+    if (outcome.kind === 'ok') return outcome.result;
+  }
+
+  return saveUsageRelatedDataLocally(
+    coreUsageFields,
+    metadataFields,
+    prior_microdollar_usage,
+    posthog_distinct_id
+  );
+}
+
+/**
+ * The write itself, always executed against the primary from wherever it runs.
+ * Exported so `POST /api/internal/usage/record` can invoke it in Frankfurt.
+ */
+export async function saveUsageRelatedDataLocally(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  prior_microdollar_usage: number,
+  posthog_distinct_id: string | null
+): Promise<UsageRecordWriteOutcome | null> {
+  // `isFirst` must be evaluated before the insert — afterwards this record is
+  // itself prior usage — but the event it drives is only emitted once the insert
+  // has committed. A redelivery that arrives while the first delivery's
+  // transaction is still open cannot see the uncommitted row either, so it also
+  // computes `isFirst`; emitting here would double-count `first_usage`.
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  if (isFirst && posthog_distinct_id)
-    await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
   const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
   if (!inserted) return null;
-  if (posthog_distinct_id) {
+  if (posthog_distinct_id && !inserted.wasRedelivery) {
+    if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
     await sendFirstMicrodollarUsageEventIfNeeded(
       inserted.newMicrodollarsUsed === null
         ? null
@@ -569,10 +615,57 @@ function scheduleKiloPassBonusIfNeeded(
   });
 }
 
+/**
+ * Identity of an already-persisted usage row, or null if it is not there.
+ *
+ * The same record can reach this write twice: `recordUsageInPrimaryRegion`
+ * retries when an attempt exceeds its 10s timeout while the first delivery is
+ * still committing, and after exhausting its retries the caller falls back to
+ * writing locally with the same `core.id`. The losing transaction then collides
+ * on the `microdollar_usage` primary key and rolls back in full, so the usage is
+ * billed exactly once. Reporting that as a failure would make callers treat
+ * billed usage as unrecorded and skip dependent writes.
+ *
+ * The row's presence under this user is the proof, not the PostgreSQL error code:
+ * `id` is generated per delivery by `toInsertableDbUsageRecord`, and the row can
+ * only be visible if a delivery of this exact record committed its whole
+ * transaction. A deadlock victim that is retried into the collision therefore
+ * recovers the same way a plain primary-key violation does.
+ *
+ * `newMicrodollarsUsed` is not reconstructable here and is only consumed by
+ * best-effort PostHog attribution and the Kilo Pass threshold, both of which run
+ * on the delivery that committed.
+ */
+async function findAlreadyRecordedUsage(
+  coreUsageFields: MicrodollarUsage
+): Promise<UsageRecordWriteOutcome | null> {
+  const existing = await db
+    .select({ id: microdollar_usage.id })
+    .from(microdollar_usage)
+    .where(
+      and(
+        eq(microdollar_usage.id, coreUsageFields.id),
+        eq(microdollar_usage.kilo_user_id, coreUsageFields.kilo_user_id)
+      )
+    )
+    .limit(1);
+  if (existing.length === 0) return null;
+
+  // Report the JS-side identity, not the DB-returned timestamp: PostgreSQL
+  // renders `created_at` as "2026-04-29 01:16:12.945+00", which is not strict
+  // ISO 8601 and fails downstream datetime validators.
+  return {
+    usageId: coreUsageFields.id,
+    createdAt: coreUsageFields.created_at,
+    newMicrodollarsUsed: null,
+    wasRedelivery: true,
+  };
+}
+
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<UsageRecordInsertResult | null> {
+): Promise<UsageRecordWriteOutcome | null> {
   try {
     const result = await startSpan(
       {
@@ -605,8 +698,20 @@ export async function insertUsageRecord(
       usageId: result.inserted.usageId,
       createdAt: result.inserted.createdAt,
       newMicrodollarsUsed: result.inserted.newMicrodollarsUsed,
+      wasRedelivery: false,
     };
   } catch (error) {
+    // The lookup itself is best-effort: it must never mask the original failure,
+    // and it throws for a malformed `id`, which is a genuine failed write.
+    const alreadyRecorded = await findAlreadyRecordedUsage(coreUsageFields).catch(() => null);
+    if (alreadyRecorded) {
+      // Not an exception: this is the designed outcome of a redelivered write.
+      sentryLogger('insertUsageRecord', 'warning')(
+        'insertUsageRecord received a redelivery of an already-recorded usage id',
+        { usageId: coreUsageFields.id }
+      );
+      return alreadyRecorded;
+    }
     console.error('insertUsageRecord failed', error);
     captureException(error, {
       tags: {

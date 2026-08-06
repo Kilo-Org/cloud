@@ -152,7 +152,7 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('apple', () => {
-    it('builds args mirroring createAppleAccountInfo, autoLink=false, and mints a token', async () => {
+    it('builds args mirroring createAppleAccountInfo, autoLink=true, and mints a token', async () => {
       mockVerifyNativeAppleIdToken.mockResolvedValue({
         sub: 'apple-sub-1',
         email: 'appleuser@example.com',
@@ -175,7 +175,7 @@ describe('POST /api/auth/native/token', () => {
           provider_account_id: 'apple-sub-1',
         }),
         undefined,
-        false,
+        true,
         expect.any(Headers),
         undefined,
         undefined,
@@ -195,7 +195,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({ google_user_name: 'appleuser' }),
         undefined,
-        false,
+        true,
         expect.any(Headers),
         undefined,
         undefined,
@@ -299,7 +299,7 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('google', () => {
-    it('builds args mirroring createGoogleAccountInfo (using hd) and autoLink=false', async () => {
+    it('builds args mirroring createGoogleAccountInfo (using hd) and autoLink=true', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',
         email: 'googleuser@example.com',
@@ -325,7 +325,7 @@ describe('POST /api/auth/native/token', () => {
           provider_account_id: 'google-sub-1',
         }),
         undefined,
-        false,
+        true,
         expect.any(Headers),
         undefined,
         undefined,
@@ -344,7 +344,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({ hosted_domain: '@@personal@@' }),
         undefined,
-        false,
+        true,
         expect.any(Headers),
         undefined,
         undefined,

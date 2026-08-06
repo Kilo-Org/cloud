@@ -32,21 +32,29 @@ export async function getOpenRouterDerivedModelVariants(
     return reasoning.mandatory ? REASONING_VARIANTS_THINKING_ONLY : REASONING_VARIANTS_BINARY;
   }
   const useAnthropicProvider = getAiSdkProvider(model, null) === 'anthropic';
-  const variants: [string, OpenCodeVariant][] = reasoning.supported_efforts.map(effort => [
-    effort,
-    {
-      reasoning: { enabled: true, effort },
-      verbosity: useAnthropicProvider ? VerbositySchema.safeParse(effort).data : undefined,
-    },
-  ]);
-  if (!reasoning.mandatory) {
-    variants.push(['none', { reasoning: { enabled: false, effort: 'none' } }]);
+  const variants: [string, OpenCodeVariant][] = reasoning.supported_efforts
+    .toReversed()
+    .map(effort => [
+      effort,
+      {
+        reasoning: { enabled: effort !== 'none', effort },
+        verbosity: useAnthropicProvider ? VerbositySchema.safeParse(effort).data : undefined,
+      },
+    ]);
+  if (!reasoning.mandatory && !variants.some(([effort]) => effort === 'none')) {
+    variants.unshift(['none', { reasoning: { enabled: false, effort: 'none' } }]);
   }
   return Object.fromEntries(variants);
 }
 
-export async function getModelVariants(model: string): Promise<OpenCodeSettings['variants']> {
-  return (await getOpenRouterDerivedModelVariants(model)) ?? getFallbackModelVariants(model);
+export async function getModelVariants(
+  model: string,
+  allowFallbackVariants: boolean
+): Promise<OpenCodeSettings['variants']> {
+  return (
+    (await getOpenRouterDerivedModelVariants(model)) ??
+    (allowFallbackVariants ? getFallbackModelVariants(model) : undefined)
+  );
 }
 
 export function getAiSdkProvider(
@@ -81,10 +89,11 @@ function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
 }
 
 export async function getGatewayOpenCodeSettings(
-  model: string
+  model: string,
+  allowFallbackVariants: boolean
 ): Promise<OpenCodeSettings | undefined> {
   const ai_sdk_provider = getAiSdkProvider(model, null);
-  const variants = await getModelVariants(model);
+  const variants = await getModelVariants(model, allowFallbackVariants);
   const prompt = getOpenCodePrompt(model);
   return { ai_sdk_provider, variants, prompt };
 }

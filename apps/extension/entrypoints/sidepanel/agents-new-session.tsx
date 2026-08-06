@@ -135,6 +135,7 @@ export const submitBlockedReason = ({
   hasModels,
   integrationInstalled,
   isCloudTarget,
+  isLoading,
   isPromptValid,
   repoCount,
   selectedRepo,
@@ -142,12 +143,18 @@ export const submitBlockedReason = ({
   hasModels: boolean;
   integrationInstalled: boolean;
   isCloudTarget: boolean;
+  /** Repositories or models still in flight; an empty list means nothing yet. */
+  isLoading: boolean;
   isPromptValid: boolean;
   repoCount: number;
   selectedRepo: string;
 }): 'connect-github' | 'no-repos' | 'pick-repo' | 'no-models' | null => {
   if (!isPromptValid || !isCloudTarget) {
     // The textarea already reports a short prompt; a CLI target needs nothing else.
+    return null;
+  }
+  if (isLoading) {
+    // Naming a blocker mid-load would name the wrong one.
     return null;
   }
   if (!integrationInstalled) {
@@ -397,6 +404,7 @@ export const AgentsNewSession = ({
     hasModels: modelOptions.length > 0,
     integrationInstalled,
     isCloudTarget,
+    isLoading: isRepoLoading || isModelsLoading,
     isPromptValid,
     repoCount: repos.length,
     selectedRepo,

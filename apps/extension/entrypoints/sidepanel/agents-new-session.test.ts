@@ -183,6 +183,7 @@ describe('submitBlockedReason helper', () => {
     hasModels: true,
     integrationInstalled: true,
     isCloudTarget: true,
+    isLoading: false,
     isPromptValid: true,
     repoCount: 1,
     selectedRepo: 'org/repo',
@@ -204,6 +205,19 @@ describe('submitBlockedReason helper', () => {
         hasModels: false,
         integrationInstalled: false,
         isCloudTarget: false,
+        repoCount: 0,
+        selectedRepo: '',
+      })
+    ).toBeNull();
+  });
+
+  it('names no blocker while the repo and model lists are still loading', () => {
+    // An empty list mid-load means "not yet", not "none available".
+    expect(
+      submitBlockedReason({
+        ...base,
+        hasModels: false,
+        isLoading: true,
         repoCount: 0,
         selectedRepo: '',
       })

@@ -18,6 +18,10 @@ describe('displayRepoName()', () => {
     expect(displayRepoName('ssh://git@github.com/org/repo.git')).toBe('org/repo');
   });
 
+  it('drops an explicit ssh port along with the host', () => {
+    expect(displayRepoName('ssh://git@gitlab.example.com:2222/org/repo.git')).toBe('org/repo');
+  });
+
   it('keeps nested groups on a non-github host', () => {
     expect(displayRepoName('https://gitlab.com/group/sub/repo.git')).toBe('group/sub/repo');
   });

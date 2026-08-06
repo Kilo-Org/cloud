@@ -1315,22 +1315,63 @@ describe('CloudAgentTransport exactly-once event replay', () => {
     };
   }
 
-  it('drops a duplicate event ID at the cursor', async () => {
-    const { transport, serviceEvents } = createTransportWithSinks();
+  it('delivers same event ID rebroadcasts (entity upsert updates)', async () => {
+    const { transport, serviceEvents, chatEvents } = createTransportWithSinks();
 
     transport.connect();
     await flushPromises();
 
-    // snapshot replay puts session.created at serviceEvents[0]
     const serviceCountBefore = serviceEvents.length;
+    const chatCountBefore = chatEvents.length;
 
-    // First delivery sets the cursor.
+    // First delivery sets the cursor. A second frame with the same eventId is
+    // how the DO broadcasts message.part.updated after an entity upsert
+    // (pending → running → completed keep the same stored row id).
     sendRaw(eventWithId(5));
-    // Duplicate — same eventId as the cursor — must be dropped.
     sendRaw(eventWithId(5));
 
-    // Only one new service event (the first delivery) reached the sink.
-    expect(serviceEvents.length).toBe(serviceCountBefore + 1);
+    expect(serviceEvents.length).toBe(serviceCountBefore + 2);
+
+    sendRaw({
+      eventId: 5,
+      executionId: null,
+      sessionId: 'ses-1',
+      streamEventType: 'kilocode',
+      timestamp: new Date().toISOString(),
+      data: {
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'part-tool-1',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
+            type: 'tool',
+            callID: 'call-1',
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: { command: 'pwd' },
+              output: '/tmp',
+              title: 'pwd',
+              metadata: {},
+              time: { start: 1, end: 2 },
+            },
+          },
+        },
+      },
+    });
+
+    const toolUpdates = chatEvents
+      .slice(chatCountBefore)
+      .filter(e => e.type === 'message.part.updated');
+    expect(toolUpdates).toHaveLength(1);
+    expect(toolUpdates[0]).toMatchObject({
+      type: 'message.part.updated',
+      part: {
+        tool: 'bash',
+        state: { status: 'completed', input: { command: 'pwd' } },
+      },
+    });
 
     transport.destroy();
   });
@@ -1441,9 +1482,10 @@ describe('CloudAgentTransport exactly-once event replay', () => {
       jest.advanceTimersByTime(2000);
       await flushMicrotasks();
 
-      // Phase 2: the DO replays 3 through 8 on the new socket.
-      // Events 3, 4, 5 must be dropped (≤ cursor at 5).
-      // Events 6, 7, 8 must be delivered.
+      // Phase 2: reconnect uses exclusive fromId (id > cursor). The DO may still
+      // overlap below the cursor during catch-up; those must be dropped. Same-id
+      // as the cursor is kept (entity upsert rebroadcasts), but exclusive replay
+      // normally starts at cursor+1.
       const newMockWs = webSocketConstructor.mock.results.at(-1)?.value as MockWebSocket;
       newMockWs.onopen?.(new Event('open'));
       for (let id = 3; id <= 8; id++) {
@@ -1468,9 +1510,9 @@ describe('CloudAgentTransport exactly-once event replay', () => {
         .map(e => e.status.attempt)
         .sort((a, b) => a - b);
 
-      // Each ID from 1 through 8 must appear exactly once.
-      // Duplicates, missing IDs, or extra deliveries will fail the assertion.
-      expect(deliveredIds).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      // 3–4 dropped (below cursor). 5 re-delivered if present (same-id upsert).
+      // 6–8 are new. Live tool updates rely on same-id delivery.
+      expect(deliveredIds).toEqual([1, 2, 3, 4, 5, 5, 6, 7, 8]);
 
       transport.destroy();
       newMockWs.onclose?.({

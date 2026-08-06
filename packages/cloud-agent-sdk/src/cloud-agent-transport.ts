@@ -201,10 +201,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
         onEvent: raw => {
-          // Drop replayed duplicates: positive IDs at or below the cursor
-          // are redundant — the sink saw them on the first delivery.
+          // Drop strictly older positive IDs (reconnect/replay catch-up).
+          // Same-id rebroadcasts must be kept: the DO entity-upserts tool
+          // parts (and messages) under a stable row id and re-emits that
+          // eventId with a newer payload (pending → running → completed).
+          // Treating `<=` as duplicate left live tools stuck on empty input.
           // eventId 0 (synthetic sentinel) is always delivered.
-          if (raw.eventId > 0 && lastEventId !== null && raw.eventId <= lastEventId) {
+          if (raw.eventId > 0 && lastEventId !== null && raw.eventId < lastEventId) {
             return;
           }
 

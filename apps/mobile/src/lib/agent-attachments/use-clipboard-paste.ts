@@ -8,10 +8,11 @@ import {
   readClipboardText,
 } from './clipboard-image';
 
-type UseClipboardImageHintOptions = {
-  /** When false, the hint is never visible. Reuse each composer's existing
-   *  "can add an attachment" expression so the hint follows pick-parity rules. */
-  enabled: boolean;
+type UseClipboardPasteOptions = {
+  /** Gates `visible` only — `paste` always works. Defaults to true. Pass each
+   *  composer's existing "can add an attachment" expression when the caller
+   *  renders the image-detected hint, so the hint follows pick-parity rules. */
+  enabled?: boolean;
   /** Called with the written cache file; the composer's upload pipeline owns
    *  every toast from this point on. */
   addFile: (file: ClipboardImageFile) => Promise<void>;
@@ -26,11 +27,12 @@ type UseClipboardImageHintOptions = {
   onUnreadable: () => void;
 };
 
-type UseClipboardImageHintReturn = {
-  /** Whether the hint should be rendered. `enabled && hasImage`. */
+type UseClipboardPasteReturn = {
+  /** Whether the image-detected hint should be rendered. `enabled && hasImage`.
+   *  A caller with an always-present paste button ignores this. */
   visible: boolean;
   /** Probe the clipboard and show the hint when an image is present.
-   *  Call this on input focus. */
+   *  Call this on input focus. Only a `visible` caller needs it. */
   refresh: () => void;
   /** Read the clipboard image, write a cache file, and route it through
    *  `addFile`. With no readable image, route the clipboard text through
@@ -40,9 +42,13 @@ type UseClipboardImageHintReturn = {
   paste: () => void;
 };
 
-export function useClipboardImageHint(
-  options: UseClipboardImageHintOptions
-): UseClipboardImageHintReturn {
+/**
+ * Clipboard paste for the composers. `paste` prefers an image — a composer that
+ * takes attachments should attach a copied screenshot — and falls back to the
+ * clipboard text when the caller supplies `addText`. `visible` and `refresh`
+ * serve the older image-detected hint row, which only kilo-chat still renders.
+ */
+export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboardPasteReturn {
   const [hasImage, setHasImage] = useState(false);
 
   const isMountedRef = useRef(true);
@@ -170,7 +176,7 @@ export function useClipboardImageHint(
     };
   }, [refresh]);
 
-  const visible = options.enabled && hasImage;
+  const visible = (options.enabled ?? true) && hasImage;
 
   return useMemo(() => ({ visible, refresh, paste }), [visible, refresh, paste]);
 }

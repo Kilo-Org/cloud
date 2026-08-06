@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useClipboardImageHint } from './use-clipboard-image-hint';
+import { useClipboardPaste } from './use-clipboard-paste';
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ function lastSetHasImageArg(): boolean | undefined {
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-describe('useClipboardImageHint', () => {
+describe('useClipboardPaste', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -77,7 +77,7 @@ describe('useClipboardImageHint', () => {
 
   it('refreshes and shows the hint when clipboard has an image', async () => {
     hasClipboardImageMock.mockResolvedValue(true);
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     hook.refresh();
     await flushMicrotasks();
@@ -93,7 +93,7 @@ describe('useClipboardImageHint', () => {
       mimeType: 'image/png',
     });
 
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     // Initial refresh shows the image.
     hook.refresh();
@@ -121,7 +121,7 @@ describe('useClipboardImageHint', () => {
       mimeType: 'image/png',
     });
 
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     // Prime with an image.
     hook.refresh();
@@ -148,7 +148,7 @@ describe('useClipboardImageHint', () => {
       mimeType: 'image/png',
     });
 
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     // Refresh shows image.
     hook.refresh();
@@ -181,7 +181,7 @@ describe('useClipboardImageHint', () => {
     readClipboardImageFileMock.mockResolvedValue(null);
 
     const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardImageHint(makeOptions({ onUnreadable }));
+    const hook = useClipboardPaste(makeOptions({ onUnreadable }));
 
     // Refresh shows the image.
     hook.refresh();
@@ -209,7 +209,7 @@ describe('useClipboardImageHint', () => {
 
     const addText = vi.fn<(text: string) => void>();
     const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardImageHint(makeOptions({ addText, onUnreadable }));
+    const hook = useClipboardPaste(makeOptions({ addText, onUnreadable }));
 
     hook.paste();
     await flushMicrotasks();
@@ -229,7 +229,7 @@ describe('useClipboardImageHint', () => {
 
     const addText = vi.fn<(text: string) => void>();
     const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardImageHint(makeOptions({ addText, onUnreadable }));
+    const hook = useClipboardPaste(makeOptions({ addText, onUnreadable }));
 
     hook.paste();
     await flushMicrotasks();
@@ -248,7 +248,7 @@ describe('useClipboardImageHint', () => {
 
     const addText = vi.fn<(text: string) => void>();
     const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardImageHint(makeOptions({ addText, onUnreadable }));
+    const hook = useClipboardPaste(makeOptions({ addText, onUnreadable }));
 
     hook.paste();
     await flushMicrotasks();
@@ -264,7 +264,7 @@ describe('useClipboardImageHint', () => {
     readClipboardTextMock.mockResolvedValue('some text');
 
     const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardImageHint(makeOptions({ onUnreadable }));
+    const hook = useClipboardPaste(makeOptions({ onUnreadable }));
 
     hook.paste();
     await flushMicrotasks();
@@ -286,7 +286,7 @@ describe('useClipboardImageHint', () => {
     });
     const addFile = vi.fn().mockRejectedValue(new Error('upload failed'));
 
-    const hook = useClipboardImageHint(makeOptions({ addFile }));
+    const hook = useClipboardPaste(makeOptions({ addFile }));
 
     // Refresh shows image.
     hook.refresh();
@@ -317,7 +317,7 @@ describe('useClipboardImageHint', () => {
     });
     readClipboardImageFileMock.mockReturnValue(pastePromise);
 
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     // Refresh shows image.
     hook.refresh();
@@ -351,7 +351,7 @@ describe('useClipboardImageHint', () => {
     });
     hasClipboardImageMock.mockReturnValueOnce(firstRefreshPromise);
 
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     // Start a refresh (slow — won't resolve yet).
     hook.refresh();
@@ -390,7 +390,7 @@ describe('useClipboardImageHint', () => {
     });
     readClipboardImageFileMock.mockReturnValue(readPromise);
 
-    const hook = useClipboardImageHint(makeOptions());
+    const hook = useClipboardPaste(makeOptions());
 
     // Refresh shows the image.
     hook.refresh();

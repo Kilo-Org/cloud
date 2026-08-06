@@ -1,44 +1,55 @@
-type ComposerSelection = { start: number; end: number };
+export type ComposerSelection = { start: number; end: number };
 
-type InsertPastedTextOptions = {
+type ComposerPasteTarget = {
+  /** The uncontrolled TextInput, or null before it mounts. */
+  input: {
+    setNativeProps(props: { text: string; selection: ComposerSelection }): void;
+  } | null;
+  /** The composer's live draft. */
   draft: string;
-  /** The composer's last known caret, or null when nothing reported one yet. */
+  /** The last caret the input reported, or null when it reported none yet. */
   selection: ComposerSelection | null;
-  text: string;
   maxLength: number;
+  onChangeText: (text: string) => void;
 };
 
-type InsertPastedTextResult = { draft: string; caret: number };
-
-/** Clamp a reported offset into `[0, max]`. */
-function clampOffset(value: number, max: number): number {
-  if (!Number.isFinite(value) || value < 0) {
-    return 0;
-  }
-  return Math.min(Math.floor(value), max);
+/** Order a reported selection and clamp both bounds into `[0, max]`. */
+function clampSelection(selection: ComposerSelection, max: number): ComposerSelection {
+  const clamp = (value: number) =>
+    Number.isFinite(value) ? Math.min(Math.max(Math.floor(value), 0), max) : max;
+  const start = clamp(selection.start);
+  const end = clamp(selection.end);
+  return { start: Math.min(start, end), end: Math.max(start, end) };
 }
 
 /**
- * Insert clipboard text into a draft the way the platform paste does: the text
- * replaces the selected range and the caret lands after the inserted text.
+ * Paste `text` into a composer the way the platform paste does: the text
+ * replaces the selected range, the caret lands after it, and the draft never
+ * exceeds `maxLength` — the pasted text is truncated, never the text the user
+ * already typed. A null selection, or one the input never reported, pastes at
+ * the draft's end.
  *
- * A null or out-of-range `selection` clamps to the draft's end, so a caret the
- * composer has not heard about pastes at the end instead of inside a word. The
- * result never exceeds `maxLength`; the pasted text is truncated, never the
- * text the user already typed.
+ * Returns the new caret so the caller can update its selection ref: RN fires
+ * no selection event for a `setNativeProps` write.
  */
-export function insertPastedText({
-  draft,
-  selection,
-  text,
-  maxLength,
-}: InsertPastedTextOptions): InsertPastedTextResult {
-  const cap = Math.max(0, Math.floor(maxLength));
-  const end = clampOffset(selection?.end ?? draft.length, draft.length);
-  const start = Math.min(clampOffset(selection?.start ?? draft.length, draft.length), end);
-  const prefix = draft.slice(0, start);
-  const suffix = draft.slice(end);
-  const room = cap - prefix.length - suffix.length;
+export function pasteTextIntoComposer(
+  text: string,
+  target: ComposerPasteTarget
+): ComposerSelection {
+  const { start, end } = clampSelection(
+    target.selection ?? { start: target.draft.length, end: target.draft.length },
+    target.draft.length
+  );
+  const prefix = target.draft.slice(0, start);
+  const suffix = target.draft.slice(end);
+  const room = Math.max(0, Math.floor(target.maxLength)) - prefix.length - suffix.length;
   const inserted = room > 0 ? text.slice(0, room) : '';
-  return { draft: prefix + inserted + suffix, caret: prefix.length + inserted.length };
+  const caretOffset = prefix.length + inserted.length;
+  const caret = { start: caretOffset, end: caretOffset };
+  const draft = prefix + inserted + suffix;
+
+  target.input?.setNativeProps({ text: draft, selection: caret });
+  // RN fires no change event for setNativeProps, so tell the composer itself.
+  target.onChangeText(draft);
+  return caret;
 }

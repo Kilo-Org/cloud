@@ -21,9 +21,9 @@ type ComposerPasteButtonProps = {
  * image-detected `AttachmentPasteHint` row: the button never appears or
  * disappears with clipboard state, so the row it lives in keeps a stable
  * footprint. The caller owns presence (attachment capability) and the disabled
- * state (the composer's paperclip rule). Pressing reads the clipboard through
- * the shared `useClipboardImageHint` paste path, which routes a readable image
- * through the attachment upload pipeline, appends clipboard text to the draft,
+ * state (the composer's input rule, so a full attachment list still pastes
+ * text). Pressing reads the clipboard through the shared `useClipboardPaste`
+ * path, which attaches a readable image, pastes clipboard text at the caret,
  * and toasts only when the clipboard holds neither.
  */
 export function ComposerPasteButton({

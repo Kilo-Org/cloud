@@ -20,7 +20,7 @@ type ChatToolbarProps = {
   order?: ChatToolbarOrder;
   /** When set, an always-present paste button renders at the row's trailing edge. */
   onPaste?: () => void;
-  /** Disabled state for the paste button; the composer's paperclip rule owns it. */
+  /** Disabled state for the paste button; the composer's input rule owns it. */
   pasteDisabled?: boolean;
   className?: string;
 };

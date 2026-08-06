@@ -34,7 +34,10 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import { insertPastedText } from '@/components/agents/composer-paste-text';
+import {
+  type ComposerSelection,
+  pasteTextIntoComposer,
+} from '@/components/agents/composer-paste-text';
 import {
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   resolveComposerTextContentWidth,
@@ -58,7 +61,7 @@ import {
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
+import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
@@ -161,10 +164,8 @@ export function ChatComposer({
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   // Last caret the input reported. Paste inserts here so the button behaves
-  // like the platform paste. ponytail: a caret the input never reported (a
-  // programmatic text swap that emits no selection event) clamps to the
-  // draft's end; track selection in `handleChangeText` too if that shows up.
-  const selectionRef = useRef<{ start: number; end: number } | null>(null);
+  // like the platform paste.
+  const selectionRef = useRef<ComposerSelection | null>(null);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -329,7 +330,6 @@ export function ChatComposer({
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
-    attachmentsEnabled,
     disabled,
     hasText,
     isFocused,
@@ -337,24 +337,24 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
-  const { paste: pasteClipboard } = useClipboardImageHint({
-    enabled: attachmentsEnabled && !control.paperclipDisabled,
+  const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await upload.addCandidates([file]);
     },
     addText: text => {
-      const pasted = insertPastedText({
+      // Same-render race guard, as in `handleSelectSlashCommand`: the button is
+      // disabled while sending, but a press committed before that render — or
+      // during the clipboard read — must not mutate a draft being submitted.
+      if (sendLockRef.current.isLocked()) {
+        return;
+      }
+      selectionRef.current = pasteTextIntoComposer(text, {
+        input: inputRef.current,
         draft: textRef.current,
         selection: selectionRef.current,
-        text,
         maxLength: 4000,
+        onChangeText: handleChangeText,
       });
-      inputRef.current?.setNativeProps({
-        text: pasted.draft,
-        selection: { start: pasted.caret, end: pasted.caret },
-      });
-      selectionRef.current = { start: pasted.caret, end: pasted.caret };
-      handleChangeText(pasted.draft);
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -716,8 +716,8 @@ export function ChatComposer({
             modelOptions={modelOptions}
             onModelSelect={onModelSelect}
             disabled={control.toolbarDisabled}
-            onPaste={control.pasteButtonVisible ? pasteClipboard : undefined}
-            pasteDisabled={control.pasteButtonDisabled}
+            onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+            pasteDisabled={!control.inputEditable}
           />
         </Animated.View>
       ) : null}

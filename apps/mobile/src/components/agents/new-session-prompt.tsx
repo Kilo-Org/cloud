@@ -14,7 +14,10 @@ import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
-import { insertPastedText } from '@/components/agents/composer-paste-text';
+import {
+  type ComposerSelection,
+  pasteTextIntoComposer,
+} from '@/components/agents/composer-paste-text';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -32,7 +35,7 @@ import {
   type AgentAttachmentCandidate,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
+import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -115,10 +118,8 @@ export function NewSessionPrompt({
   const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
   // Last caret the input reported. Paste inserts here so the button behaves
-  // like the platform paste. ponytail: a caret the input never reported clamps
-  // to the draft's end; track selection in `handlePromptChange` too if that
-  // shows up.
-  const promptSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  // like the platform paste.
+  const promptSelectionRef = useRef<ComposerSelection | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -181,24 +182,18 @@ export function NewSessionPrompt({
 
   const paperclipDisabled = control.paperclipDisabled;
 
-  const { paste: pasteClipboard } = useClipboardImageHint({
-    enabled: !paperclipDisabled,
+  const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await onPrefillAttachments([file]);
     },
     addText: text => {
-      const pasted = insertPastedText({
+      promptSelectionRef.current = pasteTextIntoComposer(text, {
+        input: promptInputRef.current,
         draft: promptRef.current,
         selection: promptSelectionRef.current,
-        text,
         maxLength: PROMPT_INPUT_MAX_CHARS,
+        onChangeText: handlePromptChange,
       });
-      promptInputRef.current?.setNativeProps({
-        text: pasted.draft,
-        selection: { start: pasted.caret, end: pasted.caret },
-      });
-      promptSelectionRef.current = { start: pasted.caret, end: pasted.caret };
-      handlePromptChange(pasted.draft);
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));

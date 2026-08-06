@@ -102,8 +102,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
-vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
-  useClipboardImageHint: (options: { addText?: (text: string) => void }) => {
+vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
+  useClipboardPaste: (options: { addText?: (text: string) => void }) => {
     clipboardHintOptions.current = options;
     return {
       visible: false,

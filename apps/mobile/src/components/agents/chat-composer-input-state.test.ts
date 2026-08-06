@@ -7,7 +7,6 @@ describe('resolveChatComposerControlState', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: true,
       isFocused: false,
@@ -20,8 +19,6 @@ describe('resolveChatComposerControlState', () => {
       inputEditable: true,
       inputAccessibilityDisabled: false,
       paperclipDisabled: false,
-      pasteButtonDisabled: false,
-      pasteButtonVisible: true,
       showToolbar: true,
       toolbarDisabled: false,
       voiceDisabled: false,
@@ -36,7 +33,6 @@ describe('resolveChatComposerControlState', () => {
       const state = resolveChatComposerControlState({
         attachmentsCount: 0,
         attachmentMax: 5,
-        attachmentsEnabled: true,
         disabled: override.disabled,
         hasText: true,
         isFocused: false,
@@ -56,7 +52,6 @@ describe('resolveChatComposerControlState', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: true,
       isFocused: false,
@@ -75,7 +70,6 @@ describe('resolveChatComposerControlState', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: false,
       isFocused: false,
@@ -93,7 +87,6 @@ describe('resolveChatComposerControlState', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: true,
       hasText: true,
       isFocused: false,
@@ -110,7 +103,6 @@ describe('resolveChatComposerControlState', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 2,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: false,
       isFocused: false,
@@ -127,7 +119,6 @@ describe('resolveChatComposerControlState', () => {
     const base = {
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: false,
       isFocused: false,
@@ -146,11 +137,10 @@ describe('resolveChatComposerControlState', () => {
     expect(resolveChatComposerControlState(base).showToolbar).toBe(false);
   });
 
-  it('disables the paperclip at the attachment cap but keeps paste live', () => {
+  it('disables the paperclip when at or above the attachment cap', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 5,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: true,
       isFocused: false,
@@ -159,16 +149,12 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.paperclipDisabled).toBe(true);
-    // A full attachment list must not block a text paste; the upload
-    // pipeline owns the over-cap toast for an image paste.
-    expect(state.pasteButtonDisabled).toBe(false);
   });
 
   it('disables the paperclip while the composer is in a toolbar-disabled state', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: true,
       isFocused: false,
@@ -177,14 +163,12 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.paperclipDisabled).toBe(true);
-    expect(state.pasteButtonDisabled).toBe(true);
   });
 
   it('disables the paperclip and input while this owner is voice active', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: true,
       isFocused: false,
@@ -193,7 +177,6 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.paperclipDisabled).toBe(true);
-    expect(state.pasteButtonDisabled).toBe(true);
     expect(state.inputEditable).toBe(false);
     expect(state.inputAccessibilityDisabled).toBe(true);
   });
@@ -202,7 +185,6 @@ describe('resolveChatComposerControlState', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
-      attachmentsEnabled: true,
       disabled: false,
       hasText: false,
       isFocused: false,
@@ -211,21 +193,5 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.voiceDisabled).toBe(false);
-  });
-
-  it('hides the paste button when attachments are disabled but keeps its disabled mirror', () => {
-    const state = resolveChatComposerControlState({
-      attachmentsCount: 0,
-      attachmentMax: 5,
-      attachmentsEnabled: false,
-      disabled: false,
-      hasText: true,
-      isFocused: false,
-      isSending: false,
-      voiceInputActive: false,
-    });
-
-    expect(state.pasteButtonVisible).toBe(false);
-    expect(state.pasteButtonDisabled).toBe(false);
   });
 });

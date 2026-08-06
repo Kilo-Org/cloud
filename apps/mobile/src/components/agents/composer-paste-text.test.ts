@@ -1,77 +1,90 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { insertPastedText } from './composer-paste-text';
+import { type ComposerSelection, pasteTextIntoComposer } from './composer-paste-text';
 
-describe('insertPastedText', () => {
+/** A composer whose input records what the paste wrote to it. */
+function makeTarget(draft: string, selection: ComposerSelection | null, maxLength = 100) {
+  const setNativeProps = vi.fn<(props: { text: string; selection: ComposerSelection }) => void>();
+  const onChangeText = vi.fn<(text: string) => void>();
+  return {
+    setNativeProps,
+    onChangeText,
+    target: { input: { setNativeProps }, draft, selection, maxLength, onChangeText },
+  };
+}
+
+describe('pasteTextIntoComposer', () => {
   it('inserts at the caret and leaves the caret after the text', () => {
-    const result = insertPastedText({
-      draft: 'fix the bug',
-      selection: { start: 4, end: 4 },
-      text: 'really ',
-      maxLength: 100,
+    const { setNativeProps, onChangeText, target } = makeTarget('fix the bug', {
+      start: 4,
+      end: 4,
     });
 
-    expect(result.draft).toBe('fix really the bug');
-    expect(result.caret).toBe(11);
+    const caret = pasteTextIntoComposer('really ', target);
+
+    expect(setNativeProps).toHaveBeenCalledWith({
+      text: 'fix really the bug',
+      selection: { start: 11, end: 11 },
+    });
+    expect(onChangeText).toHaveBeenCalledWith('fix really the bug');
+    expect(caret).toEqual({ start: 11, end: 11 });
   });
 
   it('replaces the selected range', () => {
-    const result = insertPastedText({
-      draft: 'fix the bug',
-      selection: { start: 4, end: 7 },
-      text: 'that',
-      maxLength: 100,
-    });
+    const { onChangeText, target } = makeTarget('fix the bug', { start: 4, end: 7 });
 
-    expect(result.draft).toBe('fix that bug');
-    expect(result.caret).toBe(8);
+    const caret = pasteTextIntoComposer('that', target);
+
+    expect(onChangeText).toHaveBeenCalledWith('fix that bug');
+    expect(caret).toEqual({ start: 8, end: 8 });
+  });
+
+  it('replaces the range of an inverted selection', () => {
+    const { onChangeText, target } = makeTarget('fix the bug', { start: 7, end: 4 });
+
+    pasteTextIntoComposer('that', target);
+
+    expect(onChangeText).toHaveBeenCalledWith('fix that bug');
   });
 
   it('appends when no selection was reported', () => {
-    const result = insertPastedText({
-      draft: 'fix',
-      selection: null,
-      text: ' it',
-      maxLength: 100,
-    });
+    const { onChangeText, target } = makeTarget('fix', null);
 
-    expect(result.draft).toBe('fix it');
-    expect(result.caret).toBe(6);
+    pasteTextIntoComposer(' it', target);
+
+    expect(onChangeText).toHaveBeenCalledWith('fix it');
   });
 
   it('clamps a stale caret past the draft end to the end', () => {
-    const result = insertPastedText({
-      draft: 'fix',
-      selection: { start: 40, end: 40 },
-      text: '!',
-      maxLength: 100,
-    });
+    const { onChangeText, target } = makeTarget('fix', { start: 40, end: 40 });
 
-    expect(result.draft).toBe('fix!');
-    expect(result.caret).toBe(4);
+    pasteTextIntoComposer('!', target);
+
+    expect(onChangeText).toHaveBeenCalledWith('fix!');
   });
 
   it('truncates the pasted text, never the existing draft', () => {
-    const result = insertPastedText({
-      draft: 'abcde',
-      selection: { start: 2, end: 2 },
-      text: 'XXXXX',
-      maxLength: 7,
-    });
+    const { onChangeText, target } = makeTarget('abcde', { start: 2, end: 2 }, 7);
 
-    expect(result.draft).toBe('abXXcde');
-    expect(result.caret).toBe(4);
+    const caret = pasteTextIntoComposer('XXXXX', target);
+
+    expect(onChangeText).toHaveBeenCalledWith('abXXcde');
+    expect(caret).toEqual({ start: 4, end: 4 });
   });
 
   it('keeps the draft untouched when the cap leaves no room', () => {
-    const result = insertPastedText({
-      draft: 'abcde',
-      selection: { start: 2, end: 2 },
-      text: 'XXXXX',
-      maxLength: 5,
-    });
+    const { onChangeText, target } = makeTarget('abcde', { start: 2, end: 2 }, 5);
 
-    expect(result.draft).toBe('abcde');
-    expect(result.caret).toBe(2);
+    pasteTextIntoComposer('XXXXX', target);
+
+    expect(onChangeText).toHaveBeenCalledWith('abcde');
+  });
+
+  it('still reports the draft when the input has not mounted', () => {
+    const { onChangeText, target } = makeTarget('fix', null);
+
+    pasteTextIntoComposer(' it', { ...target, input: null });
+
+    expect(onChangeText).toHaveBeenCalledWith('fix it');
   });
 });

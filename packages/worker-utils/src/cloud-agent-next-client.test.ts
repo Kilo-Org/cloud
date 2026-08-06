@@ -56,6 +56,38 @@ describe('CloudAgentNextFetchClient prepareSession', () => {
       expect.objectContaining({ body: JSON.stringify(input) })
     );
   });
+
+  it('forwards operationKey on the wire and surfaces replayed on the output', async () => {
+    const fetchMock = mockFetch(200, {
+      result: {
+        data: {
+          cloudAgentSessionId: 'agent_123',
+          kiloSessionId: 'ses_123',
+          replayed: true,
+        },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+    const input: CloudAgentPrepareSessionInput = {
+      prompt: 'test',
+      mode: 'code',
+      model: 'test-model',
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    };
+
+    const output = await client.prepareSession({}, input);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/prepareSession`,
+      expect.objectContaining({ body: JSON.stringify(input) })
+    );
+    expect(output).toEqual({
+      cloudAgentSessionId: 'agent_123',
+      kiloSessionId: 'ses_123',
+      replayed: true,
+    });
+  });
 });
 
 describe('CloudAgentNextFetchClient billing error detection', () => {

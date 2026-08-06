@@ -62,5 +62,12 @@ export type SessionCreateRequest = {
     kilocodeOrganizationId?: string;
     createdOnPlatform?: string;
     shallow?: boolean;
+    /**
+     * Client-generated UUID, stable across retries of one user intent. The
+     * handler admits the create into the operation ledger only when this is
+     * present AND the effective `autoInitiate` is true; otherwise the key is
+     * ignored and the legacy split-flow behavior is preserved.
+     */
+    operationKey?: string;
   };
 };

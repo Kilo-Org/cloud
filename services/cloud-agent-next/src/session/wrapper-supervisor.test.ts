@@ -989,6 +989,147 @@ describe('WrapperSupervisor', () => {
     });
   });
 
+  it('reconciles a completed assistant reply when the wrapper dies after finalizing', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    const assistantMessageId = 'ase_wrapper_death_reconcile';
+    const harness = createHarness(
+      [
+        liveRuntimeState({
+          pingDeadlineAt,
+          noOutputDeadlineAt,
+          finalizingWrapperRunId: WRAPPER_RUN_ID,
+        }),
+        OWNED_WRAPPER_LEASE,
+      ],
+      {
+        getAssistantMessageForUserMessage: () =>
+          ({
+            info: {
+              id: assistantMessageId,
+              role: 'assistant',
+              time: { created: 90_000, completed: 90_500 },
+            },
+            parts: [],
+          }) as unknown as LatestAssistantMessage,
+      }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/wrapper-death-reconcile' },
+    });
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      completionSource: 'idle_reconciliation',
+      assistantMessageId,
+    });
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.completed']);
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'completed',
+    });
+  });
+
+  it('still fails accepted work when the stored assistant reply never completed', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    const harness = createHarness(
+      [liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }), OWNED_WRAPPER_LEASE],
+      {
+        getAssistantMessageForUserMessage: () =>
+          ({
+            info: { id: 'ase_in_flight', role: 'assistant', time: { created: 90_000 } },
+            parts: [],
+          }) as unknown as LatestAssistantMessage,
+      }
+    );
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      error: 'Wrapper did not respond to liveness ping',
+      completionSource: 'wrapper_failure',
+      failureCode: 'wrapper_ping_timeout',
+    });
+  });
+
+  it('reconciles a terminal assistant error instead of masking it as a wrapper failure', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    const harness = createHarness(
+      [liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }), OWNED_WRAPPER_LEASE],
+      {
+        getAssistantMessageForUserMessage: () =>
+          ({
+            info: {
+              id: 'ase_terminal_error',
+              role: 'assistant',
+              error: { data: { message: 'Payment required: insufficient credits' } },
+            },
+            parts: [],
+          }) as unknown as LatestAssistantMessage,
+      }
+    );
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      completionSource: 'idle_reconciliation',
+      failureCode: 'payment_required',
+    });
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+  });
+
+  it('reconciles a completed assistant reply when disconnect grace expires after wrapper death', async () => {
+    const assistantMessageId = 'ase_disconnect_reconcile';
+    const harness = createHarness(
+      [liveRuntimeState({ finalizingWrapperRunId: WRAPPER_RUN_ID }), OWNED_WRAPPER_LEASE],
+      {
+        getAssistantMessageForUserMessage: () =>
+          ({
+            info: {
+              id: assistantMessageId,
+              role: 'assistant',
+              time: { created: 90_000, completed: 90_500 },
+            },
+            parts: [],
+          }) as unknown as LatestAssistantMessage,
+      }
+    );
+    await putSessionMessageState(harness.storage, acceptedMessage());
+    await harness.supervisor.onDisconnected({
+      disconnected: {
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      },
+      wsCloseCode: 1006,
+      wsCloseReason: 'socket closed while finalizing',
+    });
+
+    const grace = await harness.storage.get<{ disconnectedAt: number }>('disconnect_grace');
+    if (!grace) throw new Error('Expected disconnect grace to be persisted');
+    await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      completionSource: 'idle_reconciliation',
+      assistantMessageId,
+    });
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.completed']);
+  });
+
   it('defers liveness failure while disconnect grace is active for the current connection', async () => {
     const pingDeadlineAt = 92_000;
     const noOutputDeadlineAt = 332_000;

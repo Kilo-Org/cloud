@@ -1,7 +1,8 @@
 /* eslint-disable max-lines, no-unsafe-type-assertion, require-await, jest/no-hooks, jest/valid-title, promise/avoid-new, vitest/prefer-expect-type-of -- test fixture constraints */
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { getDefaultStore } from 'jotai';
 import type { PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
+import { DEFAULT_WORKFLOW_SETTINGS, MAX_WORKFLOW_COUNT } from '@/src/shared/agent-workflows';
 import type { PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
 import {
   pendingApprovalAtom,
@@ -79,6 +80,12 @@ const abortSignal = (): AbortSignal => {
   const controller = new AbortController();
   return controller.signal;
 };
+
+// Workflow settings value that enables auto-approve of workflow changes.
+const autoApproveSettings = (): Record<string, unknown> => ({
+  ...DEFAULT_WORKFLOW_SETTINGS,
+  autoApproveWorkflowChanges: true,
+});
 
 // Clear the atom and lock between tests.
 const clearAtom = (): void => {
@@ -449,10 +456,10 @@ describe(requestApproval, () => {
     expect(entry?.kind).toBe('memory');
 
     // Settle it.
-    entry?.settle({ savedId: 'mem-test', status: 'approved' });
+    entry?.settle({ autoApproved: false, savedId: 'mem-test', status: 'approved' });
 
     const outcome = await promise;
-    expect(outcome).toStrictEqual({ savedId: 'mem-test', status: 'approved' });
+    expect(outcome).toStrictEqual({ autoApproved: false, savedId: 'mem-test', status: 'approved' });
     // Atom should be cleared.
     expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
   });
@@ -471,7 +478,7 @@ describe(requestApproval, () => {
     const atomStore = getDefaultStore();
     const entry = atomStore.get(pendingApprovalAtom);
     // After abort, the entry may already be cleared or still being cleared.
-    entry?.settle({ savedId: 'late', status: 'approved' });
+    entry?.settle({ autoApproved: false, savedId: 'late', status: 'approved' });
 
     const outcome = await promise;
     expect(outcome.status).toBe('aborted');
@@ -529,7 +536,9 @@ describe(requestApproval, () => {
     const atomStore = getDefaultStore();
     expect(atomStore.get(pendingApprovalAtom)).toBeDefined();
 
-    atomStore.get(pendingApprovalAtom)?.settle({ savedId: 'id', status: 'approved' });
+    atomStore
+      .get(pendingApprovalAtom)
+      ?.settle({ autoApproved: false, savedId: 'id', status: 'approved' });
     await promise;
 
     expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
@@ -627,7 +636,7 @@ describe(requestApproval, () => {
 
     const entry2 = atomStore.get(pendingApprovalAtom);
     expect(entry2).toBeDefined();
-    entry2?.settle({ savedId: 'mem-2', status: 'approved' });
+    entry2?.settle({ autoApproved: false, savedId: 'mem-2', status: 'approved' });
 
     const outcome2 = await promise2;
     expect(outcome2.status).toBe('approved');
@@ -673,9 +682,13 @@ describe(requestApproval, () => {
     }).toStrictEqual({ kind: 'memory', text: 'second' });
 
     // Settle second with approved outcome.
-    entry2?.settle({ savedId: 'mem-second', status: 'approved' });
+    entry2?.settle({ autoApproved: false, savedId: 'mem-second', status: 'approved' });
     const outcome2 = await promise2;
-    expect(outcome2).toStrictEqual({ savedId: 'mem-second', status: 'approved' });
+    expect(outcome2).toStrictEqual({
+      autoApproved: false,
+      savedId: 'mem-second',
+      status: 'approved',
+    });
   });
 
   it('second settlement promise resolves after first failed', async () => {
@@ -703,9 +716,287 @@ describe(requestApproval, () => {
 
     const entry2 = atomStore.get(pendingApprovalAtom);
     expect(entry2).toBeDefined();
-    entry2?.settle({ savedId: 'mem-2', status: 'approved' });
+    entry2?.settle({ autoApproved: false, savedId: 'mem-2', status: 'approved' });
 
     const outcome2 = await promise2;
-    expect(outcome2).toStrictEqual({ savedId: 'mem-2', status: 'approved' });
+    expect(outcome2).toStrictEqual({ autoApproved: false, savedId: 'mem-2', status: 'approved' });
+  });
+
+  it('auto-approve workflow save persists approved hash without card or draft', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentWorkflows', []);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+    const draft = workflowDraft();
+
+    const outcome = await requestApproval(storage, 'workflow', draft, abortSignal());
+    expect(outcome).toMatchObject({ autoApproved: true, status: 'approved' });
+
+    // The stored workflow id matches the approved outcome's savedId.
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows[0]?.['id']).toBe((outcome as { savedId: string }).savedId);
+    expect(workflows[0]?.['approvedScriptHash']).toBeDefined();
+    expect(storage.values.has('local:kiloPendingWorkflowSave')).toBe(false);
+
+    // No card and the lock released.
+    const atomStore = getDefaultStore();
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
+  });
+
+  it('auto-approve returns aborted when the signal is already aborted and releases the lock', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentWorkflows', []);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+    const controller = new AbortController();
+    controller.abort();
+
+    const outcome = await requestApproval(storage, 'workflow', workflowDraft(), controller.signal);
+    expect(outcome).toStrictEqual({ status: 'aborted' });
+
+    // No save happened, no draft, no card, lock released.
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows).toStrictEqual([]);
+    expect(storage.values.has('local:kiloPendingWorkflowSave')).toBe(false);
+    const atomStore = getDefaultStore();
+    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('auto-approve returns failed with store-full reason and releases the lock', async () => {
+    const storage = createStorage();
+    const fullWorkflows = Array.from({ length: MAX_WORKFLOW_COUNT }, (_unused, index) => ({
+      approvedScriptHash: `hash-${index}`,
+      createdAt: index,
+      description: 'desc',
+      id: `wf-${index}`,
+      name: `WF ${index}`,
+      scopeOrigin: 'https://example.com',
+      script: 'return 1;',
+      updatedAt: index,
+    }));
+    storage.values.set('local:kiloAgentWorkflows', fullWorkflows);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+
+    const outcome = await requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
+    expect(outcome).toStrictEqual({ reason: 'Workflow store is full.', status: 'failed' });
+
+    // No card was set and the lock released for a retry.
+    const atomStore = getDefaultStore();
+    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('auto-approve returns failed when settings cannot be read and releases the lock', async () => {
+    const storage = createStorage();
+    // Any storage read fails, which surfaces at the settings read (the first storage call).
+    storage.getItem = () => {
+      throw new Error('Settings read failed.');
+    };
+
+    const outcome = await requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
+    expect(outcome).toStrictEqual({ reason: 'Settings read failed.', status: 'failed' });
+
+    // No card and the lock released.
+    const atomStore = getDefaultStore();
+    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('abort during the settings read releases the lock when the load resolves', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+
+    // Pause the settings read so the abort lands mid-flight.
+    // The settings read is the first and only storage call before the abort check.
+    const { promise: settingsRead, resolve: resolveSettings } = Promise.withResolvers<unknown>();
+    storage.getItem = () => settingsRead;
+
+    const approval = requestApproval(storage, 'workflow', workflowDraft(), controller.signal);
+
+    // Abort while the settings read is still pending, then let the load resolve.
+    controller.abort();
+    resolveSettings(autoApproveSettings());
+
+    const outcome = await approval;
+    expect(outcome).toStrictEqual({ status: 'aborted' });
+
+    // The auto-approve save never ran, no draft was persisted, no card, and the lock released.
+    expect({
+      draft: storage.values.has('local:kiloPendingWorkflowSave'),
+      workflows: storage.values.has('local:kiloAgentWorkflows'),
+    }).toStrictEqual({ draft: false, workflows: false });
+    expect({
+      atom: getDefaultStore().get(pendingApprovalAtom),
+      lock: getDefaultStore().get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
+  });
+
+  it('a card request succeeds after a settings-read failure', async () => {
+    // The first request fails at the settings read. The next request must still work.
+    const failingStorage = createStorage();
+    failingStorage.getItem = () => {
+      throw new Error('Settings read failed.');
+    };
+    const first = await requestApproval(failingStorage, 'workflow', workflowDraft(), abortSignal());
+    expect(first).toStrictEqual({ reason: 'Settings read failed.', status: 'failed' });
+
+    // A new request with auto-approve off shows the card and persists the draft.
+    const storage = createStorage();
+    storage.values.set('local:kiloWorkflowSettings', {
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      autoApproveWorkflowChanges: false,
+    });
+    storage.values.set('local:kiloAgentWorkflows', []);
+
+    const promise = requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    expect({
+      draft: storage.values.has('local:kiloPendingWorkflowSave'),
+      kind: atomStore.get(pendingApprovalAtom)?.kind,
+    }).toStrictEqual({ draft: true, kind: 'workflow' });
+
+    // Settle the card and clean up: no card and the lock released.
+    atomStore.get(pendingApprovalAtom)?.settle({
+      autoApproved: false,
+      savedId: 'wf-retry',
+      status: 'approved',
+    });
+    const outcome = await promise;
+    expect(outcome).toStrictEqual({ autoApproved: false, savedId: 'wf-retry', status: 'approved' });
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
+  });
+
+  it('auto-approve returns failed when hashing the script fails and releases the lock', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentWorkflows', []);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+    const digestSpy = vi.spyOn(crypto.subtle, 'digest').mockRejectedValue(new Error('hash failed'));
+
+    try {
+      const outcome = await requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
+      expect(outcome).toStrictEqual({ reason: 'hash failed', status: 'failed' });
+    } finally {
+      digestSpy.mockRestore();
+    }
+
+    // Nothing was saved, no card, and the lock released.
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows).toStrictEqual([]);
+    const atomStore = getDefaultStore();
+    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('auto-approve returns failed for a kind mismatch and releases the lock', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentWorkflows', []);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+
+    // A memory draft cannot be saved as a workflow kind.
+    const outcome = await requestApproval(storage, 'workflow', memoryDraft(), abortSignal());
+    expect(outcome).toStrictEqual({
+      reason: 'Approval draft does not match its kind.',
+      status: 'failed',
+    });
+
+    // Nothing was saved, no card, and the lock released.
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows).toStrictEqual([]);
+    const atomStore = getDefaultStore();
+    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('auto-approve clears a stale pending draft after saving', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentWorkflows', []);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+    // A stale draft left behind by an earlier interrupted card flow.
+    await savePendingWorkflowDraft(storage, workflowDraft({ name: 'stale' }));
+
+    const outcome = await requestApproval(
+      storage,
+      'workflow',
+      workflowDraft({ name: 'new' }),
+      abortSignal()
+    );
+    expect(outcome).toMatchObject({ autoApproved: true, status: 'approved' });
+
+    // The stale draft is gone and only the new workflow was saved.
+    expect(storage.values.has('local:kiloPendingWorkflowSave')).toBe(false);
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows).toHaveLength(1);
+    expect(workflows[0]?.['name']).toBe('new');
+  });
+
+  it('workflow save with auto-approve off still shows the card and returns autoApproved false', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentWorkflows', []);
+    storage.values.set('local:kiloWorkflowSettings', {
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      autoApproveWorkflowChanges: false,
+    });
+
+    const promise = requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    // The card entry exists and the draft is persisted for it.
+    const atomStore = getDefaultStore();
+    const entry = atomStore.get(pendingApprovalAtom);
+    expect(entry?.kind).toBe('workflow');
+    expect(storage.values.has('local:kiloPendingWorkflowSave')).toBe(true);
+    // The workflow was NOT auto-saved.
+    const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
+    expect(workflows).toStrictEqual([]);
+
+    // Card approval returns autoApproved false.
+    entry?.settle({ autoApproved: false, savedId: 'wf-card', status: 'approved' });
+    const outcome = await promise;
+    expect(outcome).toStrictEqual({
+      autoApproved: false,
+      savedId: 'wf-card',
+      status: 'approved',
+    });
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('memory save always shows the card even when workflow auto-approve is enabled', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentMemories', []);
+    storage.values.set('local:kiloWorkflowSettings', autoApproveSettings());
+
+    const promise = requestApproval(storage, 'memory', memoryDraft(), abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    // The card entry exists and the draft is persisted for it.
+    const atomStore = getDefaultStore();
+    const entry = atomStore.get(pendingApprovalAtom);
+    expect(entry?.kind).toBe('memory');
+    expect(storage.values.has('local:kiloPendingAgentMemoryDraft')).toBe(true);
+    // The memory was NOT auto-saved.
+    const memories = storage.values.get('local:kiloAgentMemories') as unknown[];
+    expect(memories).toStrictEqual([]);
+
+    entry?.settle({ autoApproved: false, savedId: 'mem-card', status: 'approved' });
+    const outcome = await promise;
+    expect(outcome).toStrictEqual({
+      autoApproved: false,
+      savedId: 'mem-card',
+      status: 'approved',
+    });
+    expect(atomStore.get(pendingLockAtom)).toBe(false);
   });
 });

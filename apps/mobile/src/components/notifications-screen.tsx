@@ -48,6 +48,7 @@ import {
   registerForPushNotifications,
 } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
 const deviceTokenQueryKey = ['devicePushToken'] as const;
@@ -165,7 +166,12 @@ function CategoryRow({
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
-        <Text className="text-sm font-medium">{meta.title}</Text>
+        {/* Disabled cue is the muted title, not row opacity: blanket opacity
+            drops every label below the 4.5:1 text minimum. The Switch renders
+            its own disabled appearance. */}
+        <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
+          {meta.title}
+        </Text>
         <Text variant="muted" className="mt-0.5 text-xs">
           {meta.subtitle}
         </Text>

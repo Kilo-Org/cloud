@@ -9,6 +9,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   setThemePreference,
@@ -39,7 +40,11 @@ function PreferenceRow({
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
-        <Text className="text-sm font-medium">{title}</Text>
+        {/* Disabled cue is the muted title, not row opacity — see the same
+            pattern in notifications-screen's CategoryRow. */}
+        <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
+          {title}
+        </Text>
         <Text variant="muted" className="mt-0.5 text-xs">
           {subtitle}
         </Text>

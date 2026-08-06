@@ -72,16 +72,27 @@ function compositeHex(tile: string, background: string): string {
 }
 
 describe('muted-foreground token contrast (WCAG AA text)', () => {
-  it('light theme: >= 4.5:1 against background and card', () => {
-    const surfaces = { background: lightColors.background, card: lightColors.card } as const;
+  // `secondary` is included because it is the surface of the switch rows in
+  // preferences-screen and notifications-screen, where a muted title is the
+  // disabled cue.
+  it('light theme: >= 4.5:1 against background, card, and secondary', () => {
+    const surfaces = {
+      background: lightColors.background,
+      card: lightColors.card,
+      secondary: lightColors.secondary,
+    } as const;
     for (const [name, surface] of Object.entries(surfaces)) {
       const ratio = contrastRatio(lightColors.mutedForeground, surface);
       expect(ratio, `muted-foreground vs ${name} (light)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
     }
   });
 
-  it('dark theme: >= 4.5:1 against background and card', () => {
-    const surfaces = { background: darkColors.background, card: darkColors.card } as const;
+  it('dark theme: >= 4.5:1 against background, card, and secondary', () => {
+    const surfaces = {
+      background: darkColors.background,
+      card: darkColors.card,
+      secondary: darkColors.secondary,
+    } as const;
     for (const [name, surface] of Object.entries(surfaces)) {
       const ratio = contrastRatio(darkColors.mutedForeground, surface);
       expect(ratio, `muted-foreground vs ${name} (dark)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);

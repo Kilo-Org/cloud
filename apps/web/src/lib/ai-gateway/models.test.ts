@@ -4,7 +4,7 @@ import {
   findKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
-  selectAutoFreeModel,
+  selectAutoFreeCandidate,
 } from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
@@ -160,6 +160,16 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('hardcodes the most aggressive reasoning for every Auto Free model', () => {
+      expect(
+        Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
+      ).toEqual({
+        'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
+        'inclusionai/ling-3.0-flash:free': { enabled: true, effort: 'high' },
+        'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
+      });
+    });
+
     test('weights non-Laguna auto-free models higher than Laguna', () => {
       const lagunaModel = autoFreeModels.find(({ model }) => model.includes('laguna'));
       expect(lagunaModel?.weight).toBe(1);
@@ -173,8 +183,8 @@ describe('isFreeModel', () => {
 
     test('uses autoFreeModels weights when selecting a model', () => {
       const candidates = [
-        { model: 'preferred/model', weight: 3 },
-        { model: 'other/model', weight: 1 },
+        { model: 'preferred/model', weight: 3, reasoning: { enabled: true } },
+        { model: 'other/model', weight: 1, reasoning: { enabled: true } },
       ];
       const randomSeed = Array.from({ length: 100 }, (_, index) => `weight-test-${index}`).find(
         seed => getRandomNumber(seed, 4) === 1
@@ -183,7 +193,7 @@ describe('isFreeModel', () => {
       if (!randomSeed) return;
 
       expect(getRandomNumber(randomSeed, 4)).toBe(1);
-      expect(selectAutoFreeModel(candidates, randomSeed)).toBe('preferred/model');
+      expect(selectAutoFreeCandidate(candidates, randomSeed)).toBe(candidates[0]);
     });
 
     test('all autoFreeModels should use the same AI SDK provider', () => {

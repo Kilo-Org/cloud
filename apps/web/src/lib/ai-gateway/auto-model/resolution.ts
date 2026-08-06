@@ -30,7 +30,7 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
-  selectAutoFreeModel,
+  selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -292,14 +292,20 @@ export async function resolveAutoModel(
       return { kind: 'no_free_models_available' };
     }
     const candidateIds = new Set(candidates);
-    const selectedModel = selectAutoFreeModel(
+    const selectedCandidate = selectAutoFreeCandidate(
       autoFreeModels
         .filter(candidate => candidateIds.has(candidate.model))
         .toSorted((a, b) => a.model.localeCompare(b.model)),
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
     );
-    return selectedModel
-      ? { kind: 'ok', resolved: { model: selectedModel } }
+    return selectedCandidate
+      ? {
+          kind: 'ok',
+          resolved: {
+            model: selectedCandidate.model,
+            reasoning: { ...selectedCandidate.reasoning },
+          },
+        }
       : { kind: 'no_free_models_available' };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {

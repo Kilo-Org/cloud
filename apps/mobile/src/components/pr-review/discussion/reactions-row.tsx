@@ -17,7 +17,6 @@ import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
-import { reactionPillA11y } from '@/components/pr-review/discussion/reaction-pill-a11y';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -153,9 +152,13 @@ function ReactionPill({
   if (disabled) {
     borderClass = 'border-hair-soft';
   }
+  // The pill is a toggle in behavior only, so it stays a button — never a
+  // checkbox or switch role. `selected` mirrors the accent-soft fill.
   return (
     <Pressable
-      {...reactionPillA11y({ emoji, count, viewerHasReacted, disabled })}
+      accessibilityRole="button"
+      accessibilityLabel={`${emoji} reaction, ${count} ${count === 1 ? 'reaction' : 'reactions'}`}
+      accessibilityState={{ selected: viewerHasReacted, disabled }}
       onPress={onPress}
       disabled={disabled}
       hitSlop={REACTION_PILL_HIT_SLOP}

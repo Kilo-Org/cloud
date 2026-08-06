@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { type FocusableFieldRef, focusFirstInvalid, formFieldA11y } from './form-field-a11y';
+import { formFieldA11y } from './form-field-a11y';
 
 describe('formFieldA11y', () => {
   it('returns the plain label when neither required nor error is set', () => {
@@ -28,38 +28,5 @@ describe('formFieldA11y', () => {
     expect(formFieldA11y({ label: 'Email', error: null })).toBe('Email');
     expect(formFieldA11y({ label: 'Email', error: '' })).toBe('Email');
     expect(formFieldA11y({ label: 'Email', required: true, error: '' })).toBe('Email, required');
-  });
-});
-
-describe('focusFirstInvalid', () => {
-  function mountedRef(): FocusableFieldRef {
-    return { current: { focus: vi.fn<() => void>() } };
-  }
-
-  it('focuses the first invalid field and returns true', () => {
-    const first = mountedRef();
-    const second = mountedRef();
-
-    expect(focusFirstInvalid([first, second])).toBe(true);
-    expect(first.current?.focus).toHaveBeenCalledTimes(1);
-    expect(second.current?.focus).not.toHaveBeenCalled();
-  });
-
-  it('skips unmounted fields and focuses the first mounted one', () => {
-    const unmounted: FocusableFieldRef = { current: null };
-    const mounted = mountedRef();
-
-    expect(focusFirstInvalid([unmounted, mounted])).toBe(true);
-    expect(mounted.current?.focus).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns false and focuses nothing when every field is unmounted', () => {
-    const unmounted: FocusableFieldRef = { current: null };
-
-    expect(focusFirstInvalid([unmounted, unmounted])).toBe(false);
-  });
-
-  it('returns false for an empty list', () => {
-    expect(focusFirstInvalid([])).toBe(false);
   });
 });

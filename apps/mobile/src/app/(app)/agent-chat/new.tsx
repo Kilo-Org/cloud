@@ -6,9 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import {
-  resolveRestoredNewSessionPrompt,
+  useFencedDraftLoad,
   useNewSessionCreator,
-  useNewSessionDraft,
   useRemoteSpawnDraftCleanup,
 } from '@/components/agents/use-new-session-creator';
 import {
@@ -74,7 +73,11 @@ function NewSessionScreenBody() {
   // and then be replaced by a late prefill. `undefined` marks the not-settled
   // state so the form stays on the pre-render state while the local load runs.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const draftState = useNewSessionDraft({ userId, isIdentityLoading });
+  const draftState = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: NEW_SESSION_DRAFT_KEY,
+  });
 
   // Share-prefill precedence, resolved once before the prompt mounts. The
   // prompt's own `useSharePrefill` still delivers the shared files and
@@ -190,9 +193,12 @@ function NewSessionScreenBody() {
       return;
     }
     promptStateSeededRef.current = true;
-    const restored = resolveRestoredNewSessionPrompt(initialPrompt);
-    promptRef.current = restored.prompt;
-    setHasPrompt(restored.hasPrompt);
+    // `hasPrompt` is exactly what `resolveNewSessionPromptForCreate` re-derives
+    // on submit, so seeding both from one value keeps the Start gate and the
+    // submitted text in agreement.
+    const restored = initialPrompt ?? '';
+    promptRef.current = restored;
+    setHasPrompt(restored.trim().length > 0);
   }, [draftState.settled, initialPrompt, promptRef]);
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({

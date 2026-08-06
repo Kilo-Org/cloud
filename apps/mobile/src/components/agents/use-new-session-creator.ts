@@ -39,22 +39,6 @@ type UseNewSessionCreatorResult = {
   promptRef: RefObject<string>;
 };
 
-/**
- * Route-owned restored-prompt state. The prompt input notifies the route via
- * `onChangeText` only on typing, so a restored draft must seed the creator's
- * `promptRef` and the `hasPrompt` flag explicitly once the draft load
- * settles; otherwise Start stays disabled and a remote start would send an
- * empty prompt. `hasPrompt` is exactly what `resolveNewSessionPromptForCreate`
- * re-derives from the prompt on submit, so seeding both from one source keeps
- * the button gate and the submitted text in agreement.
- */
-export function resolveRestoredNewSessionPrompt(text = ''): {
-  prompt: string;
-  hasPrompt: boolean;
-} {
-  return { prompt: text, hasPrompt: text.trim().length > 0 };
-}
-
 type UseFencedDraftLoadInput = {
   userId: string | undefined;
   isIdentityLoading: boolean;
@@ -117,24 +101,6 @@ export function useFencedDraftLoad({
     };
   }, [userId, isIdentityLoading, entityKey]);
   return draftState;
-}
-
-type UseNewSessionDraftInput = {
-  userId: string | undefined;
-  isIdentityLoading: boolean;
-};
-
-/**
- * Owns the durable new-session draft load for the route: resolves the
- * account-scoped `draft:<userId>` entry for `agent-composer:new` through the
- * shared identity/entity generation fence. Returns `{ settled, text }`, where
- * `text` stays null until a stored draft (or the absence of one) has loaded.
- */
-export function useNewSessionDraft({ userId, isIdentityLoading }: UseNewSessionDraftInput): {
-  settled: boolean;
-  text: string | null;
-} {
-  return useFencedDraftLoad({ userId, isIdentityLoading, entityKey: NEW_SESSION_DRAFT_KEY });
 }
 
 type UseRemoteSpawnDraftCleanupInput = {

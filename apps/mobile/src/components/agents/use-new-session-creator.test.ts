@@ -7,10 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import {
-  resolveRestoredNewSessionPrompt,
   useFencedDraftLoad,
   useNewSessionCreator,
-  useNewSessionDraft,
   useRemoteSpawnDraftCleanup,
 } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
@@ -224,28 +222,13 @@ describe('useNewSessionCreator onCreated', () => {
   });
 });
 
-describe('resolveRestoredNewSessionPrompt', () => {
-  it('resolves a restored draft into sendable prompt state without an edit', () => {
-    expect(resolveRestoredNewSessionPrompt('Restored draft prompt')).toEqual({
-      prompt: 'Restored draft prompt',
-      hasPrompt: true,
-    });
-  });
-
-  it('keeps submit disabled for whitespace-only or absent restored drafts', () => {
-    expect(resolveRestoredNewSessionPrompt('   ')).toEqual({ prompt: '   ', hasPrompt: false });
-    expect(resolveRestoredNewSessionPrompt(undefined)).toEqual({ prompt: '', hasPrompt: false });
-  });
-});
-
 describe('restored new-session submit', () => {
   it('sends the restored prompt without editing once the route seeds the prompt ref', async () => {
     const resultRef = mountCreator(createInput({ organizationId: 'org-1' }));
     const { createSessionFromDraft, promptRef } = requireResult(resultRef);
-    // Mirrors the route's draft-settle seeding: `resolveRestoredNewSessionPrompt`
-    // feeds the creator's promptRef with the stored text and enables submit.
-    const restored = resolveRestoredNewSessionPrompt('Restored draft prompt');
-    promptRef.current = restored.prompt;
+    // Mirrors the route's draft-settle seeding: the restored text feeds the
+    // creator's promptRef and enables submit.
+    promptRef.current = 'Restored draft prompt';
 
     await act(async () => {
       await createSessionFromDraft();
@@ -269,7 +252,11 @@ function NewSessionDraftHarness({
   isIdentityLoading: boolean;
   onRender: (state: DraftLoadState) => void;
 }) {
-  const state = useNewSessionDraft({ userId, isIdentityLoading });
+  const state = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: 'agent-composer:new',
+  });
   onRender(state);
   return null;
 }
@@ -290,7 +277,7 @@ function FencedDraftHarness({
   return null;
 }
 
-describe('useNewSessionDraft generation fencing', () => {
+describe('new-session draft generation fencing', () => {
   it('never publishes an old account load after an account switch', async () => {
     const firstLoad = deferred<string | null>();
     const secondLoad = deferred<string | null>();

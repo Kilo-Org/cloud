@@ -254,10 +254,10 @@ describe('tool-card output caps removed', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ReadToolCardBody({ part }) as unknown as React.ReactElement;
     expect(resolveMarkdownBody).toHaveBeenCalledWith(part);
-    // Read errors render through `SelectableText`, which is a read-only
-    // `TextInput` carrying the error as its `value` prop.
-    const textInputs = findByType(root, 'TextInput');
-    expect(textInputs.some(el => (el.props as { value?: unknown }).value === 'boom')).toBe(true);
+    // `SelectableText` renders a read-only `TextInput` whose text flows
+    // through the `value` prop, not a `Text` element with children.
+    const inputs = findByType(root, 'TextInput');
+    expect(inputs.some(el => (el.props as { value?: unknown }).value === 'boom')).toBe(true);
     expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
     isMarkdownPath.mockReturnValue(false);
   });

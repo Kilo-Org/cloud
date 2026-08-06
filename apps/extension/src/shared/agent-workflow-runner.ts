@@ -314,6 +314,29 @@ export const runWorkflow = async (
   // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding check guarantees a plain object or undefined.
   const normalizedInput = (input ?? {}) as Record<string, unknown>;
 
+  /* Input is embedded in the injected page code on every page, so it carries
+     the same bound as navigation state. */
+  let serializedInput = '';
+  try {
+    serializedInput = JSON.stringify(normalizedInput);
+  } catch {
+    return resultWithActions(
+      { error: 'run_workflow input is not JSON-serializable.', ok: false },
+      dryRun,
+      []
+    );
+  }
+  if (serializedInput.length > MAX_WORKFLOW_STATE_LENGTH) {
+    return resultWithActions(
+      {
+        error: `run_workflow input exceeds the size limit (${String(MAX_WORKFLOW_STATE_LENGTH)} characters). Pass only the values the workflow declares as params.`,
+        ok: false,
+      },
+      dryRun,
+      []
+    );
+  }
+
   // 2b. Declared-params gate — actionable message listing every missing value.
   const missingParams = findMissingRequiredParams(workflow, normalizedInput);
   if (missingParams.length > 0) {
@@ -347,17 +370,6 @@ export const runWorkflow = async (
   let state: unknown = { input: normalizedInput };
   let pagesVisited = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
-
-  // Verify initial input is serializable before building injected code.
-  try {
-    JSON.stringify(state);
-  } catch {
-    return resultWithActions(
-      { error: 'Workflow initial input is not serializable.', ok: false },
-      dryRun,
-      []
-    );
-  }
 
   // 4. Loop, at most MAX_WORKFLOW_PAGES_PER_RUN iterations.
   for (let pageIndex = 0; pageIndex < MAX_WORKFLOW_PAGES_PER_RUN; pageIndex++) {

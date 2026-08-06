@@ -722,7 +722,7 @@ describe('runWorkflow function', () => {
     const deps = createDeps();
     const result = await runWorkflow(deps, { input: circular, tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow initial input is not serializable.',
+      error: 'run_workflow input is not JSON-serializable.',
       ok: false,
     });
   });
@@ -969,5 +969,25 @@ describe('dry-run selector verification', () => {
     const result = await runWorkflow(deps, { tabId: 1, workflow });
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('run input bound', () => {
+  it('rejects an oversized input before touching the page', async () => {
+    const workflow = await buildApprovedWorkflow({ startUrl: 'https://shop.example.com/start' });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, {
+      input: { blob: 'x'.repeat(20_000) },
+      tabId: 1,
+      workflow,
+    });
+
+    expect(result).toStrictEqual({
+      error:
+        'run_workflow input exceeds the size limit (16000 characters). Pass only the values the workflow declares as params.',
+      ok: false,
+    });
+    expect(deps.navigateUrls).toStrictEqual([]);
   });
 });

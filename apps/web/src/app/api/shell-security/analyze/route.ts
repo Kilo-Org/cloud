@@ -11,13 +11,43 @@ import {
   type ShellSecurityError,
   type ShellSecurityResponse,
 } from '@/lib/shell-security/schemas';
-import { generateSecurityReport } from '@/lib/shell-security/report-generator';
-import { getShellSecurityContent } from '@/lib/shell-security/content-loader';
 import {
   checkShellSecurityRateLimit,
   recordShellSecurityScan,
 } from '@/lib/shell-security/rate-limiter';
 import { trackShellSecurityScanCompleted } from '@/lib/shell-security/posthog-tracking';
+
+// The shell-security plugin is end of life. Every published plugin version
+// renders `report.markdown` verbatim in chat, so this endpoint now returns a
+// static discontinuation notice instead of a generated report. It must stay a
+// 200 success response: the plugin wraps error responses in "Security checkup
+// failed unexpectedly" boilerplate, while the success path renders cleanly.
+// Old plugin versions can never be forced to upgrade, so this endpoint (and
+// its legacy /api/security-advisor/analyze alias) stays up indefinitely.
+const EOL_MARKDOWN = `## The Kilo shell security checkup has been discontinued
+
+This plugin no longer performs security analysis and will not receive updates.
+
+You can remove it with:
+
+\`\`\`
+openclaw plugins uninstall shell-security
+\`\`\`
+
+For a managed OpenClaw environment that is secure by default, see [KiloClaw](https://kilo.ai/kiloclaw).
+`;
+
+// Zero findings maps to a clean grade in the old report generator, so A/100
+// with empty findings is the most internally consistent stub for any non-plugin
+// consumer that reads the structured fields.
+const EOL_REPORT: ShellSecurityResponse['report'] = {
+  markdown: EOL_MARKDOWN,
+  grade: 'A',
+  score: 100,
+  summary: { critical: 0, warn: 0, info: 0, passed: 0 },
+  findings: [],
+  recommendations: [],
+};
 
 function errorResponse(
   code: ShellSecurityError['error']['code'],
@@ -95,21 +125,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 6. Generate report
-  const isKiloClaw = payload.source.platform === 'kiloclaw';
-  const content = await getShellSecurityContent();
-  const report = generateSecurityReport({
-    audit: payload.audit,
-    publicIp: payload.publicIp,
-    isKiloClaw,
-    content,
-  });
-
-  // 7. Record scan in DB (synchronous — must complete before response
-  // so the rate limit counter is accurate under concurrent requests)
+  // 6. Record scan in DB (synchronous — must complete before response
+  // so the rate limit counter is accurate under concurrent requests).
+  // Scan rows are also how we measure remaining traffic before removing
+  // the rest of the feature.
   await recordShellSecurityScan(user.id, organizationId ?? undefined, payload);
 
-  // 8. Fire PostHog event (non-blocking — analytics don't need to block the response)
+  // 7. Fire PostHog event (non-blocking — analytics don't need to block the
+  // response). Kept so scan-volume dashboards keep working through the EOL
+  // wind-down; finding counts reflect the stub report, not a real analysis.
   after(() => {
     try {
       trackShellSecurityScanCompleted({
@@ -120,11 +144,11 @@ export async function POST(request: NextRequest) {
         sourceMethod: payload.source.method,
         pluginVersion: payload.source.pluginVersion,
         openclawVersion: payload.source.openclawVersion,
-        findingsCritical: report.summary.critical,
-        findingsWarn: report.summary.warn,
-        findingsInfo: report.summary.info,
-        grade: report.grade,
-        score: report.score,
+        findingsCritical: EOL_REPORT.summary.critical,
+        findingsWarn: EOL_REPORT.summary.warn,
+        findingsInfo: EOL_REPORT.summary.info,
+        grade: EOL_REPORT.grade,
+        score: EOL_REPORT.score,
         publicIp: payload.publicIp,
       });
     } catch (err) {
@@ -132,18 +156,11 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  // 9. Return structured response
+  // 8. Return the static discontinuation notice
   const response: ShellSecurityResponse = {
     apiVersion: API_VERSION,
     status: 'success',
-    report: {
-      markdown: report.markdown,
-      grade: report.grade,
-      score: report.score,
-      summary: report.summary,
-      findings: report.findings,
-      recommendations: report.recommendations,
-    },
+    report: EOL_REPORT,
   };
 
   return NextResponse.json(response);

@@ -5,9 +5,7 @@ import {
   type DeviceSession,
   deviceSessionLabel,
   mapRevokeOutcome,
-  NO_CURRENT_DEVICE_NOTE,
   sortDeviceSessions,
-  UNKNOWN_DEVICE_LABEL,
 } from '@/lib/device-sessions';
 
 function makeSession(overrides: Partial<DeviceSession> & { id: string }): DeviceSession {
@@ -22,10 +20,10 @@ function makeSession(overrides: Partial<DeviceSession> & { id: string }): Device
 
 describe('deviceSessionLabel', () => {
   it('falls back to Unknown device for a missing or empty user agent', () => {
-    expect(deviceSessionLabel(null)).toBe(UNKNOWN_DEVICE_LABEL);
-    expect(deviceSessionLabel(undefined)).toBe(UNKNOWN_DEVICE_LABEL);
-    expect(deviceSessionLabel('')).toBe(UNKNOWN_DEVICE_LABEL);
-    expect(deviceSessionLabel('   ')).toBe(UNKNOWN_DEVICE_LABEL);
+    expect(deviceSessionLabel(null)).toBe('Unknown device');
+    expect(deviceSessionLabel(undefined)).toBe('Unknown device');
+    expect(deviceSessionLabel('')).toBe('Unknown device');
+    expect(deviceSessionLabel('   ')).toBe('Unknown device');
   });
 
   it('maps browser requests to Web browser', () => {
@@ -145,9 +143,5 @@ describe('classifyDeviceSessionsState', () => {
     expect(classifyDeviceSessionsState({ isLoading: false, isError: false, data: rows })).toBe(
       'no-current'
     );
-  });
-
-  it('exports the footer note for the no-current state', () => {
-    expect(NO_CURRENT_DEVICE_NOTE).toBe('Current device could not be identified');
   });
 });

@@ -7,9 +7,7 @@ type DeviceSessionList = DeviceSession[];
 export type RevokeDeviceSessionResult =
   inferRouterOutputs<MobileRouter>['user']['revokeDeviceSessionById'];
 
-export const UNKNOWN_DEVICE_LABEL = 'Unknown device';
-export const CURRENT_DEVICE_BADGE = 'This device';
-export const NO_CURRENT_DEVICE_NOTE = 'Current device could not be identified';
+const UNKNOWN_DEVICE_LABEL = 'Unknown device';
 
 /**
  * Derive a short, human-readable label from the raw `user_agent` HTTP header

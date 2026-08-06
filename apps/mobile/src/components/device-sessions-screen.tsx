@@ -14,11 +14,9 @@ import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   classifyDeviceSessionsState,
-  CURRENT_DEVICE_BADGE,
   type DeviceSession,
   deviceSessionLabel,
   mapRevokeOutcome,
-  NO_CURRENT_DEVICE_NOTE,
   type RevokeOutcome,
   sortDeviceSessions,
 } from '@/lib/device-sessions';
@@ -46,7 +44,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
           {session.isCurrent && (
             <View className="rounded-full bg-primary px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground">
-                {CURRENT_DEVICE_BADGE}
+                This device
               </Text>
             </View>
           )}
@@ -215,7 +213,7 @@ export function DeviceSessionsScreen() {
             ))}
             {state === 'no-current' && (
               <Text variant="muted" className="text-center text-xs">
-                {NO_CURRENT_DEVICE_NOTE}
+                Current device could not be identified
               </Text>
             )}
           </View>

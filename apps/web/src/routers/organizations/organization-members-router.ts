@@ -131,6 +131,18 @@ async function getDirectOrganizationRole(
 // audit log, the terminal settle, and the `organization_write_settled` outbox
 // event are written in ONE transaction (atomic). A failed helper result
 // settles the row `failed` without a success audit or success outbox. A
+// definitive authorization rejection on the keyed paths — an
+// `ensureOrganizationAccess` denial or an `assertOwnerAuthority` refusal —
+// settles the row `failed` the same way before the existing typed error
+// returns, so a same-key retry replays the rejection instead of taking over.
+// Only known authorization `TRPCError` codes (`UNAUTHORIZED` from
+// `ensureOrganizationAccess`, `FORBIDDEN` from `assertOwnerAuthority`) settle
+// as `authorization_failed`; an operational database error from the access
+// re-check is rethrown untouched and leaves the row retryable instead of
+// terminalizing it as a rejection. The takeover/repair paths
+// (`repairOrgRoleChange`, `repairOrgMemberRemove`) re-check access and owner
+// authority the same way before re-running the helper, and settle the same
+// `authorization_failed` outcome on a definitive rejection. A
 // takeover/reconcile retry reads the membership back FIRST: an already-applied
 // role or an already-removed member settles completed and replays, which
 // avoids the NOT_FOUND trap of re-running the helper on the already-applied
@@ -211,6 +223,21 @@ async function bestEffortOrgLedgerWrite(work: () => Promise<unknown>): Promise<v
       `Failed to write organization operation ledger row: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+}
+
+/**
+ * Classifies a rejection raised by the keyed-path access re-check as a
+ * definitive authorization failure: a `TRPCError` with an authorization code
+ * thrown by `ensureOrganizationAccess` (`UNAUTHORIZED`) or by the
+ * owner-authority refusal (`FORBIDDEN`). Operational database errors are not
+ * classified: they stay retryable and must never settle the row as a terminal
+ * `authorization_failed` rejection.
+ */
+function isOrgAuthorizationRejection(error: unknown): boolean {
+  if (error instanceof TRPCError) {
+    return error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN';
+  }
+  return false;
 }
 
 /** Replays a terminal row: only `completed`/`no_op` may replay a canonical result. */
@@ -419,13 +446,27 @@ async function repairOrgRoleChange(args: {
   // Not applied yet: re-run the helper under the same row (takeover). The
   // first attempt may have crashed right after admission, so re-check owner
   // authority before re-running — an admin must never grant the owner role or
-  // act on an existing owner's membership, even through the takeover path.
-  const actorRole = await ensureOrganizationAccess(
-    args.ctx,
-    args.organizationId,
-    ORGANIZATION_MANAGE_ROLES
-  );
-  assertOwnerAuthority(actorRole, { currentRole: membership.role, nextRole: args.role });
+  // act on an existing owner's membership, even through the takeover path. A
+  // definitive authorization rejection settles the row `failed` so a same-key
+  // retry replays the rejection instead of taking over again; an operational
+  // error from the access re-check is rethrown untouched and stays retryable.
+  try {
+    const actorRole = await ensureOrganizationAccess(
+      args.ctx,
+      args.organizationId,
+      ORGANIZATION_MANAGE_ROLES
+    );
+    assertOwnerAuthority(actorRole, { currentRole: membership.role, nextRole: args.role });
+  } catch (error) {
+    if (isOrgAuthorizationRejection(error)) {
+      await settleOrgRoleChangeFailed({
+        row: args.row,
+        distinctId,
+        outcomeCode: 'authorization_failed',
+      });
+    }
+    throw error;
+  }
   return executeOrgRoleChange({
     ...args,
     targetMember: { role: membership.role },
@@ -506,6 +547,26 @@ async function completeOrgMemberRemoval(args: {
   await cleanupRemovedMemberInstances(args.memberId, args.organizationId);
 
   return successResult({ updated: args.memberId });
+}
+
+/** Best-effort failed settle for a role-change row; never masks the typed rejection. */
+async function settleOrgRoleChangeFailed(args: {
+  row: OperationLedgerRow;
+  distinctId: string;
+  outcomeCode: string;
+}): Promise<void> {
+  await bestEffortOrgLedgerWrite(() =>
+    settleOperation(db, {
+      rowId: args.row.id,
+      status: 'failed',
+      outcomeCode: args.outcomeCode,
+      outboxEvent: orgSettledOutboxEvent({
+        distinctId: args.distinctId,
+        intent: 'member_role_change',
+        outcome: 'failed',
+      }),
+    })
+  );
 }
 
 /** Best-effort failed settle for a member-removal row; never masks the typed rejection. */
@@ -624,13 +685,27 @@ async function repairOrgMemberRemove(args: {
   // Re-check owner authority before re-running the removal helper: the first
   // attempt may have crashed right after admission, so the takeover path must
   // not bypass the rule that only an owner may act on an existing owner's
-  // membership.
-  const actorRole = await ensureOrganizationAccess(
-    args.ctx,
-    args.organizationId,
-    ORGANIZATION_MANAGE_ROLES
-  );
-  assertOwnerAuthority(actorRole, { currentRole: membership.role });
+  // membership. A definitive authorization rejection settles the row `failed`
+  // so a same-key retry replays the rejection instead of taking over again; an
+  // operational error from the access re-check is rethrown untouched and stays
+  // retryable.
+  try {
+    const actorRole = await ensureOrganizationAccess(
+      args.ctx,
+      args.organizationId,
+      ORGANIZATION_MANAGE_ROLES
+    );
+    assertOwnerAuthority(actorRole, { currentRole: membership.role });
+  } catch (error) {
+    if (isOrgAuthorizationRejection(error)) {
+      await settleOrgMemberRemovalFailed({
+        row: args.row,
+        distinctId,
+        outcomeCode: 'authorization_failed',
+      });
+    }
+    throw error;
+  }
 
   const completed = await executeOrgMemberRemove(args);
   return { ...completed, replayed: true };
@@ -797,13 +872,28 @@ export const organizationsMembersRouter = createTRPCRouter({
 
           // Only an owner may grant the owner role or act on an existing
           // owner's membership. Runs after the membership read so the ledger
-          // admission stays before the mutable lookup.
-          const actorRole = await ensureOrganizationAccess(
-            ctx,
-            organizationId,
-            ORGANIZATION_MANAGE_ROLES
-          );
-          assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
+          // admission stays before the mutable lookup. A definitive
+          // authorization rejection settles the admitted row `failed` (with the
+          // terminal failure outbox event) so a same-key retry replays the
+          // rejection instead of taking over; an operational error from the
+          // access re-check is rethrown untouched and stays retryable.
+          try {
+            const actorRole = await ensureOrganizationAccess(
+              ctx,
+              organizationId,
+              ORGANIZATION_MANAGE_ROLES
+            );
+            assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
+          } catch (error) {
+            if (isOrgAuthorizationRejection(error)) {
+              await settleOrgRoleChangeFailed({
+                row: admission.row,
+                distinctId,
+                outcomeCode: 'authorization_failed',
+              });
+            }
+            throw error;
+          }
 
           return executeOrgRoleChange({
             row: admission.row,
@@ -1109,13 +1199,28 @@ export const organizationsMembersRouter = createTRPCRouter({
 
           // Only an owner may act on an existing owner's membership. Runs after
           // the membership read so the ledger admission stays before the
-          // mutable lookup.
-          const actorRole = await ensureOrganizationAccess(
-            ctx,
-            organizationId,
-            ORGANIZATION_MANAGE_ROLES
-          );
-          assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
+          // mutable lookup. A definitive authorization rejection settles the
+          // admitted row `failed` (with the terminal failure outbox event) so a
+          // same-key retry replays the rejection instead of taking over; an
+          // operational error from the access re-check is rethrown untouched
+          // and stays retryable.
+          try {
+            const actorRole = await ensureOrganizationAccess(
+              ctx,
+              organizationId,
+              ORGANIZATION_MANAGE_ROLES
+            );
+            assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
+          } catch (error) {
+            if (isOrgAuthorizationRejection(error)) {
+              await settleOrgMemberRemovalFailed({
+                row: admission.row,
+                distinctId,
+                outcomeCode: 'authorization_failed',
+              });
+            }
+            throw error;
+          }
 
           return executeOrgMemberRemove({
             row: admission.row,

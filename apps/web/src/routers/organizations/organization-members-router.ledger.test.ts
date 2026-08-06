@@ -9,6 +9,8 @@ import type * as auditLogModule from '@/lib/organizations/organization-audit-log
 import type * as userModule from '@/lib/user';
 import type * as lifecycleServiceModule from '@/lib/mcp-gateway/lifecycle-service';
 import type * as instanceRegistryModule from '@/lib/kiloclaw/instance-registry';
+import type * as organizationsUtilsModule from '@/routers/organizations/utils';
+import { TRPCError } from '@trpc/server';
 
 // P1-A-08e: the organization operation ledger. The role-change and member
 // removal mutations admit / settle through `@kilocode/db/operation-ledger`,
@@ -22,6 +24,19 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 jest.mock('@kilocode/db/operation-ledger', () => ({
   admitOperation: (...args: unknown[]) => mockAdmitOperation(...args),
   settleOperation: (...args: unknown[]) => mockSettleOperation(...args),
+}));
+
+// The router re-checks organization access inside the keyed mutation bodies
+// AFTER admission. The procedure middleware keeps the REAL
+// `ensureOrganizationAccess` (it closes over the module-internal binding), so
+// existing tests run unchanged; the body-level re-check uses the mock so the
+// tests can drive a definitive authorization rejection after admission.
+const mockEnsureOrganizationAccess = jest.fn() as jest.MockedFunction<
+  typeof organizationsUtilsModule.ensureOrganizationAccess
+>;
+jest.mock('@/routers/organizations/utils', () => ({
+  ...jest.requireActual<typeof organizationsUtilsModule>('@/routers/organizations/utils'),
+  ensureOrganizationAccess: mockEnsureOrganizationAccess,
 }));
 
 const mockUpdateUserRoleInOrganization = jest.fn() as jest.MockedFunction<
@@ -147,6 +162,9 @@ beforeEach(() => {
     callback(tx)
   );
   mockSettleOperation.mockResolvedValue({ settled: true });
+  // The owner caller passes the body-level access re-check by default; tests
+  // that exercise authorization rejections override this per test.
+  mockEnsureOrganizationAccess.mockResolvedValue('owner');
   mockUpdateUserRoleInOrganization.mockResolvedValue({ success: true, updated: 'membership' });
   mockRemoveUserFromOrganization.mockResolvedValue({ rowCount: 1 });
   mockFindUserById.mockResolvedValue({ google_user_email: 'member@example.com' } as never);
@@ -337,6 +355,98 @@ describe('organizations members ledger (P1-A-08e)', () => {
       expect(mockCreateAuditLog).not.toHaveBeenCalled();
     });
 
+    it('settles the row failed when the access re-check rejects a keyed role change', async () => {
+      mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+      mockDbState.targetMember = [{ role: 'member' }];
+      mockEnsureOrganizationAccess.mockRejectedValue(
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        })
+      );
+
+      await expect(caller.update(input)).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have the required organizational role to access this feature',
+      });
+
+      // The definitive authorization rejection settles the admitted row failed
+      // before the existing error returns.
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
+        outboxEvent: { eventName: string; properties: Record<string, unknown> };
+      };
+      expect(settleCall?.outboxEvent).toMatchObject({
+        eventName: 'organization_write_settled',
+        properties: { intent: 'member_role_change', outcome: 'failed' },
+      });
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('settles the row failed when the owner-authority check rejects a keyed role change', async () => {
+      mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+      mockDbState.targetMember = [{ role: 'owner' }];
+      mockEnsureOrganizationAccess.mockResolvedValue('admin');
+
+      await expect(caller.update(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Only an organization owner can manage owners',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('leaves the row retryable when the admitted access re-check hits an operational error', async () => {
+      // An operational database error from the access re-check is NOT a
+      // definitive authorization rejection: it must be rethrown untouched and
+      // must not settle the admitted row as a terminal authorization failure.
+      mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+      mockDbState.targetMember = [{ role: 'member' }];
+      mockEnsureOrganizationAccess.mockRejectedValue(new Error('database connection failed'));
+
+      await expect(caller.update(input)).rejects.toThrow('database connection failed');
+
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('replays a settled failed role change as non-retryable instead of taking over', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'duplicate_settled',
+        row: ledgerRow({ status: 'failed', outcome_code: 'authorization_failed' }),
+      });
+      mockDbState.targetMember = [{ role: 'owner' }];
+
+      await expect(caller.update(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'This action did not complete. Please try again.',
+      });
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
+
     it('conflicts on an in-flight duplicate instead of re-running the helper', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_in_flight',
@@ -435,6 +545,76 @@ describe('organizations members ledger (P1-A-08e)', () => {
         tx,
         expect.objectContaining({ rowId: 'org-ledger-row-id', status: 'completed' })
       );
+    });
+
+    it('settles the row failed when the takeover access re-check rejects a role change', async () => {
+      // A takeover retry must not bypass the access re-check: a definitive
+      // authorization rejection settles the row `failed` before the original
+      // typed error returns, so a later same-key retry replays the rejection
+      // instead of taking over again.
+      mockAdmitOperation.mockResolvedValue({ admission: 'takeover', row: ledgerRow() });
+      mockDbState.roleReadBack = [{ role: 'owner' }];
+      mockEnsureOrganizationAccess.mockRejectedValue(
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        })
+      );
+
+      await expect(caller.update(input)).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have the required organizational role to access this feature',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('settles the row failed when the takeover owner-authority check rejects a role change', async () => {
+      mockAdmitOperation.mockResolvedValue({ admission: 'takeover', row: ledgerRow() });
+      mockDbState.roleReadBack = [{ role: 'owner' }];
+      mockEnsureOrganizationAccess.mockResolvedValue('admin');
+
+      await expect(caller.update(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Only an organization owner can manage owners',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('leaves the row retryable when the takeover access re-check hits an operational error', async () => {
+      // An operational database error during the takeover re-check is rethrown
+      // untouched and never settles the row: the retry stays retryable.
+      mockAdmitOperation.mockResolvedValue({ admission: 'takeover', row: ledgerRow() });
+      mockDbState.roleReadBack = [{ role: 'owner' }];
+      mockEnsureOrganizationAccess.mockRejectedValue(new Error('database connection failed'));
+
+      await expect(caller.update(input)).rejects.toThrow('database connection failed');
+
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -621,6 +801,121 @@ describe('organizations members ledger (P1-A-08e)', () => {
       expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
       expect(mockCreateAuditLog).not.toHaveBeenCalled();
     });
+
+    it('settles the row failed when the access re-check rejects a keyed removal', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'admitted',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      mockEnsureOrganizationAccess.mockRejectedValue(
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        })
+      );
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have the required organizational role to access this feature',
+      });
+
+      // The definitive authorization rejection settles the admitted row failed
+      // before the existing error returns.
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
+        outboxEvent: { eventName: string; properties: Record<string, unknown> };
+      };
+      expect(settleCall?.outboxEvent).toMatchObject({
+        eventName: 'organization_write_settled',
+        properties: { intent: 'member_remove', outcome: 'failed' },
+      });
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
+    });
+
+    it('settles the row failed when the owner-authority check rejects a keyed removal', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'admitted',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'owner', isBot: false }];
+      mockEnsureOrganizationAccess.mockResolvedValue('admin');
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Only an organization owner can manage owners',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
+    });
+
+    it('replays a settled failed removal as non-retryable instead of taking over', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+          status: 'failed',
+          outcome_code: 'authorization_failed',
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'This action did not complete. Please try again.',
+      });
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('leaves the row retryable when the admitted access re-check hits an operational error', async () => {
+      // An operational database error from the access re-check is NOT a
+      // definitive authorization rejection: it must be rethrown untouched and
+      // must not settle the admitted row as a terminal authorization failure.
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'admitted',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      mockEnsureOrganizationAccess.mockRejectedValue(new Error('database connection failed'));
+
+      await expect(caller.remove(input)).rejects.toThrow('database connection failed');
+
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove: read-back takeover repair for member removal', () => {
@@ -685,6 +980,94 @@ describe('organizations members ledger (P1-A-08e)', () => {
         tx,
         expect.objectContaining({ rowId: 'org-ledger-row-id', status: 'completed' })
       );
+    });
+
+    it('settles the row failed when the takeover access re-check rejects a member removal', async () => {
+      // A takeover retry must not bypass the access re-check: a definitive
+      // authorization rejection settles the row `failed` before the original
+      // typed error returns, so a later same-key retry replays the rejection
+      // instead of taking over again.
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'takeover',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      mockEnsureOrganizationAccess.mockRejectedValue(
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        })
+      );
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have the required organizational role to access this feature',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
+    });
+
+    it('settles the row failed when the takeover owner-authority check rejects a member removal', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'takeover',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'owner', isBot: false }];
+      mockEnsureOrganizationAccess.mockResolvedValue('admin');
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Only an organization owner can manage owners',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'authorization_failed',
+        })
+      );
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
+    });
+
+    it('leaves the row retryable when the takeover access re-check hits an operational error', async () => {
+      // An operational database error during the takeover re-check is rethrown
+      // untouched and never settles the row: the retry stays retryable.
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'takeover',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      mockEnsureOrganizationAccess.mockRejectedValue(new Error('database connection failed'));
+
+      await expect(caller.remove(input)).rejects.toThrow('database connection failed');
+
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
     });
 
     it('refuses to remove a service account during takeover repair (settles failed)', async () => {

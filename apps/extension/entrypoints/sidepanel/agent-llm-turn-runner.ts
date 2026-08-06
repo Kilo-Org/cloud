@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies */
 import type {
   AgentConversationEvent,
   RemoteMcpToolCallEvent,
@@ -8,6 +9,7 @@ import {
 } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
 import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
+import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import type {
   KiloGatewayToolCallRequest,
@@ -59,7 +61,7 @@ type DangerousToolCallEvent =
 
 export const runDangerousLlmTurn = ({
   executeRemoteMcpToolCall,
-  maxToolRounds = 20,
+  maxToolRounds = maxAgentToolRounds,
   remoteMcpTools = [],
   selectedTabId,
   supportsImages = false,

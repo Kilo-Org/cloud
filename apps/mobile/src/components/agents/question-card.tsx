@@ -93,12 +93,16 @@ export function QuestionCard({
   const titleRef = useRef<RNText | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
-  useEffect(() => {
-    applyBlockingCardAppearance(presentationRef.current, titleRef, {
-      announce: announceForA11y,
-      focus: moveA11yFocus,
-    });
-  }, [requestId]);
+  useEffect(
+    () =>
+      // The shared cleanup cancels a pending delayed focus retry when the
+      // request is replaced or the card unmounts.
+      applyBlockingCardAppearance(presentationRef.current, titleRef, {
+        announce: announceForA11y,
+        focus: moveA11yFocus,
+      }),
+    [requestId]
+  );
 
   function toggleOption(questionIndex: number, optionIndex: number, multiple: boolean | undefined) {
     setSelectedOptions(prev => {

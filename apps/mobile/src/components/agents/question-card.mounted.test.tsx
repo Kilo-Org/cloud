@@ -1,9 +1,14 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as permission-card.mounted.test.tsx) */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { QuestionCard } from './question-card';
+
+const a11yMocks = vi.hoisted(() => ({
+  announceForA11y: vi.fn<(message: string) => void>(),
+  moveA11yFocus: vi.fn<() => boolean>(() => true),
+}));
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -29,10 +34,7 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#ffffff', mutedForeground: '#6F6A61' }),
 }));
-vi.mock('@/lib/a11y/announce', () => ({
-  announceForA11y: vi.fn(),
-  moveA11yFocus: vi.fn(() => true),
-}));
+vi.mock('@/lib/a11y/announce', () => a11yMocks);
 
 // Custom answer selection contract (final cumulative r7):
 // - Multiple choice: the custom choice is a checkbox. Re-activating it
@@ -146,6 +148,16 @@ function typeCustomText(root: TestRenderer.ReactTestInstance, text: string): voi
 }
 
 describe('QuestionCard custom answer selection', () => {
+  beforeEach(() => {
+    a11yMocks.announceForA11y.mockReset();
+    a11yMocks.moveA11yFocus.mockReset();
+    a11yMocks.moveA11yFocus.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('unchecks the custom answer when re-activated for multiple choice', async () => {
     const renderer = await renderCard(makeQuestion({ multiple: true }));
 
@@ -184,5 +196,45 @@ describe('QuestionCard custom answer selection', () => {
 
     press(optionButton(renderer.root, 'Continue'));
     expect(customChoiceChecked(renderer.root)).toBe(false);
+  });
+
+  it('cancels the delayed focus retry when a new request replaces the card', async () => {
+    vi.useFakeTimers();
+    // First mount misses the node handle (schedules a retry); the replacement
+    // mount finds it (no new retry). If the effect dropped the shared cleanup,
+    // the first retry would still fire after 50ms and focus the stale node.
+    a11yMocks.moveA11yFocus.mockReturnValueOnce(false).mockReturnValue(true);
+
+    const renderer = await renderCard(makeQuestion());
+
+    act(() => {
+      renderer.update(
+        createElement(QuestionCard, {
+          questions: makeQuestion(),
+          onAnswer: () => undefined,
+          onReject: () => undefined,
+          requestId: 'question-req-2',
+        })
+      );
+    });
+
+    vi.advanceTimersByTime(100);
+    expect(a11yMocks.moveA11yFocus).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels the delayed focus retry on unmount', async () => {
+    vi.useFakeTimers();
+    // The first focus attempt misses the node handle, so a retry is scheduled.
+    // The effect cleanup must clear it before it can focus an unmounted node.
+    a11yMocks.moveA11yFocus.mockReturnValueOnce(false).mockReturnValue(true);
+
+    const renderer = await renderCard(makeQuestion());
+
+    act(() => {
+      renderer.unmount();
+    });
+
+    vi.advanceTimersByTime(100);
+    expect(a11yMocks.moveA11yFocus).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { AppState, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
@@ -96,6 +96,23 @@ export function AgentSessionListScreen() {
       void refetchRef.current();
     }, [])
   );
+
+  // App-foreground refresh for the Agents list. The stored query opts out of
+  // React Query's native window-focus refetch (`refetchOnWindowFocus: false`
+  // from the list hook), so an OS foreground transition must be driven here —
+  // through the same wrapped `refetch` as navigation focus — to keep every
+  // stored refetch serialized by the shared operation coordinator (backfill
+  // and departure never overlap a refetch).
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        void refetchRef.current();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const showSearchBusy = selectShowSearchBusy({
     awaitingCommit,

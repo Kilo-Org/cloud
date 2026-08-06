@@ -166,9 +166,22 @@ describe('buildAgentSessionSearchInput', () => {
 });
 
 describe('buildStoredSessionsQueryOptions', () => {
-  it('disables the native window-focus refetch so focus stays coordinated', () => {
+  it('keeps the native window-focus refetch by default (Home and Share Gate)', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    expect(infiniteQueryOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 30 }),
+      expect.objectContaining({ refetchOnWindowFocus: true })
+    );
+    expect(result.refetchOnWindowFocus).toBe(true);
+  });
+
+  it('disables the native window-focus refetch only for the Agents list configuration', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
+      refetchOnWindowFocus: false,
+    });
 
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),

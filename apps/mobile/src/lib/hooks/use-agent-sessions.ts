@@ -41,6 +41,16 @@ type UseAgentSessionsOptions = {
    * care (e.g. Home's session surface) keep the legacy behavior bit-for-bit.
    */
   sortBy?: AgentSessionSortBy;
+  /**
+   * Native window-focus (OS app foreground) refetch for the stored-sessions
+   * query. Defaults to React Query's native behavior (`true`) so Home and
+   * the Share Gate keep their foreground refresh. The Agents list passes
+   * `false`: its screen drives app-foreground refresh through an AppState
+   * callback that runs the wrapped `refetch` behind the shared operation
+   * coordinator, so the native query lifecycle must not start a stored
+   * refetch that bypasses that queue (see `buildStoredSessionsQueryOptions`).
+   */
+  refetchOnWindowFocus?: boolean;
 };
 
 type UseRecentAgentRepositoriesOptions = {
@@ -93,11 +103,12 @@ export function buildStoredSessionsQueryOptions(
     staleTime: 30_000,
     enabled: options?.enabled,
     getNextPageParam: lastPage => lastPage.nextCursor,
-    // The screen's `useFocusEffect` already runs the coordinated stored
-    // refetch, so the native window-focus refetch — which fires directly on
-    // this query on OS app foreground transitions and bypasses the operation
-    // coordinator shared with backfill and departure — is disabled.
-    refetchOnWindowFocus: false,
+    // Native window-focus refetch stays on by default so Home and the Share
+    // Gate keep their OS-foreground refresh. The Agents list opts out: its
+    // screen runs an AppState 'active' callback through the wrapped refetch,
+    // so the native query lifecycle must not start a stored refetch that
+    // bypasses the operation coordinator shared with backfill and departure.
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
   });
 }
 

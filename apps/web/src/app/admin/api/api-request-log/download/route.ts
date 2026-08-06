@@ -2,15 +2,14 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, desc, gt, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 
-// Downloading all logs for a heavy user can take a while. Without a raised
-// maxDuration the Vercel function was killed mid-stream, producing a ZIP
-// without a central directory record. macOS Archive Utility then refused to
-// extract it ("Error 79 - Inappropriate file type or format").
-export const maxDuration = 300;
+// The central directory is written only when the archive finishes. Give large
+// exports the longest function budget used by the app so Vercel does not cut
+// the stream off with an invalid ZIP.
+export const maxDuration = 800;
 
 const BATCH_SIZE = 100;
 
@@ -122,12 +121,60 @@ export async function GET(request: NextRequest) {
 
   const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId, errorsOnly);
 
-  const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
-  if (result.total === 0) {
+  // Bound pagination before streaming starts so newly inserted logs cannot
+  // keep extending a busy export toward the function timeout.
+  const [ceiling] = await db
+    .select({ lastId: api_request_log.id })
+    .from(api_request_log)
+    .where(filter)
+    .orderBy(desc(api_request_log.id))
+    .limit(1);
+  if (!ceiling) {
     return jsonError('No records found for the given criteria', 404);
   }
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  // Request logs are large and text-heavy. Level 1 retains useful compression
+  // while reducing the chance that CPU time prevents the ZIP from finalizing.
+  const archive = archiver('zip', { zlib: { level: 1 } });
+  let totalAppendedEntries = 0;
+  let totalProcessedEntries = 0;
+
+  archive.on('entry', () => {
+    totalProcessedEntries += 1;
+  });
+
+  const waitForEntries = (target: number) => {
+    if (totalProcessedEntries >= target) return Promise.resolve();
+    if (archive.destroyed) {
+      return Promise.reject(new Error('Archive closed before all entries were processed'));
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        archive.off('entry', onEntry);
+        archive.off('error', onError);
+        archive.off('close', onClose);
+      };
+      const onEntry = () => {
+        if (totalProcessedEntries >= target) {
+          cleanup();
+          resolve();
+        }
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const onClose = () => {
+        cleanup();
+        reject(new Error('Archive closed before all entries were processed'));
+      };
+
+      archive.on('entry', onEntry);
+      archive.once('error', onError);
+      archive.once('close', onClose);
+    });
+  };
 
   // Fetch and archive rows in batches using cursor-based pagination to
   // avoid loading the entire result set into memory at once.
@@ -137,7 +184,13 @@ export async function GET(request: NextRequest) {
       const rows = await db
         .select()
         .from(api_request_log)
-        .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
+        .where(
+          and(
+            filter,
+            lte(api_request_log.id, ceiling.lastId),
+            cursor ? gt(api_request_log.id, cursor) : undefined
+          )
+        )
         .orderBy(asc(api_request_log.id))
         .limit(BATCH_SIZE);
 
@@ -150,18 +203,21 @@ export async function GET(request: NextRequest) {
         const requestExt = isJson(row.request) ? 'json' : 'txt';
         const requestContent = tryFormatJson(row.request);
         if (requestContent) {
+          totalAppendedEntries += 1;
           archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
         }
 
         const responseExt = isJson(row.response) ? 'json' : 'txt';
         const responseContent = tryFormatJson(row.response);
         if (responseContent) {
+          totalAppendedEntries += 1;
           archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
         }
 
         if (row.error !== null && row.error !== undefined) {
           const errorContent = tryFormatJson(row.error);
           if (errorContent) {
+            totalAppendedEntries += 1;
             archive.append(errorContent, { name: `${ts}_${id}_error.json` });
           }
         }
@@ -169,17 +225,10 @@ export async function GET(request: NextRequest) {
 
       cursor = rows[rows.length - 1].id;
 
-      // Yield between batches while the archive's readable buffer is above
-      // its high-water mark, so we don't buffer unbounded data in memory.
-      // Polling via setImmediate rather than waiting on a single 'drain'
-      // event: archiver's internal queue pauses once it's out of entries, so
-      // after we stop appending its writable side may never go back above
-      // HWM and 'drain' would never fire again - listening for it would
-      // deadlock the stream.
-      const hwm = archive.readableHighWaterMark ?? 16 * 1024;
-      while (archive.readableLength > hwm) {
-        await new Promise<void>(resolve => setImmediate(resolve));
-      }
+      // Archiver maintains its own input queue, which is not reflected by the
+      // readable stream's high-water mark. Wait until this batch is emitted so
+      // large exports remain bounded even when compression is slower than DB reads.
+      await waitForEntries(totalAppendedEntries);
     }
 
     await archive.finalize();

@@ -94,12 +94,12 @@ vi.mock('react-native', () => ({
   },
 }));
 
+import { exchangeLegacyToken } from '@/lib/auth/auth-context';
 import {
-  exchangeLegacyToken,
   invalidateRefreshSession,
-  persistSignInCredentials,
   performRefresh,
-} from '@/lib/auth/auth-context';
+  persistSignInCredentials,
+} from '@/lib/auth/credentials';
 import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,

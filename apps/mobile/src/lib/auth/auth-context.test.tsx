@@ -743,7 +743,8 @@ describe('bootstrap and foreground race fencing', () => {
     // A same-session refresh replaces the stored pair and publishes the owner
     // while the bootstrap expiry read is in flight.
     await act(async () => {
-      await mod.persistSignInCredentialsAtEpoch('newer-token', 'newer-refresh', {
+      const credentials = await import('@/lib/auth/credentials');
+      await credentials.persistSignInCredentialsAtEpoch('newer-token', 'newer-refresh', {
         expiresIn: 3600,
       });
     });

@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { persistSignInCredentialsAtEpoch } from '@/lib/auth/auth-context';
+import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
 

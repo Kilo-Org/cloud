@@ -202,7 +202,7 @@ describe('useClipboardImageHint', () => {
 
   // ── Text fallback: paste is always available, so text must paste ────────
 
-  it('pastes clipboard text when the clipboard holds no readable image', async () => {
+  it('pastes clipboard text without reading an image the clipboard does not hold', async () => {
     hasClipboardImageMock.mockResolvedValue(false);
     readClipboardImageFileMock.mockResolvedValue(null);
     readClipboardTextMock.mockResolvedValue('https://example.com/spec');
@@ -217,9 +217,32 @@ describe('useClipboardImageHint', () => {
 
     expect(addText).toHaveBeenCalledWith('https://example.com/spec');
     expect(onUnreadable).not.toHaveBeenCalled();
+    // The image read raises the iOS 16 paste prompt; a text clipboard must
+    // never reach it.
+    expect(readClipboardImageFileMock).not.toHaveBeenCalled();
+  });
+
+  it('pastes the text when the clipboard holds an image it cannot read', async () => {
+    hasClipboardImageMock.mockResolvedValue(true);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('fallback text');
+
+    const addText = vi.fn<(text: string) => void>();
+    const onUnreadable = vi.fn<() => void>();
+    const hook = useClipboardImageHint(makeOptions({ addText, onUnreadable }));
+
+    hook.paste();
+    await flushMicrotasks();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(readClipboardImageFileMock).toHaveBeenCalledOnce();
+    expect(addText).toHaveBeenCalledWith('fallback text');
+    expect(onUnreadable).not.toHaveBeenCalled();
   });
 
   it('toasts unreadable when neither an image nor text is on the clipboard', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
     readClipboardImageFileMock.mockResolvedValue(null);
     readClipboardTextMock.mockResolvedValue('');
 
@@ -236,6 +259,7 @@ describe('useClipboardImageHint', () => {
   });
 
   it('keeps the image-only behavior when the caller omits addText', async () => {
+    hasClipboardImageMock.mockResolvedValue(true);
     readClipboardImageFileMock.mockResolvedValue(null);
     readClipboardTextMock.mockResolvedValue('some text');
 
@@ -243,6 +267,8 @@ describe('useClipboardImageHint', () => {
     const hook = useClipboardImageHint(makeOptions({ onUnreadable }));
 
     hook.paste();
+    await flushMicrotasks();
+    await flushMicrotasks();
     await flushMicrotasks();
 
     expect(readClipboardTextMock).not.toHaveBeenCalled();

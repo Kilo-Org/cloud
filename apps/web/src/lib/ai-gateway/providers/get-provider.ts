@@ -22,6 +22,7 @@ import {
   pickModelExperimentVariant,
   type AllocationSubject,
 } from '@/lib/ai-gateway/experiments/pick-variant';
+import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/google-service-account';
 
 /**
  * Metadata about the experiment that resolved this provider, attached when
@@ -105,6 +106,14 @@ async function checkCustomLlm(
   if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
     return null;
   }
+  const resolvedCustomLlm =
+    typeof customLlm.api_key === 'string'
+      ? customLlm
+      : {
+          ...customLlm,
+          google_service_account: undefined,
+          api_key: await getGoogleServiceAccountAccessToken(customLlm.google_service_account),
+        };
   return {
     kind: 'provider',
     provider: buildDirectProvider(
@@ -116,7 +125,7 @@ async function checkCustomLlm(
             ? 'responses'
             : 'chat_completions',
       ],
-      customLlm
+      resolvedCustomLlm
     ),
     userByok: null,
     bypassAccessCheck: true,

@@ -151,7 +151,8 @@ export function CustomLlmsContent() {
       <p className="text-muted-foreground">
         Manage custom LLM definitions stored in the <code>custom_llm2</code> table. Each entry has a{' '}
         <code>public_id</code> and a JSON <code>definition</code> that is validated against{' '}
-        <code>CustomLlmDefinitionSchema</code>.
+        <code>CustomLlmDefinitionSchema</code>. Authentication requires either <code>api_key</code>{' '}
+        or a standard Google Cloud service-account JSON key in <code>google_service_account</code>.
       </p>
 
       {isLoading ? (

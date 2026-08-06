@@ -5,8 +5,8 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const SAMPLE_MODELS: ModelOption[] = [
+  { id: 'kilo-auto/frontier', name: 'Auto Frontier' },
   { id: 'kilo-auto/efficient', name: 'Auto Efficient' },
-  { id: 'kilo-auto/frontier', name: 'Auto Frontier (deprecated)' },
   { id: 'kilo-auto/balanced', name: 'Auto Balanced (deprecated)' },
   { id: 'anthropic/claude-opus-4.6', name: 'Anthropic: Claude Opus 4.6' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic: Claude Sonnet 4.5' },
@@ -23,7 +23,7 @@ const meta: Meta<typeof AutoModelPicker> = {
   },
   args: {
     models: SAMPLE_MODELS,
-    value: 'kilo-auto/efficient',
+    value: 'kilo-auto/frontier',
   },
   decorators: [
     Story => (
@@ -48,6 +48,12 @@ const meta: Meta<typeof AutoModelPicker> = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+export const FrontierSelected: Story = {
+  args: {
+    value: 'kilo-auto/frontier',
+  },
+};
 
 export const EfficientSelected: Story = {
   args: {

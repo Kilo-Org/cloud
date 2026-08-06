@@ -90,7 +90,7 @@ export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
-  name: 'Auto Frontier (deprecated)',
+  name: 'Auto Frontier',
   description: 'Highest performance and capability for any task.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,

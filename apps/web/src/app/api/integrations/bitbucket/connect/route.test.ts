@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
@@ -66,7 +67,7 @@ describe('GET /api/integrations/bitbucket/connect', () => {
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
       { user: expect.objectContaining({ id: USER_ID }) },
       ORGANIZATION_ID,
-      ['owner', 'billing_manager']
+      ORGANIZATION_BILLING_ROLES
     );
   });
 });

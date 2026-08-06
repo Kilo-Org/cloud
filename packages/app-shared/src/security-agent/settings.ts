@@ -1,14 +1,13 @@
+import { canManageOrganizationBilling, type OrganizationRole } from '../organizations/roles';
+
 export const PERSONAL_SECURITY_SCOPE = 'personal';
 
 export function isPersonalSecurityScope(scope: string): boolean {
   return scope === PERSONAL_SECURITY_SCOPE;
 }
 
-export function canManageSecurityAgent(
-  scope: string,
-  role: 'owner' | 'billing_manager' | 'member' | undefined
-): boolean {
-  return isPersonalSecurityScope(scope) || role === 'owner' || role === 'billing_manager';
+export function canManageSecurityAgent(scope: string, role: OrganizationRole | undefined): boolean {
+  return isPersonalSecurityScope(scope) || canManageOrganizationBilling(role);
 }
 
 export function getSecurityAgentAuditUrl(webBaseUrl: string, scope: string): string {

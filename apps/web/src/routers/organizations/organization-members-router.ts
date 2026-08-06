@@ -21,8 +21,9 @@ import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
-  organizationOwnerMutationProcedure,
+  organizationAdminMutationProcedure,
 } from '@/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
@@ -33,13 +34,17 @@ import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
-import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
+import {
+  OrganizationRoleSchema,
+  PublicOrganizationMembersSchema,
+} from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 
 const UpdateMemberSchema = OrganizationIdInputSchema.extend({
   memberId: z.string(),
-  role: z.enum(['owner', 'member', 'billing_manager']).optional(),
+  role: OrganizationRoleSchema.optional(),
   dailyUsageLimitUsd: z.number().min(0).max(MAX_DAILY_LIMIT_USD).nullable().optional(),
 });
 
@@ -49,7 +54,7 @@ const RemoveMemberSchema = OrganizationIdInputSchema.extend({
 
 const InviteMemberSchema = OrganizationIdInputSchema.extend({
   email: z.email('Invalid email address'),
-  role: z.enum(['owner', 'member', 'billing_manager']),
+  role: OrganizationRoleSchema,
 });
 
 const DeleteInviteSchema = OrganizationIdInputSchema.extend({
@@ -61,10 +66,33 @@ const SetChildMembershipsSchema = OrganizationIdInputSchema.extend({
   childOrganizationIds: z.array(z.uuid()),
 });
 
+const OWNER_AUTHORITY_MESSAGE = 'Only an organization owner can manage owners';
+
+/**
+ * Reserves owner authority for owners. Admins match owners everywhere else, but
+ * may not grant the owner role nor act on an existing owner's membership. Both
+ * halves are required: allowing only one would let an admin strip every owner
+ * while being unable to appoint a replacement, leaving the org with no owner.
+ *
+ * Kilo staff bypass this because `ensureOrganizationAccess` resolves them to
+ * `owner`.
+ */
+function assertOwnerAuthority(
+  actorRole: OrganizationRole,
+  target: { currentRole?: OrganizationRole | null; nextRole?: OrganizationRole | null }
+): void {
+  if (actorRole === 'owner') {
+    return;
+  }
+  if (target.currentRole === 'owner' || target.nextRole === 'owner') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: OWNER_AUTHORITY_MESSAGE });
+  }
+}
+
 async function getDirectOrganizationRole(
   organizationId: string,
   userId: string
-): Promise<'owner' | 'member' | 'billing_manager' | null> {
+): Promise<OrganizationRole | null> {
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
@@ -87,14 +115,14 @@ export const organizationsMembersRouter = createTRPCRouter({
       return await getOrganizationMembers(input.organizationId);
     }),
 
-  update: organizationOwnerMutationProcedure
+  update: organizationAdminMutationProcedure
     .input(UpdateMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
       const { organizationId, memberId, role, dailyUsageLimitUsd } = input;
 
       // Get the target user's role if we need to check permissions for role or limit changes
-      let targetMember: { role: string } | undefined;
+      let targetMember: { role: OrganizationRole } | undefined;
       if (role !== undefined || dailyUsageLimitUsd !== undefined) {
         const [member] = await db
           .select({ role: organization_memberships.role })
@@ -125,6 +153,13 @@ export const organizationsMembersRouter = createTRPCRouter({
             message: 'You cannot change your own role',
           });
         }
+
+        const actorRole = await ensureOrganizationAccess(
+          ctx,
+          organizationId,
+          ORGANIZATION_MANAGE_ROLES
+        );
+        assertOwnerAuthority(actorRole, { currentRole: targetMember?.role, nextRole: role });
 
         const result = await updateUserRoleInOrganization(organizationId, memberId, role);
         const updatedUser = await findUserById(memberId);
@@ -283,7 +318,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       return successResult({ added, removed });
     }),
-  remove: organizationOwnerMutationProcedure
+  remove: organizationAdminMutationProcedure
     .input(RemoveMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -326,6 +361,13 @@ export const organizationsMembersRouter = createTRPCRouter({
           message: 'Service account users cannot be removed',
         });
       }
+
+      const actorRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
+      assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
 
       const result = await removeUserFromOrganization(organizationId, memberId, user.id);
       if (result.rowCount === 0) {
@@ -389,8 +431,16 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, email, role } = input;
 
+      // Members can be invited by any billing-capable role; elevated roles
+      // require organization-management authority, and only an owner may invite
+      // another owner.
       if (role !== 'member') {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+        const actorRole = await ensureOrganizationAccess(
+          ctx,
+          organizationId,
+          ORGANIZATION_MANAGE_ROLES
+        );
+        assertOwnerAuthority(actorRole, { nextRole: role });
       }
 
       // Get organization details
@@ -402,7 +452,8 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Owners and Kilo admins can invite any role. Billing managers can invite members only.
+      // Owners and Kilo staff can invite any role. Admins can invite any role
+      // except owner. Billing managers can invite members only.
       let invitation;
       try {
         invitation = await inviteUserToOrganization(organizationId, user.id, email, role);
@@ -476,7 +527,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         acceptInviteUrl,
       };
     }),
-  deleteInvite: organizationOwnerMutationProcedure
+  deleteInvite: organizationAdminMutationProcedure
     .input(DeleteInviteSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
@@ -500,7 +551,15 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Owners can delete any invitation
+      // Owners can revoke any invitation; admins cannot revoke an owner invite,
+      // which is a pending grant of owner authority.
+      const actorRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
+      assertOwnerAuthority(actorRole, { currentRole: invitation.role });
+
       // Expire the invitation by setting expires_at to NOW
       await db
         .update(organization_invitations)

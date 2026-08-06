@@ -21,6 +21,7 @@ import {
   ReviewMemoryChangeRequestError,
 } from '@/lib/code-reviews/review-memory/change-request';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';
@@ -86,7 +87,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   setEnabled: baseProcedure
     .input(PlatformOwnerInputSchema.extend({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       const enabled = await setReviewMemoryEnabled({
         owner,
         platform: input.platform,
@@ -99,7 +100,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   triggerAnalysis: baseProcedure
     .input(PlatformOwnerInputSchema.extend({ repoFullName: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
       return await runReviewMemoryAnalysis({
         owner,
@@ -119,7 +120,7 @@ export const reviewMemoryRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
       const proposal = await updateProposal({
         owner,
@@ -135,7 +136,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   rejectProposal: baseProcedure
     .input(PlatformOwnerInputSchema.extend({ proposalId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
       const proposal = await rejectProposal({ owner, proposalId: input.proposalId });
       if (!proposal) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposal not found.' });
@@ -145,7 +146,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   approveAndOpenChangeRequest: baseProcedure
     .input(PlatformOwnerInputSchema.extend({ proposalId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
       try {
         return await approveAndOpenReviewMemoryChangeRequest({

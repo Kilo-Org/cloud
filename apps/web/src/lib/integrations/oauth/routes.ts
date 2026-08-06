@@ -1,6 +1,7 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   handleStatefulPlatformOAuthConnect,
@@ -38,7 +39,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'linear_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/linear-service')).getLinearOAuthUrl,
-      organizationRoles: ['owner', 'billing_manager'],
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
       requireActiveOrganizationSubscription: true,
     },
   ],

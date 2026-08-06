@@ -6,6 +6,7 @@ import {
   ensureOrganizationAccess,
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
@@ -50,7 +51,7 @@ async function hasWorkOsConnections(organizationId: string) {
 export const organizationSsoRouter = createTRPCRouter({
   createConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
     const { organizationId } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ['owner']);
+    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
     const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
     if (workOSOrg) {
       throw new TRPCError({
@@ -100,7 +101,7 @@ export const organizationSsoRouter = createTRPCRouter({
   }),
   deleteConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
     const { organizationId } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ['owner']);
+    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
     const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
     if (!workOSOrg) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
@@ -110,7 +111,7 @@ export const organizationSsoRouter = createTRPCRouter({
   }),
   generateAdminPortalLink: adminProcedure.input(AdminPortalSchema).mutation(async opts => {
     const { organizationId, linkType } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ['owner']);
+    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
     const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
     if (!workOSOrg) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
@@ -129,7 +130,7 @@ export const organizationSsoRouter = createTRPCRouter({
   }),
   updateSsoDomain: adminProcedure.input(UpdateSSODomainSchema).mutation(async opts => {
     const { organizationId, ssoDomain } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ['owner']);
+    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
 
     await db.transaction(async tx => {
       const [organization] = await tx
@@ -182,7 +183,7 @@ export const organizationSsoRouter = createTRPCRouter({
   }),
   clearSsoDomain: adminProcedure.input(OrgIdSchema).mutation(async opts => {
     const { organizationId } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ['owner']);
+    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
 
     await db
       .update(organizations)

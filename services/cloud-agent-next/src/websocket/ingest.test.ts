@@ -1233,30 +1233,65 @@ describe('createIngestHandler', () => {
     });
 
     it.each([
-      { failureCode: 'payment_required' as const, error: 'Insufficient credits' },
-      { failureCode: 'model_missing' as const, error: 'Model not found' },
-    ])('forwards $failureCode wrapper failures to the session coordinator', async failure => {
-      const doContext = createNewPathDOContext();
-      const handler = createIngestHandler(
-        createFakeState(),
-        createFakeEventQueries(),
-        SESSION_ID,
-        vi.fn(),
-        doContext
-      );
-      const ws = createFakeWebSocket(makeNewPathAttachment());
+      {
+        failureCode: 'payment_required' as const,
+        error: 'Insufficient credits',
+        safeMessage: 'Assistant request failed: insufficient credits',
+      },
+      {
+        failureCode: 'model_missing' as const,
+        error: 'Model not found',
+        safeMessage: 'Assistant request failed: model not found',
+      },
+      {
+        failureCode: 'kilo_output_limit' as const,
+        error: 'Assistant response hit the output length limit',
+        safeMessage: 'Assistant response hit the output length limit',
+      },
+    ])(
+      'forwards $failureCode wrapper failures to the session coordinator',
+      async ({ safeMessage, ...failure }) => {
+        const doContext = createNewPathDOContext();
+        const eventQueries = createFakeEventQueries();
+        const broadcast = vi.fn();
+        const handler = createIngestHandler(
+          createFakeState(),
+          eventQueries,
+          SESSION_ID,
+          broadcast,
+          doContext
+        );
+        const ws = createFakeWebSocket(makeNewPathAttachment());
 
-      await handler.handleIngestMessage(
-        ws,
-        makeStreamMessage('error', { fatal: true, ...failure })
-      );
+        await handler.handleIngestMessage(
+          ws,
+          makeStreamMessage('error', { fatal: true, errorSource: 'assistant', ...failure })
+        );
 
-      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
-        wrapperRunId: WRAPPER_RUN_ID,
-        status: 'failed',
-        ...failure,
-      });
-    });
+        expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
+          wrapperRunId: WRAPPER_RUN_ID,
+          status: 'failed',
+          errorSource: 'assistant',
+          ...failure,
+        });
+        expect(broadcast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            stream_event_type: 'cloud.status',
+            payload: JSON.stringify({ cloudStatus: { type: 'error', message: safeMessage } }),
+          })
+        );
+        expect(eventQueries.insert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: JSON.stringify({
+              fatal: true,
+              errorSource: 'assistant',
+              error: safeMessage,
+              message: safeMessage,
+            }),
+          })
+        );
+      }
+    );
 
     it('does NOT terminalize on wrapper complete event (new path)', async () => {
       const state = createFakeState();

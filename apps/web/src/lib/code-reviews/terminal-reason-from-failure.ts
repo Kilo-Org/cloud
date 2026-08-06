@@ -66,6 +66,7 @@ const FAILURE_CODE_REASONS = {
   assistant_error: 'assistant_failed',
   missing_assistant_reply: 'assistant_no_reply',
   payment_required: 'billing',
+  kilo_output_limit: 'assistant_failed',
   user_interrupt: 'user_cancelled',
   container_shutdown: 'container_shutdown',
   system_interrupt: 'interrupted',

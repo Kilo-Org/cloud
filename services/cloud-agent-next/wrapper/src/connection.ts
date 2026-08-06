@@ -230,9 +230,18 @@ export function isSessionIdleEvent(
 
 function isAssistantCompletionSignal(info: unknown): boolean {
   if (!isRecord(info) || info.role !== 'assistant') return false;
+  if (isOutputLimitTermination(info)) return false;
   const time = isRecord(info.time) ? info.time : undefined;
   return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
+
+function isOutputLimitTermination(info: Record<string, unknown>): boolean {
+  if (info.finish === 'length') return true;
+  const error = info.error;
+  return isRecord(error) && error.name === 'MessageOutputLengthError';
+}
+
+const KILO_OUTPUT_LIMIT_MESSAGE = 'Assistant response hit the output length limit';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1220,6 +1229,18 @@ export function createConnectionManager(
               const currentSessionId = state.currentSession?.kiloSessionId;
               if (!currentSessionId || msgSessionId === currentSessionId) {
                 state.setLastAssistantMessageId(messageInfo.id);
+                // finish === "length" must win over completion-signal arming so a
+                // terminalized run does not also arm post-completion waiters.
+                // Skip while finalizing: post-completion turns (e.g. condense) must
+                // not rewrite a successful run into kilo_output_limit.
+                if (isOutputLimitTermination(messageInfo) && !state.isFinalizing) {
+                  callbacks.onTerminalError({
+                    code: 'kilo_output_limit',
+                    message: KILO_OUTPUT_LIMIT_MESSAGE,
+                    errorSource: 'assistant',
+                  });
+                  return;
+                }
               }
             }
             if (isAssistantCompletionSignal(messageInfo)) {

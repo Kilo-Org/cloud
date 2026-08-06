@@ -5428,6 +5428,7 @@ export type CloudAgentSessionRunFailureCode =
   | 'wrapper_error_after_activity'
   | 'missing_assistant_reply'
   | 'payment_required'
+  | 'kilo_output_limit'
   | 'user_interrupt'
   | 'container_shutdown'
   | 'system_interrupt'

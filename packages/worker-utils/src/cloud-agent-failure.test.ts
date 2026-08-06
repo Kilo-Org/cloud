@@ -44,6 +44,18 @@ describe('classifyCloudAgentFailure', () => {
     });
   });
 
+  it.each([
+    'kilo_output_limit',
+    'wrapper_no_output',
+    'wrapper_ping_timeout',
+    'wrapper_disconnected',
+  ] as const)('classifies %s as platform wrapper_liveness', code => {
+    expect(classifyCloudAgentFailure({ source: 'run', stage: 'agent_activity', code })).toEqual({
+      responsibility: 'platform',
+      reason: 'wrapper_liveness',
+    });
+  });
+
   it('preserves ambiguous assistant and source-control failures as unknown', () => {
     expect(
       classifyCloudAgentFailure({

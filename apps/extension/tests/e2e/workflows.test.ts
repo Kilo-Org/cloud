@@ -817,12 +817,12 @@ document.getElementById('search').addEventListener('click', function () {
     const runPrompt = sidePanel.getByRole('dialog', { name: 'Run workflow "Flight search"' });
     await expect(runPrompt).toBeVisible();
     await expect(runPrompt.getByText('Origin airport')).toBeVisible();
-    await expect(runPrompt.getByRole('button', { name: 'Run', exact: true })).toBeDisabled();
+    await expect(runPrompt.getByRole('button', { exact: true, name: 'Run' })).toBeDisabled();
 
     await runPrompt.getByPlaceholder('ZRH').fill('ZRH');
     await runPrompt.getByPlaceholder('NRT').fill('NRT');
-    await expect(runPrompt.getByRole('button', { name: 'Run', exact: true })).toBeEnabled();
-    await runPrompt.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(runPrompt.getByRole('button', { exact: true, name: 'Run' })).toBeEnabled();
+    await runPrompt.getByRole('button', { exact: true, name: 'Run' }).click();
 
     // The run executes with the collected input; waitFor bridges the async results.
     await expect(sidePanel.getByText('run_workflow completed')).toBeVisible({ timeout: 15_000 });

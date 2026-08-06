@@ -1,4 +1,5 @@
 /* eslint-disable max-expects, jsx-no-new-object-as-prop -- test rendering helpers and fixture assertions */
+// @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';

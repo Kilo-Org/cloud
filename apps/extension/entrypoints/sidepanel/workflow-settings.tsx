@@ -54,6 +54,7 @@ const WorkflowRow = ({
     isApproved: item.isApproved,
     isDangerousMode,
   });
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   return (
     <li
@@ -93,11 +94,23 @@ const WorkflowRow = ({
           <Play aria-hidden="true" className="size-3.5" />
         </button>
         <button
-          aria-label={item.deleteAriaLabel}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:border-status-red-500/50 hover:bg-status-red-500/10 hover:text-status-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
-          onClick={() => {
-            onDelete(item.id);
+          aria-label={confirmingDelete ? `Confirm delete "${item.name}"` : item.deleteAriaLabel}
+          className={
+            confirmingDelete
+              ? 'flex size-8 shrink-0 items-center justify-center rounded-md border border-status-red-500 bg-status-red-500/20 text-status-red-300 transition hover:bg-status-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background'
+              : 'flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:border-status-red-500/50 hover:bg-status-red-500/10 hover:text-status-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background'
+          }
+          onBlur={() => {
+            setConfirmingDelete(false);
           }}
+          onClick={() => {
+            if (confirmingDelete) {
+              onDelete(item.id);
+              return;
+            }
+            setConfirmingDelete(true);
+          }}
+          title={confirmingDelete ? 'Click again to delete' : undefined}
           type="button"
         >
           <Trash2 aria-hidden="true" className="size-3.5" />
@@ -114,9 +127,7 @@ export const WorkflowSettings = (): JSX.Element => {
   const mode = useAtomValue(conversationModeAtom);
   const activeConversationId = useAtomValue(activeConversationIdAtom);
 
-  /* Fall back to old behavior when the mode atom is not yet wired:
-     the safe toggle blocks Run regardless. Once wired, dangerous mode
-     bypasses the safe toggle gate. */
+  /* Mode atom not wired → safe toggle blocks Run; wired dangerous mode bypasses it. */
   const isDangerousMode = mode === 'dangerous';
 
   /* Fall back to old behavior when the activeConversationId atom is not yet

@@ -14,6 +14,12 @@ export default defineConfig({
     },
     environment: 'node',
     globals: false,
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'entrypoints/**/*.test.ts'],
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'entrypoints/**/*.test.ts',
+      'entrypoints/**/*.test.tsx',
+    ],
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

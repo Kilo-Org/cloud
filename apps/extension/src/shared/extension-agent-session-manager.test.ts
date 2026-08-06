@@ -580,7 +580,20 @@ describe('createExtensionAgentSessionManager', () => {
       const trpc = makeTrpcMock();
       trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
         history: {
-          messages: [{ info: { role: 'user', time: {} }, parts: [] }],
+          messages: [
+            {
+              info: { role: 'user', sessionID: SESSION_ID, time: {} },
+              parts: [
+                {
+                  id: 'part-1',
+                  messageID: 'msg-1',
+                  sessionID: SESSION_ID,
+                  text: 'hello',
+                  type: 'text',
+                },
+              ],
+            },
+          ],
           nextCursor: 'cursor-1',
           omittedItemCount: 5,
         },
@@ -592,9 +605,71 @@ describe('createExtensionAgentSessionManager', () => {
       expect(result).toStrictEqual({
         info: { id: SESSION_ID },
         kind: 'success',
-        messages: [{ info: { role: 'user', time: {} }, parts: [] }],
+        messages: [
+          {
+            info: { role: 'user', sessionID: SESSION_ID, time: {} },
+            parts: [
+              {
+                id: 'part-1',
+                messageID: 'msg-1',
+                sessionID: SESSION_ID,
+                text: 'hello',
+                type: 'text',
+              },
+            ],
+          },
+        ],
         nextCursor: 'cursor-1',
         omittedItemCount: 5,
+      });
+    });
+
+    it('normalizes a mismatched server session id to the requested id', async () => {
+      const trpc = makeTrpcMock();
+      const serverSessionId = 'ses_server_mismatched_0000000001' as KiloSessionId;
+      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+        history: {
+          messages: [
+            {
+              info: { role: 'user', sessionID: serverSessionId, time: {} },
+              parts: [
+                {
+                  id: 'part-1',
+                  messageID: 'msg-1',
+                  sessionID: serverSessionId,
+                  text: 'hello',
+                  type: 'text',
+                },
+              ],
+            },
+          ],
+          nextCursor: 'cursor-1',
+          omittedItemCount: 2,
+        },
+        kiloSessionId: serverSessionId,
+      });
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [
+          {
+            info: { role: 'user', sessionID: SESSION_ID, time: {} },
+            parts: [
+              {
+                id: 'part-1',
+                messageID: 'msg-1',
+                sessionID: SESSION_ID,
+                text: 'hello',
+                type: 'text',
+              },
+            ],
+          },
+        ],
+        nextCursor: 'cursor-1',
+        omittedItemCount: 2,
       });
     });
 

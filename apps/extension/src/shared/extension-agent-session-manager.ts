@@ -119,9 +119,39 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
 }
 
 /**
+ * Pin a replayed page to the active kilo session.
+ *
+ * The manager renders the root transcript only for messages whose
+ * `sessionID` equals the adopted root session id, which `onSessionCreated`
+ * seeds from the page's `info.id`. The session-ingest worker can persist
+ * messages under a session id that differs from the one the extension opened
+ * (the session-scoped page fetch is authoritative for the viewer), so without
+ * this normalization every replayed message is filtered out and the reopened
+ * live transcript renders empty. Rewriting the page id and each message and
+ * part session id to the requested `kiloSessionId` keeps live and replayed
+ * messages in the same root transcript while leaving the pagination cursor
+ * and older-message behavior untouched.
+ */
+function pinPageToSession(
+  page: SessionSnapshotPage & { kind: 'success' },
+  kiloSessionId: KiloSessionId
+): SessionSnapshotPage & { kind: 'success' } {
+  return {
+    ...page,
+    info: { ...page.info, id: kiloSessionId },
+    messages: page.messages.map(message => ({
+      info: { ...message.info, sessionID: kiloSessionId },
+      parts: message.parts.map(part => ({ ...part, sessionID: kiloSessionId })),
+    })),
+  };
+}
+
+/**
  * Adapt `cliSessionsV2.getSessionMessagesPage` result to the SDK's
  * `SessionSnapshotPageOutcome` union. Extension-owned; mirrors the mobile
- * `fetchMobileSessionSnapshotPage` adapter.
+ * `fetchMobileSessionSnapshotPage` adapter and pins the replayed page to the
+ * requested `kiloSessionId` so the manager's root transcript filter keeps the
+ * loaded history on screen.
  */
 async function fetchExtensionSessionSnapshotPage(
   trpcClient: TrpcClient,
@@ -136,24 +166,30 @@ async function fetchExtensionSessionSnapshotPage(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
   const history = result.history as KiloSdkMessageHistory | null;
   if (history === null) {
-    return {
-      info: { id: result.kiloSessionId },
-      kind: 'success',
-      messages: [],
-      nextCursor: null,
-      omittedItemCount: 0,
-    };
+    return pinPageToSession(
+      {
+        info: { id: result.kiloSessionId },
+        kind: 'success',
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+      kiloSessionId
+    );
   }
 
   if (isHistoryPage(history)) {
-    return {
-      info: { id: result.kiloSessionId },
-      kind: 'success',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated shape
-      messages: history.messages as SessionSnapshotPage['messages'],
-      nextCursor: history.nextCursor,
-      omittedItemCount: history.omittedItemCount,
-    };
+    return pinPageToSession(
+      {
+        info: { id: result.kiloSessionId },
+        kind: 'success',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated shape
+        messages: history.messages as SessionSnapshotPage['messages'],
+        nextCursor: history.nextCursor,
+        omittedItemCount: history.omittedItemCount,
+      },
+      kiloSessionId
+    );
   }
 
   return history;

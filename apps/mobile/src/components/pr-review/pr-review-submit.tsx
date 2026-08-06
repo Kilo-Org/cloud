@@ -21,6 +21,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import {
+  focusAfterPendingCommentRemoval,
   PendingQueueHint,
   PrReviewPendingCommentRow,
   ReviewSummaryField,
@@ -157,7 +158,12 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
+          // Announce/focus only when the remove is confirmed synchronous:
+          // the provider's removeComment filters by id and returns nothing,
+          // so the item must still be queued at delete-confirm time.
+          const removed = pending.items.some(queued => queued.id === item.id);
           pending.removeComment(item.id);
+          focusAfterPendingCommentRemoval(bodyInputRef, removed);
         },
       },
     ]);
@@ -171,9 +177,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     inlineErrorKind === 'reconnect';
 
   const keyboardVisible = useFormSheetKeyboardVisible();
-  // Keyboard-open viewport is tight; keep count, hide per-item rows so
+  // Keyboard-open viewport is tight; keep the count, hide per-item rows so
   // Submit + Cancel stay above the keyboard at scroll offset 0.
-  const showPendingRows = !keyboardVisible;
 
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
@@ -226,7 +231,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
             </Text>
             {queueHint}
-            {showPendingRows
+            {!keyboardVisible
               ? pending.items.map(item => (
                   <PrReviewPendingCommentRow
                     key={item.id}

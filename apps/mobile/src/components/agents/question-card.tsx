@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   type Text as RNText,
   ScrollView,
   TextInput,
@@ -126,15 +125,15 @@ export function QuestionCard({
     }
   }
 
-  function toggleCustom(questionIndex: number, multiple: boolean | undefined) {
-    setCustomSelected(prev => {
-      const wasSelected = prev[questionIndex] ?? false;
-      if (!multiple && !wasSelected) {
-        // Single select: deselect preset options when custom is toggled on
-        setSelectedOptions(p => ({ ...p, [questionIndex]: new Set<number>() }));
-      }
-      return { ...prev, [questionIndex]: !wasSelected };
-    });
+  function selectCustomOption(questionIndex: number, multiple: boolean | undefined) {
+    if (customSelected[questionIndex]) {
+      return;
+    }
+    if (!multiple) {
+      // Single select: deselect preset options when custom is chosen.
+      setSelectedOptions(p => ({ ...p, [questionIndex]: new Set<number>() }));
+    }
+    setCustomSelected(prev => ({ ...prev, [questionIndex]: true }));
   }
 
   function handleCustomTextChange(questionIndex: number, text: string) {
@@ -251,37 +250,36 @@ export function QuestionCard({
                     );
                   })}
                   {allowCustom ? (
-                    <Pressable
-                      onPress={() => {
-                        toggleCustom(qIndex, question.multiple);
+                    // The custom answer input IS the control: it must not be
+                    // nested under a selection Pressable (that would shadow it
+                    // for assistive technology). Selecting the custom option
+                    // happens from focusing the input and from typing; the
+                    // selected border/background visual stays driven by
+                    // `isCustomActive`.
+                    <TextInput
+                      defaultValue=""
+                      onFocus={() => {
+                        selectCustomOption(qIndex, question.multiple);
                       }}
-                      disabled={isSubmitting || isInert}
+                      onChangeText={text => {
+                        handleCustomTextChange(qIndex, text);
+                      }}
+                      placeholder="Type your own answer…"
+                      placeholderTextColor={colors.mutedForeground}
+                      editable={!isSubmitting && !isInert}
+                      accessibilityLabel="Type your own answer"
                       accessibilityState={{
                         disabled: isSubmitting || isInert,
                         selected: isCustomActive,
                       }}
                       className={cn(
-                        'flex-row items-center rounded-md border px-3 py-2.5 shadow-sm shadow-black/5',
+                        'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-black/5',
                         isCustomActive
-                          ? 'border-primary bg-primary'
-                          : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',
                         (isSubmitting || isInert) && 'opacity-50'
                       )}
-                    >
-                      <TextInput
-                        defaultValue=""
-                        onChangeText={text => {
-                          handleCustomTextChange(qIndex, text);
-                        }}
-                        placeholder="Type your own answer…"
-                        placeholderTextColor={colors.mutedForeground}
-                        editable={!isSubmitting && !isInert}
-                        className={cn(
-                          'flex-1 py-0.5 text-sm',
-                          isCustomActive ? 'text-primary-foreground' : 'text-foreground'
-                        )}
-                      />
-                    </Pressable>
+                    />
                   ) : null}
                 </View>
               </View>

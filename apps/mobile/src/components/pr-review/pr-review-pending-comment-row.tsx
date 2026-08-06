@@ -6,6 +6,7 @@ import { type RefObject } from 'react';
 import { Trash2 } from 'lucide-react-native';
 import { Pressable, TextInput, View } from 'react-native';
 
+import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -56,6 +57,29 @@ export function PrReviewPendingCommentRow({
       </Pressable>
     </View>
   );
+}
+
+/**
+ * Pending-comment removal outcome: announce the deletion and land focus on
+ * the always-mounted, accessibility-labeled Review summary input. A toast
+ * would paint behind the form sheet on iOS, so the announcement is
+ * imperative (`announceForA11y`) rather than toast-owned.
+ *
+ * `removed` must be the caller's confirmed synchronous successful remove —
+ * the item was still queued at delete-confirm time, so the provider's
+ * id-filter definitely dropped it. A failed or absent remove (stale id that
+ * was already dropped) announces nothing and moves no focus, mirroring the
+ * confirmed-success gate on the session-list delete focus handoff.
+ */
+export function focusAfterPendingCommentRemoval(
+  inputRef: RefObject<TextInput | null>,
+  removed: boolean
+): void {
+  if (!removed) {
+    return;
+  }
+  announceForA11y('Pending comment deleted');
+  moveA11yFocus(inputRef);
 }
 
 /** Mono location label matching the composer range format (en dash). */

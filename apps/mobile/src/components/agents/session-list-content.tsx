@@ -29,12 +29,14 @@ import { selectSessionListContentSurface } from '@/components/agents/session-lis
 import { type SessionSection } from '@/components/agents/session-list-helpers';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
+import { sessionListSearchInputA11yRef } from '@/components/agents/session-list-search-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
@@ -236,7 +238,13 @@ export function AgentSessionListContent({
           onSessionPress(item.session_id, item.organization_id);
         }}
         onDelete={() => {
-          deleteSession(item.session_id);
+          // The search input is an always-mounted accessible anchor (when any
+          // sessions remain). The deletion is announced by the mutation hook's
+          // success toast; onDeleted only restores focus, and moveA11yFocus
+          // no-ops when the header is unmounted (last session deleted).
+          deleteSession(item.session_id, () => {
+            moveA11yFocus(sessionListSearchInputA11yRef);
+          });
         }}
         onRename={newTitle => {
           renameSession(item.session_id, newTitle);

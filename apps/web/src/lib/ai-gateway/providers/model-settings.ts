@@ -47,7 +47,7 @@ export async function getOpenRouterDerivedModelVariants(
 
 export async function getModelVariants(
   model: string,
-  allowFallbackVariants = true
+  allowFallbackVariants: boolean
 ): Promise<OpenCodeSettings['variants']> {
   return (
     (await getOpenRouterDerivedModelVariants(model)) ??
@@ -88,7 +88,7 @@ function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
 
 export async function getGatewayOpenCodeSettings(
   model: string,
-  allowFallbackVariants = true
+  allowFallbackVariants: boolean
 ): Promise<OpenCodeSettings | undefined> {
   const ai_sdk_provider = getAiSdkProvider(model, null);
   const variants = await getModelVariants(model, allowFallbackVariants);

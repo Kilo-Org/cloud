@@ -227,15 +227,13 @@ let openPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 // eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize the open synchronously before any await; the awaits live inside the memoized open chain (same pattern as chainSave in save-chain.ts)
 async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
   // Single-flight: one module-level open promise, awaited by every caller.
-  // A total open failure drops the memo so a later caller can retry.
-  openPromise ??= (async () => {
-    try {
-      return await openEncryptedDatabase();
-    } catch (error) {
-      openPromise = null;
-      throw error;
-    }
-  })();
+  // The memo is kept on failure too, so every later caller rejects with the
+  // same error instead of re-running the open. Retrying would delete the
+  // database, regenerate the key, and report to Sentry once per call — and
+  // the read cache calls on every query settle. Nothing an open failure hits
+  // is transient: a wrong key, a corrupt file, and a build without SQLCipher
+  // all need a relaunch or a rebuild.
+  openPromise ??= openEncryptedDatabase();
   return openPromise;
 }
 

@@ -206,6 +206,15 @@ describe('SQLCipher presence', () => {
     await expect(setItem('s', 'a', 'x')).rejects.toThrow(MissingSQLCipherError);
     expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
   });
+
+  it('reports a missing SQLCipher build exactly once, however many callers arrive', async () => {
+    hasSQLCipher = false;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow(MissingSQLCipherError);
+    await expect(getItem('s', 'a')).rejects.toThrow(MissingSQLCipherError);
+    await expect(clearScope('s')).rejects.toThrow(MissingSQLCipherError);
+    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('single-flight open contract', () => {
@@ -271,7 +280,7 @@ describe('probe failure recovery', () => {
     await expect(getItem('s', 'a')).resolves.toBe('x');
   });
 
-  it('rejects when the recovery probe also fails and allows a later retry', async () => {
+  it('rejects every later caller with the same failure, without reopening', async () => {
     failNextProbe = true;
     failEveryProbe = true;
     await expect(setItem('s', 'a', 'x')).rejects.toThrow();
@@ -279,10 +288,18 @@ describe('probe failure recovery', () => {
     // Both the first handle and the recovery-opened handle were closed.
     expect(closeCallCount).toBe(2);
 
-    // The memoized open was dropped, so the next caller opens fresh and succeeds.
+    // The failed open stays memoized: no second delete, no second key, no
+    // second Sentry report, however many callers arrive.
     failEveryProbe = false;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow();
+    await expect(getItem('s', 'a')).rejects.toThrow();
+    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(2);
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+
+    // A relaunch (a fresh module) opens cleanly again.
+    resetEncryptedKvOpenForTests();
     await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -304,18 +321,19 @@ describe('PRAGMA failure recovery', () => {
     await expect(getItem('s', 'a')).resolves.toBe('x');
   });
 
-  it('closes both handles when the PRAGMA key fails on recovery too, then allows a retry', async () => {
+  it('closes both handles when the PRAGMA key fails on recovery too, then stays failed', async () => {
     failEveryPragma = true;
     await expect(setItem('s', 'a', 'x')).rejects.toThrow();
 
     // Both the initial handle and the recovery-opened handle were closed.
     expect(closeCallCount).toBe(2);
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
 
-    // The memoized open was dropped, so the next caller opens fresh and succeeds.
+    // The failed open stays memoized: no reopen, no second delete.
     failEveryPragma = false;
-    await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(3);
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow();
+    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(2);
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -57,6 +57,7 @@ import {
   useCliSessionPresence,
 } from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
+import { useFencedDraftLoad } from '@/components/agents/use-new-session-creator';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
@@ -94,8 +95,10 @@ import {
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
@@ -192,6 +195,22 @@ export function SessionDetailContent({
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
+
+  // Durable composer draft: load the stored draft before the composer mounts
+  // (the composer seeds its input once), and only render the composer after
+  // the load settles. Identity gates the whole flow: drafts neither save nor
+  // restore while the user id is unknown. `settled=false` marks the
+  // not-settled state so the composer stays hidden until the load resolves.
+  // The shared fence resets on identity or session changes and only the
+  // newest generation's load publishes, so an old account or session load can
+  // never restore into the current composer.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const sessionComposerDraftKey = agentComposerDraftKey(sessionId);
+  const composerDraft = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: sessionComposerDraftKey,
+  });
 
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
@@ -968,7 +987,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {isComposerMounted ? (
+        {isComposerMounted && composerDraft.settled ? (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -979,6 +998,7 @@ export function SessionDetailContent({
               isSelectionCurrent={isModelPickerSelectionCurrent}
             >
               <ChatComposer
+                key={`${userId ?? 'anonymous'}:${sessionId}`}
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
@@ -1001,6 +1021,8 @@ export function SessionDetailContent({
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}
+                draftKey={userId ? sessionComposerDraftKey : undefined}
+                initialDraft={composerDraft.text ?? undefined}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

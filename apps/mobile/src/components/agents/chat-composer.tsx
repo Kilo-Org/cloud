@@ -59,8 +59,10 @@ import {
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
+import { clearDraft as clearStoredDraft, flushDraft, saveDraft } from '@/lib/persist/drafts';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import {
@@ -129,6 +131,18 @@ type ChatComposerProps = {
   shareId?: string;
   /** Remote-spawn auto-send flag; fires one submit after share delivery completes. */
   autoSend?: boolean;
+  /**
+   * Durable draft persistence key. When set (with a resolved identity), text
+   * changes are saved debounced, flushed on background/unmount, and cleared
+   * on successful send — the draft survives process kill, never navigation.
+   */
+  draftKey?: string;
+  /**
+   * Restored draft text, seeded once into the empty input on mount through
+   * the existing pendingDraftRestoreRef restore path. The host resolves the
+   * draft before mounting the composer (render only after the load settles).
+   */
+  initialDraft?: string;
 };
 
 export function ChatComposer({
@@ -154,9 +168,14 @@ export function ChatComposer({
   commandState = null,
   shareId,
   autoSend,
+  draftKey,
+  initialDraft,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
+  // Draft persistence is fenced on identity: while the user id is unknown,
+  // drafts neither save nor flush (the drafts module no-ops on an empty id).
+  const { userId } = useCurrentUserId();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const inputFocusedRef = useRef(false);
@@ -233,6 +252,38 @@ export function ChatComposer({
   const measureRef = useRef(measure);
   measureRef.current = measure;
 
+  // Seed the host-loaded draft once, before the first restore-effect run, by
+  // reusing the existing pendingDraftRestoreRef path (it also sets text,
+  // selection, hasText, slash-command state, and the measure node). Seeding
+  // is seed-once: the host resolves the draft before mounting the composer,
+  // so a later prop change never re-applies (and never overwrites typing).
+  const initialDraftSeededRef = useRef(false);
+  if (!initialDraftSeededRef.current) {
+    initialDraftSeededRef.current = true;
+    if (initialDraft !== undefined && initialDraft !== '') {
+      pendingDraftRestoreRef.current = initialDraft;
+    }
+  }
+
+  // Flush the debounced draft write when the app leaves `active` and on
+  // unmount, so a backgrounded-then-killed app (or a navigation away) does
+  // not lose the last keystrokes inside the 500 ms window. The drafts module
+  // epoch-fences the write, so a sign-out that bumped the epoch skips it.
+  useEffect(() => {
+    if (!draftKey || !userId) {
+      return undefined;
+    }
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState !== 'active') {
+        void flushDraft(userId, draftKey);
+      }
+    });
+    return () => {
+      subscription.remove();
+      void flushDraft(userId, draftKey);
+    };
+  }, [draftKey, userId]);
+
   useEffect(() => {
     const draft = pendingDraftRestoreRef.current;
     if (draft === null) {
@@ -242,6 +293,10 @@ export function ChatComposer({
     if (!draft) {
       return;
     }
+    // Sync the live submit-time ref with the restored text: `handleSend`
+    // reads `textRef.current`, so an immediate send (before any keystroke)
+    // must see the restored draft, not the mount-time empty string.
+    textRef.current = draft;
     inputRef.current?.setNativeProps({
       text: draft,
       selection: { start: draft.length, end: draft.length },
@@ -283,6 +338,12 @@ export function ChatComposer({
     // auto-send the user's modified draft.
     if (shareDeliveredRef.current) {
       setAutoSendArmed(false);
+    }
+    // Save boundary for the durable draft: every text change (typing, share
+    // prefill, voice transcript) goes through here. Debounced 500 ms; a
+    // background/unmount flush forces the pending write.
+    if (draftKey && userId) {
+      saveDraft(userId, draftKey, value);
     }
   }
 
@@ -492,6 +553,11 @@ export function ChatComposer({
     setSlashCommandInput(null);
     measure.reset();
     inputRef.current?.clear();
+    // Clear the persisted draft only on successful send / explicit clear,
+    // never on navigation-away, process kill, or sign-out.
+    if (draftKey && userId) {
+      void clearStoredDraft(userId, draftKey);
+    }
   }
 
   async function handleSend() {

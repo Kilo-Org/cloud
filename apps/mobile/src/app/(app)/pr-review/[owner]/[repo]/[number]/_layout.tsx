@@ -2,6 +2,8 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { prReviewDraftKey } from '@/lib/persist/drafts';
 import { PendingReviewProvider } from '@/lib/pr-review/pending-review-provider';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { parseParam } from '@/lib/route-params';
@@ -21,6 +23,11 @@ type Params = {
  * context (the provider lifetime is the mounted navigation entry, so
  * pending comments survive opening/closing the sheets and the back
  * stack, but clear when the user leaves the PR entirely).
+ *
+ * The provider is keyed by `entity:user`, so an account change (or a
+ * different PR, via the route) remounts it: in-memory items and
+ * hydration state die with the old instance, and pending comments are
+ * persisted per user and per PR under `draft:<userId>`.
  */
 export default function PrReviewNumberLayout() {
   const params = useLocalSearchParams<Params>();
@@ -29,10 +36,13 @@ export default function PrReviewNumberLayout() {
   const rawNumber = parseParam(params.number);
   const number = rawNumber ? Number.parseInt(rawNumber, 10) : Number.NaN;
   const { fullSheetDetent } = useFormSheetDetents();
+  const { userId } = useCurrentUserId();
 
   if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
     return <InvalidRouteState backTo={'/(app)/pr-review' as Href} />;
   }
+
+  const draftEntityKey = prReviewDraftKey(owner, repo, number);
 
   const sheetOptions = {
     presentation: 'formSheet' as const,
@@ -46,7 +56,11 @@ export default function PrReviewNumberLayout() {
   // revoked user can never reach the authenticated queries and mutations.
   return (
     <PrReviewConnectGate>
-      <PendingReviewProvider>
+      <PendingReviewProvider
+        key={`${draftEntityKey}:${userId ?? ''}`}
+        userId={userId}
+        draftEntityKey={draftEntityKey}
+      >
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="comment-composer" options={sheetOptions} />
           <Stack.Screen name="review-submit" options={sheetOptions} />

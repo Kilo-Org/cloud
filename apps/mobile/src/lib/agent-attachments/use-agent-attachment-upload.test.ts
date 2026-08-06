@@ -31,6 +31,7 @@ const hoisted = vi.hoisted(() => {
     uploadOne: vi.fn(),
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
+    measureLocalSize: vi.fn(),
   };
 });
 
@@ -44,7 +45,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 vi.mock('@/lib/agent-attachments/upload-task', () => ({
   normalizeFilename: (name: string) => name,
-  measureLocalSize: vi.fn().mockResolvedValue(1024),
+  measureLocalSize: hoisted.measureLocalSize,
   describeTerminalReason: () => "This file can't be uploaded.",
   uploadOne: hoisted.uploadOne,
 }));
@@ -378,6 +379,8 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     hoisted.uploadOne.mockReset();
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
     resolveUpload = undefined;
     rejectUpload = undefined;
     // Every test controls a fresh pending `uploadOne` promise and settles it
@@ -522,6 +525,65 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('adds no stale candidates or uploads when reset runs during measurement', async () => {
+    let resolveMeasure: ((size: number) => void) | undefined = undefined;
+    hoisted.measureLocalSize.mockReturnValueOnce(
+      new Promise<number>(resolve => {
+        resolveMeasure = resolve;
+      })
+    );
+    const renderer = await mountHook();
+
+    let addPromise: Promise<void> | undefined = undefined;
+    await act(async () => {
+      // The continuation suspends on the pending measurement below.
+      addPromise = hookApi().addCandidates([{ name: 'doc.pdf', uri: 'file:///cache/doc.pdf' }]);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+
+    await act(async () => {
+      resolveMeasure?.(1024);
+      await addPromise;
+      await settle();
+    });
+
+    // The post-reset generation guard drops the measured candidates: no
+    // chips, no uploads, no announcements, and no failure toasts.
+    expect(hookApi().attachments).toHaveLength(0);
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('keeps the upload successful when the success announcement throws', async () => {
+    hoisted.announceForA11y.mockImplementationOnce(() => {
+      throw new Error('announce failed');
+    });
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    // The throw is swallowed by the isolated announcement, so the uploaded
+    // state stands and no failure toast is emitted.
+    expect(hoisted.announceForA11y).toHaveBeenCalledTimes(1);
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    const attachment = hookApi().attachments[0];
+    expect(attachment?.status).toBe('uploaded');
+    expect(attachment?.remoteFilename).toBe('doc.pdf');
     renderer.unmount();
   });
 });

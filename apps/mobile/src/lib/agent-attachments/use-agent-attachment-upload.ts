@@ -130,8 +130,14 @@ export function useAgentAttachmentUpload(
           // Hook-owned success announcement (D19): the flip to terminal
           // success announces exactly once, and only while the composer is
           // still mounted. The chip is presentational and never announces.
+          // The call stays isolated so a throwing native announce cannot
+          // enter the upload catch and convert success into a failure toast.
           if (isMountedRef.current) {
-            announceForA11y('Attachment uploaded');
+            try {
+              announceForA11y('Attachment uploaded');
+            } catch {
+              // Best-effort: the uploaded chip is the visible source of truth.
+            }
           }
         } catch (error) {
           if (generationRef.current !== generation || !liveIdsRef.current.has(attachment.id)) {
@@ -161,6 +167,7 @@ export function useAgentAttachmentUpload(
       if (candidates.length === 0) {
         return;
       }
+      const generation = generationRef.current;
       const limit = canAddAttachments(attachments.length, candidates.length);
       if (!limit.ok) {
         toast.error(`Maximum ${AGENT_ATTACHMENT_MAX_FILES} files allowed`);
@@ -183,6 +190,13 @@ export function useAgentAttachmentUpload(
           return { candidate, size };
         })
       );
+
+      // Row 3.3 stale-outcome guard: a reset while measurement is pending
+      // invalidates the captured generation, so the continuation must not
+      // classify, add, or start uploads for the previous composer session.
+      if (generationRef.current !== generation || !isMountedRef.current) {
+        return;
+      }
 
       const additions: AgentAttachment[] = [];
       for (const { candidate, size } of measured) {
@@ -236,9 +250,12 @@ export function useAgentAttachmentUpload(
   );
 
   const reset = useCallback(() => {
-    setAttachments([]);
-    liveIdsRef.current.clear();
+    // Invalidate the generation before clearing state so a pending
+    // candidate-measurement continuation observes the new generation
+    // and drops its candidates instead of adding them post-reset.
     generationRef.current += 1;
+    liveIdsRef.current.clear();
+    setAttachments([]);
     pathRef.current = Crypto.randomUUID();
     messageUuidRef.current = Crypto.randomUUID();
   }, []);

@@ -278,7 +278,6 @@ describe('MarkdownRenderer key stability', () => {
       renderer.text(' after'),
     ];
     for (const result of [
-      renderer.heading(children),
       renderer.strong(children),
       renderer.em(children),
       renderer.del(children),
@@ -286,6 +285,12 @@ describe('MarkdownRenderer key stability', () => {
       expect(Array.isArray(result)).toBe(true);
       expect((result as ReactNode[])[1]).toMatchObject({ type: 'MarkdownImage' });
     }
+    // A mixed image-and-text heading keeps header semantics without wrapping
+    // the image in native Text.
+    const mixedHeading = renderer.heading(children) as ReactElement<Record<string, unknown>>;
+    expect(mixedHeading.type).toBe('View');
+    expect(mixedHeading.props.accessibilityRole).toBe('header');
+    expect(mixedHeading.props.children).toEqual(children);
     // link() wraps image children in a Pressable with link behavior
     const linkResult = renderer.link(children, 'https://example.com') as ReactElement<
       Record<string, unknown>
@@ -296,10 +301,13 @@ describe('MarkdownRenderer key stability', () => {
     expect(typeof linkResult.props.onPress).toBe('function');
     // Ancestors must not wrap the Pressable in native Text.
     expect(Array.isArray(renderer.text([linkResult]))).toBe(true);
-    expect(Array.isArray(renderer.heading([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.strong([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.em([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.del([linkResult]))).toBe(true);
+    // The linked heading carries real text, so it keeps header semantics too.
+    const linkedHeading = renderer.heading([linkResult]) as ReactElement<Record<string, unknown>>;
+    expect(linkedHeading.type).toBe('View');
+    expect(linkedHeading.props.accessibilityRole).toBe('header');
     // html() with non-string input delegates to textOrChildren
     expect(renderer.html(children)).toMatchObject([
       { type: 'Text' },
@@ -318,10 +326,40 @@ describe('MarkdownRenderer heading semantics', () => {
     expect(element.props.children).toBe('Section title');
   });
 
-  it('heading() keeps image children as pass-through', async () => {
+  it('heading() gives a mixed image-and-text heading the header role', async () => {
     const renderer = await createRenderer();
     const children: ReactNode[] = [
       renderer.text('before '),
+      renderer.html('<img alt="a" src="https://x/a.png">'),
+    ];
+    const result = renderer.heading(children) as ReactElement<Record<string, unknown>>;
+    expect(result.type).toBe('View');
+    expect(result.props.accessibilityRole).toBe('header');
+    // The image stays inside the header-role wrapper (not wrapped in Text).
+    expect(result.props.children).toEqual(children);
+  });
+
+  it('heading() keeps an image-only heading pass-through', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [renderer.html('<img alt="a" src="https://x/a.png">')];
+    const result = renderer.heading(children);
+    expect(Array.isArray(result)).toBe(true);
+    expect((result as ReactNode[])[0]).toMatchObject({ type: 'MarkdownImage' });
+  });
+
+  it('heading() keeps a linked image-only heading pass-through', async () => {
+    const renderer = await createRenderer();
+    const imageChildren: ReactNode[] = [renderer.html('<img alt="a" src="https://x/a.png">')];
+    const linkResult = renderer.link(imageChildren, 'https://example.com');
+    const result = renderer.heading([linkResult]);
+    expect(Array.isArray(result)).toBe(true);
+    expect((result as ReactNode[])[0]).toMatchObject({ type: 'Pressable' });
+  });
+
+  it('heading() treats whitespace-only text around an image as image-only', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [
+      renderer.text(' '),
       renderer.html('<img alt="a" src="https://x/a.png">'),
     ];
     const result = renderer.heading(children);

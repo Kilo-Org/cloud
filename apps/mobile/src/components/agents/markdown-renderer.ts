@@ -54,6 +54,38 @@ function containsMarkdownImage(nodes: ReactNode[]): boolean {
   return false;
 }
 
+/**
+ * Recursively checks whether any node in the tree carries non-image text
+ * content. Whitespace-only strings do not count, so a heading that is an
+ * image plus trailing whitespace still counts as image-only.
+ */
+function containsMeaningfulNonImageText(nodes: ReactNode[]): boolean {
+  for (const node of nodes) {
+    if (Array.isArray(node)) {
+      if (containsMeaningfulNonImageText(node as ReactNode[])) {
+        return true;
+      }
+    } else if (typeof node === 'string') {
+      if (node.trim().length > 0) {
+        return true;
+      }
+    } else if (typeof node === 'number') {
+      return true;
+    } else if (isValidElement(node)) {
+      const children = (node.props as { children?: ReactNode }).children;
+      if (node.type !== MarkdownImage && children !== undefined) {
+        const list = Array.isArray(children)
+          ? (children as ReactNode[])
+          : ([children] as ReactNode[]);
+        if (containsMeaningfulNonImageText(list)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // The library's default `Renderer` renders code blocks with the `em` text
 // style (italic) and renders tables with fixed column widths that frequently
 // overflow the screen with no way to scroll within a chat bubble. We subclass
@@ -114,8 +146,13 @@ export class MarkdownRenderer extends Renderer {
 
   override heading(text: string | ReactNode[], styles?: TextStyle): ReactNode {
     // Headings announce as headers; image-only headings stay pass-through so
-    // the image keeps its own tap target and label.
+    // the image keeps its own tap target and label. A heading that mixes an
+    // image with real text keeps header semantics, so wrap it in a
+    // header-role View that leaves the image reachable.
     if (typeof text !== 'string' && text.length > 0 && containsMarkdownImage(text)) {
+      if (containsMeaningfulNonImageText(text)) {
+        return createElement(View, { accessibilityRole: 'header', key: this.getKey() }, text);
+      }
       return text;
     }
     return this.textNode(text, styles, { accessibilityRole: 'header' });

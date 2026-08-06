@@ -751,7 +751,9 @@ function useSecurityAgentProviderValue(
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
-        trackCommand(data.commandId);
+        if (data.commandId) {
+          trackCommand(data.commandId);
+        }
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -773,7 +775,9 @@ function useSecurityAgentProviderValue(
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
         toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
-        trackCommand(data.commandId);
+        if (data.commandId) {
+          trackCommand(data.commandId);
+        }
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -849,7 +853,9 @@ function useSecurityAgentProviderValue(
             ? 'Analysis restart queued'
             : securityAgentCommandAdmissionCopy.start_analysis.successTitle
         );
-        trackCommand(data.commandId);
+        if (data.commandId) {
+          trackCommand(data.commandId);
+        }
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -950,7 +956,9 @@ function useSecurityAgentProviderValue(
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
-        trackCommand(data.commandId);
+        if (data.commandId) {
+          trackCommand(data.commandId);
+        }
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -972,7 +980,9 @@ function useSecurityAgentProviderValue(
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
         toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
-        trackCommand(data.commandId);
+        if (data.commandId) {
+          trackCommand(data.commandId);
+        }
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -1158,12 +1168,24 @@ function useSecurityAgentProviderValue(
       if (isOrg && organizationId) {
         orgDismissMutate(
           { organizationId, findingId: finding.id, reason, comment },
-          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+          {
+            onSuccess: data => {
+              if (data.commandId) {
+                trackCommand(data.commandId, onSuccess);
+              }
+            },
+          }
         );
       } else {
         personalDismissMutate(
           { findingId: finding.id, reason, comment },
-          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+          {
+            onSuccess: data => {
+              if (data.commandId) {
+                trackCommand(data.commandId, onSuccess);
+              }
+            },
+          }
         );
       }
     },

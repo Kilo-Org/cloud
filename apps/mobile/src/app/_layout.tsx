@@ -302,7 +302,11 @@ function RootLayoutNav() {
     accountId: userId,
     optionalConsent,
   });
-  useScreenTracking();
+  // Consent is settled when the account and its consent decision have loaded
+  // without error and no consent prompt is outstanding. Screen capture must
+  // wait for this: analytics eligibility is decided only after consent.
+  const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
+  useScreenTracking(bootstrapSettled);
 
   useEffect(() => {
     if (shareIntentError) {

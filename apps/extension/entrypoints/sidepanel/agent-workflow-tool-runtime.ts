@@ -89,6 +89,28 @@ const formatArgsError = (toolName: string, error: z.ZodError): string => {
   return `Invalid arguments for ${toolName} — ${details}.`;
 };
 
+/**
+ * Resolve a relative startUrl (e.g. "/" or "/travel/flights") against the
+ * workflow scope. Models reasonably pass a path; accept it instead of failing.
+ * Returns the input unchanged when it is already absolute or unresolvable.
+ */
+export const resolveWorkflowStartUrl = (
+  startUrl: string | undefined,
+  scopeOrigin: string
+): string | undefined => {
+  if (startUrl === undefined || URL.canParse(startUrl)) {
+    return startUrl;
+  }
+  if (!startUrl.startsWith('/')) {
+    return startUrl;
+  }
+  try {
+    return new URL(startUrl, scopeOrigin).toString();
+  } catch {
+    return startUrl;
+  }
+};
+
 const validateWorkflowInput = (
   args: z.infer<typeof saveWorkflowArgsSchema>
 ): string | undefined => {
@@ -122,7 +144,7 @@ const validateWorkflowInput = (
 
   if (args.startUrl !== undefined) {
     if (!URL.canParse(args.startUrl)) {
-      return 'startUrl is not a valid URL.';
+      return `startUrl must be an absolute URL inside the scope, e.g. "${args.scopeOrigin}/path", or a path starting with "/". Received: ${args.startUrl}`;
     }
     if (
       !matchesWorkflowScope(
@@ -259,10 +281,21 @@ const executeSaveWorkflow = async (
   toolCall: WorkflowToolCallEvent,
   ctx: WorkflowToolContext
 ): Promise<EvalTabResult> => {
-  const parsed = saveWorkflowArgsSchema.safeParse(toolCall.arguments);
-  if (!parsed.success) {
-    return { error: formatArgsError('save_workflow', parsed.error), ok: false };
+  const rawParsed = saveWorkflowArgsSchema.safeParse(toolCall.arguments);
+  if (!rawParsed.success) {
+    return { error: formatArgsError('save_workflow', rawParsed.error), ok: false };
   }
+
+  const resolvedStartUrl = resolveWorkflowStartUrl(
+    rawParsed.data.startUrl,
+    rawParsed.data.scopeOrigin
+  );
+  const parsed = {
+    data: {
+      ...rawParsed.data,
+      ...(resolvedStartUrl === undefined ? {} : { startUrl: resolvedStartUrl }),
+    },
+  };
 
   const validationError = validateWorkflowInput(parsed.data);
   if (validationError !== undefined) {

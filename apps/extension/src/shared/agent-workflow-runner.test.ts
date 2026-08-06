@@ -888,3 +888,86 @@ describe('workflow params and input', () => {
     });
   });
 });
+
+describe('dry-run selector verification', () => {
+  it('marks post-action selector misses as unverified instead of hard failures', () => {
+    const code = buildWorkflowPageCode('return { done: true, result: 1 };', {}, true);
+
+    expect(code).toContain('if (dryRun && dryRunActions.length > 0)');
+    expect(code).toContain('kiloDryRunUnverified');
+  });
+
+  it('reports success with recorded actions when a dry run cannot reach later content', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            dryRunActions: [{ action: 'click', selector: '#search' }],
+            dryRunUnverified: true,
+            error: 'Selector not reachable in a dry run: .result',
+            ok: false,
+          },
+        },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+
+    expect(result.ok).toBe(true);
+    expect(result.dryRunActions).toStrictEqual([{ action: 'click', selector: '#search' }]);
+  });
+
+  it('still fails a dry run when a selector is wrong before any action', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            dryRunActions: [],
+            dryRunUnverified: false,
+            error: 'No element matches selector: #missing',
+            ok: false,
+          },
+        },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('treats a dry run that returns nothing after recorded actions as verified', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        {
+          ok: true,
+          value: {
+            dryRunActions: [{ action: 'fill', selector: '#origin' }],
+            ok: true,
+            value: undefined,
+          },
+        },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails a real run that returns nothing', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [{ ok: true, value: { dryRunActions: [], ok: true, value: undefined } }],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+
+    expect(result.ok).toBe(false);
+  });
+});

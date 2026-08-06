@@ -316,7 +316,7 @@ export const createWorkflowToolDefinitions = ({
     definitions.push({
       function: {
         description:
-          'Run a stored user-approved workflow on its scoped site. Only approved workflows can run. With dryRun: true, page.click and page.fill verify selectors and record intended actions instead of performing them; navigations still happen; the result lists the recorded actions. Use dry runs to verify selectors, not outcomes — page state after a recorded action may diverge from a real run.',
+          "Run a stored user-approved workflow on its scoped site. Only approved workflows can run. Pass the workflow's declared params in input. With dryRun: true, page.click and page.fill verify selectors and record intended actions instead of performing them; navigations still happen; the result lists the recorded actions. A dry run verifies selectors up to the first recorded action — content those actions would produce never appears, and the result says so instead of failing. Never re-save or edit a workflow because a dry run stopped there; a real run is the only way to verify the rest, and the user starts it.",
         name: 'run_workflow',
         parameters: {
           additionalProperties: false,

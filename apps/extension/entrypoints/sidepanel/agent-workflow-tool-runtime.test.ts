@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
-import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
+import { executeWorkflowToolCall, resolveWorkflowStartUrl } from './agent-workflow-tool-runtime';
 
 // ---------- mocks ----------
 
@@ -373,7 +373,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
-      error: 'startUrl is not a valid URL.',
+      error: `startUrl must be an absolute URL inside the scope, e.g. "https://example.com/path", or a path starting with "/". Received: not-a-valid-url`,
       ok: false,
     });
   });
@@ -819,5 +819,44 @@ describe('workflow params through tools', () => {
         ],
       },
     });
+  });
+});
+
+describe('startUrl resolution', () => {
+  it('resolves a path startUrl against the scope origin', () => {
+    expect(resolveWorkflowStartUrl('/', 'https://example.com')).toBe('https://example.com/');
+    expect(resolveWorkflowStartUrl('/travel/flights', 'https://example.com')).toBe(
+      'https://example.com/travel/flights'
+    );
+  });
+
+  it('leaves absolute and unresolvable values untouched', () => {
+    expect(resolveWorkflowStartUrl('https://example.com/x', 'https://example.com')).toBe(
+      'https://example.com/x'
+    );
+    expect(resolveWorkflowStartUrl('travel', 'https://example.com')).toBe('travel');
+    expect(resolveWorkflowStartUrl(undefined, 'https://example.com')).toBeUndefined();
+  });
+
+  it('accepts a path startUrl in save_workflow and stores it absolute', async () => {
+    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'id-1', status: 'approved' });
+    const ctx = createBaseCtx({ requestApproval });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'Test',
+        name: 'Test',
+        scopeOrigin: 'https://example.com',
+        script: 'return { done: true, result: 1 };',
+        startUrl: '/search',
+      }),
+      ctx
+    );
+
+    expect(result).toStrictEqual({ ok: true, value: { saved: true, workflowId: 'id-1' } });
+    expect(requestApproval).toHaveBeenCalledWith(
+      'workflow',
+      expect.objectContaining({ startUrl: 'https://example.com/search' })
+    );
   });
 });

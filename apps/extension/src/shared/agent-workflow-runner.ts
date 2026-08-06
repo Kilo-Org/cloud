@@ -45,6 +45,7 @@ const scriptEnvelopeSchema = z.object({
     .array(z.object({ action: z.string(), selector: z.string() }))
     .optional()
     .default([]),
+  dryRunUnverified: z.boolean().optional(),
   error: z.string().optional(),
   ok: z.boolean(),
   value: z.unknown().optional(),
@@ -72,7 +73,14 @@ export const buildWorkflowPageCode = (
   'const page = {\n' +
   '  __q(selector) {\n' +
   '    const el = document.querySelector(selector);\n' +
-  "    if (el === null) { throw new Error('No element matches selector: ' + selector); }\n" +
+  '    if (el === null) {\n' +
+  '      if (dryRun && dryRunActions.length > 0) {\n' +
+  "        const skipped = new Error('Selector not reachable in a dry run: ' + selector);\n" +
+  '        skipped.kiloDryRunUnverified = true;\n' +
+  '        throw skipped;\n' +
+  '      }\n' +
+  "      throw new Error('No element matches selector: ' + selector);\n" +
+  '    }\n' +
   '    return el;\n' +
   '  },\n' +
   '  click(selector) {\n' +
@@ -124,6 +132,7 @@ export const buildWorkflowPageCode = (
   '    ok: false,\n' +
   '    error: error instanceof Error ? error.message : String(error),\n' +
   '    dryRunActions,\n' +
+  '    dryRunUnverified: error instanceof Error && error.kiloDryRunUnverified === true,\n' +
   '  };\n' +
   '}';
 /* eslint-enable prefer-template */
@@ -408,6 +417,24 @@ export const runWorkflow = async (
     const pageActions = envelope.data.dryRunActions;
     dryRunActions.push(...pageActions);
 
+    /* A dry run cannot reach content its own skipped clicks would have produced.
+       Selectors up to the first recorded action are verified, so this reports
+       success with the recorded actions instead of failing a correct script. */
+    if (dryRun && envelope.data.dryRunUnverified === true) {
+      return resultWithActions(
+        {
+          ok: true,
+          pagesVisited,
+          result: {
+            dryRun: true,
+            note: `Selectors before the first recorded action are verified. The script then stopped: ${envelope.data.error ?? 'a later selector was unreachable.'} That is expected in a dry run, because recorded clicks and fills never change the page. Ask the user to start a real run to verify the rest.`,
+          },
+        },
+        dryRun,
+        dryRunActions
+      );
+    }
+
     // Script threw an error.
     if (!envelope.data.ok) {
       return resultWithActions(
@@ -421,6 +448,23 @@ export const runWorkflow = async (
     const innerValue = envelope.data.value as Record<string, unknown>;
 
     if (innerValue === null || innerValue === undefined || typeof innerValue !== 'object') {
+      /* Same reasoning as above: a dry-run script that falls through without a
+         return value usually read post-action content that never rendered. */
+      if (dryRun && dryRunActions.length > 0) {
+        return resultWithActions(
+          {
+            ok: true,
+            pagesVisited,
+            result: {
+              dryRun: true,
+              note: 'Selectors before the first recorded action are verified. The script returned no value, which is expected in a dry run when it reads content that recorded clicks and fills would have produced. Ask the user to start a real run to verify the rest.',
+            },
+          },
+          dryRun,
+          dryRunActions
+        );
+      }
+
       return resultWithActions(
         { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
         dryRun,

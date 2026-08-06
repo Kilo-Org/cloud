@@ -415,6 +415,51 @@ describe('streaming text part id', () => {
     expect(getStreamingTextPartId(messages)).toBe('p-tail');
   });
 
+  it('skips a synthetic snapshot part that follows active assistant text', () => {
+    const messages: StoredMessage[] = [
+      {
+        info: assistantInfo('msg-stream'),
+        parts: [
+          {
+            id: 'p-real',
+            messageID: 'msg-stream',
+            sessionID: 'ses-1',
+            text: 'real output',
+            type: 'text' as const,
+          },
+          {
+            id: 'p-snap',
+            messageID: 'msg-stream',
+            sessionID: 'ses-1',
+            synthetic: true,
+            text: '⠋ Initializing snapshot…',
+            type: 'text' as const,
+          },
+        ],
+      },
+    ];
+    expect(getStreamingTextPartId(messages)).toBe('p-real');
+  });
+
+  it('returns undefined when the streaming message has only a synthetic snapshot part', () => {
+    const messages: StoredMessage[] = [
+      {
+        info: assistantInfo('msg-snap'),
+        parts: [
+          {
+            id: 'p-snap',
+            messageID: 'msg-snap',
+            sessionID: 'ses-1',
+            synthetic: true,
+            text: '⠋ Initializing snapshot…',
+            type: 'text' as const,
+          },
+        ],
+      },
+    ];
+    expect(getStreamingTextPartId(messages)).toBeUndefined();
+  });
+
   it('returns undefined on a completed transcript', () => {
     const messages: StoredMessage[] = [
       {

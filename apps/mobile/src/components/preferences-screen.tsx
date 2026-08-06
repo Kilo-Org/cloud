@@ -1,12 +1,20 @@
-import { Brain, type LucideIcon, Smartphone } from 'lucide-react-native';
+import { type Href, useRouter } from 'expo-router';
+import { Bell, Brain, type LucideIcon, Smartphone } from 'lucide-react-native';
 import { Switch, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  setThemePreference,
+  type ThemePreference,
+  useThemePreference,
+} from '@/lib/hooks/use-theme-preference';
 
 type PreferenceRowProps = Readonly<{
   icon: LucideIcon;
@@ -50,6 +58,8 @@ function PreferenceRow({
 }
 
 export function PreferencesScreen() {
+  const router = useRouter();
+  const { preference: themePreference } = useThemePreference();
   const {
     defaultExpanded,
     hasLoaded: reasoningLoaded,
@@ -85,6 +95,40 @@ export function PreferencesScreen() {
           disabled={!keepScreenOnLoaded}
           onValueChange={setKeepScreenOn}
         />
+
+        {/* Appearance */}
+        <View className="mt-3 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Appearance
+          </Text>
+          <SegmentedControl<ThemePreference>
+            accessibilityLabel="Appearance"
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            value={themePreference}
+            onChange={setThemePreference}
+          />
+        </View>
+
+        {/* Notifications */}
+        <View className="mt-3 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Notifications
+          </Text>
+          <ConfigureRow
+            icon={Bell}
+            title="Notifications"
+            subtitle="Push preferences"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            }}
+          />
+        </View>
       </TabScreenScrollView>
     </View>
   );

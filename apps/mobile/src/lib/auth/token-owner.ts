@@ -14,10 +14,9 @@ export type ActiveToken = {
   expiresAtMs: number | null;
 };
 
-export type ActiveTokenSnapshot = ActiveToken & { epoch: number; generation: number };
+export type ActiveTokenSnapshot = ActiveToken & { epoch: number };
 
 let activeToken: ActiveTokenState | null = null;
-let activeTokenGeneration = 0;
 
 // Sign-out teardown guard: set synchronously when sign-out starts and cleared
 // only when a sign-in publishes credentials. While it is set the stored
@@ -38,7 +37,6 @@ export function isSignOutTeardownActive(): boolean {
 
 /** Holds the token in memory, tagged with the auth epoch that was current when it was stored. */
 export function setActiveToken(token: string, expiresAtMs: number | null): void {
-  activeTokenGeneration += 1;
   activeToken = { token, expiresAtMs, epoch: currentAuthEpoch() };
 }
 
@@ -54,7 +52,7 @@ export function getActiveTokenSnapshot(): ActiveTokenSnapshot | null {
   if (!activeToken || !isCurrentAuthEpoch(activeToken.epoch)) {
     return null;
   }
-  return { ...activeToken, generation: activeTokenGeneration };
+  return { ...activeToken };
 }
 
 /**
@@ -71,7 +69,6 @@ export function publishActiveTokenExpiry(
     !activeToken ||
     activeToken.token !== snapshot.token ||
     activeToken.epoch !== snapshot.epoch ||
-    activeTokenGeneration !== snapshot.generation ||
     !isCurrentAuthEpoch(activeToken.epoch)
   ) {
     return;

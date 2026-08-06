@@ -184,10 +184,7 @@ describe('token-owner', () => {
     });
 
     it('does nothing when no owner is held', () => {
-      publishActiveTokenExpiry(
-        { token: 'token-a', expiresAtMs: null, epoch: 0, generation: 0 },
-        1234
-      );
+      publishActiveTokenExpiry({ token: 'token-a', expiresAtMs: null, epoch: 0 }, 1234);
       expect(getActiveToken()).toBeNull();
     });
 

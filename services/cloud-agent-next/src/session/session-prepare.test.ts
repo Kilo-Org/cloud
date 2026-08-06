@@ -20,6 +20,8 @@ import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import {
   createSessionWithLedger,
+  sessionCreateIntentFingerprint,
+  SESSION_CREATE_INTENT_FINGERPRINT_KEY,
   type SessionRegistrationContext,
 } from './session-registration.js';
 
@@ -573,11 +575,14 @@ describe('createSessionWithLedger admission ladder', () => {
     // The create effect ran; the failure is the terminal settle, not the DO.
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     // Canonical IDs were recorded before the DO call, so the next same-key
-    // retry reconciles them instead of allocating a second session.
+    // retry reconciles them instead of allocating a second session. The create
+    // intent fingerprint travels with the same write so a changed same-key
+    // intent is rejected before any replay or reconciliation.
     expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
+      createIntentFingerprint: expect.any(String),
     });
   });
 
@@ -1346,6 +1351,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
+      createIntentFingerprint: expect.any(String),
     });
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), {
       rowId: ROW_ID,
@@ -1377,5 +1383,485 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
+  });
+});
+
+describe('createSessionWithLedger changed-intent rejection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    generateSandboxRoutingTargetMock.mockResolvedValue({
+      kind: 'isolated',
+      sandboxId: 'sb-test-123',
+    });
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({}),
+    });
+    settleOperationMock.mockResolvedValue({ settled: true });
+    markReconcilePendingMock.mockResolvedValue({});
+    recordOperationProgressMock.mockResolvedValue(undefined);
+  });
+
+  const createOptions = { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 };
+  const ORIGINAL_OPTIONS = {
+    operationKey: OPERATION_KEY,
+    kilocodeOrganizationId: 'org-abc',
+  };
+
+  function originalRequest(): SessionCreateRequest {
+    return makeRequest({
+      initialTurn: { type: 'prompt', prompt: 'Build the feature' },
+      options: ORIGINAL_OPTIONS,
+    });
+  }
+
+  /** Completed ledger row whose canonical result holds the request's intent fingerprint. */
+  async function completedRowFor(request: SessionCreateRequest): Promise<OperationLedgerRow> {
+    return makeLedgerRow({
+      status: 'completed',
+      canonical_result: {
+        cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        initialMessageId: INITIAL_MESSAGE_ID,
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+  }
+
+  /** Asserts the request is rejected with the typed error and no effect runs. */
+  async function expectRejectedWithoutEffects(request: SessionCreateRequest) {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await expect(createSessionWithLedger(request, ctx, createOptions)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+
+    // Rejected before replay, reconciliation, or any external effect.
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+  }
+
+  it('records the create intent fingerprint with the first admitted create progress', async () => {
+    const request = originalRequest();
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await createSessionWithLedger(request, ctx, createOptions);
+
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+      createIntentFingerprint: await sessionCreateIntentFingerprint(request),
+    });
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+  });
+
+  it('replays a settled row when the retry intent matches the stored fingerprint', async () => {
+    const request = originalRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(request),
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await createSessionWithLedger(request, ctx, createOptions);
+
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replay when the retry changes the prompt', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        initialTurn: { type: 'prompt', prompt: 'Build something else entirely' },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes the repository', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        repository: { type: 'github', repo: 'acme/other-repo' },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes the model', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        agent: { mode: 'code', model: 'gpt-4' },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes the organization', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: 'org-xyz' },
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes another create input (agent mode)', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        agent: { mode: 'architect', model: 'claude-3' },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes the finalization policy', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        finalization: { autoCommit: true },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes the appended system prompt', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        profile: {
+          overrides: { appendSystemPrompt: 'Follow these extra rules' },
+        },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes resolved profile settings', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        profile: {
+          resolved: { setupCommands: ['pnpm install'] },
+        },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes a resolved runtime agent', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(originalRequest()),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        profile: {
+          resolved: {
+            runtimeAgents: [
+              {
+                slug: 'reviewer',
+                name: 'Reviewer',
+                config: { prompt: 'Review the diff', mode: 'subagent' },
+              },
+            ],
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a takeover reconcile when the retry changes finalization', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+            await sessionCreateIntentFingerprint(originalRequest()),
+        },
+      }),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        finalization: { condenseOnComplete: true },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('replays when only credential-only profile material changed between retries', async () => {
+    // Rotated envVars, encrypted secrets, and MCP environment/header secrets
+    // are credential-only fields excluded from the intent fingerprint: the
+    // same-key retry must replay the prior session instead of rejecting.
+    const original = makeRequest({
+      profile: {
+        id: 'prof-1',
+        resolved: {
+          envVars: { ORIGINAL_TOKEN: 'old-value' },
+          encryptedSecrets: {
+            API_KEY: {
+              encryptedData: 'abc',
+              encryptedDEK: 'def',
+              algorithm: 'rsa-aes-256-gcm',
+              version: 1,
+            },
+          },
+          mcpServers: {
+            github: {
+              type: 'remote',
+              url: 'https://mcp.example.com/github',
+              headers: { Authorization: 'Bearer old-secret' },
+            },
+          },
+        },
+      },
+      options: ORIGINAL_OPTIONS,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(original),
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await createSessionWithLedger(
+      makeRequest({
+        profile: {
+          id: 'prof-1',
+          resolved: {
+            envVars: { ROTATED_TOKEN: 'new-value' },
+            encryptedSecrets: {
+              API_KEY: {
+                encryptedData: 'zzz',
+                encryptedDEK: 'yyy',
+                algorithm: 'rsa-aes-256-gcm',
+                version: 1,
+              },
+            },
+            mcpServers: {
+              github: {
+                type: 'remote',
+                url: 'https://mcp.example.com/github',
+                headers: { Authorization: 'Bearer new-secret' },
+              },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      ctx,
+      createOptions
+    );
+
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replay when the retry changes an MCP server behavior setting', async () => {
+    // MCP server `environment`/`headers` are credential-only and excluded, but
+    // the server selection itself (url/command/enabled) is create behavior.
+    const original = makeRequest({
+      profile: {
+        resolved: {
+          mcpServers: {
+            github: {
+              type: 'remote',
+              url: 'https://mcp.example.com/github',
+              enabled: true,
+            },
+          },
+        },
+      },
+      options: ORIGINAL_OPTIONS,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(original),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        profile: {
+          resolved: {
+            mcpServers: {
+              github: {
+                type: 'remote',
+                url: 'https://mcp.example.com/github-v2',
+                enabled: true,
+              },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a replay when the retry changes only a remote MCP server timeout', async () => {
+    // The remote MCP server `timeout` is behavior-changing create input the
+    // Durable Object receives (materialized into KILO_CONFIG_CONTENT.mcp), so
+    // a timeout-only change on the same key must never replay or reconcile the
+    // prior session: it rejects before any effect execution.
+    const original = makeRequest({
+      profile: {
+        resolved: {
+          mcpServers: {
+            github: {
+              type: 'remote',
+              url: 'https://mcp.example.com/github',
+              timeout: 30_000,
+            },
+          },
+        },
+      },
+      options: ORIGINAL_OPTIONS,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: await completedRowFor(original),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        profile: {
+          resolved: {
+            mcpServers: {
+              github: {
+                type: 'remote',
+                url: 'https://mcp.example.com/github',
+                timeout: 60_000,
+              },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a takeover reconcile before any reconcile step when the intent changed', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+            await sessionCreateIntentFingerprint(originalRequest()),
+        },
+      }),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        initialTurn: { type: 'prompt', prompt: 'A different prompt' },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('rejects a duplicate_reconcile_pending retry when the intent changed', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+            await sessionCreateIntentFingerprint(originalRequest()),
+        },
+      }),
+    });
+    await expectRejectedWithoutEffects(
+      makeRequest({
+        repository: { type: 'github', repo: 'acme/changed-repo' },
+        options: ORIGINAL_OPTIONS,
+      })
+    );
+  });
+
+  it('keeps the legacy replay behavior for rows recorded without an intent fingerprint', async () => {
+    // Rows admitted before the fingerprint contract carry no comparison data:
+    // the same-key retry keeps the current replay behavior.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      }),
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await createSessionWithLedger(
+      makeRequest({ options: ORIGINAL_OPTIONS }),
+      ctx,
+      createOptions
+    );
+
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 });

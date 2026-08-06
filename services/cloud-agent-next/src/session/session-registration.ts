@@ -51,7 +51,7 @@ import type {
   SessionMessageAdmissionResult,
 } from '../execution/types.js';
 import { throwAdmissionError } from './queue-message.js';
-import type { SessionCreateRequest } from './session-requests.js';
+import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -373,11 +373,14 @@ async function allocateNewSession(
       // Record progress immediately after ID generation (plan P1-A-08b step 3):
       // the ladder treats missing IDs as "nothing external happened". A failure
       // here still fails the create at the report allocation stage and settles
-      // the admitted row so the client gets a terminal result.
+      // the admitted row so the client gets a terminal result. The immutable
+      // create-intent fingerprint is recorded with the same write so a same-key
+      // retry can reject a changed intent before any replay or reconciliation.
       await recordOperationProgress(ledger.db, ledger.rowId, {
         cloudAgentSessionId,
         kiloSessionId,
         initialMessageId: initialTurn.messageId,
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       });
     }
 
@@ -706,6 +709,196 @@ export async function startNewSession(
 
 // ----- ledger-guarded session creation (plan P1-A-08b step 3) -----------------
 
+// ----- immutable create-intent fingerprint (same-key dedupe guard) -------------
+
+/**
+ * Ledger `canonical_result` key holding the SHA-256 fingerprint of the
+ * immutable create intent, recorded with the first admitted create's progress.
+ * A same-key retry compares its own intent against this fingerprint before
+ * replaying or reconciling the row, so a changed request can never inherit the
+ * prior operation's session. Stored data is bounded (64 hex chars) and
+ * non-reversible; no raw prompt, system prompt, profile value, repository,
+ * model, organization, token, or resource content is persisted.
+ */
+export const SESSION_CREATE_INTENT_FINGERPRINT_KEY = 'createIntentFingerprint';
+
+/** SHA-256 hex digest of the given value. */
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Deterministic JSON serialization: object keys are sorted and undefined
+ * values are dropped (JSON semantics), so field order or an explicit
+ * `undefined` never changes a fingerprint.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === undefined || value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record)
+      .sort()
+      .filter(key => record[key] !== undefined);
+    return `{${keys.map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Repository identity with all credential material removed. The explicit git
+ * token is excluded so a refreshed credential on the same repository is the
+ * same create intent.
+ */
+function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<string, unknown> {
+  switch (repository.type) {
+    case 'github':
+      return { type: 'github', repo: repository.repo, branch: repository.branch };
+    case 'gitlab':
+      return { type: 'gitlab', url: repository.url, branch: repository.branch };
+    case 'bitbucket':
+      return {
+        type: 'bitbucket',
+        url: repository.url,
+        workspaceUuid: repository.workspaceUuid,
+        repositoryUuid: repository.repositoryUuid,
+        bitbucketIntegrationId: repository.bitbucketIntegrationId,
+        branch: repository.branch,
+      };
+    case 'git':
+      return { type: 'git', url: repository.url, branch: repository.branch };
+  }
+}
+
+/**
+ * Behavior-changing profile configuration with all credential material
+ * removed. The resolved `envVars` and `encryptedSecrets` are excluded so a
+ * rotated secret on the same profile is the same create intent; MCP server
+ * `environment`/`headers` blocks carry the same credential-only class and are
+ * excluded too. Setup commands, MCP server selection (command/url/enabled/
+ * timeout), runtime skills, runtime agents, and kilo commands are immutable
+ * create inputs sent to the Durable Object and stay in the intent.
+ */
+function profileCreateIntent(
+  profile: SessionCreateRequest['profile']
+): Record<string, unknown> | undefined {
+  const resolved = profile?.resolved;
+  if (!resolved) {
+    return profile?.id ? { id: profile.id } : undefined;
+  }
+  const mcpServers = resolved.mcpServers
+    ? Object.fromEntries(
+        Object.entries(resolved.mcpServers).map(([name, server]) => {
+          // Credential-only MCP `environment` (local) and `headers` (remote)
+          // blocks are excluded; the remaining keys describe create behavior.
+          const behavior: Record<string, unknown> =
+            server.type === 'local'
+              ? {
+                  type: server.type,
+                  command: server.command,
+                  ...(server.enabled !== undefined ? { enabled: server.enabled } : {}),
+                  ...(server.timeout !== undefined ? { timeout: server.timeout } : {}),
+                }
+              : {
+                  type: server.type,
+                  url: server.url,
+                  ...(server.enabled !== undefined ? { enabled: server.enabled } : {}),
+                  ...(server.timeout !== undefined ? { timeout: server.timeout } : {}),
+                };
+          return [name, behavior];
+        })
+      )
+    : undefined;
+  return {
+    ...(profile?.id ? { id: profile.id } : {}),
+    setupCommands: resolved.setupCommands,
+    ...(mcpServers ? { mcpServers } : {}),
+    runtimeSkills: resolved.runtimeSkills,
+    runtimeAgents: resolved.runtimeAgents,
+    kiloCommands: resolved.kiloCommands,
+  };
+}
+
+/**
+ * Stable fingerprint of the immutable create intent, compared before replay,
+ * reconciliation, or effect execution on a same-key retry. Covers every
+ * behavior-changing create input the Durable Object receives: the prompt or
+ * command, the agent selection and appended system prompt, the repository
+ * identity, the finalization policy, the resolved profile configuration, the
+ * organization, and the remaining fixed create inputs (devcontainer, profile
+ * id, shallow clone, origin platform). Excluded by design: server-allocated
+ * identity, the initial message id, credential-only material (git token,
+ * profile envVars/encrypted secrets, MCP server environment/headers), and
+ * mutable continuation fields such as `callbackTarget`.
+ */
+export async function sessionCreateIntentFingerprint(
+  input: SessionRegistrationInput
+): Promise<string> {
+  const initialTurn =
+    input.initialTurn.type === 'prompt'
+      ? {
+          type: 'prompt' as const,
+          prompt: input.initialTurn.prompt,
+          attachments: input.initialTurn.attachments,
+        }
+      : {
+          type: 'command' as const,
+          command: input.initialTurn.command,
+          arguments: input.initialTurn.arguments,
+          attachments: input.initialTurn.attachments,
+        };
+  return sha256Hex(
+    canonicalJson({
+      initialTurn,
+      agent: {
+        mode: input.agent.mode,
+        model: input.agent.model,
+        variant: input.agent.variant || undefined,
+        // The DO stores the effective appended system prompt under `agent`;
+        // it is immutable create input, so a changed system prompt must never
+        // replay or reconcile a prior session.
+        appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt || undefined,
+      },
+      repository: repositoryCreateIntent(input.repository),
+      finalization: input.finalization,
+      runtime: input.runtime?.devcontainer ? { devcontainer: true } : undefined,
+      options: input.options
+        ? {
+            kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
+            createdOnPlatform: input.options.createdOnPlatform || undefined,
+            shallow: input.options.shallow === true ? true : undefined,
+          }
+        : undefined,
+      profile: profileCreateIntent(input.profile),
+    })
+  );
+}
+
+/**
+ * Rejects a same-key retry whose create intent changed after the row recorded
+ * its intent fingerprint. Rows admitted before the fingerprint contract carry
+ * no comparison data and keep the legacy replay/reconcile behavior.
+ */
+async function assertCreateIntentUnchanged(
+  input: SessionRegistrationInput,
+  row: OperationLedgerRow
+): Promise<void> {
+  const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
+  if (typeof stored !== 'string' || stored.length === 0) {
+    return;
+  }
+  if ((await sessionCreateIntentFingerprint(input)) !== stored) {
+    // Typed non-retryable session creation failure: the client clears the key
+    // and starts a new intent instead of inheriting the prior operation.
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+  }
+}
+
 /**
  * Creates a session under the operation ledger. Admit only when the caller
  * (the prepare handler) has already gated on `operationKey` present AND
@@ -714,11 +907,13 @@ export async function startNewSession(
  * Admission outcomes:
  * - `admitted`: run the create effect and settle completed/failed, or mark
  *   reconcile-pending on an unknown transport outcome.
- * - `duplicate_settled`: replay the canonical result with `replayed: true`.
+ * - `duplicate_settled`: replay the canonical result with `replayed: true`,
+ *   but only when the retry's immutable create intent still matches.
  * - `duplicate_in_flight`: `CONFLICT` `creation_in_progress`.
  * - `duplicate_reconcile_in_progress`: another retry holds the reconciliation
  *   lease; `CONFLICT` `creation_in_progress`.
- * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
+ * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect,
+ *   but only when the retry's immutable create intent still matches.
  */
 export async function createSessionWithLedger(
   input: SessionRegistrationInput,
@@ -740,7 +935,7 @@ export async function createSessionWithLedger(
     case 'admitted':
       return executeLedgerCreate(input, ctx, options, db, admission.row, 'new');
     case 'duplicate_settled':
-      return replaySettledCreate(admission.row);
+      return replaySettledCreate(admission.row, input);
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
       throw creationInProgressError();
@@ -750,7 +945,10 @@ export async function createSessionWithLedger(
   }
 }
 
-function replaySettledCreate(row: OperationLedgerRow): LedgerSessionCreateResult {
+async function replaySettledCreate(
+  row: OperationLedgerRow,
+  input: SessionRegistrationInput
+): Promise<LedgerSessionCreateResult> {
   // Only a `completed` settle may replay a successful create. Failed, no_op,
   // interrupted, and superseded terminal rows must surface the typed
   // non-retryable failure even when progress recorded canonical IDs before the
@@ -758,6 +956,9 @@ function replaySettledCreate(row: OperationLedgerRow): LedgerSessionCreateResult
   if (row.status !== 'completed') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
+  // A changed same-key create intent must never replay the prior session; the
+  // typed non-retryable failure lets the client clear the key and start fresh.
+  await assertCreateIntentUnchanged(input, row);
   const canonical = row.canonical_result ?? {};
   const cloudAgentSessionId =
     typeof canonical.cloudAgentSessionId === 'string' ? canonical.cloudAgentSessionId : undefined;
@@ -919,6 +1120,10 @@ async function reconcileLedgerCreate(
   db: WorkerDb,
   row: OperationLedgerRow
 ): Promise<LedgerSessionCreateResult> {
+  // A changed same-key create intent is rejected before ANY reconcile step: no
+  // fresh create, no ownership-row lookup, and no DO metadata read.
+  await assertCreateIntentUnchanged(input, row);
+
   const canonical = row.canonical_result ?? {};
   const cloudAgentSessionId =
     typeof canonical.cloudAgentSessionId === 'string' ? canonical.cloudAgentSessionId : undefined;

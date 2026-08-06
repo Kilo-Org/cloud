@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
-import { AlertCircle, File as FileIcon, X } from 'lucide-react-native';
+import { AlertCircle, File as FileIcon, RotateCcw, X } from 'lucide-react-native';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -14,7 +14,8 @@ type Props = {
   onRetry: (id: string) => void;
 };
 
-const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+/** 28pt visible button + 8pt slop on every side = 44pt effective target. */
+const CHIP_BUTTON_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 
 function AttachmentChip({
   attachment,
@@ -38,63 +39,94 @@ function AttachmentChip({
   });
 
   return (
-    <Pressable
-      onPress={description.showRetry ? onRetry : undefined}
-      disabled={!description.showRetry}
+    <View
       className={cn(
         'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
-        isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2',
-        description.showRetry && 'border-destructive active:opacity-70',
+        isImage ? 'h-16 w-20' : 'h-12 w-48',
+        description.showRetry && 'border-destructive',
         isErrored && !description.showRetry && 'border-destructive/60'
       )}
-      accessibilityRole={description.showRetry ? 'button' : undefined}
-      accessibilityLabel={
-        description.showRetry
-          ? `Retry uploading ${attachment.filename}`
-          : `${attachment.filename}, ${attachment.status}`
-      }
     >
-      {isImage ? (
-        <Image
-          source={{ uri: attachment.localUri }}
-          className="h-full w-full"
-          contentFit="cover"
-          transition={0}
-        />
-      ) : (
-        <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          {isErrored ? (
-            <AlertCircle size={14} color={colors.destructive} />
-          ) : (
-            <FileIcon size={14} color={colors.mutedForeground} />
-          )}
-          <View className="min-w-0 flex-1">
-            <Text numberOfLines={1} className="text-xs text-foreground">
-              {description.filename}
-            </Text>
-            <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {description.message ?? `${description.sizeText} · ${description.progressText}`}
-            </Text>
+      {/* Chip body — the single accessible element describing the attachment.
+          The container above stays non-accessible so the sibling Retry and
+          Remove controls are individually reachable instead of being shadowed
+          by an accessible parent. */}
+      <View
+        className="h-full w-full"
+        accessible
+        accessibilityLabel={description.accessibilityLabel}
+        accessibilityRole={isUploading ? 'progressbar' : undefined}
+        accessibilityValue={
+          isUploading && attachment.progress !== null
+            ? { min: 0, max: 100, now: Math.round(attachment.progress * 100) }
+            : undefined
+        }
+        accessibilityState={
+          isUploading && attachment.progress === null ? { busy: true } : undefined
+        }
+      >
+        {isImage ? (
+          <Image
+            source={{ uri: attachment.localUri }}
+            className="h-full w-full"
+            contentFit="cover"
+            transition={0}
+          />
+        ) : (
+          <View
+            className={cn(
+              'h-full w-full flex-row items-center gap-2',
+              // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
+              // the retryable chip's file content shifts right of its 44pt
+              // target instead of being hidden underneath it.
+              description.showRetry ? 'pl-10 pr-2' : 'px-2'
+            )}
+          >
+            {isErrored ? (
+              <AlertCircle size={14} color={colors.destructive} />
+            ) : (
+              <FileIcon size={14} color={colors.mutedForeground} />
+            )}
+            <View className="min-w-0 flex-1">
+              <Text numberOfLines={1} className="text-xs text-foreground">
+                {description.filename}
+              </Text>
+              <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
+                {description.message ?? `${description.sizeText} · ${description.progressText}`}
+              </Text>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {isImage && isUploading ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
-          <ActivityIndicator size="small" color={colors.foreground} />
-        </View>
-      ) : null}
+        {isImage && isUploading ? (
+          <View className="absolute inset-0 items-center justify-center bg-black/30">
+            <ActivityIndicator size="small" color={colors.foreground} />
+          </View>
+        ) : null}
 
-      {isImage && isErrored ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
-          <AlertCircle size={20} color="white" />
-        </View>
+        {isImage && isErrored ? (
+          <View className="absolute inset-0 items-center justify-center bg-black/30">
+            <AlertCircle size={20} color="white" />
+          </View>
+        ) : null}
+      </View>
+
+      {description.showRetry ? (
+        <Pressable
+          onPress={onRetry}
+          hitSlop={CHIP_BUTTON_HIT_SLOP}
+          className="absolute bottom-1 left-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={`Retry uploading ${attachment.filename}`}
+        >
+          <RotateCcw size={14} color={colors.foreground} />
+        </Pressable>
       ) : null}
 
       {description.showRemove ? (
         <Pressable
           onPress={onRemove}
-          hitSlop={REMOVE_HIT_SLOP}
+          hitSlop={CHIP_BUTTON_HIT_SLOP}
           className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
           accessibilityRole="button"
           accessibilityLabel={`Remove attachment ${attachment.filename}`}
@@ -102,7 +134,7 @@ function AttachmentChip({
           <X size={14} color={colors.foreground} />
         </Pressable>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 

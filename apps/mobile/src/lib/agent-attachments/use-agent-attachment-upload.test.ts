@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/auth/auth-context.test.tsx) */
+/* eslint-disable max-lines -- the Row 3.3 hook FSM suite shares this single owned test file with the pure upload-contract helpers */
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AGENT_ATTACHMENT_MAX_BYTES } from './constants';
 import {
@@ -11,7 +15,39 @@ import {
   hasAnyFailedAttachment,
   isAnyAttachmentUploading,
 } from './agent-attachment-types';
+import { useAgentAttachmentUpload } from './use-agent-attachment-upload';
 // Tests import pure helpers from their owning module (not the hook barrel).
+
+// ---- Row 3.3 hook-test mocks ----
+//
+// The hook tests below drive the upload FSM through `useAgentAttachmentUpload`
+// with `uploadOne` as a manually-resolved promise. `uploadOne` is mocked so
+// `expo-file-system/legacy` and the tRPC client never load in the node env.
+
+const hoisted = vi.hoisted(() => {
+  let idCounter = 0;
+  return {
+    randomUUID: vi.fn(() => `uuid-${(idCounter += 1)}`),
+    uploadOne: vi.fn(),
+    announceForA11y: vi.fn(),
+    announcingToastError: vi.fn(),
+  };
+});
+
+vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: hoisted.announceForA11y }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: hoisted.announcingToastError, success: vi.fn(), warning: vi.fn() },
+}));
+vi.mock('@/lib/agent-attachments/upload-task', () => ({
+  normalizeFilename: (name: string) => name,
+  measureLocalSize: vi.fn().mockResolvedValue(1024),
+  describeTerminalReason: () => "This file can't be uploaded.",
+  uploadOne: hoisted.uploadOne,
+}));
 
 function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
   return {
@@ -281,5 +317,211 @@ describe('feature-state matrix — send-admission behavior', () => {
 describe('size limits (20 MB / 5 files) — constant parity', () => {
   it('exposes the 20 MB constant for both web and mobile parity', () => {
     expect(AGENT_ATTACHMENT_MAX_BYTES).toBe(20 * 1024 * 1024);
+  });
+});
+
+// ---- Row 3.3: announcement ownership + stale-outcome guard ----
+//
+// These tests drive the hook FSM through a controlled `uploadOne` promise and
+// assert that success/failure announcements belong ONLY to the current
+// attachment in the current generation: a removed or reset upload must not
+// update state or announce. `measureLocalSize` resolves 1024 so a `doc.pdf`
+// candidate always classifies as a valid document chip.
+
+let resolveUpload: ((value: { key: string }) => void) | undefined = undefined;
+let rejectUpload: ((reason?: unknown) => void) | undefined = undefined;
+
+type HookApi = ReturnType<typeof useAgentAttachmentUpload>;
+
+const hookRef: { current: HookApi | undefined } = { current: undefined };
+
+function Harness() {
+  hookRef.current = useAgentAttachmentUpload();
+  return null;
+}
+
+function hookApi(): HookApi {
+  const current = hookRef.current;
+  if (!current) {
+    throw new Error('hook was not mounted');
+  }
+  return current;
+}
+
+async function mountHook(): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    await Promise.resolve();
+    ref.current = TestRenderer.create(createElement(Harness));
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function addDocument(): Promise<void> {
+  await act(async () => {
+    await hookApi().addCandidates([{ name: 'doc.pdf', uri: 'file:///cache/doc.pdf' }]);
+  });
+}
+
+async function settle(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    // Every test controls a fresh pending `uploadOne` promise and settles it
+    // explicitly, so remove/reset can run while the upload is still in flight.
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  it('announces success exactly once when the upload resolves', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(hoisted.announceForA11y).toHaveBeenCalledTimes(1);
+    expect(hoisted.announceForA11y).toHaveBeenCalledWith('Attachment uploaded');
+    const attachment = hookApi().attachments[0];
+    expect(attachment?.status).toBe('uploaded');
+    expect(attachment?.remoteFilename).toBe('doc.pdf');
+    renderer.unmount();
+  });
+
+  it('owns retryable failure announcements: one announcingToast.error, no success announce', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
+    expect(hoisted.announcingToastError).toHaveBeenCalledWith(
+      'Failed to upload file: Network error'
+    );
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    const attachment = hookApi().attachments[0];
+    expect(attachment?.status).toBe('error');
+    expect(attachment?.terminal).toBe(false);
+    expect(attachment?.error).toBe('Network error');
+    renderer.unmount();
+  });
+
+  it('owns terminal failure announcements: one announcingToast.error with terminal copy', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
+      await settle();
+    });
+
+    expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
+    expect(hoisted.announcingToastError).toHaveBeenCalledWith("This file can't be uploaded.");
+    const attachment = hookApi().attachments[0];
+    expect(attachment?.status).toBe('error');
+    expect(attachment?.terminal).toBe(true);
+    expect(attachment?.error).toBe("This file can't be uploaded.");
+    renderer.unmount();
+  });
+
+  it('restarts the upload when retry is pressed after a retryable failure', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    // The retried attempt gets a fresh pending promise to resolve.
+    const retried = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValueOnce(retried);
+    await act(async () => {
+      hookApi().retryAttachment(id);
+      await settle();
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+    expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('never announces or updates state when the chip is removed before success', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('never announces or updates state when the composer is reset before the outcome', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
   });
 });

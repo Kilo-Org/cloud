@@ -17,7 +17,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   if (isImage && part.url) {
     return (
       <View className="my-1 overflow-hidden rounded-lg">
-        <Image source={{ uri: part.url }} className="aspect-video w-full" contentFit="contain" />
+        <Image
+          source={{ uri: part.url }}
+          className="aspect-video w-full"
+          contentFit="contain"
+          alt={part.filename ? `Image output, ${part.filename}` : 'Image output'}
+        />
         {part.filename ? (
           <Text className="mt-1 text-xs text-muted-foreground">{part.filename}</Text>
         ) : null}

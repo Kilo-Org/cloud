@@ -6,6 +6,7 @@ import {
   isUsageRowConflict,
   stackFramesUnderHeader,
 } from './usage-record-diagnostics';
+import { isTransactionBeginFailure, recordTransactionBeginFailure } from '@/lib/db-pool-leak-probe';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -689,6 +690,12 @@ export async function insertUsageRecord(
             // retrying — `id` is fixed for the delivery — so stop immediately and
             // let the outer handler recover the committed row's identity. Retrying
             // it burned three attempts and rebuilt the statement each time.
+            // Count a failed `BEGIN` before deciding what to do with it. Under
+            // drizzle 0.45.2 the `BEGIN` is issued outside the `try`/`finally`, so
+            // this failure never reaches `release()` and burns a pool slot for the
+            // life of the process. The count is what makes the leak measurable
+            // against the pool's low-water mark.
+            if (isTransactionBeginFailure(error)) recordTransactionBeginFailure();
             if (attempt >= 2 || isUsageRowConflict(error)) throw error;
             // Never log the raw error: its message is the interpolated statement,
             // roughly 30KB including prompt prefixes and the client IP.

@@ -2,15 +2,17 @@ jest.mock('@/lib/drizzle', () => ({
   pool: { totalCount: 4, idleCount: 1, waitingCount: 0, options: { max: 10 } },
 }));
 
-import { describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, test } from '@jest/globals';
 
 import {
   createPhaseTimer,
   describeDatabaseError,
   isUsageRowConflict,
+  noteRequestStart,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
   stackFramesUnderHeader,
+  __resetRequestClockForTest,
 } from './usage-record-diagnostics';
 
 /** Shape of the drizzle wrapper: a message carrying the statement, plus a cause. */
@@ -254,12 +256,41 @@ describe('readPoolGauges', () => {
 
 describe('shouldEmitUsageRecordTiming', () => {
   test('always emits at or above the slow threshold', () => {
-    expect(shouldEmitUsageRecordTiming(1_000, () => 1)).toBe(true);
-    expect(shouldEmitUsageRecordTiming(50_000, () => 1)).toBe(true);
+    expect(shouldEmitUsageRecordTiming(1_000, null, () => 1)).toBe(true);
+    expect(shouldEmitUsageRecordTiming(50_000, null, () => 1)).toBe(true);
   });
 
   test('samples a small fraction of fast requests for a baseline', () => {
-    expect(shouldEmitUsageRecordTiming(5, () => 0.005)).toBe(true);
-    expect(shouldEmitUsageRecordTiming(5, () => 0.5)).toBe(false);
+    expect(shouldEmitUsageRecordTiming(5, null, () => 0.005)).toBe(true);
+    expect(shouldEmitUsageRecordTiming(5, null, () => 0.5)).toBe(false);
+  });
+
+  // The leak observation: a request landing on a quiet instance is fast, so the
+  // duration threshold would never surface it, yet it is the only moment when a
+  // leaked slot is distinguishable from a busy one.
+  test('always emits the first request after the instance has been quiet', () => {
+    expect(shouldEmitUsageRecordTiming(5, 5_000, () => 1)).toBe(true);
+    expect(shouldEmitUsageRecordTiming(5, 60_000, () => 1)).toBe(true);
+  });
+
+  test('does not treat a busy instance as an observation point', () => {
+    expect(shouldEmitUsageRecordTiming(5, 4_999, () => 1)).toBe(false);
+    expect(shouldEmitUsageRecordTiming(5, 0, () => 1)).toBe(false);
+  });
+});
+
+describe('noteRequestStart', () => {
+  beforeEach(() => {
+    __resetRequestClockForTest();
+  });
+
+  test('reports null for the first request on an instance', () => {
+    expect(noteRequestStart(1_000)).toBeNull();
+  });
+
+  test('reports the gap since the previous request', () => {
+    noteRequestStart(1_000);
+    expect(noteRequestStart(7_500)).toBe(6_500);
+    expect(noteRequestStart(7_600)).toBe(100);
   });
 });

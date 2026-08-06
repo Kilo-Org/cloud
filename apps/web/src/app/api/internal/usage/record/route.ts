@@ -14,6 +14,7 @@ import {
 import {
   createPhaseTimer,
   emitUsageRecordTiming,
+  noteRequestStart,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
 } from '@/lib/ai-gateway/usage-record-diagnostics';
@@ -48,7 +49,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // pairing them with the in-process pool gauges distinguishes waiting for a pool
   // connection from waiting for PostgreSQL from a stalled event loop.
   const timer = createPhaseTimer();
+  // Read before this request acquires anything: on an instance that has been quiet
+  // longer than `idleTimeoutMillis`, anything still checked out belongs to nobody.
+  const msSinceLastRequest = noteRequestStart();
   const poolBefore = readPoolGauges();
+  const checkedOutAtEntry = poolBefore.total - poolBefore.idle;
   let poolWaitingPeak = poolBefore.waiting;
   const samplePool = () => {
     const gauges = readPoolGauges();
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   };
   const reportTiming = (usageId: string, outcome: UsageRecordResponse['status']) => {
     const totalMs = timer.totalMs();
-    if (!shouldEmitUsageRecordTiming(totalMs)) return;
+    if (!shouldEmitUsageRecordTiming(totalMs, msSinceLastRequest)) return;
     emitUsageRecordTiming({
       usageId,
       outcome,
@@ -66,6 +71,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       poolBefore,
       poolAfter: samplePool(),
       poolWaitingPeak,
+      msSinceLastRequest,
+      checkedOutAtEntry,
     });
   };
 

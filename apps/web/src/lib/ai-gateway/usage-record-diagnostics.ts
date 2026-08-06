@@ -2,6 +2,7 @@ import 'server-only';
 
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { pool } from '@/lib/drizzle';
+import { readPoolLeakStats } from '@/lib/db-pool-leak-probe';
 
 /**
  * Diagnostics for the Frankfurt-local usage write.
@@ -95,13 +96,54 @@ export type UsageRecordTiming = {
   poolAfter: PoolGauges;
   /** Highest `waitingCount` sampled during the request. */
   poolWaitingPeak: number;
+  /**
+   * Milliseconds since the previous request on this instance, `null` for the
+   * first. Above `QUIET_INSTANCE_MS` the pool should have drained, so a non-zero
+   * `checked_out` in the same line is a leaked slot.
+   */
+  msSinceLastRequest: number | null;
+  /**
+   * Checked-out connections observed at handler entry, before this request
+   * acquired anything. On a quiet instance this should be zero.
+   */
+  checkedOutAtEntry: number;
 };
+
+/**
+ * A request arriving after this much instance quiet is treated as an observation
+ * point regardless of how fast it was. `idleTimeoutMillis` is 5s, so by then a
+ * healthy pool has closed its idle clients and `checked_out` should be zero —
+ * which is precisely when a leaked slot is visible. These requests are fast, so
+ * the duration threshold would never surface them.
+ */
+const QUIET_INSTANCE_MS = 5_000;
 
 export function shouldEmitUsageRecordTiming(
   totalMs: number,
+  msSinceLastRequest: number | null = null,
   random: () => number = Math.random
 ): boolean {
-  return totalMs >= SLOW_EMIT_THRESHOLD_MS || random() < BASELINE_SAMPLE_RATE;
+  if (totalMs >= SLOW_EMIT_THRESHOLD_MS) return true;
+  if (msSinceLastRequest !== null && msSinceLastRequest >= QUIET_INSTANCE_MS) return true;
+  return random() < BASELINE_SAMPLE_RATE;
+}
+
+/**
+ * Milliseconds since the previous request on this instance, or `null` for the
+ * first one. Tracked here rather than in the route so the notion of "quiet" and
+ * its emission threshold stay together.
+ */
+let lastRequestAtMs: number | null = null;
+
+export function noteRequestStart(now: number = Date.now()): number | null {
+  const since = lastRequestAtMs === null ? null : now - lastRequestAtMs;
+  lastRequestAtMs = now;
+  return since;
+}
+
+/** Test-only reset so quiet-period assertions do not depend on suite ordering. */
+export function __resetRequestClockForTest(): void {
+  lastRequestAtMs = null;
 }
 
 /**
@@ -120,6 +162,9 @@ export function emitUsageRecordTiming(timing: UsageRecordTiming): void {
       pool_waiting_peak: timing.poolWaitingPeak,
       pool_max: poolMax(),
       event_loop_lag: eventLoopLagMs(),
+      ms_since_last_request: timing.msSinceLastRequest,
+      checked_out_at_entry: timing.checkedOutAtEntry,
+      pool_leak: readPoolLeakStats(),
     })
   );
 }

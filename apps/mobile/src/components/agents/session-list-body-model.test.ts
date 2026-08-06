@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- one coherent decision-tree suite; every branch maps to a feature-state row in the model's doc comment
 import { describe, expect, it } from 'vitest';
 
 import { selectSessionListBodyModel } from './session-list-body-model';
@@ -144,6 +145,72 @@ describe('selectSessionListBodyModel', () => {
     });
   });
 
+  describe('stored rows do not widen inline errors into query states', () => {
+    it('does not add an inline error to a stored-row search error with an empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          isSearching: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'clear-search',
+        showInlineError: false,
+      });
+    });
+
+    it('does not add an inline error to a stored-row filter error with an empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'clear-filters',
+        showInlineError: false,
+      });
+    });
+
+    it('does not add an inline error to a stored-row search with an active-poll failure and empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          isSearching: true,
+          activeIsError: true,
+        })
+      ).toEqual({
+        kind: 'filtered-empty',
+        primaryAction: 'clear-search',
+        showInlineError: false,
+      });
+    });
+
+    it('does not add an inline error to a stored-row filter with an active-poll failure and empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          activeIsError: true,
+        })
+      ).toEqual({
+        kind: 'filtered-empty',
+        primaryAction: 'clear-filters',
+        showInlineError: false,
+      });
+    });
+  });
+
   describe('empty body without active query', () => {
     it('shows retryable error empty with Retry (no Clear) when the body errored', () => {
       expect(
@@ -222,6 +289,48 @@ describe('selectSessionListBodyModel', () => {
         kind: 'no-past-sessions',
         primaryAction: 'new-task',
         showInlineError: false,
+      });
+    });
+  });
+
+  describe('all-active while the tray is empty (full-view exclusion window)', () => {
+    it('returns all-active with no CTA when stored rows load and every one is excluded before enrichment', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: false });
+    });
+
+    it('keeps all-active while more history pages exist but the tray is empty (render-list keeps its tray conjunct)', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+          hasMoreHistory: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: false });
+    });
+
+    it('shows the inline error when the active poll failed during the all-excluded window', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+          activeIsError: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: true });
+    });
+
+    it('keeps query-error precedence when the stored query itself errored', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'none',
+        showInlineError: true,
       });
     });
   });

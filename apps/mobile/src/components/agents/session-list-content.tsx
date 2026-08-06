@@ -80,8 +80,9 @@ type AgentSessionListContentProps = {
   sortBy: AgentSessionSortBy;
   /**
    * Pinned "Active now" tray rendered as `ListHeaderComponent` so it scrolls
-   * with history in one continuous gesture. Not a virtualized cell — Reanimated
-   * layout transitions on the tray keep working. Pass `null` when empty.
+   * with history in one continuous gesture. The tray and its rows are fully
+   * atomic — no entering, exiting, or layout animations — so a session moving
+   * between history and the tray swaps in one commit. Pass `null` when empty.
    */
   activeNowSection: ReactElement | null;
 };
@@ -314,9 +315,10 @@ export function AgentSessionListContent({
   }
 
   // Single SectionList render site: tray stays in ListHeaderComponent across
-  // loading → rows so ActiveNowSection's local expanded state is not reset.
-  // While loading, sections are empty and skeletons fill ListEmptyComponent
-  // under the tray (active query may already have resolved).
+  // loading → rows, so the atomic tray never remounts while the body toggles
+  // between skeletons and rows. While loading, sections are empty and
+  // skeletons fill ListEmptyComponent under the tray (active query may
+  // already have resolved).
   let emptyComponent: ReactNode = null;
   if (surface.listEmpty === 'loading-skeletons') {
     emptyComponent = (

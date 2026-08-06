@@ -7,7 +7,9 @@ import {
   selectPinnedActiveSessions,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
+import { shouldBackfillHistoryAfterActiveExclusion } from '@/components/agents/session-list-backfill';
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
+import { useHistoryBackfill } from '@/components/agents/use-history-backfill';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import {
   useAgentSessions,
@@ -40,6 +42,8 @@ export function useAgentSessionListData(options: {
     activeIsError,
     isLoading,
     storedIsError,
+    storedIsFetching,
+    storedLoadedPageCount,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
@@ -50,6 +54,11 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
     sortBy,
+    // The Agents screen drives app-foreground refresh through the AppState
+    // 'active' listener and the wrapped `refetch`, so the stored query opts
+    // out of React Query's native window-focus refetch (Home and the Share
+    // Gate keep the native default through `buildStoredSessionsQueryOptions`).
+    refetchOnWindowFocus: false,
   });
   const isSearching = searchQuery.length > 0;
   const search = useAgentSessionSearch({
@@ -134,6 +143,38 @@ export function useAgentSessionListData(options: {
       data: group.sessions,
     }));
   }, [activeSessionIds, dateGroups, effectiveSearchQuery, search.dateGroups]);
+  // Bounded automatic backfill: when active-set exclusion empties every
+  // rendered stored page and no gate (search, loading, error, in-flight
+  // stored fetch, page bound) blocks, fetch the next stored page so history
+  // still surfaces below a viewport-filling tray. `paging` selects the search
+  // vs stored pagination; the `isSearching` gate keeps the stored fetch from
+  // ever firing during committed search mode.
+  const shouldBackfill = useMemo(
+    () =>
+      shouldBackfillHistoryAfterActiveExclusion({
+        hasHistoryContent: sections.length > 0,
+        hasStoredSessions: storedSessions.length > 0,
+        hasMoreHistory: paging.hasNextPage,
+        isFetchingNextPage: paging.isFetchingNextPage,
+        isFetching: storedIsFetching,
+        isSearching,
+        isLoading,
+        isError: contentIsError,
+        loadedPageCount: storedLoadedPageCount,
+      }),
+    [
+      contentIsError,
+      isLoading,
+      isSearching,
+      paging.hasNextPage,
+      paging.isFetchingNextPage,
+      sections,
+      storedIsFetching,
+      storedLoadedPageCount,
+      storedSessions,
+    ]
+  );
+  useHistoryBackfill({ shouldBackfill, fetchNextPage: paging.fetchNextPage });
   const projectOptions = useMemo(() => {
     const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
     for (const project of recentRepositories?.repositories.slice(0, 3) ?? []) {

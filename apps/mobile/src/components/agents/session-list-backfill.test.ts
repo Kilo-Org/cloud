@@ -11,6 +11,7 @@ function params(
   return {
     hasHistoryContent: false,
     hasStoredSessions: true,
+    hasPinnedActive: true,
     hasMoreHistory: true,
     isFetchingNextPage: false,
     isFetching: false,
@@ -30,6 +31,7 @@ describe('shouldBackfillHistoryAfterActiveExclusion', () => {
   it.each([
     ['history content is visible', { hasHistoryContent: true }],
     ['no stored rows are loaded', { hasStoredSessions: false }],
+    ['the tray is empty (unenriched window)', { hasPinnedActive: false }],
     ['no further history page exists', { hasMoreHistory: false }],
     ['the next page is already fetching', { isFetchingNextPage: true }],
     ['any stored fetch is in flight', { isFetching: true }],

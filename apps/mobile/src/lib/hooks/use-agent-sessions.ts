@@ -7,6 +7,7 @@ import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
 import {
   buildActiveSessionsTrayInput,
   filterActiveSessionsByOrganization,
+  selectActiveExclusionIds,
 } from '@/lib/active-sessions-live';
 import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import {
@@ -242,6 +243,18 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);
 
+  // Unfiltered cache ids for history exclusion. Differs from
+  // `activeSessionIds` (org-filtered, tray-oriented) by also covering live
+  // rows the org filter hides until enrichment — the Agents list excludes
+  // those from history immediately (direct move into the tray at enrichment).
+  // The departure-refetch effect below intentionally keeps diffing the
+  // filtered set: an unenriched row that disappears re-renders from the
+  // already-loaded stored pages as soon as the exclusion lifts.
+  const activeExclusionIds = useMemo(
+    () => selectActiveExclusionIds(active.data?.sessions ?? []),
+    [active.data]
+  );
+
   const dateGroups = useMemo(
     () => groupAgentSessionsByDate(storedSessions, sortBy),
     [storedSessions, sortBy]
@@ -281,6 +294,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     storedSessions,
     activeSessions,
     activeSessionIds,
+    activeExclusionIds,
     dateGroups,
     isLoading: stored.isLoading || active.isLoading,
     isError: stored.isError || active.isError,

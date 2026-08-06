@@ -226,6 +226,48 @@ describe('selectSessionListBodyModel', () => {
     });
   });
 
+  describe('all-active while the tray is empty (full-view exclusion window)', () => {
+    it('returns all-active with no CTA when stored rows load and every one is excluded before enrichment', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: false });
+    });
+
+    it('keeps all-active while more history pages exist but the tray is empty (render-list keeps its tray conjunct)', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+          hasMoreHistory: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: false });
+    });
+
+    it('shows the inline error when the active poll failed during the all-excluded window', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+          activeIsError: true,
+        })
+      ).toEqual({ kind: 'all-active', primaryAction: 'none', showInlineError: true });
+    });
+
+    it('keeps query-error precedence when the stored query itself errored', () => {
+      expect(
+        model({
+          hasStoredSessions: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'none',
+        showInlineError: true,
+      });
+    });
+  });
+
   describe('inline error / staleness surfacing', () => {
     it('shows the inline error when only the active poll failed and the tray is present', () => {
       expect(

@@ -67,10 +67,11 @@ export function BodyEmpty({
     );
   }
   if (kind === 'all-active') {
-    // Every loaded stored session is currently active and pinned above, so
-    // the body is empty only because the active set consumed the history.
-    // No creation CTA: the tray, the FAB, and the header action already
-    // offer creation.
+    // Every loaded stored session is excluded by the live active set, so the
+    // body is empty only because the active set consumed the history. In the
+    // full view the exclusion set also covers WS-written rows awaiting org
+    // attribution, so the tray can be momentarily empty here. No creation
+    // CTA: the tray, the FAB, and the header action already offer creation.
     return (
       <View className="items-center justify-center pt-12">
         <EmptyState

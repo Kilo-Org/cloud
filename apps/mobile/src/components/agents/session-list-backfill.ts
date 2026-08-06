@@ -5,6 +5,9 @@
  * keeps the list rendered instead of claiming the history is exhausted. This
  * selector decides whether the caller should fetch the next stored page
  * automatically. Every gate must be green:
+ *  - `hasPinnedActive` is the populated-tray gate: the backfill exists to
+ *    fill history below a viewport-filling tray, so an empty tray (the
+ *    unenriched window, covered by the `all-active` body) blocks it.
  *  - `hasHistoryContent` is false when no rendered section survives the
  *    active-set exclusion.
  *  - `hasMoreHistory` is the stored pagination `hasNextPage`.
@@ -27,6 +30,7 @@ export const MAX_HISTORY_AUTOLOAD_PAGES = 3;
 export function shouldBackfillHistoryAfterActiveExclusion(params: {
   hasHistoryContent: boolean;
   hasStoredSessions: boolean;
+  hasPinnedActive: boolean;
   hasMoreHistory: boolean | undefined;
   isFetchingNextPage: boolean;
   isFetching: boolean;
@@ -36,6 +40,7 @@ export function shouldBackfillHistoryAfterActiveExclusion(params: {
   loadedPageCount: number;
 }): boolean {
   return (
+    params.hasPinnedActive &&
     !params.hasHistoryContent &&
     params.hasStoredSessions &&
     params.hasMoreHistory === true &&

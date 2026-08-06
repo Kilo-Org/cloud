@@ -4,7 +4,6 @@ import { Pressable, View } from 'react-native';
 
 import { AgentBadge } from '@/components/ui/agent-badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { sessionRowAccessibilityLabel } from '@/components/agents/session-row-accessibility-label';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
@@ -182,16 +181,10 @@ export function SessionRow({
   );
   if (onPress) {
     return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={sessionRowAccessibilityLabel({
-          title,
-          needsInput,
-          badge: agentLabel,
-        })}
-        className="active:opacity-70"
-      >
+      // No caller passes `onPress` today; both session rows wrap this
+      // primitive in their own labelled Pressable. A future caller owns its
+      // own accessible name.
+      <Pressable onPress={onPress} className="active:opacity-70">
         {row}
       </Pressable>
     );

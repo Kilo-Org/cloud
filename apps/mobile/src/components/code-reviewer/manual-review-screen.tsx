@@ -240,6 +240,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
+            accessibilityLabel={
+              urlError ? `Pull request URL, error: ${urlError}` : 'Pull request URL'
+            }
             onChangeText={value => {
               urlRef.current = value;
               if (urlError) {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
 
 import { moveA11yFocus } from '@/lib/a11y/announce';
 
@@ -147,8 +148,18 @@ function accessibilityLabelOf(node: RenderedElement | null | undefined): string 
   return typeof node.props.accessibilityLabel === 'string' ? node.props.accessibilityLabel : '';
 }
 
-function isLabeledRow(node: RenderedElement): boolean {
-  return node.type === 'View' && typeof node.props.accessibilityLabel === 'string';
+/** The one accessible element per row that carries the linear reading label. */
+function isAccessibleLabelElement(node: RenderedElement): boolean {
+  return (
+    node.type === 'View' &&
+    node.props.accessible === true &&
+    typeof node.props.accessibilityLabel === 'string'
+  );
+}
+
+/** The row container: a flex-row View that must stay a non-accessible wrapper. */
+function isRowContainer(node: RenderedElement): boolean {
+  return node.type === 'View' && node.props.className === 'flex-row';
 }
 
 describe('MarkdownTable close button', () => {
@@ -206,7 +217,7 @@ describe('MarkdownTable table semantics', () => {
     expect(rowNodes[1]?.props.headerTexts).toEqual(['Column 1']);
   });
 
-  it('header row keeps its linear label without an accessible container', () => {
+  it('header row exposes its linear label as one accessible element', () => {
     // eslint-disable-next-line new-cap
     const element = TableRow({
       palette: mockPalette,
@@ -217,14 +228,17 @@ describe('MarkdownTable table semantics', () => {
       isHeader: true,
       headerTexts: ['Column 1'],
     });
-    const rowView = findFirst(element, isLabeledRow);
+    const labelElement = findFirst(element, isAccessibleLabelElement);
 
-    expect(rowView).not.toBeNull();
-    expect(accessibilityLabelOf(rowView)).toBe('Column 1');
-    expect(rowView?.props.accessible).not.toBe(true);
+    expect(labelElement).not.toBeNull();
+    expect(accessibilityLabelOf(labelElement)).toBe('Column 1');
+    // The container stays non-accessible so nested controls remain reachable.
+    const container = findFirst(element, isRowContainer);
+    expect(container?.props.accessible).not.toBe(true);
+    expect(container?.props.accessibilityLabel).toBeUndefined();
   });
 
-  it('body row keeps its linear label without an accessible container', () => {
+  it('body row exposes its linear label as one accessible element', () => {
     // eslint-disable-next-line new-cap
     const element = TableRow({
       palette: mockPalette,
@@ -234,11 +248,14 @@ describe('MarkdownTable table semantics', () => {
       isLastRow: true,
       headerTexts: ['Column 1'],
     });
-    const rowView = findFirst(element, isLabeledRow);
+    const labelElement = findFirst(element, isAccessibleLabelElement);
 
-    expect(rowView).not.toBeNull();
-    expect(accessibilityLabelOf(rowView)).toBe('Column 1: Row 1');
-    expect(rowView?.props.accessible).not.toBe(true);
+    expect(labelElement).not.toBeNull();
+    expect(accessibilityLabelOf(labelElement)).toBe('Column 1: Row 1');
+    // The container stays non-accessible so nested controls remain reachable.
+    const container = findFirst(element, isRowContainer);
+    expect(container?.props.accessible).not.toBe(true);
+    expect(container?.props.accessibilityLabel).toBeUndefined();
   });
 
   it('labels a multi-column body row with every header', () => {
@@ -251,11 +268,41 @@ describe('MarkdownTable table semantics', () => {
       isLastRow: true,
       headerTexts: ['Name', 'Age'],
     });
-    const rowView = findFirst(element, isLabeledRow);
+    const labelElement = findFirst(element, isAccessibleLabelElement);
 
-    expect(rowView).not.toBeNull();
-    expect(accessibilityLabelOf(rowView)).toBe('Name: John, Age: 30');
-    expect(rowView?.props.accessible).not.toBe(true);
+    expect(labelElement).not.toBeNull();
+    expect(accessibilityLabelOf(labelElement)).toBe('Name: John, Age: 30');
+    const container = findFirst(element, isRowContainer);
+    expect(container?.props.accessible).not.toBe(true);
+  });
+
+  it('keeps nested cell content as reachable siblings of the row label element', () => {
+    // A cell carrying an interactive link stays a child of the NON-accessible
+    // row container (and a sibling of the label element), so the nested
+    // control is not shadowed by an accessible ancestor.
+    const link = createElement(
+      'Pressable',
+      { accessibilityRole: 'link', accessibilityLabel: 'Open docs' },
+      'docs'
+    );
+    // eslint-disable-next-line new-cap
+    const element = TableRow({
+      palette: mockPalette,
+      cells: [[link]],
+      columnCount: 1,
+      columnWidth: 200,
+      isLastRow: true,
+      headerTexts: ['Docs'],
+    });
+    const container = findFirst(element, isRowContainer);
+    const labelElement = findFirst(element, isAccessibleLabelElement);
+    const nestedLink = findFirst(element, node => node.type === 'Pressable');
+
+    expect(container).not.toBeNull();
+    expect(container?.props.accessible).not.toBe(true);
+    expect(labelElement).not.toBeNull();
+    expect(accessibilityLabelOf(labelElement)).toBe('Docs: Open docs');
+    expect(nestedLink).not.toBeNull();
   });
 
   it('modal title is a header and onShow moves focus to it after presentation', () => {

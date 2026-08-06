@@ -89,6 +89,16 @@ function chipContainer(root: TestRenderer.ReactTestInstance): TestRenderer.React
   );
 }
 
+/** The hidden wrapper that isolates the chip body's visual descendants. */
+function chipContentWrapper(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      node.props.importantForAccessibility === 'no-hide-descendants'
+  );
+}
+
 function labeledPressables(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return root.findAll(
     node =>
@@ -207,6 +217,59 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     expect(container.props.accessible).toBeUndefined();
     expect(container.props.accessibilityRole).toBeUndefined();
     expect(container.props.accessibilityLabel).toBeUndefined();
+
+    renderer.unmount();
+  });
+
+  it('removes the summary container role from the strip scroll view', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const scrollViews = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
+    );
+    expect(scrollViews).toHaveLength(1);
+    expect(scrollViews[0]?.props.accessibilityRole).toBeUndefined();
+    expect(scrollViews[0]?.props.accessibilityLabel).toBeUndefined();
+
+    renderer.unmount();
+  });
+
+  it('hides the chip body visual descendants so only the labeled body is announced', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const body = chipBody(renderer.root);
+    expect(body.props.accessibilityLabel).toBe('doc.pdf, Uploaded');
+
+    // One hidden wrapper per chip body: every visual child (Text nodes,
+    // thumbnail, ActivityIndicator) lives inside it and is excluded from the
+    // accessibility tree, so the body cannot produce duplicate announcements.
+    const wrapper = chipContentWrapper(renderer.root);
+    expect(wrapper.props.accessibilityElementsHidden).toBe(true);
+    const bodyTexts = body.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Text'
+    );
+    expect(bodyTexts.length).toBeGreaterThan(0);
+    const wrapperTexts = wrapper.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Text'
+    );
+    expect(wrapperTexts.length).toBe(bodyTexts.length);
+
+    renderer.unmount();
+  });
+
+  it('keeps the image thumbnail inside the hidden body content', async () => {
+    const renderer = await mount([
+      makeAttachment({ kind: 'image', filename: 'photo.png', status: 'uploaded', progress: 1 }),
+    ]);
+
+    const wrapper = chipContentWrapper(renderer.root);
+    const thumbnails = wrapper.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Image'
+    );
+    expect(thumbnails).toHaveLength(1);
+    // Decorative thumbnail stays inside the hidden content: no label of its own.
+    expect(thumbnails[0]?.props.accessible).toBeUndefined();
+    expect(thumbnails[0]?.props.accessibilityLabel).toBeUndefined();
 
     renderer.unmount();
   });

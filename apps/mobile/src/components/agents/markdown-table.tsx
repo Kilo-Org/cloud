@@ -348,18 +348,25 @@ export function TableRow({
 }: TableRowProps) {
   // The label is the linear reading fallback for the row: the header row
   // announces the column titles, and every body row announces "header: cell"
-  // pairs in reading order. The row is deliberately not an accessibility
-  // container, so nested Markdown links and image buttons stay independently
-  // reachable by assistive technology.
+  // pairs in reading order. The row container is deliberately NOT an
+  // accessibility element, so nested Markdown links and image buttons stay
+  // independently reachable; the label lives on a 1px invisible accessible
+  // sibling that both screen readers can focus (an accessible container
+  // would shadow the nested controls on iOS).
   const cellTexts = cells.map(node => extractNodeText(node));
   const rowLabel = linearRowLabel(isHeader ? [] : headerTexts, cellTexts);
   return (
     <View
-      accessibilityLabel={rowLabel}
       className="flex-row"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant header background
       style={isHeader ? { backgroundColor: palette.codeBackground } : undefined}
     >
+      <View
+        accessible
+        accessibilityLabel={rowLabel}
+        className="absolute h-px w-px overflow-hidden"
+        pointerEvents="none"
+      />
       {Array.from({ length: columnCount }, (_, colIdx) => (
         <TableCell
           key={colIdx}

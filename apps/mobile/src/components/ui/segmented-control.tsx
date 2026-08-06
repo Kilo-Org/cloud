@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, View } from 'react-native';
+import { Pressable } from 'react-native';
 
-import { radioItemA11y } from '@/components/ui/radio-group';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
@@ -27,11 +27,7 @@ export function SegmentedControl<T extends string>({
   accessibilityLabel,
 }: Readonly<SegmentedControlProps<T>>) {
   return (
-    <View
-      accessibilityRole="radiogroup"
-      accessibilityLabel={accessibilityLabel}
-      className="flex-row rounded-lg bg-secondary p-1"
-    >
+    <RadioGroup label={accessibilityLabel} className="flex-row rounded-lg bg-secondary p-1">
       {options.map(option => {
         const selected = value === option.value;
         return (
@@ -61,6 +57,6 @@ export function SegmentedControl<T extends string>({
           </Pressable>
         );
       })}
-    </View>
+    </RadioGroup>
   );
 }

@@ -18,6 +18,7 @@ import {
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import {
   PendingQueueHint,
@@ -177,13 +178,11 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
   // PendingQueueHint so empty-queue + COMMENT is not contradictory.
+  // blockReason is a local persistent validation error (no mutation toast
+  // owns it), so AccessibleStatus announces it through the status contract.
   let queueHint: ReactNode = null;
   if (blockReason !== null) {
-    queueHint = (
-      <Text variant="muted" className="text-xs">
-        {blockReason}
-      </Text>
-    );
+    queueHint = <AccessibleStatus message={blockReason} tone="status" className="text-xs" />;
   } else if (!keyboardVisible && (queuedCount === 0 || hasStaleItems)) {
     queueHint = <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />;
   }
@@ -246,10 +245,21 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
           {inlineError && inlineErrorKind !== 'reconnect' ? (
             <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-2">
+              {/* Mutation-classified errors are toast-owned (announcingToast);
+                  the inline text stays visual-only so it never double-announces. */}
               <Text className="text-xs text-destructive">{inlineError}</Text>
             </View>
           ) : null}
-          {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+          {inlineErrorKind === 'reconnect' ? (
+            <>
+              {/* The persistent reconnect message is a local status, not the
+                  toast-owned mutation copy, so AccessibleStatus owns its
+                  announcement on both platforms. The notice below keeps the
+                  Check connection retry CTA. */}
+              <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
+              <PrReviewReconnectNotice />
+            </>
+          ) : null}
         </View>
 
         <PrFormSheetFooter>

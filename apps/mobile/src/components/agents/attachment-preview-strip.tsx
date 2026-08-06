@@ -65,50 +65,60 @@ function AttachmentChip({
           isUploading && attachment.progress === null ? { busy: true } : undefined
         }
       >
-        {isImage ? (
-          <Image
-            source={{ uri: attachment.localUri }}
-            className="h-full w-full"
-            contentFit="cover"
-            transition={0}
-          />
-        ) : (
-          <View
-            className={cn(
-              'h-full w-full flex-row items-center gap-2',
-              // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
-              // the retryable chip's file content shifts right of its 44pt
-              // target instead of being hidden underneath it.
-              description.showRetry ? 'pl-10 pr-2' : 'px-2'
-            )}
-          >
-            {isErrored ? (
-              <AlertCircle size={14} color={colors.destructive} />
-            ) : (
-              <FileIcon size={14} color={colors.mutedForeground} />
-            )}
-            <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="text-xs text-foreground">
-                {description.filename}
-              </Text>
-              <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-                {description.message ?? `${description.sizeText} · ${description.progressText}`}
-              </Text>
+        {/* Visual descendants are excluded from the accessibility tree so
+            the body stays the single announced element: the nested Texts,
+            the decorative thumbnail, and the uploading ActivityIndicator
+            must never surface as duplicate nodes. */}
+        <View
+          className="h-full w-full"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {isImage ? (
+            <Image
+              source={{ uri: attachment.localUri }}
+              className="h-full w-full"
+              contentFit="cover"
+              transition={0}
+            />
+          ) : (
+            <View
+              className={cn(
+                'h-full w-full flex-row items-center gap-2',
+                // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
+                // the retryable chip's file content shifts right of its 44pt
+                // target instead of being hidden underneath it.
+                description.showRetry ? 'pl-10 pr-2' : 'px-2'
+              )}
+            >
+              {isErrored ? (
+                <AlertCircle size={14} color={colors.destructive} />
+              ) : (
+                <FileIcon size={14} color={colors.mutedForeground} />
+              )}
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="text-xs text-foreground">
+                  {description.filename}
+                </Text>
+                <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
+                  {description.message ?? `${description.sizeText} · ${description.progressText}`}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {isImage && isUploading ? (
-          <View className="absolute inset-0 items-center justify-center bg-black/30">
-            <ActivityIndicator size="small" color={colors.foreground} />
-          </View>
-        ) : null}
+          {isImage && isUploading ? (
+            <View className="absolute inset-0 items-center justify-center bg-black/30">
+              <ActivityIndicator size="small" color={colors.foreground} />
+            </View>
+          ) : null}
 
-        {isImage && isErrored ? (
-          <View className="absolute inset-0 items-center justify-center bg-black/30">
-            <AlertCircle size={20} color="white" />
-          </View>
-        ) : null}
+          {isImage && isErrored ? (
+            <View className="absolute inset-0 items-center justify-center bg-black/30">
+              <AlertCircle size={20} color="white" />
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {description.showRetry ? (
@@ -149,7 +159,6 @@ export function AttachmentPreviewStrip({ attachments, onRemove, onRetry }: Reado
       className="mb-2"
       contentContainerClassName="items-center"
       keyboardShouldPersistTaps="handled"
-      accessibilityRole="summary"
     >
       {attachments.map(attachment => (
         <AttachmentChip

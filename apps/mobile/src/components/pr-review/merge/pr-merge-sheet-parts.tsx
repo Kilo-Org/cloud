@@ -11,6 +11,7 @@ import {
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -21,15 +22,14 @@ import {
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 
-function shortMethodChipLabel(value: AllowedMergeMethod): string {
-  if (value === 'merge') {
-    return 'Merge';
-  }
-  if (value === 'squash') {
-    return 'Squash';
-  }
-  return 'Rebase';
-}
+const NO_ENABLED_METHODS_MESSAGE =
+  'This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.';
+
+const SHORT_METHOD_LABELS: Record<AllowedMergeMethod, string> = {
+  merge: 'Merge',
+  squash: 'Squash',
+  rebase: 'Rebase',
+};
 
 function MethodPicker({
   methodOptions,
@@ -51,7 +51,6 @@ function MethodPicker({
         {methodOptions.map(option => {
           const active = method === option.value;
           // Long labels stay readable via accessibilityLabel; chip shows short text.
-          const shortLabel = shortMethodChipLabel(option.value);
           return (
             <Pressable
               key={option.value}
@@ -77,7 +76,7 @@ function MethodPicker({
                   !active && !isDisabled && 'text-foreground'
                 )}
               >
-                {shortLabel}
+                {SHORT_METHOD_LABELS[option.value]}
               </Text>
             </Pressable>
           );
@@ -240,10 +239,11 @@ export function MergeSheetFormBody(props: {
       <View className="gap-1.5 px-6 pt-1.5">
         {noMethodsAllowed ? (
           <View className="rounded-md border border-border bg-secondary p-3">
-            <Text className="text-sm text-muted-foreground">
-              This repository has no enabled merge methods. Ask a repository admin to enable merge,
-              squash, or rebase merging.
-            </Text>
+            <AccessibleStatus
+              message={NO_ENABLED_METHODS_MESSAGE}
+              tone="status"
+              className="text-sm"
+            />
           </View>
         ) : (
           <MethodPicker
@@ -278,7 +278,12 @@ export function MergeSheetFormBody(props: {
             <Text className="text-xs text-destructive">{inlineError}</Text>
           </View>
         ) : null}
-        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+        {inlineErrorKind === 'reconnect' ? (
+          <>
+            <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
+            <PrReviewReconnectNotice />
+          </>
+        ) : null}
       </View>
 
       <PrFormSheetFooter className="pb-1 pt-1">

@@ -76,7 +76,7 @@ export function QueryError({
       icon={meta.icon}
       title={titleText}
       description={
-        <AccessibleStatus message={descriptionText} tone="status" className="text-center text-sm" />
+        <AccessibleStatus message={descriptionText} tone="error" className="text-center text-sm" />
       }
       className={className}
       placement={placement}

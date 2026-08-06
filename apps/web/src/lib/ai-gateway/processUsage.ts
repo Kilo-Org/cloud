@@ -58,6 +58,7 @@ import type {
   PromptInfo,
   UsageMetaData,
   UsageRecordInsertResult,
+  UsageRecordWriteOutcome,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import {
@@ -343,13 +344,17 @@ export async function saveUsageRelatedDataLocally(
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null
-): Promise<UsageRecordInsertResult | null> {
+): Promise<UsageRecordWriteOutcome | null> {
+  // `isFirst` must be evaluated before the insert — afterwards this record is
+  // itself prior usage — but the event it drives is only emitted once the insert
+  // has committed. A redelivery that arrives while the first delivery's
+  // transaction is still open cannot see the uncommitted row either, so it also
+  // computes `isFirst`; emitting here would double-count `first_usage`.
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  if (isFirst && posthog_distinct_id)
-    await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
   const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
   if (!inserted) return null;
-  if (posthog_distinct_id) {
+  if (posthog_distinct_id && !inserted.wasRedelivery) {
+    if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
     await sendFirstMicrodollarUsageEventIfNeeded(
       inserted.newMicrodollarsUsed === null
         ? null
@@ -633,7 +638,7 @@ function scheduleKiloPassBonusIfNeeded(
  */
 async function findAlreadyRecordedUsage(
   coreUsageFields: MicrodollarUsage
-): Promise<UsageRecordInsertResult | null> {
+): Promise<UsageRecordWriteOutcome | null> {
   const existing = await db
     .select({ id: microdollar_usage.id })
     .from(microdollar_usage)
@@ -653,13 +658,14 @@ async function findAlreadyRecordedUsage(
     usageId: coreUsageFields.id,
     createdAt: coreUsageFields.created_at,
     newMicrodollarsUsed: null,
+    wasRedelivery: true,
   };
 }
 
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<UsageRecordInsertResult | null> {
+): Promise<UsageRecordWriteOutcome | null> {
   try {
     const result = await startSpan(
       {
@@ -692,6 +698,7 @@ export async function insertUsageRecord(
       usageId: result.inserted.usageId,
       createdAt: result.inserted.createdAt,
       newMicrodollarsUsed: result.inserted.newMicrodollarsUsed,
+      wasRedelivery: false,
     };
   } catch (error) {
     // The lookup itself is best-effort: it must never mask the original failure,

@@ -89,8 +89,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // matching the pre-existing local behaviour. Report it as a successful HTTP
   // exchange with a negative outcome so the client does not retry a write that
   // deliberately gave up.
+  //
+  // Deliberately not an `unavailable` signal that would make the client write
+  // locally instead: `insertUsageRecord` has already retried the transaction
+  // three times against this primary, and a cross-region retry from SFO would
+  // re-add the transatlantic lock hold this endpoint exists to remove — at the
+  // exact moment the database is least able to absorb it. The failure is
+  // reported from here via `captureException` in `insertUsageRecord`.
   const response: UsageRecordResponse = result
-    ? { status: 'recorded', result }
+    ? {
+        // A recovered identity means an earlier delivery of this same record
+        // committed while this one was in flight, which is what `duplicate`
+        // describes; its post-commit side effects ran on that delivery.
+        status: result.wasRedelivery ? 'duplicate' : 'recorded',
+        result: {
+          usageId: result.usageId,
+          createdAt: result.createdAt,
+          newMicrodollarsUsed: result.newMicrodollarsUsed,
+        },
+      }
     : { status: 'not_recorded', result: null };
 
   return NextResponse.json(response);

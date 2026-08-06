@@ -323,4 +323,120 @@ describe('privacy deny-list', () => {
     expect(redactProhibitedProperties(input)).toEqual({ surface: 'claw', ok_count: 1 });
     expect(input).toEqual({ surface: 'claw', email: 'a@b.co', session_id: 'x', ok_count: 1 });
   });
+
+  it('blocks the named variant examples', () => {
+    for (const key of [
+      'repository',
+      'comment',
+      'message',
+      'raw_prompt',
+      'api_token',
+      'secret_value',
+    ]) {
+      expect(isProhibitedPropertyKey(key), key).toBe(true);
+    }
+  });
+
+  it('blocks common case, separator, and suffix variants', () => {
+    for (const key of [
+      'Email',
+      'EMAIL',
+      'REPOSITORY',
+      'Repositories',
+      'Raw_Prompt',
+      'rawPrompt',
+      'API_TOKEN',
+      'apiToken',
+      'SECRET_VALUE',
+      'secretValue',
+      'Comment',
+      'userComment',
+      'Message',
+      'user_message',
+      'emails',
+      'user_email',
+      'prompts',
+      'tokens',
+      'secrets',
+      'comments',
+      'messages',
+      'repos',
+      'provider_transaction_id',
+      'userId',
+      'session_id',
+    ]) {
+      expect(isProhibitedPropertyKey(key), key).toBe(true);
+    }
+  });
+
+  it('blocks repository-name and acronym camel-case variants', () => {
+    for (const key of [
+      'repo_name',
+      'repoName',
+      'RepositoryName',
+      'repo_url',
+      'APIToken',
+      'ApiToken',
+      'OAuthToken',
+    ]) {
+      expect(isProhibitedPropertyKey(key), key).toBe(true);
+    }
+  });
+
+  it('keeps allowed catalog fields allowed across case variants', () => {
+    for (const key of [
+      'repo_count',
+      'error_count',
+      'duration_ms',
+      'event_uuid',
+      'Event_UUID',
+      'eventUuid',
+      'ok_count',
+    ]) {
+      expect(isProhibitedPropertyKey(key), key).toBe(false);
+    }
+  });
+
+  it('redacts the named variants while keeping allowed catalog fields', () => {
+    const input = {
+      surface: 'claw',
+      repository: 'acme/app',
+      comment: 'lgtm',
+      message: 'hello',
+      raw_prompt: 'write tests',
+      api_token: 'tok',
+      secret_value: 's3cr3t',
+      repo_count: 3,
+      duration_ms: 42,
+      event_uuid: 'abc',
+    };
+    expect(redactProhibitedProperties(input)).toEqual({
+      surface: 'claw',
+      repo_count: 3,
+      duration_ms: 42,
+      event_uuid: 'abc',
+    });
+  });
+
+  it('redacts case and camelCase variants at runtime', () => {
+    const input = { Raw_Prompt: 'x', apiToken: 'y', SecretValue: 'z', ok_count: 1 };
+    expect(redactProhibitedProperties(input)).toEqual({ ok_count: 1 });
+  });
+
+  it('redacts the repaired repository and acronym variants at runtime', () => {
+    const input = {
+      repo_name: 'acme/app',
+      repoName: 'acme/app',
+      repository: 'acme/app',
+      APIToken: 'tok',
+      repo_count: 3,
+      duration_ms: 42,
+      event_uuid: 'abc',
+    };
+    expect(redactProhibitedProperties(input)).toEqual({
+      repo_count: 3,
+      duration_ms: 42,
+      event_uuid: 'abc',
+    });
+  });
 });

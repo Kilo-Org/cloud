@@ -262,6 +262,8 @@ describe('captureUncataloged privacy and gates', () => {
       surface: 'claw',
       email: 'a@b.co',
       session_id: 'x',
+      repo_name: 'acme/app',
+      APIToken: 'tok',
       ok_count: 1,
     });
 

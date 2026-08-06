@@ -1021,9 +1021,10 @@ export const AgentChatPanel = ({
         submitMessage(conversation.id, queued);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- submitMessage and isModelInCatalog are component-scope helpers reading refs for latest values; listing them would loop every render. The listed deps are the only triggers: a run or compaction ending, or a catalog change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- submitMessage and isModelInCatalog are component-scope helpers reading refs for latest values; listing them would loop every render. The listed deps are the only triggers: a run or compaction ending, a catalog change, or a stored conversation update such as the model repair.
   }, [
     compactingConversationIds,
+    conversationStore,
     isConversationStoreLoaded,
     modelOptions,
     runningConversationIds,

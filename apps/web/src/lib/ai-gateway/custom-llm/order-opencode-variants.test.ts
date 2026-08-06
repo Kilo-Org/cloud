@@ -4,7 +4,7 @@ import { orderOpenCodeSettings, orderOpenCodeVariants } from './order-opencode-v
 const variant = { reasoning: { enabled: true } };
 
 describe('orderOpenCodeVariants', () => {
-  it('orders reasoning effort variants from least to most intensive', () => {
+  it('orders reasoning effort variants from most to least intensive', () => {
     const variants = {
       max: variant,
       medium: variant,
@@ -16,13 +16,13 @@ describe('orderOpenCodeVariants', () => {
     };
 
     expect(Object.keys(orderOpenCodeVariants(variants))).toEqual([
-      'none',
-      'minimal',
-      'low',
-      'medium',
-      'high',
-      'xhigh',
       'max',
+      'xhigh',
+      'high',
+      'medium',
+      'low',
+      'minimal',
+      'none',
     ]);
     expect(Object.keys(variants)).toEqual([
       'max',
@@ -42,12 +42,12 @@ describe('orderOpenCodeVariants', () => {
     ]);
   });
 
-  it('orders instant and effort variants from least to most intensive', () => {
+  it('orders instant and effort variants consistently with fallback variants', () => {
     expect(
       Object.keys(
         orderOpenCodeVariants({ high: variant, medium: variant, instant: variant, low: variant })
       )
-    ).toEqual(['instant', 'low', 'medium', 'high']);
+    ).toEqual(['instant', 'high', 'medium', 'low']);
   });
 
   it('orders arbitrary and mixed variant names alphabetically', () => {
@@ -66,7 +66,7 @@ describe('orderOpenCodeSettings', () => {
 
     expect(orderOpenCodeSettings(settings)).toEqual({
       ai_sdk_provider: 'anthropic',
-      variants: { low: variant, high: variant },
+      variants: { high: variant, low: variant },
     });
   });
 

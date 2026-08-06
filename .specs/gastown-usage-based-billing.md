@@ -2,14 +2,13 @@
 
 ## Role of This Document
 
-This spec defines how Gastown charges Kilo credits for Cloudflare Container usage. It is the
-source of truth for pricing, payer attribution, metering lifecycle, budget enforcement, and
-user-visible behavior. The `@kilocode/container-usage` interface described here is proposed
-and is not yet available in production.
+This is retained design history for the Gastown producer. The authoritative rollout and
+settlement design is `fd-plans/research/container-billing-charge-and-enforce.md`; where this
+document differs from that plan, the plan wins.
 
 ## Status
 
-Draft -- created 2026-07-21.
+Superseded for rollout and accounting decisions -- created 2026-07-21.
 
 ## Conventions
 
@@ -24,8 +23,8 @@ settle continuously against the owner's Kilo credit balance through the future
 and enforcing budget verdicts; the metering service owns usage calculation, pricing, ledger
 debits, idempotency, and balance evaluation.
 
-The initial price is **three times the attributable Cloudflare Container cost**. This is a
-usage-based charge, not a subscription or flat-rate entitlement.
+Pricing is the immutable rate snapshotted from the accepted SKU. Do not introduce a generic
+provider-cost multiplier in the producer.
 
 ## Definitions
 
@@ -114,7 +113,10 @@ reservations, credit debits, or remaining balance. Therefore `GASTOWN_BILLING_EN
 off for customer charging until those ledger capabilities are implemented; the current integration
 is suitable for shadow metering and reconciliation.
 
-### Required admission contract before customer charging
+### Superseded admission design
+
+The following reservation design is superseded. The meter-owned `recordStart` balance check is
+the authoritative cold-start admission decision; no hold or fourth authorization RPC is planned.
 
 The current three recording calls are not sufficient by themselves to prevent a cold start:
 `recordStart` returns no budget verdict, while `recordHeartbeat` is defined only after

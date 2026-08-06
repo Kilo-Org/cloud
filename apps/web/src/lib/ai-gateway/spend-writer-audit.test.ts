@@ -12,6 +12,7 @@ const classifiedIncrementWriters = {
   'apps/web/src/lib/kiloclaw/credit-billing.ts': 'included_kiloclaw_enrollment',
   'apps/web/src/lib/organizations/organization-usage.ts':
     'included_ai_gateway_and_exa_organization',
+  'services/container-usage-meter/src/postgres.ts': 'included_container_usage_settlement',
   'services/kiloclaw-billing/src/lifecycle.ts': 'included_kiloclaw_renewal',
   'apps/web/src/app/admin/api/organizations/[id]/consume-credits/route.ts':
     'excluded_development_consume_route',

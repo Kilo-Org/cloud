@@ -1,11 +1,11 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
 // P1-A-08b: the share gate must attach one hoisted `operationKey` per
 // share-spawn intent (share + instance) to the `spawn` call, keep it across
 // retryable outcomes (the relay dedupes the same-key retry), and rotate it
-// on a terminal outcome (`ready` commit navigation or a typed non-retryable
-// rejection). This suite mounts the real `ShareGateSheet` with every
-// RN-touching dependency stubbed and drives the spawn via the list's
-// captured `onSpawnInstance` prop.
+// on a terminal outcome (a `ready` spawn — even when commit navigation is
+// suppressed — or a typed non-retryable rejection). This suite mounts the
+// real `ShareGateSheet` with every RN-touching dependency stubbed and drives
+// the spawn via the list's captured `onSpawnInstance` prop.
 
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -16,9 +16,14 @@ import {
   REMOTE_SPAWN_RETRYABLE_TOAST,
 } from '@/lib/remote-submit-outcome';
 import { __resetPendingShareNavigationForTests } from '@/lib/share-navigation';
-import { __resetSharePayloadStoreForTests, putSharePayload } from '@/lib/share-payload';
+import {
+  __resetSharePayloadStoreForTests,
+  peekSharePayload,
+  putSharePayload,
+} from '@/lib/share-payload';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type CreateSessionOutcome } from '@/lib/hooks/remote-instance-spawn-classifier';
+import type * as sharePayloadModule from '@/lib/share-payload';
 import { type ShareCliSpawnRow } from './share-cli-spawn';
 import { ShareGateSheet } from './share-gate-sheet';
 
@@ -120,6 +125,16 @@ vi.mock('expo-file-system/legacy', () => ({
   deleteAsync: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('expo-share-intent', () => ({}));
+// Wrap only `peekSharePayload` so the tests can force a single settle-time
+// miss (a cleared payload) while the real store keeps staging. Everything
+// else in the module stays the real implementation.
+vi.mock('@/lib/share-payload', async importOriginal => {
+  const actual = await importOriginal<typeof sharePayloadModule>();
+  return {
+    ...actual,
+    peekSharePayload: vi.fn(actual.peekSharePayload),
+  };
+});
 vi.mock('@/components/agents/session-list-helpers', () => ({
   expandPlatformFilter: (value: unknown) => value,
 }));
@@ -239,6 +254,7 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     refetchInstancesMock.mockClear();
     alertMock.mockClear();
     shareDestinationListProps.current = null;
+    vi.mocked(peekSharePayload).mockClear();
     __resetSharePayloadStoreForTests();
     __resetPendingShareNavigationForTests();
   });
@@ -300,6 +316,33 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     // The press after ready is a fresh intent with a fresh key.
     expect(keys[2]).not.toBe(keys[0]);
     expect(routerBack).toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('rotates the operationKey on a suppressed ready spawn before a later eligible spawn', async () => {
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+    const list = captureListProps();
+
+    // 19b: the user dismissed mid-spawn, so the settle-time payload lookup
+    // misses even though the ready outcome arrived. Navigation is suppressed.
+    spawnMock.mockResolvedValueOnce(readyOutcome());
+    vi.mocked(peekSharePayload).mockReturnValueOnce(null);
+    await pressSpawn(list.onSpawnInstance);
+    expect(routerBack).not.toHaveBeenCalled();
+
+    // A later eligible spawn (payload staged again) must be a fresh intent
+    // with a fresh key, not a replay of the settled key.
+    spawnMock.mockResolvedValueOnce(readyOutcome());
+    await pressSpawn(list.onSpawnInstance);
+
+    const keys = usedOperationKeys();
+    expect(keys[0]).toBeDefined();
+    expect(keys[1]).not.toBe(keys[0]);
+    expect(routerBack).toHaveBeenCalledTimes(1);
 
     act(() => {
       renderer.unmount();

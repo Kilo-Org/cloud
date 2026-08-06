@@ -20,7 +20,7 @@ jest.mock('@/lib/user/server', () => ({
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 25;
 
 function createRequest() {
   const params = new URLSearchParams({
@@ -53,7 +53,7 @@ describe('GET /admin/api/api-request-log/download', () => {
   it('streams a complete ZIP from a bounded result set across backpressured DB batches', async () => {
     // The first batch must exceed both the Node and web stream queues. This
     // keeps page two blocked until the test starts consuming the response.
-    const payload = randomBytes(32 * 1024).toString('base64');
+    const payload = randomBytes(128 * 1024).toString('base64');
     const rows = await db
       .insert(api_request_log)
       .values(

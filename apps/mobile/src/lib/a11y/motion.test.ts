@@ -1,66 +1,20 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
-import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
-import { createElement, type ReactElement, useEffect } from 'react';
+import { createElement, useEffect } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { type ActionSheetListModel } from '@/components/ui/reduced-motion-sheet';
+import { type MotionPolicy, useMotionPolicy } from './motion';
 
-import {
-  actionSheetToListModel,
-  type MotionPolicy,
-  type ShowActionSheetWithOptions,
-  useAppActionSheet,
-  useMotionPolicy,
-} from './motion';
+// Centralized reduced-motion policy (P3-C-05, D15). Reduce motion on maps to
+// immediate imperative scrolls; off keeps them animated.
 
-// Centralized reduced-motion policy (P3-C-05, D6 revised, D15, D21).
-//
-// Feature states covered:
-// - Android + reduce motion: the library action sheet is never shown; the
-//   shared non-animated Modal option list receives the mapped model, and every
-//   item activation or dismissal wires the caller's callback.
-// - Android without reduce motion and iOS: the library sheet is delegated to
-//   unchanged, so native presentation and callbacks stay identical.
-// - The pure mapper preserves option order, arbitrary option counts, and the
-//   destructive/cancel indices — `destructiveButtonIndex` as a single index
-//   or an array; dismissal reports the cancel index.
-
-const platformMock = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 const reduceMotionMock = vi.hoisted(() => ({ current: true }));
-const libraryShowMock = vi.hoisted(() => vi.fn());
-const showReducedMotionSheetMock = vi.hoisted(() => vi.fn());
-
-vi.mock('react-native', () => ({
-  Platform: platformMock,
-}));
 
 vi.mock('react-native-reanimated', () => ({
   useReducedMotion: () => reduceMotionMock.current,
 }));
 
-vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: libraryShowMock }),
-}));
-
-// Stub the imperative dispatch; the host accessibility tests live in
-// `motion-sheet.test.ts` and drive the real dispatch there.
-vi.mock('@/components/ui/reduced-motion-sheet', () => ({
-  showReducedMotionSheet: showReducedMotionSheetMock,
-}));
-
-type Renderer = TestRenderer.ReactTestRenderer;
-
-const showHolder: { current?: ShowActionSheetWithOptions } = {};
 const policyHolder: { current?: MotionPolicy } = {};
-
-function ShowHarness() {
-  const { showActionSheetWithOptions } = useAppActionSheet();
-  useEffect(() => {
-    showHolder.current = showActionSheetWithOptions;
-  }, [showActionSheetWithOptions]);
-  return null;
-}
 
 function PolicyHarness() {
   const policy = useMotionPolicy();
@@ -70,142 +24,27 @@ function PolicyHarness() {
   return null;
 }
 
-async function mountHarness(element: ReactElement): Promise<{
-  renderer: Renderer;
-  unmount: () => void;
-}> {
-  const holder: { current?: Renderer } = {};
+async function mountPolicy(): Promise<{ policy: MotionPolicy; unmount: () => void }> {
+  const holder: { current?: TestRenderer.ReactTestRenderer } = {};
   await act(async () => {
     await Promise.resolve();
-    holder.current = TestRenderer.create(element);
+    holder.current = TestRenderer.create(createElement(PolicyHarness));
   });
   const renderer = holder.current;
   if (renderer === undefined) {
     throw new Error('renderer was not created');
   }
+  const policy = policyHolder.current;
+  if (policy === undefined) {
+    throw new Error('policy was not captured');
+  }
   return {
-    renderer,
+    policy,
     unmount: () => {
       renderer.unmount();
     },
   };
 }
-
-async function mountShow(): Promise<{ show: ShowActionSheetWithOptions; unmount: () => void }> {
-  const { unmount } = await mountHarness(createElement(ShowHarness));
-  const show = showHolder.current;
-  if (show === undefined) {
-    throw new Error('show was not captured');
-  }
-  return { show, unmount };
-}
-
-async function mountPolicy(): Promise<{ policy: MotionPolicy; unmount: () => void }> {
-  const { unmount } = await mountHarness(createElement(PolicyHarness));
-  const policy = policyHolder.current;
-  if (policy === undefined) {
-    throw new Error('policy was not captured');
-  }
-  return { policy, unmount };
-}
-
-describe('actionSheetToListModel', () => {
-  it('maps title, message, and options to list items with their indices', () => {
-    const options: ActionSheetOptions = {
-      title: 'Session options',
-      message: 'Choose an action',
-      options: ['Rename', 'Delete', 'Cancel'],
-      cancelButtonIndex: 2,
-      destructiveButtonIndex: 1,
-    };
-    const model = actionSheetToListModel(options, vi.fn());
-
-    expect(model.title).toBe('Session options');
-    expect(model.message).toBe('Choose an action');
-    expect(model.items).toEqual([
-      { label: 'Rename', index: 0, destructive: false, cancel: false },
-      { label: 'Delete', index: 1, destructive: true, cancel: false },
-      { label: 'Cancel', index: 2, destructive: false, cancel: true },
-    ]);
-  });
-
-  it('preserves option order, keeping the cancel entry where the caller put it', () => {
-    const model = actionSheetToListModel(
-      { options: ['Cancel', 'Save'], cancelButtonIndex: 0 },
-      vi.fn()
-    );
-
-    expect(model.items.map(item => item.label)).toEqual(['Cancel', 'Save']);
-    expect(model.items[0]?.cancel).toBe(true);
-    expect(model.items[1]?.cancel).toBe(false);
-  });
-
-  it('marks every index in a destructive array as destructive', () => {
-    const model = actionSheetToListModel(
-      {
-        options: ['Edit', 'Delete', 'Remove', 'Cancel'],
-        cancelButtonIndex: 3,
-        destructiveButtonIndex: [1, 2],
-      },
-      vi.fn()
-    );
-
-    expect(model.items.map(item => item.destructive)).toEqual([false, true, true, false]);
-    expect(model.items.map(item => item.cancel)).toEqual([false, false, false, true]);
-  });
-
-  it('omits title and message when the caller passes none', () => {
-    const model = actionSheetToListModel({ options: ['Only'] }, vi.fn());
-
-    expect(model.title).toBeUndefined();
-    expect(model.message).toBeUndefined();
-  });
-
-  it('maps an arbitrary option count one-to-one', () => {
-    const labels = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'];
-    const model = actionSheetToListModel({ options: labels }, vi.fn());
-
-    expect(model.items).toHaveLength(labels.length);
-    expect(model.items.map(item => item.label)).toEqual(labels);
-    expect(model.items.map(item => item.index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
-  });
-
-  it('maps a single-option sheet to one item', () => {
-    const model = actionSheetToListModel({ options: ['Only'] }, vi.fn());
-
-    expect(model.items).toEqual([{ label: 'Only', index: 0, destructive: false, cancel: false }]);
-  });
-
-  it('invokes the callback with the selected index on item activation', () => {
-    const callback = vi.fn();
-    const model = actionSheetToListModel({ options: ['A', 'B', 'C'] }, callback);
-
-    model.onSelect(1);
-
-    expect(callback).toHaveBeenCalledWith(1);
-  });
-
-  it('invokes the callback with the cancel index on dismissal', () => {
-    const callback = vi.fn();
-    const model = actionSheetToListModel(
-      { options: ['A', 'Cancel'], cancelButtonIndex: 1 },
-      callback
-    );
-
-    model.onDismiss();
-
-    expect(callback).toHaveBeenCalledWith(1);
-  });
-
-  it('invokes the callback with undefined on dismissal when there is no cancel button', () => {
-    const callback = vi.fn();
-    const model = actionSheetToListModel({ options: ['A'] }, callback);
-
-    model.onDismiss();
-
-    expect(callback).toHaveBeenCalledWith(undefined);
-  });
-});
 
 describe('useMotionPolicy', () => {
   it('maps reduce motion on to immediate scrolls', async () => {
@@ -221,74 +60,6 @@ describe('useMotionPolicy', () => {
     const { policy, unmount } = await mountPolicy();
 
     expect(policy).toEqual({ reduceMotion: false, scrollAnimated: true });
-    unmount();
-  });
-});
-
-describe('useAppActionSheet platform delegation', () => {
-  beforeEach(() => {
-    libraryShowMock.mockClear();
-    showReducedMotionSheetMock.mockClear();
-  });
-
-  it('Android with reduce motion: shows the non-animated sheet, never the library', async () => {
-    platformMock.OS = 'android';
-    reduceMotionMock.current = true;
-    const callback = vi.fn();
-    const options: ActionSheetOptions = {
-      options: ['Rename', 'Delete', 'Cancel'],
-      cancelButtonIndex: 2,
-      destructiveButtonIndex: 1,
-    };
-    const { show, unmount } = await mountShow();
-
-    await act(() => {
-      show(options, callback);
-    });
-
-    expect(libraryShowMock).not.toHaveBeenCalled();
-    expect(showReducedMotionSheetMock).toHaveBeenCalledTimes(1);
-    const model = showReducedMotionSheetMock.mock.calls[0]?.[0] as ActionSheetListModel;
-    expect(model.items.map(item => item.label)).toEqual(['Rename', 'Delete', 'Cancel']);
-    expect(model.items[1]?.destructive).toBe(true);
-    expect(model.items[2]?.cancel).toBe(true);
-    model.onSelect(0);
-    expect(callback).toHaveBeenCalledWith(0);
-    callback.mockClear();
-    model.onDismiss();
-    expect(callback).toHaveBeenCalledWith(2);
-    unmount();
-  });
-
-  it('Android without reduce motion: delegates to the library sheet', async () => {
-    platformMock.OS = 'android';
-    reduceMotionMock.current = false;
-    const callback = vi.fn();
-    const options: ActionSheetOptions = { options: ['A', 'B'] };
-    const { show, unmount } = await mountShow();
-
-    await act(() => {
-      show(options, callback);
-    });
-
-    expect(showReducedMotionSheetMock).not.toHaveBeenCalled();
-    expect(libraryShowMock).toHaveBeenCalledWith(options, callback);
-    unmount();
-  });
-
-  it('iOS with reduce motion: delegates to the native library sheet', async () => {
-    platformMock.OS = 'ios';
-    reduceMotionMock.current = true;
-    const callback = vi.fn();
-    const options: ActionSheetOptions = { options: ['A', 'B'], cancelButtonIndex: 1 };
-    const { show, unmount } = await mountShow();
-
-    await act(() => {
-      show(options, callback);
-    });
-
-    expect(showReducedMotionSheetMock).not.toHaveBeenCalled();
-    expect(libraryShowMock).toHaveBeenCalledWith(options, callback);
     unmount();
   });
 });

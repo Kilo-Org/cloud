@@ -1,10 +1,10 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
-import { useAppActionSheet } from '@/lib/a11y/motion';
 import { openExternalUrl } from '@/lib/external-link';
 import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 
@@ -34,7 +34,7 @@ function buildPrReviewHref(href: string): Href | null {
 }
 
 export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
-  const { showActionSheetWithOptions } = useAppActionSheet();
+  const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
   const router = useRouter();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);

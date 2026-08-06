@@ -1,3 +1,4 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
@@ -6,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
-import { useAppActionSheet } from '@/lib/a11y/motion';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -49,7 +49,7 @@ export function RemoteSessionRow({
 }: Readonly<RemoteSessionRowProps>) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { showActionSheetWithOptions } = useAppActionSheet();
+  const { showActionSheetWithOptions } = useActionSheet();
   const { renameSession } = useSessionMutations();
   const title = session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);

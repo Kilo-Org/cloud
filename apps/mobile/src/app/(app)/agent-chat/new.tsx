@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
@@ -14,7 +15,6 @@ import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session
 import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { useAppActionSheet } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -38,7 +38,7 @@ export default function NewSessionScreen() {
 }
 function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
-  const { showActionSheetWithOptions } = useAppActionSheet();
+  const { showActionSheetWithOptions } = useActionSheet();
   const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
     organizationId?: string;
     shareId?: string;

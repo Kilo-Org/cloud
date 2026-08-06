@@ -1,3 +1,4 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
@@ -6,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
-import { useAppActionSheet } from '@/lib/a11y/motion';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   isAttentionAcked,
@@ -98,7 +98,7 @@ export function StoredSessionRow({
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { showActionSheetWithOptions } = useAppActionSheet();
+  const { showActionSheetWithOptions } = useActionSheet();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);

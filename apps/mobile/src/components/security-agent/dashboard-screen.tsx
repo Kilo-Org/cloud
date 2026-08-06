@@ -3,6 +3,7 @@ import {
   type DashboardMetricTone,
   getSecurityRepositoriesInScope,
 } from '@kilocode/app-shared/security-agent';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useRouter } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from 'lucide-react-native';
 import { useState } from 'react';
@@ -17,7 +18,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { useAppActionSheet } from '@/lib/a11y/motion';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -39,7 +39,7 @@ const METRIC_TONE_CLASS: Record<DashboardMetricTone, string> = {
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { showActionSheetWithOptions } = useAppActionSheet();
+  const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshFailed, setRefreshFailed] = useState(false);

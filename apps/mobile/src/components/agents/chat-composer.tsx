@@ -4,6 +4,7 @@
  * is not expressed as a unit test.
  */
 import * as Haptics from 'expo-haptics';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -44,7 +45,6 @@ import {
 } from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
-import { useAppActionSheet } from '@/lib/a11y/motion';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
 import {
@@ -160,7 +160,7 @@ export function ChatComposer({
   autoSend,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
-  const { showActionSheetWithOptions } = useAppActionSheet();
+  const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   // Last caret the input reported. Paste inserts here so the button behaves

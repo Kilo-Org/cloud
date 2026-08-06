@@ -45,13 +45,32 @@ vi.mock('@/lib/agent-session-cache', () => ({
   invalidateAgentSessionQueries: vi.fn(),
 }));
 // The real classifier lives in mobile-session-manager (covered by its own
-// suite); this test only needs the retryable/non-retryable split.
-vi.mock('@/components/agents/mobile-session-manager', () => ({
-  isCloudPrepareRetryableError: (error: unknown) => {
-    const record = error as { data?: { code?: string }; message?: string };
-    return record.data?.code === 'CONFLICT' && record.message === 'creation_in_progress';
-  },
-}));
+// suite); this test mirrors its decision so hook-level retries are exercised
+// for every retryable shape: no code (transport), CONFLICT +
+// `creation_in_progress`, and the transient 5xx-class codes.
+vi.mock('@/components/agents/mobile-session-manager', () => {
+  const TRANSIENT_CODES = new Set([
+    'INTERNAL_SERVER_ERROR',
+    'BAD_GATEWAY',
+    'SERVICE_UNAVAILABLE',
+    'GATEWAY_TIMEOUT',
+    'TIMEOUT',
+    'TOO_MANY_REQUESTS',
+  ]);
+  return {
+    isCloudPrepareRetryableError: (error: unknown) => {
+      const record = error as { data?: { code?: string }; code?: string; message?: string };
+      const code = record.data?.code ?? record.code;
+      if (code === undefined) {
+        return true;
+      }
+      if (code === 'CONFLICT') {
+        return record.message === 'creation_in_progress';
+      }
+      return TRANSIENT_CODES.has(code);
+    },
+  };
+});
 vi.mock('expo-crypto', () => {
   let n = 0;
   return {
@@ -75,6 +94,14 @@ function creationInProgressError(): Error {
 
 function badRequestError(): Error {
   return Object.assign(new Error('session_creation_failed'), { data: { code: 'BAD_REQUEST' } });
+}
+
+function transportError(): Error {
+  return new Error('Network request failed');
+}
+
+function transient5xxError(): Error {
+  return Object.assign(new Error('service unavailable'), { data: { code: 'SERVICE_UNAVAILABLE' } });
 }
 
 type ReactInternals = {
@@ -195,6 +222,39 @@ describe('useNewSessionCreator operationKey', () => {
     expect(keys[1]).toBe(keys[0]);
     // The submit after success is a fresh intent with a fresh key.
     expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it('keeps the same operationKey across a plain transport failure', async () => {
+    prepareSessionMutate
+      .mockRejectedValueOnce(transportError())
+      .mockRejectedValueOnce(transportError());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    await creator.createSessionFromDraft();
+
+    const keys = usedOperationKeys();
+    expect(keys[0]).toBeDefined();
+    // A transport failure is ambiguous: the ledger may have accepted the
+    // attempt, so the same-key retry lets it reconcile instead of spawning a
+    // second session.
+    expect(keys[1]).toBe(keys[0]);
+  });
+
+  it('keeps the same operationKey across a transient typed 5xx failure', async () => {
+    prepareSessionMutate
+      .mockRejectedValueOnce(transient5xxError())
+      .mockRejectedValueOnce(transient5xxError());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    await creator.createSessionFromDraft();
+
+    const keys = usedOperationKeys();
+    expect(keys[0]).toBeDefined();
+    expect(keys[1]).toBe(keys[0]);
   });
 
   it('rotates the operationKey after a typed non-retryable rejection', async () => {

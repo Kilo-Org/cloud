@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import { isSecuritySyncRetryable } from '@/lib/hooks/use-security-agent-mutations';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -152,6 +153,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
+  // A persistence failure (or any typed terminal rejection) ended the intent:
+  // the hook already rotated the operation key, so a re-submit would be a
+  // fresh intent against a ledger row that was never recorded. Disable the
+  // CTA and let the inline state-specific copy explain the outcome.
+  const dismissBlocked = dismissFinding.isError && !isSecuritySyncRetryable(dismissFinding.error);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Dismiss finding" modal />
@@ -190,7 +197,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
         )}
 
-        <Button disabled={!reason || dismissFinding.isPending} onPress={onSubmit}>
+        <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}

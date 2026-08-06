@@ -50,6 +50,23 @@ beforeEach(() => {
   vi.mocked(runSecurityNotificationSweep).mockResolvedValue({} as never);
 });
 
+/**
+ * Worker db mock whose ledger provider-ref lookup succeeds but finds no rows.
+ * Terminal messages for keyless/scheduled work have no ledger row, so the
+ * settle must skip and the message must still be acknowledged.
+ */
+function emptyLedgerWorkerDb(): never {
+  return {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [] as { id: string }[],
+        }),
+      }),
+    }),
+  } as never;
+}
+
 describe('collectScheduledSyncOwners', () => {
   it('skips owners whose automatic sync policy is disabled', () => {
     const owners = collectScheduledSyncOwners([
@@ -106,7 +123,7 @@ describe('scheduled sync dispatch', () => {
           }),
         }),
       } as never)
-      .mockReturnValueOnce({} as never);
+      .mockReturnValueOnce(emptyLedgerWorkerDb());
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
 
     await worker.scheduled(
@@ -364,7 +381,8 @@ describe('manual sync dispatch', () => {
       repoFullName: 'kilo/repo',
     });
 
-    vi.mocked(getWorkerDb).mockReturnValue({} as never);
+    const workerDb = emptyLedgerWorkerDb();
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const ack = vi.fn();
     const retry = vi.fn();
@@ -386,12 +404,12 @@ describe('manual sync dispatch', () => {
     );
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
       1,
-      {},
+      workerDb,
       expect.objectContaining({ status: 'running' })
     );
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
       2,
-      {},
+      workerDb,
       expect.objectContaining({ status: 'succeeded', resultCode: 'SYNC_COMPLETED' })
     );
     expect(
@@ -402,6 +420,7 @@ describe('manual sync dispatch', () => {
   });
 
   it('enables sync-time notification staging only for exact true rollout flag', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(emptyLedgerWorkerDb());
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const ack = vi.fn();
     const retry = vi.fn();
@@ -481,7 +500,7 @@ describe('manual sync dispatch', () => {
       },
     });
 
-    vi.mocked(getWorkerDb).mockReturnValue({} as never);
+    vi.mocked(getWorkerDb).mockReturnValue(emptyLedgerWorkerDb());
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const ack = vi.fn();
     const retry = vi.fn();
@@ -507,6 +526,7 @@ describe('manual sync dispatch', () => {
       transitioned: false,
       command: { status: 'succeeded', result_code: 'SYNC_COMPLETED' },
     } as never);
+    vi.mocked(getWorkerDb).mockReturnValue(emptyLedgerWorkerDb());
     const ack = vi.fn();
     const retry = vi.fn();
 
@@ -658,6 +678,8 @@ describe('manual dismissal dispatch', () => {
       commandStatus: 'succeeded',
       resultCode: 'FINDING_DISMISSED',
     });
+    const workerDb = emptyLedgerWorkerDb();
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
     const ack = vi.fn();
     const retry = vi.fn();
 
@@ -692,7 +714,7 @@ describe('manual dismissal dispatch', () => {
 
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
       2,
-      {},
+      workerDb,
       expect.objectContaining({ status: 'succeeded', resultCode: 'FINDING_DISMISSED' })
     );
     expect(
@@ -958,7 +980,7 @@ describe('security operation ledger provider_ref join', () => {
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
-    await processSyncMessage();
+    const { ack, retry } = await processSyncMessage();
 
     expect(settleOperation).not.toHaveBeenCalled();
     expect(
@@ -968,6 +990,56 @@ describe('security operation ledger provider_ref join', () => {
       )?.[0]
     ).toBe('Security operation ledger row not found for provider ref; skipping settle');
     info.mockRestore();
+    // The missing-row skip is preserved: the terminal message is still
+    // acknowledged, never retried.
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('does not acknowledge a terminal message when the ledger settle fails', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([{ id: 'ledger-row-id' }]));
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 3, errors: 0, staleRepos: 0 } as never);
+    vi.mocked(settleOperation).mockRejectedValueOnce(new Error('settle failed'));
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const { ack, retry } = await processSyncMessage();
+
+    expect(settleOperation).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to settle security operation ledger row'),
+      expect.objectContaining({ result_code: 'SYNC_COMPLETED' })
+    );
+    errorLog.mockRestore();
+    // The terminal message must not be acknowledged after a settlement
+    // failure; it is retried so the settle runs again on redelivery.
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not acknowledge a terminal message when the ledger lookup fails', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue({
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => {
+              throw new Error('ledger lookup failed');
+            },
+          }),
+        }),
+      }),
+    } as never);
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const { ack, retry } = await processSyncMessage();
+
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining('Security operation ledger lookup failed'),
+      expect.objectContaining({ provider_ref: messageId })
+    );
+    errorLog.mockRestore();
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it('settles the row failed with retry-exhaustion after final delivery failure', async () => {

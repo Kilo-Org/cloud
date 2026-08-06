@@ -419,8 +419,10 @@ async function resolveSecuritySettleDistinctId(
 
 /**
  * Settles the ledger row joined by `provider_ref = messageId`. Missing rows
- * skip; the settle is best-effort (a failure never re-queues the message — the
- * command already reached a terminal state). Terminal rows are no-ops.
+ * skip (scheduled syncs and keyless commands have no ledger row, and a second
+ * settle of a terminal row is a no-op by ledger design). A failed lookup or
+ * settle re-throws so the caller leaves the queue message unacknowledged —
+ * the message is retried instead of losing the terminal settlement.
  */
 async function settleSecurityLedgerByProviderRef(
   db: WorkerDb,
@@ -449,7 +451,7 @@ async function settleSecurityLedgerByProviderRef(
       provider_ref: params.providerRef,
       error_type: error instanceof Error ? error.name : 'UnknownError',
     });
-    return;
+    throw error;
   }
   if (!row) {
     console.info('Security operation ledger row not found for provider ref; skipping settle', {
@@ -506,6 +508,7 @@ async function settleSecurityLedgerByProviderRef(
       result_code: params.resultCode,
       error_type: error instanceof Error ? error.name : 'UnknownError',
     });
+    throw error;
   }
 }
 

@@ -1,0 +1,204 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
+
+// Dismiss-screen terminal-state contract: a persistence failure (the ledger
+// could not record the outcome, so a same-key retry guarantee does not hold)
+// is non-retryable — the form must show its state-specific copy and disable
+// the dismissal CTA. Retryable failures (in-progress, ambiguous, transport)
+// keep the CTA so the user can retry under the same hoisted key.
+
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { DismissFindingScreen } from './dismiss-finding-screen';
+
+const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
+  () => 'We could not record this action. Please try again later.'
+);
+const IN_PROGRESS_COPY = vi.hoisted(
+  () => 'A security sync is already in progress. Please try again.'
+);
+
+const routerBack = vi.hoisted(() => vi.fn());
+const dismiss = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  isPending: false,
+  isError: false,
+  error: null as Error | null,
+}));
+const capability = vi.hoisted(() => ({
+  canManage: true,
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+}));
+const finding = vi.hoisted(() => ({
+  isLoading: false,
+  isError: false,
+  error: null as unknown,
+  data: { status: 'open' },
+  refetch: vi.fn(),
+}));
+const pillGroup = vi.hoisted(() => ({
+  onChange: (() => undefined) as (value: string) => void,
+}));
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  ScrollView: 'ScrollView',
+  TextInput: 'TextInput',
+  ActivityIndicator: 'ActivityIndicator',
+}));
+vi.mock('lucide-react-native', () => ({ ShieldOff: 'ShieldOff' }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: routerBack }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#000', primaryForeground: '#fff' }),
+}));
+vi.mock('@/lib/hooks/use-security-agent', () => ({
+  useSecurityAgentCapability: () => capability,
+}));
+vi.mock('@/lib/hooks/use-security-findings', () => ({
+  useSecurityFinding: () => finding,
+  useDismissSecurityFinding: () => dismiss,
+}));
+// Faithful-enough mirror of the real classifier (covered by its own suite):
+// the persistence-failure and replay-failed markers are non-retryable, the
+// rest (transport, in-progress copy, ambiguous, settle-failed) are retryable.
+vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
+  isSecuritySyncRetryable: (error: unknown) => {
+    const message = error instanceof Error ? error.message : '';
+    return !(
+      message === 'We could not record this action. Please try again later.' ||
+      message === 'This action did not complete. Please try again.' ||
+      message === 'operation_key_reuse_mismatch'
+    );
+  },
+}));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: () => null }));
+vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/security-agent/settings-pill-group', () => ({
+  PillGroup: (props: { onChange: (value: string) => void }) => {
+    pillGroup.onChange = props.onChange;
+    return null;
+  },
+}));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+
+type R = TestRenderer.ReactTestRenderer;
+type I = TestRenderer.ReactTestInstance;
+
+function renderScreen(): R {
+  const ref: { current: R | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(DismissFindingScreen, { scope: 'personal', findingId: 'finding-1' })
+    );
+  });
+  const r = ref.current;
+  if (!r) {
+    throw new Error('renderer was not created');
+  }
+  return r;
+}
+
+function selectReason(): void {
+  act(() => {
+    pillGroup.onChange('not_used');
+  });
+}
+
+function findDismissButton(root: I): I {
+  const nodes = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 dismissal Button, got ${nodes.length}`);
+  }
+  const n = nodes[0];
+  if (!n) {
+    throw new Error('dismissal Button not found');
+  }
+  return n;
+}
+
+function buttonDisabled(root: I): boolean | undefined {
+  return findDismissButton(root).props.disabled as boolean | undefined;
+}
+
+function renderedTexts(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        typeof n.props.children === 'string'
+    )
+    .map(n => n.props.children as string);
+}
+
+describe('DismissFindingScreen dismissal CTA states', () => {
+  beforeEach(() => {
+    dismiss.mutate.mockClear();
+    dismiss.isPending = false;
+    dismiss.isError = false;
+    dismiss.error = null;
+    capability.canManage = true;
+    capability.isLoading = false;
+    capability.isError = false;
+    finding.isLoading = false;
+    finding.isError = false;
+    finding.data = { status: 'open' };
+  });
+
+  it('keeps the dismissal CTA enabled once a reason is chosen', () => {
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(false);
+  });
+
+  it('keeps the dismissal CTA enabled after a retryable failure and shows its copy', () => {
+    dismiss.isError = true;
+    dismiss.error = new Error(IN_PROGRESS_COPY);
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
+  });
+
+  it('disables the dismissal CTA and shows the persistence-failure copy after a non-retryable error', () => {
+    dismiss.isError = true;
+    dismiss.error = new Error(PERSISTENCE_FAILED_MESSAGE);
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(true);
+    expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
+  });
+
+  it('disables the dismissal CTA while the dismissal is pending', () => {
+    dismiss.isPending = true;
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(true);
+  });
+
+  it('submits the dismissal and pops the screen only on success', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    expect(dismiss.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ findingId: 'finding-1', reason: 'not_used' }),
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+});

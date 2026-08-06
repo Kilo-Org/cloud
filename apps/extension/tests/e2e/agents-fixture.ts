@@ -67,16 +67,50 @@ export interface HistorySessionSeed {
   updatedAt: string;
 }
 
+export interface ConnectedInstanceSeed {
+  connectionId: string;
+  name: string;
+  projectName: string;
+}
+
+export const DEFAULT_INSTANCE: ConnectedInstanceSeed = {
+  connectionId: 'cli-connection-42',
+  name: 'igor-mbp',
+  projectName: 'cloud',
+};
+
+export const SPAWNED_SESSION_ID = 'ses_spawnedcli0000000000000001';
+
+export interface AssociatedPrSeed {
+  headSha: string | null;
+  lastSyncedAt: string;
+  number: number;
+  state: string;
+  title: string | null;
+  url: string;
+}
+
 export interface AgentsFixtureOptions {
   activeListFailuresBeforeSuccess?: number;
   activeSessions?: (CloudAgentSessionSeed | RemoteSessionSeed)[];
   cloudAgentWsEvents?: unknown[];
+  /** PR returned on `cliSessionsV2.getWithRuntimeState` for cloud sessions. */
+  cloudSessionAssociatedPr?: AssociatedPrSeed;
   getSessionFailuresBeforeSuccess?: number;
   historyListFailuresBeforeSuccess?: number;
   historySessions?: HistorySessionSeed[];
+  /** Connected CLI instances returned by `activeSessions.listInstances`. */
+  instances?: ConnectedInstanceSeed[];
+  /** Keep the mocked ingest relay silent — the connection never reports
+   * connected (simulates an outage; default false). */
+  ingestSilent?: boolean;
+  /** GitHub integration state for the repository pickers (default true). */
+  integrationInstalled?: boolean;
   onCloudAgentClientMessage?: (message: unknown) => void;
   onIngestClientMessage?: (message: unknown) => void;
   prepareSessionError?: Record<string, unknown>;
+  /** Fail `prepareSession` with 500 this many times, then succeed. */
+  prepareSessionFailuresBeforeSuccess?: number;
   prepareSessionStatusCode?: number;
 }
 
@@ -208,7 +242,10 @@ export const mockAgentsApi = async (
   let activeListFailures = options.activeListFailuresBeforeSuccess ?? 0;
   let historyListFailures = options.historyListFailuresBeforeSuccess ?? 0;
   let getSessionFailures = options.getSessionFailuresBeforeSuccess ?? 0;
+  let prepareSessionFailures = options.prepareSessionFailuresBeforeSuccess ?? 0;
   let preparedKiloSessionId: string | null = null;
+  /** Set when a `create_session` command spawns a session on a CLI instance. */
+  let spawnedKiloSessionId: string | null = null;
 
   // ---- /api/user ----
   await context.route('https://app.kilo.ai/api/user', route =>
@@ -264,7 +301,21 @@ export const mockAgentsApi = async (
             ? activeSessionFromCloudAgent(session)
             : activeSessionFromRemote(session)
         );
+        if (spawnedKiloSessionId !== null) {
+          sessions.push({
+            connectionId: options.instances?.[0]?.connectionId ?? 'cli-connection-42',
+            gitBranch: 'main',
+            gitUrl: 'github.com/org/repo',
+            id: spawnedKiloSessionId,
+            status: 'idle',
+            title: 'Spawned session',
+          });
+        }
         return { result: { data: { sessions } } };
+      }
+
+      if (proc === 'activeSessions.listInstances') {
+        return { result: { data: { instances: options.instances ?? [] } } };
       }
 
       if (proc === 'cliSessionsV2.list') {
@@ -367,6 +418,9 @@ export const mockAgentsApi = async (
         return {
           result: {
             data: {
+              ...(cloudSession && options.cloudSessionAssociatedPr
+                ? { associatedPr: options.cloudSessionAssociatedPr }
+                : {}),
               cloud_agent_session_id: cloudSession?.cloudAgentSessionId ?? null,
               git_branch: cloudSession?.gitBranch ?? null,
               git_url: cloudSession?.gitUrl ?? null,
@@ -374,7 +428,10 @@ export const mockAgentsApi = async (
               parent_session_id: null,
               runtimeState,
               session_id: requestedId,
-              title: cloudSession?.title ?? 'Test Session',
+              title:
+                requestedId === spawnedKiloSessionId
+                  ? 'Spawned session'
+                  : (cloudSession?.title ?? 'Test Session'),
               total_cost_microdollars: 0,
             },
           },
@@ -416,11 +473,14 @@ export const mockAgentsApi = async (
         proc === 'cloudAgentNext.listGitHubRepositories' ||
         proc === 'organizations.cloudAgentNext.listGitHubRepositories'
       ) {
+        const integrationInstalled = options.integrationInstalled ?? true;
         return {
           result: {
             data: {
-              integrationInstalled: true,
-              repositories: [{ fullName: 'org/repo', id: 1, name: 'repo', private: false }],
+              integrationInstalled,
+              repositories: integrationInstalled
+                ? [{ fullName: 'org/repo', id: 1, name: 'repo', private: false }]
+                : [],
             },
           },
         };
@@ -475,6 +535,20 @@ export const mockAgentsApi = async (
           proc === 'organizations.cloudAgentNext.prepareSession'
         ) {
           calledProcedures.push({ input: inputs[0], proc });
+          if (prepareSessionFailures > 0) {
+            prepareSessionFailures -= 1;
+            await route.fulfill({
+              json: {
+                error: {
+                  code: -32_603,
+                  data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+                  message: 'Server error',
+                },
+              },
+              status: 500,
+            });
+            return;
+          }
           const statusCode = options.prepareSessionStatusCode;
           if (statusCode !== undefined) {
             const errorBody = options.prepareSessionError ?? {
@@ -546,17 +620,44 @@ export const mockAgentsApi = async (
   });
 
   // ---- WebSocket: session ingest ----
-  await context.routeWebSocket('wss://ingest.kilosessions.ai/api/user/web', ws => {
+  // Glob with a wildcard — the client appends ?token=…&connectionId=… and a
+  // Bare-string pattern silently never matches (auth then fails).
+  await context.routeWebSocket('wss://ingest.kilosessions.ai/api/user/web**', ws => {
+    // A healthy relay speaks first; one parsed message marks the SDK
+    // Connection as connected. `ingestSilent` simulates an outage instead.
+    if (options.ingestSilent !== true) {
+      ws.send(JSON.stringify({ data: {}, event: 'connected', type: 'system' }));
+    }
     ws.onMessage(message => {
       const parsed = parseJsonMessage(message);
       ingestClientMessages.push(parsed);
       options.onIngestClientMessage?.(parsed);
+      if (isRecordObject(parsed) && parsed['type'] === 'ping') {
+        // Answer liveness pings so the SDK keeps the socket alive.
+        if (options.ingestSilent !== true) {
+          ws.send(JSON.stringify({ nonce: parsed['nonce'], type: 'pong' }));
+        }
+        return;
+      }
       if (
         isRecordObject(parsed) &&
         typeof parsed['type'] === 'string' &&
         parsed['type'] === 'command'
       ) {
         const cmdId = typeof parsed['id'] === 'string' ? parsed['id'] : '';
+        // Spawn commands answer with the strict v1 envelope so the
+        // Extension's CLI spawn flow can navigate to the new session.
+        if (parsed['command'] === 'create_session') {
+          spawnedKiloSessionId = SPAWNED_SESSION_ID;
+          ws.send(
+            JSON.stringify({
+              id: cmdId,
+              result: { protocolVersion: 1, sessionID: SPAWNED_SESSION_ID },
+              type: 'response',
+            })
+          );
+          return;
+        }
         ws.send(JSON.stringify({ id: cmdId, result: {}, type: 'response' }));
       }
     });

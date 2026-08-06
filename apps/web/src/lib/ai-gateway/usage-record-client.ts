@@ -105,14 +105,14 @@ export async function recordUsageInPrimaryRegion(
         // failure — but the status was already 2xx, so the write may have
         // committed, exactly like the schema mismatch below. Both must fall back
         // rather than re-send and manufacture a redelivery.
-        let payload: unknown;
+        let responseBody: unknown;
         try {
-          payload = await response.json();
+          responseBody = await response.json();
         } catch {
           lastReason = 'unreadable_response';
           break;
         }
-        const parsed = UsageRecordResponseSchema.safeParse(payload);
+        const parsed = UsageRecordResponseSchema.safeParse(responseBody);
         if (!parsed.success) {
           // A malformed response is not safe to retry: the write may well have
           // committed. Fall back so the caller can reconcile on `core.id`.

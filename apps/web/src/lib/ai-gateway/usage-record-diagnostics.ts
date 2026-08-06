@@ -199,15 +199,30 @@ export function describeDatabaseError(error: unknown): DatabaseErrorDescription 
  * prefixes and the client IP. Dropping the header keeps the throw site, which
  * `Error.captureStackTrace` on the replacement would lose.
  *
- * Frames themselves are `at fn (chunk:line:col)` and carry no request data.
+ * The header is removed by exact `${name}: ${message}` prefix, never by searching
+ * for the first frame-shaped line. That search is unsafe here because the message
+ * embeds `user_prompt_prefix`: a user pasting a stack trace into their prompt —
+ * routine for a coding assistant — puts a line matching `/^\s+at\s/` inside the
+ * message, and slicing from it carries the rest of the parameters, client IP
+ * included, into the result.
+ *
+ * Fails closed. If the stack does not start with the expected header the message
+ * boundary is unknown, so no frames are emitted at all; `describeDatabaseError`
+ * still supplies the actionable code and constraint. Losing a throw site is
+ * cheaper than leaking a prompt.
  */
 export function stackFramesUnderHeader(error: unknown, header: string): string {
   if (!(error instanceof Error) || typeof error.stack !== 'string') return header;
-  // The message is multi-line for a drizzle failure, so anchor on the first frame
-  // rather than assuming the header occupies a single line.
-  const firstFrame = error.stack.search(/^\s+at\s/m);
-  if (firstFrame === -1) return header;
-  return `${header}\n${error.stack.slice(firstFrame)}`;
+  const originalHeader = error.message.length > 0 ? `${error.name}: ${error.message}` : error.name;
+  if (!error.stack.startsWith(originalHeader)) return header;
+  // Belt and braces: after an exact strip nothing but frames can remain, but a
+  // message mutated after construction would slip through, so keep only lines
+  // that are actually frames.
+  const frames = error.stack
+    .slice(originalHeader.length)
+    .split('\n')
+    .filter(line => /^\s+at\s/.test(line));
+  return frames.length > 0 ? `${header}\n${frames.join('\n')}` : header;
 }
 
 /** PostgreSQL `unique_violation`. */

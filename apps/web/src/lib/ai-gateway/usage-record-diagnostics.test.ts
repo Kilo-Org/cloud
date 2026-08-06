@@ -113,9 +113,52 @@ describe('stackFramesUnderHeader', () => {
     );
   });
 
-  test('anchors on the first frame even when the message spans lines', () => {
+  test('removes a multi-line message in full', () => {
     const error = new Error('line one\nline two\nparams: secret');
     error.stack = 'Error: line one\nline two\nparams: secret\n    at inner (chunk.js:1:1)';
+    expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe(
+      'Error: redacted\n    at inner (chunk.js:1:1)'
+    );
+  });
+
+  // A user pasting a stack trace into their prompt is routine for a coding
+  // assistant, and `user_prompt_prefix` is interpolated into the message. Anchoring
+  // on the first frame-shaped line would start the slice inside the message and
+  // carry the remaining parameters — client IP, city — into the result.
+  test('does not leak parameters when the prompt itself contains a stack trace', () => {
+    const prompt = 'Fix this:\n    at handler (app.js:10:5)\n    at run (app.js:2:1)';
+    const error = new Error(
+      `Failed query: WITH microdollar_usage_ins AS (...)\nparams: 3f5826e7,${prompt},134.82.68.167,Miami`
+    );
+    error.name = 'DrizzleQueryError';
+
+    const stack = stackFramesUnderHeader(error, 'Error: redacted');
+
+    expect(stack).not.toContain('134.82.68.167');
+    expect(stack).not.toContain('Miami');
+    expect(stack).not.toContain('Fix this');
+    expect(stack).not.toContain('app.js');
+    expect(stack).not.toContain('params:');
+  });
+
+  // Fails closed: an unrecognised header means the message boundary is unknown.
+  test('emits no frames when the stack does not start with the expected header', () => {
+    const error = new Error('secret params: 134.82.68.167');
+    error.stack = 'SomethingElse: unrelated\n    at inner (chunk.js:1:1)';
+    expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe('Error: redacted');
+  });
+
+  test('handles an empty message, whose header is the name alone', () => {
+    const error = new Error('');
+    error.stack = 'Error\n    at inner (chunk.js:1:1)';
+    expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe(
+      'Error: redacted\n    at inner (chunk.js:1:1)'
+    );
+  });
+
+  test('drops non-frame lines that survive the strip', () => {
+    const error = new Error('boom');
+    error.stack = 'Error: boom\ntrailing junk\n    at inner (chunk.js:1:1)';
     expect(stackFramesUnderHeader(error, 'Error: redacted')).toBe(
       'Error: redacted\n    at inner (chunk.js:1:1)'
     );

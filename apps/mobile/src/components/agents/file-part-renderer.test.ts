@@ -17,7 +17,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6b7280' }),
 }));
 
-type ImageElement = ReactElement<{ alt?: string; children?: ReactNode }>;
+type ImageElement = ReactElement<{
+  accessible?: boolean;
+  accessibilityRole?: string;
+  accessibilityLabel?: string;
+  children?: ReactNode;
+}>;
 
 function childNodes(element: ImageElement): ReactNode[] {
   const children = element.props.children;
@@ -53,21 +58,25 @@ function imagePart(overrides: Partial<FilePart> = {}): FilePart {
   };
 }
 
-describe('FilePartRenderer — image alt forwarding (Row 3.3)', () => {
-  it('passes the expected alt (with the filename) to the Image element', () => {
+describe('FilePartRenderer — image label forwarding (Row 3.3)', () => {
+  it('labels the image with its filename and exposes it to assistive technology', () => {
     const element = FilePartRenderer({ part: imagePart() }) as ImageElement;
     const images = imageElements(element);
     expect(images).toHaveLength(1);
-    expect(images[0]?.props.alt).toBe('Image output, photo.png');
+    expect(images[0]?.props.accessibilityLabel).toBe('Image output, photo.png');
+    // expo-image defaults `accessible` to false, so the label alone would
+    // leave the image unreachable.
+    expect(images[0]?.props.accessible).toBe(true);
+    expect(images[0]?.props.accessibilityRole).toBe('image');
   });
 
-  it('falls back to a generic alt when the image part has no filename', () => {
+  it('falls back to a generic label when the image part has no filename', () => {
     const element = FilePartRenderer({
       part: imagePart({ filename: undefined }),
     }) as ImageElement;
     const images = imageElements(element);
     expect(images).toHaveLength(1);
-    expect(images[0]?.props.alt).toBe('Image output');
+    expect(images[0]?.props.accessibilityLabel).toBe('Image output');
   });
 
   it('renders a file row with no Image element for a non-image part', () => {

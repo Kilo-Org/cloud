@@ -42,17 +42,24 @@ export const productionReadCacheKv: ReadCacheKv = {
  */
 export function CachePersistenceMount() {
   const { userId, isLoading, isError } = useCurrentUserId();
-  const { authEpoch } = useAuth();
+  const { authEpoch, isSigningOut } = useAuth();
 
   useEffect(() => {
-    if (!userId || isLoading || isError) {
+    // While sign-out is active the old user id is still cached (the query
+    // client is only cleared at the end of sign-out): refuse to subscribe so
+    // a resubscription fenced on the new epoch cannot publish the old user's
+    // blob before the sign-out cleanup finishes.
+    if (!userId || isLoading || isError || isSigningOut) {
       return undefined;
     }
 
     // The epoch that owns this identity resolution. Every later sign-in or
     // sign-out bumps it, fencing the persister against stale writes. The
     // reactive `authEpoch` re-runs this effect on the bump, so the persister
-    // is recreated even when the user id stays equal.
+    // is recreated even when the user id stays equal. `isSigningOut` re-runs
+    // the effect too: sign-out flips it in the same render as the bump, so
+    // the teardown below runs and the body returns early instead of
+    // resubscribing while the old user id is still cached.
     const epoch = authEpoch;
     const kv = getBoundReadCacheKv();
     if (!kv) {
@@ -100,7 +107,7 @@ export function CachePersistenceMount() {
     });
 
     return unsubscribe;
-  }, [userId, isLoading, isError, authEpoch]);
+  }, [userId, isLoading, isError, authEpoch, isSigningOut]);
 
   return null;
 }

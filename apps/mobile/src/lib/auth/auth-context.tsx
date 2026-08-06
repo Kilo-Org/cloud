@@ -28,7 +28,11 @@ import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
-import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
+import {
+  clearCacheScopeForSignOut,
+  readCachedUserId,
+  setSignOutActive,
+} from '@/lib/persist/read-cache';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
@@ -56,6 +60,10 @@ type AuthContextValue = {
   /** Reactive snapshot of the auth epoch; bumps when sign-in or sign-out
    *  advances it, so subscribers (e.g. the read-cache mount) can resubscribe. */
   authEpoch: number;
+  /** Reactive sign-out state: true from the synchronous start of sign-out
+   *  until a sign-in's credential publication succeeds. The read-cache mount
+   *  refuses to subscribe or publish while it is set. */
+  isSigningOut: boolean;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
@@ -266,6 +274,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   // Reactive snapshot of the module auth epoch, advanced synchronously at the
   // start of sign-in and sign-out so a subscriber can resubscribe on the bump.
   const [authEpoch, setAuthEpoch] = useState(() => currentAuthEpoch());
+  // Reactive sign-out state. Flips to true synchronously at the start of
+  // sign-out (same render as the epoch bump) so the read-cache mount cannot
+  // resubscribe while the old user id is still cached; cleared only after a
+  // sign-in's credential publication succeeds.
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const isSignedOutReference = useRef(false);
 
   useEffect(() => {
@@ -331,6 +344,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // Clear the guard so a later refused refresh can sign out again.
       isSignedOutReference.current = false;
       setSessionEnded(false);
+      // Credentials published on the winning epoch: the sign-out fence opens
+      // so the read-cache mount can subscribe for the new session.
+      setSignOutActive(false);
+      setIsSigningOut(false);
       trackEvent('login');
       resetPurchaseErrorToastDedup();
       setToken(tokenValue);
@@ -340,6 +357,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
   const signOut = useCallback(async (ended = false) => {
     isSignedOutReference.current = true;
+    // Close the cache publication fence synchronously, before the epoch bump
+    // and before any await, so a write can never land in the scope that the
+    // cleanup below clears. The reactive state flips in the same render as
+    // the epoch bump, so the read-cache mount unsubscribes and cannot
+    // resubscribe while the old user id is still cached.
+    setSignOutActive(true);
+    setIsSigningOut(true);
     invalidateRefreshSession();
     setAuthEpoch(currentAuthEpoch());
     clearActiveToken();
@@ -462,8 +486,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, [token]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ token, isLoading, sessionEnded, authEpoch, signIn, signOut }),
-    [token, isLoading, sessionEnded, authEpoch, signIn, signOut]
+    () => ({ token, isLoading, sessionEnded, authEpoch, isSigningOut, signIn, signOut }),
+    [token, isLoading, sessionEnded, authEpoch, isSigningOut, signIn, signOut]
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

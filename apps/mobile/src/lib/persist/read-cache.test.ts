@@ -21,6 +21,7 @@ import {
   resetReadCacheForTests,
   restorePersistedCacheOnColdStart,
   SCHEMA_VERSION,
+  setSignOutActive,
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from './read-cache';
@@ -480,6 +481,25 @@ describe('publication fence', () => {
     await persister.persistClient(makePersistedClient({ id: 'u1' }));
 
     expect(kv.setItem).not.toHaveBeenCalled();
+  });
+
+  it('refuses publication while sign-out is active, even at the current epoch with a matching user', async () => {
+    const { kv } = createFakeKv();
+    const queryClient = makeAuthoritativeQueryClient('u1');
+    const epoch = currentAuthEpoch();
+    const persister = createReadCachePersister({ kv, queryClient, userId: 'u1', epoch });
+
+    // Sign-out flips the fence while the epoch and the cached user id still
+    // look current — the exact window in which the old mount resubscribed and
+    // rewrote the old user's blob before the cleanup finished.
+    setSignOutActive(true);
+    await persister.persistClient(makePersistedClient({ id: 'u1' }));
+    expect(kv.setItem).not.toHaveBeenCalled();
+
+    // A sign-in that published its credentials clears the fence.
+    setSignOutActive(false);
+    await persister.persistClient(makePersistedClient({ id: 'u1' }));
+    expect(kv.setItem).toHaveBeenCalledTimes(1);
   });
 });
 

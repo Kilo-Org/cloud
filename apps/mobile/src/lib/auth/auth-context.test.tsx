@@ -78,6 +78,7 @@ const hoisted = vi.hoisted(() => {
 const readCacheMock = vi.hoisted(() => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),
+  setSignOutActive: vi.fn(),
 }));
 
 // ---- all vi.mock calls ----
@@ -181,6 +182,7 @@ type AuthContextValue = {
   isLoading: boolean;
   sessionEnded: boolean;
   authEpoch: number;
+  isSigningOut: boolean;
   signIn: (token: string) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
@@ -515,6 +517,9 @@ describe('stale sign-in continuation', () => {
     expect(resetPurchaseErrorToastDedup).not.toHaveBeenCalled();
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
+    // The fenced sign-in also never opened the sign-out fence: the cache mount
+    // stays refused while the user is signed out.
+    expect(getCtx().isSigningOut).toBe(true);
 
     unmount();
   });
@@ -537,6 +542,51 @@ describe('stale sign-in continuation', () => {
       await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
     expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
     expect(getCtx().token).toBe('second-token');
+
+    unmount();
+  });
+
+  it('regression: sign-out activates the reactive sign-out state and keeps it set after teardown', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+
+    expect(getCtx().isSigningOut).toBe(false);
+
+    await act(async () => {
+      await getCtx().signOut();
+    });
+
+    // The fence is closed at the synchronous start of sign-out and stays
+    // closed through the whole teardown and after it: the cache mount cannot
+    // resubscribe while the old user id is still cached or after the cleanup.
+    expect(getCtx().isSigningOut).toBe(true);
+    expect(readCacheMock.setSignOutActive).toHaveBeenCalledWith(true);
+
+    unmount();
+  });
+
+  it('regression: a published sign-in clears the sign-out state, a fenced one does not', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+
+    // Sign out, then sign in successfully: only a sign-in whose credentials
+    // published on the winning epoch opens the fence.
+    await act(async () => {
+      await getCtx().signOut();
+    });
+    await act(async () => {
+      await getCtx().signIn('new-token');
+    });
+    expect(getCtx().isSigningOut).toBe(false);
+    expect(readCacheMock.setSignOutActive).toHaveBeenCalledWith(false);
+
+    // A sign-in fenced by a newer sign-out never published its credentials:
+    // the reactive state stays active and the fence stays closed.
+    const staleSignIn = getCtx().signIn('stale-token');
+    const signOutPromise = getCtx().signOut(true);
+    await act(async () => {
+      await Promise.all([staleSignIn, signOutPromise]);
+    });
+    expect(getCtx().isSigningOut).toBe(true);
+    expect(getCtx().sessionEnded).toBe(true);
 
     unmount();
   });

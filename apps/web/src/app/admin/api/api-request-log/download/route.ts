@@ -2,7 +2,7 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, desc, gt, or, isNotNull, type SQL } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 
@@ -122,21 +122,12 @@ export async function GET(request: NextRequest) {
 
   const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId, errorsOnly);
 
-  // Bound pagination before streaming starts so newly inserted logs cannot
-  // keep extending a busy export toward the function timeout.
-  const [ceiling] = await db
-    .select({ lastId: api_request_log.id })
-    .from(api_request_log)
-    .where(filter)
-    .orderBy(desc(api_request_log.id))
-    .limit(1);
-  if (!ceiling) {
+  const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
+  if (result.total === 0) {
     return jsonError('No records found for the given criteria', 404);
   }
 
-  // Request logs are large and text-heavy. Level 1 retains useful compression
-  // while reducing the chance that CPU time prevents the ZIP from finalizing.
-  const archive = archiver('zip', { zlib: { level: 1 } });
+  const archive = archiver('zip', { zlib: { level: 6 } });
   let totalAppendedEntries = 0;
   let totalProcessedEntries = 0;
 
@@ -185,13 +176,7 @@ export async function GET(request: NextRequest) {
       const rows = await db
         .select()
         .from(api_request_log)
-        .where(
-          and(
-            filter,
-            lte(api_request_log.id, ceiling.lastId),
-            cursor ? gt(api_request_log.id, cursor) : undefined
-          )
-        )
+        .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
         .orderBy(asc(api_request_log.id))
         .limit(BATCH_SIZE);
 

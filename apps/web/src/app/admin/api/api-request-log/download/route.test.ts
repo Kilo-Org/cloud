@@ -50,7 +50,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, TEST_USER_ID));
   });
 
-  it('streams a complete ZIP from a bounded result set across backpressured DB batches', async () => {
+  it('streams a complete ZIP across backpressured DB batches', async () => {
     // The first batch must exceed both the Node and web stream queues. This
     // keeps page two blocked until the test starts consuming the response.
     const payload = randomBytes(128 * 1024).toString('base64');
@@ -70,15 +70,6 @@ describe('GET /admin/api/api-request-log/download', () => {
 
     const response = await GET(createRequest());
 
-    await db.insert(api_request_log).values({
-      created_at: '2026-08-01T12:01:00.000Z',
-      kilo_user_id: TEST_USER_ID,
-      provider: 'test-provider',
-      model: TEST_MODEL,
-      request: { index: 'inserted-after-ceiling' },
-      response: JSON.stringify({ output: 'inserted-after-ceiling' }),
-    });
-
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('application/zip');
     expect(response.headers.get('Content-Disposition')).toBe(
@@ -97,8 +88,5 @@ describe('GET /admin/api/api-request-log/download', () => {
       output: BATCH_SIZE,
       payload,
     });
-    expect(
-      Object.values(entries).some(entry => strFromU8(entry).includes('inserted-after-ceiling'))
-    ).toBe(false);
   });
 });

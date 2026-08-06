@@ -18,6 +18,7 @@ import {
   settleOperation,
   markReconcilePending,
   recordOperationProgress,
+  recordOperationAcceptance,
   setOperationProviderRef,
   computeEventUuid,
   CanonicalResultTooLargeError,
@@ -457,6 +458,85 @@ describe('operation ledger (integration)', () => {
 
     const cleared = await setOperationProviderRef(db, { rowId, providerRef: null });
     expect(cleared?.provider_ref).toBeNull();
+  });
+
+  it('records provider_ref and canonical_result atomically in one acceptance call', async () => {
+    const admitted = await admitSession('acceptance-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    const updated = await recordOperationAcceptance(db, {
+      rowId,
+      providerRef: 'msg-1',
+      canonicalResult: { commandId: 'cmd-1', runId: 'run-1', messageId: 'msg-1' },
+    });
+    expect(updated?.provider_ref).toBe('msg-1');
+    expect(updated?.canonical_result).toMatchObject({
+      commandId: 'cmd-1',
+      runId: 'run-1',
+      messageId: 'msg-1',
+    });
+
+    // A second acceptance on the same row overwrites provider_ref and merges
+    // the correlation data, as a takeover re-submit does.
+    const reaccepted = await recordOperationAcceptance(db, {
+      rowId,
+      providerRef: 'msg-2',
+      canonicalResult: { commandId: 'cmd-2', runId: 'run-2', messageId: 'msg-2' },
+    });
+    expect(reaccepted?.provider_ref).toBe('msg-2');
+    expect(reaccepted?.canonical_result).toMatchObject({
+      commandId: 'cmd-2',
+      runId: 'run-2',
+      messageId: 'msg-2',
+    });
+  });
+
+  it('leaves NO partial acceptance state when the atomic write fails', async () => {
+    const admitted = await admitSession('acceptance-failure-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    // An oversized merged result must throw BEFORE either column is written:
+    // provider_ref and canonical_result commit together or not at all. A
+    // partial provider_ref would let a same-key retry blind-duplicate the
+    // command against an un-recorded acceptance.
+    const oversized: Record<string, unknown> = { pad: 'x'.repeat(5000) };
+    await expect(
+      recordOperationAcceptance(db, {
+        rowId,
+        providerRef: 'msg-partial',
+        canonicalResult: oversized,
+      })
+    ).rejects.toBeInstanceOf(CanonicalResultTooLargeError);
+
+    const [row] = await db.select().from(operation_ledgers).where(eq(operation_ledgers.id, rowId));
+    expect(row?.status).toBe('admitted');
+    expect(row?.provider_ref).toBeNull();
+    expect(row?.canonical_result).toBeNull();
+  });
+
+  it('returns null for an acceptance record on a terminal or missing row', async () => {
+    const admitted = await admitSession('acceptance-terminal-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    await settleOperation(db, { rowId, status: 'completed' });
+    expect(
+      await recordOperationAcceptance(db, {
+        rowId,
+        providerRef: 'msg-1',
+        canonicalResult: { commandId: 'cmd-1' },
+      })
+    ).toBeNull();
+
+    expect(
+      await recordOperationAcceptance(db, {
+        rowId: '00000000-0000-4000-8000-000000000000',
+        providerRef: 'msg-1',
+        canonicalResult: { commandId: 'cmd-1' },
+      })
+    ).toBeNull();
   });
 
   it('computes a deterministic UUIDv5 per (rowId, eventName)', async () => {

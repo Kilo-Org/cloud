@@ -123,38 +123,36 @@ describe('syncByokProviderNotificationsToRedis', () => {
 describe('deprecated auto model audience', () => {
   it('parses, groups, and de-duplicates Snowflake rows', () => {
     const rows = parseDeprecatedAutoModelRows([
-      ['user_a', 'kilo-auto/frontier'],
       ['user_a', 'kilo-auto/balanced'],
-      ['user_a', 'kilo-auto/frontier'],
+      ['user_a', 'kilo-auto/balanced'],
       ['user_b', 'kilo-auto/balanced'],
     ]);
 
     const grouped = groupDeprecatedAutoModelsByUser(rows);
 
-    expect(grouped.get('user_a')).toEqual(['kilo-auto/frontier', 'kilo-auto/balanced']);
+    expect(grouped.get('user_a')).toEqual(['kilo-auto/balanced']);
     expect(grouped.get('user_b')).toEqual(['kilo-auto/balanced']);
   });
 
   it('rejects unexpected Snowflake model ids', () => {
-    expect(() => parseDeprecatedAutoModelRows([['user_a', 'kilo-auto/efficient']])).toThrow(
+    expect(() => parseDeprecatedAutoModelRows([['user_a', 'kilo-auto/frontier']])).toThrow(
       'Failed to parse deprecated auto model rows'
     );
   });
 
   it('writes one entry per user with the model array and a 7-day TTL', async () => {
     const rows: DeprecatedAutoModelRow[] = [
-      { userId: 'user_a', modelId: 'kilo-auto/frontier' },
       { userId: 'user_a', modelId: 'kilo-auto/balanced' },
       { userId: 'user_b', modelId: 'kilo-auto/balanced' },
     ];
 
     const result = await syncDeprecatedAutoModelNotificationsToRedis(async () => rows);
 
-    expect(result).toEqual({ rowCount: 3, userCount: 2 });
+    expect(result).toEqual({ rowCount: 2, userCount: 2 });
     expect(mockPipelineSets).toEqual([
       {
         key: 'notification:deprecated-auto-models:user_a',
-        value: JSON.stringify(['kilo-auto/frontier', 'kilo-auto/balanced']),
+        value: JSON.stringify(['kilo-auto/balanced']),
         opts: { ex: SEVEN_DAYS_SECONDS },
       },
       {
@@ -178,24 +176,18 @@ describe('deprecated auto model audience', () => {
       publicKeyFingerprint: 'SHA256:fingerprint',
     };
     mockedResolveSnowflakeConfig.mockReturnValueOnce(config);
-    mockedExecuteSnowflakeStatement.mockResolvedValueOnce([
-      ['user_a', 'kilo-auto/frontier'],
-      ['user_b', 'kilo-auto/balanced'],
-    ]);
+    mockedExecuteSnowflakeStatement.mockResolvedValueOnce([['user_a', 'kilo-auto/balanced']]);
 
     await expect(syncDeprecatedAutoModelNotificationsToRedis()).resolves.toEqual({
-      rowCount: 2,
-      userCount: 2,
+      rowCount: 1,
+      userCount: 1,
     });
     expect(mockedExecuteSnowflakeStatement).toHaveBeenCalledWith({
       config,
       statement: expect.stringMatching(
-        /from microdollar_usage_daily[\s\S]*usage_date >= dateadd\(week, -1, current_date\(\)\)[\s\S]*auto_model in \(\?, \?\)[\s\S]*total_output_tokens > 0/
+        /from microdollar_usage_daily[\s\S]*usage_date >= dateadd\(week, -1, current_date\(\)\)[\s\S]*auto_model in \(\?\)[\s\S]*total_output_tokens > 0/
       ),
-      bindings: [
-        { type: 'TEXT', value: 'kilo-auto/frontier' },
-        { type: 'TEXT', value: 'kilo-auto/balanced' },
-      ],
+      bindings: [{ type: 'TEXT', value: 'kilo-auto/balanced' }],
       timeoutSeconds: 60,
     });
   });
@@ -233,14 +225,9 @@ describe('getByokProvidersForUser', () => {
 
 describe('getDeprecatedAutoModelsForUser', () => {
   it('returns the parsed model array for the user', async () => {
-    mockedRedisGet.mockResolvedValueOnce(
-      JSON.stringify(['kilo-auto/frontier', 'kilo-auto/balanced'])
-    );
+    mockedRedisGet.mockResolvedValueOnce(JSON.stringify(['kilo-auto/balanced']));
 
-    await expect(getDeprecatedAutoModelsForUser('user_a')).resolves.toEqual([
-      'kilo-auto/frontier',
-      'kilo-auto/balanced',
-    ]);
+    await expect(getDeprecatedAutoModelsForUser('user_a')).resolves.toEqual(['kilo-auto/balanced']);
     expect(mockedRedisGet).toHaveBeenCalledWith('notification:deprecated-auto-models:user_a');
   });
 
@@ -251,7 +238,7 @@ describe('getDeprecatedAutoModelsForUser', () => {
   });
 
   it('fails open to an empty array when the cached value is malformed', async () => {
-    mockedRedisGet.mockResolvedValueOnce(JSON.stringify(['kilo-auto/efficient']));
+    mockedRedisGet.mockResolvedValueOnce(JSON.stringify(['kilo-auto/frontier']));
 
     await expect(getDeprecatedAutoModelsForUser('user_a')).resolves.toEqual([]);
   });

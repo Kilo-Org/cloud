@@ -357,10 +357,10 @@ async function generateDeprecatedAutoModelsNotification(
 
     return [
       {
-        id: 'deprecated-auto-models-aug-2026',
-        title: 'Auto Frontier and Auto Balanced are deprecated',
+        id: 'deprecated-auto-balanced-aug-2026',
+        title: 'Auto Balanced is deprecated',
         message:
-          'Auto Frontier and Auto Balanced are deprecated and will be removed in a future release. Switch to Auto Efficient to keep using automatic model routing.',
+          'Auto Balanced is deprecated and will be removed in a future release. Switch to Auto Efficient to keep using automatic model routing.',
         suggestModelId: KILO_AUTO_EFFICIENT_MODEL.id,
         showIn: ['cli', 'extension'],
       },

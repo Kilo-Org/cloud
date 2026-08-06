@@ -118,13 +118,13 @@ group by u.id, ev.properties.apiProvider
 limit 5e5
 `;
 
-export const DEPRECATED_AUTO_MODEL_IDS = ['kilo-auto/frontier', 'kilo-auto/balanced'] as const;
+export const DEPRECATED_AUTO_MODEL_IDS = ['kilo-auto/balanced'] as const;
 
 const DEPRECATED_AUTO_MODELS_QUERY = `
 select distinct kilo_user_id, auto_model
 from microdollar_usage_daily
 where usage_date >= dateadd(week, -1, current_date())
-  and auto_model in (?, ?)
+  and auto_model in (?)
   and total_output_tokens > 0
   and kilo_user_id is not null
 limit 500000

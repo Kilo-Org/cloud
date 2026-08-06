@@ -81,7 +81,7 @@ describe('workflow settings', () => {
     vi.resetAllMocks();
   });
 
-  it('renders the toggle heading and saved workflows label', async () => {
+  it('renders all three settings switches and the saved workflows label', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
     mockLoadWorkflowSettings.mockResolvedValue({
       ...DEFAULT_WORKFLOW_SETTINGS,
@@ -95,6 +95,8 @@ describe('workflow settings', () => {
     await waitFor(() => {
       expect(getByText('Allow workflows in safe mode')).toBeDefined();
     });
+    expect(getByText('Auto-approve workflow changes')).toBeDefined();
+    expect(getByText('Auto-approve workflow runs')).toBeDefined();
     expect(getByText('Saved workflows')).toBeDefined();
   });
 
@@ -256,6 +258,74 @@ describe('workflow settings', () => {
     });
   });
 
+  it('persists only the toggled setting key', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
+    mockSaveWorkflowSettings.mockResolvedValue();
+
+    const { getByLabelText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    const toggle = getByLabelText('Auto-approve workflow runs');
+    await waitFor(() => {
+      if (toggle instanceof HTMLButtonElement) {
+        expect(toggle.disabled).toBe(false);
+      }
+    });
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(mockSaveWorkflowSettings).toHaveBeenCalledWith(expect.anything(), {
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+        autoApproveWorkflowRuns: true,
+      });
+    });
+  });
+
+  it('persists only the auto-approve changes key when toggled', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
+    mockSaveWorkflowSettings.mockResolvedValue();
+
+    const { getByLabelText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    const changesToggle = getByLabelText('Auto-approve workflow changes');
+    await waitFor(() => {
+      if (changesToggle instanceof HTMLButtonElement) {
+        expect(changesToggle.disabled).toBe(false);
+      }
+    });
+
+    fireEvent.click(changesToggle);
+
+    await waitFor(() => {
+      expect(mockSaveWorkflowSettings).toHaveBeenCalledWith(expect.anything(), {
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        autoApproveWorkflowChanges: true,
+      });
+      expect(getByLabelText('Auto-approve workflow changes').getAttribute('aria-checked')).toBe(
+        'true'
+      );
+      expect(getByLabelText('Allow workflows in safe mode').getAttribute('aria-checked')).toBe(
+        'false'
+      );
+      expect(getByLabelText('Auto-approve workflow runs').getAttribute('aria-checked')).toBe(
+        'false'
+      );
+    });
+  });
+
   it('rolls back toggle state when save fails', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
     mockLoadWorkflowSettings.mockResolvedValue({
@@ -302,6 +372,30 @@ describe('workflow settings', () => {
       expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
 
+  it('renders three switches off on a fresh store', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({ ...DEFAULT_WORKFLOW_SETTINGS });
+
+    const { getByLabelText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      const toggle = getByLabelText('Allow workflows in safe mode');
+      if (toggle instanceof HTMLButtonElement) {
+        expect(toggle.disabled).toBe(false);
+      }
+    });
+
+    for (const label of [
+      'Allow workflows in safe mode',
+      'Auto-approve workflow changes',
+      'Auto-approve workflow runs',
+    ]) {
+      expect(getByLabelText(label).getAttribute('aria-checked')).toBe('false');
+    }
+  });
+
   it('calls deleteAgentWorkflow on delete click', async () => {
     mockUseAgentWorkflows.mockReturnValue({
       ...emptyResult,
@@ -338,6 +432,87 @@ describe('workflow settings', () => {
     }
 
     expect(mockDeleteAgentWorkflow).toHaveBeenCalledWith(expect.anything(), 'wf-1');
+  });
+
+  it('deletes on first click when auto-approve changes is on', async () => {
+    mockUseAgentWorkflows.mockReturnValue({
+      ...emptyResult,
+      workflows: [approvedWorkflow],
+    });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      autoApproveWorkflowChanges: true,
+    });
+    mockDeleteAgentWorkflow.mockResolvedValue();
+
+    const { getByLabelText, queryByLabelText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      const changesToggle = getByLabelText('Auto-approve workflow changes');
+      if (changesToggle instanceof HTMLButtonElement) {
+        expect(changesToggle.disabled).toBe(false);
+        expect(changesToggle.getAttribute('aria-checked')).toBe('true');
+      }
+    });
+
+    const deleteButton = getByLabelText('Delete workflow "Order pizza"');
+    if (deleteButton instanceof HTMLButtonElement) {
+      deleteButton.click();
+    }
+
+    expect(mockDeleteAgentWorkflow).toHaveBeenCalledWith(expect.anything(), 'wf-1');
+    expect(queryByLabelText('Confirm delete "Order pizza"')).toBeNull();
+  });
+
+  it('shows a delete error and keeps the row when delete fails', async () => {
+    mockUseAgentWorkflows.mockReturnValue({
+      ...emptyResult,
+      workflows: [approvedWorkflow],
+    });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
+    mockDeleteAgentWorkflow.mockRejectedValue(new Error('Storage write failed'));
+
+    const { getByLabelText, getByText, queryByText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByLabelText('Delete workflow "Order pizza"')).toBeDefined();
+    });
+
+    const deleteButton = getByLabelText('Delete workflow "Order pizza"');
+    if (deleteButton instanceof HTMLButtonElement) {
+      deleteButton.click();
+    }
+
+    await waitFor(() => {
+      expect(getByLabelText('Confirm delete "Order pizza"')).toBeDefined();
+    });
+    const confirmButton = getByLabelText('Confirm delete "Order pizza"');
+    if (confirmButton instanceof HTMLButtonElement) {
+      confirmButton.click();
+    }
+
+    await waitFor(() => {
+      expect(getByText("Couldn't delete the workflow. Try again.")).toBeDefined();
+    });
+    expect(getByText('Order pizza')).toBeDefined();
+
+    // The row stays armed, so a later confirm retries and clears the error.
+    mockDeleteAgentWorkflow.mockResolvedValue();
+    const retryButton = getByLabelText('Confirm delete "Order pizza"');
+    if (retryButton instanceof HTMLButtonElement) {
+      retryButton.click();
+    }
+
+    await waitFor(() => {
+      expect(queryByText("Couldn't delete the workflow. Try again.")).toBeNull();
+    });
   });
 
   it('disables Run button for unapproved workflow', async () => {

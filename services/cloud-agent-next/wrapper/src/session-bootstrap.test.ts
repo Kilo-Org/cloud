@@ -1052,6 +1052,19 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       subtype: 'git_network_failed',
     },
     {
+      name: 'clone network failure with progress object counts is not rate limited',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr:
+          'remote: Enumerating objects: 429, done.\n' +
+          'remote: Total 429 (delta 12), reused 100 (delta 30), pack-reused 0\n' +
+          'fatal: the remote end hung up unexpectedly',
+        exitCode: 128,
+      },
+      subtype: 'git_network_failed',
+    },
+    {
       name: 'clone corrupt pack',
       stage: 'clone',
       result: { stdout: '', stderr: 'fatal: pack has bad object at offset', exitCode: 128 },

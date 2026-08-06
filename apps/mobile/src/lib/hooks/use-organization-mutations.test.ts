@@ -170,16 +170,24 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
     );
   });
 
-  it('does not attach an operation key to a limit-only update (outside the ledger)', async () => {
-    membersUpdateMutateMock.mockResolvedValueOnce({ success: true, updated: 'limit' });
+  it('does not attach an operation key or rotate the hoisted key on a limit-only update (success or failure)', async () => {
+    const badRequest = new Error('limit update rejected');
+    Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
+    membersUpdateMutateMock
+      .mockResolvedValueOnce({ success: true, updated: 'limit' })
+      .mockRejectedValueOnce(badRequest);
     useOrganizationMutations(ORG_ID);
 
     await updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', dailyUsageLimitUsd: 25 });
+    await expect(
+      updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', dailyUsageLimitUsd: 30 })
+    ).rejects.toMatchObject({ message: 'limit update rejected' });
 
+    // A limit-only update never runs a keyed role mutation: it must not read
+    // or rotate the hoisted key, even when it fails, so a pending role-change
+    // key survives for another intent.
     expect(hoistedKeys.getKey).not.toHaveBeenCalled();
-    expect(membersUpdateMutateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ memberId: 'member-1', dailyUsageLimitUsd: 25 })
-    );
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
     expect(membersUpdateMutateMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: expect.any(String) })
     );
@@ -194,39 +202,27 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the key on an in-progress CONFLICT and maps it onto retryable copy', async () => {
-    membersUpdateMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+  it('keeps the key on retryable failures (in-progress, network, settle-failed)', async () => {
+    // Each scenario rejects the role change with a retryable outcome; the
+    // ledger owns the same-key retry, so the hoisted key must survive. The
+    // in-progress marker is mapped onto the retryable copy before surfacing.
+    const retryable: [raw: string, expected: string][] = [
+      ['operation_in_progress', 'This change is still being processed. Please try again.'],
+      ['Network request failed', 'Network request failed'],
+      [
+        'The action completed, but we could not record the result. Please try again.',
+        'The action completed, but we could not record the result. Please try again.',
+      ],
+    ];
     useOrganizationMutations(ORG_ID);
-
-    await expect(
-      updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
-    ).rejects.toMatchObject({
-      message: 'This change is still being processed. Please try again.',
-    });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
-  it('keeps the key on a retryable network failure (the ledger owns the retry)', async () => {
-    membersUpdateMutateMock.mockRejectedValueOnce(new Error('Network request failed'));
-    useOrganizationMutations(ORG_ID);
-
-    await expect(
-      updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
-    ).rejects.toMatchObject({ message: 'Network request failed' });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
-  it('keeps the key on the settle-failed marker (same-key retry repairs by read-back)', async () => {
-    membersUpdateMutateMock.mockRejectedValueOnce(
-      new Error('The action completed, but we could not record the result. Please try again.')
+    await Promise.all(
+      retryable.map(async ([raw, expected]) => {
+        membersUpdateMutateMock.mockRejectedValueOnce(new Error(raw));
+        await expect(
+          updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
+        ).rejects.toMatchObject({ message: expected });
+      })
     );
-    useOrganizationMutations(ORG_ID);
-
-    await expect(
-      updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
-    ).rejects.toMatchObject({
-      message: 'The action completed, but we could not record the result. Please try again.',
-    });
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });
 

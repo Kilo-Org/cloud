@@ -206,22 +206,28 @@ export function useOrganizationMutations(
         role?: OrgRole;
         dailyUsageLimitUsd?: number | null;
       }) => {
+        // Only the role branch is ledger-backed (P1-A-08e); a limit-only
+        // request carries no key. Key rotation (regenerate after a terminal
+        // outcome) must therefore run only when a keyed role mutation actually
+        // ran — a limit-only update must not clear the pending role-change key
+        // hoisted for another intent.
+        const isKeyedRoleMutation = input.role !== undefined;
         try {
           const result = await trpcClient.organizations.members.update.mutate({
             organizationId,
             ...input,
-            // Only the role branch is ledger-backed (P1-A-08e). A limit-only
-            // request carries no key — the server keeps its existing path.
             ...(input.role !== undefined && {
               operationKey: getKey(
                 organizationRoleChangeIntentFingerprint(organizationId, input.memberId, input.role)
               ),
             }),
           });
-          rotateKey();
+          if (isKeyedRoleMutation) {
+            rotateKey();
+          }
           return result;
         } catch (error) {
-          if (!isOrganizationMutationRetryable(error)) {
+          if (isKeyedRoleMutation && !isOrganizationMutationRetryable(error)) {
             rotateKey();
           }
           throw mapOrganizationOperationError(error);

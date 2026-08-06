@@ -996,8 +996,8 @@ export const AgentChatPanel = ({
    * of startTurn's finally: React batches the run's last setConversationStore calls, so
    * conversationStoreRef.current is only current after the commit, and a drain inside the
    * finally would build the next request without the turn it is answering. A conversation
-   * whose stored model is not in the loaded catalog keeps waiting; the seed effect repairs
-   * the model and re-runs this one through the modelOptions dependency.
+   * whose stored model is not in the loaded catalog keeps waiting; the model-repair effect
+   * repairs the model and re-runs this one through the modelOptions dependency.
    */
   useEffect(() => {
     if (!isConversationStoreLoaded) {

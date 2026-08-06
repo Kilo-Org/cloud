@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   type Text as RNText,
   ScrollView,
   TextInput,
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Check } from 'lucide-react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -73,16 +75,14 @@ export function QuestionCard({
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
   const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
   const customInputs = useRef<Record<number, string>>({});
+  const customInputRefs = useRef<Record<number, TextInput | null>>({});
   // Unread; setting it forces a re-render on every keystroke so
   // `allQuestionsAnswered` (derived from the customInputs ref) stays in sync.
   const [, setCustomHasText] = useState<Record<number, boolean>>({});
 
   // Accessibility presentation is derived from the shared FSM so the
   // selection logic and CTA flags stay covered by pure-logic tests.
-  const presentation = useMemo(
-    () => getBlockingCardPresentationForKind({ kind: 'question', submissionError }),
-    [submissionError]
-  );
+  const presentation = getBlockingCardPresentationForKind({ kind: 'question', submissionError });
 
   // The card root wraps interactive controls, so it must NOT be an
   // accessibility element. The focus target is a non-interactive leaf title
@@ -93,15 +93,12 @@ export function QuestionCard({
   const titleRef = useRef<RNText | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
-  useEffect(
-    () =>
-      applyBlockingCardAppearance(presentationRef.current, titleRef, {
-        announce: announceForA11y,
-        focus: moveA11yFocus,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only announce/focus on a new request
-    [requestId]
-  );
+  useEffect(() => {
+    applyBlockingCardAppearance(presentationRef.current, titleRef, {
+      announce: announceForA11y,
+      focus: moveA11yFocus,
+    });
+  }, [requestId]);
 
   function toggleOption(questionIndex: number, optionIndex: number, multiple: boolean | undefined) {
     setSelectedOptions(prev => {
@@ -144,28 +141,16 @@ export function QuestionCard({
     );
     // Auto-select custom when the user starts typing
     if (text.trim().length > 0 && !customSelected[questionIndex]) {
-      const question = questions[questionIndex];
-      if (!question?.multiple) {
-        // Single select: deselect preset options
-        setSelectedOptions(prev => ({ ...prev, [questionIndex]: new Set<number>() }));
-      }
-      setCustomSelected(prev => ({ ...prev, [questionIndex]: true }));
+      selectCustomOption(questionIndex, questions[questionIndex]?.multiple);
     }
   }
 
   function buildAnswers(): string[][] {
     return questions.map((q, qIndex) => {
-      const selected = selectedOptions[qIndex];
-      const labels =
-        selected && selected.size > 0
-          ? [...selected].map(oIndex => {
-              const option = q.options[oIndex];
-              return option ? option.label : '';
-            })
-          : [];
-
-      const isCustom = customSelected[qIndex] ?? false;
-      const customText = isCustom ? (customInputs.current[qIndex] ?? '').trim() : '';
+      const labels = [...(selectedOptions[qIndex] ?? [])].map(
+        oIndex => q.options[oIndex]?.label ?? ''
+      );
+      const customText = customSelected[qIndex] ? (customInputs.current[qIndex] ?? '').trim() : '';
       return customText ? [...labels, customText] : labels;
     });
   }
@@ -190,6 +175,11 @@ export function QuestionCard({
   const allQuestionsAnswered = buildAnswers().every(answer => answer.length > 0);
   const title = formatBlockingCardTitle('Agent needs input', pendingCount);
   const isInert = presentation.state === 'non-retryable';
+  const interactionDisabled = isSubmitting || isInert;
+  const submitDisabled = !allQuestionsAnswered || interactionDisabled;
+  const submittingSpinner = isSubmitting ? (
+    <ActivityIndicator size="small" color={colors.primaryForeground} />
+  ) : null;
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -211,7 +201,6 @@ export function QuestionCard({
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
         <View className="gap-4 p-4">
           {questions.map((question, qIndex) => {
-            const allowCustom = question.custom !== false;
             const isCustomActive = customSelected[qIndex] ?? false;
             return (
               <View key={qIndex} className="gap-2">
@@ -230,7 +219,7 @@ export function QuestionCard({
                         onPress={() => {
                           toggleOption(qIndex, oIndex, question.multiple);
                         }}
-                        disabled={isSubmitting || isInert}
+                        disabled={interactionDisabled}
                         accessibilityRole="button"
                         accessibilityLabel={`${option.label}${isSelected ? ', selected' : ''}`}
                         className={cn(
@@ -249,37 +238,73 @@ export function QuestionCard({
                       </Button>
                     );
                   })}
-                  {allowCustom ? (
-                    // The custom answer input IS the control: it must not be
-                    // nested under a selection Pressable (that would shadow it
-                    // for assistive technology). Selecting the custom option
-                    // happens from focusing the input and from typing; the
-                    // selected border/background visual stays driven by
-                    // `isCustomActive`.
-                    <TextInput
-                      defaultValue=""
-                      onFocus={() => {
-                        selectCustomOption(qIndex, question.multiple);
-                      }}
-                      onChangeText={text => {
-                        handleCustomTextChange(qIndex, text);
-                      }}
-                      placeholder="Type your own answer…"
-                      placeholderTextColor={colors.mutedForeground}
-                      editable={!isSubmitting && !isInert}
-                      accessibilityLabel="Type your own answer"
-                      accessibilityState={{
-                        disabled: isSubmitting || isInert,
-                        selected: isCustomActive,
-                      }}
-                      className={cn(
-                        'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-black/5',
-                        isCustomActive
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',
-                        (isSubmitting || isInert) && 'opacity-50'
-                      )}
-                    />
+                  {question.custom !== false ? (
+                    // The custom answer choice is a SIBLING radio/checkbox
+                    // Pressable — a TextInput cannot expose a checked choice
+                    // state, and nesting the input inside a selection
+                    // Pressable would shadow it for assistive technology. The
+                    // radio carries the checked semantics (radio for a single
+                    // choice, checkbox beside multi-select options); pressing
+                    // it also focuses the input so typing flows. The input
+                    // below stays a separate, editable control.
+                    <View className="gap-1">
+                      <Pressable
+                        accessibilityRole={question.multiple ? 'checkbox' : 'radio'}
+                        accessibilityLabel="Type your own answer"
+                        accessibilityState={{
+                          checked: isCustomActive,
+                          disabled: interactionDisabled,
+                        }}
+                        disabled={interactionDisabled}
+                        onPress={() => {
+                          selectCustomOption(qIndex, question.multiple);
+                          customInputRefs.current[qIndex]?.focus();
+                        }}
+                        className={cn(
+                          'min-h-11 flex-row items-center justify-between rounded-md border px-3',
+                          isCustomActive
+                            ? 'border-primary bg-primary'
+                            : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',
+                          interactionDisabled && 'opacity-50'
+                        )}
+                      >
+                        <Text
+                          className={cn(
+                            'text-sm',
+                            isCustomActive ? 'text-primary-foreground' : 'text-foreground'
+                          )}
+                        >
+                          Type your own answer
+                        </Text>
+                        {isCustomActive ? (
+                          <Check size={16} color={colors.primaryForeground} />
+                        ) : null}
+                      </Pressable>
+                      <TextInput
+                        ref={node => {
+                          customInputRefs.current[qIndex] = node;
+                        }}
+                        defaultValue=""
+                        onFocus={() => {
+                          selectCustomOption(qIndex, question.multiple);
+                        }}
+                        onChangeText={text => {
+                          handleCustomTextChange(qIndex, text);
+                        }}
+                        placeholder="Type your own answer…"
+                        placeholderTextColor={colors.mutedForeground}
+                        editable={!interactionDisabled}
+                        accessibilityLabel="Type your own answer"
+                        accessibilityState={{ disabled: interactionDisabled }}
+                        className={cn(
+                          'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-black/5',
+                          isCustomActive
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',
+                          interactionDisabled && 'opacity-50'
+                        )}
+                      />
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -295,40 +320,26 @@ export function QuestionCard({
               variant="outline"
               className="flex-1"
               onPress={handleReject}
-              disabled={isSubmitting || isInert}
+              disabled={interactionDisabled}
             >
               <Text className="text-sm">Skip</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'answer' ? (
-            <Button
-              className="flex-1"
-              onPress={handleSubmit}
-              disabled={!allQuestionsAnswered || isSubmitting || isInert}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
+            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+              {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>Retry</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'reject' ? (
-            <Button className="flex-1" onPress={handleRetrySkip} disabled={isSubmitting || isInert}>
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
+            <Button className="flex-1" onPress={handleRetrySkip} disabled={interactionDisabled}>
+              {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>Retry skip</Text>
             </Button>
           ) : null}
           {presentation.hasPrimaryCta ? (
-            <Button
-              className="flex-1"
-              onPress={handleSubmit}
-              disabled={!allQuestionsAnswered || isSubmitting || isInert}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
+            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+              {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
                 {isSubmitting ? 'Submitting…' : 'Send answers'}
               </Text>

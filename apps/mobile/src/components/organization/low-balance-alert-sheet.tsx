@@ -12,6 +12,7 @@ import {
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -133,12 +134,21 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         </>
       )}
 
-      {mutations.updateMinimumBalanceAlert.isError && (
-        <Text className="text-sm text-destructive">
-          {mutations.updateMinimumBalanceAlert.error.message}
-        </Text>
-      )}
+      {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
+          P2), so AccessibleStatus is the single announcement owner here: one
+          announcement per platform, visuals preserved (tone error). */}
+      <AccessibleStatus
+        message={
+          mutations.updateMinimumBalanceAlert.isError
+            ? mutations.updateMinimumBalanceAlert.error.message
+            : null
+        }
+        className="text-sm"
+      />
 
+      {/* Disabled-until-valid (D11): the Save button cannot fire while an
+          enabled alert has an invalid threshold or emails, so
+          focus-to-first-invalid has no reachable submit boundary. */}
       <Button
         disabled={!canSave}
         loading={mutations.updateMinimumBalanceAlert.isPending}

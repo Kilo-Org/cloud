@@ -7,12 +7,13 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { ROLE_LABEL } from '@/components/organization/member-row';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
-import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -120,10 +121,16 @@ export function InviteMemberSheet() {
         </View>
       )}
 
-      {mutations.invite.isError && (
-        <Text className="text-sm text-destructive">{mutations.invite.error.message}</Text>
-      )}
+      {/* The mutation hook has no toast for invite (inline error pattern P2),
+          so AccessibleStatus is the single announcement owner here: one
+          announcement per platform, visuals preserved (tone error). */}
+      <AccessibleStatus
+        message={mutations.invite.isError ? mutations.invite.error.message : null}
+        className="text-sm"
+      />
 
+      {/* Disabled-until-valid (D11): the button cannot fire while the email is
+          invalid, so focus-to-first-invalid has no reachable submit boundary. */}
       <Button disabled={!canSubmit} loading={mutations.invite.isPending} onPress={onSubmit}>
         <Text className="text-primary-foreground">Send invite</Text>
       </Button>

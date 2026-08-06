@@ -42,96 +42,74 @@ vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: libraryShowMock }),
 }));
 
+// Stub the imperative dispatch; the host accessibility tests live in
+// `motion-sheet.test.ts` and drive the real dispatch there.
 vi.mock('@/components/ui/reduced-motion-sheet', () => ({
   showReducedMotionSheet: showReducedMotionSheetMock,
 }));
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
-function ShowHarness({
-  onReady,
-}: {
-  readonly onReady: (show: ShowActionSheetWithOptions) => void;
-}) {
+const showHolder: { current?: ShowActionSheetWithOptions } = {};
+const policyHolder: { current?: MotionPolicy } = {};
+
+function ShowHarness() {
   const { showActionSheetWithOptions } = useAppActionSheet();
   useEffect(() => {
-    onReady(showActionSheetWithOptions);
-  }, [onReady, showActionSheetWithOptions]);
+    showHolder.current = showActionSheetWithOptions;
+  }, [showActionSheetWithOptions]);
   return null;
 }
 
-function PolicyHarness({ onReady }: { readonly onReady: (policy: MotionPolicy) => void }) {
+function PolicyHarness() {
   const policy = useMotionPolicy();
   useEffect(() => {
-    onReady(policy);
-  }, [onReady, policy]);
+    policyHolder.current = policy;
+  }, [policy]);
   return null;
 }
 
-async function mount(element: ReactElement): Promise<Renderer> {
+async function mountHarness(element: ReactElement): Promise<{
+  renderer: Renderer;
+  unmount: () => void;
+}> {
   const holder: { current?: Renderer } = {};
   await act(async () => {
     await Promise.resolve();
     holder.current = TestRenderer.create(element);
   });
   const renderer = holder.current;
-  if (!renderer) {
+  if (renderer === undefined) {
     throw new Error('renderer was not created');
   }
-  return renderer;
+  return {
+    renderer,
+    unmount: () => {
+      renderer.unmount();
+    },
+  };
 }
 
-async function mountShow(): Promise<{
-  show: ShowActionSheetWithOptions;
-  unmount: () => void;
-}> {
-  const holder: { current?: ShowActionSheetWithOptions } = {};
-  const renderer = await mount(
-    createElement(ShowHarness, {
-      onReady: next => {
-        holder.current = next;
-      },
-    })
-  );
-  const show = holder.current;
-  if (!show) {
+async function mountShow(): Promise<{ show: ShowActionSheetWithOptions; unmount: () => void }> {
+  const { unmount } = await mountHarness(createElement(ShowHarness));
+  const show = showHolder.current;
+  if (show === undefined) {
     throw new Error('show was not captured');
   }
-  return {
-    show,
-    unmount: () => {
-      renderer.unmount();
-    },
-  };
+  return { show, unmount };
 }
 
-async function mountPolicy(): Promise<{
-  policy: MotionPolicy;
-  unmount: () => void;
-}> {
-  const holder: { current?: MotionPolicy } = {};
-  const renderer = await mount(
-    createElement(PolicyHarness, {
-      onReady: next => {
-        holder.current = next;
-      },
-    })
-  );
-  const policy = holder.current;
-  if (!policy) {
+async function mountPolicy(): Promise<{ policy: MotionPolicy; unmount: () => void }> {
+  const { unmount } = await mountHarness(createElement(PolicyHarness));
+  const policy = policyHolder.current;
+  if (policy === undefined) {
     throw new Error('policy was not captured');
   }
-  return {
-    policy,
-    unmount: () => {
-      renderer.unmount();
-    },
-  };
+  return { policy, unmount };
 }
 
 describe('actionSheetToListModel', () => {
   it('maps title, message, and options to list items with their indices', () => {
-    const callback = vi.fn();
     const options: ActionSheetOptions = {
       title: 'Session options',
       message: 'Choose an action',
@@ -139,8 +117,7 @@ describe('actionSheetToListModel', () => {
       cancelButtonIndex: 2,
       destructiveButtonIndex: 1,
     };
-
-    const model = actionSheetToListModel(options, callback);
+    const model = actionSheetToListModel(options, vi.fn());
 
     expect(model.title).toBe('Session options');
     expect(model.message).toBe('Choose an action');
@@ -152,10 +129,9 @@ describe('actionSheetToListModel', () => {
   });
 
   it('preserves option order, keeping the cancel entry where the caller put it', () => {
-    const callback = vi.fn();
     const model = actionSheetToListModel(
       { options: ['Cancel', 'Save'], cancelButtonIndex: 0 },
-      callback
+      vi.fn()
     );
 
     expect(model.items.map(item => item.label)).toEqual(['Cancel', 'Save']);
@@ -164,8 +140,7 @@ describe('actionSheetToListModel', () => {
   });
 
   it('omits title and message when the caller passes none', () => {
-    const callback = vi.fn();
-    const model = actionSheetToListModel({ options: ['Only'] }, callback);
+    const model = actionSheetToListModel({ options: ['Only'] }, vi.fn());
 
     expect(model.title).toBeUndefined();
     expect(model.message).toBeUndefined();
@@ -173,8 +148,7 @@ describe('actionSheetToListModel', () => {
 
   it('maps an arbitrary option count one-to-one', () => {
     const labels = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'];
-    const callback = vi.fn();
-    const model = actionSheetToListModel({ options: labels }, callback);
+    const model = actionSheetToListModel({ options: labels }, vi.fn());
 
     expect(model.items).toHaveLength(labels.length);
     expect(model.items.map(item => item.label)).toEqual(labels);
@@ -182,8 +156,7 @@ describe('actionSheetToListModel', () => {
   });
 
   it('maps a single-option sheet to one item', () => {
-    const callback = vi.fn();
-    const model = actionSheetToListModel({ options: ['Only'] }, callback);
+    const model = actionSheetToListModel({ options: ['Only'] }, vi.fn());
 
     expect(model.items).toEqual([{ label: 'Only', index: 0, destructive: false, cancel: false }]);
   });

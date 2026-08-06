@@ -77,13 +77,28 @@ const PartRow = ({ part }: { part: Part }): JSX.Element | null => {
   return null;
 };
 
+/**
+ * Real transcripts carry a reasoning part before nearly every step. Keep a
+ * single reasoning row only while the message still streams; a completed
+ * message shows its tools and text without the noise.
+ */
+export const visibleParts = (parts: Part[], isStreaming: boolean): Part[] => {
+  if (isStreaming) {
+    return parts.filter(
+      (part, index) => part.type !== 'reasoning' || parts[index + 1] === undefined
+    );
+  }
+  return parts.filter(part => part.type !== 'reasoning');
+};
+
 const MessageRow = ({ message }: { message: StoredMessage }): JSX.Element => {
   const isUser = message.info.role === 'user';
   const isStreaming =
     message.info.role === 'assistant' &&
     message.info.time.completed === undefined &&
     !message.info.error;
-  const hasContent = message.parts.length > 0;
+  const parts = visibleParts(message.parts, isStreaming);
+  const hasContent = parts.length > 0;
 
   return (
     <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
@@ -96,8 +111,8 @@ const MessageRow = ({ message }: { message: StoredMessage }): JSX.Element => {
       >
         {hasContent ? (
           <div className="space-y-1">
-            {/* Parts render in stored order: reasoning and tools come before the text they produced. */}
-            {message.parts.map(part => (
+            {/* Parts render in stored order: tools come before the text they produced. */}
+            {parts.map(part => (
               <PartRow key={part.id} part={part} />
             ))}
           </div>

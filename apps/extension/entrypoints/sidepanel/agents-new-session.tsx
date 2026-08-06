@@ -25,10 +25,10 @@ import {
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
-import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import { useExtensionAgents } from './agents-provider';
 import { activeSessionsQueryKey, sessionHistoryQueryKey } from './agents-session-list';
+import { ModelPicker } from './model-picker';
 import { useGatewayModels } from './use-gateway-models';
 
 // ---------------------------------------------------------------------------
@@ -243,11 +243,9 @@ export const AgentsNewSession = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [repoDropdownOpen, setRepoDropdownOpen] = useState(false);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [repoSearch, setRepoSearch] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const repoDropdownRef = useRef<HTMLDivElement>(null);
-  const modelDropdownRef = useRef<HTMLDivElement>(null);
 
   const isCloudTarget = runTarget === 'cloud';
   const selectedInstance = useMemo(
@@ -262,17 +260,13 @@ export const AgentsNewSession = ({
     }
   }, [isCloudTarget, selectedInstance]);
 
-  // ---- Close dropdowns on outside click ----
+  // ---- Close the repo dropdown on outside click ----
   useEffect(() => {
     const handler = (evt: MouseEvent): void => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- browser DOM event target
       if (repoDropdownRef.current && !repoDropdownRef.current.contains(evt.target as Node)) {
         setRepoDropdownOpen(false);
         setRepoSearch('');
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- browser DOM event target
-      if (modelDropdownRef.current && !modelDropdownRef.current.contains(evt.target as Node)) {
-        setModelDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -354,11 +348,11 @@ export const AgentsNewSession = ({
 
   // ---- Handlers ----
   const handleModelSelect = useCallback(
-    (model: KiloGatewayModelOption) => {
-      setSelectedModel(model.id);
+    (modelId: string) => {
+      setSelectedModel(modelId);
       setIsModelUserSelected(true);
       setSelectedVariant('');
-      setLastSelectedMutation.mutate({ model: model.id });
+      setLastSelectedMutation.mutate({ model: modelId });
     },
     [setLastSelectedMutation]
   );
@@ -599,82 +593,19 @@ export const AgentsNewSession = ({
 
         {/* Toolbar: model + variant + repo */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Model picker (cloud target only) */}
-          {isCloudTarget ? (
-            <div ref={modelDropdownRef} className="relative">
-              <button
-                aria-label="Select model"
-                className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isSubmitting || modelOptions.length === 0}
-                onClick={() => {
-                  setModelDropdownOpen(prev => !prev);
-                }}
-                type="button"
-              >
-                <span className="max-w-[140px] truncate">
-                  {selectedModelOption?.name ?? 'Select model'}
-                </span>
-                <ChevronDown className="size-3.5 shrink-0" />
-              </button>
-              {modelDropdownOpen ? (
-                <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
-                  {(() => {
-                    if (modelLoadError !== undefined) {
-                      return (
-                        <div className="px-3 py-2">
-                          <p className="type-label text-status-red-400">{modelLoadError}</p>
-                          <button
-                            className="mt-1 type-label text-link hover:text-link-hover underline underline-offset-4"
-                            onClick={() => {
-                              void refetchModels();
-                            }}
-                            type="button"
-                          >
-                            Retry
-                          </button>
-                        </div>
-                      );
-                    }
-                    if (isModelsLoading) {
-                      return (
-                        <p className="px-3 py-2 type-label text-foreground-muted">
-                          Loading models…
-                        </p>
-                      );
-                    }
-                    if (modelOptions.length === 0) {
-                      return (
-                        <p className="px-3 py-2 type-label text-foreground-muted">
-                          No models available
-                        </p>
-                      );
-                    }
-                    return modelOptions.map(model => (
-                      <button
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
-                        key={model.id}
-                        onClick={() => {
-                          handleModelSelect(model);
-                          setModelDropdownOpen(false);
-                        }}
-                        type="button"
-                      >
-                        <span className="truncate flex-1">{model.name}</span>
-                        {model.id === selectedModel ? (
-                          <Check className="size-3.5 shrink-0 text-brand-primary" />
-                        ) : null}
-                      </button>
-                    ));
-                  })()}
-                </div>
-              ) : null}
-            </div>
+          {/* Model picker (cloud target only) — same component as the browser tab */}
+          {isCloudTarget && auth !== undefined ? (
+            <ModelPicker
+              auth={auth}
+              disabled={isSubmitting || modelOptions.length === 0}
+              model={selectedModel}
+              modelOptions={modelOptions}
+              onModelChange={handleModelSelect}
+              organizationId={organizationId ?? undefined}
+            />
           ) : null}
           {isCloudTarget
             ? (() => {
-                if (modelDropdownOpen) {
-                  return null;
-                }
                 if (modelLoadError !== undefined) {
                   return (
                     <div className="flex items-center gap-1.5">
@@ -693,7 +624,7 @@ export const AgentsNewSession = ({
                   );
                 }
                 if (isModelsLoading) {
-                  return <span className="type-label text-foreground-muted">Loading models…</span>;
+                  return null;
                 }
                 if (modelOptions.length === 0) {
                   return (
@@ -723,9 +654,6 @@ export const AgentsNewSession = ({
                   aria-label="Thinking effort"
                   className="appearance-none bg-transparent outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isSubmitting}
-                  onFocus={() => {
-                    setModelDropdownOpen(false);
-                  }}
                   onChange={changeEvent => {
                     handleVariantSelect(changeEvent.target.value);
                   }}
@@ -896,7 +824,6 @@ export const AgentsNewSession = ({
                   className="max-w-40 appearance-none truncate bg-transparent outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isSubmitting}
                   onFocus={() => {
-                    setModelDropdownOpen(false);
                     setRepoDropdownOpen(false);
                   }}
                   onChange={changeEvent => {

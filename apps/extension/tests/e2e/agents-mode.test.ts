@@ -561,7 +561,7 @@ test('Agents new session spawns onto a connected CLI instance', async () => {
     await runOn.selectOption(DEFAULT_INSTANCE.connectionId);
 
     // Cloud-only pickers leave the form; the CLI hint appears.
-    await expect(sidePanel.getByLabel('Select model')).toBeHidden();
+    await expect(sidePanel.getByLabel('Model', { exact: true })).toBeHidden();
     await expect(sidePanel.getByLabel('Select repository')).toBeHidden();
     await expect(sidePanel.getByText(/Runs in cloud/)).toBeVisible();
 

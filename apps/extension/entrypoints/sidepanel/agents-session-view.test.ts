@@ -127,38 +127,45 @@ describe('agents message list rendering', () => {
     expect(container.textContent).toContain('completed');
   });
 
-  it('renders reasoning parts as muted label', () => {
-    const messages: StoredMessage[] = [
+  it('hides reasoning parts on a completed message and shows the tail while streaming', () => {
+    const completedInfo = {
+      id: 'msg-4',
+      sessionID: 'ses-1',
+      role: 'assistant',
+      time: { created: 4000, completed: 4000 },
+      parentID: 'msg-3',
+      modelID: 'test',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: '',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    } satisfies AssistantMessage;
+    const reasoningParts = [
       {
-        info: {
-          id: 'msg-4',
-          sessionID: 'ses-1',
-          role: 'assistant',
-          time: { created: 4000, completed: 4000 },
-          parentID: 'msg-3',
-          modelID: 'test',
-          providerID: 'kilo',
-          mode: 'code',
-          agent: '',
-          path: { cwd: '/', root: '/' },
-          cost: 0,
-          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        } satisfies AssistantMessage,
-        parts: [
-          {
-            id: 'p-4',
-            sessionID: 'ses-1',
-            messageID: 'msg-4',
-            type: 'reasoning' as const,
-            text: 'Let me think...',
-            time: { start: 4000, end: 4100 },
-          },
-        ],
+        id: 'p-4',
+        sessionID: 'ses-1',
+        messageID: 'msg-4',
+        type: 'reasoning' as const,
+        text: 'Let me think...',
+        time: { start: 4000, end: 4100 },
       },
     ];
+    const messages: StoredMessage[] = [{ info: completedInfo, parts: reasoningParts }];
 
+    // Completed message: reasoning is noise and stays hidden.
     const { container } = render(h(AgentsMessageList, { messages }));
-    expect(container.textContent).toContain('Reasoning');
+    expect(container.textContent).not.toContain('Reasoning');
+
+    // Streaming message: the trailing reasoning part renders as a live label.
+    const streamingInfo = {
+      ...completedInfo,
+      time: { created: 4000 },
+    } satisfies AssistantMessage;
+    const streaming: StoredMessage[] = [{ info: streamingInfo, parts: reasoningParts }];
+    const { container: streamingContainer } = render(h(AgentsMessageList, { messages: streaming }));
+    expect(streamingContainer.textContent).toContain('Reasoning');
   });
 });
 

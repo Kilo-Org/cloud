@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Shared tool panel and per-state mappers for both conversation renderers */
 import type { JSX, ReactNode } from 'react';
 import { isValidElement } from 'react';
 import type { Components } from 'react-markdown';
@@ -155,15 +156,29 @@ const ThinkingEvent = ({
   </details>
 );
 
-const ToolExchangeEvent = ({
-  item,
+const ToolExchangePanel = ({
+  argumentsText,
+  codeText,
+  imageDataUrl,
+  imageAlt,
+  resultText,
+  status,
+  subtitle,
+  title,
 }: {
-  item: Extract<GroupedConversationItem, { readonly type: 'tool-exchange' }>;
+  /** Rendered under "Arguments". Omit to hide the block. */
+  argumentsText?: string | undefined;
+  /** Rendered under "Code". Omit to hide the block. */
+  codeText?: string | undefined;
+  imageDataUrl?: string | undefined;
+  imageAlt?: string | undefined;
+  /** Rendered under "Result" or "Error". Omit while the tool still runs. */
+  resultText?: string | undefined;
+  status: 'completed' | 'failed' | 'running';
+  subtitle: string;
+  title: string;
 }): JSX.Element => {
-  const isSuccessful = item.result.ok;
-  const screenshotDataUrl = isSuccessful
-    ? getViewportScreenshotDataUrl(item.toolCall.name, item.result.value)
-    : undefined;
+  const isSuccessful = status !== 'failed';
 
   const panelClassName = isSuccessful
     ? 'group min-w-0 rounded-lg border border-border bg-surface-inset px-3 py-2'
@@ -191,41 +206,100 @@ const ToolExchangeEvent = ({
     <details className={panelClassName}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background">
         <span className={titleClassName}>
-          {item.toolCall.name} {isSuccessful ? 'completed' : 'failed'}
+          {title} {status}
         </span>
-        <span className={tabClassName}>
-          {'serverName' in item.toolCall ? item.toolCall.serverName : `tab ${item.toolCall.tabId}`}
-        </span>
+        <span className={tabClassName}>{subtitle}</span>
       </summary>
       <div className="mt-2 grid min-w-0 gap-2">
-        {item.toolCall.name === 'eval' ? (
+        {codeText === undefined ? null : (
           <div className="min-w-0">
             <p className={codeLabelClassName}>Code</p>
-            <pre className={codeBlockClassName}>{item.toolCall.code}</pre>
+            <pre className={codeBlockClassName}>{codeText}</pre>
           </div>
-        ) : null}
-        {'arguments' in item.toolCall ? (
+        )}
+        {argumentsText === undefined ? null : (
           <div className="min-w-0">
             <p className={codeLabelClassName}>Arguments</p>
-            <pre className={codeBlockClassName}>{formatToolValue(item.toolCall.arguments)}</pre>
+            <pre className={codeBlockClassName}>{argumentsText}</pre>
           </div>
-        ) : null}
-        <div className="min-w-0">
-          <p className={resultLabelClassName}>{isSuccessful ? 'Result' : 'Error'}</p>
-          {screenshotDataUrl === undefined ? (
-            <pre className={resultBlockClassName}>
-              {isSuccessful ? formatToolValue(item.result.value) : item.result.error}
-            </pre>
-          ) : (
-            <img
-              alt="Viewport screenshot captured by get_viewport_screenshot"
-              className="mt-1 max-h-40 max-w-full rounded-md border border-border object-contain"
-              src={screenshotDataUrl}
-            />
-          )}
-        </div>
+        )}
+        {resultText === undefined && imageDataUrl === undefined ? null : (
+          <div className="min-w-0">
+            <p className={resultLabelClassName}>{status === 'failed' ? 'Error' : 'Result'}</p>
+            {imageDataUrl === undefined ? (
+              <pre className={resultBlockClassName}>{resultText}</pre>
+            ) : (
+              <img
+                alt={imageAlt ?? 'Viewport screenshot captured by get_viewport_screenshot'}
+                className="mt-1 max-h-40 max-w-full rounded-md border border-border object-contain"
+                src={imageDataUrl}
+              />
+            )}
+          </div>
+        )}
       </div>
     </details>
+  );
+};
+
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+
+const getToolExchangeStatus = (
+  result: ToolResultEvent | undefined
+): 'completed' | 'failed' | 'running' => {
+  if (result === undefined) {
+    return 'running';
+  }
+
+  return result.ok ? 'completed' : 'failed';
+};
+
+const getToolExchangeResultText = (
+  result: ToolResultEvent | undefined,
+  hasResultImage: boolean
+): string | undefined => {
+  if (result === undefined || hasResultImage) {
+    return undefined;
+  }
+
+  return result.ok ? formatToolValue(result.value) : (result.error ?? '');
+};
+
+const ToolExchangeEvent = ({
+  item,
+}: {
+  item: Extract<GroupedConversationItem, { readonly type: 'tool-exchange' }>;
+}): JSX.Element => {
+  const { result, toolCall } = item;
+
+  if ('source' in toolCall) {
+    return (
+      <ToolExchangePanel
+        argumentsText={formatToolValue(toolCall.arguments)}
+        imageAlt={`Image produced by ${toolCall.name}`}
+        imageDataUrl={result?.imageDataUrl}
+        resultText={getToolExchangeResultText(result, result?.imageDataUrl !== undefined)}
+        status={getToolExchangeStatus(result)}
+        subtitle={toolCall.title ?? ''}
+        title={toolCall.name}
+      />
+    );
+  }
+
+  const screenshotDataUrl =
+    result?.ok === true ? getViewportScreenshotDataUrl(toolCall.name, result.value) : undefined;
+
+  return (
+    <ToolExchangePanel
+      argumentsText={'arguments' in toolCall ? formatToolValue(toolCall.arguments) : undefined}
+      codeText={'code' in toolCall ? toolCall.code : undefined}
+      imageAlt="Viewport screenshot captured by get_viewport_screenshot"
+      imageDataUrl={screenshotDataUrl}
+      resultText={getToolExchangeResultText(result, screenshotDataUrl !== undefined)}
+      status={getToolExchangeStatus(result)}
+      subtitle={'serverName' in toolCall ? toolCall.serverName : `tab ${toolCall.tabId}`}
+      title={toolCall.name}
+    />
   );
 };
 

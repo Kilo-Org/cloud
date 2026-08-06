@@ -194,6 +194,20 @@ describe('phase classification', () => {
   });
 });
 
+describe('organization_member_invited role schema', () => {
+  const invitedSchema = ANALYTICS_EVENT_SCHEMAS[ORGANIZATION_MEMBER_INVITED_EVENT];
+
+  it('accepts every current organization role payload', () => {
+    for (const role of ['owner', 'admin', 'member', 'billing_manager']) {
+      expect(invitedSchema.safeParse({ role }).success, `role=${role}`).toBe(true);
+    }
+  });
+
+  it('rejects an unknown role payload', () => {
+    expect(invitedSchema.safeParse({ role: 'superadmin' }).success).toBe(false);
+  });
+});
+
 describe('app_startup validation', () => {
   const startupSchema = ANALYTICS_EVENT_SCHEMAS[APP_STARTUP_EVENT];
 

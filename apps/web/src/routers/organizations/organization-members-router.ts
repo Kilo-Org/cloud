@@ -16,14 +16,15 @@ import {
   type OperationLedgerRow,
 } from '@kilocode/db/schema';
 import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
+  organizationAdminMutationProcedure,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
-  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
@@ -34,7 +35,11 @@ import { successResult, type SuccessResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
-import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
+import {
+  OrganizationRoleSchema,
+  PublicOrganizationMembersSchema,
+} from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import {
   admitOperation,
   settleOperation,
@@ -47,7 +52,7 @@ const operationKeySchema = z.string().min(1).max(128).optional();
 
 const UpdateMemberSchema = OrganizationIdInputSchema.extend({
   memberId: z.string(),
-  role: z.enum(['owner', 'member', 'billing_manager']).optional(),
+  role: OrganizationRoleSchema.optional(),
   dailyUsageLimitUsd: z.number().min(0).max(MAX_DAILY_LIMIT_USD).nullable().optional(),
   /** Optional client-generated per-intent key for the role-change ledger (P1-A-08e). */
   operationKey: operationKeySchema,
@@ -61,7 +66,7 @@ const RemoveMemberSchema = OrganizationIdInputSchema.extend({
 
 const InviteMemberSchema = OrganizationIdInputSchema.extend({
   email: z.email('Invalid email address'),
-  role: z.enum(['owner', 'member', 'billing_manager']),
+  role: OrganizationRoleSchema,
 });
 
 const DeleteInviteSchema = OrganizationIdInputSchema.extend({
@@ -73,10 +78,33 @@ const SetChildMembershipsSchema = OrganizationIdInputSchema.extend({
   childOrganizationIds: z.array(z.uuid()),
 });
 
+const OWNER_AUTHORITY_MESSAGE = 'Only an organization owner can manage owners';
+
+/**
+ * Reserves owner authority for owners. Admins match owners everywhere else, but
+ * may not grant the owner role nor act on an existing owner's membership. Both
+ * halves are required: allowing only one would let an admin strip every owner
+ * while being unable to appoint a replacement, leaving the org with no owner.
+ *
+ * Kilo staff bypass this because `ensureOrganizationAccess` resolves them to
+ * `owner`.
+ */
+function assertOwnerAuthority(
+  actorRole: OrganizationRole,
+  target: { currentRole?: OrganizationRole | null; nextRole?: OrganizationRole | null }
+): void {
+  if (actorRole === 'owner') {
+    return;
+  }
+  if (target.currentRole === 'owner' || target.nextRole === 'owner') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: OWNER_AUTHORITY_MESSAGE });
+  }
+}
+
 async function getDirectOrganizationRole(
   organizationId: string,
   userId: string
-): Promise<'owner' | 'member' | 'billing_manager' | null> {
+): Promise<OrganizationRole | null> {
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
@@ -242,7 +270,7 @@ async function executeOrgRoleChange(args: {
   user: OrgActor;
   organizationId: string;
   memberId: string;
-  role: 'owner' | 'member' | 'billing_manager';
+  role: OrganizationRole;
   dailyUsageLimitUsd?: number | null;
   targetMember?: { role: string };
 }): Promise<SuccessResult<{ updated: string }>> {
@@ -315,10 +343,11 @@ async function executeOrgRoleChange(args: {
  */
 async function repairOrgRoleChange(args: {
   row: OperationLedgerRow;
+  ctx: TRPCContext;
   user: OrgActor;
   organizationId: string;
   memberId: string;
-  role: 'owner' | 'member' | 'billing_manager';
+  role: OrganizationRole;
   dailyUsageLimitUsd?: number | null;
 }): Promise<SuccessResult<{ updated: string }>> {
   const distinctId = args.user.google_user_email || args.user.id;
@@ -387,7 +416,16 @@ async function repairOrgRoleChange(args: {
     return successResult({ updated: 'role and limit', replayed: true });
   }
 
-  // Not applied yet: re-run the helper under the same row (takeover).
+  // Not applied yet: re-run the helper under the same row (takeover). The
+  // first attempt may have crashed right after admission, so re-check owner
+  // authority before re-running — an admin must never grant the owner role or
+  // act on an existing owner's membership, even through the takeover path.
+  const actorRole = await ensureOrganizationAccess(
+    args.ctx,
+    args.organizationId,
+    ORGANIZATION_MANAGE_ROLES
+  );
+  assertOwnerAuthority(actorRole, { currentRole: membership.role, nextRole: args.role });
   return executeOrgRoleChange({
     ...args,
     targetMember: { role: membership.role },
@@ -539,13 +577,18 @@ async function executeOrgMemberRemove(args: {
  */
 async function repairOrgMemberRemove(args: {
   row: OperationLedgerRow;
+  ctx: TRPCContext;
   user: OrgActor;
   organizationId: string;
   memberId: string;
 }): Promise<SuccessResult<{ updated: string; replayed: true }>> {
   const distinctId = args.user.google_user_email || args.user.id;
   const [membership] = await db
-    .select({ id: organization_memberships.id, isBot: kilocode_users.is_bot })
+    .select({
+      id: organization_memberships.id,
+      role: organization_memberships.role,
+      isBot: kilocode_users.is_bot,
+    })
     .from(organization_memberships)
     .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
@@ -578,6 +621,17 @@ async function repairOrgMemberRemove(args: {
     });
   }
 
+  // Re-check owner authority before re-running the removal helper: the first
+  // attempt may have crashed right after admission, so the takeover path must
+  // not bypass the rule that only an owner may act on an existing owner's
+  // membership.
+  const actorRole = await ensureOrganizationAccess(
+    args.ctx,
+    args.organizationId,
+    ORGANIZATION_MANAGE_ROLES
+  );
+  assertOwnerAuthority(actorRole, { currentRole: membership.role });
+
   const completed = await executeOrgMemberRemove(args);
   return { ...completed, replayed: true };
 }
@@ -590,7 +644,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       return await getOrganizationMembers(input.organizationId);
     }),
 
-  update: organizationOwnerMutationProcedure
+  update: organizationAdminMutationProcedure
     .input(UpdateMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -648,6 +702,16 @@ export const organizationsMembersRouter = createTRPCRouter({
             message: 'User is not a member of this organization',
           });
         }
+
+        // Only an owner may grant the owner role or change an existing owner's
+        // role; admins match owners everywhere else (P1-A-08e: retained before
+        // the role-change helper).
+        const actorRole = await ensureOrganizationAccess(
+          ctx,
+          organizationId,
+          ORGANIZATION_MANAGE_ROLES
+        );
+        assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
 
         const result = await updateUserRoleInOrganization(organizationId, memberId, role);
         const updatedUser = await findUserById(memberId);
@@ -731,6 +795,16 @@ export const organizationsMembersRouter = createTRPCRouter({
             });
           }
 
+          // Only an owner may grant the owner role or act on an existing
+          // owner's membership. Runs after the membership read so the ledger
+          // admission stays before the mutable lookup.
+          const actorRole = await ensureOrganizationAccess(
+            ctx,
+            organizationId,
+            ORGANIZATION_MANAGE_ROLES
+          );
+          assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
+
           return executeOrgRoleChange({
             row: admission.row,
             user,
@@ -745,6 +819,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         case 'duplicate_reconcile_pending':
           return repairOrgRoleChange({
             row: admission.row,
+            ctx,
             user,
             organizationId,
             memberId,
@@ -886,7 +961,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       return successResult({ added, removed });
     }),
-  remove: organizationOwnerMutationProcedure
+  remove: organizationAdminMutationProcedure
     .input(RemoveMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -932,6 +1007,15 @@ export const organizationsMembersRouter = createTRPCRouter({
             message: 'Service account users cannot be removed',
           });
         }
+
+        // Only an owner may act on an existing owner's membership; admins match
+        // owners everywhere else.
+        const actorRole = await ensureOrganizationAccess(
+          ctx,
+          organizationId,
+          ORGANIZATION_MANAGE_ROLES
+        );
+        assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
 
         const result = await removeUserFromOrganization(organizationId, memberId, user.id);
         if (result.rowCount === 0) {
@@ -1023,6 +1107,16 @@ export const organizationsMembersRouter = createTRPCRouter({
             });
           }
 
+          // Only an owner may act on an existing owner's membership. Runs after
+          // the membership read so the ledger admission stays before the
+          // mutable lookup.
+          const actorRole = await ensureOrganizationAccess(
+            ctx,
+            organizationId,
+            ORGANIZATION_MANAGE_ROLES
+          );
+          assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
+
           return executeOrgMemberRemove({
             row: admission.row,
             user,
@@ -1034,6 +1128,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         case 'duplicate_reconcile_pending':
           return repairOrgMemberRemove({
             row: admission.row,
+            ctx,
             user,
             organizationId,
             memberId,
@@ -1051,8 +1146,16 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, email, role } = input;
 
+      // Members can be invited by any billing-capable role; elevated roles
+      // require organization-management authority, and only an owner may invite
+      // another owner.
       if (role !== 'member') {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+        const actorRole = await ensureOrganizationAccess(
+          ctx,
+          organizationId,
+          ORGANIZATION_MANAGE_ROLES
+        );
+        assertOwnerAuthority(actorRole, { nextRole: role });
       }
 
       // Get organization details
@@ -1138,7 +1241,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         acceptInviteUrl,
       };
     }),
-  deleteInvite: organizationOwnerMutationProcedure
+  deleteInvite: organizationAdminMutationProcedure
     .input(DeleteInviteSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
@@ -1162,7 +1265,15 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Owners can delete any invitation
+      // Owners can revoke any invitation; admins cannot revoke an owner invite,
+      // which is a pending grant of owner authority.
+      const actorRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
+      assertOwnerAuthority(actorRole, { currentRole: invitation.role });
+
       // Expire the invitation by setting expires_at to NOW
       await db
         .update(organization_invitations)

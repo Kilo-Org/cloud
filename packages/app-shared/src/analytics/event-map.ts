@@ -49,7 +49,7 @@ export const INSTANCE_ACTIONS = [
 ] as const;
 export const PERMISSION_RESPONSES = ['once', 'always', 'reject'] as const;
 export const FEEDBACK_SENTIMENTS = ['positive', 'negative'] as const;
-export const ORGANIZATION_ROLES = ['owner', 'member', 'billing_manager'] as const;
+export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
 
 /** App cold-start outcome values (mirrors apps/mobile/src/lib/startup-timing.ts). */
 export const STARTUP_OUTCOMES = [

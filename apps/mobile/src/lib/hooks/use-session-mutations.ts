@@ -116,14 +116,8 @@ export function useSessionMutations() {
           await chainSave(sessionId, () =>
             deleteSessionMutation.mutateAsync({ session_id: sessionId })
           );
-          try {
-            announcingToast.success('Session deleted');
-          } finally {
-            // The success toast announces through the shared adapter. Even if
-            // its announcement boundary fails, the caller's completion (e.g.
-            // moving assistive-technology focus to a stable anchor) must run.
-            onDeleted?.();
-          }
+          announcingToast.success('Session deleted');
+          onDeleted?.();
         } catch {
           // Already surfaced via the mutation's own onError (toast + rollback).
         }

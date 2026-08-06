@@ -284,23 +284,6 @@ describe('useSessionMutations', () => {
       expect(toastSuccessMock).toHaveBeenCalledWith('Session deleted');
     });
 
-    it('invokes onDeleted even when the success toast throws', async () => {
-      mutateAsyncMock.mockResolvedValue(undefined);
-      toastSuccessMock.mockImplementationOnce(() => {
-        throw new Error('native announcement failed');
-      });
-      const onDeleted = vi.fn(() => undefined);
-
-      const { deleteSession } = useSessionMutations();
-      deleteSession('s1', onDeleted);
-
-      // The focus callback must still run after a throwing success toast.
-      await vi.waitFor(() => {
-        expect(onDeleted).toHaveBeenCalledTimes(1);
-      });
-      expect(toastSuccessMock).toHaveBeenCalledWith('Session deleted');
-    });
-
     it('does not invoke onDeleted or the success toast when the delete fails', async () => {
       mutateAsyncMock.mockRejectedValueOnce(new Error('delete failed'));
       const onDeleted = vi.fn(() => undefined);

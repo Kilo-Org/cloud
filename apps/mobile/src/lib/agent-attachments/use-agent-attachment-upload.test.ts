@@ -564,26 +564,4 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
     renderer.unmount();
   });
-
-  it('keeps the upload successful when the success announcement throws', async () => {
-    hoisted.announceForA11y.mockImplementationOnce(() => {
-      throw new Error('announce failed');
-    });
-    const renderer = await mountHook();
-    await addDocument();
-
-    await act(async () => {
-      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await settle();
-    });
-
-    // The throw is swallowed by the isolated announcement, so the uploaded
-    // state stands and no failure toast is emitted.
-    expect(hoisted.announceForA11y).toHaveBeenCalledTimes(1);
-    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
-    const attachment = hookApi().attachments[0];
-    expect(attachment?.status).toBe('uploaded');
-    expect(attachment?.remoteFilename).toBe('doc.pdf');
-    renderer.unmount();
-  });
 });

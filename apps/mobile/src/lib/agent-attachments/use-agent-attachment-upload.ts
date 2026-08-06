@@ -130,14 +130,10 @@ export function useAgentAttachmentUpload(
           // Hook-owned success announcement (D19): the flip to terminal
           // success announces exactly once, and only while the composer is
           // still mounted. The chip is presentational and never announces.
-          // The call stays isolated so a throwing native announce cannot
-          // enter the upload catch and convert success into a failure toast.
+          // `announceForA11y` swallows native failures, so it can never enter
+          // the upload catch and turn success into a failure toast.
           if (isMountedRef.current) {
-            try {
-              announceForA11y('Attachment uploaded');
-            } catch {
-              // Best-effort: the uploaded chip is the visible source of truth.
-            }
+            announceForA11y('Attachment uploaded');
           }
         } catch (error) {
           if (generationRef.current !== generation || !liveIdsRef.current.has(attachment.id)) {

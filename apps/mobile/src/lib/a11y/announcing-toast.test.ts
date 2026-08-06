@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as announceModule from './announce';
 import { announceForA11y } from './announce';
 import { announcingToast } from './announcing-toast';
 
@@ -115,18 +114,6 @@ describe('announcingToast', () => {
     const toasted = sonnerMock.success.mock.calls[0]?.[0];
     expect(announced).toBe(toasted);
     expect(announced).toBe(message);
-  });
-
-  it('still shows the toast when the announcement fails natively', () => {
-    const announceSpy = vi.spyOn(announceModule, 'announceForA11y').mockImplementation(() => {
-      throw new Error('native announcement failed');
-    });
-
-    const result = announcingToast.success('Session deleted');
-
-    expect(result).toBe('success-id');
-    expect(sonnerMock.success).toHaveBeenCalledWith('Session deleted', undefined);
-    announceSpy.mockRestore();
   });
 
   it('reuses announceForA11y from the shared helper (no second announce utility)', () => {

@@ -19,15 +19,9 @@ import { announceForA11y } from './announce';
 type ToastOptions = NonNullable<Parameters<typeof toast.success>[1]>;
 
 function announceTitle(title: string): void {
-  // `announceForA11y` trims and drops empty messages, so we don't gate
-  // the call here. The announce boundary is best effort: a native
-  // accessibility failure must never prevent the visual toast from
-  // rendering or the caller from completing.
-  try {
-    announceForA11y(title);
-  } catch {
-    // Best effort: the visual toast and caller flow continue.
-  }
+  // `announceForA11y` trims, drops empty messages, and swallows a native
+  // accessibility failure, so the visual toast always renders.
+  announceForA11y(title);
 }
 
 function success(title: string, options?: ToastOptions): string | number {

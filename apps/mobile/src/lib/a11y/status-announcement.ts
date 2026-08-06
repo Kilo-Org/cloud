@@ -48,11 +48,7 @@ export function useStatusAnnouncement(message: string | null): void {
     const next = nextAnnouncement(prevRef.current, message);
     prevRef.current = message;
     if (Platform.OS === 'ios' && next != null) {
-      try {
-        announceForA11y(next);
-      } catch {
-        // Best-effort: the visible status text carries the state.
-      }
+      announceForA11y(next);
     }
   }, [message]);
 }

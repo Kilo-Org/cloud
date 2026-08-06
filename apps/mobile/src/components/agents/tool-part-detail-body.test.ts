@@ -20,6 +20,7 @@ import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('lucide-react-native', () => ({ Terminal: 'Terminal' }));
 vi.mock('./bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
@@ -292,7 +293,10 @@ describe('BashToolCardBody streaming contract', () => {
   it('renders the $ command block while running with a short command', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = RealBashToolCardBody({ part: makeToolPart('bash', runningState) });
-    const commands = findAll(root, el => el.type === 'Text' && renderedText(el) === '$ echo hi');
+    const commands = findAll(
+      root,
+      el => el.type === 'SelectableText' && renderedText(el) === '$ echo hi'
+    );
     expect(commands).toHaveLength(1);
   });
 });

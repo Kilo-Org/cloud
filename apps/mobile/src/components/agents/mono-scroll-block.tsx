@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
+import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,8 @@ type MonoScrollBlockProps = {
   textClassName?: string;
   /** Optional chrome around the scroller (e.g. rounded bg on preparation output). */
   containerClassName?: string;
+  /** True for the transcript caller: keeps the `Text` path byte-identical there. */
+  inTranscript?: boolean;
 };
 
 /**
@@ -48,6 +51,7 @@ export function MonoScrollBlock({
   maxLength,
   textClassName,
   containerClassName,
+  inTranscript = false,
 }: Readonly<MonoScrollBlockProps>) {
   const textSelectable = useTranscriptTextSelectable();
   const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);
@@ -62,6 +66,8 @@ export function MonoScrollBlock({
     [displayText]
   );
 
+  const contentClasses = 'shrink-0 self-start font-mono text-xs leading-4';
+
   return (
     <View className={containerClassName}>
       <ScrollView
@@ -70,13 +76,22 @@ export function MonoScrollBlock({
         // eslint-disable-next-line react-native/no-inline-styles -- measured height cannot be a Tailwind class
         style={contentHeight === undefined ? undefined : { height: contentHeight }}
       >
-        <Text
-          selectable={textSelectable}
-          onLayout={handleContentLayout}
-          className={cn('shrink-0 self-start font-mono text-xs leading-4', textClassName)}
-        >
-          {displayText}
-        </Text>
+        {inTranscript ? (
+          <Text
+            selectable={textSelectable}
+            onLayout={handleContentLayout}
+            className={cn(contentClasses, textClassName)}
+          >
+            {displayText}
+          </Text>
+        ) : (
+          <SelectableText
+            onLayout={handleContentLayout}
+            className={cn(contentClasses, textClassName)}
+          >
+            {displayText}
+          </SelectableText>
+        )}
       </ScrollView>
       {isTruncated ? (
         <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">

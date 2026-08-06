@@ -4,7 +4,7 @@ import { db, type db as defaultDb } from '@/lib/drizzle';
 import {
   buildExaUsageLogPartitionIndexDefinitions,
   buildExaUsageLogPartitionIndexDropStatement,
-} from '@/lib/exa-usage-partitions';
+} from '@/lib/usage-partitions';
 import { sql } from 'drizzle-orm';
 
 export type ExaUsageLogIndexScriptArgs = {

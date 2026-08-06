@@ -26,6 +26,9 @@ vi.mock('@/components/sheet-header', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
+vi.mock('@/components/ui/selectable-text', () => ({
+  SelectableText: 'SelectableText',
+}));
 vi.mock('./tool-part-detail-body', () => ({
   ToolPartDetailBody: 'ToolPartDetailBody',
 }));
@@ -188,9 +191,8 @@ describe('PartDetailSheetHost mounted', () => {
     const reasoningTexts = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        propOf(node, 'children') === 'working through it' &&
-        propOf(node, 'selectable') === true
+        (node.type as string) === 'SelectableText' &&
+        propOf(node, 'children') === 'working through it'
     );
     expect(reasoningTexts).toHaveLength(1);
   });

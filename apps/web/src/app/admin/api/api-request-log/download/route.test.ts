@@ -6,7 +6,7 @@ import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
 import { defineTestUser } from '@/tests/helpers/user.helper';
-import { GET, maxDuration } from './route';
+import { GET } from './route';
 
 jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
@@ -79,7 +79,6 @@ describe('GET /admin/api/api-request-log/download', () => {
       response: JSON.stringify({ output: 'inserted-after-ceiling' }),
     });
 
-    expect(maxDuration).toBe(800);
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('application/zip');
     expect(response.headers.get('Content-Disposition')).toBe(

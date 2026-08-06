@@ -6,10 +6,11 @@ import { and, gte, lte, eq, asc, desc, gt, or, isNotNull, type SQL } from 'drizz
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 
-// The central directory is written only when the archive finishes. Give large
-// exports the longest function budget used by the app so Vercel does not cut
-// the stream off with an invalid ZIP.
-export const maxDuration = 800;
+// Downloading all logs for a heavy user can take a while. Without a raised
+// maxDuration the Vercel function was killed mid-stream, producing a ZIP
+// without a central directory record. macOS Archive Utility then refused to
+// extract it ("Error 79 - Inappropriate file type or format").
+export const maxDuration = 300;
 
 const BATCH_SIZE = 100;
 

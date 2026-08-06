@@ -25,21 +25,40 @@ const LOAD_ERROR_MESSAGE = "Couldn't load workflows. Try again.";
 const DELETE_ERROR_MESSAGE = "Couldn't delete the workflow. Try again.";
 
 const SETTINGS_TOGGLE_ROWS = [
-  { key: 'allowWorkflowsInSafeMode', label: 'Allow workflows in safe mode' },
-  { key: 'autoApproveWorkflowChanges', label: 'Auto-approve workflow changes' },
-  { key: 'autoApproveWorkflowRuns', label: 'Auto-approve workflow runs' },
-] as const satisfies readonly { key: keyof AgentWorkflowSettings; label: string }[];
+  {
+    description: '',
+    key: 'allowWorkflowsInSafeMode',
+    label: 'Allow workflows in safe mode',
+  },
+  {
+    description:
+      'Save workflow changes without the approval card, and delete without the confirm click.',
+    key: 'autoApproveWorkflowChanges',
+    label: 'Auto-approve workflow changes',
+  },
+  {
+    description: 'Let Kilo start a workflow run without asking first.',
+    key: 'autoApproveWorkflowRuns',
+    label: 'Auto-approve workflow runs',
+  },
+] as const satisfies readonly {
+  description: string;
+  key: keyof AgentWorkflowSettings;
+  label: string;
+}[];
 
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
 
 const SettingsToggle = ({
   checked,
+  description,
   disabled,
   label,
   onToggle,
 }: {
   checked: boolean;
+  description: string;
   disabled: boolean;
   label: string;
   onToggle: () => void;
@@ -47,6 +66,9 @@ const SettingsToggle = ({
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0 flex-1">
       <p className="type-body font-medium text-foreground">{label}</p>
+      {description === '' ? null : (
+        <p className="type-body mt-0.5 text-foreground-muted">{description}</p>
+      )}
     </div>
     <button
       aria-checked={checked}
@@ -166,6 +188,7 @@ export const WorkflowSettings = (): JSX.Element => {
         {SETTINGS_TOGGLE_ROWS.map(row => (
           <SettingsToggle
             checked={settings[row.key]}
+            description={row.description}
             disabled={!settingsLoaded || settingsSaving}
             key={row.key}
             label={row.label}

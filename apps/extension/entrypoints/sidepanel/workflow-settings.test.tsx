@@ -100,6 +100,27 @@ describe('workflow settings', () => {
     expect(getByText('Saved workflows')).toBeDefined();
   });
 
+  it('renders the explanatory description under each new workflow setting', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
+
+    const { getByText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText(
+          'Save workflow changes without the approval card, and delete without the confirm click.'
+        )
+      ).toBeDefined();
+    });
+    expect(getByText('Let Kilo start a workflow run without asking first.')).toBeDefined();
+  });
+
   it('shows empty state when no workflows', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
     mockLoadWorkflowSettings.mockResolvedValue({

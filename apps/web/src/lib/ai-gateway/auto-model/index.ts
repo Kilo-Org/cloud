@@ -126,7 +126,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Auto Balanced (deprecated)',
-  description: 'Great balance of price and capability.',
+  description: 'Superseded by Auto Efficient.',
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
   prompt_price: '0.000000325',

@@ -52,22 +52,20 @@ export type ScreenTrackingInput = {
   readonly lastCaptured: ScreenTrackingCapture | null;
 };
 
-export type ScreenTrackingReason =
-  | 'not-settled'
-  | 'analytics-not-ready'
-  | 'analytics-client-stale'
-  | 'bootstrap-not-settled'
-  | 'no-screen'
-  | 'redirect-only'
-  | 'kiloclaw-excluded'
-  | 'duplicate';
-
 export type ScreenTrackingDecision =
   | { readonly capture: true; readonly screenName: string; readonly reason: 'captured' }
   | {
       readonly capture: false;
       readonly screenName: string | undefined;
-      readonly reason: ScreenTrackingReason;
+      readonly reason:
+        | 'not-settled'
+        | 'analytics-not-ready'
+        | 'analytics-client-stale'
+        | 'bootstrap-not-settled'
+        | 'no-screen'
+        | 'redirect-only'
+        | 'kiloclaw-excluded'
+        | 'duplicate';
     };
 
 export function decideScreenTracking(input: ScreenTrackingInput): ScreenTrackingDecision {

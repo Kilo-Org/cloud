@@ -85,7 +85,7 @@ const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
 ]);
 
 /** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
-export const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
+const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
 
 /**
  * True when a `prepareSession` failure may be retried with the SAME

@@ -63,15 +63,17 @@ export type KVPair = {
   updatedAt: number;
 };
 
+// The empty check is load-bearing, not a type duplicate: an empty scope
+// silently widens `clearScopePrefix` to every scope in the database.
 export function validateScope(scope: string): void {
-  if (typeof scope !== 'string' || scope.length === 0) {
+  if (scope.length === 0) {
     throw new TypeError('encrypted-kv: scope must be a non-empty string');
   }
 }
 
 export function validateItemKey(scope: string, k: string): void {
   validateScope(scope);
-  if (typeof k !== 'string' || k.length === 0) {
+  if (k.length === 0) {
     throw new TypeError('encrypted-kv: key must be a non-empty string');
   }
 }

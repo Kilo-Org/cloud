@@ -39,16 +39,53 @@ const toolStatusColor = (status: string): string => {
   return 'text-foreground-muted';
 };
 
+/** Longest tool error rendered inline; the rest would swamp the transcript. */
+const TOOL_ERROR_MAX_LENGTH = 200;
+
+/**
+ * First meaningful line of a tool error, clamped. Tool failures arrive as
+ * anything from one line to a stack trace, and the transcript must stay
+ * readable in a narrow panel.
+ */
+export const toolErrorSummary = (error: string): string => {
+  const firstLine = error
+    .split('\n')
+    .map(line => line.trim())
+    .find(line => line !== '');
+  if (firstLine === undefined) {
+    return '';
+  }
+  return firstLine.length > TOOL_ERROR_MAX_LENGTH
+    ? `${firstLine.slice(0, TOOL_ERROR_MAX_LENGTH)}…`
+    : firstLine;
+};
+
 const ToolPartRow = ({ part }: { part: Extract<Part, { type: 'tool' }> }): JSX.Element => {
-  const { status } = part.state;
+  const { state } = part;
+  const { status } = state;
   const isActive = status === 'running' || status === 'pending';
+  // The tool's own summary of the call — a path, a command. Absent while pending.
+  const title = 'title' in state ? state.title : undefined;
+  const errorSummary = state.status === 'error' ? toolErrorSummary(state.error) : '';
+
   return (
-    <div className="flex items-center gap-1.5 text-xs">
-      {isActive ? (
-        <Loader2 aria-hidden="true" className="size-3 animate-spin text-foreground-muted" />
-      ) : null}
-      <span className="text-foreground-muted">{part.tool}</span>
-      <span className={toolStatusColor(status)}>{toolStatusLabel(status)}</span>
+    <div className="text-xs">
+      <div className="flex items-center gap-1.5">
+        {isActive ? (
+          <Loader2
+            aria-hidden="true"
+            className="size-3 shrink-0 animate-spin text-foreground-muted"
+          />
+        ) : null}
+        <span className="shrink-0 text-foreground-muted">{part.tool}</span>
+        {title === undefined || title === '' ? null : (
+          <span className="min-w-0 flex-1 truncate text-foreground-subtle">{title}</span>
+        )}
+        <span className={`shrink-0 ${toolStatusColor(status)}`}>{toolStatusLabel(status)}</span>
+      </div>
+      {errorSummary === '' ? null : (
+        <p className="mt-0.5 break-words text-status-red-400">{errorSummary}</p>
+      )}
     </div>
   );
 };

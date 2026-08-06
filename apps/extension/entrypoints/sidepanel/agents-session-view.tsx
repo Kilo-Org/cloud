@@ -57,6 +57,11 @@ export const AgentsSessionView = ({
   const [retryingPrompt, setRetryingPrompt] = useState(false);
   const [retryingSwitch, setRetryingSwitch] = useState(false);
   const [retrySucceeded, setRetrySucceeded] = useState(false);
+  /*
+   * A sent prompt reaches the agent before `isStreaming` flips. Without this
+   * the composer just goes dead and the transcript shows nothing happening.
+   */
+  const [isSending, setIsSending] = useState(false);
 
   // When a new failedPrompt appears, reset the retry-succeeded flag.
   useEffect(() => {
@@ -95,9 +100,17 @@ export const AgentsSessionView = ({
     };
   }, [kiloSessionId, manager]);
 
+  // The agent picked the prompt up, or it failed: stop claiming work.
+  useEffect(() => {
+    if (isStreaming || error !== null) {
+      setIsSending(false);
+    }
+  }, [isStreaming, error]);
+
   const handleSend = useCallback(
     async (text: string) => {
       setRetrySucceeded(false);
+      setIsSending(true);
       const rawMode = sessionConfig?.mode ?? '';
       const rawModel = sessionConfig?.model ?? '';
       const mode = rawMode === '' ? 'code' : rawMode;
@@ -115,9 +128,12 @@ export const AgentsSessionView = ({
         });
         if (ok) {
           setRetrySucceeded(true);
+        } else {
+          setIsSending(false);
         }
       } catch {
         // Keep failedPrompt row visible — the SDK sets error atom, caller retains card.
+        setIsSending(false);
       }
     },
     [manager, sessionConfig]
@@ -449,7 +465,7 @@ export const AgentsSessionView = ({
         </div>
       ) : (
         <>
-          <AgentsMessageList isStreaming={isStreaming} messages={messages} />
+          <AgentsMessageList isStreaming={isStreaming || isSending} messages={messages} />
           <AgentsComposer
             canSend={canSend}
             canInterrupt={canInterrupt}

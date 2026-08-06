@@ -55,8 +55,7 @@ const mockAutoDismissEligibleFindings =
   >();
 const mockAdmitOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockMarkReconcilePending = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-const mockRecordOperationProgress = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-const mockSetOperationProviderRef = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 jest.mock('../services/manual-sync-client', () => ({
@@ -76,8 +75,7 @@ jest.mock('../services/manual-remediation-client', () => ({
 jest.mock('@kilocode/db/operation-ledger', () => ({
   admitOperation: mockAdmitOperation,
   markReconcilePending: mockMarkReconcilePending,
-  recordOperationProgress: mockRecordOperationProgress,
-  setOperationProviderRef: mockSetOperationProviderRef,
+  recordOperationAcceptance: mockRecordOperationAcceptance,
   settleOperation: mockSettleOperation,
 }));
 jest.mock('../github/permissions', () => ({
@@ -156,8 +154,7 @@ beforeEach(() => {
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
   mockCheckDependabotAlertsAvailability.mockResolvedValue([]);
-  mockRecordOperationProgress.mockResolvedValue({});
-  mockSetOperationProviderRef.mockResolvedValue({});
+  mockRecordOperationAcceptance.mockResolvedValue({});
   mockMarkReconcilePending.mockResolvedValue({});
   mockSettleOperation.mockResolvedValue({ settled: true });
 });
@@ -697,12 +694,11 @@ describe('security operation ledger (P1-A-08e)', () => {
       resourceKey: `security:manual_sync:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:kilo/repo`,
       taxonomy: 'reconcile-first',
     });
-    expect(mockSetOperationProviderRef.mock.calls[0]?.[1]).toEqual({
+    expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
       providerRef: messageId,
+      canonicalResult: { commandId, runId, messageId },
     });
-    expect(mockRecordOperationProgress.mock.calls[0]?.[1]).toBe('ledger-row-id');
-    expect(mockRecordOperationProgress.mock.calls[0]?.[2]).toEqual({ commandId, runId, messageId });
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
   });
 
@@ -730,7 +726,7 @@ describe('security operation ledger (P1-A-08e)', () => {
     });
 
     expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
-    expect(mockSetOperationProviderRef).not.toHaveBeenCalled();
+    expect(mockRecordOperationAcceptance).not.toHaveBeenCalled();
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 
@@ -775,9 +771,10 @@ describe('security operation ledger (P1-A-08e)', () => {
       })
     ).resolves.toEqual({ success: true, ...accepted });
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
-    expect(mockSetOperationProviderRef.mock.calls[0]?.[1]).toEqual({
+    expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
       providerRef: messageId,
+      canonicalResult: { commandId, runId, messageId },
     });
   });
 
@@ -871,7 +868,7 @@ describe('security operation ledger (P1-A-08e)', () => {
   it('never returns a success receipt when the acceptance cannot be recorded', async () => {
     mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
     mockSubmitManualSecuritySync.mockResolvedValue(accepted);
-    mockSetOperationProviderRef.mockRejectedValue(new Error('database unavailable'));
+    mockRecordOperationAcceptance.mockRejectedValue(new Error('database unavailable'));
 
     let captured: unknown;
     try {
@@ -889,6 +886,28 @@ describe('security operation ledger (P1-A-08e)', () => {
       'The action completed, but we could not record the result. Please try again.'
     );
     expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('writes the acceptance through ONE atomic helper so a failed record leaves no partial state that could blind-duplicate', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+    mockSubmitManualSecuritySync.mockResolvedValue(accepted);
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).resolves.toEqual({ success: true, ...accepted });
+
+    // The acceptance record is a single atomic call carrying BOTH columns: a
+    // separate provider_ref write (which could succeed while the canonical
+    // result write fails, leaving a joinable half-record) must never happen.
+    expect(mockRecordOperationAcceptance).toHaveBeenCalledTimes(1);
+    expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
+      rowId: 'ledger-row-id',
+      providerRef: messageId,
+      canonicalResult: { commandId, runId, messageId },
+    });
   });
 
   it('surfaces a distinct persistence error when the reconcile-pending write fails', async () => {
@@ -949,9 +968,10 @@ describe('security operation ledger (P1-A-08e)', () => {
       operationKey,
       resourceKey: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}`,
     });
-    expect(mockSetOperationProviderRef.mock.calls[0]?.[1]).toEqual({
+    expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
       providerRef: 'dismiss-message-123',
+      canonicalResult: { commandId, runId, messageId: 'dismiss-message-123' },
     });
     expect(mockSubmitManualFindingDismissal).toHaveBeenCalledTimes(1);
   });

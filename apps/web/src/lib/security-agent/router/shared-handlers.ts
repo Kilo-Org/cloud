@@ -118,8 +118,7 @@ import {
 import {
   admitOperation,
   markReconcilePending,
-  recordOperationProgress,
-  setOperationProviderRef,
+  recordOperationAcceptance,
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
@@ -378,20 +377,26 @@ async function bestEffortLedgerWrite(work: () => Promise<unknown>): Promise<void
 /**
  * Durably records the Worker's accepted correlation ids on the ledger row: the
  * `provider_ref` (Worker `messageId`) the Worker later joins on, plus the
- * replay-safe `commandId`/`runId`/`messageId` in `canonical_result`. A failure
- * must never yield a success receipt for an un-recorded row: the caller
- * surfaces a retryable server error and a same-key retry re-submits.
+ * replay-safe `commandId`/`runId`/`messageId` in `canonical_result`. Both are
+ * written by ONE atomic ledger helper, so a failure leaves NO partial state
+ * (`provider_ref` without `canonical_result`, or vice versa) that a same-key
+ * retry could blind-duplicate a command against. A failure must never yield a
+ * success receipt for an un-recorded row: the caller surfaces a retryable
+ * server error and a same-key retry re-submits.
  */
 async function recordSecurityAcceptance(
   row: OperationLedgerRow,
   accepted: { commandId: string; runId: string; messageId: string }
 ): Promise<void> {
   try {
-    await setOperationProviderRef(db, { rowId: row.id, providerRef: accepted.messageId });
-    await recordOperationProgress(db, row.id, {
-      commandId: accepted.commandId,
-      runId: accepted.runId,
-      messageId: accepted.messageId,
+    await recordOperationAcceptance(db, {
+      rowId: row.id,
+      providerRef: accepted.messageId,
+      canonicalResult: {
+        commandId: accepted.commandId,
+        runId: accepted.runId,
+        messageId: accepted.messageId,
+      },
     });
   } catch (error) {
     console.error(

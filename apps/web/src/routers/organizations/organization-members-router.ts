@@ -97,8 +97,8 @@ async function getDirectOrganizationRole(
 //
 // The role-change (`update` with `role`) and member-removal (`remove`)
 // mutations accept an optional `operationKey`. When present, the mutation
-// admits an `organization`-domain ledger row BEFORE running the membership
-// helper, and only then executes. Later same-key calls dedupe, replay the
+// admits an `organization`-domain ledger row BEFORE the mutable membership
+// lookup, and only then executes. Later same-key calls dedupe, replay the
 // canonical result, or conflict. After a successful helper commit, the success
 // audit log, the terminal settle, and the `organization_write_settled` outbox
 // event are written in ONE transaction (atomic). A failed helper result
@@ -110,8 +110,13 @@ async function getDirectOrganizationRole(
 // missing-membership precondition: a retry of an already-removed member must
 // reach the settled replay or takeover repair instead of being rejected with
 // NOT_FOUND first; the permission and bot checks are retained for a
-// first-time removal. The membership helpers and the `dailyUsageLimitUsd`
-// path are unchanged.
+// first-time removal. For keyed role changes the same admission-before-lookup
+// order holds: a settled role change replays even when the member was removed
+// after the original success, and a takeover read-back that finds the member
+// gone (the keyed path reads membership only after admission, so an absent
+// read-back means the member was removed after the original success) completes
+// the record as completed and replays. The membership helpers and the
+// `dailyUsageLimitUsd` path are unchanged.
 
 const ORG_LEDGER_DOMAIN = 'organization' as const;
 /** The in-flight window: while an `admitted` row holds a live lease, same-key
@@ -301,7 +306,11 @@ async function executeOrgRoleChange(args: {
  * Read-back-first takeover repair for a role change: if the read-back shows
  * the target role already applied, the first attempt committed the change
  * without settling — settle completed and replay without re-running the
- * helper (avoiding the NOT_FOUND trap). If the member is gone, settle failed.
+ * helper (avoiding the NOT_FOUND trap). If the member is gone, the keyed path
+ * reads membership only after admission and settles `failed` when the member
+ * is absent on first execution, so an absent read-back here means the original
+ * success committed and the member was REMOVED later: complete the record as
+ * completed and replay instead of failing on the mutable membership state.
  * Otherwise re-run the helper under the same row.
  */
 async function repairOrgRoleChange(args: {
@@ -325,22 +334,30 @@ async function repairOrgRoleChange(args: {
     .limit(1);
 
   if (!membership) {
-    await bestEffortOrgLedgerWrite(() =>
-      settleOperation(db, {
-        rowId: args.row.id,
-        status: 'failed',
-        outcomeCode: 'member_absent',
+    const updatedUser = await findUserById(args.memberId);
+    const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
+    await db.transaction(async tx => {
+      await createAuditLog({
+        action: 'organization.member.change_role',
+        actor_email: args.user.google_user_email,
+        actor_id: args.user.id,
+        actor_name: args.user.google_user_name,
+        message: `Changed role for user ${updatedUserEmail} from unknown to ${args.role}`,
+        organization_id: args.organizationId,
+        tx,
+      });
+      await settleOrgCompletedInTransaction({
+        tx,
+        row: args.row,
+        canonicalResult: { updated: 'role and limit' },
         outboxEvent: orgSettledOutboxEvent({
           distinctId,
           intent: 'member_role_change',
-          outcome: 'failed',
+          outcome: 'completed',
         }),
-      })
-    );
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'User is not a member of this organization',
+      });
     });
+    return successResult({ updated: 'role and limit', replayed: true });
   }
 
   if (membership.role === args.role) {
@@ -546,18 +563,43 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, memberId, role, dailyUsageLimitUsd, operationKey } = input;
 
-      // Get the target user's role if we need to check permissions for role or limit changes
-      let targetMember: { role: string } | undefined;
-      if (role !== undefined || dailyUsageLimitUsd !== undefined) {
-        // Prevent users from changing their own role
-        if (role !== undefined && user.id === memberId) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You cannot change your own role',
-          });
-        }
+      // Prevent users from changing their own role (P1-A-08e: retained before
+      // every role-change path, including keyed ones, before any ledger write).
+      if (role !== undefined && user.id === memberId) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You cannot change your own role',
+        });
+      }
 
-        const [member] = await db
+      // Limit-only update: existing path exactly, no ledger.
+      if (role === undefined) {
+        if (dailyUsageLimitUsd !== undefined) {
+          const [targetMember] = await db
+            .select({ role: organization_memberships.role })
+            .from(organization_memberships)
+            .where(
+              and(
+                eq(organization_memberships.organization_id, organizationId),
+                eq(organization_memberships.kilo_user_id, memberId)
+              )
+            );
+
+          if (!targetMember) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'User is not a member of this organization',
+            });
+          }
+
+          await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
+        }
+        return successResult({ updated: 'limit' });
+      }
+
+      // Role change without an operationKey: existing path exactly.
+      if (operationKey === undefined) {
+        const [targetMember] = await db
           .select({ role: organization_memberships.role })
           .from(organization_memberships)
           .where(
@@ -567,26 +609,13 @@ export const organizationsMembersRouter = createTRPCRouter({
             )
           );
 
-        if (!member) {
+        if (!targetMember) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'User is not a member of this organization',
           });
         }
 
-        targetMember = member;
-      }
-
-      // Limit-only update: existing path exactly, no ledger.
-      if (role === undefined) {
-        if (dailyUsageLimitUsd !== undefined && targetMember) {
-          await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
-        }
-        return successResult({ updated: 'limit' });
-      }
-
-      // Role change without an operationKey: existing path exactly.
-      if (operationKey === undefined) {
         const result = await updateUserRoleInOrganization(organizationId, memberId, role);
         const updatedUser = await findUserById(memberId);
         const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
@@ -613,8 +642,10 @@ export const organizationsMembersRouter = createTRPCRouter({
         return successResult({ updated: 'role and limit' });
       }
 
-      // Role change with an operationKey: admit a ledger row before running
-      // the helper (P1-A-08e).
+      // Role change with an operationKey: admit a ledger row BEFORE the mutable
+      // membership lookup (P1-A-08e). A settled duplicate must replay even when
+      // the member was removed after the original success; the existence read
+      // therefore runs only on the `admitted` first execution.
       const resourceKey = orgMemberRoleResourceKey(organizationId, memberId, role);
       const admission = await admitOperation(db, {
         userId: user.id,
@@ -633,7 +664,40 @@ export const organizationsMembersRouter = createTRPCRouter({
         throw orgOperationKeyReuseMismatchError();
       }
       switch (admission.admission) {
-        case 'admitted':
+        case 'admitted': {
+          const distinctId = user.google_user_email || user.id;
+          const [targetMember] = await db
+            .select({ role: organization_memberships.role })
+            .from(organization_memberships)
+            .where(
+              and(
+                eq(organization_memberships.organization_id, organizationId),
+                eq(organization_memberships.kilo_user_id, memberId)
+              )
+            );
+
+          // A first-time role change of an absent member settles the row
+          // `failed` so a later same-key retry replays the failure instead of
+          // taking over past the membership check.
+          if (!targetMember) {
+            await bestEffortOrgLedgerWrite(() =>
+              settleOperation(db, {
+                rowId: admission.row.id,
+                status: 'failed',
+                outcomeCode: 'member_absent',
+                outboxEvent: orgSettledOutboxEvent({
+                  distinctId,
+                  intent: 'member_role_change',
+                  outcome: 'failed',
+                }),
+              })
+            );
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'User is not a member of this organization',
+            });
+          }
+
           return executeOrgRoleChange({
             row: admission.row,
             user,
@@ -643,6 +707,7 @@ export const organizationsMembersRouter = createTRPCRouter({
             dailyUsageLimitUsd,
             targetMember,
           });
+        }
         case 'takeover':
         case 'duplicate_reconcile_pending':
           return repairOrgRoleChange({

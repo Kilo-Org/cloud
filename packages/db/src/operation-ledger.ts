@@ -418,6 +418,64 @@ export async function setOperationProviderRef(
   return updated ?? null;
 }
 
+export type RecordAcceptanceInput = {
+  rowId: string;
+  /** The provider reference (for example the worker `messageId`) to store. */
+  providerRef: string | null;
+  /** Correlation data merged into `canonical_result` (for example `commandId`). */
+  canonicalResult: Record<string, unknown>;
+};
+
+/**
+ * Records a provider acceptance ATOMICALLY: `provider_ref` and the merged
+ * `canonical_result` are written in one transaction (P1-A-08e). A failure
+ * rolls back both writes, so no partial acceptance state — `provider_ref`
+ * without `canonical_result`, or vice versa — can exist for a same-key retry
+ * to blind-duplicate a command against. Same bound/CAS semantics as
+ * `recordOperationProgress`: only non-terminal rows are updated, the merged
+ * result is bounded at `MAX_CANONICAL_RESULT_BYTES` (an oversized merge
+ * throws `CanonicalResultTooLargeError` and leaves the row unchanged), and a
+ * missing or terminal row returns null.
+ */
+export async function recordOperationAcceptance(
+  database: LedgerDatabase,
+  input: RecordAcceptanceInput
+): Promise<OperationLedgerRow | null> {
+  return runInTransaction(database, async tx => {
+    const [row] = await tx
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, input.rowId))
+      .for('update');
+
+    if (!row || isTerminalOperationStatus(row.status)) {
+      return null;
+    }
+
+    const merged = { ...(row.canonical_result ?? {}), ...input.canonicalResult };
+    const serialized = JSON.stringify(merged) ?? '{}';
+    const bytes = serializedByteLength(serialized);
+    if (bytes > MAX_CANONICAL_RESULT_BYTES) {
+      throw new CanonicalResultTooLargeError(bytes);
+    }
+
+    const [updated] = await tx
+      .update(operation_ledgers)
+      .set({
+        provider_ref: input.providerRef,
+        canonical_result: merged,
+      })
+      .where(
+        and(
+          eq(operation_ledgers.id, row.id),
+          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES)
+        )
+      )
+      .returning();
+    return updated ?? null;
+  });
+}
+
 // ----- terminal settle and reconcile ----------------------------------------------
 
 /**

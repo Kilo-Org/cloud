@@ -282,6 +282,54 @@ describe('organizations members ledger (P1-A-08e)', () => {
       expect(mockCreateAuditLog).not.toHaveBeenCalled();
     });
 
+    it('replays a settled role change even when the member was removed after the original success', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          status: 'completed',
+          canonical_result: { updated: 'role and limit' },
+        }),
+      });
+      // The member is already gone. Keyed role changes admit BEFORE the
+      // mutable membership lookup, so the settled replay must not be blocked
+      // by the NOT_FOUND precondition.
+      mockDbState.targetMember = [];
+
+      const result = await caller.update(input);
+
+      expect(result).toEqual({ success: true, updated: 'role and limit', replayed: true });
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('settles the row failed when a first-time keyed role change finds the member already gone', async () => {
+      mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
+      mockDbState.targetMember = [];
+
+      await expect(caller.update(input)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'User is not a member of this organization',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'member_absent',
+        })
+      );
+      // The ledger admission runs BEFORE the membership lookup: the absent
+      // member settles the row `failed` instead of being rejected before the
+      // keyed path could ever admit.
+      expect(mockAdmitOperation.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSettleOperation.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+      );
+      expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
+
     it('conflicts on an in-flight duplicate instead of re-running the helper', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_in_flight',
@@ -337,26 +385,34 @@ describe('organizations members ledger (P1-A-08e)', () => {
       );
     });
 
-    it('settles the row failed when the read-back shows the member is gone', async () => {
+    it('completes the record and replays when the read-back shows the member removed after the original success', async () => {
       mockAdmitOperation.mockResolvedValue({ admission: 'takeover', row: ledgerRow() });
       mockDbState.targetMember = [{ role: 'member' }];
+      // The member is gone at retry time. The keyed path reads membership only
+      // after admission and settles `failed` when the member is absent on first
+      // execution, so an absent read-back means the original success committed
+      // and the member was REMOVED later: complete as completed and replay
+      // instead of failing the retry with NOT_FOUND.
       mockDbState.roleReadBack = [];
 
-      await expect(caller.update(input)).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-        message: 'User is not a member of this organization',
-      });
+      const result = await caller.update(input);
 
-      expect(mockSettleOperation).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          rowId: 'org-ledger-row-id',
-          status: 'failed',
-          outcomeCode: 'member_absent',
-        })
-      );
+      expect(result).toEqual({ success: true, updated: 'role and limit', replayed: true });
       expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
-      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'organization.member.change_role', tx })
+      );
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({ rowId: 'org-ledger-row-id', status: 'completed' })
+      );
+      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
+        outboxEvent?: { eventName: string; properties: { outcome: string } };
+      };
+      expect(settleCall?.outboxEvent).toMatchObject({
+        eventName: 'organization_write_settled',
+        properties: { intent: 'member_role_change', outcome: 'completed' },
+      });
     });
 
     it('re-runs the helper under the same row when the read-back shows a different role', async () => {

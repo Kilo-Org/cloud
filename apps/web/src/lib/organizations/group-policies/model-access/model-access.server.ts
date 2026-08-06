@@ -16,7 +16,6 @@ import {
 } from '@/lib/organizations/organization-group-policy-context.server';
 
 export type EffectiveOrganizationModelPolicy = {
-  requireModelInCurrentSnapshot: boolean;
   organizationModelDenyList: string[];
   organizationProviderCeiling?: string[];
   memberGrant:
@@ -49,12 +48,8 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
-  const requireModelInCurrentSnapshot =
-    organizationModelDenyList.length > 0 || organizationProviderCeiling !== undefined;
-
   if (!organizationRestrictionsEnabled) {
     return {
-      requireModelInCurrentSnapshot: false,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -68,7 +63,6 @@ export function evaluateEffectiveModelAccessPolicy(
     .filter(policy => policy.type === 'model_access');
   if (policies.length === 0 || policies.some(policy => policy.data.mode === 'all')) {
     return {
-      requireModelInCurrentSnapshot,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -79,7 +73,6 @@ export function evaluateEffectiveModelAccessPolicy(
 
   const selectedPolicies = policies.filter(policy => policy.data.mode === 'selected');
   return {
-    requireModelInCurrentSnapshot,
     organizationModelDenyList,
     organizationProviderCeiling,
     memberGrant: {
@@ -118,7 +111,9 @@ export async function getEffectiveModelDecision(
   if (policy.organizationModelDenyList.includes(normalizedModelId)) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const currentModelProviders = policy.requireModelInCurrentSnapshot
+  const hasOrganizationRestrictions =
+    policy.organizationModelDenyList.length > 0 || policy.organizationProviderCeiling !== undefined;
+  const currentModelProviders = hasOrganizationRestrictions
     ? await providerLookup(normalizedModelId)
     : undefined;
   if (currentModelProviders?.size === 0) {

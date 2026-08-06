@@ -11,7 +11,11 @@ function lookup(map: Record<string, string[]>): ProviderLookup {
 
 describe('model access predicates', () => {
   test('undefined provider allow list only applies model deny list', async () => {
-    const isAllowed = createAllowPredicateFromProviderAllowList(['openai/gpt-4o'], undefined);
+    const isAllowed = createAllowPredicateFromProviderAllowList(
+      ['openai/gpt-4o'],
+      undefined,
+      lookup({ 'anthropic/claude-3-opus': ['anthropic'] })
+    );
 
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
     await expect(isAllowed('anthropic/claude-3-opus')).resolves.toBe(true);
@@ -62,7 +66,6 @@ describe('model access predicates', () => {
   test('enterprise deny lists require models to exist in the current snapshot', async () => {
     const isAllowed = createAllowPredicateFromRestrictions(
       {
-        requireModelInCurrentSnapshot: true,
         modelDenyList: ['x-ai/grok-4.5'],
       },
       lookup({ 'x-ai/grok-4.6': ['x-ai'] })
@@ -77,7 +80,6 @@ describe('model access predicates', () => {
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(
         {
-          requireModelInCurrentSnapshot: true,
           providerAllowList: [],
           modelDenyList: [modelId],
         },

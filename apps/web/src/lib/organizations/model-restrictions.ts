@@ -6,11 +6,8 @@ export function getEffectiveModelRestrictions(organization: Organization): Model
   if (organization.plan !== 'enterprise') {
     return { modelDenyList: [] };
   }
-  const providerAllowList = organization.settings?.provider_allow_list;
-  const modelDenyList = organization.settings?.model_deny_list ?? [];
   return {
-    requireModelInCurrentSnapshot: providerAllowList !== undefined || modelDenyList.length > 0,
-    providerAllowList,
-    modelDenyList,
+    providerAllowList: organization.settings?.provider_allow_list,
+    modelDenyList: organization.settings?.model_deny_list ?? [],
   };
 }

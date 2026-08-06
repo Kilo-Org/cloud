@@ -41,7 +41,10 @@
  *    staleness surface is rendered whenever there is visible content —
  *    including the all-excluded window (stored rows loaded, nothing
  *    rendered, tray empty), where the widened term treats the `all-active`
- *    body as visible content.
+ *    body as visible content. That widened stored-rows term is gated on
+ *    there being no active query: an empty search or filter state keeps
+ *    only its own body-level error surface and never gains a second
+ *    inline error from stored rows alone.
  */
 
 export type SessionListBodyModel =
@@ -129,8 +132,14 @@ export function selectSessionListBodyModel(
     activeIsError,
   } = inputs;
 
+  // The stored-rows term only widens inline-error visibility in the
+  // no-query full-view all-excluded window (the `all-active` body below).
+  // Search and filter states already surface their own body-level error
+  // (`query-error-empty`) or filtered-empty body, so they never get a
+  // second inline error from stored rows alone.
   const showInlineError =
-    (isError || activeIsError) && (hasHistoryContent || hasPinnedActive || hasStoredSessions);
+    (isError || activeIsError) &&
+    (hasHistoryContent || hasPinnedActive || (!hasActiveQuery && hasStoredSessions));
 
   // History has rows — nothing to decide at the body level.
   if (hasHistoryContent) {

@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- one coherent decision-tree suite; every branch maps to a feature-state row in the model's doc comment
 import { describe, expect, it } from 'vitest';
 
 import { selectSessionListBodyModel } from './session-list-body-model';
@@ -140,6 +141,72 @@ describe('selectSessionListBodyModel', () => {
         primaryAction: 'retry',
         secondaryAction: 'clear-search',
         showInlineError: true,
+      });
+    });
+  });
+
+  describe('stored rows do not widen inline errors into query states', () => {
+    it('does not add an inline error to a stored-row search error with an empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          isSearching: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'clear-search',
+        showInlineError: false,
+      });
+    });
+
+    it('does not add an inline error to a stored-row filter error with an empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          isError: true,
+        })
+      ).toEqual({
+        kind: 'query-error-empty',
+        primaryAction: 'retry',
+        secondaryAction: 'clear-filters',
+        showInlineError: false,
+      });
+    });
+
+    it('does not add an inline error to a stored-row search with an active-poll failure and empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          isSearching: true,
+          activeIsError: true,
+        })
+      ).toEqual({
+        kind: 'filtered-empty',
+        primaryAction: 'clear-search',
+        showInlineError: false,
+      });
+    });
+
+    it('does not add an inline error to a stored-row filter with an active-poll failure and empty tray', () => {
+      expect(
+        model({
+          hasHistoryContent: false,
+          hasStoredSessions: true,
+          hasActiveQuery: true,
+          activeIsError: true,
+        })
+      ).toEqual({
+        kind: 'filtered-empty',
+        primaryAction: 'clear-filters',
+        showInlineError: false,
       });
     });
   });

@@ -81,7 +81,7 @@ export type {
   UserWebSystemEvent,
 } from './user-web-connection';
 
-export { createRemoteSessionOnConnection } from './create-session';
+export { createRemoteSessionOnConnection, parseCreateSessionResponse } from './create-session';
 
 export {
   REMOTE_MODEL_IDENTITY_MAX_LENGTH,

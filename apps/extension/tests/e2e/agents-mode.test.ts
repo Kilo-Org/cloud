@@ -116,8 +116,10 @@ test('Agents list shows empty state when no sessions exist', async () => {
 
     await expect(sidePanel.getByText('No active sessions')).toBeVisible();
     await expect(
-      sidePanel.getByText('No sessions yet. Create your first cloud session!')
+      sidePanel.getByText('No sessions yet. Start your first session above.')
     ).toBeVisible();
+    // With zero sessions and no query there is nothing to search.
+    await expect(sidePanel.getByLabel('Search sessions')).toBeHidden();
   } finally {
     await cleanup();
   }
@@ -132,13 +134,20 @@ test('Agents list shows populated active and history sessions', async () => {
     // Active section
     await expect(sidePanel.getByText('Fix login bug')).toBeVisible();
     await expect(sidePanel.getByText('Running')).toBeVisible();
-    await expect(sidePanel.getByText('Cloud')).toBeVisible();
+    // Platform markers: cloud icon on the cloud row, terminal icon on the CLI row.
+    await expect(sidePanel.getByLabel('Cloud agent')).toBeVisible();
+    await expect(sidePanel.getByLabel('CLI')).toBeVisible();
+    // The CLI row's raw status renders capitalized.
+    await expect(sidePanel.getByText('Idle')).toBeVisible();
+    // Repo and branch join with a separator, host prefix stripped.
+    await expect(sidePanel.getByText('org/repo · fix/login')).toBeVisible();
 
     // History section
     await expect(sidePanel.getByText('Refactor auth module')).toBeVisible();
-    // The null-title history session renders "New session" as the row title.
-    // Use the button accessible name which includes the relative time.
-    await expect(sidePanel.getByRole('button', { name: /New session \d+d ago/ })).toBeVisible();
+    // The null-title history session renders a muted "Untitled session" title.
+    await expect(
+      sidePanel.getByRole('button', { name: /Untitled session \d+d ago/ })
+    ).toBeVisible();
   } finally {
     await cleanup();
   }
@@ -382,7 +391,9 @@ test('Agents new session shows the create form and navigates to the new session 
 
     // Click "New session"
     await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
-    await expect(sidePanel.getByText('New Cloud Session')).toBeVisible({ timeout: 10_000 });
+    await expect(sidePanel.getByText('New session', { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Fill the form
     const promptArea = sidePanel.getByLabel('What would you like to do?');
@@ -425,7 +436,9 @@ test('Agents new session shows credits error (402) with Add credits CTA', async 
     await navigateToAgentsMode(sidePanel);
 
     await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
-    await expect(sidePanel.getByText('New Cloud Session')).toBeVisible({ timeout: 10_000 });
+    await expect(sidePanel.getByText('New session', { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
 
     const promptArea = sidePanel.getByLabel('What would you like to do?');
     await promptArea.fill('Fix the login page');

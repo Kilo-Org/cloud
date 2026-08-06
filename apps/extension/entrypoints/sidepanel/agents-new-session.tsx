@@ -9,14 +9,19 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Cloud,
   FolderGit2,
   Loader2,
   Lock,
   RefreshCw,
   Search,
-  Send,
+  TerminalSquare,
 } from 'lucide-react';
-import { formatSessionError } from '@kilocode/cloud-agent-sdk';
+import {
+  createRemoteSessionOnConnection,
+  formatSessionError,
+  parseCreateSessionResponse,
+} from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
@@ -139,10 +144,10 @@ export const AgentsNewSession = ({
   onCreated,
   onCancel,
 }: {
-  onCreated: (kiloSessionId: string) => void;
+  onCreated: (kiloSessionId: string, initialPrompt?: string) => void;
   onCancel: () => void;
 }): JSX.Element => {
-  const { organizationId, trpcClient } = useExtensionAgents();
+  const { organizationId, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
 
   // ---- Auth (for gateway models) ----
@@ -217,11 +222,23 @@ export const AgentsNewSession = ({
     return raw?.integrationInstalled ?? true;
   }, [repoData]);
 
+  // ---- Connected CLI instances (spawn targets) ----
+  // A failed query degrades to cloud-only; the form never blocks on this.
+  const { data: instancesData } = useQuery({
+    enabled: auth !== undefined && auth.token !== '',
+    queryFn: () => trpcClient.activeSessions.listInstances.query(),
+    queryKey: ['agents-new-session', 'instances'],
+    retry: 1,
+  });
+  const instances = useMemo(() => instancesData?.instances ?? [], [instancesData]);
+
   // ---- Form state ----
   const [prompt, setPrompt] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedVariant, setSelectedVariant] = useState('');
+  /** 'cloud' or a CLI instance connectionId. */
+  const [runTarget, setRunTarget] = useState('cloud');
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -231,6 +248,19 @@ export const AgentsNewSession = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const repoDropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  const isCloudTarget = runTarget === 'cloud';
+  const selectedInstance = useMemo(
+    () => instances.find(instance => instance.connectionId === runTarget),
+    [instances, runTarget]
+  );
+
+  // A picked instance that disconnects falls back to cloud.
+  useEffect(() => {
+    if (!isCloudTarget && selectedInstance === undefined) {
+      setRunTarget('cloud');
+    }
+  }, [isCloudTarget, selectedInstance]);
 
   // ---- Close dropdowns on outside click ----
   useEffect(() => {
@@ -293,7 +323,10 @@ export const AgentsNewSession = ({
   // ---- Derived state ----
   const trimmed = trimValue(prompt);
   const isPromptValid = trimmed.length >= PROMPT_MIN_LENGTH && trimmed.length <= PROMPT_MAX_LENGTH;
-  const isFormValid = isPromptValid && selectedModel !== '' && selectedRepo !== '';
+  // A CLI instance inherits repo and model from the CLI; cloud needs both.
+  const isFormValid = isCloudTarget
+    ? isPromptValid && selectedModel !== '' && selectedRepo !== ''
+    : isPromptValid;
   const repoStatus = (() => {
     if (isRepoLoading) {
       return 'loading';
@@ -348,6 +381,32 @@ export const AgentsNewSession = ({
     setSubmitError(null);
     setIsSubmitting(true);
 
+    // ---- CLI instance target: spawn over the user-web socket ----
+    if (!isCloudTarget) {
+      try {
+        const raw = await createRemoteSessionOnConnection(
+          userWebConnection,
+          runTarget,
+          organizationId === null ? undefined : { orgId: organizationId }
+        );
+        const parsed = parseCreateSessionResponse(raw);
+        if (!parsed.ok) {
+          setSubmitError('The CLI did not return a session id. Update the Kilo CLI and retry.');
+          setIsSubmitting(false);
+          return;
+        }
+        void queryClient.invalidateQueries({
+          queryKey: activeSessionsQueryKey(organizationId),
+        });
+        setIsSubmitting(false);
+        onCreated(parsed.kiloSessionId, trimmed);
+      } catch (error) {
+        setSubmitError(error instanceof Error ? error.message : 'Failed to start the session.');
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     const messageId = generateMessageId();
     const input = buildSubmitInput({
       initialMessageId: messageId,
@@ -397,6 +456,9 @@ export const AgentsNewSession = ({
   }, [
     isFormValid,
     isSubmitting,
+    isCloudTarget,
+    runTarget,
+    userWebConnection,
     trimmed,
     selectedModel,
     selectedVariant,
@@ -475,7 +537,7 @@ export const AgentsNewSession = ({
         >
           <ArrowLeft className="size-4" />
         </button>
-        <span className="type-label text-foreground">New Cloud Session</span>
+        <span className="type-label text-foreground">New session</span>
       </div>
 
       {/* Error banner */}
@@ -529,7 +591,7 @@ export const AgentsNewSession = ({
             value={prompt}
           />
           {prompt.length > 0 && prompt.length < PROMPT_MIN_LENGTH ? (
-            <p className="mt-1 type-label text-status-red-400">
+            <p className="mt-1 type-label text-foreground-muted">
               Enter at least {PROMPT_MIN_LENGTH} characters
             </p>
           ) : null}
@@ -537,118 +599,124 @@ export const AgentsNewSession = ({
 
         {/* Toolbar: model + variant + repo */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Model picker */}
-          <div ref={modelDropdownRef} className="relative">
-            <button
-              aria-label="Select model"
-              className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isSubmitting || modelOptions.length === 0}
-              onClick={() => {
-                setModelDropdownOpen(prev => !prev);
-              }}
-              type="button"
-            >
-              <span className="max-w-[140px] truncate">
-                {selectedModelOption?.name ?? 'Select model'}
-              </span>
-              <ChevronDown className="size-3.5 shrink-0" />
-            </button>
-            {modelDropdownOpen ? (
-              <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
-                {(() => {
-                  if (modelLoadError !== undefined) {
-                    return (
-                      <div className="px-3 py-2">
-                        <p className="type-label text-status-red-400">{modelLoadError}</p>
-                        <button
-                          className="mt-1 type-label text-link hover:text-link-hover underline underline-offset-4"
-                          onClick={() => {
-                            void refetchModels();
-                          }}
-                          type="button"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    );
-                  }
-                  if (isModelsLoading) {
-                    return (
-                      <p className="px-3 py-2 type-label text-foreground-muted">Loading models…</p>
-                    );
-                  }
-                  if (modelOptions.length === 0) {
-                    return (
-                      <p className="px-3 py-2 type-label text-foreground-muted">
-                        No models available
-                      </p>
-                    );
-                  }
-                  return modelOptions.map(model => (
-                    <button
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
-                      key={model.id}
-                      onClick={() => {
-                        handleModelSelect(model);
-                        setModelDropdownOpen(false);
-                      }}
-                      type="button"
-                    >
-                      <span className="truncate flex-1">{model.name}</span>
-                      {model.id === selectedModel ? (
-                        <Check className="size-3.5 shrink-0 text-brand-primary" />
-                      ) : null}
-                    </button>
-                  ));
-                })()}
-              </div>
-            ) : null}
-          </div>
-          {(() => {
-            if (modelDropdownOpen) {
-              return null;
-            }
-            if (modelLoadError !== undefined) {
-              return (
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
-                  <span className="type-label text-status-red-400">{modelLoadError}</span>
-                  <button
-                    className="type-label text-link hover:text-link-hover underline underline-offset-4"
-                    onClick={() => {
-                      void refetchModels();
-                    }}
-                    type="button"
-                  >
-                    Retry
-                  </button>
+          {/* Model picker (cloud target only) */}
+          {isCloudTarget ? (
+            <div ref={modelDropdownRef} className="relative">
+              <button
+                aria-label="Select model"
+                className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isSubmitting || modelOptions.length === 0}
+                onClick={() => {
+                  setModelDropdownOpen(prev => !prev);
+                }}
+                type="button"
+              >
+                <span className="max-w-[140px] truncate">
+                  {selectedModelOption?.name ?? 'Select model'}
+                </span>
+                <ChevronDown className="size-3.5 shrink-0" />
+              </button>
+              {modelDropdownOpen ? (
+                <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
+                  {(() => {
+                    if (modelLoadError !== undefined) {
+                      return (
+                        <div className="px-3 py-2">
+                          <p className="type-label text-status-red-400">{modelLoadError}</p>
+                          <button
+                            className="mt-1 type-label text-link hover:text-link-hover underline underline-offset-4"
+                            onClick={() => {
+                              void refetchModels();
+                            }}
+                            type="button"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      );
+                    }
+                    if (isModelsLoading) {
+                      return (
+                        <p className="px-3 py-2 type-label text-foreground-muted">
+                          Loading models…
+                        </p>
+                      );
+                    }
+                    if (modelOptions.length === 0) {
+                      return (
+                        <p className="px-3 py-2 type-label text-foreground-muted">
+                          No models available
+                        </p>
+                      );
+                    }
+                    return modelOptions.map(model => (
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
+                        key={model.id}
+                        onClick={() => {
+                          handleModelSelect(model);
+                          setModelDropdownOpen(false);
+                        }}
+                        type="button"
+                      >
+                        <span className="truncate flex-1">{model.name}</span>
+                        {model.id === selectedModel ? (
+                          <Check className="size-3.5 shrink-0 text-brand-primary" />
+                        ) : null}
+                      </button>
+                    ));
+                  })()}
                 </div>
-              );
-            }
-            if (isModelsLoading) {
-              return <span className="type-label text-foreground-muted">Loading models…</span>;
-            }
-            if (modelOptions.length === 0) {
-              return (
-                <div className="flex items-center gap-1.5">
-                  <span className="type-label text-foreground-muted">No models available</span>
-                  <button
-                    className="type-label text-link hover:text-link-hover underline underline-offset-4"
-                    onClick={() => {
-                      void refetchModels();
-                    }}
-                    type="button"
-                  >
-                    Retry
-                  </button>
-                </div>
-              );
-            }
-            return null;
-          })()}
+              ) : null}
+            </div>
+          ) : null}
+          {isCloudTarget
+            ? (() => {
+                if (modelDropdownOpen) {
+                  return null;
+                }
+                if (modelLoadError !== undefined) {
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
+                      <span className="type-label text-status-red-400">{modelLoadError}</span>
+                      <button
+                        className="type-label text-link hover:text-link-hover underline underline-offset-4"
+                        onClick={() => {
+                          void refetchModels();
+                        }}
+                        type="button"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  );
+                }
+                if (isModelsLoading) {
+                  return <span className="type-label text-foreground-muted">Loading models…</span>;
+                }
+                if (modelOptions.length === 0) {
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <span className="type-label text-foreground-muted">No models available</span>
+                      <button
+                        className="type-label text-link hover:text-link-hover underline underline-offset-4"
+                        onClick={() => {
+                          void refetchModels();
+                        }}
+                        type="button"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })()
+            : null}
 
-          {/* Variant picker */}
-          {availableVariants.length > 0 ? (
+          {/* Variant picker (cloud target only) */}
+          {isCloudTarget && availableVariants.length > 0 ? (
             <div className="relative">
               <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-within:ring-2 focus-within:ring-brand-primary-ring">
                 <select
@@ -670,163 +738,204 @@ export const AgentsNewSession = ({
                     </option>
                   ))}
                 </select>
+                <ChevronDown aria-hidden="true" className="pointer-events-none size-3.5 shrink-0" />
               </div>
             </div>
           ) : null}
 
-          <div className="flex-1" />
-
-          {/* Repo picker */}
-          <div ref={repoDropdownRef} className="relative">
-            <button
-              aria-label="Select repository"
-              className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isSubmitting || repoStatus === 'loading'}
-              onClick={() => {
-                setRepoDropdownOpen(prev => !prev);
-              }}
-              type="button"
-            >
-              <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
-              <span
-                className={`max-w-[120px] truncate ${selectedRepo ? 'text-foreground' : 'text-foreground-muted'}`}
+          {/* Repo picker (cloud target only) */}
+          {isCloudTarget ? (
+            <div ref={repoDropdownRef} className="relative">
+              <button
+                aria-label="Select repository"
+                className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isSubmitting || repoStatus === 'loading'}
+                onClick={() => {
+                  setRepoDropdownOpen(prev => !prev);
+                }}
+                type="button"
               >
-                {selectedRepo || 'Repository'}
-              </span>
-              {repoStatus === 'loading' ? (
-                <Loader2 className="size-3.5 shrink-0 animate-spin" />
-              ) : (
-                <ChevronDown className="size-3.5 shrink-0" />
-              )}
-            </button>
-            {repoDropdownOpen ? (
-              <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
-                {(() => {
-                  if (repoStatus === 'loading') {
-                    return (
-                      <p className="px-3 py-2 type-label text-foreground-muted">
-                        Loading repositories...
-                      </p>
-                    );
-                  }
-                  if (repoStatus === 'error') {
-                    return (
-                      <div className="px-3 py-2">
-                        <p className="type-label text-status-red-400">
-                          Failed to load repositories
-                        </p>
-                        <button
-                          className="mt-1 flex items-center gap-1 type-label text-link hover:text-link-hover underline underline-offset-4"
-                          disabled={isRepoRefetching}
-                          onClick={() => {
-                            void refetchRepos();
-                          }}
-                          type="button"
-                        >
-                          <RefreshCw
-                            className={`size-3 ${isRepoRefetching ? 'animate-spin' : ''}`}
-                          />
-                          {isRepoRefetching ? 'Retrying...' : 'Retry'}
-                        </button>
-                      </div>
-                    );
-                  }
-                  if (!integrationInstalled) {
-                    return (
-                      <div className="px-3 py-2 text-center">
-                        <p className="type-label text-foreground-muted">
-                          GitHub integration not connected
-                        </p>
-                        <p className="mt-1 type-label text-foreground-muted">
-                          <a
-                            className="text-link hover:text-link-hover underline underline-offset-4"
-                            href={`${getKiloApiBaseUrl().replace(/\/+$/, '')}${organizationId === null ? '/integrations' : `/organizations/${organizationId}/integrations`}`}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Connect GitHub
-                          </a>{' '}
-                          to start a session
-                        </p>
-                      </div>
-                    );
-                  }
-                  if (repos.length === 0) {
-                    return (
-                      <div className="px-3 py-2 text-center">
-                        <p className="type-label text-foreground-muted">No repositories found</p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <>
-                      {/* Repo search */}
-                      <div className="sticky top-0 z-10 border-b border-border bg-surface-overlay px-2 py-1.5">
-                        <div className="flex items-center gap-1.5 rounded-md border border-border bg-input-bg px-2 py-1">
-                          <Search className="size-3 shrink-0 text-foreground-muted" />
-                          <input
-                            aria-label="Search repositories"
-                            className="w-full bg-transparent type-label text-foreground placeholder:text-foreground-muted outline-none"
-                            onChange={changeEvent => {
-                              setRepoSearch(changeEvent.target.value);
-                            }}
-                            placeholder="Search repositories..."
-                            type="text"
-                            value={repoSearch}
-                          />
-                        </div>
-                      </div>
-                      {filteredRepos.length === 0 ? (
+                <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
+                <span
+                  className={`max-w-[120px] truncate ${selectedRepo ? 'text-foreground' : 'text-foreground-muted'}`}
+                >
+                  {selectedRepo || 'Repository'}
+                </span>
+                {repoStatus === 'loading' ? (
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                ) : (
+                  <ChevronDown className="size-3.5 shrink-0" />
+                )}
+              </button>
+              {repoDropdownOpen ? (
+                <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-border bg-surface-overlay py-1 shadow-lg">
+                  {(() => {
+                    if (repoStatus === 'loading') {
+                      return (
                         <p className="px-3 py-2 type-label text-foreground-muted">
-                          No repositories match your search
+                          Loading repositories...
                         </p>
-                      ) : (
-                        filteredRepos.map(repo => (
+                      );
+                    }
+                    if (repoStatus === 'error') {
+                      return (
+                        <div className="px-3 py-2">
+                          <p className="type-label text-status-red-400">
+                            Failed to load repositories
+                          </p>
                           <button
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
-                            key={repo.id}
+                            className="mt-1 flex items-center gap-1 type-label text-link hover:text-link-hover underline underline-offset-4"
+                            disabled={isRepoRefetching}
                             onClick={() => {
-                              setSelectedRepo(repo.fullName);
-                              setRepoDropdownOpen(false);
-                              setRepoSearch('');
+                              void refetchRepos();
                             }}
                             type="button"
                           >
-                            <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
-                            <span className="truncate flex-1">{repo.fullName}</span>
-                            {repo.private ? (
-                              <Lock className="size-3 shrink-0 text-foreground-muted" />
-                            ) : null}
-                            {repo.fullName === selectedRepo ? (
-                              <Check className="size-3.5 shrink-0 text-brand-primary" />
-                            ) : null}
+                            <RefreshCw
+                              className={`size-3 ${isRepoRefetching ? 'animate-spin' : ''}`}
+                            />
+                            {isRepoRefetching ? 'Retrying...' : 'Retry'}
                           </button>
-                        ))
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            ) : null}
-          </div>
+                        </div>
+                      );
+                    }
+                    if (!integrationInstalled) {
+                      return (
+                        <div className="px-3 py-2 text-center">
+                          <p className="type-label text-foreground-muted">
+                            GitHub integration not connected
+                          </p>
+                          <p className="mt-1 type-label text-foreground-muted">
+                            <a
+                              className="text-link hover:text-link-hover underline underline-offset-4"
+                              href={`${getKiloApiBaseUrl().replace(/\/+$/, '')}${organizationId === null ? '/integrations' : `/organizations/${organizationId}/integrations`}`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              Connect GitHub
+                            </a>{' '}
+                            to start a session
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (repos.length === 0) {
+                      return (
+                        <div className="px-3 py-2 text-center">
+                          <p className="type-label text-foreground-muted">No repositories found</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        {/* Repo search */}
+                        <div className="sticky top-0 z-10 border-b border-border bg-surface-overlay px-2 py-1.5">
+                          <div className="flex items-center gap-1.5 rounded-md border border-border bg-input-bg px-2 py-1">
+                            <Search className="size-3 shrink-0 text-foreground-muted" />
+                            <input
+                              aria-label="Search repositories"
+                              className="w-full bg-transparent type-label text-foreground placeholder:text-foreground-muted outline-none"
+                              onChange={changeEvent => {
+                                setRepoSearch(changeEvent.target.value);
+                              }}
+                              placeholder="Search repositories..."
+                              type="text"
+                              value={repoSearch}
+                            />
+                          </div>
+                        </div>
+                        {filteredRepos.length === 0 ? (
+                          <p className="px-3 py-2 type-label text-foreground-muted">
+                            No repositories match your search
+                          </p>
+                        ) : (
+                          filteredRepos.map(repo => (
+                            <button
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
+                              key={repo.id}
+                              onClick={() => {
+                                setSelectedRepo(repo.fullName);
+                                setRepoDropdownOpen(false);
+                                setRepoSearch('');
+                              }}
+                              type="button"
+                            >
+                              <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
+                              <span className="truncate flex-1">{repo.fullName}</span>
+                              {repo.private ? (
+                                <Lock className="size-3 shrink-0 text-foreground-muted" />
+                              ) : null}
+                              {repo.fullName === selectedRepo ? (
+                                <Check className="size-3.5 shrink-0 text-brand-primary" />
+                              ) : null}
+                            </button>
+                          ))
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
-          {/* Submit */}
-          <button
-            aria-label="Start session"
-            className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand-primary text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!isFormValid || isSubmitting}
-            onClick={() => {
-              void handleSubmit();
-            }}
-            type="button"
-          >
-            {isSubmitting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Send className="size-4" />
-            )}
-          </button>
+          {/* Run-on picker — visible only when a CLI instance is connected */}
+          {instances.length > 0 ? (
+            <div className="relative">
+              <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-within:ring-2 focus-within:ring-brand-primary-ring">
+                {isCloudTarget ? (
+                  <Cloud aria-hidden="true" className="size-3.5 shrink-0 text-foreground-muted" />
+                ) : (
+                  <TerminalSquare
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-foreground-muted"
+                  />
+                )}
+                <select
+                  aria-label="Run on"
+                  className="max-w-40 appearance-none truncate bg-transparent outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isSubmitting}
+                  onFocus={() => {
+                    setModelDropdownOpen(false);
+                    setRepoDropdownOpen(false);
+                  }}
+                  onChange={changeEvent => {
+                    setRunTarget(changeEvent.target.value);
+                  }}
+                  value={runTarget}
+                >
+                  <option value="cloud">Cloud agent</option>
+                  {instances.map(instance => (
+                    <option key={instance.connectionId} value={instance.connectionId}>
+                      {instance.name} · {instance.projectName}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown aria-hidden="true" className="pointer-events-none size-3.5 shrink-0" />
+              </div>
+            </div>
+          ) : null}
         </div>
+
+        {/* CLI target hint */}
+        {isCloudTarget || selectedInstance === undefined ? null : (
+          <p className="type-label -mt-2 text-foreground-muted">
+            Runs in {selectedInstance.projectName} with the repository and model of the CLI.
+          </p>
+        )}
+
+        {/* Submit */}
+        <button
+          className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-md bg-brand-primary type-label font-medium text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle"
+          disabled={!isFormValid || isSubmitting}
+          onClick={() => {
+            void handleSubmit();
+          }}
+          type="button"
+        >
+          {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+          {isSubmitting ? 'Starting…' : 'Start session'}
+        </button>
       </div>
     </div>
   );

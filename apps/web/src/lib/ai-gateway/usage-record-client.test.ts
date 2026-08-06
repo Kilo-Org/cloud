@@ -24,7 +24,11 @@ jest.mock('@sentry/nextjs', () => ({
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type * as SentryNextjs from '@sentry/nextjs';
 
-import { recordUsageInPrimaryRegion } from './usage-record-client';
+import {
+  ATTEMPT_TIMEOUT_MS,
+  MAX_ATTEMPTS,
+  recordUsageInPrimaryRegion,
+} from './usage-record-client';
 import type { UsageRecordRequest } from './usage-record-contract';
 
 const mockedCaptureException = jest.requireMock<typeof SentryNextjs>('@sentry/nextjs')
@@ -103,15 +107,48 @@ describe('recordUsageInPrimaryRegion', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  test('retries a 5xx and succeeds', async () => {
+  // 429/502/503 are refusals: the function provably did not run, so re-sending
+  // cannot produce a second write.
+  test.each([429, 502, 503])('retries a %i refusal and succeeds', async status => {
     mockFetch
-      .mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 503))
+      .mockResolvedValueOnce(jsonResponse({ error: 'boom' }, status))
       .mockResolvedValueOnce(jsonResponse(recorded));
 
     const outcome = await recordUsageInPrimaryRegion(payload);
 
     expect(outcome.kind).toBe('ok');
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  // A 500 means our handler threw, possibly after the transaction committed. This
+  // was the dominant source of primary-key collisions, so it must not retry.
+  test.each([500, 504])('does not retry an ambiguous %i', async status => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, status));
+
+    const outcome = await recordUsageInPrimaryRegion(payload);
+
+    expect(outcome).toEqual({ kind: 'unavailable', reason: `http_${status}` });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  // The regression this branch exists to prevent: a 10s timeout against a p95 of
+  // ~50s meant roughly 20% of deliveries were re-sent with the same core.id.
+  test('never retries a timeout, because the write may still be in flight', async () => {
+    const timeout = new Error('The operation was aborted due to timeout');
+    timeout.name = 'TimeoutError';
+    mockFetch.mockRejectedValue(timeout);
+
+    const outcome = await recordUsageInPrimaryRegion(payload);
+
+    expect(outcome).toEqual({ kind: 'unavailable', reason: 'TimeoutError' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  // Guards the invariant the incident violated: the attempt budget has to clear the
+  // endpoint's tail, and stay inside its maxDuration of 150s.
+  test('keeps the attempt timeout above the observed p95 and below maxDuration', () => {
+    expect(ATTEMPT_TIMEOUT_MS).toBeGreaterThan(50_000);
+    expect(ATTEMPT_TIMEOUT_MS).toBeLessThan(150_000);
   });
 
   test('retries a network failure and succeeds', async () => {
@@ -143,13 +180,13 @@ describe('recordUsageInPrimaryRegion', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  test('stops after three attempts and reports unavailable', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, 500));
+  test('stops after the attempt cap and reports unavailable', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, 503));
 
     const outcome = await recordUsageInPrimaryRegion(payload);
 
     expect(outcome.kind).toBe('unavailable');
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(MAX_ATTEMPTS);
     expect(mockedCaptureException).toHaveBeenCalledTimes(1);
   });
 
@@ -165,7 +202,7 @@ describe('recordUsageInPrimaryRegion', () => {
   });
 
   test('reports the failure to Sentry with the usage id for reconciliation', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, 500));
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, 503));
 
     await recordUsageInPrimaryRegion(payload);
 

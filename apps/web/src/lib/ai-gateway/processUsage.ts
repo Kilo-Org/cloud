@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
+import { describeDatabaseError, isUsageRowConflict } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -618,13 +619,13 @@ function scheduleKiloPassBonusIfNeeded(
 /**
  * Identity of an already-persisted usage row, or null if it is not there.
  *
- * The same record can reach this write twice: `recordUsageInPrimaryRegion`
- * retries when an attempt exceeds its 10s timeout while the first delivery is
- * still committing, and after exhausting its retries the caller falls back to
- * writing locally with the same `core.id`. The losing transaction then collides
- * on the `microdollar_usage` primary key and rolls back in full, so the usage is
- * billed exactly once. Reporting that as a failure would make callers treat
- * billed usage as unrecorded and skip dependent writes.
+ * The same record can still reach this write twice. `recordUsageInPrimaryRegion`
+ * no longer retries an attempt timeout — doing so was the dominant source of
+ * collisions — but on timeout it falls back to writing locally with the same
+ * `core.id` while the remote delivery may still be committing. The losing
+ * transaction then collides on the `microdollar_usage` primary key and rolls back
+ * in full, so the usage is billed exactly once. Reporting that as a failure would
+ * make callers treat billed usage as unrecorded and skip dependent writes.
  *
  * The row's presence under this user is the proof, not the PostgreSQL error code:
  * `id` is generated per delivery by `toInsertableDbUsageRecord`, and the row can
@@ -680,11 +681,18 @@ export async function insertUsageRecord(
             // Every retry opens a fresh transaction for the usage and balance write.
             return await insertUsageTransaction(coreUsageFields, metadataFields);
           } catch (error) {
-            if (attempt >= 2) throw error;
-            sentryLogger('insertUsageRecord', 'warning')(
-              'insertUsageRecord concurrency failure',
-              error
-            );
+            // A collision on this record's own id can never be resolved by
+            // retrying — `id` is fixed for the delivery — so stop immediately and
+            // let the outer handler recover the committed row's identity. Retrying
+            // it burned three attempts and rebuilt the statement each time.
+            if (attempt >= 2 || isUsageRowConflict(error)) throw error;
+            // Never log the raw error: its message is the interpolated statement,
+            // roughly 30KB including prompt prefixes and the client IP.
+            sentryLogger('insertUsageRecord', 'warning')('insertUsageRecord concurrency failure', {
+              usageId: coreUsageFields.id,
+              attempt,
+              error: describeDatabaseError(error),
+            });
             await new Promise(r => setTimeout(r, Math.random() * 100));
             attempt++;
           }
@@ -712,15 +720,24 @@ export async function insertUsageRecord(
       );
       return alreadyRecorded;
     }
-    console.error('insertUsageRecord failed', error);
-    captureException(error, {
+    // Report the redacted description rather than `error`, whose message carries
+    // the interpolated statement and its parameters. The stack is preserved on the
+    // replacement so the failing call site is still identifiable.
+    const described = describeDatabaseError(error);
+    console.error('insertUsageRecord failed', { usageId: coreUsageFields.id, error: described });
+    const redacted = new Error(
+      `insertUsageRecord failed (code=${described.code ?? 'unknown'} constraint=${described.constraint ?? 'none'})`
+    );
+    if (error instanceof Error && error.stack) redacted.stack = error.stack;
+    captureException(redacted, {
       tags: {
         source: 'insertUsageRecord',
         spendCategory: 'variable',
         spendSource: 'ai_gateway',
         ownerType: coreUsageFields.organization_id ? 'organization' : 'user',
+        databaseErrorCode: described.code ?? 'unknown',
       },
-      extra: { sourceRecordId: coreUsageFields.id },
+      extra: { sourceRecordId: coreUsageFields.id, databaseError: described },
     });
     return null;
   }

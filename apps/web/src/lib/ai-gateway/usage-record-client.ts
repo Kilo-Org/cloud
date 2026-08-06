@@ -17,10 +17,20 @@ import { UsageRecordResponseSchema, type UsageRecordRequest } from './usage-reco
 
 const USAGE_RECORD_PATH = '/api/internal/usage/record';
 
-/** Per-attempt budget. Runs inside `after()`, so keep the total bounded. */
-const ATTEMPT_TIMEOUT_MS = 10_000;
-const MAX_ATTEMPTS = 3;
+/**
+ * Per-attempt budget. Runs inside `after()`, so the total stays bounded, and it
+ * must stay under the endpoint's `maxDuration` of 150s.
+ *
+ * This was 10s, which was below the endpoint's actual p95 of roughly 50s. Every
+ * request slower than the timeout was abandoned and re-sent with the same
+ * `core.id`, so ~20% of deliveries became redeliveries that collided on the
+ * `microdollar_usage` primary key — about 4,400 collisions per five minutes — and
+ * each retry added load that made the endpoint slower still. Keep this
+ * comfortably above the observed tail.
+ */
+export const ATTEMPT_TIMEOUT_MS = 90_000;
 const RETRY_BASE_DELAY_MS = 200;
+export const MAX_ATTEMPTS = 2;
 
 /**
  * `unavailable` tells the caller to fall back to writing locally. A slow
@@ -36,9 +46,27 @@ function retryDelayMs(attempt: number): number {
   return RETRY_BASE_DELAY_MS * attempt + Math.random() * RETRY_BASE_DELAY_MS;
 }
 
-/** 4xx other than 429 means the payload or auth is wrong; retrying cannot help. */
+/**
+ * Only statuses that prove the request never reached the write.
+ *
+ * 429 and 503 are refusals, and a 502 means the gateway never got a response from
+ * a function that therefore did not run. A 500 is the opposite: our handler threw,
+ * possibly after the transaction committed, so re-sending risks a redelivery for
+ * no benefit. 504 is likewise ambiguous. 4xx other than 429 means the payload or
+ * auth is wrong, which a retry cannot fix.
+ */
 function isRetryableStatus(status: number): boolean {
-  return status >= 500 || status === 429;
+  return status === 429 || status === 502 || status === 503;
+}
+
+/**
+ * A timeout is never retried. The endpoint may still be mid-write, so re-sending
+ * produces exactly the primary-key collision this client used to cause. Falling
+ * back to a local write is the safer response: it is slower, but the endpoint's
+ * own conflict handling recognises the collision and recovers the identity.
+ */
+function isRetryableError(error: unknown): boolean {
+  return !(error instanceof Error) || error.name !== 'TimeoutError';
 }
 
 export async function recordUsageInPrimaryRegion(
@@ -85,6 +113,7 @@ export async function recordUsageInPrimaryRegion(
       }
     } catch (error) {
       lastReason = error instanceof Error ? error.name : 'fetch_failed';
+      if (!isRetryableError(error)) break;
     }
 
     if (attempt < MAX_ATTEMPTS) {

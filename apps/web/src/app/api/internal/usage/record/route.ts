@@ -11,6 +11,12 @@ import {
   UsageRecordRequestSchema,
   type UsageRecordResponse,
 } from '@/lib/ai-gateway/usage-record-contract';
+import {
+  createPhaseTimer,
+  emitUsageRecordTiming,
+  readPoolGauges,
+  shouldEmitUsageRecordTiming,
+} from '@/lib/ai-gateway/usage-record-diagnostics';
 
 /**
  * Frankfurt-local sink for AI-gateway usage writes.
@@ -37,8 +43,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Phase timings exist to locate the ~50s tail this endpoint exhibits while the
+  // database and Supavisor are both idle. Splitting validate / dedupe / write and
+  // pairing them with the in-process pool gauges distinguishes waiting for a pool
+  // connection from waiting for PostgreSQL from a stalled event loop.
+  const timer = createPhaseTimer();
+  const poolBefore = readPoolGauges();
+  let poolWaitingPeak = poolBefore.waiting;
+  const samplePool = () => {
+    const gauges = readPoolGauges();
+    poolWaitingPeak = Math.max(poolWaitingPeak, gauges.waiting);
+    return gauges;
+  };
+  const reportTiming = (usageId: string, outcome: UsageRecordResponse['status']) => {
+    const totalMs = timer.totalMs();
+    if (!shouldEmitUsageRecordTiming(totalMs)) return;
+    emitUsageRecordTiming({
+      usageId,
+      outcome,
+      totalMs,
+      phases: timer.phases(),
+      poolBefore,
+      poolAfter: samplePool(),
+      poolWaitingPeak,
+    });
+  };
+
   const rawBody: unknown = await request.json().catch(() => null);
   const parsed = UsageRecordRequestSchema.safeParse(rawBody);
+  timer.mark('validate');
   if (!parsed.success) {
     // Deliberately a 400: the client must not retry a payload we cannot accept,
     // and a schema failure here means a lost billing row that needs a human.
@@ -56,16 +89,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // such a redelivery is detectable, and skipping the write avoids burning the
   // retry budget in `insertUsageRecord` and re-running its side effects.
   //
-  // This check cannot cover the redelivery that arrives while the first attempt
-  // is still open — the common case, since the client retries a 10s attempt
-  // timeout and this write can legitimately take longer. That window is closed by
-  // `insertUsageRecord`, which recovers the identity of an already-persisted row
-  // instead of reporting a primary-key collision as a failed write.
+  // This check cannot cover the redelivery that arrives while the first attempt is
+  // still open. That window is closed by `insertUsageRecord`, which recovers the
+  // identity of an already-persisted row instead of reporting a primary-key
+  // collision as a failed write.
   const existing = await db
     .select({ id: microdollar_usage.id })
     .from(microdollar_usage)
     .where(eq(microdollar_usage.id, core.id))
     .limit(1);
+  timer.mark('dedupe_check');
+  samplePool();
 
   if (existing.length > 0) {
     // Post-commit side effects ran on the first delivery, so do not re-run them.
@@ -75,6 +109,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       status: 'duplicate',
       result: { usageId: core.id, createdAt: core.created_at, newMicrodollarsUsed: null },
     };
+    reportTiming(core.id, 'duplicate');
     return NextResponse.json(duplicate);
   }
 
@@ -84,6 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     prior_microdollar_usage,
     posthog_distinct_id
   );
+  timer.mark('write');
 
   // `saveUsageRelatedDataLocally` swallows database errors and returns null,
   // matching the pre-existing local behaviour. Report it as a successful HTTP
@@ -91,11 +127,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // deliberately gave up.
   //
   // Deliberately not an `unavailable` signal that would make the client write
-  // locally instead: `insertUsageRecord` has already retried the transaction
-  // three times against this primary, and a cross-region retry from SFO would
-  // re-add the transatlantic lock hold this endpoint exists to remove — at the
-  // exact moment the database is least able to absorb it. The failure is
-  // reported from here via `captureException` in `insertUsageRecord`.
+  // locally instead: `insertUsageRecord` has already exhausted its retries against
+  // this primary, and a cross-region retry from SFO would re-add the transatlantic
+  // lock hold this endpoint exists to remove — at the exact moment the database is
+  // least able to absorb it. The failure is reported from here via
+  // `captureException` in `insertUsageRecord`.
   const response: UsageRecordResponse = result
     ? {
         // A recovered identity means an earlier delivery of this same record
@@ -114,5 +150,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     : { status: 'not_recorded', result: null };
 
+  reportTiming(core.id, response.status);
   return NextResponse.json(response);
 }

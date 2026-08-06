@@ -28,7 +28,6 @@ type CodeBlockProps = {
       The markdown renderer passes palette.textColor so code inside user
       variant bubbles keeps its designed ink color (lime/primary surfaces). */
   baseColor?: string;
-  containerClassName?: string;
 };
 
 /**
@@ -55,7 +54,6 @@ function CodeBlockImpl({
   maxLength,
   selectable,
   baseColor,
-  containerClassName,
 }: Readonly<CodeBlockProps>) {
   const sheet = useMonoScrollSheet();
   const textMode = sheet?.mode ?? 'wrap';
@@ -109,7 +107,7 @@ function CodeBlockImpl({
 
   if (textMode === 'wrap') {
     return (
-      <View className={containerClassName}>
+      <View>
         <RNText selectable={effectiveSelectable} className="font-mono text-xs leading-4">
           {content}
         </RNText>
@@ -119,7 +117,7 @@ function CodeBlockImpl({
   }
 
   return (
-    <View className={containerClassName}>
+    <View>
       <ScrollView
         {...MONO_SCROLL_VIEW_PROPS}
         // Explicit height from measured content — see MonoScrollBlock's doc.

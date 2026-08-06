@@ -18,8 +18,6 @@ import { TodoTaskRows } from './todo-task-rows';
  * when nothing parses, plus the error. Renders only inside the detail sheet —
  * attachments and the pending/running status line live in `ToolPartDetailBody`.
  */
-const NO_TASKS_TEXT = 'No tasks.';
-
 export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
@@ -31,7 +29,8 @@ export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
         <TodoTaskRows tasks={todoModel.tasks} truncated={todoModel.truncated} />
       ) : null}
       {todoModel && todoModel.tasks.length === 0 ? (
-        <SelectableText className="text-sm text-muted-foreground">{NO_TASKS_TEXT}</SelectableText>
+        // eslint-disable-next-line react-native/no-raw-text -- static copy inlined in place of the removed NO_TASKS_TEXT
+        <SelectableText className="text-sm text-muted-foreground">No tasks.</SelectableText>
       ) : null}
       {!todoModel && output ? (
         <MonoScrollBlock content={output} textClassName="text-foreground" />

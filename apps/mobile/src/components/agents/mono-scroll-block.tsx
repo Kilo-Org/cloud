@@ -86,7 +86,7 @@ export function MonoScrollBlock({
   inTranscript = false,
 }: Readonly<MonoScrollBlockProps>) {
   const textSelectable = useTranscriptTextSelectable();
-  const sheet = useContext(MonoScrollSheetContext);
+  const sheet = useMonoScrollSheet();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
   const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);

@@ -27,14 +27,20 @@ describe('getFallbackModelVariants', () => {
     });
   });
 
-  test('orders OpenAI variants from most to least intensive', () => {
-    expect(Object.keys(getFallbackModelVariants('openai/gpt-5.6-sol') ?? {})).toEqual([
-      'max',
-      'xhigh',
-      'high',
-      'medium',
-      'low',
-      'none',
-    ]);
+  test.each([
+    ['anthropic/claude-opus-5', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
+    ['deepseek/deepseek-v4', ['none', 'low', 'high', 'max']],
+    ['google/gemini-3.1-pro-preview', ['minimal', 'low', 'medium', 'high']],
+    ['z-ai/glm-5.2', ['none', 'high', 'xhigh']],
+    ['xai/grok-4.5', ['low', 'medium', 'high']],
+    ['moonshotai/kimi-k3', ['none', 'low', 'high', 'max']],
+    ['inception/mercury-2', ['instant', 'low', 'medium', 'high']],
+    ['meta/muse-1', ['none', 'minimal', 'low', 'medium', 'high', 'xhigh']],
+    ['nvidia/nemotron-3-super-120b-a12b:free', ['none', 'medium', 'high']],
+    ['openai/gpt-5.6-sol', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
+    ['qwen/qwen3.8', ['minimal', 'low', 'medium', 'high', 'xhigh']],
+    ['stepfun/step-3.7-flash', ['low', 'medium', 'high']],
+  ])('orders fallback variants from least to most intensive for %s', (model, expected) => {
+    expect(Object.keys(getFallbackModelVariants(model) ?? {})).toEqual(expected);
   });
 });

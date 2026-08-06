@@ -32,15 +32,17 @@ export async function getOpenRouterDerivedModelVariants(
     return reasoning.mandatory ? REASONING_VARIANTS_THINKING_ONLY : REASONING_VARIANTS_BINARY;
   }
   const useAnthropicProvider = getAiSdkProvider(model, null) === 'anthropic';
-  const variants: [string, OpenCodeVariant][] = reasoning.supported_efforts.map(effort => [
-    effort,
-    {
-      reasoning: { enabled: true, effort },
-      verbosity: useAnthropicProvider ? VerbositySchema.safeParse(effort).data : undefined,
-    },
-  ]);
-  if (!reasoning.mandatory) {
-    variants.push(['none', { reasoning: { enabled: false, effort: 'none' } }]);
+  const variants: [string, OpenCodeVariant][] = reasoning.supported_efforts
+    .toReversed()
+    .map(effort => [
+      effort,
+      {
+        reasoning: { enabled: effort !== 'none', effort },
+        verbosity: useAnthropicProvider ? VerbositySchema.safeParse(effort).data : undefined,
+      },
+    ]);
+  if (!reasoning.mandatory && !variants.some(([effort]) => effort === 'none')) {
+    variants.unshift(['none', { reasoning: { enabled: false, effort: 'none' } }]);
   }
   return Object.fromEntries(variants);
 }

@@ -207,10 +207,10 @@ describe('parseModelsDevProviderModels', () => {
     );
 
     expect(models[0].variants).toEqual({
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
       minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
       xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
     });
   });

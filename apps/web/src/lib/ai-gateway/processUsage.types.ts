@@ -194,6 +194,20 @@ export type CoreUsageWithMetaData = {
 
 export type BalanceUpdateResult = { newMicrodollarsUsed: number } | null;
 
+/**
+ * Identity of a persisted `microdollar_usage` row, as reported by the write.
+ *
+ * This lives here rather than in `processUsage.ts` because
+ * `usage-record-client.ts` needs it while `processUsage.ts` imports that client:
+ * declaring it there makes the two modules mutually dependent, which the
+ * `dependency-cycle-check` script rejects even for type-only imports.
+ */
+export type UsageRecordInsertResult = {
+  usageId: string;
+  createdAt: string;
+  newMicrodollarsUsed: number | null;
+};
+
 export type UsageMetaData = {
   id: string;
   message_id: string;

@@ -57,6 +57,7 @@ import type {
   OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
+  UsageRecordInsertResult,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import {
@@ -128,12 +129,6 @@ const extractMessageTextContent = (m: Message) =>
       : '';
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
-
-export type UsageRecordInsertResult = {
-  usageId: string;
-  createdAt: string;
-  newMicrodollarsUsed: number | null;
-};
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {

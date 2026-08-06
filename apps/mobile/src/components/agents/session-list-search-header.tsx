@@ -31,6 +31,7 @@ export function SessionListSearchHeader({
         <Search size={18} color={colors.mutedForeground} />
         <TextInput
           ref={inputRef}
+          accessibilityLabel="Search sessions"
           className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
           placeholder="Search sessions..."
           placeholderTextColor={colors.mutedForeground}

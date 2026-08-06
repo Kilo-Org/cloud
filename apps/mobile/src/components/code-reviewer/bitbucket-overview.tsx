@@ -193,6 +193,7 @@ export function BitbucketOverview({
                     </Text>
                   </View>
                   <Switch
+                    accessibilityLabel="Automatic reviews"
                     value={config.data.isEnabled}
                     disabled={
                       !canEdit ||

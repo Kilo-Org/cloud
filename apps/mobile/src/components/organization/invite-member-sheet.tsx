@@ -10,6 +10,7 @@ import { PermissionDenied } from '@/components/organization/permission-denied';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
@@ -72,11 +73,14 @@ export function InviteMemberSheet() {
 
       <FormField
         label="Email"
+        required
         accessibilityLabel="Email"
         placeholder="name@company.com"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
         autoFocus
         validate={value => (EMAIL_PATTERN.test(value.trim()) ? null : EMAIL_ERROR)}
         onChangeText={value => {
@@ -92,7 +96,7 @@ export function InviteMemberSheet() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Role
           </Text>
-          <View className="overflow-hidden rounded-lg bg-secondary">
+          <RadioGroup label="Role" className="overflow-hidden rounded-lg bg-secondary">
             {INVITABLE_ROLES.map((value, index) => {
               const selected = role === value;
               return (
@@ -105,15 +109,14 @@ export function InviteMemberSheet() {
                   onPress={() => {
                     setRole(value);
                   }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
+                  {...radioItemA11y({ label: ROLE_LABEL[value], checked: selected })}
                 >
                   <Text className="flex-1 text-sm">{ROLE_LABEL[value]}</Text>
                   {selected && <Check size={16} color={colors.primary} />}
                 </Pressable>
               );
             })}
-          </View>
+          </RadioGroup>
         </View>
       )}
 

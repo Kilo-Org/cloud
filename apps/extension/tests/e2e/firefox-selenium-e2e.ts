@@ -1,6 +1,7 @@
 /* eslint-disable id-length, import/no-nodejs-modules, max-lines, no-await-in-loop, promise/avoid-new, promise/no-callback-in-promise, promise/prefer-await-to-callbacks */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
@@ -57,6 +58,7 @@ const chromeWorkflowNames = [
   'settings memories list supports delete and shows the empty state',
   'model picker search filters and selects by model id',
   'workflow create, approve, and run returns result',
+  'workflow auto-approve save stores approved hash',
 ] as const;
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
@@ -3070,6 +3072,118 @@ const scenarios: FirefoxScenario[] = [
               session.driver,
               'The workflow read the heading: Kilo extension fixture.'
             );
+          }
+        );
+      } finally {
+        await targetServer.close();
+      }
+    },
+  },
+  {
+    name: 'workflow auto-approve save stores approved hash',
+    run: async context => {
+      const simpleReadScript = `
+  const heading = await page.text('h1');
+  return { done: true, result: { heading } };
+`;
+      const approvedScriptHash = createHash('sha256').update(simpleReadScript).digest('hex');
+
+      const targetServer = await startTargetPageServer();
+      const scopeOrigin = new URL(targetServer.url).origin;
+
+      try {
+        await withSession(
+          context.api,
+          {
+            firstCompletionEvents: [
+              {
+                choices: [
+                  {
+                    delta: {
+                      tool_calls: [
+                        {
+                          function: {
+                            arguments: JSON.stringify({
+                              description: 'Read the page heading.',
+                              name: 'Read heading',
+                              scopeOrigin,
+                              script: simpleReadScript,
+                            }),
+                            name: 'save_workflow',
+                          },
+                          id: 'call_save_wf_auto_1',
+                          index: 0,
+                          type: 'function',
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+            secondCompletionEvents: contentOnlyCompletion('Workflow auto-approved and saved.'),
+            toolNames: dangerousToolNames,
+          },
+          async session => {
+            // Navigate to the pre-started target page.
+            await session.driver.switchTo().newWindow('tab');
+            await session.driver.get(targetServer.url);
+
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await waitForTargetTab(session.driver, 'Kilo extension fixture');
+            await switchToDangerousMode(session.driver);
+
+            // Auto-approve must be seeded before the save turn executes.
+            await seedFirefoxStorage(session.driver, 'kiloWorkflowSettings', {
+              allowWorkflowsInSafeMode: false,
+              autoApproveWorkflowChanges: true,
+              autoApproveWorkflowRuns: false,
+            });
+
+            // Turn 1: save_workflow with the auto-approve setting on.
+            await sendMessage(session.driver, 'Save a workflow to read the heading');
+
+            // The follow-up assistant turn only arrives after the save tool result is sent.
+            // The card path never sends it without a click, so this proves no card blocked.
+            await waitForText(session.driver, 'Workflow auto-approved and saved.');
+
+            // No approval card and no Approve button may exist.
+            const dialogs = await session.driver.findElements(
+              By.css('[role="dialog"][aria-label="Save workflow"]')
+            );
+            assert.equal(dialogs.length, 0);
+            const approveButtons = await session.driver.findElements(
+              By.xpath('//button[contains(normalize-space(.), "Approve and save")]')
+            );
+            assert.equal(approveButtons.length, 0);
+
+            // The auto-approve path writes no pending draft.
+            const stored = await readFirefoxStorage(session.driver, [
+              'kiloAgentWorkflows',
+              'kiloPendingWorkflowSave',
+            ]);
+            assert.equal(stored['kiloPendingWorkflowSave'], undefined);
+
+            // The workflow is stored with the approved script hash.
+            const storedWorkflows = z
+              .array(
+                z.object({
+                  approvedScriptHash: z.string(),
+                  id: z.string(),
+                  script: z.string(),
+                })
+              )
+              .parse(stored['kiloAgentWorkflows']);
+            const [storedWorkflow] = storedWorkflows;
+            assert.ok(storedWorkflow !== undefined, 'Expected a stored workflow');
+            assert.equal(storedWorkflow.script, simpleReadScript);
+            assert.equal(storedWorkflow.approvedScriptHash, approvedScriptHash);
+
+            // The tool exchange reports the auto-approved save.
+            const saveBody = await expandToolExchange(session.driver, 'save_workflow');
+            assert.match(saveBody, /"autoApproved"\s*:\s*true/u);
+            assert.match(saveBody, /"saved"\s*:\s*true/u);
           }
         );
       } finally {

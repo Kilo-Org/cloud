@@ -58,6 +58,7 @@ Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter ki
 ## Agent Modes
 
 - Safe mode exposes read tools (`get_page_snapshot`, `find_in_page`, `get_element_details`, `search_memories`, `get_memory`, and when the model supports images `get_viewport_screenshot`), workflow read tools (`search_workflows`, `get_workflow`), and card-gated tools (`save_workflow`, `save_memory`).
+- `search_workflows` without a query lists workflows scoped to the selected tab. With a query it searches every site, ranks in-scope matches first, and reports `inScope` and `startUrl` per result.
 - `save_workflow` and `save_memory` are card-gated — the executor blocks the tool turn until the user approves or rejects on the approval card.
 - `run_workflow` is gated behind the "Allow workflows in safe mode" toggle. In dangerous mode the toggle is bypassed and `run_workflow` is always available.
 - `delete_workflow` and `eval` are dangerous-mode only and never exposed in safe mode.
@@ -70,12 +71,25 @@ Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter ki
 
 ## Workflows
 
-A workflow is a stored async function script with signature `({ page, state }) => result`.
+A workflow is a stored async function script with signature `({ page, state, input }) => result`.
 The script must return `{ done: true, result }` to finish, or `{ navigate: "<url>", state }` to continue on another page in the same origin scope.
-Page helpers (`page.click`, `page.fill`, `page.text`, `page.textAll`, `page.attr`, `page.exists`) let the script read and interact with the page.
+Page helpers (`page.click`, `page.fill`, `page.text`, `page.textAll`, `page.attr`, `page.exists`, `await page.waitFor(selector, timeoutMs?)`) let the script read and interact with the page.
 Every workflow is scoped to an origin and an optional path prefix; `run_workflow` refuses to execute when the selected tab origin does not match the stored scope.
 Approval is per script version: the SHA-256 hash of the approved script is stored as `approvedScriptHash`.
 Any edit to the script clears approval and requires the user to re-approve on the save card (`aria-label="Save workflow"`).
+
+### Params and input
+
+A workflow declares `params` (`name`, `description`, optional `example`, optional `required`) for values that vary between runs.
+`run_workflow` passes `input` to the script and rejects a run when a declared required param is missing.
+`input` is re-injected on every page, so a navigation never loses it. `state.input` mirrors `input` on the first page only, for scripts written before params existed.
+The settings Run button opens a param form when the workflow declares params; required values gate the Run button.
+
+### Dry runs
+
+A dry run records `page.click` and `page.fill` instead of performing them, so content those actions would produce never appears.
+A selector miss **after** the first recorded action reports success with the recorded actions and a note; a miss **before** any action is a real failure.
+Do not treat a dry run that stops after recorded actions as a broken workflow, and do not re-save the script because of it. Only a real run, started by the user, verifies the rest.
 
 ## Prompt Context
 

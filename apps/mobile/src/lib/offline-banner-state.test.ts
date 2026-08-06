@@ -4,6 +4,7 @@ import { type ConnectivityState } from '@/lib/connectivity-online';
 import {
   type ConnectivitySource,
   createOfflineBannerStore,
+  OFFLINE_BANNER_DEBOUNCE_MS,
   type OfflineBannerStore,
   type OfflineBannerTimer,
 } from '@/lib/offline-banner-state';
@@ -34,14 +35,14 @@ function createFakeSource() {
   };
 }
 
-type ScheduledEntry = { callback: () => void; cancelled: boolean };
+type ScheduledEntry = { callback: () => void; cancelled: boolean; delayMs: number };
 
 function createFakeTimer() {
   const scheduled: ScheduledEntry[] = [];
   const timer: OfflineBannerTimer = {
     // oxlint-disable-next-line promise/prefer-await-to-callbacks -- the fake timer stores callbacks for manual firing
-    set(callback) {
-      const entry: ScheduledEntry = { callback, cancelled: false };
+    set(callback, delayMs) {
+      const entry: ScheduledEntry = { callback, cancelled: false, delayMs };
       scheduled.push(entry);
       return {
         cancel() {
@@ -99,6 +100,8 @@ describe('createOfflineBannerStore', () => {
 
     expect(store.isOffline()).toBe(false);
     expect(listener).not.toHaveBeenCalled();
+
+    expect(timer.scheduled[0]?.delayMs).toBe(OFFLINE_BANNER_DEBOUNCE_MS);
 
     timer.firePending();
 

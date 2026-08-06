@@ -13,7 +13,10 @@ import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationWelcomeHeader } from './OrganizationWelcomeHeader';
 import { NewOrganizationWelcomeHeader } from './NewOrganizationWelcomeHeader';
 import { OrganizationTopupSuccessHeader } from './OrganizationTopupSuccessHeader';
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
@@ -156,7 +159,7 @@ export function OrganizationDashboard({
                 ) : (
                   <OrganizationProvidersAndModelsConfigurationCard
                     organizationId={organizationId}
-                    readonly={!(currentRole === 'owner' || isKiloAdmin)}
+                    readonly={!(canManageOrganization(currentRole) || isKiloAdmin)}
                   />
                 )}
               </>
@@ -179,7 +182,7 @@ export function OrganizationDashboard({
                 <SSOSignupCard organization={organizationData} role={currentRole} />
               </LockableContainer>
             )}
-            {(currentRole === 'owner' || isKiloAdmin) && (
+            {(canManageOrganization(currentRole) || isKiloAdmin) && (
               <OrganizationEmailPreferencesCard organizationId={organizationId} />
             )}
             <Card>

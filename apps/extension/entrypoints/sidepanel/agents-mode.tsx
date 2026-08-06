@@ -4,7 +4,10 @@ import { AgentsSessionList } from './agents-session-list';
 import { AgentsSessionView } from './agents-session-view';
 import { AgentsNewSession } from './agents-new-session';
 
-type AgentsView = { kind: 'list' } | { kind: 'session'; kiloSessionId: string } | { kind: 'new' };
+type AgentsView =
+  | { kind: 'list' }
+  | { kind: 'session'; kiloSessionId: string; initialPrompt?: string }
+  | { kind: 'new' };
 
 export const AgentsMode = (): JSX.Element => {
   const [view, setView] = useState<AgentsView>({ kind: 'list' });
@@ -12,6 +15,7 @@ export const AgentsMode = (): JSX.Element => {
   if (view.kind === 'session') {
     return (
       <AgentsSessionView
+        initialPrompt={view.initialPrompt}
         kiloSessionId={view.kiloSessionId}
         onBack={() => {
           setView({ kind: 'list' });
@@ -26,8 +30,12 @@ export const AgentsMode = (): JSX.Element => {
         onCancel={() => {
           setView({ kind: 'list' });
         }}
-        onCreated={(kiloSessionId: string) => {
-          setView({ kiloSessionId, kind: 'session' });
+        onCreated={(kiloSessionId: string, initialPrompt?: string) => {
+          setView({
+            kiloSessionId,
+            kind: 'session',
+            ...(initialPrompt === undefined ? {} : { initialPrompt }),
+          });
         }}
       />
     );

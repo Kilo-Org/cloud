@@ -80,7 +80,7 @@ describe('parseModelsDevProviderModels', () => {
             reasoning_options: [{ type: 'toggle' }],
           },
           beta: {
-            id: 'beta',
+            id: 'claude-beta',
             status: 'beta',
             reasoning: false,
           },
@@ -130,7 +130,7 @@ describe('parseModelsDevProviderModels', () => {
         },
       },
       {
-        id: 'beta',
+        id: 'claude-beta',
         name: undefined,
         context_length: undefined,
         max_completion_tokens: undefined,
@@ -207,10 +207,10 @@ describe('parseModelsDevProviderModels', () => {
     );
 
     expect(models[0].variants).toEqual({
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
       minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
       xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
     });
   });

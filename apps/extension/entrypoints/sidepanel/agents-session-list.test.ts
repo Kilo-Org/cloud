@@ -39,16 +39,26 @@ describe('sessionStatusBadge()', () => {
     expect(badge!.label).toBe('Running');
   });
 
+  it("maps the cloud agent's busy status onto the Running label", () => {
+    const badge = sessionStatusBadge('busy');
+    expect(badge!.label).toBe('Running');
+    expect(badge!.className).toContain('bg-status-green');
+  });
+
+  it('maps retry onto a Retrying label', () => {
+    expect(sessionStatusBadge('retry')!.label).toBe('Retrying');
+  });
+
   it('returns "Running" for uppercase RUNNING', () => {
     const badge = sessionStatusBadge('RUNNING');
     expect(badge).not.toBeNull();
     expect(badge!.label).toBe('Running');
   });
 
-  it('passes through unrecognized status as label', () => {
+  it('capitalizes an unrecognized status label', () => {
     const badge = sessionStatusBadge('idle');
     expect(badge).not.toBeNull();
-    expect(badge!.label).toBe('idle');
+    expect(badge!.label).toBe('Idle');
   });
 
   it('returns "Needs input" with yellow styling for question', () => {
@@ -69,14 +79,9 @@ describe('sessionStatusBadge()', () => {
     expect(badge!.className).toContain('text-foreground-muted');
   });
 
-  // Proves the actual undefined-status path: a cloud-agent session with an
-  // Empty-string status falls through to the fallback label (the empty string
-  // Itself), not to the null branch.
-  it('returns fallback badge for empty string status', () => {
-    const badge = sessionStatusBadge('');
-    expect(badge).not.toBeNull();
-    expect(badge!.label).toBe('');
-    expect(badge!.className).toContain('text-foreground-muted');
+  // An empty-string status renders no badge — an empty pill carries no signal.
+  it('returns null for empty string status', () => {
+    expect(sessionStatusBadge('')).toBeNull();
   });
 });
 

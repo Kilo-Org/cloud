@@ -5,6 +5,8 @@ import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
+import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
+import { redisClient } from '@/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -17,9 +19,24 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
+jest.mock('@/lib/config.server', () => ({
+  ...jest.requireActual('@/lib/config.server'),
+  BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
+  BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
+}));
+jest.mock('@/lib/coding-plans/byteplus-usage', () => ({
+  getBytePlusUsage: jest.fn(),
+}));
 jest.mock('ai', () => ({
   createGateway: jest.fn(() => jest.fn((modelId: string) => ({ modelId }))),
   generateText: jest.fn(),
+}));
+jest.mock('@/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  },
 }));
 
 const PLAN_ID = 'minimax-token-plan-plus';
@@ -30,6 +47,10 @@ const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
 const mockedGenerateText = jest.mocked(generateText);
+const mockedGetBytePlusUsage = jest.mocked(getBytePlusUsage);
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedRedisSet = jest.mocked(redisClient.set);
+const mockedRedisDel = jest.mocked(redisClient.del);
 
 function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.randomUUID()}`) {
   return `${key}::${upstreamPlanId}`;
@@ -56,6 +77,35 @@ function usageResponse() {
     { status: 200, headers: { 'content-type': 'application/json' } }
   );
 }
+
+beforeEach(() => {
+  mockedGetBytePlusUsage.mockResolvedValue({
+    fetchedAt: '2026-08-06T12:00:00.000Z',
+    windows: [
+      {
+        id: 'short_term',
+        remainingPercent: 80,
+        resetsAt: '2026-08-06T17:00:00.000Z',
+        period: { unit: 'hour', value: 5 },
+      },
+      {
+        id: 'weekly',
+        remainingPercent: 70,
+        resetsAt: '2026-08-13T12:00:00.000Z',
+        period: { unit: 'week', value: 1 },
+      },
+      {
+        id: 'monthly',
+        remainingPercent: 60,
+        resetsAt: '2026-09-05T12:00:00.000Z',
+        period: { unit: 'month', value: 1 },
+      },
+    ],
+  });
+  mockedRedisGet.mockResolvedValue(null);
+  mockedRedisSet.mockResolvedValue('OK');
+  mockedRedisDel.mockResolvedValue(1);
+});
 
 afterEach(async () => {
   jest.restoreAllMocks();
@@ -313,6 +363,7 @@ describe('coding plans router', () => {
     });
 
     expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]).toMatchObject({ canQueryUsage: true });
     expect(detail).toMatchObject({
       id: activation.subscriptionId,
       planId: PLAN_ID,
@@ -321,6 +372,7 @@ describe('coding plans router', () => {
       providerId: 'minimax',
       routeLabel: 'MiniMax via Kilo Gateway',
       features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
+      canQueryUsage: true,
       hasInstalledByokKey: true,
       status: 'active',
       costKiloCredits: 20,
@@ -427,6 +479,61 @@ describe('coding plans router', () => {
     }
   });
 
+  it('serves owner-scoped BytePlus usage for Lite without exposing seat metadata', async () => {
+    const owner = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    const otherUser = await insertTestUser();
+    await uploadKeysToInventory(
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
+      [inventoryEntry('byteplus-inference-key', 'assigned-byteplus-username')],
+      {
+        validateCredential: async () => ({
+          valid: true,
+          upstreamUsageId: 'seat-byteplus-lite',
+        }),
+      }
+    );
+    const ownerCaller = await createCallerForUser(owner.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const activation = await ownerCaller.codingPlans.subscribe({
+      planId: BYTEPLUS_PLAN_ID,
+      idempotencyKey: 'byteplus-usage',
+    });
+
+    const subscriptions = await ownerCaller.codingPlans.listSubscriptions();
+    const detail = await ownerCaller.codingPlans.getSubscriptionDetail({
+      subscriptionId: activation.subscriptionId,
+    });
+    const usage = await ownerCaller.codingPlans.getUsage({
+      subscriptionId: activation.subscriptionId,
+    });
+
+    expect(subscriptions[0]).toMatchObject({ canQueryUsage: true });
+    expect(detail).toMatchObject({
+      providerId: 'byteplus-coding',
+      planId: BYTEPLUS_PLAN_ID,
+      canQueryUsage: true,
+    });
+    expect(detail).not.toHaveProperty('hasUpstreamUsageId');
+    expect(JSON.stringify({ subscriptions, detail, usage })).not.toContain('seat-byteplus-lite');
+    expect(usage.subscription.windows.map(window => window.id)).toEqual([
+      'short_term',
+      'weekly',
+      'monthly',
+    ]);
+    expect(mockedGetBytePlusUsage).toHaveBeenCalledWith('seat-byteplus-lite');
+
+    await expect(
+      otherCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Coding Plan subscription not found.',
+    });
+  });
+
   it('serves usage for non-terminal subscriptions and rejects terminal ones', async () => {
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
@@ -470,12 +577,17 @@ describe('coding plans router', () => {
       .update(coding_plan_subscriptions)
       .set({ status: 'canceled' })
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    const cacheReadsBeforeCancellation = mockedRedisGet.mock.calls.length;
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
     ).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       message: 'Coding Plan subscription is not eligible for usage.',
     });
+    expect(mockedRedisGet).toHaveBeenCalledTimes(cacheReadsBeforeCancellation);
+    await expect(
+      caller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ canQueryUsage: false });
   });
 
   it('fails safely for a corrupt inventory assignment without affecting database-only reads', async () => {
@@ -517,7 +629,11 @@ describe('coding plans router', () => {
     await expect(caller.codingPlans.listSubscriptions()).resolves.toHaveLength(1);
     await expect(
       caller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
-    ).resolves.toMatchObject({ id: activation.subscriptionId, status: 'active' });
+    ).resolves.toMatchObject({
+      id: activation.subscriptionId,
+      status: 'active',
+      canQueryUsage: false,
+    });
   });
 
   it('isolates upstream usage failures from subscription metadata', async () => {

@@ -505,6 +505,36 @@ async function hasCanonicalProvisionSubscription(
   return await hasSubscriptionForInstance(getWorkerDb(connectionString), instanceId);
 }
 
+async function resolveCanonicalProvisionEntitlement(params: {
+  env: AppEnv['Bindings'];
+  userId: string;
+  orgId: string | null;
+}): Promise<{
+  priceVersion: KiloClawPriceVersion;
+  selfServiceInstanceType: InstanceTierKey;
+}> {
+  const resolvedEntitlement = await resolveProvisionEntitlementWithFallback({
+    env: params.env,
+    input: { userId: params.userId, orgId: params.orgId },
+  });
+  if (!isKiloClawPriceVersion(resolvedEntitlement.priceVersion)) {
+    throw new Error(`Unknown KiloClaw price version: ${resolvedEntitlement.priceVersion}`);
+  }
+  const pricing = getKiloClawPricingCatalogEntry(resolvedEntitlement.priceVersion);
+  const resolvedSelfServiceInstanceType = InstanceTierKeySchema.parse(
+    resolvedEntitlement.selfServiceInstanceType
+  );
+  if (resolvedSelfServiceInstanceType !== pricing.selfServiceInstanceType) {
+    throw new Error(
+      `KiloClaw entitlement tier drift during provision: price version ${pricing.priceVersion} resolved ${resolvedSelfServiceInstanceType}, catalog expects ${pricing.selfServiceInstanceType}`
+    );
+  }
+  return {
+    priceVersion: pricing.priceVersion,
+    selfServiceInstanceType: pricing.selfServiceInstanceType,
+  };
+}
+
 function isWithinSelfServiceEntitlement(
   requestedTier: InstanceTierKey,
   entitlementTier: InstanceTierKey
@@ -1350,6 +1380,11 @@ platform.post('/provision', async c => {
         }
       } else if (bootstrapSubscription === true) {
         explicitInstanceRequiresSubscriptionBootstrap = true;
+        provisionEntitlement = await resolveCanonicalProvisionEntitlement({
+          env: c.env,
+          userId,
+          orgId: orgId ?? null,
+        });
       } else {
         return jsonError(
           'Provisioning completed but subscription finalization is pending',
@@ -1362,26 +1397,11 @@ platform.post('/provision', async c => {
       assertAvailableProvider(c.env, selectedProvider);
     }
     if (shouldInsertInstanceRecord) {
-      const resolvedEntitlement = await resolveProvisionEntitlementWithFallback({
+      provisionEntitlement = await resolveCanonicalProvisionEntitlement({
         env: c.env,
-        input: { userId, orgId: orgId ?? null },
+        userId,
+        orgId: orgId ?? null,
       });
-      if (!isKiloClawPriceVersion(resolvedEntitlement.priceVersion)) {
-        throw new Error(`Unknown KiloClaw price version: ${resolvedEntitlement.priceVersion}`);
-      }
-      const pricing = getKiloClawPricingCatalogEntry(resolvedEntitlement.priceVersion);
-      const resolvedSelfServiceInstanceType = InstanceTierKeySchema.parse(
-        resolvedEntitlement.selfServiceInstanceType
-      );
-      if (resolvedSelfServiceInstanceType !== pricing.selfServiceInstanceType) {
-        throw new Error(
-          `KiloClaw entitlement tier drift during provision: price version ${pricing.priceVersion} resolved ${resolvedSelfServiceInstanceType}, catalog expects ${pricing.selfServiceInstanceType}`
-        );
-      }
-      provisionEntitlement = {
-        priceVersion: pricing.priceVersion,
-        selfServiceInstanceType: pricing.selfServiceInstanceType,
-      };
       if (
         requestedInstanceType &&
         !isWithinSelfServiceEntitlement(

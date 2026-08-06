@@ -11,6 +11,7 @@ import type {
   OrganizationWithMembers,
 } from '@/lib/organizations/organization-types';
 import { capitalize, cn } from '@/lib/utils';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type FreeTrialWarningBannerProps = {
   organization: OrganizationWithMembers;
@@ -125,11 +126,11 @@ export function FreeTrialWarningBanner({
   const state = getOrgTrialStatusFromDays(daysRemaining);
   const planName = capitalize(organization.plan);
   const styles = getStylesForState(state, planName);
-  const isOwner = userRole === 'owner';
+  const canManage = canManageOrganization(userRole);
   const buttonVariant = getButtonVariantForState(state);
-  const message = getTrialMessage(daysRemaining, isOwner);
+  const message = getTrialMessage(daysRemaining, canManage);
   const pathname = usePathname();
-  const shouldShowUpgradeButton = isOwner && !pathname.endsWith('/subscriptions');
+  const shouldShowUpgradeButton = canManage && !pathname.endsWith('/subscriptions');
 
   return (
     <div

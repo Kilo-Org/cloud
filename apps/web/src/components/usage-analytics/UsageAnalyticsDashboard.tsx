@@ -18,6 +18,7 @@ import {
 import { Download, SlidersHorizontal } from 'lucide-react';
 import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
 import { BreakdownPieChart } from './BreakdownPieChart';
@@ -717,7 +718,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                 <FeatureAdoptionView organizationId={enterpriseOrg.organizationId} />
                 <RecommendationsView
                   organizationId={enterpriseOrg.organizationId}
-                  canDismiss={callerRole === 'owner'}
+                  canDismiss={canManageOrganization(callerRole)}
                 />
               </div>
             ) : (

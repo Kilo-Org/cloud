@@ -22,11 +22,12 @@ type MemberRowProps = {
 
 export const ROLE_LABEL: Record<OrgRole, string> = {
   owner: 'Owner',
+  admin: 'Admin',
   member: 'Member',
   billing_manager: 'Billing manager',
 };
 
-const ROLE_OPTIONS: OrgRole[] = ['owner', 'member', 'billing_manager'];
+const ROLE_OPTIONS: OrgRole[] = ['owner', 'admin', 'member', 'billing_manager'];
 
 export function MemberRow({
   member,

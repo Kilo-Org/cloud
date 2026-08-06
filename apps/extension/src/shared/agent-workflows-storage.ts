@@ -47,6 +47,7 @@ const toAgentWorkflow = (value: z.infer<typeof agentWorkflowSchema>): AgentWorkf
   scopeOrigin: value.scopeOrigin,
   script: value.script,
   updatedAt: value.updatedAt,
+  ...(value.params === undefined || value.params.length === 0 ? {} : { params: value.params }),
   ...(value.pathPrefix === undefined ? {} : { pathPrefix: value.pathPrefix }),
   ...(value.startUrl === undefined ? {} : { startUrl: value.startUrl }),
 });
@@ -72,6 +73,9 @@ const toPendingDraft = (
   }
   if (Object.hasOwn(value, 'workflowId')) {
     draft.workflowId = value.workflowId;
+  }
+  if (value.params !== undefined) {
+    draft.params = value.params;
   }
 
   return draft;
@@ -122,6 +126,9 @@ export const addAgentWorkflow = async (
     scopeOrigin: parsedInput.scopeOrigin,
     script: parsedInput.script,
     updatedAt: now,
+    ...(parsedInput.params === undefined || parsedInput.params.length === 0
+      ? {}
+      : { params: parsedInput.params }),
     ...(parsedInput.pathPrefix === undefined ? {} : { pathPrefix: parsedInput.pathPrefix }),
     ...(parsedInput.startUrl === undefined ? {} : { startUrl: parsedInput.startUrl }),
   };
@@ -152,6 +159,8 @@ export const updateAgentWorkflow = async (
   const resolvedPathPrefix = pathPrefixProvided ? updates.pathPrefix : existing.pathPrefix;
   const startUrlProvided = Object.hasOwn(updates, 'startUrl');
   const resolvedStartUrl = startUrlProvided ? updates.startUrl : existing.startUrl;
+  const paramsProvided = Object.hasOwn(updates, 'params');
+  const resolvedParams = paramsProvided ? updates.params : existing.params;
 
   const updated: AgentWorkflow = {
     approvedScriptHash,
@@ -162,6 +171,9 @@ export const updateAgentWorkflow = async (
     scopeOrigin: updates.scopeOrigin ?? existing.scopeOrigin,
     script: updates.script ?? existing.script,
     updatedAt: Date.now(),
+    ...(resolvedParams === undefined || resolvedParams.length === 0
+      ? {}
+      : { params: resolvedParams }),
     ...(resolvedPathPrefix === undefined ? {} : { pathPrefix: resolvedPathPrefix }),
     ...(resolvedStartUrl === undefined ? {} : { startUrl: resolvedStartUrl }),
   };

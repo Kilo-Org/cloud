@@ -236,6 +236,48 @@ function getAssistantErrorMessage(error: unknown): string | undefined {
   return 'Assistant message failed';
 }
 
+function assistantErrorTerminalizeParams(assistantError: string): TerminalizeParams {
+  const assistantFailure = classifyAssistantFailure(assistantError);
+  return {
+    kind: 'failed',
+    reason: 'assistant_error',
+    error: assistantError,
+    completionSource: 'idle_reconciliation',
+    failureStage: 'agent_activity',
+    failureCode: assistantFailure.terminalCode ?? 'assistant_error',
+    assistantFailureReason: assistantFailure.reason,
+    providerOwnership: assistantFailure.providerOwnership,
+    safeFailureMessage: assistantFailure.safeMessage,
+  };
+}
+
+function hasAssistantCompletionMarker(info: LatestAssistantMessage['info']): boolean {
+  const time = info.time;
+  if (typeof time !== 'object' || time === null || !('completed' in time)) return false;
+  return typeof time.completed === 'number';
+}
+
+/**
+ * Wrapper-death reconciliation needs positive terminal evidence: unlike the
+ * sealed-batch path, no wrapper `complete` vouches for turn finality, so bare
+ * assistant-message presence is not enough. Require the same completion
+ * marker the wrapper itself uses to arm finalization (the wrapper's
+ * isAssistantCompletionSignal): a completed timestamp or a terminal error.
+ */
+function projectWrapperDeathReconciliation(
+  assistantMessage: LatestAssistantMessage | null
+): TerminalizeParams | null {
+  if (!assistantMessage) return null;
+  const assistantError = getAssistantErrorMessage(assistantMessage.info.error);
+  if (assistantError !== undefined) return assistantErrorTerminalizeParams(assistantError);
+  if (!hasAssistantCompletionMarker(assistantMessage.info)) return null;
+  return {
+    kind: 'completed',
+    assistantMessageId: assistantMessage.info.id,
+    completionSource: 'idle_reconciliation',
+  };
+}
+
 function getWrapperInterruptionFailureCode(
   interruptionSource: WrapperTerminalEvent['interruptionSource'],
   error: string | undefined
@@ -624,6 +666,49 @@ export function createWrapperSupervisor(
     }
   }
 
+  /**
+   * When the wrapper dies before its terminal report, the DO's event store
+   * still holds every kilocode event that arrived over the FIFO ingest
+   * channel — including, by ingest ordering, the completed assistant state
+   * whenever the wrapper had already started finalizing. Settle from that
+   * positive terminal evidence when present; otherwise fall back to
+   * wrapper-failure handling.
+   */
+  async function terminalizeAcceptedMessagesForDeadWrapper(
+    acceptedMessages: SessionMessageState[],
+    fallbackParams: (message: SessionMessageState) => TerminalizeParams
+  ): Promise<void> {
+    const metadata = await getMetadata();
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    let reconciledCount = 0;
+    for (const message of acceptedMessages) {
+      const reconciled =
+        metadata && kiloSessionId
+          ? projectWrapperDeathReconciliation(
+              getAssistantMessageForUserMessage(
+                metadata.identity.sessionId,
+                kiloSessionId,
+                message.messageId
+              )
+            )
+          : null;
+      if (reconciled) reconciledCount += 1;
+      await messageSettlementOutbox.terminalizeSessionMessageOnce(
+        message.messageId,
+        reconciled ?? fallbackParams(message)
+      );
+    }
+    if (reconciledCount > 0) {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          reconciledCount,
+          fallbackCount: acceptedMessages.length - reconciledCount,
+        })
+        .warn('Settled accepted wrapper work from stored assistant events after wrapper death');
+    }
+  }
+
   async function handleUnhealthyWrapper(
     state: WrapperRuntimeState,
     error: string,
@@ -641,17 +726,17 @@ export function createWrapperSupervisor(
     await requestPhysicalWrapperStop('unhealthy-wrapper');
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
-    for (const message of acceptedMessages) {
+    await terminalizeAcceptedMessagesForDeadWrapper(acceptedMessages, message => {
       const activityObserved = message.agentActivityObservedAt !== undefined;
-      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+      return {
         kind: 'failed',
         reason: 'wrapper_failure',
         error,
         completionSource: 'wrapper_failure',
         failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
         failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
-      });
-    }
+      };
+    });
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
     if (isWrapperRunFinalizing(state) && state.wrapperRunId) {
       await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(state.wrapperRunId);
@@ -720,17 +805,17 @@ export function createWrapperSupervisor(
       .warn('Grace period expired - failing supervised wrapper work');
     await requestPhysicalWrapperStop('unhealthy-wrapper');
     await storage.delete(DISCONNECT_GRACE_KEY);
-    for (const message of acceptedMessages) {
+    await terminalizeAcceptedMessagesForDeadWrapper(acceptedMessages, message => {
       const activityObserved = message.agentActivityObservedAt !== undefined;
-      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+      return {
         kind: 'failed',
         reason: 'wrapper_disconnected',
         error: 'Wrapper disconnected',
         completionSource: 'wrapper_failure',
         failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
         failureCode: activityObserved ? 'wrapper_error_after_activity' : 'wrapper_disconnected',
-      });
-    }
+      };
+    });
     await clearWrapperRuntimeIdentity(
       storage,
       {
@@ -971,21 +1056,10 @@ export function createWrapperSupervisor(
         : null;
       const assistantError = getAssistantErrorMessage(assistantMessage?.info.error);
       if (assistantError !== undefined) {
-        const assistantFailure = classifyAssistantFailure(assistantError);
         projectedSettlements.push({
           message,
           observeCorrelatedActivity: true,
-          params: {
-            kind: 'failed',
-            reason: 'assistant_error',
-            error: assistantError,
-            completionSource: 'idle_reconciliation',
-            failureStage: 'agent_activity',
-            failureCode: assistantFailure.terminalCode ?? 'assistant_error',
-            assistantFailureReason: assistantFailure.reason,
-            providerOwnership: assistantFailure.providerOwnership,
-            safeFailureMessage: assistantFailure.safeMessage,
-          },
+          params: assistantErrorTerminalizeParams(assistantError),
         });
       } else if (assistantMessage) {
         projectedSettlements.push({

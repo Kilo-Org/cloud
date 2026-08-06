@@ -5,6 +5,7 @@ import {
   Pressable,
   TextInput as RNTextInput,
   type TextInput,
+  type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -12,7 +13,11 @@ import { Paperclip } from 'lucide-react-native';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
+import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
+import {
+  type ComposerSelection,
+  pasteTextIntoComposer,
+} from '@/components/agents/composer-paste-text';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -30,7 +35,7 @@ import {
   type AgentAttachmentCandidate,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
+import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -112,6 +117,9 @@ export function NewSessionPrompt({
   const promptRef = useRef(initialPrompt ?? '');
   const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
+  // Last caret the input reported. Paste inserts here so the button behaves
+  // like the platform paste.
+  const promptSelectionRef = useRef<ComposerSelection | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -174,10 +182,25 @@ export function NewSessionPrompt({
 
   const paperclipDisabled = control.paperclipDisabled;
 
-  const hint = useClipboardImageHint({
-    enabled: !paperclipDisabled,
+  const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await onPrefillAttachments([file]);
+    },
+    addText: text => {
+      // The hook calls the latest render's callback, so this sees a create or
+      // a voice session that started during the clipboard read. Neither may
+      // take a draft mutation. `NewSessionPrompt` holds no submit lock, so the
+      // button's own disabled rule is the authority.
+      if (!control.inputEditable) {
+        return;
+      }
+      promptSelectionRef.current = pasteTextIntoComposer(text, {
+        input: promptInputRef.current,
+        draft: promptRef.current,
+        selection: promptSelectionRef.current,
+        maxLength: PROMPT_INPUT_MAX_CHARS,
+        onChangeText: handlePromptChange,
+      });
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -187,6 +210,10 @@ export function NewSessionPrompt({
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
+  }
+
+  function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
+    promptSelectionRef.current = event.nativeEvent.selection;
   }
 
   function handlePaperclipPress() {
@@ -204,13 +231,6 @@ export function NewSessionPrompt({
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
       />
-      {hint.visible ? (
-        <AttachmentPasteHint
-          onPress={() => {
-            hint.paste();
-          }}
-        />
-      ) : null}
       <View className="px-2 pt-2">
         {promptMeasure.measureElement}
         <RNTextInput
@@ -231,31 +251,34 @@ export function NewSessionPrompt({
               : undefined,
           ]}
           onChangeText={handlePromptChange}
+          onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
           scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
           editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
-          onFocus={() => {
-            hint.refresh();
-          }}
         />
         <View className="flex-row items-center justify-between pb-2">
-          <Pressable
-            onPress={handlePaperclipPress}
-            disabled={paperclipDisabled}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className={cn(
-              'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-              paperclipDisabled && 'opacity-50'
-            )}
-            accessibilityRole="button"
-            accessibilityLabel="Add attachment"
-            accessibilityState={{ disabled: paperclipDisabled }}
-          >
-            <Paperclip size={18} color={colors.mutedForeground} />
-          </Pressable>
+          <View className="flex-row items-center gap-1">
+            <Pressable
+              onPress={handlePaperclipPress}
+              disabled={paperclipDisabled}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              className={cn(
+                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+                paperclipDisabled && 'opacity-50'
+              )}
+              accessibilityRole="button"
+              accessibilityLabel="Add attachment"
+              accessibilityState={{ disabled: paperclipDisabled }}
+            >
+              <Paperclip size={18} color={colors.mutedForeground} />
+            </Pressable>
+            {/* Follows the input, not the paperclip: a full attachment list
+                still allows a text paste. */}
+            <ComposerPasteButton onPress={pasteClipboard} disabled={!control.inputEditable} />
+          </View>
           {voiceInput.available ? (
             <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
               <VoiceInputStatus status={voiceInput.status} />

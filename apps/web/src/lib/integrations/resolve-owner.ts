@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Owner } from './core/types';
 import type { TRPCContext } from '@/lib/trpc/init';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
@@ -27,7 +28,7 @@ export async function ensureIntegrationAccess(
   roles?: OrganizationRole[]
 ) {
   if (organizationId) {
-    await ensureOrganizationAccess(ctx, organizationId, roles ?? ['owner', 'billing_manager']);
+    await ensureOrganizationAccess(ctx, organizationId, roles ?? ORGANIZATION_BILLING_ROLES);
   }
 }
 

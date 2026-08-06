@@ -1,8 +1,11 @@
-/* eslint-disable max-lines -- the renderer suite keeps key-stability, image pass-through, and heading semantics together */
+/* eslint-disable max-lines -- the renderer suite keeps key-stability, image pass-through, heading semantics, and link interaction together */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { type ReactElement, type ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { openExternalUrl } from '@/lib/external-link';
+
 import { type MarkdownPalette } from './markdown-palette';
 import { type MarkdownRenderer } from './markdown-renderer';
 
@@ -373,5 +376,49 @@ describe('MarkdownRenderer heading semantics', () => {
     const strongElement = renderer.strong('bold') as ReactElement<Record<string, unknown>>;
     expect(textElement.props.accessibilityRole).toBeUndefined();
     expect(strongElement.props.accessibilityRole).toBeUndefined();
+  });
+});
+
+describe('MarkdownRenderer link interaction', () => {
+  beforeEach(() => {
+    vi.mocked(openExternalUrl).mockClear();
+  });
+
+  it('text links keep selection, link role, label, hint, and press handler', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.link('click here', 'https://example.com') as ReactElement<
+      Record<string, unknown>
+    >;
+
+    expect(element.type).toBe('Text');
+    expect(element.props.selectable).toBe(true);
+    expect(element.props.accessibilityRole).toBe('link');
+    expect(element.props.accessibilityLabel).toBe('label');
+    expect(element.props.accessibilityHint).toBe('hint');
+    expect(element.props.accessibilityActions).toEqual([]);
+    expect(typeof element.props.onPress).toBe('function');
+  });
+
+  it('a handled text-link press stays in the caller and does not open the URL', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const renderer = new RendererClass(palette, true, { onPressLink: () => true });
+    const element = renderer.link('click here', 'https://example.com') as ReactElement<{
+      onPress: () => void;
+    }>;
+
+    element.props.onPress();
+
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('an unhandled text-link press opens the external URL with the resolved label', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.link('click here', 'https://example.com') as ReactElement<{
+      onPress: () => void;
+    }>;
+
+    element.props.onPress();
+
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com', { label: 'label' });
   });
 });

@@ -11,14 +11,6 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 vi.mock('react-native', () => ({
   View: 'View',
 }));
-vi.mock('react-native-reanimated', () => ({
-  __esModule: true,
-  default: { View: 'Animated.View' },
-  FadeIn: { duration: () => ({}) },
-  FadeOut: { duration: () => ({}) },
-  LinearTransition: { duration: () => ({}) },
-  useReducedMotion: () => true,
-}));
 vi.mock('@/components/agents/remote-session-row', () => ({
   RemoteSessionRow: 'RemoteSessionRow',
 }));
@@ -89,13 +81,15 @@ function collectElements(node: unknown): React.ReactElement[] {
 
 describe('ActiveNowSection rows', () => {
   it('renders one row per pinned session, with no cap', async () => {
-    // Rows are `AnimatedRow` elements; their own children are not evaluated
-    // without a renderer, so the elements carrying a `session` prop are the
-    // row count.
+    // Rows are `RemoteSessionRow` elements rendered directly by the section;
+    // their own children are not evaluated without a renderer, so the elements
+    // carrying a `session` prop are the row count.
     const rows = collectElements(await renderSection(pinnedSessions())).filter(element =>
       Object.hasOwn(elementProps(element), 'session')
     );
     expect(rows).toHaveLength(PINNED_IDS.length);
+    const ids = rows.map(element => (elementProps(element).session as ActiveSession).id);
+    expect(ids).toEqual(PINNED_IDS);
   });
 
   it('renders no expander control', async () => {
@@ -111,21 +105,23 @@ describe('ActiveNowSection rows', () => {
   });
 });
 
-describe('ActiveNowSection reduced motion', () => {
-  it('loads the module under useReducedMotion() => true without throwing', async () => {
-    const mod = await import('./active-now-section');
-    expect(typeof mod.ActiveNowSection).toBe('function');
+describe('ActiveNowSection atomic swap', () => {
+  it('mounts the tray and rows atomically — no entering, exiting, or layout props', async () => {
+    const animated = collectElements(await renderSection(pinnedSessions())).filter(element => {
+      const props = elementProps(element);
+      return (
+        Object.hasOwn(props, 'entering') ||
+        Object.hasOwn(props, 'exiting') ||
+        Object.hasOwn(props, 'layout')
+      );
+    });
+    expect(animated).toEqual([]);
   });
 
-  it('suppresses LinearTransition on the tray under reduced motion', async () => {
-    // The gate is `layout={reducedMotion ? undefined : LinearTransition}`, so
-    // every element that carries a `layout` prop must pass `undefined`.
-    const layoutElements = collectElements(await renderSection(pinnedSessions())).filter(element =>
-      Object.hasOwn(elementProps(element), 'layout')
+  it('scopes the tray surface with the agents-active-now-section test id', async () => {
+    const containers = collectElements(await renderSection(pinnedSessions())).filter(
+      element => elementProps(element).testID === 'agents-active-now-section'
     );
-    expect(layoutElements.length).toBeGreaterThan(0);
-    for (const element of layoutElements) {
-      expect(elementProps(element).layout).toBeUndefined();
-    }
+    expect(containers).toHaveLength(1);
   });
 });

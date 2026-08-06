@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   MAX_WORKFLOW_PAGES_PER_RUN,
   MAX_WORKFLOW_STATE_LENGTH,
+  findMissingRequiredParams,
+  formatMissingParamsError,
   isWorkflowApproved,
   matchesWorkflowScope,
 } from './agent-workflows';
@@ -43,6 +45,7 @@ const scriptEnvelopeSchema = z.object({
     .array(z.object({ action: z.string(), selector: z.string() }))
     .optional()
     .default([]),
+  dryRunUnverified: z.boolean().optional(),
   error: z.string().optional(),
   ok: z.boolean(),
   value: z.unknown().optional(),
@@ -52,10 +55,17 @@ const scriptEnvelopeSchema = z.object({
  * Build the injected page code for a single workflow page eval.
  * Uses plain string CONCATENATION, never a template literal — a workflow script
  * containing a backtick or `${` would otherwise break or corrupt the composed code.
- * `state` and `dryRun` are embedded with `JSON.stringify`.
+ * `state`, `dryRun`, and `input` are embedded with `JSON.stringify`.
+ * `input` is re-injected on every page so scripts never lose run inputs
+ * across navigations; `state` carries only what the script returns.
  */
-/* eslint-disable prefer-template -- Concatenation avoids template-literal injection from untrusted workflow scripts. */
-export const buildWorkflowPageCode = (script: string, state: unknown, dryRun: boolean): string =>
+/* eslint-disable prefer-template, max-params -- Concatenation avoids template-literal injection from untrusted workflow scripts; the page code needs all four values. */
+export const buildWorkflowPageCode = (
+  script: string,
+  state: unknown,
+  dryRun: boolean,
+  input: unknown = {}
+): string =>
   'const dryRun = ' +
   JSON.stringify(dryRun) +
   ';\n' +
@@ -63,7 +73,14 @@ export const buildWorkflowPageCode = (script: string, state: unknown, dryRun: bo
   'const page = {\n' +
   '  __q(selector) {\n' +
   '    const el = document.querySelector(selector);\n' +
-  "    if (el === null) { throw new Error('No element matches selector: ' + selector); }\n" +
+  '    if (el === null) {\n' +
+  '      if (dryRun && dryRunActions.length > 0) {\n' +
+  "        const skipped = new Error('Selector not reachable in a dry run: ' + selector);\n" +
+  '        skipped.kiloDryRunUnverified = true;\n' +
+  '        throw skipped;\n' +
+  '      }\n' +
+  "      throw new Error('No element matches selector: ' + selector);\n" +
+  '    }\n' +
   '    return el;\n' +
   '  },\n' +
   '  click(selector) {\n' +
@@ -88,13 +105,26 @@ export const buildWorkflowPageCode = (script: string, state: unknown, dryRun: bo
   '  },\n' +
   '  attr(selector, name) { return page.__q(selector).getAttribute(name); },\n' +
   '  exists(selector) { return document.querySelector(selector) !== null; },\n' +
+  '  async waitFor(selector, timeoutMs) {\n' +
+  "    if (dryRun) { dryRunActions.push({ action: 'waitFor', selector }); return; }\n" +
+  '    const limit = typeof timeoutMs === "number" && timeoutMs > 0 ? Math.min(timeoutMs, 25000) : 10000;\n' +
+  '    const start = Date.now();\n' +
+  '    while (document.querySelector(selector) === null) {\n' +
+  '      if (Date.now() - start >= limit) {\n' +
+  "        throw new Error('Timed out waiting for selector: ' + selector + ' (' + limit + 'ms). The element never appeared; check the selector or wait for a different one.');\n" +
+  '      }\n' +
+  '      await new Promise((resolve) => setTimeout(resolve, 100));\n' +
+  '    }\n' +
+  '  },\n' +
   '};\n' +
-  'const workflow = async ({ page, state }) => { ' +
+  'const workflow = async ({ page, state, input }) => { ' +
   script +
   ' };\n' +
   'try {\n' +
   '  const value = await workflow({ page, state: ' +
   JSON.stringify(state) +
+  ', input: ' +
+  JSON.stringify(input) +
   ' });\n' +
   '  return { ok: true, value, dryRunActions };\n' +
   '} catch (error) {\n' +
@@ -102,6 +132,7 @@ export const buildWorkflowPageCode = (script: string, state: unknown, dryRun: bo
   '    ok: false,\n' +
   '    error: error instanceof Error ? error.message : String(error),\n' +
   '    dryRunActions,\n' +
+  '    dryRunUnverified: error instanceof Error && error.kiloDryRunUnverified === true,\n' +
   '  };\n' +
   '}';
 /* eslint-enable prefer-template */
@@ -131,6 +162,32 @@ const resultWithActions = (
 
 const isRunStopped = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
+const formatWorkflowScopeText = (
+  workflow: Pick<AgentWorkflow, 'scopeOrigin' | 'pathPrefix'>
+): string => workflow.scopeOrigin + (workflow.pathPrefix ?? '');
+
+/**
+ * Echo a short preview of an invalid script return value so the caller can
+ * see what the script actually produced, plus the two valid shapes.
+ */
+const invalidValueError = (value: unknown, dryRun: boolean): string => {
+  let preview = '';
+  try {
+    preview = JSON.stringify(value) ?? String(value);
+  } catch {
+    preview = String(value);
+  }
+  if (preview.length > 200) {
+    preview = `${preview.slice(0, 200)}…`;
+  }
+
+  const dryRunHint = dryRun
+    ? ' This was a dry run: clicks and fills are recorded, not performed, so content they would produce never appears — return early (e.g. after page.exists checks) instead of reading absent results.'
+    : '';
+
+  return `Workflow script returned an invalid value: ${preview}. Return { done: true, result } to finish, or { navigate: "<url>", state: { … } } to continue on another page.${dryRunHint}`;
+};
+
 type NavigationValidationResult =
   | { kind: 'ok'; navigateUrl: string; nextState: Record<string, unknown> }
   | { kind: 'error'; errorResult: WorkflowRunResult };
@@ -153,7 +210,8 @@ const validateNavigationState = (
   ) {
     return {
       errorResult: {
-        error: 'Workflow script returned an invalid value.',
+        error:
+          'Workflow script returned { navigate } without a state object. Return { navigate: "<url>", state: { … } } — state must be a JSON object (use {} when nothing needs to carry over).',
         ok: false,
         pageUrl: url,
       },
@@ -194,7 +252,7 @@ const validateNavigationState = (
   if (!matchesWorkflowScope(workflow, navigateUrl)) {
     return {
       errorResult: {
-        error: 'Navigation target is outside the workflow scope.',
+        error: `Navigation target ${navigateUrl} is outside the workflow scope ${formatWorkflowScopeText(workflow)}. Navigate only within the scope, or save the workflow with a wider scope.`,
         ok: false,
         pageUrl: url,
       },
@@ -208,8 +266,10 @@ const validateNavigationState = (
 /**
  * Run a stored workflow script across one or more pages.
  *
- * The script receives `{ page, state }` where page provides DOM helpers and
- * state is `{ input }` on the first page. The script must return one of:
+ * The script receives `{ page, state, input }`: page provides DOM helpers,
+ * input holds the run inputs on every page, and state carries what the
+ * script returns across navigations (`state.input` also mirrors input on
+ * the first page for older scripts). The script must return one of:
  * - `{ done: true, result: <JSON-serializable> }` to finish
  * - `{ navigate: '<url>', state: <JSON object> }` to move to the next page
  * A thrown error fails the run with the error message and the page URL.
@@ -225,14 +285,76 @@ export const runWorkflow = async (
 
   // 1. Approval gate — also applies to dry runs.
   if (!(await isWorkflowApproved(workflow))) {
-    return resultWithActions({ error: 'Workflow script is not approved.', ok: false }, dryRun, []);
+    return resultWithActions(
+      {
+        error:
+          'Workflow script is not approved. Save it again with save_workflow (same workflowId) so the user can approve this version on the card.',
+        ok: false,
+      },
+      dryRun,
+      []
+    );
+  }
+
+  // 2a. Input shape gate — before any navigation.
+  if (
+    input !== undefined &&
+    (typeof input !== 'object' || input === null || Array.isArray(input))
+  ) {
+    return resultWithActions(
+      {
+        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        ok: false,
+      },
+      dryRun,
+      []
+    );
+  }
+
+  // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding check guarantees a plain object or undefined.
+  const normalizedInput = (input ?? {}) as Record<string, unknown>;
+
+  /* Input is embedded in the injected page code on every page, so it carries
+     the same bound as navigation state. */
+  let serializedInput = '';
+  try {
+    serializedInput = JSON.stringify(normalizedInput);
+  } catch {
+    return resultWithActions(
+      { error: 'run_workflow input is not JSON-serializable.', ok: false },
+      dryRun,
+      []
+    );
+  }
+  if (serializedInput.length > MAX_WORKFLOW_STATE_LENGTH) {
+    return resultWithActions(
+      {
+        error: `run_workflow input exceeds the size limit (${String(MAX_WORKFLOW_STATE_LENGTH)} characters). Pass only the values the workflow declares as params.`,
+        ok: false,
+      },
+      dryRun,
+      []
+    );
+  }
+
+  // 2b. Declared-params gate — actionable message listing every missing value.
+  const missingParams = findMissingRequiredParams(workflow, normalizedInput);
+  if (missingParams.length > 0) {
+    return resultWithActions(
+      { error: formatMissingParamsError(missingParams), ok: false },
+      dryRun,
+      []
+    );
   }
 
   // 2. Optional startUrl navigation.
   if (workflow.startUrl !== undefined && workflow.startUrl !== '') {
     if (!matchesWorkflowScope(workflow, workflow.startUrl)) {
       return resultWithActions(
-        { error: 'Workflow startUrl is outside the workflow scope.', ok: false },
+        {
+          error: `Workflow startUrl ${workflow.startUrl} is outside the workflow scope ${formatWorkflowScopeText(workflow)}. Update the workflow so startUrl matches the scope.`,
+          ok: false,
+        },
         dryRun,
         []
       );
@@ -243,21 +365,11 @@ export const runWorkflow = async (
     }
   }
 
-  // 3. Initialize before the loop.
-  let state: unknown = { input: input ?? {} };
+  // 3. Initialize before the loop. `state.input` mirrors `input` on the first
+  // Page for scripts written against the old contract.
+  let state: unknown = { input: normalizedInput };
   let pagesVisited = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
-
-  // Verify initial input is serializable before building injected code.
-  try {
-    JSON.stringify(state);
-  } catch {
-    return resultWithActions(
-      { error: 'Workflow initial input is not serializable.', ok: false },
-      dryRun,
-      []
-    );
-  }
 
   // 4. Loop, at most MAX_WORKFLOW_PAGES_PER_RUN iterations.
   for (let pageIndex = 0; pageIndex < MAX_WORKFLOW_PAGES_PER_RUN; pageIndex++) {
@@ -274,14 +386,18 @@ export const runWorkflow = async (
     }
     if (!matchesWorkflowScope(workflow, url)) {
       return resultWithActions(
-        { error: 'Tab is outside the workflow scope.', ok: false, pageUrl: url },
+        {
+          error: `Tab is at ${url}, but this workflow only runs on ${formatWorkflowScopeText(workflow)}. Navigate the tab there first, or save the workflow with a startUrl so runs navigate automatically.`,
+          ok: false,
+          pageUrl: url,
+        },
         dryRun,
         dryRunActions
       );
     }
 
     // C. Build the injected code.
-    const code = buildWorkflowPageCode(workflow.script, state, dryRun);
+    const code = buildWorkflowPageCode(workflow.script, state, dryRun, normalizedInput);
 
     // D. Eval in the tab.
     // eslint-disable-next-line no-await-in-loop — Sequential workflow execution by design.
@@ -303,7 +419,7 @@ export const runWorkflow = async (
     const envelope = scriptEnvelopeSchema.safeParse(evalResult.value);
     if (!envelope.success) {
       return resultWithActions(
-        { error: 'Workflow script returned an unparseable value.', ok: false, pageUrl: url },
+        { error: invalidValueError(evalResult.value, dryRun), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
@@ -312,6 +428,24 @@ export const runWorkflow = async (
     // Accumulate dryRunActions.
     const pageActions = envelope.data.dryRunActions;
     dryRunActions.push(...pageActions);
+
+    /* A dry run cannot reach content its own skipped clicks would have produced.
+       Selectors up to the first recorded action are verified, so this reports
+       success with the recorded actions instead of failing a correct script. */
+    if (dryRun && envelope.data.dryRunUnverified === true) {
+      return resultWithActions(
+        {
+          ok: true,
+          pagesVisited,
+          result: {
+            dryRun: true,
+            note: `Selectors before the first recorded action are verified. The script then stopped: ${envelope.data.error ?? 'a later selector was unreachable.'} That is expected in a dry run, because recorded clicks and fills never change the page. Ask the user to start a real run to verify the rest.`,
+          },
+        },
+        dryRun,
+        dryRunActions
+      );
+    }
 
     // Script threw an error.
     if (!envelope.data.ok) {
@@ -326,8 +460,25 @@ export const runWorkflow = async (
     const innerValue = envelope.data.value as Record<string, unknown>;
 
     if (innerValue === null || innerValue === undefined || typeof innerValue !== 'object') {
+      /* Same reasoning as above: a dry-run script that falls through without a
+         return value usually read post-action content that never rendered. */
+      if (dryRun && dryRunActions.length > 0) {
+        return resultWithActions(
+          {
+            ok: true,
+            pagesVisited,
+            result: {
+              dryRun: true,
+              note: 'Selectors before the first recorded action are verified. The script returned no value, which is expected in a dry run when it reads content that recorded clicks and fills would have produced. Ask the user to start a real run to verify the rest.',
+            },
+          },
+          dryRun,
+          dryRunActions
+        );
+      }
+
       return resultWithActions(
-        { error: 'Workflow script returned an invalid value.', ok: false, pageUrl: url },
+        { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
@@ -359,7 +510,7 @@ export const runWorkflow = async (
 
     // Anything else is invalid.
     return resultWithActions(
-      { error: 'Workflow script returned an invalid value.', ok: false, pageUrl: url },
+      { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
       dryRun,
       dryRunActions
     );
@@ -367,7 +518,10 @@ export const runWorkflow = async (
 
   // 5. Loop exhausted.
   return resultWithActions(
-    { error: 'Workflow exceeded the page limit.', ok: false },
+    {
+      error: `Workflow exceeded the page limit (${String(MAX_WORKFLOW_PAGES_PER_RUN)} pages). Check the script for a navigation loop.`,
+      ok: false,
+    },
     dryRun,
     dryRunActions
   );

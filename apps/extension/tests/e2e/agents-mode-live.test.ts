@@ -104,52 +104,18 @@ test('live local backend: open remote CLI session, send, assert reply, send long
     });
 
     // Wait for active sessions to load. Sessions poll every ~30s; bound to 60s.
-    // Must find at least one non-Cloud active session row.
-    const sessionRows = sidePanel.locator('button:has(> div:has(> span.truncate))');
+    // CLI rows carry the "CLI" platform icon (cloud rows carry "Cloud agent").
+    const remoteRows = sidePanel.locator('button', {
+      has: sidePanel.locator('svg[aria-label="CLI"]'),
+    });
     await expect
-      .poll(
-        async () => {
-          const count = await sessionRows.count();
-          for (let idx = 0; idx < count; idx += 1) {
-            const hasCloudBadge = await sessionRows
-              .nth(idx)
-              .locator('text=Cloud')
-              .isVisible()
-              .catch(() => false);
-            if (!hasCloudBadge) {
-              return true;
-            }
-          }
-          return false;
-        },
-        {
-          message: 'No non-Cloud active sessions found — expected at least one remote CLI session',
-          timeout: 60_000,
-        }
-      )
-      .toBe(true);
+      .poll(() => remoteRows.count(), {
+        message: 'No remote CLI sessions found — expected at least one active CLI session',
+        timeout: 60_000,
+      })
+      .toBeGreaterThan(0);
 
-    // Find a non-Cloud active session. The session buttons are nested <button>
-    // Elements with a truncate span showing the title. Cloud sessions have a
-    // "Cloud" badge. Filter to rows without the Cloud badge.
-    let remoteRow: ReturnType<typeof sessionRows.nth> | null = null;
-    const rowCount = await sessionRows.count();
-    for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
-      const row = sessionRows.nth(rowIdx);
-      const hasCloudBadge = await row
-        .locator('text=Cloud')
-        .isVisible()
-        .catch(() => false);
-      if (!hasCloudBadge) {
-        remoteRow = row;
-        break;
-      }
-    }
-    if (!remoteRow) {
-      throw new Error('No remote CLI sessions found — all active sessions are Cloud sessions');
-    }
-
-    await remoteRow.click();
+    await remoteRows.first().click();
     await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 15_000 });
 
     // Wait for the initial transcript to replace the session-loading skeleton.

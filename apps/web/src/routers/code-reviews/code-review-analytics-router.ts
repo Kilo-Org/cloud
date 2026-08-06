@@ -5,6 +5,7 @@ import { setReviewAnalyticsEnabled } from '@/lib/code-reviews/analytics/settings
 import { readDb } from '@/lib/drizzle';
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import { timedUsageQuery } from '@/lib/usage-query';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -55,7 +56,7 @@ export const codeReviewAnalyticsRouter = createTRPCRouter({
   }),
 
   setEnabled: baseProcedure.input(SetEnabledInputSchema).mutation(async ({ ctx, input }) => {
-    await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+    await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
 
     const enabled = await setReviewAnalyticsEnabled({
       owner: { type: 'org', id: input.organizationId },

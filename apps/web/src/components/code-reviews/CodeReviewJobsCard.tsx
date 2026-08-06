@@ -66,10 +66,7 @@ import {
   defaultCouncilSelections,
   type CouncilSpecialistSelection,
 } from '@/lib/code-reviews/core/council-selection';
-import {
-  getAvailableThinkingEfforts,
-  thinkingEffortLabel,
-} from '@/lib/code-reviews/core/model-variants';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import {
   getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredRecoveryHref,
@@ -174,12 +171,19 @@ function selectInitialManualJobModel(params: {
 
 function selectInitialManualJobThinkingEffort(
   configuredThinkingEffort: string | null | undefined,
-  modelSlug: string
+  modelSlug: string,
+  modelOptions: ModelOption[],
+  isLoadingModels: boolean
 ): string | null {
   if (!configuredThinkingEffort) {
     return null;
   }
-  return getAvailableThinkingEfforts(modelSlug).includes(configuredThinkingEffort)
+  if (isLoadingModels) {
+    return configuredThinkingEffort;
+  }
+  return modelOptions
+    .find(model => model.id === modelSlug)
+    ?.variants?.includes(configuredThinkingEffort)
     ? configuredThinkingEffort
     : null;
 }
@@ -233,7 +237,8 @@ export function CodeReviewJobsCard({
     platform === 'gitlab'
       ? 'https://gitlab.com/group/project/-/merge_requests/123'
       : 'https://github.com/owner/repo/pull/123';
-  const manualJobAvailableThinkingEfforts = getAvailableThinkingEfforts(manualJobModelSlug);
+  const manualJobAvailableThinkingEfforts =
+    modelOptions.find(model => model.id === manualJobModelSlug)?.variants ?? [];
   const manualJobUrlError = getManualJobUrlError(
     manualJobUrl,
     platform,
@@ -309,13 +314,16 @@ export function CodeReviewJobsCard({
     manualJobCouncilBelowMin;
 
   useEffect(() => {
+    if (isLoadingModels) return;
     if (
       manualJobThinkingEffort &&
-      !getAvailableThinkingEfforts(manualJobModelSlug).includes(manualJobThinkingEffort)
+      !modelOptions
+        .find(model => model.id === manualJobModelSlug)
+        ?.variants?.includes(manualJobThinkingEffort)
     ) {
       setManualJobThinkingEffort(null);
     }
-  }, [manualJobModelSlug, manualJobThinkingEffort]);
+  }, [isLoadingModels, manualJobModelSlug, manualJobThinkingEffort, modelOptions]);
 
   useEffect(() => {
     if (!manualJobDialogOpen || modelOptions.length === 0 || manualJobModelAllowed) {
@@ -329,12 +337,18 @@ export function CodeReviewJobsCard({
     });
     setManualJobModelSlug(nextModelSlug);
     setManualJobThinkingEffort(
-      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug)
+      selectInitialManualJobThinkingEffort(
+        defaultThinkingEffort,
+        nextModelSlug,
+        modelOptions,
+        isLoadingModels
+      )
     );
   }, [
     defaultModel,
     defaultModelSlug,
     defaultThinkingEffort,
+    isLoadingModels,
     manualJobDialogOpen,
     manualJobModelAllowed,
     modelOptions,
@@ -350,7 +364,12 @@ export function CodeReviewJobsCard({
     setManualJobUrlTouched(false);
     setManualJobModelSlug(nextModelSlug);
     setManualJobThinkingEffort(
-      selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug)
+      selectInitialManualJobThinkingEffort(
+        defaultThinkingEffort,
+        nextModelSlug,
+        modelOptions,
+        isLoadingModels
+      )
     );
     setManualJobInstructions('');
     setManualJobCouncilEnabled(false);

@@ -28,7 +28,7 @@ import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
   organizationMemberProcedure,
-  organizationOwnerMutationProcedure,
+  organizationAdminMutationProcedure,
 } from '@/routers/organizations/utils';
 import { getModelAccessPolicyEditorData } from '@/lib/organizations/group-policies/model-access/model-access.server';
 
@@ -108,7 +108,7 @@ export const organizationGroupsRouter = createTRPCRouter({
     return { group };
   }),
 
-  create: organizationOwnerMutationProcedure
+  create: organizationAdminMutationProcedure
     .input(CreateGroupInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await createOrganizationGroup({
@@ -120,7 +120,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  updateMetadata: organizationOwnerMutationProcedure
+  updateMetadata: organizationAdminMutationProcedure
     .input(UpdateMetadataInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await updateOrganizationGroupMetadata({
@@ -132,7 +132,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  updateDetails: organizationOwnerMutationProcedure
+  updateDetails: organizationAdminMutationProcedure
     .input(UpdateGroupDetailsInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await updateOrganizationGroupDetails({
@@ -145,7 +145,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  setPolicy: organizationOwnerMutationProcedure
+  setPolicy: organizationAdminMutationProcedure
     .input(SetPolicyInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await setOrganizationGroupPolicy({
@@ -156,7 +156,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  removePolicy: organizationOwnerMutationProcedure
+  removePolicy: organizationAdminMutationProcedure
     .input(RemovePolicyInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await removeOrganizationGroupPolicy({
@@ -167,7 +167,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  setMembers: organizationOwnerMutationProcedure
+  setMembers: organizationAdminMutationProcedure
     .input(SetMembersInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await setOrganizationGroupMembers({
@@ -178,7 +178,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  setMemberGroups: organizationOwnerMutationProcedure
+  setMemberGroups: organizationAdminMutationProcedure
     .input(SetMemberGroupsInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await setOrganizationMemberGroups({
@@ -189,7 +189,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  delete: organizationOwnerMutationProcedure
+  delete: organizationAdminMutationProcedure
     .input(GroupIdInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await deleteOrganizationGroup({
@@ -216,7 +216,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       }
     }),
 
-  setDefaultPolicy: organizationOwnerMutationProcedure
+  setDefaultPolicy: organizationAdminMutationProcedure
     .input(SetDefaultPolicyInputSchema)
     .mutation(async ({ input, ctx }) => {
       return await setDefaultOrganizationGroupPolicy({
@@ -226,7 +226,7 @@ export const organizationGroupsRouter = createTRPCRouter({
       });
     }),
 
-  removeDefaultPolicy: organizationOwnerMutationProcedure
+  removeDefaultPolicy: organizationAdminMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({ policyType: OrganizationGroupPolicyTypeSchema }).strict()
     )

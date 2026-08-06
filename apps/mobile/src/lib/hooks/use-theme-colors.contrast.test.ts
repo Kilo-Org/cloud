@@ -122,3 +122,17 @@ describe('status token contrast on light surfaces (WCAG AA text)', () => {
     expect(compositeHex(`${lightColors.destructive}1a`, lightColors.background)).toBe('#f3e8e2');
   });
 });
+
+describe('warn foreground token contrast (WCAG AA text)', () => {
+  it('light theme: warnForeground vs warn >= 4.5:1', () => {
+    // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
+    const ratio = contrastRatio(lightColors.warnForeground, lightColors.warn);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: warnForeground vs warn >= 4.5:1', () => {
+    // Precomputed ≈ 9.29:1 for #1A1A10 on #F2B05F.
+    const ratio = contrastRatio(darkColors.warnForeground, darkColors.warn);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+});

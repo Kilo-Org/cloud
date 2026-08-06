@@ -191,6 +191,7 @@ async function insertCodingPlanInventoryKey(values: {
   userId: string;
   planId: string;
   providerId: string;
+  upstreamUsageId?: string;
 }): Promise<string> {
   const [inventoryKey] = await schemaTestDb.db
     .insert(schema.coding_plan_key_inventory)
@@ -198,6 +199,7 @@ async function insertCodingPlanInventoryKey(values: {
       plan_id: values.planId,
       provider_id: values.providerId,
       upstream_plan_id: `upstream-${crypto.randomUUID()}`,
+      upstream_usage_id: values.upstreamUsageId,
       credential_fingerprint: `fingerprint-${crypto.randomUUID()}`,
       assigned_to_user_id: values.userId,
       status: 'assigned',
@@ -793,6 +795,30 @@ describe('database schema', () => {
       ).rejects.toMatchObject({
         cause: {
           constraint: 'UQ_coding_plan_sub_live_user_provider',
+        },
+      });
+    });
+  });
+
+  it('prevents a provider usage subject from being attached to multiple inventory rows', async () => {
+    await withCodingPlanSchemaUser(async ({ userId }) => {
+      await insertCodingPlanInventoryKey({
+        userId,
+        planId: 'byteplus-coding-plan-team-lite',
+        providerId: 'byteplus-coding',
+        upstreamUsageId: 'seat-123',
+      });
+
+      await expect(
+        insertCodingPlanInventoryKey({
+          userId,
+          planId: 'byteplus-coding-plan-team-pro',
+          providerId: 'byteplus-coding',
+          upstreamUsageId: 'seat-123',
+        })
+      ).rejects.toMatchObject({
+        cause: {
+          constraint: 'UQ_coding_plan_key_inv_provider_usage_id',
         },
       });
     });

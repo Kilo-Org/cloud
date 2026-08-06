@@ -33,7 +33,7 @@ describe('agent LLM harness', () => {
     expect(createEvalToolDefinition()).toStrictEqual({
       function: {
         description:
-          'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read.',
+          'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read. This is plain JavaScript with DOM access — workflow page helpers like page.click or page.fill do not exist here; use document.querySelector and native DOM calls.',
         name: 'eval',
         parameters: {
           additionalProperties: false,
@@ -377,11 +377,11 @@ describe('agent LLM harness', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Never do a real run to verify');
   });
 
-  it('tells the model that omitting pathPrefix or startUrl clears them when updating a workflow', () => {
+  it('tells the model that omitting pathPrefix, startUrl, or params clears them when updating a workflow', () => {
     const definitions = createWorkflowToolDefinitions({ mode: 'safe' });
     const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
     expect(JSON.stringify(saveWorkflow?.function.parameters)).toContain(
-      'When updating, omitting pathPrefix or startUrl clears the stored value.'
+      'When updating, omitting pathPrefix, startUrl, or params clears the stored value.'
     );
   });
 

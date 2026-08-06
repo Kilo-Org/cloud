@@ -7,6 +7,7 @@ import {
   MODE,
   PROMPT_MAX_LENGTH,
   PROMPT_MIN_LENGTH,
+  submitBlockedReason,
 } from './agents-new-session';
 
 /* eslint-disable jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- WXT virtual module has no importable runtime type in Vitest. */
@@ -174,5 +175,70 @@ describe('buildPrepareSessionInput helper', () => {
     const copy = { ...baseInput };
     buildPrepareSessionInput('org-1', baseInput);
     expect(baseInput).toStrictEqual(copy);
+  });
+});
+
+describe('submitBlockedReason helper', () => {
+  const base = {
+    hasModels: true,
+    integrationInstalled: true,
+    isCloudTarget: true,
+    isLoading: false,
+    isPromptValid: true,
+    repoCount: 1,
+    selectedRepo: 'org/repo',
+  };
+
+  it('returns null when the cloud form is submittable', () => {
+    expect(submitBlockedReason(base)).toBeNull();
+  });
+
+  it('stays silent while the prompt is still too short', () => {
+    // The textarea already reports the length requirement.
+    expect(submitBlockedReason({ ...base, isPromptValid: false, selectedRepo: '' })).toBeNull();
+  });
+
+  it('stays silent for a CLI target, which needs no repo or model', () => {
+    expect(
+      submitBlockedReason({
+        ...base,
+        hasModels: false,
+        integrationInstalled: false,
+        isCloudTarget: false,
+        repoCount: 0,
+        selectedRepo: '',
+      })
+    ).toBeNull();
+  });
+
+  it('names no blocker while the repo and model lists are still loading', () => {
+    // An empty list mid-load means "not yet", not "none available".
+    expect(
+      submitBlockedReason({
+        ...base,
+        hasModels: false,
+        isLoading: true,
+        repoCount: 0,
+        selectedRepo: '',
+      })
+    ).toBeNull();
+  });
+
+  it('reports connect-github before anything else', () => {
+    expect(
+      submitBlockedReason({ ...base, integrationInstalled: false, repoCount: 0, selectedRepo: '' })
+    ).toBe('connect-github');
+  });
+
+  it('reports no-repos when the integration is installed but empty', () => {
+    expect(submitBlockedReason({ ...base, repoCount: 0, selectedRepo: '' })).toBe('no-repos');
+  });
+
+  it('reports no-models when models failed to load', () => {
+    expect(submitBlockedReason({ ...base, hasModels: false })).toBe('no-models');
+  });
+
+  it('reports pick-repo when repositories exist but none is chosen', () => {
+    expect(submitBlockedReason({ ...base, selectedRepo: '' })).toBe('pick-repo');
   });
 });

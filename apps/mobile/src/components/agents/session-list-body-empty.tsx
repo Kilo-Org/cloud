@@ -1,4 +1,4 @@
-import { History, SearchX } from 'lucide-react-native';
+import { Activity, History, SearchX } from 'lucide-react-native';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 
 type BodyEmptyProps = {
-  kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions';
+  kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions' | 'all-active';
   isSearching: boolean;
   secondaryAction?: 'clear-search' | 'clear-filters' | 'none';
   emptyStateAction: ReactNode;
@@ -18,7 +18,9 @@ type BodyEmptyProps = {
  * Renders the body empty-state for the Agents session list, switched on the
  * `kind` returned by the body render model. Each branch is a compact
  * `View` matching the design language of the rest of the list (icon + title
- * + description + one CTA).
+ * + description). Every branch keeps its action, except `all-active`, which
+ * intentionally has no CTA: the tray, the FAB, and the header action already
+ * offer creation.
  */
 export function BodyEmpty({
   kind,
@@ -61,6 +63,23 @@ export function BodyEmpty({
         {secondaryAction === 'clear-search' || secondaryAction === 'clear-filters'
           ? clearQueryAction
           : null}
+      </View>
+    );
+  }
+  if (kind === 'all-active') {
+    // Every loaded stored session is excluded by the live active set, so the
+    // body is empty only because the active set consumed the history. In the
+    // full view the exclusion set also covers WS-written rows awaiting org
+    // attribution, so the tray can be momentarily empty here. No creation
+    // CTA: the tray, the FAB, and the header action already offer creation.
+    return (
+      <View className="items-center justify-center pt-12">
+        <EmptyState
+          icon={Activity}
+          title="All sessions are active"
+          description="Completed sessions will appear here."
+          placement="top"
+        />
       </View>
     );
   }

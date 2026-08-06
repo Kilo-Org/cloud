@@ -38,6 +38,7 @@ import {
 } from '@/lib/organizations/organization-auto-model-shared';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type CustomModesLayoutProps = {
   organizationId: string;
@@ -209,7 +210,7 @@ export function CustomModesLayout({ organizationId, role, isGlobalAdmin }: Custo
   const isDefaultModelFeatureEnabled = useFeatureFlagEnabled(ORGANIZATION_AUTO_MODEL_FLAG);
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isDefaultModelConfigEnabled = isDevelopment || isDefaultModelFeatureEnabled === true;
-  const canMaintainRoutedMode = role === 'owner' || isGlobalAdmin;
+  const canMaintainRoutedMode = canManageOrganization(role) || isGlobalAdmin;
   const canSetDefaultModel =
     organizationData?.plan === 'enterprise' && isDefaultModelConfigEnabled && canMaintainRoutedMode;
   const isOrganizationAutoDefaultActive =

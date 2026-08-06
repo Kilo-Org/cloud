@@ -22,75 +22,68 @@ export const REASONING_VARIANTS_BINARY = {
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
-export const REASONING_VARIANTS_MAX_HIGH_LOW_NONE = {
-  max: { reasoning: { enabled: true, effort: 'max' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  low: { reasoning: { enabled: true, effort: 'low' } },
-  none: { reasoning: { enabled: false, effort: 'none' } },
-} as const;
-
-export const REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL = {
-  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
-  low: { reasoning: { enabled: true, effort: 'low' } },
+export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
 } as const;
 
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
-  low: { reasoning: { enabled: true, effort: 'low' } },
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
-  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
-  low: { reasoning: { enabled: true, effort: 'low' } },
-  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
   none: { reasoning: { enabled: false, effort: 'none' } },
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
-  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
   none: { reasoning: { enabled: false, effort: 'none' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_MEDIUM_HIGH = {
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
   none: { reasoning: { enabled: false, effort: 'none' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
-  max: { reasoning: { enabled: true, effort: 'max' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  low: { reasoning: { enabled: true, effort: 'low' } },
   none: { reasoning: { enabled: false, effort: 'none' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  max: { reasoning: { enabled: true, effort: 'max' } },
 } as const;
 
 const REASONING_VARIANTS_CLAUDE = {
-  max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
-  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
-  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
   none: { reasoning: { enabled: false, effort: 'none' } },
+  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+  max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
 } as const;
 
 export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  high: { reasoning: { enabled: true, effort: 'high' } },
-  medium: { reasoning: { enabled: true, effort: 'medium' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export function getFallbackModelVariants(model: string): OpenCodeSettings['variants'] {
@@ -113,7 +106,7 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
   if (isKimiModel(model)) {
-    return REASONING_VARIANTS_MAX_HIGH_LOW_NONE;
+    return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
   }
   if (model.includes('laguna')) {
     return REASONING_VARIANTS_BINARY;
@@ -143,12 +136,11 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
     return Object.fromEntries(
       ReasoningEffortSchema.options
         .filter(e => e !== 'minimal')
-        .reverse()
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
   if (isQwenModel(model)) {
-    return REASONING_VARIANTS_XHIGH_HIGH_MEDIUM_LOW_MINIMAL;
+    return REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH_XHIGH;
   }
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;

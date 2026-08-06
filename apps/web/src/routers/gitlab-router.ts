@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import * as gitlabService from '@/lib/integrations/gitlab-service';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   resolveOwner,
@@ -69,7 +70,7 @@ export const gitlabRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
       }
       const owner = resolveOwner(ctx, input.organizationId);
       return gitlabService.connectWithPAT(owner, input.token, input.instanceUrl, ctx.user.id);

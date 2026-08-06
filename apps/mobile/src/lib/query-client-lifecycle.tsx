@@ -1,9 +1,9 @@
-import { addEventListener, type NetInfoState } from '@react-native-community/netinfo';
+import { addEventListener } from '@react-native-community/netinfo';
 import { focusManager, onlineManager } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-type ConnectivityState = Pick<NetInfoState, 'isConnected' | 'isInternetReachable'>;
+import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
 
 type QueryClientLifecycleSources = {
   getAppState: () => AppStateStatus;
@@ -36,10 +36,6 @@ const defaultManagers: QueryClientLifecycleManagers = {
   focus: focusManager,
   online: onlineManager,
 };
-
-function isOnline(state: ConnectivityState): boolean {
-  return state.isInternetReachable ?? state.isConnected ?? true;
-}
 
 export function installQueryClientNativeLifecycle({
   sources = nativeLifecycleSources,

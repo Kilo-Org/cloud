@@ -48,7 +48,18 @@ export function SessionListSearchHeader({
   return (
     <View>
       <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
-        <Search size={18} color={colors.mutedForeground} />
+        {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
+        <View className="h-[18px] w-[18px] items-center justify-center">
+          {showSearchBusy ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.mutedForeground}
+              accessibilityLabel="Searching"
+            />
+          ) : (
+            <Search size={18} color={colors.mutedForeground} />
+          )}
+        </View>
         <TextInput
           ref={attachInputRef}
           accessibilityLabel="Search sessions"
@@ -72,14 +83,6 @@ export function SessionListSearchHeader({
           </Pressable>
         ) : null}
       </View>
-      {showSearchBusy ? (
-        <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
-          <Text variant="muted" className="text-xs">
-            Searching…
-          </Text>
-        </View>
-      ) : null}
       {showInlineError ? (
         <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
           Couldn't refresh. Pull down to try again.

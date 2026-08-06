@@ -3,6 +3,10 @@ import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@/lib/trpc/init';
 import type { TRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
@@ -13,8 +17,15 @@ export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
 });
 
-const parentOrganizationAccessRoles = ['owner', 'billing_manager'] satisfies OrganizationRole[];
-const rolePriority = ['owner', 'billing_manager', 'member'] satisfies OrganizationRole[];
+// Roles in a parent organization that inherit access to its children. Kept
+// separate from ORGANIZATION_BILLING_ROLES so changing billing scope cannot
+// silently widen child-organization inheritance.
+const parentOrganizationAccessRoles = [
+  'owner',
+  'admin',
+  'billing_manager',
+] satisfies OrganizationRole[];
+const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 function allowedRole(
   rows: { role: OrganizationRole }[],
@@ -262,19 +273,19 @@ export const organizationMemberMutationProcedure = baseProcedure
     return next();
   });
 
-// Custom procedure that ensures user has owner access to the organization
-export const organizationOwnerProcedure = baseProcedure
+// Ensures the caller can manage the organization (owner or admin).
+export const organizationAdminProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
-    await ensureOrganizationAccess(ctx, input.organizationId, ['owner']);
+    await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
     return next();
   });
 
-// Owner procedure that also enforces trial/subscription status on mutations
-export const organizationOwnerMutationProcedure = baseProcedure
+// Owner/admin procedure that also enforces trial/subscription status on mutations
+export const organizationAdminMutationProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
-    await ensureOrganizationAccess(ctx, input.organizationId, ['owner']);
+    await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
     await requireActiveSubscriptionOrTrial(input.organizationId);
     return next();
   });
@@ -283,7 +294,7 @@ export const organizationOwnerMutationProcedure = baseProcedure
 export const organizationBillingProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
-    await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+    await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
     return next();
   });
 
@@ -291,7 +302,7 @@ export const organizationBillingProcedure = baseProcedure
 export const organizationBillingMutationProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
-    await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+    await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
     await requireActiveSubscriptionOrTrial(input.organizationId);
     return next();
   });

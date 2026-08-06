@@ -21,6 +21,7 @@ import {
 } from '@/lib/integrations/platforms/bitbucket/credentials';
 import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
 import { getUserFromAuth } from '@/lib/user/server';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 type CallbackState = { owner: string; returnTo?: string };
@@ -68,7 +69,7 @@ async function authorizeOwner(owner: Owner, user: AuthenticatedOAuthUser): Promi
     if (owner.id !== user.id) throw new Error('OAuth owner mismatch');
     return;
   }
-  await ensureOrganizationAccess({ user }, owner.id, ['owner', 'billing_manager']);
+  await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
 }
 
 export async function handleBitbucketOAuthCallback(request: NextRequest): Promise<Response> {

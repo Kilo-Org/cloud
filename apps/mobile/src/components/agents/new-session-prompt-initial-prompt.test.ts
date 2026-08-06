@@ -2,8 +2,14 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 
 const onChangeTextMock = vi.fn();
+const pasteClipboardImageMock = vi.hoisted(() => vi.fn());
+/** Captures the options the composer hands the clipboard hint. */
+const clipboardHintOptions = vi.hoisted(() => ({
+  current: null as { addText?: (text: string) => void } | null,
+}));
 
 // ── React hooks (real useEffect needs rendering context, so mock all hooks) ──
 vi.mock('react', async () => {
@@ -38,6 +44,7 @@ vi.mock('react-native-reanimated', () => ({
 
 // ── icons ──────────────────────────────────────────────────────────
 vi.mock('lucide-react-native', () => ({
+  ClipboardPaste: () => null,
   Paperclip: () => null,
 }));
 
@@ -53,10 +60,6 @@ vi.mock('@/components/agents/attachment-preview-strip', () => ({
   AttachmentPreviewStrip: () => null,
 }));
 
-vi.mock('@/components/agents/attachment-paste-hint', () => ({
-  AttachmentPasteHint: () => null,
-}));
-
 vi.mock('@/components/agents/chat-toolbar', () => ({
   ChatToolbar: () => null,
 }));
@@ -70,12 +73,14 @@ vi.mock('@/components/agents/use-text-height', () => ({
   }),
 }));
 
+const controlState = vi.hoisted(() => ({ inputEditable: true }));
+
 vi.mock('@/components/agents/new-session-prompt-state', () => ({
   resolveNewSessionPromptControlState: () => ({
     createDisabled: false,
     hasPrompt: false,
     inputAccessibilityDisabled: false,
-    inputEditable: true,
+    inputEditable: controlState.inputEditable,
     paperclipDisabled: false,
     voiceDisabled: false,
   }),
@@ -99,12 +104,15 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
-vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
-  useClipboardImageHint: () => ({
-    visible: false,
-    refresh: vi.fn(),
-    paste: vi.fn(),
-  }),
+vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
+  useClipboardPaste: (options: { addText?: (text: string) => void }) => {
+    clipboardHintOptions.current = options;
+    return {
+      visible: false,
+      refresh: vi.fn(),
+      paste: pasteClipboardImageMock,
+    };
+  },
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
@@ -130,19 +138,20 @@ vi.mock('@/lib/voice-input/voice-input-draft', () => ({
 
 // ── helpers ────────────────────────────────────────────────────────
 type Node = { props?: Record<string, unknown> } | null | undefined | string | number | boolean;
+type ElementType = string | ((...args: never[]) => unknown);
 
-function findElementByType(node: Node, typeName: string): Record<string, unknown> | null {
+function findElementByType(node: Node, target: ElementType): Record<string, unknown> | null {
   if (node === null || typeof node !== 'object') {
     return null;
   }
   const props = node.props ?? {};
   const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type === typeName) {
+  const nodeType = (node as { type?: unknown }).type;
+  if (nodeType === target) {
     return node.props ?? {};
   }
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementByType(child as Node, typeName);
+    const found = findElementByType(child as Node, target);
     if (found) {
       return found;
     }
@@ -236,5 +245,56 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textInputProps).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(textInputProps!.defaultValue).toBeUndefined();
+  });
+
+  it('pastes clipboard text at the reported caret, not at the draft end', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    onChangeTextMock.mockClear();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt({
+      ...defaultProps(),
+      initialPrompt: 'fix the bug',
+    }) as Node;
+
+    const textInputProps = findElementByType(element, 'TextInput') ?? {};
+    const reportSelection = textInputProps.onSelectionChange as (event: {
+      nativeEvent: { selection: { start: number; end: number } };
+    }) => void;
+    reportSelection({ nativeEvent: { selection: { start: 4, end: 4 } } });
+
+    clipboardHintOptions.current?.addText?.('really ');
+
+    expect(onChangeTextMock).toHaveBeenCalledWith('fix really the bug');
+  });
+
+  it('drops a paste that resolves after the input stopped accepting text', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    onChangeTextMock.mockClear();
+    controlState.inputEditable = false;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      NewSessionPrompt({ ...defaultProps(), initialPrompt: 'fix the bug' });
+
+      clipboardHintOptions.current?.addText?.('really ');
+    } finally {
+      controlState.inputEditable = true;
+    }
+
+    expect(onChangeTextMock).not.toHaveBeenCalled();
+  });
+
+  it('renders the paste button wired to the clipboard hint paste path', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt(defaultProps()) as Node;
+
+    const pasteButtonProps = findElementByType(element, ComposerPasteButton);
+    expect(pasteButtonProps).not.toBeNull();
+    const props = pasteButtonProps ?? {};
+    expect(props.onPress).toBe(pasteClipboardImageMock);
+    expect(props.disabled).toBe(false);
   });
 });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- close button, trigger, two-axis modal, and table a11y semantics share one ~75-line native-module mock block; splitting the file would duplicate it */
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 
@@ -92,7 +93,7 @@ const rows: React.ReactNode[][][] = [[['Row 1']]];
 type RenderedElement = {
   type: unknown;
   props: Record<string, unknown> & {
-    children?: RenderedElement | RenderedElement[];
+    children?: React.ReactNode;
   };
 };
 
@@ -160,6 +161,33 @@ function isAccessibleLabelElement(node: RenderedElement): boolean {
 /** The row container: a flex-row View that must stay a non-accessible wrapper. */
 function isRowContainer(node: RenderedElement): boolean {
   return node.type === 'View' && node.props.className === 'flex-row';
+}
+
+/**
+ * The chip Pressable that opens the modal. Its accessible name is the linear
+ * table summary ("Table, 1 column, 1 row, opens full screen"), so match on the
+ * "Table," prefix; the visible chip text stays "View table".
+ */
+function findTriggerPressable(element: unknown): RenderedElement | null {
+  return findFirst(
+    element,
+    node => node.type === 'Pressable' && accessibilityLabelOf(node).startsWith('Table,')
+  );
+}
+
+/** Walk the element tree for a Text node rendering exactly the summary string. */
+function findSummaryText(element: unknown, summary: string): RenderedElement | null {
+  return findFirst(element, node => node.type === 'Text' && node.props.children === summary);
+}
+
+/** Every ScrollView node in tree order. */
+function collectScrollViews(element: unknown): RenderedElement[] {
+  return findAll(element, node => node.type === 'ScrollView');
+}
+
+/** Whether `node` appears anywhere inside `ancestor`'s subtree. */
+function isDescendant(ancestor: RenderedElement, node: RenderedElement): boolean {
+  return findAll(ancestor, () => true).includes(node);
 }
 
 describe('MarkdownTable close button', () => {
@@ -322,5 +350,58 @@ describe('MarkdownTable table semantics', () => {
     expect(moveA11yFocus).not.toHaveBeenCalled();
     onShow?.();
     expect(moveA11yFocus).toHaveBeenCalled();
+  });
+});
+
+describe('MarkdownTable trigger and two-axis modal', () => {
+  it('renders the "View table" trigger Pressable', () => {
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({ palette: mockPalette, header, rows });
+    const trigger = findTriggerPressable(element);
+
+    expect(trigger).not.toBeNull();
+    if (!trigger) {
+      throw new Error('trigger should not be null');
+    }
+    expect(trigger.props.accessibilityRole).toBe('button');
+  });
+
+  it('summarizes the existing 1-by-1 fixture as "1 column · 1 row"', () => {
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({ palette: mockPalette, header, rows });
+
+    expect(findSummaryText(element, '1 column · 1 row')).not.toBeNull();
+  });
+
+  it('summarizes a 2-by-3 fixture as "2 columns · 3 rows"', () => {
+    const twoByThreeHeader: React.ReactNode[][] = [['A'], ['B']];
+    const twoByThreeRows: React.ReactNode[][][] = [
+      [['1'], ['2']],
+      [['3'], ['4']],
+      [['5'], ['6']],
+    ];
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({
+      palette: mockPalette,
+      header: twoByThreeHeader,
+      rows: twoByThreeRows,
+    });
+
+    expect(findSummaryText(element, '2 columns · 3 rows')).not.toBeNull();
+  });
+
+  it('renders exactly two axis ScrollViews, inner horizontal nested in outer vertical', () => {
+    // eslint-disable-next-line new-cap
+    const element = MarkdownTable({ palette: mockPalette, header, rows });
+    const scrollViews = collectScrollViews(element);
+
+    expect(scrollViews).toHaveLength(2);
+    const [outerScrollView, innerScrollView] = scrollViews;
+    if (!outerScrollView || !innerScrollView) {
+      throw new Error('expected exactly two ScrollViews');
+    }
+    expect(outerScrollView.props.horizontal).toBeUndefined();
+    expect(innerScrollView.props.horizontal).toBe(true);
+    expect(isDescendant(outerScrollView, innerScrollView)).toBe(true);
   });
 });

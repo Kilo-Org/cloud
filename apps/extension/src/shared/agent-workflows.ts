@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Single domain module for workflow types, validation, search, and formatting; splitting would scatter the contract. */
 import { z } from 'zod';
 import { sanitizeTabContextText } from './tab-context-sanitize';
 
@@ -5,6 +6,10 @@ export const MAX_WORKFLOW_COUNT = 100;
 export const MAX_WORKFLOW_SCRIPT_LENGTH = 32_000;
 export const MAX_WORKFLOW_NAME_LENGTH = 80;
 export const MAX_WORKFLOW_DESCRIPTION_LENGTH = 300;
+export const MAX_WORKFLOW_PARAM_COUNT = 10;
+export const MAX_WORKFLOW_PARAM_NAME_LENGTH = 40;
+export const MAX_WORKFLOW_PARAM_DESCRIPTION_LENGTH = 150;
+export const MAX_WORKFLOW_PARAM_EXAMPLE_LENGTH = 120;
 export const MAX_WORKFLOW_PAGES_PER_RUN = 20;
 export const MAX_WORKFLOW_STATE_LENGTH = 16_000;
 export const WORKFLOW_INDEX_ENTRY_COUNT = 20;
@@ -14,6 +19,13 @@ export const WORKFLOW_NAVIGATION_TIMEOUT_MS = 30_000;
 
 const WORKFLOW_INDEX_PREVIEW_LENGTH = 80;
 
+export interface AgentWorkflowParam {
+  name: string;
+  description: string;
+  example?: string | undefined;
+  required?: boolean | undefined;
+}
+
 export interface AgentWorkflow {
   id: string;
   name: string;
@@ -21,6 +33,7 @@ export interface AgentWorkflow {
   scopeOrigin: string;
   pathPrefix?: string | undefined;
   startUrl?: string | undefined;
+  params?: AgentWorkflowParam[] | undefined;
   script: string;
   approvedScriptHash?: string | undefined;
   createdAt: number;
@@ -41,6 +54,7 @@ export interface PendingAgentWorkflowDraft {
   scopeOrigin: string;
   pathPrefix?: string | null | undefined;
   startUrl?: string | null | undefined;
+  params?: AgentWorkflowParam[] | undefined;
   script: string;
   createdAt: number;
 }
@@ -49,6 +63,17 @@ export interface AgentWorkflowSettings {
   allowWorkflowsInSafeMode: boolean;
 }
 
+export const agentWorkflowParamSchema = z
+  .object({
+    description: z.string().max(MAX_WORKFLOW_PARAM_DESCRIPTION_LENGTH),
+    example: z.string().max(MAX_WORKFLOW_PARAM_EXAMPLE_LENGTH).optional(),
+    name: z.string().min(1).max(MAX_WORKFLOW_PARAM_NAME_LENGTH),
+    required: z.boolean().optional(),
+  })
+  .strip();
+
+const workflowParamsSchema = z.array(agentWorkflowParamSchema).max(MAX_WORKFLOW_PARAM_COUNT);
+
 export const agentWorkflowSchema = z
   .object({
     approvedScriptHash: z.string().optional(),
@@ -56,6 +81,7 @@ export const agentWorkflowSchema = z
     description: z.string().max(MAX_WORKFLOW_DESCRIPTION_LENGTH),
     id: z.string().min(1),
     name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
+    params: workflowParamsSchema.optional(),
     pathPrefix: z.string().optional(),
     scopeOrigin: z.string(),
     script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
@@ -69,6 +95,7 @@ export const agentWorkflowInputSchema = z
     approvedScriptHash: z.string().optional(),
     description: z.string().max(MAX_WORKFLOW_DESCRIPTION_LENGTH),
     name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
+    params: workflowParamsSchema.optional(),
     pathPrefix: z.string().optional(),
     scopeOrigin: z.string(),
     script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
@@ -83,6 +110,7 @@ export const pendingAgentWorkflowDraftSchema = z
     createdAt: z.number(),
     description: z.string().max(MAX_WORKFLOW_DESCRIPTION_LENGTH),
     name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
+    params: workflowParamsSchema.optional(),
     pathPrefix: z.string().nullable().optional(),
     scopeOrigin: z.string(),
     script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
@@ -152,25 +180,27 @@ const formatWorkflowScope = (workflow: Pick<AgentWorkflow, 'scopeOrigin' | 'path
   workflow.scopeOrigin + (workflow.pathPrefix ?? '');
 
 /**
- * Search workflows scoped to currentUrl, filtered by an optional query.
- * Case-insensitive substring match on name, description, scopeOrigin, pathPrefix.
- * Capped at WORKFLOW_SEARCH_RESULT_COUNT.
+ * Search workflows, filtered by an optional query.
+ * Without a query: workflows scoped to currentUrl, newest first.
+ * With a query: case-insensitive substring match on name, description,
+ * scopeOrigin, and pathPrefix across ALL workflows — a workflow saved for
+ * another site is still findable (its startUrl lets it run from anywhere).
+ * In-scope matches rank first. Capped at WORKFLOW_SEARCH_RESULT_COUNT.
  */
 export const searchAgentWorkflows = (
   workflows: readonly AgentWorkflow[],
   currentUrl: string,
   query?: string
 ): AgentWorkflow[] => {
-  const inScope = workflows.filter(workflow => matchesWorkflowScope(workflow, currentUrl));
-  const sorted = sortByUpdatedAtDesc(inScope);
-
   const trimmedQuery = (query ?? '').trim();
+
   if (trimmedQuery.length === 0) {
-    return sorted.slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
+    const inScope = workflows.filter(workflow => matchesWorkflowScope(workflow, currentUrl));
+    return sortByUpdatedAtDesc(inScope).slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
   }
 
   const lowerQuery = trimmedQuery.toLowerCase();
-  const matches = sorted.filter(workflow => {
+  const matches = workflows.filter(workflow => {
     const corpus = [
       workflow.name,
       workflow.description,
@@ -182,7 +212,13 @@ export const searchAgentWorkflows = (
     return corpus.includes(lowerQuery);
   });
 
-  return matches.slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
+  const ranked = matches.toSorted((left, right) => {
+    const leftInScope = matchesWorkflowScope(left, currentUrl) ? 0 : 1;
+    const rightInScope = matchesWorkflowScope(right, currentUrl) ? 0 : 1;
+    return leftInScope - rightInScope || right.updatedAt - left.updatedAt;
+  });
+
+  return ranked.slice(0, WORKFLOW_SEARCH_RESULT_COUNT);
 };
 
 /**
@@ -206,8 +242,13 @@ export const formatAgentWorkflowIndex = (
       singleLinePreview(workflow.description || workflow.name, WORKFLOW_INDEX_PREVIEW_LENGTH)
     );
     const scope = formatWorkflowScope(workflow);
+    const params = workflow.params ?? [];
+    const paramsSuffix =
+      params.length === 0
+        ? ''
+        : ` (inputs: ${params.map(param => sanitizeTabContextText(param.name)).join(', ')})`;
 
-    return `- [${workflow.id}] ${sanitizeTabContextText(workflow.name)} — ${preview} (${scope})`;
+    return `- [${workflow.id}] ${sanitizeTabContextText(workflow.name)} — ${preview} (${scope})${paramsSuffix}`;
   });
 
   const remaining = inScope.length - WORKFLOW_INDEX_ENTRY_COUNT;
@@ -216,6 +257,36 @@ export const formatAgentWorkflowIndex = (
   }
 
   return `<workflows count="${inScope.length}">\n${lines.join('\n')}\n</workflows>`;
+};
+
+/**
+ * List declared required params that the run input does not provide.
+ */
+export const findMissingRequiredParams = (
+  workflow: Pick<AgentWorkflow, 'params'>,
+  input: Record<string, unknown> | undefined
+): AgentWorkflowParam[] =>
+  (workflow.params ?? []).filter(
+    param => param.required === true && (input === undefined || input[param.name] === undefined)
+  );
+
+/**
+ * Build an actionable error message for missing required params.
+ * Names each missing param with its description and example so the caller
+ * (an agent or the run form) can supply values without reading the script.
+ */
+export const formatMissingParamsError = (missing: readonly AgentWorkflowParam[]): string => {
+  const details = missing
+    .map(param => {
+      const example = param.example === undefined ? '' : ` (e.g. ${JSON.stringify(param.example)})`;
+      return `"${param.name}" — ${param.description}${example}`;
+    })
+    .join('; ');
+  const exampleInput = JSON.stringify(
+    Object.fromEntries(missing.map(param => [param.name, param.example ?? '<value>']))
+  );
+
+  return `Missing required input: ${details}. Call run_workflow again with input: ${exampleInput}.`;
 };
 
 /**

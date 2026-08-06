@@ -7,6 +7,7 @@ import { isValidReturnUrl } from '@/lib/payment-return-url';
 import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
 
   let stripeCustomerId: string | null | undefined;
   if (organizationId) {
-    const orgContext = await getAuthorizedOrgContext(organizationId, ['owner', 'billing_manager']);
+    const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES);
     if (!orgContext.success) {
       return orgContext.nextResponse;
     }

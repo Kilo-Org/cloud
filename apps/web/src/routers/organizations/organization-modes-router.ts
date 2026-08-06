@@ -5,6 +5,7 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -98,7 +99,7 @@ async function applyOrganizationAutoRouteChange(
 ): Promise<OrganizationSettings> {
   await assertOrganizationAutoWriteEnabled(ctx.user.id);
   assertOrganizationAutoEligible(organization);
-  await ensureOrganizationAccess(ctx, organization.id, ['owner']);
+  await ensureOrganizationAccess(ctx, organization.id, ORGANIZATION_MANAGE_ROLES);
   const orgAutoModel = getOrganizationAutoSettings(organization.settings);
   const currentRoute = orgAutoModel.routes[modeSlug];
   if (routeModel === null && !currentRoute) {
@@ -225,7 +226,7 @@ export const organizationModesRouter = createTRPCRouter({
       if (route_model !== undefined) {
         await assertOrganizationAutoWriteEnabled(ctx.user.id);
         assertOrganizationAutoEligible(organization);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
       }
 
       let createdMode: OrganizationMode | null | undefined;
@@ -334,7 +335,7 @@ export const organizationModesRouter = createTRPCRouter({
       if (route_model !== undefined) {
         await assertOrganizationAutoWriteEnabled(ctx.user.id);
         assertOrganizationAutoEligible(organization);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
       }
 
       const hasModeUpdates =
@@ -365,7 +366,7 @@ export const organizationModesRouter = createTRPCRouter({
             let nextSettings = lockedOrganization.settings;
 
             if (sourceHasRoute && slugChanged) {
-              await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+              await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
               if (hasOrganizationAutoRoute(routes, nextSlug)) {
                 throw new TRPCError({
                   code: 'CONFLICT',
@@ -477,7 +478,7 @@ export const organizationModesRouter = createTRPCRouter({
       if (route_model !== undefined) {
         await assertOrganizationAutoWriteEnabled(ctx.user.id);
         assertOrganizationAutoEligible(organization);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
       }
 
       const routeAuditChanges: string[] = [];
@@ -525,7 +526,7 @@ export const organizationModesRouter = createTRPCRouter({
                 );
               }
             } else if (hasExistingRoute) {
-              await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+              await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
 
               if (!preserveBuiltInRoute) {
                 routeAuditChanges.push(

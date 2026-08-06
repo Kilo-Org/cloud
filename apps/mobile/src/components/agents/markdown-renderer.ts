@@ -1,6 +1,7 @@
 import { createElement, isValidElement, type ReactNode } from 'react';
 import {
   type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
   type AccessibilityRole,
   type GestureResponderEvent,
   type ImageStyle,
@@ -192,64 +193,56 @@ export class MarkdownRenderer extends Renderer {
     styles?: TextStyle,
     title?: string
   ): ReactNode {
+    const interactionProps = this.linkInteractionProps(children, href, title);
     if (typeof children !== 'string' && children.length > 0 && containsMarkdownImage(children)) {
-      const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
-      const linkActionsEnabled = this.onLongPressLink !== undefined;
-
-      return createElement(
-        Pressable,
-        {
-          accessibilityRole: 'link',
-          accessibilityHint: LINK_ACCESSIBILITY_HINT,
-          accessibilityLabel,
-          accessibilityActions: getLinkAccessibilityActions(linkActionsEnabled),
-          key: this.getKey(),
-          onAccessibilityAction: (event: AccessibilityActionEvent) => {
-            if (event.nativeEvent.actionName === 'showLinkActions') {
-              this.onLongPressLink?.(href);
-            }
-          },
-          onLongPress: getLinkLongPressHandler(this.onLongPressLink, href),
-          onPress: () => {
-            const handled = this.onPressLink?.(href);
-            if (handled) {
-              return;
-            }
-            void openExternalUrl(href, { label: accessibilityLabel });
-          },
-        },
-        children
-      );
+      return createElement(Pressable, { ...interactionProps, key: this.getKey() }, children);
     }
-    const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
-    const linkActionsEnabled = this.onLongPressLink !== undefined;
-
     return createElement(
       Text,
       {
+        ...interactionProps,
         selectable: this.selectable,
-        accessibilityRole: 'link',
-        accessibilityHint: LINK_ACCESSIBILITY_HINT,
-        accessibilityLabel,
-        accessibilityActions: getLinkAccessibilityActions(linkActionsEnabled),
         key: this.getKey(),
-        onAccessibilityAction: (event: AccessibilityActionEvent) => {
-          if (event.nativeEvent.actionName === 'showLinkActions') {
-            this.onLongPressLink?.(href);
-          }
-        },
-        onLongPress: getLinkLongPressHandler(this.onLongPressLink, href),
-        onPress: () => {
-          const handled = this.onPressLink?.(href);
-          if (handled) {
-            return;
-          }
-          void openExternalUrl(href, { label: accessibilityLabel });
-        },
         style: styles,
       },
       children
     );
+  }
+
+  /** Interaction wiring shared by the Pressable (image) and Text link branches. */
+  private linkInteractionProps(
+    children: string | ReactNode[],
+    href: string,
+    title?: string
+  ): {
+    accessibilityRole: 'link';
+    accessibilityHint: string;
+    accessibilityLabel: string;
+    accessibilityActions: AccessibilityActionInfo[] | undefined;
+    onAccessibilityAction: (event: AccessibilityActionEvent) => void;
+    onLongPress: ((event: GestureResponderEvent) => void) | undefined;
+    onPress: () => void;
+  } {
+    const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
+    return {
+      accessibilityRole: 'link',
+      accessibilityHint: LINK_ACCESSIBILITY_HINT,
+      accessibilityLabel,
+      accessibilityActions: getLinkAccessibilityActions(this.onLongPressLink !== undefined),
+      onAccessibilityAction: (event: AccessibilityActionEvent) => {
+        if (event.nativeEvent.actionName === 'showLinkActions') {
+          this.onLongPressLink?.(href);
+        }
+      },
+      onLongPress: getLinkLongPressHandler(this.onLongPressLink, href),
+      onPress: () => {
+        const handled = this.onPressLink?.(href);
+        if (handled) {
+          return;
+        }
+        void openExternalUrl(href, { label: accessibilityLabel });
+      },
+    };
   }
 
   override strong(children: string | ReactNode[], styles?: TextStyle): ReactNode {

@@ -6,6 +6,7 @@ import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
+import { OfflineBanner } from '@/components/offline-banner';
 import { ReducedMotionSheetHost } from '@/components/ui/reduced-motion-sheet';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -27,6 +28,7 @@ export function AppRootProviders({ children }: { readonly children: ReactNode })
               <ActionSheetProvider>
                 <>
                   {children}
+                  <OfflineBanner />
                   <PortalHost />
                   {/* Reduced-motion sheet host sits beside ActionSheetProvider so
                       Android Reduce Motion can show a non-animated option list

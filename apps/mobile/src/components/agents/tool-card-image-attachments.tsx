@@ -79,14 +79,16 @@ function ToolCardImageAttachment({
           }}
         />
       </Pressable>
-      <ImageViewerModal
-        visible={viewerVisible}
-        uri={uri}
-        filename={label}
-        onClose={() => {
-          setViewerVisible(false);
-        }}
-      />
+      {viewerVisible ? (
+        <ImageViewerModal
+          visible={viewerVisible}
+          uri={uri}
+          filename={label}
+          onClose={() => {
+            setViewerVisible(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -97,6 +99,9 @@ export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>)
     return null;
   }
 
+  // Render only the first image attachment: the cache stores one image per
+  // part id (first attachment wins, see tool-card-image-cache.ts). Later
+  // entries would show the same cached bytes instead of their own content.
   // Prefer the first attachment's filename; fall back to tool input filePath.
   const attachmentFilename = attachments[0]?.filename;
   const filePath = typeof part.state.input.filePath === 'string' ? part.state.input.filePath : '';
@@ -104,9 +109,7 @@ export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>)
 
   return (
     <View className="gap-2">
-      {attachments.map((_, index) => (
-        <ToolCardImageAttachment key={index} part={part} label={label} />
-      ))}
+      <ToolCardImageAttachment part={part} label={label} />
     </View>
   );
 }

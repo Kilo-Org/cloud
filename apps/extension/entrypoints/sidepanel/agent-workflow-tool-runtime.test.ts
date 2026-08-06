@@ -2,7 +2,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
-import { executeWorkflowToolCall, resolveWorkflowStartUrl } from './agent-workflow-tool-runtime';
+import {
+  executeWorkflowToolCall,
+  formatEmptySearchMessage,
+  resolveWorkflowStartUrl,
+} from './agent-workflow-tool-runtime';
 
 // ---------- mocks ----------
 
@@ -908,5 +912,33 @@ describe('run results name the workflow', () => {
       error: 'Workflow "Flight price search" failed: Tab is at X.',
       ok: false,
     });
+  });
+});
+
+describe('empty search messages', () => {
+  it('tells the model to create one when nothing is saved', () => {
+    expect(formatEmptySearchMessage(0, undefined)).toBe(
+      'No workflows saved yet. Use save_workflow to create one.'
+    );
+    expect(formatEmptySearchMessage(0, 'flights')).toBe(
+      'No workflows saved yet. Use save_workflow to create one.'
+    );
+  });
+
+  it('never suggests searching with a query when a query already missed', () => {
+    const message = formatEmptySearchMessage(3, 'flights');
+    expect(message).toContain('No saved workflow matches "flights"');
+    expect(message).toContain('already covered every site');
+    expect(message).not.toContain('with a query to find them');
+  });
+
+  it('suggests a query search only when no query was given', () => {
+    expect(formatEmptySearchMessage(3, undefined)).toBe(
+      'No workflows for this site. 3 workflow(s) are saved for other sites — call search_workflows with a query to find them.'
+    );
+  });
+
+  it('treats a blank query as no query', () => {
+    expect(formatEmptySearchMessage(2, '   ')).toContain('call search_workflows with a query');
   });
 });

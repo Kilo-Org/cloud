@@ -111,6 +111,24 @@ export const resolveWorkflowStartUrl = (
   }
 };
 
+/**
+ * Explain an empty search without inviting the same call again.
+ * A query already covers every site, so a query that matched nothing must not
+ * suggest searching again with a query.
+ */
+export const formatEmptySearchMessage = (savedCount: number, query: string | undefined): string => {
+  if (savedCount === 0) {
+    return 'No workflows saved yet. Use save_workflow to create one.';
+  }
+
+  const trimmedQuery = (query ?? '').trim();
+  if (trimmedQuery.length > 0) {
+    return `No saved workflow matches "${trimmedQuery}". This search already covered every site, and ${String(savedCount)} workflow(s) are saved. Call search_workflows with no query to list the ones for this site, ask the user which workflow they mean, or save a new one.`;
+  }
+
+  return `No workflows for this site. ${String(savedCount)} workflow(s) are saved for other sites — call search_workflows with a query to find them.`;
+};
+
 const validateWorkflowInput = (
   args: z.infer<typeof saveWorkflowArgsSchema>
 ): string | undefined => {
@@ -235,13 +253,12 @@ const executeSearchWorkflows = async (
   const results = searchAgentWorkflows(workflows, ctx.selectedTabUrl, parsed.data.query);
 
   if (results.length === 0) {
-    const message =
-      workflows.length === 0
-        ? 'No workflows saved yet. Use save_workflow to create one.'
-        : `No workflows for this site. ${String(workflows.length)} exist for other sites — search with a query to find them.`;
     return {
       ok: true,
-      value: { message, results: [] },
+      value: {
+        message: formatEmptySearchMessage(workflows.length, parsed.data.query),
+        results: [],
+      },
     };
   }
 

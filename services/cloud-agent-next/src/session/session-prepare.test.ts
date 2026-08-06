@@ -765,40 +765,36 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     expect(result.cloudAgentSessionId).toBe(CLOUD_AGENT_SESSION_ID);
   });
 
-  it('(c) removes a stale ownership row only after two absent metadata reads, then creates fresh', async () => {
-    // The stale-row cleanup is authorized only when BOTH metadata reads are
-    // absent: the authoritative second read runs BEFORE the delete, so a
-    // concurrently committing registration can never be orphaned.
+  it('(c) regression: two absent metadata reads never delete the ownership row or allocate fresh IDs', async () => {
+    // Two absent metadata reads do NOT fence a later DO registration: the
+    // original create RPC may still be in flight and commit registration plus
+    // the initial admission after these reads. Deleting the ownership row and
+    // allocating fresh IDs would then double-admit the initial turn, so the
+    // ladder must preserve the row and surface `creation_in_progress` instead.
     admitOperationMock.mockResolvedValueOnce({
       admission: 'takeover',
       row: makeLedgerRow({ canonical_result: canonicalIds }),
     });
-    // First: ownership present. Second (after delete): ownership gone. Third: user email.
-    getPgDbMock.mockReturnValue(
-      makeDb([[{ sessionId: KILO_SESSION_ID }], [], [{ email: 'test@example.com' }]])
-    );
+    // Only the ownership lookup runs; the conservative path writes nothing.
+    getPgDbMock.mockReturnValue(makeDb([[{ sessionId: KILO_SESSION_ID }]]));
     const doStub = makeDoStub({
       getMetadata: vi.fn().mockResolvedValue(null),
     });
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      takeoverOptions
-    );
+    await expect(
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      )
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
 
-    // Both reads preceded the empty-only delete.
+    // Both reads ran, then the ladder stopped: no delete, no fresh create, no settle.
     expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
-    expect(deleteCliSessionMock).toHaveBeenCalledWith(
-      KILO_SESSION_ID,
-      USER_ID,
-      expect.any(Object),
-      { onlyIfEmpty: true }
-    );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
-    expect(settleOptions(0)?.outboxEvent).toMatchObject({ properties: { admission: 'takeover' } });
-    expect(result.cloudAgentSessionId).toBe(CLOUD_AGENT_SESSION_ID);
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
   it('(c) reconciles and replays when the authoritative second read proves registration, without deleting the ownership row', async () => {
@@ -890,19 +886,17 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
-  it('(c-keep) stays reconcile-pending when both metadata reads are absent and the empty-only delete refuses', async () => {
-    // Both metadata reads are absent (the authoritative second read runs before
-    // the delete), yet the empty-only delete refuses because the ownership row
-    // has real content. The DO never registered, so admission cannot prove a
-    // live session: stay reconcile-pending conservatively.
+  it('(c-keep) stays in-progress and preserves the ownership row when both metadata reads are absent', async () => {
+    // Both metadata reads are absent, so admission cannot prove a live session
+    // and a later DO registration is still possible. The ladder must NOT even
+    // attempt the empty-only ownership delete: it stays in-progress and leaves
+    // the ownership row and the ledger row untouched.
     admitOperationMock.mockResolvedValueOnce({
       admission: 'takeover',
       row: makeLedgerRow({ canonical_result: canonicalIds }),
     });
-    // First: ownership present. Second (after delete): still present.
-    getPgDbMock.mockReturnValue(
-      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ sessionId: KILO_SESSION_ID }]])
-    );
+    // Only the ownership lookup runs; the conservative path writes nothing.
+    getPgDbMock.mockReturnValue(makeDb([[{ sessionId: KILO_SESSION_ID }]]));
     const doStub = makeDoStub({
       getMetadata: vi.fn().mockResolvedValue(null),
       // Contract check: without metadata the DO cannot report admission.
@@ -921,7 +915,8 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
 
     expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
-    expect(deleteCliSessionMock).toHaveBeenCalledTimes(1);
+    // The empty-only delete is no longer attempted from absent reads alone.
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.getMessageResult).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
@@ -959,6 +954,173 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
+  });
+
+  it('(d) settles failed and surfaces session_creation_failed when the found initial message status is failed', async () => {
+    // The initial message was admitted but ended in a terminal failure. The
+    // ladder must settle the row as a terminal failure and surface the typed
+    // non-retryable error; a completed replay would report success against a
+    // dead session and a later fresh create would double-admit the turn.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    // First: ownership present. Second: user email for the failure settle.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({
+      getMessageResult: vi.fn().mockResolvedValue({
+        type: 'found',
+        result: {
+          messageId: INITIAL_MESSAGE_ID,
+          status: 'failed',
+          createdAt: 1,
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        },
+      } satisfies MessageResultRPCResponse),
+    });
+    const ctx = makeContext(doStub);
+
+    await expect(
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+
+    expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'failed',
+        outcomeCode: 'initial_admission_rejected',
+      })
+    );
+    expect(settleOptions(0)?.outboxEvent).toMatchObject({
+      eventName: 'session_create_settled',
+      distinctId: 'test@example.com',
+      properties: {
+        outcome: 'failed',
+        admission: 'takeover',
+        failure_stage: 'initial_admission',
+      },
+    });
+  });
+
+  it('(d) settles failed and surfaces session_creation_failed when the found initial message status is interrupted', async () => {
+    // An interrupted initial message is the same terminal-failure contract:
+    // never settle the create as completed and never replay success.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    // First: ownership present. Second: user email for the failure settle.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({
+      getMessageResult: vi.fn().mockResolvedValue({
+        type: 'found',
+        result: {
+          messageId: INITIAL_MESSAGE_ID,
+          status: 'interrupted',
+          createdAt: 1,
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        },
+      } satisfies MessageResultRPCResponse),
+    });
+    const ctx = makeContext(doStub);
+
+    await expect(
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+
+    expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'failed',
+        outcomeCode: 'initial_admission_rejected',
+      })
+    );
+    expect(settleOptions(0)?.outboxEvent).toMatchObject({
+      eventName: 'session_create_settled',
+      distinctId: 'test@example.com',
+      properties: {
+        outcome: 'failed',
+        admission: 'takeover',
+        failure_stage: 'initial_admission',
+      },
+    });
+  });
+
+  it('(d) surfaces a typed retryable internal error instead of session_creation_failed when the terminal failure settle fails', async () => {
+    // The initial message ended in a terminal failure, but the ledger DB is
+    // down so the failed settle cannot be made durable. The ladder must NOT
+    // swallow the failed settle and report the non-retryable
+    // `session_creation_failed`: the row would stay non-terminal while the
+    // client clears the key. It surfaces the typed retryable internal error
+    // and the same-key retry reconciles the same failed message again.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    // First: ownership present. Second: user email for the failure settle.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({
+      getMessageResult: vi.fn().mockResolvedValue({
+        type: 'found',
+        result: {
+          messageId: INITIAL_MESSAGE_ID,
+          status: 'failed',
+          createdAt: 1,
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        },
+      } satisfies MessageResultRPCResponse),
+    });
+    const ctx = makeContext(doStub);
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+
+    await expect(
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      )
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'session_creation_settle_failed',
+      cause: expect.objectContaining({
+        error: 'SESSION_CREATE_SETTLE_FAILED',
+        retryable: true,
+      }),
+    });
+
+    // The failed terminal settle was attempted and its rejection surfaced as
+    // the retryable error: the operation row is never falsely terminalized and
+    // no fresh create or completed replay ran.
+    expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'failed',
+        outcomeCode: 'initial_admission_rejected',
+      })
+    );
   });
 
   it('surfaces a typed retryable internal error instead of replaying when the reconcile settle fails', async () => {

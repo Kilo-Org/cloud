@@ -261,6 +261,23 @@ async function settleConfirmedSuccess(db: WorkerDb, input: SettleOperationInput)
 }
 
 /**
+ * Terminal `failed` settle for a reconcile-confirmed terminal initial-message
+ * failure. As with `settleConfirmedSuccess`, a settle failure must not be
+ * swallowed: the row would stay non-terminal while the caller reports the
+ * non-retryable `session_creation_failed`, and the client would clear the key
+ * without a durable terminal outcome. It surfaces the typed retryable internal
+ * error instead; the same-key retry reconciles the same failed message and
+ * re-attempts the terminal settle.
+ */
+async function settleConfirmedFailure(db: WorkerDb, input: SettleOperationInput): Promise<void> {
+  try {
+    await settleOperation(db, input);
+  } catch (error) {
+    throw ledgerSettleFailureError(error);
+  }
+}
+
+/**
  * Best-effort ledger write: a failure is logged and never masks the primary
  * creation outcome. The row then stays `admitted`/`reconcile_pending` and the
  * same-key retry ladder recovers it.
@@ -881,13 +898,19 @@ async function readSessionMetadata(
  *      SECOND metadata read BEFORE touching the ownership row (a single null
  *      read is not proof of no registration). If the second read returns
  *      metadata, the DO committed registration → reconcile initial admission
- *      and settle/replay WITHOUT deleting the ownership row. Only when BOTH
- *      reads are absent is the ownership row stale: delete it (`onlyIfEmpty`).
- *      If the delete refused (row not empty), stay reconcile-pending; if the
- *      row is gone, the DO never registered → fresh create under the row.
+ *      and settle/replay WITHOUT deleting the ownership row. When BOTH reads
+ *      are absent, stay conservative: two absent reads do NOT fence a later
+ *      DO registration (the original create RPC may still be in flight), so
+ *      the ownership row is preserved and the retry surfaces
+ *      `creation_in_progress`; deleting the row and allocating fresh IDs
+ *      could double-admit the initial turn.
  *   d. Metadata present → completion requires the recorded `initialMessageId`
- *      to be admitted. Admitted → settle completed (+ outbox) and replay.
- *      Not admitted / not determinable → `CONFLICT` `creation_in_progress`.
+ *      to be admitted. Admitted with a status that proves admission without
+ *      terminal failure (`queued`, `running`, `completed`) → settle completed
+ *      (+ outbox) and replay. A found message with status `failed` or
+ *      `interrupted` is a terminal failure → settle the row failed and surface
+ *      `session_creation_failed`. Not admitted / not determinable →
+ *      `CONFLICT` `creation_in_progress`.
  */
 async function reconcileLedgerCreate(
   input: SessionRegistrationInput,
@@ -940,26 +963,14 @@ async function reconcileLedgerCreate(
       );
     }
 
-    // Both reads absent → the ownership row is stale; remove it (empty-only).
-    const sessionService = new SessionService();
-    try {
-      await sessionService.deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
-        onlyIfEmpty: true,
-      });
-    } catch {
-      throw creationInProgressError();
-    }
-    // Re-read ownership and continue conservatively. If the delete refused,
-    // the row has real content but the DO never registered (both reads absent)
-    // → stay reconcile-pending: `getMessageResult` reports `session-not-found`
-    // whenever metadata is absent, so admission cannot prove a live session. If
-    // the row is gone, the DO never registered → a fresh create under the row
-    // is safe.
-    const afterDelete = await findCliSessionOwnershipRow(db, ctx.userId, kiloSessionId);
-    if (afterDelete) {
-      throw creationInProgressError();
-    }
-    return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
+    // Both reads absent. Two absent reads do NOT fence a later DO
+    // registration: the original create RPC may still be in flight and commit
+    // registration plus the initial admission after these reads. Deleting the
+    // ownership row and allocating fresh IDs would then double-admit the
+    // initial turn. Stay conservative: preserve the ownership row, keep the
+    // ledger row non-terminal, and surface `creation_in_progress` so a later
+    // same-key retry reconciles again. Never fresh-create from absence alone.
+    throw creationInProgressError();
   }
 
   // (d) Metadata present → completion requires the recorded initialMessageId.
@@ -1007,6 +1018,35 @@ async function confirmInitialMessageAdmitted(
   if (messageResult.type !== 'found') {
     // Not admitted or not determinable.
     throw creationInProgressError();
+  }
+
+  // A found message with status `failed` or `interrupted` proves the initial
+  // turn was admitted but ended in a terminal failure. Settling the create as
+  // completed would replay a successful session against a dead session, and a
+  // later fresh create would double-admit the turn. Settle the row as a
+  // terminal failure with the session-create failure outcome and surface the
+  // typed non-retryable `session_creation_failed` so the client starts a new
+  // intent. Only `queued`, `running`, or `completed` proves admission without
+  // terminal failure and may replay. A failed settle must never produce that
+  // non-retryable outcome: the row would stay non-terminal while the client
+  // clears the key, so the settle surfaces the typed retryable internal error
+  // and the same-key retry reconciles again.
+  if (messageResult.result.status === 'failed' || messageResult.result.status === 'interrupted') {
+    const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
+    await settleConfirmedFailure(db, {
+      rowId: row.id,
+      status: 'failed',
+      outcomeCode: 'initial_admission_rejected',
+      outboxEvent: sessionCreateSettledOutboxEvent({
+        distinctId,
+        outcome: 'failed',
+        admission: 'takeover',
+        failureStage: 'initial_admission',
+        startedAt: options.startedAt,
+        inOrganization: input.options?.kilocodeOrganizationId != null,
+      }),
+    });
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
 
   const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);

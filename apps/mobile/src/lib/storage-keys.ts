@@ -21,6 +21,12 @@ export const THEME_PREFERENCE_KEY = 'theme-preference';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
+/**
+ * Identity hint for the cold-start read-cache restore (DEC-01). Class
+ * `account-metadata`: written when the authenticated identity resolves and
+ * deleted on sign-out via `deleteAccountMetadata`.
+ */
+export const ACTIVE_USER_ID_KEY = 'active-user-id';
 export const KILOCLAW_OWNED_KEY = 'kiloclaw-owned';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';

@@ -53,6 +53,9 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { productionReadCacheKv } from '@/lib/persist/cache-persistence-mount';
+import { bindReadCacheKv, restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
+import { queryClient } from '@/lib/query-client';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -79,6 +82,12 @@ const navigationIntegration = Sentry.reactNavigationIntegration({
 
 // No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
 installE2EWebSocketLatency();
+
+// Bind the production SQLCipher KV adapter for the encrypted read cache
+// (DEC-01). Runs at module scope so the cold-start restore and the sign-out
+// cache-scope cleanup always see the real adapter, without auth-context or
+// read-cache importing the native chain.
+bindReadCacheKv(productionReadCacheKv);
 
 // DEC-02 consent rule: crash and error reporting is mandatory, so
 // `initSentry(false)` runs at module scope — a crash during bootstrap
@@ -155,6 +164,13 @@ function RootLayoutNav() {
       Sentry.captureException(fontsError);
     }
   }, [fontsError]);
+
+  // Cold-start read-cache restore: best effort, never blocks startup. Starts
+  // before the auth gate resolves so allowlisted queries can hydrate under
+  // the splash; the authenticated mount abandons or rescopes it on identity.
+  useEffect(() => {
+    void restorePersistedCacheOnColdStart(queryClient);
+  }, []);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 

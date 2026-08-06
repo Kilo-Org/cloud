@@ -28,9 +28,11 @@ import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
+  ACTIVE_USER_ID_KEY,
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -51,6 +53,9 @@ type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
   sessionEnded: boolean;
+  /** Reactive snapshot of the auth epoch; bumps when sign-in or sign-out
+   *  advances it, so subscribers (e.g. the read-cache mount) can resubscribe. */
+  authEpoch: number;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
@@ -258,6 +263,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [token, setToken] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [sessionEnded, setSessionEnded] = useState(false);
+  // Reactive snapshot of the module auth epoch, advanced synchronously at the
+  // start of sign-in and sign-out so a subscriber can resubscribe on the bump.
+  const [authEpoch, setAuthEpoch] = useState(() => currentAuthEpoch());
   const isSignedOutReference = useRef(false);
 
   useEffect(() => {
@@ -311,6 +319,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signIn = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
       invalidateRefreshSession();
+      setAuthEpoch(currentAuthEpoch());
       const epoch = currentAuthEpoch();
       const published = await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
       // A sign-in superseded by a newer sign-in or sign-out while its
@@ -332,6 +341,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signOut = useCallback(async (ended = false) => {
     isSignedOutReference.current = true;
     invalidateRefreshSession();
+    setAuthEpoch(currentAuthEpoch());
     clearActiveToken();
     // Close ownership persistence before any await so a late list response
     // cannot write the previous account's answer during teardown.
@@ -355,6 +365,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await deleteAccountMetadata(ORGANIZATION_STORAGE_KEY);
     await deleteAccountMetadata(SESSION_FILTERS_KEY);
     await deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY);
+    await deleteAccountMetadata(ACTIVE_USER_ID_KEY);
     await clearLastActiveInstance();
     await clearKiloClawOwned();
     await clearRecentPrs();
@@ -362,6 +373,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     clearAgentModelPreference();
     clearReasoningPreference();
     clearKeepScreenOnPreference();
+    // Phase 4b read-cache cleanup: capture the authoritative user id from the
+    // getMe cache before it is cleared, then remove that user's cache scope
+    // (or every `cache:` scope when the id is unknown — privacy wins). Best
+    // effort: a failed cleanup must never abort sign-out, so the query client
+    // and auth state reset below always run.
+    const knownUserId = readCachedUserId(queryClient);
+    try {
+      await clearCacheScopeForSignOut(knownUserId);
+    } catch {
+      // A stale blob only costs a future warm start.
+    }
     queryClient.clear();
     setSessionEnded(ended);
     setToken(undefined);
@@ -440,8 +462,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, [token]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ token, isLoading, sessionEnded, signIn, signOut }),
-    [token, isLoading, sessionEnded, signIn, signOut]
+    () => ({ token, isLoading, sessionEnded, authEpoch, signIn, signOut }),
+    [token, isLoading, sessionEnded, authEpoch, signIn, signOut]
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

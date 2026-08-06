@@ -73,6 +73,13 @@ const hoisted = vi.hoisted(() => {
   };
 });
 
+// Hoisted so the sign-out regression test can make cache cleanup reject
+// without loading the native-bound read-cache chain.
+const readCacheMock = vi.hoisted(() => ({
+  clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
+  readCachedUserId: vi.fn().mockReturnValue(null),
+}));
+
 // ---- all vi.mock calls ----
 
 vi.mock('expo-secure-store', () => ({
@@ -107,6 +114,8 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn() },
 }));
+
+vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: vi.fn(),
@@ -145,6 +154,7 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
   KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
@@ -170,6 +180,7 @@ type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
   sessionEnded: boolean;
+  authEpoch: number;
   signIn: (token: string) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
@@ -403,6 +414,31 @@ describe('sign-out teardown ordering', () => {
     expect(deleteIndex).toBeGreaterThanOrEqual(0);
     const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
     expect(deleteOrder).toBeGreaterThan(secureStore.setItemAsync.mock.invocationCallOrder[0]);
+
+    unmount();
+  });
+
+  it('regression: a cache cleanup failure does not abort sign-out query or auth state reset', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    const clearMock = vi.mocked(queryClientMock.clear);
+
+    // The encrypted-kv clear rejects (storage failure): logout must still
+    // attempt the cleanup before the query client clear, and the rejection
+    // must not stop the clear, the credential deletes, or the state reset.
+    readCacheMock.clearCacheScopeForSignOut.mockRejectedValueOnce(new Error('kv down'));
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(readCacheMock.clearCacheScopeForSignOut).toHaveBeenCalledWith(null);
+    const cleanupOrder: number =
+      readCacheMock.clearCacheScopeForSignOut.mock.invocationCallOrder[0];
+    const clearOrder: number = clearMock.mock.invocationCallOrder[0];
+    expect(cleanupOrder).toBeLessThan(clearOrder);
+    expect(clearMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
 
     unmount();
   });
@@ -700,6 +736,96 @@ describe('bootstrap and foreground race fencing', () => {
     expect(tokenOwner.getActiveToken()).toBeNull();
 
     fetchSpy.mockRestore();
+    unmount();
+  });
+});
+
+describe('reactive auth epoch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.callOrder.length = 0;
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+  });
+
+  /** Mount the provider with a consumer that re-captures the context on every
+   *  render, so the test can read the epoch after sign-in or sign-out moved it. */
+  // oxlint-disable-next-line require-await -- dynamic import is awaited
+  async function mountEpochTest(): Promise<{
+    getCtx: () => AuthContextValue;
+    unmount: () => void;
+  }> {
+    vi.resetModules();
+    const mod = await import('./auth-context');
+
+    let capturedCtx: AuthContextValue | undefined = undefined;
+    function Consumer(): null {
+      capturedCtx = mod.useAuth();
+      return null;
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(mod.AuthProvider, null, createElement(Consumer))
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    return {
+      getCtx: () => {
+        // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- safety net for test failures
+        if (!capturedCtx) {
+          throw new Error('auth context not captured');
+        }
+        return capturedCtx;
+      },
+      unmount: () => {
+        renderer?.unmount();
+      },
+    };
+  }
+
+  it('exposes the current auth epoch in the context value', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    const { currentAuthEpoch } = await import('@/lib/auth/auth-epoch');
+
+    expect(getCtx().authEpoch).toBe(currentAuthEpoch());
+
+    unmount();
+  });
+
+  it('advances the reactive auth epoch immediately when signIn bumps the epoch', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    const { currentAuthEpoch } = await import('@/lib/auth/auth-epoch');
+    const before = getCtx().authEpoch;
+
+    await act(async () => {
+      await getCtx().signIn('new-token');
+    });
+
+    expect(getCtx().authEpoch).toBeGreaterThan(before);
+    expect(getCtx().authEpoch).toBe(currentAuthEpoch());
+
+    unmount();
+  });
+
+  it('advances the reactive auth epoch immediately when signOut bumps the epoch', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    const { currentAuthEpoch } = await import('@/lib/auth/auth-epoch');
+    const before = getCtx().authEpoch;
+
+    await act(async () => {
+      await getCtx().signOut();
+    });
+
+    expect(getCtx().authEpoch).toBeGreaterThan(before);
+    expect(getCtx().authEpoch).toBe(currentAuthEpoch());
+
     unmount();
   });
 });

@@ -8,6 +8,7 @@ import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mou
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { StoreKiloPassPurchaseProvider } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 
 export default function AppLayout() {
   const colors = useThemeColors();
@@ -16,6 +17,7 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <CachePersistenceMount />
       <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>

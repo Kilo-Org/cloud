@@ -1,9 +1,8 @@
-import { createContext, type ReactNode, useContext, useRef } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { createStore, Provider as JotaiProvider } from 'jotai';
 import { type SessionManager } from '@kilocode/cloud-agent-sdk';
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import { useOwnedResource } from '@/lib/hooks/use-owned-resource';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 
@@ -18,21 +17,23 @@ export function AgentSessionProvider({
 }: Readonly<AgentSessionProviderProps>) {
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
-  const manager = useOwnedResource(
-    () =>
-      createMobileAgentSessionManager({
-        store: storeRef.current,
-        userWebConnection,
-        organizationId,
-      }),
-    instance => {
-      instance.destroy();
-    }
-  );
+  const managerRef = useRef<SessionManager | null>(null);
+  managerRef.current ??= createMobileAgentSessionManager({
+    store: storeRef.current,
+    userWebConnection,
+    organizationId,
+  });
+
+  useEffect(() => {
+    const manager = managerRef.current;
+    return () => {
+      manager?.destroy();
+    };
+  }, []);
 
   return (
     <JotaiProvider store={storeRef.current}>
-      <ManagerContext.Provider value={manager}>{children}</ManagerContext.Provider>
+      <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
     </JotaiProvider>
   );
 }

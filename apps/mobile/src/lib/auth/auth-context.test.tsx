@@ -738,7 +738,7 @@ describe('bootstrap and foreground race fencing', () => {
         return '9999999999999';
       });
 
-    const { getCtx, unmount, mod } = await mountProvider();
+    const { getCtx, unmount } = await mountProvider();
 
     // A same-session refresh replaces the stored pair and publishes the owner
     // while the bootstrap expiry read is in flight.

@@ -874,6 +874,7 @@ const ActivateCheckoutHostingOutputSchema = z.discriminatedUnion('outcome', [
       'missing_instance',
       'destroyed_instance',
       'requires_reprovision',
+      'signup_unavailable',
       'insufficient_credits',
       'expired_commit',
       'unexpected_error',
@@ -1075,7 +1076,10 @@ export const kiloPassRouter = createTRPCRouter({
           appAccountToken: purchase.appAccountToken,
           userAppStoreAccountToken: ctx.user.app_store_account_token,
         });
-        const result = await completeStoreKiloPassPurchase({ user: ctx.user, purchase });
+        const result = await completeStoreKiloPassPurchase({
+          user: ctx.user,
+          purchase,
+        });
         if (!result.alreadyProcessed) {
           trackKiloPassPurchaseCompleted({
             channel: 'app_store',
@@ -1132,7 +1136,9 @@ export const kiloPassRouter = createTRPCRouter({
     .output(SidebarPromoEligibilityOutputSchema)
     .query(async ({ ctx }) => {
       const subscription = await getKiloPassStateForUser(readDb, ctx.user.id);
-      return { showPromoBanner: !subscription || isStripeSubscriptionEnded(subscription.status) };
+      return {
+        showPromoBanner: !subscription || isStripeSubscriptionEnded(subscription.status),
+      };
     }),
 
   getReferralRewardSummary: baseProcedure
@@ -1229,7 +1235,10 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null, isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive() };
+      return {
+        subscription: null,
+        isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive(),
+      };
     }
 
     if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
@@ -1278,7 +1287,10 @@ export const kiloPassRouter = createTRPCRouter({
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
     if (!stripeCustomerId) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Missing Stripe customer for user.',
+      });
     }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(
@@ -1565,6 +1577,21 @@ export const kiloPassRouter = createTRPCRouter({
           )
         )
         .limit(1);
+      if (!existingSubscription) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          reason: 'signup_unavailable',
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
+        return {
+          outcome: 'action_required',
+          hostingIntent: hostingPlan,
+          reason: 'signup_unavailable',
+        };
+      }
       const settledSubscription = await getSettledKiloPassCheckoutSubscription({
         userId: ctx.user.id,
         stripeSubscriptionId,
@@ -1670,7 +1697,10 @@ export const kiloPassRouter = createTRPCRouter({
           actor: { actorType: 'user', actorId: ctx.user.id },
           commitQualification:
             hostingPlan === 'commit'
-              ? { source: 'checkout_confirmed_before_cutoff', qualifiedAt: checkoutConfirmedAt }
+              ? {
+                  source: 'checkout_confirmed_before_cutoff',
+                  qualifiedAt: checkoutConfirmedAt,
+                }
               : undefined,
         });
       } catch (error) {
@@ -1742,7 +1772,10 @@ export const kiloPassRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Missing Stripe customer for user.',
+        });
       }
 
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
@@ -1763,12 +1796,18 @@ export const kiloPassRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Missing Stripe customer for user.',
+        });
       }
 
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Kilo Pass subscription found.',
+        });
       }
       assertStripeManagedSubscription(subscription);
 
@@ -1828,12 +1867,18 @@ export const kiloPassRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Missing Stripe customer for user.',
+        });
       }
 
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Kilo Pass subscription found.',
+        });
       }
       assertStripeManagedSubscription(subscription);
 
@@ -1878,12 +1923,18 @@ export const kiloPassRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Missing Stripe customer for user.',
+        });
       }
 
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Kilo Pass subscription found.',
+        });
       }
       assertStripeManagedSubscription(subscription);
 
@@ -1994,7 +2045,10 @@ export const kiloPassRouter = createTRPCRouter({
           });
         } catch (error) {
           captureException(error, {
-            tags: { source: 'kilo_pass_scheduled_change', stage: 'overdue_read_reconciliation' },
+            tags: {
+              source: 'kilo_pass_scheduled_change',
+              stage: 'overdue_read_reconciliation',
+            },
             extra: {
               scheduledChangeId: scheduledChange.id,
               scheduleId: scheduledChange.stripe_schedule_id,
@@ -2025,7 +2079,10 @@ export const kiloPassRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Kilo Pass subscription found.',
+        });
       }
       assertStripeManagedSubscription(subscription);
 
@@ -2110,8 +2167,14 @@ export const kiloPassRouter = createTRPCRouter({
       });
 
       // Stripe schedule creation (two-phase schedule; switch price at effectiveAt).
-      const currentPriceId = getStripePriceIdForKiloPass({ tier: fromTier, cadence: fromCadence });
-      const targetPriceId = getStripePriceIdForKiloPass({ tier: toTier, cadence: toCadence });
+      const currentPriceId = getStripePriceIdForKiloPass({
+        tier: fromTier,
+        cadence: fromCadence,
+      });
+      const targetPriceId = getStripePriceIdForKiloPass({
+        tier: toTier,
+        cadence: toCadence,
+      });
 
       const scheduledChangeId = crypto.randomUUID();
       const metadata = {
@@ -2226,7 +2289,10 @@ export const kiloPassRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Kilo Pass subscription found.',
+        });
       }
       assertStripeManagedSubscription(subscription);
 
@@ -2290,7 +2356,10 @@ export const kiloPassRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Kilo Pass subscription found.',
+        });
       }
 
       const offset = parseOffsetCursor(input.cursor);
@@ -2392,7 +2461,10 @@ export const kiloPassRouter = createTRPCRouter({
 
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Missing Stripe customer for user.',
+        });
       }
 
       return {

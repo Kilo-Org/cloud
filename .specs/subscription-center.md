@@ -29,6 +29,7 @@ Updated 2026-06-19 -- Current Coding Plan quota presentation and routing indepen
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
 Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
+Updated 2026-08-05 -- closed fresh KiloClaw instance provisioning surfaces.
 
 ## Conventions
 
@@ -264,13 +265,16 @@ the change completes. Every final Commit summary card and detail view MUST
 state that hosting ends on the final date unless the customer continues
 month-to-month, and MUST expose the continuation action directly. When retirement state cannot be derived safely, the surface MUST hide unsafe billing actions, preserve only access supported by canonical state, and show a generic temporary billing-state error without exposing internal reason codes.
 
-When the user has no non-terminal KiloClaw subscription, the enrollment
-view MUST display Standard as the only currently available offer after the
-Commit sales cutoff. Canceled KiloClaw history MUST NOT cause Commit, an
-earlier price, or an earlier entitlement to appear as the available offer.
-Stripe-funded enrollment awaiting invoice settlement MUST be presented as
-pending rather than active. Active and terminal history MUST continue to show
-historical Commit names, prices, invoices, and credit deductions.
+When the user has no current personal KiloClaw subscription, the KiloClaw group
+MUST state that new instances are unavailable and MUST NOT show a signup,
+enrollment, or recovery action. Users with a current personal subscription or an
+existing live instance retain the applicable enrollment, recovery, and
+management surfaces. Canceled, expired, suspended, transferred-out, and purely
+historical KiloClaw rows MUST NOT cause an available offer, Commit, an earlier
+price, or an earlier entitlement to appear. Stripe-funded
+enrollment awaiting invoice settlement MUST be presented as pending rather
+than active. Active and terminal history MUST continue to show historical
+Commit names, prices, invoices, and credit deductions.
 
 ### Coding Plans Subscriptions (Personal Route)
 
@@ -496,6 +500,12 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-08-05 -- Close fresh KiloClaw instance provisioning surfaces
+
+- Replaced KiloClaw signup offers with an unavailable notice when the requested personal or organization context lacks a current access-granting subscription.
+- Prevented canceled and historical subscription rows from presenting replacement-instance actions.
+- Preserved management surfaces for existing live instances and current subscriptions.
 
 ### 2026-07-14 -- Coding Plans installed keys made read-only
 

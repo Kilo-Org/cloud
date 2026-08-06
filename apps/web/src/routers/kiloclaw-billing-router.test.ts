@@ -23,26 +23,18 @@ import {
   kiloclaw_subscription_change_log,
   kilocode_users,
   credit_transactions,
-  kilo_pass_issuance_items,
-  kilo_pass_issuances,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import {
-  KiloPassTier,
-  KiloPassCadence,
-  KiloPassPaymentProvider,
-  KiloPassIssuanceItemKind,
-  KiloPassIssuanceSource,
-} from '@/lib/kilo-pass/enums';
+import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
@@ -72,7 +64,9 @@ jest.mock('@/lib/stripe-client', () => {
       release: jest.fn(),
       retrieve: jest.fn(),
     },
-    checkout: { sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() } },
+    checkout: {
+      sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() },
+    },
     billingPortal: { sessions: { create: jest.fn() } },
     invoices: { list: jest.fn() },
     errors,
@@ -179,7 +173,12 @@ type StripeMockShape = {
   checkout: { sessions: { create: AnyMock; list: AnyMock; expire: AnyMock } };
   billingPortal: { sessions: { create: AnyMock } };
   subscriptions: { retrieve: AnyMock; update: AnyMock; list: AnyMock };
-  subscriptionSchedules: { create: AnyMock; update: AnyMock; release: AnyMock; retrieve: AnyMock };
+  subscriptionSchedules: {
+    create: AnyMock;
+    update: AnyMock;
+    release: AnyMock;
+    retrieve: AnyMock;
+  };
   invoices: { list: AnyMock };
   errors: Stripe['errors'];
 };
@@ -247,19 +246,39 @@ beforeEach(async () => {
   stripePriceIdsMock.getStripePriceIdMetadata.mockReset();
   stripePriceIdsMock.getStripePriceIdMetadata.mockImplementation((priceId: string) => {
     if (priceId === 'price_commit') {
-      return { plan: 'commit', priceVersion: LEGACY_KILOCLAW_PRICE_VERSION, isIntro: false };
+      return {
+        plan: 'commit',
+        priceVersion: LEGACY_KILOCLAW_PRICE_VERSION,
+        isIntro: false,
+      };
     }
     if (priceId === 'price_standard') {
-      return { plan: 'standard', priceVersion: LEGACY_KILOCLAW_PRICE_VERSION, isIntro: false };
+      return {
+        plan: 'standard',
+        priceVersion: LEGACY_KILOCLAW_PRICE_VERSION,
+        isIntro: false,
+      };
     }
     if (priceId === 'price_standard_intro') {
-      return { plan: 'standard', priceVersion: LEGACY_KILOCLAW_PRICE_VERSION, isIntro: true };
+      return {
+        plan: 'standard',
+        priceVersion: LEGACY_KILOCLAW_PRICE_VERSION,
+        isIntro: true,
+      };
     }
     if (priceId === 'price_current_commit') {
-      return { plan: 'commit', priceVersion: CURRENT_KILOCLAW_PRICE_VERSION, isIntro: false };
+      return {
+        plan: 'commit',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        isIntro: false,
+      };
     }
     if (priceId === 'price_current_standard') {
-      return { plan: 'standard', priceVersion: CURRENT_KILOCLAW_PRICE_VERSION, isIntro: false };
+      return {
+        plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        isIntro: false,
+      };
     }
     return null;
   });
@@ -552,6 +571,7 @@ describe('getBillingStatus', () => {
 
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(true);
+    expect(result.hasExistingPersonalSubscription).toBe(false);
   });
 
   it('returns trialEligible false when user only has a destroyed personal instance row', async () => {
@@ -566,6 +586,7 @@ describe('getBillingStatus', () => {
 
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(false);
+    expect(result.hasExistingPersonalSubscription).toBe(false);
   });
 
   it('returns trialEligible false when user has an active personal instance row', async () => {
@@ -579,6 +600,7 @@ describe('getBillingStatus', () => {
 
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(false);
+    expect(result.hasExistingPersonalSubscription).toBe(false);
   });
 
   it('returns trialEligible false when user has a canceled subscription but no instance', async () => {
@@ -594,6 +616,8 @@ describe('getBillingStatus', () => {
 
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(false);
+    expect(result.hasExistingPersonalSubscription).toBe(true);
+    expect(result.hasCurrentPersonalSubscription).toBe(false);
   });
 
   it('returns trialEligible false when user only has an org-backed subscription', async () => {
@@ -622,6 +646,7 @@ describe('getBillingStatus', () => {
     // Must be false — ensureProvisionAccess checks ALL subscriptions (including
     // org) and would block trial creation, so trialEligible must agree.
     expect(result.trialEligible).toBe(false);
+    expect(result.hasExistingPersonalSubscription).toBe(false);
   });
 
   it('prefers an active subscription over an older canceled row', async () => {
@@ -801,65 +826,29 @@ describe('provision detached personal billing recovery', () => {
     );
   });
 
-  it('bootstraps a fresh trial onto an active orphan instance with zero subscription rows', async () => {
-    const activeInstance = await createKiloclawInstance(user.id);
-    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
-      await db.insert(kiloclaw_subscriptions).values({
-        user_id: user.id,
-        instance_id: activeInstance.id,
-        plan: 'trial',
-        status: 'trialing',
-        trial_started_at: '2026-04-20T10:00:00.000Z',
-        trial_ends_at: '2026-04-27T10:00:00.000Z',
-      });
+  it.each(['provision', 'updateConfig'] as const)(
+    'rejects new personal subscriptions from kiloclaw.%s',
+    async procedure => {
+      const caller = await createCallerForUser(user.id);
 
-      return {
-        sandboxId: activeInstance.sandbox_id,
-        instanceId: activeInstance.id,
-      };
-    });
+      await expect(caller.kiloclaw[procedure]({})).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'A current KiloClaw subscription is required to provision an instance.',
+      });
+      expect(kiloclawInternalClientMock.__provisionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not bootstrap a fresh trial onto an active orphan instance', async () => {
+    await createKiloclawInstance(user.id);
 
     const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.provision({})).resolves.toEqual({
-      sandboxId: activeInstance.sandbox_id,
-      instanceId: activeInstance.id,
+    await expect(caller.kiloclaw.provision({})).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'A current KiloClaw subscription is required to provision an instance.',
     });
 
-    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
-      user.id,
-      expect.any(Object),
-      {
-        instanceId: activeInstance.id,
-        bootstrapSubscription: true,
-      }
-    );
-    expect(posthogCaptureMock).toHaveBeenCalledWith({
-      distinctId: user.google_user_email,
-      event: 'claw_trial_started',
-      properties: expect.objectContaining({
-        user_id: user.id,
-        plan: 'trial',
-      }),
-    });
-
-    const [trialSubscription] = await db
-      .select({
-        trialEndsAt: kiloclaw_subscriptions.trial_ends_at,
-      })
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.instance_id, activeInstance.id))
-      .limit(1);
-
-    expect(trialSubscription).toBeDefined();
-    expect(posthogCaptureMock).toHaveBeenCalledWith({
-      distinctId: user.google_user_email,
-      event: 'claw_trial_started',
-      properties: {
-        user_id: user.id,
-        plan: 'trial',
-        trial_ends_at: trialSubscription?.trialEndsAt,
-      },
-    });
+    expect(kiloclawInternalClientMock.__provisionMock).not.toHaveBeenCalled();
   });
 
   it('rejects reprovision for legacy earlybird purchase without canonical subscription row', async () => {
@@ -880,6 +869,16 @@ describe('provision detached personal billing recovery', () => {
   it.each(['provision', 'updateConfig'] as const)(
     'maps Worker admission conflicts from kiloclaw.%s',
     async procedure => {
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: null,
+        stripe_subscription_id: `sub_admission_conflict_${procedure}`,
+        payment_source: 'stripe',
+        plan: 'standard',
+        status: 'active',
+        current_period_start: '2026-04-01T00:00:00.000Z',
+        current_period_end: '2026-05-01T00:00:00.000Z',
+      });
       kiloclawInternalClientMock.__provisionMock.mockRejectedValueOnce(
         new MockKiloClawApiError(
           409,
@@ -902,10 +901,23 @@ describe('provision detached personal billing recovery', () => {
   it.each(['provision', 'updateConfig'] as const)(
     'maps missing Worker instances from kiloclaw.%s',
     async procedure => {
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: null,
+        stripe_subscription_id: `sub_missing_instance_${procedure}`,
+        payment_source: 'stripe',
+        plan: 'standard',
+        status: 'active',
+        current_period_start: '2026-04-01T00:00:00.000Z',
+        current_period_end: '2026-05-01T00:00:00.000Z',
+      });
       kiloclawInternalClientMock.__provisionMock.mockRejectedValueOnce(
         new MockKiloClawApiError(
           404,
-          JSON.stringify({ error: 'Active instance not found', code: 'instance_not_found' })
+          JSON.stringify({
+            error: 'Active instance not found',
+            code: 'instance_not_found',
+          })
         )
       );
 
@@ -1132,7 +1144,9 @@ describe('subscription center procedures', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id });
+    const result = await caller.kiloclaw.getSubscriptionDetail({
+      instanceId: instance.id,
+    });
 
     expect(result).toMatchObject({
       instanceId: instance.id,
@@ -1226,7 +1240,9 @@ describe('subscription center procedures', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id });
+    const result = await caller.kiloclaw.getSubscriptionDetail({
+      instanceId: instance.id,
+    });
 
     expect(result).toMatchObject({
       instanceId: instance.id,
@@ -1256,7 +1272,9 @@ describe('subscription center procedures', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id });
+    const result = await caller.kiloclaw.getSubscriptionDetail({
+      instanceId: instance.id,
+    });
 
     expect(result).toMatchObject({
       instanceId: instance.id,
@@ -1307,7 +1325,10 @@ describe('subscription center procedures', () => {
       has_more: false,
     });
 
-    const instance = await createInstanceRow({ userId: user.id, name: 'Stripe Instance' });
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Stripe Instance',
+    });
     await insertSubscriptionRow({
       userId: user.id,
       instanceId: instance.id,
@@ -1317,7 +1338,9 @@ describe('subscription center procedures', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.getBillingHistory({ instanceId: instance.id });
+    const result = await caller.kiloclaw.getBillingHistory({
+      instanceId: instance.id,
+    });
 
     expect(stripeMock.invoices.list).toHaveBeenCalledWith({
       subscription: 'sub_kiloclaw_stripe',
@@ -1355,7 +1378,10 @@ describe('subscription center procedures', () => {
       name: 'Credits Instance',
       sandboxId,
     });
-    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+    const otherInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Other Instance',
+    });
 
     await insertSubscriptionRow({
       userId: user.id,
@@ -1397,7 +1423,9 @@ describe('subscription center procedures', () => {
     ]);
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.getBillingHistory({ instanceId: instance.id });
+    const result = await caller.kiloclaw.getBillingHistory({
+      instanceId: instance.id,
+    });
 
     expect(result).toEqual({
       entries: [
@@ -1426,7 +1454,10 @@ describe('subscription center procedures', () => {
       url: 'https://stripe.example.test/kiloclaw-portal',
     });
 
-    const instance = await createInstanceRow({ userId: user.id, name: 'Portal Instance' });
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Portal Instance',
+    });
     await insertSubscriptionRow({
       userId: user.id,
       instanceId: instance.id,
@@ -1441,7 +1472,9 @@ describe('subscription center procedures', () => {
       returnUrl: 'https://example.test/subscriptions/kiloclaw',
     });
 
-    expect(result).toEqual({ url: 'https://stripe.example.test/kiloclaw-portal' });
+    expect(result).toEqual({
+      url: 'https://stripe.example.test/kiloclaw-portal',
+    });
     expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith({
       customer: user.stripe_customer_id,
       return_url: 'https://example.test/subscriptions/kiloclaw',
@@ -1452,8 +1485,14 @@ describe('subscription center procedures', () => {
     stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
-    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
+    const otherInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Other Instance',
+    });
 
     await insertSubscriptionRow({
       userId: user.id,
@@ -1548,7 +1587,10 @@ describe('subscription center procedures', () => {
     );
     stripeMock.subscriptions.retrieve
       .mockResolvedValueOnce(liveSubscription)
-      .mockResolvedValueOnce({ ...liveSubscription, cancel_at_period_end: true });
+      .mockResolvedValueOnce({
+        ...liveSubscription,
+        cancel_at_period_end: true,
+      });
     stripeMock.subscriptions.update.mockResolvedValue({});
     const { enforceKiloClawCommitRetirementGuard } =
       await import('@/lib/kiloclaw/commit-retirement');
@@ -1581,7 +1623,9 @@ describe('subscription center procedures', () => {
       const result =
         mutationPath === 'legacy'
           ? await caller.kiloclaw.reactivateSubscription()
-          : await caller.kiloclaw.reactivateSubscriptionAtInstance({ instanceId: instance.id });
+          : await caller.kiloclaw.reactivateSubscriptionAtInstance({
+              instanceId: instance.id,
+            });
 
       expect(result).toEqual({ success: true });
       expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
@@ -1617,7 +1661,9 @@ describe('subscription center procedures', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.reactivateSubscriptionAtInstance({ instanceId: instance.id });
+    await caller.kiloclaw.reactivateSubscriptionAtInstance({
+      instanceId: instance.id,
+    });
 
     const [row] = await db
       .select()
@@ -1653,7 +1699,9 @@ describe('subscription center procedures', () => {
 
     const caller = await createCallerForUser(user.id);
     await expect(
-      caller.kiloclaw.reactivateSubscriptionAtInstance({ instanceId: instance.id })
+      caller.kiloclaw.reactivateSubscriptionAtInstance({
+        instanceId: instance.id,
+      })
     ).rejects.toThrow('Commit retirement state requires support review.');
 
     const [row] = await db
@@ -1671,8 +1719,14 @@ describe('subscription center procedures', () => {
       items: { data: [{ price: { id: 'price_standard' } }] },
     });
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
-    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
+    const otherInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Other Instance',
+    });
 
     await db.insert(kiloclaw_subscriptions).values([
       {
@@ -1762,7 +1816,11 @@ describe('subscription center procedures', () => {
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sched_final_continuation',
       phases: [
-        { items: [{ price: 'price_commit' }], start_date: 1_767_225_600, end_date: 1_783_478_400 },
+        {
+          items: [{ price: 'price_commit' }],
+          start_date: 1_767_225_600,
+          end_date: 1_783_478_400,
+        },
       ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
@@ -1786,7 +1844,9 @@ describe('subscription center procedures', () => {
           expect.objectContaining({
             end_date: Math.floor(new Date(FINAL_COMMIT_END).getTime() / 1000),
           }),
-          expect.objectContaining({ items: [{ price: 'price_test_kiloclaw' }] }),
+          expect.objectContaining({
+            items: [{ price: 'price_test_kiloclaw' }],
+          }),
         ],
       })
     );
@@ -1835,14 +1895,20 @@ describe('subscription center procedures', () => {
       stripeMock.subscriptions.retrieve
         .mockResolvedValueOnce(liveSubscription)
         .mockResolvedValueOnce(liveSubscription)
-        .mockResolvedValueOnce({ ...liveSubscription, schedule: null, cancel_at_period_end: true });
+        .mockResolvedValueOnce({
+          ...liveSubscription,
+          schedule: null,
+          cancel_at_period_end: true,
+        });
       stripeMock.subscriptions.update.mockResolvedValue({});
 
       const caller = await createCallerForUser(user.id);
       const result =
         mutationPath === 'legacy'
           ? await caller.kiloclaw.acceptConversion()
-          : await caller.kiloclaw.acceptConversionAtInstance({ instanceId: instance.id });
+          : await caller.kiloclaw.acceptConversionAtInstance({
+              instanceId: instance.id,
+            });
 
       expect(result).toEqual({ success: true });
       const [row] = await db
@@ -1863,8 +1929,14 @@ describe('subscription center procedures', () => {
     stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
-    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
+    const otherInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Other Instance',
+    });
 
     await db.insert(kiloclaw_subscriptions).values([
       {
@@ -1971,7 +2043,10 @@ describe('subscription center procedures', () => {
       .mockResolvedValueOnce({ cancel_at_period_end: false });
     stripeMock.subscriptions.update.mockRejectedValue(new Error('Stripe update failed'));
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: targetInstance.id,
@@ -1995,7 +2070,9 @@ describe('subscription center procedures', () => {
 
     const caller = await createCallerForUser(user.id);
     await expect(
-      caller.kiloclaw.acceptConversionAtInstance({ instanceId: targetInstance.id })
+      caller.kiloclaw.acceptConversionAtInstance({
+        instanceId: targetInstance.id,
+      })
     ).rejects.toThrow('Failed to schedule Stripe cancellation. Please try again.');
 
     const [targetRow] = await db
@@ -2026,12 +2103,24 @@ describe('subscription center procedures', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sched_target_switch',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
-    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
+    const otherInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Other Instance',
+    });
 
     await db.insert(kiloclaw_subscriptions).values([
       {
@@ -2116,11 +2205,20 @@ describe('subscription center procedures', () => {
     );
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sched_target_switch_recreated',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: targetInstance.id,
@@ -2208,7 +2306,9 @@ describe('subscription center procedures', () => {
       const result =
         mutationPath === 'legacy'
           ? await caller.kiloclaw.cancelPlanSwitch()
-          : await caller.kiloclaw.cancelPlanSwitchAtInstance({ instanceId: instance.id });
+          : await caller.kiloclaw.cancelPlanSwitchAtInstance({
+              instanceId: instance.id,
+            });
 
       expect(result).toEqual({ success: true });
       const [row] = await db
@@ -2241,7 +2341,9 @@ describe('subscription center procedures', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.cancelPlanSwitchAtInstance({ instanceId: instance.id });
+    await caller.kiloclaw.cancelPlanSwitchAtInstance({
+      instanceId: instance.id,
+    });
 
     const [row] = await db
       .select()
@@ -2262,8 +2364,14 @@ describe('subscription center procedures', () => {
       items: { data: [{ price: { id: 'price_standard' } }] },
     });
 
-    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
-    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+    const targetInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Instance',
+    });
+    const otherInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Other Instance',
+    });
 
     await db.insert(kiloclaw_subscriptions).values([
       {
@@ -2371,7 +2479,10 @@ describe('createSubscriptionCheckout', () => {
     const caller = await createCallerForUser(user.id);
 
     await expect(
-      caller.kiloclaw.enrollWithCredits({ plan: 'commit', instanceId: enrollmentInstance.id })
+      caller.kiloclaw.enrollWithCredits({
+        plan: 'commit',
+        instanceId: enrollmentInstance.id,
+      })
     ).rejects.toThrow('Commit is no longer available');
 
     const switchInstance = await createKiloclawInstance(user.id);
@@ -2389,7 +2500,10 @@ describe('createSubscriptionCheckout', () => {
       'Commit is no longer available'
     );
     await expect(
-      caller.kiloclaw.switchPlanAtInstance({ instanceId: switchInstance.id, toPlan: 'commit' })
+      caller.kiloclaw.switchPlanAtInstance({
+        instanceId: switchInstance.id,
+        toPlan: 'commit',
+      })
     ).rejects.toThrow('Commit is no longer available');
 
     const [row] = await db
@@ -2404,7 +2518,7 @@ describe('createSubscriptionCheckout', () => {
 
     const caller = await createCallerForUser(user.id);
     await expect(caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' })).rejects.toThrow(
-      'Reprovision KiloClaw before starting a new Stripe subscription.'
+      'A current KiloClaw subscription is required to provision an instance.'
     );
 
     expect(stripeMock.subscriptions.list).not.toHaveBeenCalled();
@@ -2696,8 +2810,31 @@ describe('createKiloPassUpsellCheckout', () => {
     expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
   });
 
+  it('rejects Kilo Pass hosting activation without an existing personal subscription', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.kiloclaw.createKiloPassUpsellCheckout({
+        instanceId: instance.id,
+        tier: '199',
+        cadence: 'yearly',
+        hostingPlan: 'standard',
+      })
+    ).rejects.toThrow('A current KiloClaw subscription is required to provision an instance.');
+
+    expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
   it('rejects current Standard hosting when the selected Kilo Pass tier cannot cover the first charge', async () => {
     const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
     const caller = await createCallerForUser(user.id);
 
     await expect(
@@ -2717,6 +2854,12 @@ describe('createKiloPassUpsellCheckout', () => {
   it('rejects commit hosting for monthly tier 19', async () => {
     setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+    });
     const caller = await createCallerForUser(user.id);
 
     await expect(
@@ -2736,6 +2879,12 @@ describe('createKiloPassUpsellCheckout', () => {
   it('rejects commit hosting for yearly tier 19 when monthly effective credits cannot cover the charge', async () => {
     setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+    });
     const caller = await createCallerForUser(user.id);
 
     await expect(
@@ -2935,6 +3084,13 @@ describe('createKiloPassUpsellCheckout', () => {
 
   it('allows current Standard hosting when balance plus selected tier projection covers the first charge', async () => {
     const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
     await db
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 4_000_000 })
@@ -2988,6 +3144,13 @@ describe('createKiloPassUpsellCheckout', () => {
   it('allows current Commit hosting only when balance plus selected tier projection covers the six-month charge', async () => {
     setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
     await db
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 8_000_000 })
@@ -3278,8 +3441,16 @@ describe('handleKiloClawSubscriptionUpdated', () => {
       priceId: 'price_commit',
     });
     stripeMock.subscriptions.retrieve
-      .mockResolvedValueOnce({ ...subscription, schedule: null, cancel_at_period_end: false })
-      .mockResolvedValueOnce({ ...subscription, schedule: null, cancel_at_period_end: true });
+      .mockResolvedValueOnce({
+        ...subscription,
+        schedule: null,
+        cancel_at_period_end: false,
+      })
+      .mockResolvedValueOnce({
+        ...subscription,
+        schedule: null,
+        cancel_at_period_end: true,
+      });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
     await handleKiloClawSubscriptionUpdated({
@@ -3313,8 +3484,16 @@ describe('handleKiloClawSubscriptionUpdated', () => {
       priceId: 'price_commit',
     });
     stripeMock.subscriptions.retrieve
-      .mockResolvedValueOnce({ ...subscription, schedule: null, cancel_at_period_end: false })
-      .mockResolvedValueOnce({ ...subscription, schedule: null, cancel_at_period_end: true });
+      .mockResolvedValueOnce({
+        ...subscription,
+        schedule: null,
+        cancel_at_period_end: false,
+      })
+      .mockResolvedValueOnce({
+        ...subscription,
+        schedule: null,
+        cancel_at_period_end: true,
+      });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
     await handleKiloClawSubscriptionUpdated({
@@ -3396,7 +3575,12 @@ describe('handleKiloClawSubscriptionDeleted', () => {
     if (!existing) throw new Error('Failed to insert ambiguous deleted fixture');
     const subscription = makeStripeSubscription({
       id: 'sub_deleted_manual_review',
-      metadata: { type: 'kiloclaw', plan: 'commit', kiloUserId: user.id, instanceId: instance.id },
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'commit',
+        kiloUserId: user.id,
+        instanceId: instance.id,
+      },
       status: 'canceled',
       cancel_at_period_end: true,
       priceId: 'price_commit',
@@ -3655,8 +3839,16 @@ describe('handleKiloClawSubscriptionCreated', () => {
       created: Math.floor(new Date('2026-06-05T23:59:59.000Z').getTime() / 1000),
     });
     stripeMock.subscriptions.retrieve
-      .mockResolvedValueOnce({ ...subscription, schedule: null, cancel_at_period_end: false })
-      .mockResolvedValueOnce({ ...subscription, schedule: null, cancel_at_period_end: true });
+      .mockResolvedValueOnce({
+        ...subscription,
+        schedule: null,
+        cancel_at_period_end: false,
+      })
+      .mockResolvedValueOnce({
+        ...subscription,
+        schedule: null,
+        cancel_at_period_end: true,
+      });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
     await handleKiloClawSubscriptionCreated({
@@ -3720,7 +3912,10 @@ describe('handleKiloClawSubscriptionCreated', () => {
   });
 
   it('does not mutate a canceled legacy row when current checkout points at it', async () => {
-    const instance = await createWebhookAnchor({ plan: 'standard', status: 'canceled' });
+    const instance = await createWebhookAnchor({
+      plan: 'standard',
+      status: 'canceled',
+    });
 
     const subscription = makeStripeSubscription({
       id: 'sub_current_after_legacy_cancel',
@@ -3952,8 +4147,16 @@ describe('handleKiloClawSubscriptionCreated', () => {
       priceId: 'price_commit',
     });
     stripeMock.subscriptions.retrieve
-      .mockResolvedValueOnce({ ...staleSubscription, schedule: null, cancel_at_period_end: false })
-      .mockResolvedValueOnce({ ...staleSubscription, schedule: null, cancel_at_period_end: true });
+      .mockResolvedValueOnce({
+        ...staleSubscription,
+        schedule: null,
+        cancel_at_period_end: false,
+      })
+      .mockResolvedValueOnce({
+        ...staleSubscription,
+        schedule: null,
+        cancel_at_period_end: true,
+      });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
     await handleKiloClawSubscriptionCreated({
@@ -3981,7 +4184,13 @@ describe('handleKiloClawSubscriptionCreated', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_auto',
-      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard_intro' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -4030,7 +4239,13 @@ describe('handleKiloClawSubscriptionCreated', () => {
       id: 'sched_half',
       metadata: { origin: 'auto-intro' },
       // Only 1 phase — the 2-phase rewrite never completed
-      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard_intro' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
       status: 'active',
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
@@ -4083,7 +4298,11 @@ describe('handleKiloClawSubscriptionCreated', () => {
     );
     stripePriceIdsMock.getStripePriceIdMetadata.mockImplementation((priceId: string) =>
       priceId === 'price_legacy_standard_intro'
-        ? { plan: 'standard', priceVersion: LEGACY_KILOCLAW_PRICE_VERSION, isIntro: true }
+        ? {
+            plan: 'standard',
+            priceVersion: LEGACY_KILOCLAW_PRICE_VERSION,
+            isIntro: true,
+          }
         : null
     );
     stripePriceIdsMock.getStripePriceIdForClawPlan.mockImplementation(
@@ -4131,7 +4350,9 @@ describe('handleKiloClawSubscriptionCreated', () => {
       'sched_legacy_half',
       expect.objectContaining({
         phases: expect.arrayContaining([
-          expect.objectContaining({ items: [{ price: 'price_legacy_standard_intro' }] }),
+          expect.objectContaining({
+            items: [{ price: 'price_legacy_standard_intro' }],
+          }),
           expect.objectContaining({
             items: [{ price: `${LEGACY_KILOCLAW_PRICE_VERSION}_standard` }],
           }),
@@ -4355,9 +4576,15 @@ describe('current-price canceled Stripe checkout webhook ordering', () => {
           eventId: `evt_created_${orderKey}`,
           subscription,
         });
-        await handleKiloClawInvoicePaid({ eventId: `evt_invoice_${orderKey}`, invoice });
+        await handleKiloClawInvoicePaid({
+          eventId: `evt_invoice_${orderKey}`,
+          invoice,
+        });
       } else {
-        await handleKiloClawInvoicePaid({ eventId: `evt_invoice_${orderKey}`, invoice });
+        await handleKiloClawInvoicePaid({
+          eventId: `evt_invoice_${orderKey}`,
+          invoice,
+        });
         await handleKiloClawSubscriptionCreated({
           eventId: `evt_created_${orderKey}`,
           subscription,
@@ -4711,7 +4938,9 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
           amount_paid: 30_600,
           currency: 'usd',
           charge: 'ch_rowless_paid_commit_provider_failure',
-          parent: { subscription_details: { subscription: stripeSubscriptionId } },
+          parent: {
+            subscription_details: { subscription: stripeSubscriptionId },
+          },
           lines: {
             data: [
               {
@@ -5216,7 +5445,13 @@ describe('reactivateSubscription', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_restored',
-      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard_intro' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5311,7 +5546,13 @@ describe('switchPlan', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_new',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5379,7 +5620,13 @@ describe('switchPlan', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_legacy_family',
-      phases: [{ items: [{ price: 'price_legacy_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_legacy_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5390,7 +5637,9 @@ describe('switchPlan', () => {
       'sub_sched_legacy_family',
       expect.objectContaining({
         phases: [
-          expect.objectContaining({ items: [{ price: 'price_legacy_standard' }] }),
+          expect.objectContaining({
+            items: [{ price: 'price_legacy_standard' }],
+          }),
           { items: [{ price: `${LEGACY_KILOCLAW_PRICE_VERSION}_commit` }] },
         ],
       })
@@ -5409,7 +5658,13 @@ describe('switchPlan', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_effective',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5472,7 +5727,13 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
       id: 'sched_auto',
       metadata: { origin: 'auto-intro' },
-      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard_intro' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
       status: 'active',
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
@@ -5515,7 +5776,13 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
       id: 'sched_hidden_auto',
       metadata: { origin: 'auto-intro' },
-      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard_intro' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
       status: 'active',
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
@@ -5549,13 +5816,25 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
       id: 'sched_hidden_user',
       metadata: {},
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
       status: 'active',
     });
     stripeMock.subscriptionSchedules.release.mockResolvedValue({});
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sched_fresh',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5594,7 +5873,13 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
       id: 'sched_hidden_transient',
       metadata: {},
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
       status: 'active',
     });
     // Transient error — not "not active" or "released" or "canceled"
@@ -5622,7 +5907,13 @@ describe('switchPlan', () => {
     // which has already rolled over to the regular price
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sched_fresh_price',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5636,7 +5927,9 @@ describe('switchPlan', () => {
       string,
       unknown
     >;
-    const phases = updateArgs.phases as Array<{ items: Array<{ price: string }> }>;
+    const phases = updateArgs.phases as Array<{
+      items: Array<{ price: string }>;
+    }>;
     expect(phases[0].items[0].price).toBe('price_standard');
   });
 });
@@ -5756,7 +6049,13 @@ describe('cancelPlanSwitch', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sched_auto_restored',
-      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard_intro' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -5833,7 +6132,12 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
 
     stripeMock.subscriptions.list.mockResolvedValue({ data: [] });
     stripeMock.checkout.sessions.list.mockResolvedValue({
-      data: [{ id: 'cs_existing', metadata: { type: 'kiloclaw', instanceId: instance.id } }],
+      data: [
+        {
+          id: 'cs_existing',
+          metadata: { type: 'kiloclaw', instanceId: instance.id },
+        },
+      ],
     });
     stripeMock.checkout.sessions.create.mockResolvedValue({
       id: 'cs_new',
@@ -5841,7 +6145,9 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
+    const result = await caller.kiloclaw.createSubscriptionCheckout({
+      plan: 'standard',
+    });
 
     expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_existing');
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
@@ -5861,7 +6167,12 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
 
     stripeMock.subscriptions.list.mockResolvedValue({ data: [] });
     stripeMock.checkout.sessions.list.mockResolvedValue({
-      data: [{ id: 'cs_gone', metadata: { type: 'kiloclaw', instanceId: instance.id } }],
+      data: [
+        {
+          id: 'cs_gone',
+          metadata: { type: 'kiloclaw', instanceId: instance.id },
+        },
+      ],
     });
     stripeMock.checkout.sessions.expire.mockRejectedValue(new Error('session no longer open'));
     stripeMock.checkout.sessions.create.mockResolvedValue({
@@ -5870,7 +6181,9 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
+    const result = await caller.kiloclaw.createSubscriptionCheckout({
+      plan: 'standard',
+    });
 
     expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_gone');
     expect(result).toEqual({ url: 'https://checkout.stripe.com/new' });
@@ -5990,7 +6303,9 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
+    const result = await caller.kiloclaw.createSubscriptionCheckout({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ url: 'https://checkout.stripe.com/personal' });
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
@@ -6048,7 +6363,12 @@ describe('personal billing mutations do not affect org subscriptions', () => {
       })
       .returning();
 
-    return { orgInstance, personalInstance, orgSub: orgSub!, personalSub: personalSub! };
+    return {
+      orgInstance,
+      personalInstance,
+      orgSub: orgSub!,
+      personalSub: personalSub!,
+    };
   }
 
   it('cancelSubscription targets the personal subscription, not the org one', async () => {
@@ -6116,7 +6436,13 @@ describe('personal billing mutations do not affect org subscriptions', () => {
     });
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_personal',
-      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      phases: [
+        {
+          items: [{ price: 'price_standard' }],
+          start_date: 1000,
+          end_date: 2000,
+        },
+      ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({});
 
@@ -6192,7 +6518,11 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_new',
       phases: [
-        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+        {
+          start_date: now,
+          end_date: now + 86400 * 30,
+          items: [{ price: 'price_test_kiloclaw' }],
+        },
       ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({
@@ -6322,7 +6652,11 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_new',
       phases: [
-        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+        {
+          start_date: now,
+          end_date: now + 86400 * 30,
+          items: [{ price: 'price_test_kiloclaw' }],
+        },
       ],
     });
     stripeMock.subscriptionSchedules.update.mockResolvedValue({
@@ -6347,7 +6681,11 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_orphan',
       phases: [
-        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+        {
+          start_date: now,
+          end_date: now + 86400 * 30,
+          items: [{ price: 'price_test_kiloclaw' }],
+        },
       ],
     });
     stripeMock.subscriptionSchedules.update.mockRejectedValue(new Error('Stripe update failed'));
@@ -6381,7 +6719,11 @@ describe('switchPlan', () => {
     stripeMock.subscriptionSchedules.create.mockResolvedValue({
       id: 'sub_sched_race',
       phases: [
-        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+        {
+          start_date: now,
+          end_date: now + 86400 * 30,
+          items: [{ price: 'price_test_kiloclaw' }],
+        },
       ],
     });
     // Simulate a concurrent request writing a schedule to the DB while our
@@ -6832,67 +7174,6 @@ describe('enrollWithCredits', () => {
     return instance;
   }
 
-  async function createActiveYearlyTier49KiloPassWithBaseIssuance(userId: string) {
-    const providerSubscriptionId = `kp-recovery-${crypto.randomUUID()}`;
-    const [subscription] = await db
-      .insert(kilo_pass_subscriptions)
-      .values({
-        kilo_user_id: userId,
-        provider_subscription_id: providerSubscriptionId,
-        stripe_subscription_id: providerSubscriptionId,
-        tier: KiloPassTier.Tier49,
-        cadence: KiloPassCadence.Yearly,
-        status: 'active',
-        cancel_at_period_end: false,
-        started_at: '2026-07-01T00:00:00.000Z',
-        current_streak_months: 1,
-        next_yearly_issue_at: '2026-08-01T00:00:00.000Z',
-      })
-      .returning();
-
-    if (!subscription) {
-      throw new Error('Failed to insert Kilo Pass subscription');
-    }
-
-    const [baseCreditTransaction] = await db
-      .insert(credit_transactions)
-      .values({
-        kilo_user_id: userId,
-        amount_microdollars: 49_000_000,
-        is_free: false,
-        description: 'Kilo Pass Pro yearly base credits',
-        credit_category: `kilo-pass-base:${providerSubscriptionId}:2026-07`,
-        check_category_uniqueness: true,
-      })
-      .returning();
-
-    if (!baseCreditTransaction) {
-      throw new Error('Failed to insert Kilo Pass base credit transaction');
-    }
-
-    const [issuance] = await db
-      .insert(kilo_pass_issuances)
-      .values({
-        kilo_pass_subscription_id: subscription.id,
-        issue_month: '2026-07-01',
-        source: KiloPassIssuanceSource.Cron,
-      })
-      .returning();
-
-    if (!issuance) {
-      throw new Error('Failed to insert Kilo Pass issuance');
-    }
-
-    await db.insert(kilo_pass_issuance_items).values({
-      kilo_pass_issuance_id: issuance.id,
-      kind: KiloPassIssuanceItemKind.Base,
-      credit_transaction_id: baseCreditTransaction.id,
-      amount_usd: 49,
-    });
-
-    return { subscription, issuance };
-  }
-
   it('clears destruction fields and records resume retry state when credit enrollment activates a suspended trial', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 60_000_000);
@@ -6913,7 +7194,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -6973,7 +7256,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -7012,7 +7297,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -7100,7 +7387,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -7154,7 +7443,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -7175,31 +7466,29 @@ describe('enrollWithCredits', () => {
     expect(deduction?.amount_microdollars).toBe(-55_000_000);
   });
 
-  it('charges current standard pricing for fresh enrollment with no subscription row', async () => {
+  it('rejects credit enrollment without an existing personal subscription', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 60_000_000);
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({
-      plan: 'standard',
-      instanceId: instance.id,
-    });
+    await expect(
+      caller.kiloclaw.enrollWithCredits({
+        plan: 'standard',
+        instanceId: instance.id,
+      })
+    ).rejects.toThrow('A current KiloClaw subscription is required to provision an instance.');
 
-    expect(result).toEqual({ success: true });
-
-    const [sub] = await db
+    const subscriptions = await db
       .select()
       .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, user.id))
-      .limit(1);
-    expect(sub.kiloclaw_price_version).toBe(CURRENT_KILOCLAW_PRICE_VERSION);
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+    expect(subscriptions).toHaveLength(0);
 
-    const txns = await db
+    const transactions = await db
       .select()
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
-    const deduction = txns.find(t => t.amount_microdollars < 0);
-    expect(deduction?.amount_microdollars).toBe(-55_000_000);
+    expect(transactions).toHaveLength(0);
   });
 
   it('rejects current standard enrollment when balance only covers legacy pricing', async () => {
@@ -7407,353 +7696,12 @@ describe('enrollWithCredits', () => {
     );
   });
 
-  it('reprovisions a destroyed canceled Standard subscription and activates with Kilo Pass projected bonus credits', async () => {
-    setTestSystemTime('2026-07-01T12:00:00.000Z');
+  it('does not reprovision a destroyed canceled Standard subscription', async () => {
     const destroyedInstance = await createInstance(user.id);
     await db
       .update(kiloclaw_instances)
       .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
       .where(eq(kiloclaw_instances.id, destroyedInstance.id));
-    await db
-      .update(kilocode_users)
-      .set({
-        total_microdollars_acquired: 43_710_000,
-        microdollars_used: 0,
-        kilo_pass_threshold: 49_000_000,
-      })
-      .where(eq(kilocode_users.id, user.id));
-    const { issuance } = await createActiveYearlyTier49KiloPassWithBaseIssuance(user.id);
-    const [oldSubscription] = await db
-      .insert(kiloclaw_subscriptions)
-      .values({
-        user_id: user.id,
-        instance_id: destroyedInstance.id,
-        payment_source: 'credits',
-        plan: 'standard',
-        status: 'canceled',
-        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-        current_period_start: '2026-05-30T00:00:00.000Z',
-        current_period_end: '2026-06-30T00:00:00.000Z',
-        credit_renewal_at: '2026-06-30T00:00:00.000Z',
-      })
-      .returning();
-    const freshInstance = {
-      id: crypto.randomUUID(),
-      sandboxId: `ki_${crypto.randomUUID()}`,
-    };
-    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
-      await db.insert(kiloclaw_instances).values({
-        id: freshInstance.id,
-        user_id: user.id,
-        sandbox_id: freshInstance.sandboxId,
-      });
-      return {
-        instanceId: freshInstance.id,
-        sandboxId: freshInstance.sandboxId,
-      };
-    });
-
-    const caller = await createCallerForUser(user.id);
-    const beforeStatus = await caller.kiloclaw.getBillingStatus();
-    expect(beforeStatus.creditReprovisionRecovery).toEqual({
-      eligible: true,
-      plan: 'standard',
-      costMicrodollars: 55_000_000,
-      projectedKiloPassBonusMicrodollars: 24_500_000,
-      effectiveBalanceMicrodollars: 68_210_000,
-      shortfallMicrodollars: 0,
-    });
-
-    const result = await caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' });
-
-    expect(result).toEqual({
-      success: true,
-      status: 'activated',
-      instanceId: freshInstance.id,
-    });
-
-    const subscriptions = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, user.id));
-    const predecessor = subscriptions.find(subscription => subscription.id === oldSubscription?.id);
-    const successor = subscriptions.find(
-      subscription => subscription.instance_id === freshInstance.id
-    );
-
-    expect(successor).toEqual(
-      expect.objectContaining({
-        status: 'active',
-        payment_source: 'credits',
-        plan: 'standard',
-        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-        credit_renewal_at: expect.any(String),
-      })
-    );
-    expect(predecessor?.transferred_to_subscription_id).toBe(successor?.id);
-
-    const [updatedUser] = await db
-      .select({
-        acquired: kilocode_users.total_microdollars_acquired,
-        used: kilocode_users.microdollars_used,
-        threshold: kilocode_users.kilo_pass_threshold,
-      })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, user.id))
-      .limit(1);
-    expect(updatedUser).toEqual({
-      acquired: 68_210_000,
-      used: 55_000_000,
-      threshold: null,
-    });
-
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
-      where: and(
-        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
-        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-      ),
-      columns: {
-        kind: true,
-        amount_usd: true,
-        bonus_percent_applied: true,
-      },
-    });
-    expect(bonusItem).toEqual(
-      expect.objectContaining({
-        kind: KiloPassIssuanceItemKind.Bonus,
-        amount_usd: 24.5,
-        bonus_percent_applied: 0.5,
-      })
-    );
-
-    const deductions = await db
-      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
-      .from(credit_transactions)
-      .where(eq(credit_transactions.kilo_user_id, user.id));
-    expect(deductions.map(row => row.amountMicrodollars)).toContain(-55_000_000);
-  });
-
-  it('rolls back a duplicate fresh provision when another recovery activates first', async () => {
-    setTestSystemTime('2026-07-01T12:00:00.000Z');
-    const destroyedInstance = await createInstance(user.id);
-    await db
-      .update(kiloclaw_instances)
-      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
-      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
-    await db
-      .update(kilocode_users)
-      .set({
-        total_microdollars_acquired: 120_000_000,
-        microdollars_used: 0,
-        kilo_pass_threshold: null,
-      })
-      .where(eq(kilocode_users.id, user.id));
-    const [oldSubscription] = await db
-      .insert(kiloclaw_subscriptions)
-      .values({
-        user_id: user.id,
-        instance_id: destroyedInstance.id,
-        payment_source: 'credits',
-        plan: 'standard',
-        status: 'canceled',
-        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-        current_period_start: '2026-05-30T00:00:00.000Z',
-        current_period_end: '2026-06-30T00:00:00.000Z',
-        credit_renewal_at: '2026-06-30T00:00:00.000Z',
-      })
-      .returning();
-    const oldSubscriptionId = oldSubscription?.id;
-    if (!oldSubscriptionId) throw new Error('Expected old subscription fixture');
-    const winningInstance = {
-      id: crypto.randomUUID(),
-      sandboxId: `ki_${crypto.randomUUID()}`,
-    };
-    const freshInstance = {
-      id: crypto.randomUUID(),
-      sandboxId: `ki_${crypto.randomUUID()}`,
-    };
-    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
-      await db.insert(kiloclaw_instances).values({
-        id: winningInstance.id,
-        user_id: user.id,
-        sandbox_id: winningInstance.sandboxId,
-      });
-      const [winningSubscription] = await db
-        .insert(kiloclaw_subscriptions)
-        .values({
-          user_id: user.id,
-          instance_id: winningInstance.id,
-          payment_source: 'credits',
-          plan: 'standard',
-          status: 'active',
-          kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-          current_period_start: '2026-07-01T12:00:00.000Z',
-          current_period_end: '2026-08-01T12:00:00.000Z',
-          credit_renewal_at: '2026-08-01T12:00:00.000Z',
-        })
-        .returning();
-      const winningSubscriptionId = winningSubscription?.id;
-      if (!winningSubscriptionId) throw new Error('Expected winning subscription fixture');
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({ transferred_to_subscription_id: winningSubscriptionId })
-        .where(eq(kiloclaw_subscriptions.id, oldSubscriptionId));
-      await db.insert(kiloclaw_instances).values({
-        id: freshInstance.id,
-        user_id: user.id,
-        sandbox_id: freshInstance.sandboxId,
-      });
-      return {
-        instanceId: freshInstance.id,
-        sandboxId: freshInstance.sandboxId,
-      };
-    });
-
-    const caller = await createCallerForUser(user.id);
-    await expect(
-      caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' })
-    ).resolves.toEqual({
-      success: true,
-      status: 'activated',
-      instanceId: winningInstance.id,
-    });
-
-    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledTimes(1);
-
-    const [freshRow] = await db
-      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.id, freshInstance.id))
-      .limit(1);
-    expect(freshRow?.destroyedAt).toEqual(expect.any(String));
-
-    const freshSubscriptions = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.instance_id, freshInstance.id));
-    expect(freshSubscriptions).toEqual([]);
-    expect(kiloclawInternalClientMock.__destroyMock).toHaveBeenCalledWith(
-      user.id,
-      freshInstance.id,
-      { reason: 'stale_provision_cleanup' }
-    );
-
-    const [predecessor] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.id, oldSubscriptionId))
-      .limit(1);
-    expect(predecessor).toEqual(
-      expect.objectContaining({
-        transferred_to_subscription_id: expect.any(String),
-      })
-    );
-  });
-
-  it('rolls back the fresh instance when destroyed-subscription credit recovery enrollment fails', async () => {
-    setTestSystemTime('2026-07-01T12:00:00.000Z');
-    const destroyedInstance = await createInstance(user.id);
-    await db
-      .update(kiloclaw_instances)
-      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
-      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
-    await db
-      .update(kilocode_users)
-      .set({
-        total_microdollars_acquired: 60_000_000,
-        microdollars_used: 0,
-        kilo_pass_threshold: null,
-      })
-      .where(eq(kilocode_users.id, user.id));
-    await db.insert(kiloclaw_subscriptions).values({
-      user_id: user.id,
-      instance_id: destroyedInstance.id,
-      payment_source: 'credits',
-      plan: 'standard',
-      status: 'canceled',
-      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-    });
-    const freshInstance = {
-      id: crypto.randomUUID(),
-      sandboxId: `ki_${crypto.randomUUID()}`,
-    };
-    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
-      await db.insert(kiloclaw_instances).values({
-        id: freshInstance.id,
-        user_id: user.id,
-        sandbox_id: freshInstance.sandboxId,
-      });
-      await db.insert(credit_transactions).values({
-        kilo_user_id: user.id,
-        amount_microdollars: -55_000_000,
-        is_free: false,
-        description: 'Duplicate KiloClaw enrollment deduction',
-        credit_category: `kiloclaw-subscription:${freshInstance.id}:2026-07`,
-        check_category_uniqueness: true,
-      });
-      return {
-        instanceId: freshInstance.id,
-        sandboxId: freshInstance.sandboxId,
-      };
-    });
-
-    const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.getBillingStatus()).resolves.toMatchObject({
-      creditReprovisionRecovery: {
-        eligible: true,
-        effectiveBalanceMicrodollars: 60_000_000,
-        shortfallMicrodollars: 0,
-      },
-    });
-
-    const result = await caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' });
-
-    expect(result).toEqual({
-      success: false,
-      status: 'action_required',
-      instanceId: null,
-      message:
-        'Credit activation did not finish, so the new KiloClaw was rolled back. Retry activation or contact support.',
-    });
-    const [rolledBackInstance] = await db
-      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.id, freshInstance.id))
-      .limit(1);
-    expect(rolledBackInstance?.destroyedAt).toEqual(expect.any(String));
-    const freshSubscriptions = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.instance_id, freshInstance.id));
-    expect(freshSubscriptions).toEqual([]);
-    await expect(caller.kiloclaw.getBillingStatus()).resolves.toMatchObject({
-      creditReprovisionRecovery: {
-        eligible: true,
-        effectiveBalanceMicrodollars: 60_000_000,
-        shortfallMicrodollars: 0,
-      },
-    });
-    expect(kiloclawInternalClientMock.__destroyMock).toHaveBeenCalledWith(
-      user.id,
-      freshInstance.id,
-      { reason: 'stale_provision_cleanup' }
-    );
-  });
-
-  it('does not offer or run destroyed-subscription credit recovery when effective balance is insufficient', async () => {
-    const destroyedInstance = await createInstance(user.id);
-    await db
-      .update(kiloclaw_instances)
-      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
-      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
-    await db
-      .update(kilocode_users)
-      .set({
-        total_microdollars_acquired: 43_710_000,
-        microdollars_used: 0,
-        kilo_pass_threshold: null,
-      })
-      .where(eq(kilocode_users.id, user.id));
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: destroyedInstance.id,
@@ -7764,18 +7712,12 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const status = await caller.kiloclaw.getBillingStatus();
-    expect(status.creditReprovisionRecovery).toEqual({
-      eligible: false,
-      plan: 'standard',
-      costMicrodollars: 55_000_000,
-      projectedKiloPassBonusMicrodollars: 0,
-      effectiveBalanceMicrodollars: 43_710_000,
-      shortfallMicrodollars: 11_290_000,
+    await expect(caller.kiloclaw.getBillingStatus()).resolves.toMatchObject({
+      creditReprovisionRecovery: { eligible: false },
     });
     await expect(
       caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' })
-    ).rejects.toThrow('Effective credit balance is insufficient');
+    ).rejects.toThrow('Credit-funded reprovision recovery is not available');
     expect(kiloclawInternalClientMock.__provisionMock).not.toHaveBeenCalled();
   });
 
@@ -7846,7 +7788,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -7982,7 +7926,9 @@ describe('enrollWithCredits', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -8007,7 +7953,9 @@ describe('enrollWithCredits', () => {
     await giveUserCredits(user.id, 5_000_000); // $5 — enough for $4 intro, not enough for $9
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+    const result = await caller.kiloclaw.enrollWithCredits({
+      plan: 'standard',
+    });
 
     expect(result).toEqual({ success: true });
 
@@ -8466,7 +8414,9 @@ describe('getBillingStatus with credits', () => {
 
     const caller = await createCallerForUser(user.id);
     const status = await caller.kiloclaw.getBillingStatus();
-    const portal = await caller.kiloclaw.getCustomerPortalUrl({ instanceId: instance.id });
+    const portal = await caller.kiloclaw.getCustomerPortalUrl({
+      instanceId: instance.id,
+    });
 
     expect(status.subscription).toMatchObject({
       paymentSource: 'credits',
@@ -8476,7 +8426,9 @@ describe('getBillingStatus with credits', () => {
       renewalCostMicrodollars: 55_000_000,
       renewalCostSource: 'stripe_approximation',
     });
-    expect(portal).toEqual({ url: 'https://stripe.example.test/hybrid-portal' });
+    expect(portal).toEqual({
+      url: 'https://stripe.example.test/hybrid-portal',
+    });
   });
 
   it('reports creditIntroEligible=true for new user with no subscription', async () => {
@@ -8611,6 +8563,24 @@ describe('getBillingStatus with credits', () => {
     const result = await caller.kiloclaw.getBillingStatus();
 
     expect(result.hasActiveKiloPass).toBe(true);
+  });
+
+  it('includes detached canonical history in the personal billing summary', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: null,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getPersonalBillingSummary();
+
+    expect(result.hasExistingPersonalSubscription).toBe(true);
+    expect(result.hasCurrentPersonalSubscription).toBe(true);
+    expect(result.hasActiveInstance).toBe(false);
   });
 
   it('reports legacy recurring Standard upsell cost when prior paid history removes intro eligibility', async () => {
@@ -9118,7 +9088,9 @@ describe('acceptConversion', () => {
     stripeMock.subscriptions.retrieve.mockResolvedValueOnce({ schedule: null });
     stripeMock.subscriptions.update.mockRejectedValue(new Error('Stripe API error'));
     // Re-fetch confirms Stripe did NOT apply cancel_at_period_end
-    stripeMock.subscriptions.retrieve.mockResolvedValueOnce({ cancel_at_period_end: false });
+    stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+      cancel_at_period_end: false,
+    });
 
     const caller = await createCallerForUser(user.id);
     await expect(caller.kiloclaw.acceptConversion()).rejects.toThrow(
@@ -9153,7 +9125,9 @@ describe('acceptConversion', () => {
     stripeMock.subscriptions.retrieve.mockResolvedValueOnce({ schedule: null });
     stripeMock.subscriptions.update.mockRejectedValue(new Error('Stripe timeout'));
     // Re-fetch confirms Stripe DID apply cancel_at_period_end (timeout-after-commit)
-    stripeMock.subscriptions.retrieve.mockResolvedValueOnce({ cancel_at_period_end: true });
+    stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+      cancel_at_period_end: true,
+    });
 
     const caller = await createCallerForUser(user.id);
     const result = await caller.kiloclaw.acceptConversion();

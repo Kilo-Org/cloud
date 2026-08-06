@@ -30,6 +30,64 @@ import { db } from '@/lib/drizzle';
  */
 export type ResolvedExperimentUpstream = CustomLlmApiConfig & { api_key: string };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function setPropertyPath(target: Record<string, unknown>, path: string, value: string) {
+  const segments = path.split('.');
+  const finalSegment = segments.at(-1);
+  if (!finalSegment) {
+    return;
+  }
+
+  let current = target;
+
+  for (const segment of segments.slice(0, -1)) {
+    const existing = current[segment];
+    if (isRecord(existing)) {
+      current = existing;
+      continue;
+    }
+
+    const nested: Record<string, unknown> = {};
+    current[segment] = nested;
+    current = nested;
+  }
+
+  current[finalSegment] = value;
+}
+
+function mapThoughtSignatures(context: TransformRequestContext, path: string) {
+  if (context.request.kind !== 'chat_completions') {
+    return;
+  }
+
+  for (const message of context.request.body.messages) {
+    if (!isRecord(message)) {
+      continue;
+    }
+
+    delete message.thoughtSignature;
+
+    if (!Array.isArray(message.tool_calls)) {
+      continue;
+    }
+
+    for (const toolCall of message.tool_calls) {
+      if (!isRecord(toolCall)) {
+        continue;
+      }
+
+      const signature = toolCall.thoughtSignature;
+      delete toolCall.thoughtSignature;
+      if (typeof signature === 'string') {
+        setPropertyPath(toolCall, path, signature);
+      }
+    }
+  }
+}
+
 async function compressWithHeadroom(
   context: TransformRequestContext,
   compression: CustomLlmCompression
@@ -119,6 +177,9 @@ export function buildDirectProvider(
         } else {
           context.request.body.messages = messages as OpenRouterChatCompletionRequest['messages'];
         }
+      }
+      if (upstream.thought_signature_mapping) {
+        mapThoughtSignatures(context, upstream.thought_signature_mapping);
       }
     },
   };

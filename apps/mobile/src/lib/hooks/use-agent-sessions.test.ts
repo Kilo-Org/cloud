@@ -1,10 +1,32 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildActiveSessionsInput,
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
+import { buildStoredSessionsQueryOptions } from '@/lib/hooks/use-agent-sessions';
+
+// The hook module transitively imports react-native (via the user-web-
+// connection lifecycle) and the real tRPC client (via `@/lib/trpc`), which the
+// node vitest pipeline cannot transform. The options builder itself is pure,
+// so only the module-load chain needs these mocks; no hook is mounted.
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => false,
+}));
+
+vi.mock('@/lib/active-sessions-live-sync', () => ({
+  refreshActiveSessionsNow: vi.fn().mockResolvedValue(false),
+}));
+
+function createTrpcStub(infiniteQueryOptions: unknown) {
+  const stub = { cliSessionsV2: { list: { infiniteQueryOptions } } };
+  return stub as never;
+}
 
 describe('buildAgentSessionListInput', () => {
   it('defaults to updated_at when sortBy is omitted (matches pre-feature behavior)', () => {
@@ -140,5 +162,27 @@ describe('buildAgentSessionSearchInput', () => {
       organizationId: 'org-1',
     });
     expect(input).not.toHaveProperty('cursor');
+  });
+});
+
+describe('buildStoredSessionsQueryOptions', () => {
+  it('disables the native window-focus refetch so focus stays coordinated', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    expect(infiniteQueryOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 30 }),
+      expect.objectContaining({ refetchOnWindowFocus: false })
+    );
+    expect(result.refetchOnWindowFocus).toBe(false);
+  });
+
+  it('keeps the explicit fetch paths enabled (enabled passthrough)', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
+      enabled: false,
+    });
+
+    expect(result.enabled).toBe(false);
   });
 });

@@ -79,16 +79,32 @@ function getUpdatedSince(days: number): string {
 
 // ── Queries ──────────────────────────────────────────────────────────
 
+/**
+ * Build the stored-sessions infinite-query options shared by every stored
+ * refetch path on the Agents screen (focus return, pull-to-refresh, retry,
+ * departure trigger, backfill). Kept as a pure builder so the query options
+ * are executable-tested without mounting the hook.
+ */
+export function buildStoredSessionsQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  options?: UseAgentSessionsOptions
+) {
+  return trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
+    staleTime: 30_000,
+    enabled: options?.enabled,
+    getNextPageParam: lastPage => lastPage.nextCursor,
+    // The screen's `useFocusEffect` already runs the coordinated stored
+    // refetch, so the native window-focus refetch — which fires directly on
+    // this query on OS app foreground transitions and bypasses the operation
+    // coordinator shared with backfill and departure — is disabled.
+    refetchOnWindowFocus: false,
+  });
+}
+
 function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
 
-  return useInfiniteQuery(
-    trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
-      staleTime: 30_000,
-      enabled: options?.enabled,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-    })
-  );
+  return useInfiniteQuery(buildStoredSessionsQueryOptions(trpc, options));
 }
 
 function useActiveSessions(options?: UseAgentSessionsOptions) {

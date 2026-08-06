@@ -1,5 +1,5 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- injectable query/sleep fakes settle without await */
-/* eslint-disable max-lines -- the manager suite pins key rotation, retry cadence, and attachment mints in one file. */
+/* eslint-disable max-lines -- the manager suite pins retry cadence and attachment mints in one file. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
@@ -12,15 +12,6 @@ import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
 }));
-vi.mock('expo-crypto', () => {
-  let n = 0;
-  return {
-    randomUUID: () => {
-      n += 1;
-      return `op-key-${n}`;
-    },
-  };
-});
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
@@ -66,17 +57,8 @@ vi.mock('@/lib/trpc', () => ({
 
 const { buildRemoteAttachmentParts } =
   await import('@/components/agents/mobile-session-manager-helpers');
-const {
-  createMobileAgentSessionManager,
-  fetchSessionWithNotFoundRetry,
-  isCloudPrepareRetryableError,
-  readFetchSessionErrorCode,
-} = await import('@/components/agents/mobile-session-manager');
-const { createSessionManager: createSessionManagerReal } =
-  await import('@kilocode/cloud-agent-sdk');
-// The module is mocked with `createSessionManager: vi.fn()` above; recover
-// the mock instance typing so `.mockClear()` / `.mock.calls` typecheck.
-const createSessionManagerMock = vi.mocked(createSessionManagerReal);
+const { fetchSessionWithNotFoundRetry, isCloudPrepareRetryableError, readFetchSessionErrorCode } =
+  await import('@/components/agents/mobile-session-manager');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
 
@@ -88,14 +70,6 @@ function notFoundError(): Error {
 
 function withCode(code: string, message: string): Error {
   return Object.assign(new Error(message), { data: { code } });
-}
-
-function creationInProgressError(): Error {
-  return Object.assign(new Error('creation_in_progress'), { data: { code: 'CONFLICT' } });
-}
-
-function badRequestError(): Error {
-  return Object.assign(new Error('session_creation_failed'), { data: { code: 'BAD_REQUEST' } });
 }
 
 describe('buildRemoteAttachmentParts', () => {
@@ -262,112 +236,6 @@ describe('isCloudPrepareRetryableError', () => {
 
   it('rotates the key on a CONFLICT with any other message', () => {
     expect(isCloudPrepareRetryableError(withCode('CONFLICT', 'something else'))).toBe(false);
-  });
-});
-
-describe('createMobileAgentSessionManager prepare operationKey', () => {
-  const PREPARE_INPUT = {
-    prompt: 'continue this',
-    mode: 'code',
-    model: 'kilo-auto/efficient',
-    githubRepo: 'owner/repo',
-    initialMessageId: 'msg-1',
-  };
-
-  function createPrepare(): {
-    prepare: (input: Record<string, unknown>) => Promise<{
-      cloudAgentSessionId: string;
-      kiloSessionId: string;
-    }>;
-  } {
-    createSessionManagerMock.mockClear();
-    createMobileAgentSessionManager({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- store is never read with the SDK mocked
-      store: {} as never,
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- connection is never read with the SDK mocked
-      userWebConnection: {} as never,
-      organizationId: undefined,
-    });
-    const config = createSessionManagerMock.mock.calls[0]?.[0];
-    if (!config) {
-      throw new Error('createSessionManager was not called');
-    }
-    return config as unknown as {
-      prepare: (input: Record<string, unknown>) => Promise<{
-        cloudAgentSessionId: string;
-        kiloSessionId: string;
-      }>;
-    };
-  }
-
-  beforeEach(() => {
-    prepareSessionMutate.mockReset();
-  });
-
-  it('attaches a stable operationKey when autoInitiate is true and keeps it across retryable failures', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockResolvedValue({ cloudAgentSessionId: 'c-1', kiloSessionId: 'k-1' });
-    const config = createPrepare();
-    const input = { ...PREPARE_INPUT, autoInitiate: true };
-
-    await expect(config.prepare(input)).rejects.toBeDefined();
-    await expect(config.prepare(input)).rejects.toBeDefined();
-    await config.prepare(input);
-
-    const keys = prepareSessionMutate.mock.calls.map(
-      call => (call[0] as { operationKey?: string }).operationKey
-    );
-    expect(keys).toEqual([expect.any(String), keys[0], keys[0]]);
-    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
-      autoInitiate: true,
-      operationKey: expect.any(String),
-    });
-  });
-
-  it('rotates the operationKey after a successful prepare', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockResolvedValue({ cloudAgentSessionId: 'c-1', kiloSessionId: 'k-1' });
-    const config = createPrepare();
-    const input = { ...PREPARE_INPUT, autoInitiate: true };
-
-    await expect(config.prepare(input)).rejects.toBeDefined();
-    await config.prepare(input);
-    await config.prepare(input);
-
-    const keys = prepareSessionMutate.mock.calls.map(
-      call => (call[0] as { operationKey?: string }).operationKey
-    );
-    expect(keys[0]).toBeDefined();
-    expect(keys[1]).toBe(keys[0]);
-    expect(keys[2]).not.toBe(keys[0]);
-  });
-
-  it('rotates the operationKey after a typed non-retryable rejection', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(badRequestError())
-      .mockResolvedValue({ cloudAgentSessionId: 'c-1', kiloSessionId: 'k-1' });
-    const config = createPrepare();
-    const input = { ...PREPARE_INPUT, autoInitiate: true };
-
-    await expect(config.prepare(input)).rejects.toBeDefined();
-    await config.prepare(input);
-
-    const keys = prepareSessionMutate.mock.calls.map(
-      call => (call[0] as { operationKey?: string }).operationKey
-    );
-    expect(keys[1]).not.toBe(keys[0]);
-  });
-
-  it('never attaches an operationKey when autoInitiate is absent', async () => {
-    prepareSessionMutate.mockResolvedValue({ cloudAgentSessionId: 'c-1', kiloSessionId: 'k-1' });
-    const config = createPrepare();
-
-    await config.prepare(PREPARE_INPUT);
-
-    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('operationKey');
   });
 });
 

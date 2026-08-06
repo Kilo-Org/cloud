@@ -106,8 +106,12 @@ async function getDirectOrganizationRole(
 // takeover/reconcile retry reads the membership back FIRST: an already-applied
 // role or an already-removed member settles completed and replays, which
 // avoids the NOT_FOUND trap of re-running the helper on the already-applied
-// state. The membership helpers and the `dailyUsageLimitUsd` path are
-// unchanged.
+// state. For member removal the ledger admission runs BEFORE the
+// missing-membership precondition: a retry of an already-removed member must
+// reach the settled replay or takeover repair instead of being rejected with
+// NOT_FOUND first; the permission and bot checks are retained for a
+// first-time removal. The membership helpers and the `dailyUsageLimitUsd`
+// path are unchanged.
 
 const ORG_LEDGER_DOMAIN = 'organization' as const;
 /** The in-flight window: while an `admitted` row holds a live lease, same-key
@@ -449,6 +453,26 @@ async function completeOrgMemberRemoval(args: {
   return successResult({ updated: args.memberId });
 }
 
+/** Best-effort failed settle for a member-removal row; never masks the typed rejection. */
+async function settleOrgMemberRemovalFailed(args: {
+  row: OperationLedgerRow;
+  distinctId: string;
+  outcomeCode: string;
+}): Promise<void> {
+  await bestEffortOrgLedgerWrite(() =>
+    settleOperation(db, {
+      rowId: args.row.id,
+      status: 'failed',
+      outcomeCode: args.outcomeCode,
+      outboxEvent: orgSettledOutboxEvent({
+        distinctId: args.distinctId,
+        intent: 'member_remove',
+        outcome: 'failed',
+      }),
+    })
+  );
+}
+
 /**
  * Runs the removal helper under an already-admitted row. A `rowCount` of zero
  * means the member was already gone (never satisfied under the `admitted`
@@ -463,18 +487,11 @@ async function executeOrgMemberRemove(args: {
   const distinctId = args.user.google_user_email || args.user.id;
   const result = await removeUserFromOrganization(args.organizationId, args.memberId, args.user.id);
   if (result.rowCount === 0) {
-    await bestEffortOrgLedgerWrite(() =>
-      settleOperation(db, {
-        rowId: args.row.id,
-        status: 'failed',
-        outcomeCode: 'member_absent',
-        outboxEvent: orgSettledOutboxEvent({
-          distinctId,
-          intent: 'member_remove',
-          outcome: 'failed',
-        }),
-      })
-    );
+    await settleOrgMemberRemovalFailed({
+      row: args.row,
+      distinctId,
+      outcomeCode: 'member_absent',
+    });
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Failed to remove user from organization',
@@ -785,38 +802,39 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Get the target user's role and bot status
-      const [targetMember] = await db
-        .select({
-          role: organization_memberships.role,
-          isBot: kilocode_users.is_bot,
-        })
-        .from(organization_memberships)
-        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-        .where(
-          and(
-            eq(organization_memberships.organization_id, organizationId),
-            eq(organization_memberships.kilo_user_id, memberId)
-          )
-        );
-
-      if (!targetMember) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'User is not a member of this organization',
-        });
-      }
-
-      // Prevent removal of bot users
-      if (targetMember.isBot) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Service account users cannot be removed',
-        });
-      }
-
-      // Without an operationKey, use the existing path exactly.
+      // Without an operationKey, use the existing path exactly: the target
+      // membership lookup (missing-member NOT_FOUND + bot FORBIDDEN) runs
+      // before the helper and no ledger row is written.
       if (operationKey === undefined) {
+        const [targetMember] = await db
+          .select({
+            role: organization_memberships.role,
+            isBot: kilocode_users.is_bot,
+          })
+          .from(organization_memberships)
+          .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organizationId),
+              eq(organization_memberships.kilo_user_id, memberId)
+            )
+          );
+
+        if (!targetMember) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User is not a member of this organization',
+          });
+        }
+
+        // Prevent removal of bot users
+        if (targetMember.isBot) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Service account users cannot be removed',
+          });
+        }
+
         const result = await removeUserFromOrganization(organizationId, memberId, user.id);
         if (result.rowCount === 0) {
           throw new TRPCError({
@@ -841,8 +859,12 @@ export const organizationsMembersRouter = createTRPCRouter({
         return successResult({ updated: memberId });
       }
 
-      // With an operationKey, admit a ledger row before running the helper
-      // (P1-A-08e).
+      // With an operationKey, admit a ledger row BEFORE the missing-membership
+      // precondition (P1-A-08e). A same-key retry after a lost response must
+      // be able to replay a settled row or enter takeover repair when the
+      // member is already removed; the precondition would otherwise reject the
+      // retry with NOT_FOUND before the ledger could repair it. The permission
+      // and bot checks are retained for a first-time (`admitted`) removal.
       const resourceKey = orgMemberRemoveResourceKey(organizationId, memberId);
       const admission = await admitOperation(db, {
         userId: user.id,
@@ -858,13 +880,58 @@ export const organizationsMembersRouter = createTRPCRouter({
         throw orgOperationKeyReuseMismatchError();
       }
       switch (admission.admission) {
-        case 'admitted':
+        case 'admitted': {
+          const distinctId = user.google_user_email || user.id;
+          const [targetMember] = await db
+            .select({
+              role: organization_memberships.role,
+              isBot: kilocode_users.is_bot,
+            })
+            .from(organization_memberships)
+            .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+            .where(
+              and(
+                eq(organization_memberships.organization_id, organizationId),
+                eq(organization_memberships.kilo_user_id, memberId)
+              )
+            );
+
+          // A first-time removal of a member that is already gone settles the
+          // row `failed` so a later same-key retry replays the failure instead
+          // of taking over into the removal helper.
+          if (!targetMember) {
+            await settleOrgMemberRemovalFailed({
+              row: admission.row,
+              distinctId,
+              outcomeCode: 'member_absent',
+            });
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'User is not a member of this organization',
+            });
+          }
+
+          // Prevent removal of bot users; the refusal settles the row `failed`
+          // so a later same-key retry cannot take over past the bot check.
+          if (targetMember.isBot) {
+            await settleOrgMemberRemovalFailed({
+              row: admission.row,
+              distinctId,
+              outcomeCode: 'bot_removal_refused',
+            });
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Service account users cannot be removed',
+            });
+          }
+
           return executeOrgMemberRemove({
             row: admission.row,
             user,
             organizationId,
             memberId,
           });
+        }
         case 'takeover':
         case 'duplicate_reconcile_pending':
           return repairOrgMemberRemove({

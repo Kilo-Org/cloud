@@ -35,6 +35,12 @@ type ManualSecuritySyncWorkerResponse = {
   error?: string;
 };
 
+// The Worker's known disabled-routing response: returned with status 503
+// BEFORE enqueueing when command routing is paused. It is a definitive
+// pre-acceptance rejection — the Worker will never accept while routing is
+// paused — not ambiguous transport.
+const MANUAL_SYNC_DISABLED_ROUTING_ERROR = 'Manual sync Worker routing is disabled';
+
 export async function submitManualSecuritySync(
   params: SubmitManualSecuritySyncParams
 ): Promise<AcceptedManualSecuritySync> {
@@ -93,6 +99,20 @@ export async function submitManualSecuritySync(
   }
 
   if (!response.ok) {
+    // The known disabled-routing 503 is a definitive pre-acceptance rejection:
+    // the Worker returns it before enqueueing, so the row settles `failed` and
+    // a later retry must be a fresh intent. Match the exact known body only —
+    // a gateway 503 with arbitrary HTML stays ambiguous transport below.
+    if (
+      response.status === 503 &&
+      body?.success === false &&
+      body?.error === MANUAL_SYNC_DISABLED_ROUTING_ERROR
+    ) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Security sync service request failed (status ${response.status}).`,
+      });
+    }
     // A 5xx is ambiguous transport: the Worker may or may not have accepted.
     if (response.status >= 500) {
       throw new TRPCError({
@@ -100,10 +120,10 @@ export async function submitManualSecuritySync(
         message: `Security sync service request failed (status ${response.status}). Try again.`,
       });
     }
-    // A 4xx is a definitive pre-acceptance rejection (validation, auth,
-    // disabled routing). Do not blindly interpolate body.error — the worker
-    // may not be ours and the body can be attacker/gateway-controlled HTML.
-    // Keep the message short and non-secret.
+    // A 4xx is a definitive pre-acceptance rejection (validation, auth).
+    // Do not blindly interpolate body.error — the worker may not be ours and
+    // the body can be attacker/gateway-controlled HTML. Keep the message short
+    // and non-secret.
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: `Security sync service request failed (status ${response.status}).`,

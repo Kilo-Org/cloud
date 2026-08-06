@@ -9,7 +9,10 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
-import { isSecuritySyncRetryable } from '@/lib/hooks/use-security-agent-mutations';
+import {
+  isSecuritySyncRetryable,
+  mapSecuritySyncOperationError,
+} from '@/lib/hooks/use-security-agent-mutations';
 import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -138,7 +141,9 @@ export function useDismissSecurityFinding(scope: string) {
         if (!isSecuritySyncRetryable(error)) {
           rotateKey();
         }
-        throw error;
+        // Map the raw `operation_in_progress` CONFLICT marker onto retryable
+        // copy before the form renders it inline (P2).
+        throw mapSecuritySyncOperationError(error);
       }
     },
     onSuccess: result => {

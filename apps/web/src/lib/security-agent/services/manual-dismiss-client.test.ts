@@ -106,6 +106,61 @@ describe('submitManualFindingDismissal', () => {
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });
 
+  it('classifies the known disabled-routing 503 as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () =>
+        Promise.resolve({ success: false, error: 'Finding dismissal Worker routing is disabled' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((captured as TRPCError).message).toContain('503');
+    // The known body is matched, never echoed back into the message.
+    expect((captured as TRPCError).message).not.toContain('disabled');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('keeps a 503 with a non-matching body ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ success: false, error: 'gateway upstream unavailable' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+    expect((captured as TRPCError).message).toContain('503');
+  });
+
   it('classifies a 4xx status as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
     mockFetch.mockResolvedValue({
       ok: false,

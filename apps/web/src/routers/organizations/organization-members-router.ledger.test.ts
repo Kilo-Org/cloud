@@ -466,7 +466,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
     });
 
-    it('replays a settled duplicate without re-running the helper', async () => {
+    it('replays a settled duplicate without re-running the helper, even when the member is already gone', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_settled',
         row: ledgerRow({
@@ -476,7 +476,9 @@ describe('organizations members ledger (P1-A-08e)', () => {
           canonical_result: { updated: MEMBER_ID },
         }),
       });
-      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      // The member is already removed: the missing-member precondition must not
+      // block the settled replay (admission runs before the precondition).
+      mockDbState.removeTargetMember = [];
 
       const result = await caller.remove(input);
 
@@ -502,6 +504,60 @@ describe('organizations members ledger (P1-A-08e)', () => {
       });
       expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
     });
+
+    it('settles the row failed when a first-time removal finds the member already gone', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'admitted',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [];
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'User is not a member of this organization',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'member_absent',
+        })
+      );
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('settles the row failed when the target is a service account (bot)', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'admitted',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: true }];
+
+      await expect(caller.remove(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Service account users cannot be removed',
+      });
+
+      expect(mockSettleOperation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          rowId: 'org-ledger-row-id',
+          status: 'failed',
+          outcomeCode: 'bot_removal_refused',
+        })
+      );
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove: read-back takeover repair for member removal', () => {
@@ -519,7 +575,10 @@ describe('organizations members ledger (P1-A-08e)', () => {
           resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
         }),
       });
-      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      // The member is already removed when the retry arrives (lost response
+      // after the first removal committed): the missing-member precondition
+      // must not run before the ledger — the takeover repair handles it.
+      mockDbState.removeTargetMember = [];
       mockDbState.memberReadBack = [];
 
       const result = await caller.remove(input);

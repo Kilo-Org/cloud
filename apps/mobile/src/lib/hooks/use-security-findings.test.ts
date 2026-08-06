@@ -183,12 +183,22 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the key on an in-progress CONFLICT (same-key retry reconciles)', async () => {
+  it('keeps the key on an in-progress CONFLICT and maps it onto retryable copy', async () => {
     personalDismissMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
     useDismissSecurityFinding('personal');
 
     await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'operation_in_progress',
+      message: 'A security sync is already in progress. Please try again.',
+    });
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+  });
+
+  it('maps an org in-progress dismissal CONFLICT onto retryable copy', async () => {
+    orgDismissMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useDismissSecurityFinding(ORG_ID);
+
+    await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
+      message: 'A security sync is already in progress. Please try again.',
     });
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });

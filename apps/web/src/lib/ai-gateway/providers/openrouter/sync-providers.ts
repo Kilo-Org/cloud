@@ -45,6 +45,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 
 /**
@@ -346,7 +347,9 @@ async function syncProviders(
     // Deduplicate models within each provider by slug
     const uniqueModelsMap = new Map<string, OpenRouterModel>();
     data.models.forEach(model => {
-      uniqueModelsMap.set(normalizeModelId(model.slug), model);
+      // A model may show a ZDR route even though the same provider also offers data-retaining routes.
+      const normalizedModel = withWorstProviderDataPolicy(model, data.provider.dataPolicy);
+      uniqueModelsMap.set(normalizeModelId(model.slug), normalizedModel);
     });
     const uniqueModels = Array.from(uniqueModelsMap.values());
 

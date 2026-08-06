@@ -419,7 +419,10 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: { model: 'stepfun/step-3.7-flash:free' },
+      resolved: {
+        model: 'stepfun/step-3.7-flash:free',
+        reasoning: { enabled: true, effort: 'high' },
+      },
     });
     expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
   });

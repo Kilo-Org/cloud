@@ -34,21 +34,43 @@ import {
   deepseekDiscountedModels,
 } from '@/lib/ai-gateway/providers/deepseek';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
-export type AutoFreeModel = { model: string; weight: number };
+export type AutoFreeModel = {
+  model: string;
+  weight: number;
+  reasoning: OpenRouterReasoningConfig;
+};
 
-export const autoFreeModels = [
+export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   ...(stepfun_37_flash_free_model.status === 'public'
-    ? [{ model: stepfun_37_flash_free_model.public_id, weight: 2 }]
+    ? [
+        {
+          model: stepfun_37_flash_free_model.public_id,
+          weight: 3,
+          reasoning: { enabled: true, effort: 'high' },
+        } satisfies AutoFreeModel,
+      ]
     : []),
-  { model: 'inclusionai/ling-3.0-flash:free', weight: 2 },
-  { model: 'poolside/laguna-s-2.1:free', weight: 1 },
-] satisfies ReadonlyArray<AutoFreeModel>;
+  {
+    model: 'inclusionai/ling-3.0-flash:free',
+    weight: 3,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
+  {
+    model: 'poolside/laguna-s-2.1:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
+];
 
-export function selectAutoFreeModel(candidates: ReadonlyArray<AutoFreeModel>, randomSeed: string) {
+export function selectAutoFreeCandidate(
+  candidates: ReadonlyArray<AutoFreeModel>,
+  randomSeed: string
+): AutoFreeModel | null {
   const totalWeight = candidates.reduce((total, candidate) => total + candidate.weight, 0);
   if (totalWeight === 0) return null;
 
@@ -56,7 +78,7 @@ export function selectAutoFreeModel(candidates: ReadonlyArray<AutoFreeModel>, ra
   let cumulativeWeight = 0;
   for (const candidate of candidates) {
     cumulativeWeight += candidate.weight;
-    if (bucket < cumulativeWeight) return candidate.model;
+    if (bucket < cumulativeWeight) return candidate;
   }
   return null;
 }

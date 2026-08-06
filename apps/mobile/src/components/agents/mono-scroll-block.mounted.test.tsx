@@ -1,74 +1,253 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { MonoScrollBlock } from './mono-scroll-block';
+import { type MonoScrollTextMode } from './mono-scroll-block-model';
+import { MonoScrollBlock, MonoScrollSheetProvider } from './mono-scroll-block';
 
+// RNGH ships Flow source that the node project cannot parse, so the horizontal
+// ScrollView becomes a string element; `LayoutChangeEvent` is type-only.
 vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
 }));
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return {
+    Text: 'Text',
+    TextClassContext: React.createContext<string | undefined>(undefined),
+  };
+});
 vi.mock('@/components/ui/selectable-text', () => ({
   SelectableText: 'SelectableText',
 }));
 vi.mock('./bubble-text-selection-context', () => ({
-  useTranscriptTextSelectable: () => false,
+  useTranscriptTextSelectable: () => true,
 }));
 
-async function renderBlock(props: {
-  content: string;
-  maxLength?: number;
-  inTranscript?: boolean;
-}): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
+/** 300+ char single-line payload, like a long tool output line. */
+const LONG_LINE = `${'x'.repeat(300)} tail`;
+
+const NOOP_TRACK: () => () => void = () => () => {
+  // Presence is asserted through spies in the registration tests.
+};
+
+type BlockProps = Parameters<typeof MonoScrollBlock>[0];
+
+function findByType(
+  root: TestRenderer.ReactTestInstance,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: string): unknown {
+  if (!instance) {
+    return undefined;
+  }
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return instance.props[key];
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+/** The mono Text: the one Text child carrying the long payload. */
+function monoText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const found = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      ((node.type as string) === 'Text' || (node.type as string) === 'SelectableText') &&
+      typeof propOf(node, 'children') === 'string' &&
+      (propOf(node, 'children') as string).length > 50
+  );
+  const [text] = found;
+  if (!text) {
+    throw new Error(`expected exactly one mono text, found ${found.length}`);
+  }
+  return text;
+}
+
+function findMonoText(root: TestRenderer.ReactTestInstance, type: string) {
+  const found = findByType(root, type).find(
+    node =>
+      typeof propOf(node, 'children') === 'string' &&
+      (propOf(node, 'children') as string).length > 50
+  );
+  if (!found) {
+    throw new Error(`expected ${type} mono text`);
+  }
+  return found;
+}
+
+function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      propOf(node, 'accessibilityLabel') === 'Content truncated'
+  );
+}
+
+async function mount(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(MonoScrollBlock, props));
+    ref.current = TestRenderer.create(element);
   });
-  const renderer = rendererRef.current;
+  const renderer = ref.current;
   if (!renderer) {
     throw new Error('renderer was not created');
   }
   return renderer;
 }
 
+async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    renderer.unmount();
+  });
+}
+
+function withSheet(
+  mode: MonoScrollTextMode,
+  track: () => () => void,
+  block: ReactElement
+): ReactElement {
+  const value = { mode, track };
+  return <MonoScrollSheetProvider value={value}>{block}</MonoScrollSheetProvider>;
+}
+
+function blockElement(props?: Partial<BlockProps>): ReactElement {
+  return createElement(MonoScrollBlock, { content: LONG_LINE, ...props });
+}
+
+function fireLayout(text: TestRenderer.ReactTestInstance, height: number): void {
+  const onLayout = propOf(text, 'onLayout');
+  (
+    onLayout as (event: {
+      nativeEvent: { layout: { x: number; y: number; width: number; height: number } };
+    }) => void
+  )({ nativeEvent: { layout: { x: 0, y: 0, width: 100, height } } });
+}
+
 describe('MonoScrollBlock mounted', () => {
-  it('defaults to SelectableText and wires onLayout for the height pin', async () => {
-    const content = 'line one\nline two';
-    const renderer = await renderBlock({ content });
+  it('renders the scroll branch with transcript defaults outside the sheet', async () => {
+    const renderer = await mount(blockElement());
 
-    const selectableHosts = renderer.root.findAll(
-      node => (node.type as string) === 'SelectableText'
-    );
-    expect(selectableHosts).toHaveLength(1);
-    expect(selectableHosts[0]?.props.children).toBe(content);
-    // The height pin measures from the content's layout, so the sheet branch
-    // must forward onLayout; a later edit dropping it would break the pin.
-    expect(typeof selectableHosts[0]?.props.onLayout).toBe('function');
+    const scrollViews = findByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(propOf(scrollViews[0], 'horizontal')).toBe(true);
+    expect(propOf(scrollViews[0], 'showsHorizontalScrollIndicator')).toBe(true);
+    expect(propOf(monoText(renderer.root), 'className') as string).toContain('shrink-0 self-start');
 
-    // The sheet branch must not render the transcript Text.
-    expect(renderer.root.findAll(node => (node.type as string) === 'Text')).toHaveLength(0);
+    await unmount(renderer);
   });
 
-  it('keeps the transcript on Text when inTranscript is set', async () => {
-    const content = 'transcript output';
-    const renderer = await renderBlock({ content, inTranscript: true });
+  it('keeps the full scroll contract under the sheet in scroll mode', async () => {
+    const unregister = vi.fn();
+    const track = vi.fn(() => unregister);
+    const renderer = await mount(withSheet('scroll', track, blockElement()));
 
-    const textHosts = renderer.root.findAll(
-      node => (node.type as string) === 'Text' && node.props.children === content
+    const scrollViews = findByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(propOf(scrollViews[0], 'horizontal')).toBe(true);
+    expect(propOf(scrollViews[0], 'showsHorizontalScrollIndicator')).toBe(true);
+
+    const text = findMonoText(renderer.root, 'SelectableText');
+    expect(propOf(text, 'className') as string).toContain('shrink-0 self-start');
+
+    // Height pin: measuring the content pins the ScrollView height.
+    await act(async () => {
+      await Promise.resolve();
+      fireLayout(text, 48);
+    });
+    expect(propOf(findByType(renderer.root, 'ScrollView')[0], 'style')).toEqual({ height: 48 });
+
+    expect(track).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the truncated marker in scroll mode when maxLength is exceeded', async () => {
+    const renderer = await mount(withSheet('scroll', NOOP_TRACK, blockElement({ maxLength: 200 })));
+
+    expect(monoText(renderer.root)).toBeTruthy();
+    expect(truncatedMarkers(renderer.root)).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('renders SelectableText with no scroller in wrap mode', async () => {
+    const renderer = await mount(withSheet('wrap', NOOP_TRACK, blockElement()));
+
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findByType(renderer.root, 'Text')).toHaveLength(0);
+    const text = findMonoText(renderer.root, 'SelectableText');
+    const className = propOf(text, 'className') as string;
+    expect(className).toContain('font-mono text-xs leading-4');
+    expect(className).not.toContain('shrink-0');
+
+    await unmount(renderer);
+  });
+
+  it('renders plain Text for transcript blocks in wrap mode', async () => {
+    const renderer = await mount(
+      withSheet('wrap', NOOP_TRACK, blockElement({ inTranscript: true }))
     );
-    expect(textHosts).toHaveLength(1);
-    // A UITextView must never land inside the transcript FlashList.
-    expect(renderer.root.findAll(node => (node.type as string) === 'SelectableText')).toHaveLength(
-      0
-    );
+
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SelectableText')).toHaveLength(0);
+    const text = findMonoText(renderer.root, 'Text');
+    expect(propOf(text, 'selectable')).toBe(true);
+    const className = propOf(text, 'className') as string;
+    expect(className).toContain('font-mono text-xs leading-4');
+    expect(className).not.toContain('shrink-0');
+
+    await unmount(renderer);
+  });
+
+  it('renders the truncated marker in wrap mode when maxLength is exceeded', async () => {
+    const renderer = await mount(withSheet('wrap', NOOP_TRACK, blockElement({ maxLength: 200 })));
+
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(truncatedMarkers(renderer.root)).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('registers presence once on mount and unregisters on unmount', async () => {
+    const unregister = vi.fn();
+    const track = vi.fn(() => unregister);
+    const renderer = await mount(withSheet('wrap', track, blockElement()));
+
+    expect(track).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-register when the mode flips — track identity stays stable', async () => {
+    const unregister = vi.fn();
+    const track = vi.fn(() => unregister);
+    const renderer = await mount(withSheet('wrap', track, blockElement()));
+    expect(track).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(withSheet('scroll', track, blockElement()));
+    });
+    expect(track).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(withSheet('wrap', track, blockElement()));
+    });
+    expect(track).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+    expect(unregister).toHaveBeenCalledTimes(1);
   });
 });

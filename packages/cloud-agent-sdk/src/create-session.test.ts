@@ -376,35 +376,94 @@ describe('createRemoteSessionOnConnection', () => {
     });
   });
 
-  it('keeps the extended and bare identities stable and distinct across attempts', async () => {
+  it('regression: later attempts with the same logical key use the proven bare identity and never replay the stale extended error', async () => {
+    // The relay stores the delivered `invalid create_session command` error
+    // under `${key}:ext` forever, so every later attempt under that identity
+    // would replay the stale error instead of reaching the CLI. After the
+    // first ext→bare fallback succeeds, attempts 2 and 3 must ride the proven
+    // `${key}:bare` identity directly (the DO replays its terminal success).
     const connection = makeFakeConnection();
     connection.sendCommandToConnection
+      // Attempt 1: the extended attempt is rejected by the old CLI...
       .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      // ...and the bare fallback provisions the session.
       .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID })
-      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
-      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+      // Attempts 2 and 3: the DO replays the terminal bare success envelope.
+      .mockResolvedValue({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
 
-    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+    const first = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
       mutationId: 'spawn-key-1',
       agent: 'code',
     });
-    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+    const second = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+    const third = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
       mutationId: 'spawn-key-1',
       agent: 'code',
     });
 
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(4);
     const mutationIds = connection.sendCommandToConnection.mock.calls.map(
       call => (call[0] as { mutationId?: string }).mutationId
     );
-    // Same key, same attempt → identical wire identity across calls.
+    // Exactly one extended attempt; every later attempt rides the proven bare
+    // identity, so the stale extended error is never replayed.
     expect(mutationIds).toEqual([
       'spawn-key-1:ext',
       'spawn-key-1:bare',
-      'spawn-key-1:ext',
+      'spawn-key-1:bare',
       'spawn-key-1:bare',
     ]);
-    // The two durable identities must never collide.
     expect(new Set(mutationIds).size).toBe(2);
+    for (const call of connection.sendCommandToConnection.mock.calls.slice(1)) {
+      expect(call[0]).toMatchObject({
+        command: 'create_session',
+        data: { protocolVersion: 1 },
+        expectedConnectionId: 'cli-owner-1',
+        mutationId: 'spawn-key-1:bare',
+      });
+    }
+    for (const result of [first, second, third]) {
+      expect(parseCreateSessionResponse(result)).toEqual({
+        ok: true,
+        kiloSessionId: VALID_SESSION_ID,
+      });
+    }
+  });
+
+  it('tries the extended identity again for a fresh connection with the same logical key', async () => {
+    // The dead-identity memory is per connection: a brand-new connection owns
+    // a separate UserConnectionDO, so its `${key}:ext` identity is not durably
+    // poisoned and the extended attempt must be tried again.
+    const first = makeFakeConnection();
+    first.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+    await createRemoteSessionOnConnection(first, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    const second = makeFakeConnection();
+    second.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+    const result = await createRemoteSessionOnConnection(second, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    expect(second.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    const mutationIds = second.sendCommandToConnection.mock.calls.map(
+      call => (call[0] as { mutationId?: string }).mutationId
+    );
+    expect(mutationIds).toEqual(['spawn-key-1:ext', 'spawn-key-1:bare']);
+    expect(parseCreateSessionResponse(result)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
+    });
   });
 
   it('omits mutationId on both attempts when the caller provides none', async () => {

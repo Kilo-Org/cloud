@@ -75,6 +75,47 @@ function attemptMutationId(key: string | undefined, suffix: string): string | un
 }
 
 /**
+ * Connections whose extended (`${key}:ext`) durable identity already delivered
+ * the old-CLI `invalid create_session command` terminal error. The relay stores
+ * that delivered error under the extended identity, so every later attempt
+ * under `${key}:ext` replays the stale error instead of reaching the CLI. Once
+ * the `${key}:bare` fallback has succeeded, later creates with the same logical
+ * key on the same connection skip the dead extended identity and use the proven
+ * bare identity directly. Keyed by connection object (each connection owns a
+ * separate UserConnectionDO) and composite on `connectionId` + logical key, so
+ * a fresh connection is never short-circuited.
+ */
+const bareFallbackProvenKeys = new WeakMap<object, Set<string>>();
+
+/** Composite key for one connection's durable extended identity. */
+function extendedIdentityKey(connectionId: string, logicalKey: string): string {
+  return `${connectionId}:${logicalKey}`;
+}
+
+/** Remembers that the connection's `${logicalKey}:ext` identity is dead. */
+function markExtendedIdentityDead(
+  connection: object,
+  connectionId: string,
+  logicalKey: string
+): void {
+  const keys = bareFallbackProvenKeys.get(connection) ?? new Set<string>();
+  keys.add(extendedIdentityKey(connectionId, logicalKey));
+  bareFallbackProvenKeys.set(connection, keys);
+}
+
+/** True when the connection already proved the `${logicalKey}:ext` identity dead. */
+function isExtendedIdentityDead(
+  connection: object,
+  connectionId: string,
+  logicalKey: string
+): boolean {
+  return (
+    bareFallbackProvenKeys.get(connection)?.has(extendedIdentityKey(connectionId, logicalKey)) ??
+    false
+  );
+}
+
+/**
  * Connection-scoped `create_session` for the `kilo remote` process-per-session
  * spawn flow. Unlike the session-scoped `createSession` in
  * `cli-live-transport.ts` (which fences the command to a known Kilo sessionId),
@@ -87,6 +128,12 @@ function attemptMutationId(key: string | undefined, suffix: string): string | un
  * bare retry uses `${key}:bare`, so the two durable identities cannot collide
  * (see `attemptMutationId`). When omitted, the wire carries no mutationId and
  * the relay falls back to a per-wire random correlation id.
+ *
+ * Once an extended attempt delivers the old-CLI `invalid create_session
+ * command` error, the relay keeps that terminal error under `${key}:ext`
+ * forever. Later creates with the same logical key on the same connection
+ * therefore skip the dead extended identity and use the proven `${key}:bare`
+ * identity directly, so a retry never replays the stale extended error.
  *
  * The returned promise resolves with the raw reply; the caller is responsible
  * for parsing the response shape. A delivered error response (string or
@@ -108,8 +155,24 @@ export async function createRemoteSessionOnConnection(
   };
   const hasExtendedFields =
     data.agent !== undefined || data.model !== undefined || data.orgId !== undefined;
-  const extendedMutationId = attemptMutationId(input?.mutationId, EXTENDED_MUTATION_ID_SUFFIX);
+  const logicalKey = input?.mutationId;
+  // A prior extended attempt for this connection and logical key already
+  // delivered the old-CLI invalid-command terminal error, which the relay
+  // stores under `${key}:ext` and would replay on every later attempt. Skip
+  // the dead identity and use the proven `${key}:bare` identity directly.
+  const extendedIdentityIsDead =
+    logicalKey !== undefined && isExtendedIdentityDead(connection, connectionId, logicalKey);
+  const extendedMutationId = attemptMutationId(logicalKey, EXTENDED_MUTATION_ID_SUFFIX);
   try {
+    if (extendedIdentityIsDead) {
+      const bareMutationId = attemptMutationId(logicalKey, BARE_MUTATION_ID_SUFFIX);
+      return await connection.sendCommandToConnection({
+        command: 'create_session',
+        data: { protocolVersion: 1 },
+        expectedConnectionId: connectionId,
+        ...(bareMutationId !== undefined ? { mutationId: bareMutationId } : {}),
+      });
+    }
     return await connection.sendCommandToConnection({
       command: 'create_session',
       data,
@@ -124,7 +187,13 @@ export async function createRemoteSessionOnConnection(
       error instanceof CommandDeliveredError &&
       error.message === INVALID_CREATE_SESSION_COMMAND
     ) {
-      const bareMutationId = attemptMutationId(input?.mutationId, BARE_MUTATION_ID_SUFFIX);
+      // The extended identity is now durably dead (the relay stored the
+      // invalid-command error under it): remember it so later retries with the
+      // same logical key skip straight to the proven bare identity.
+      if (logicalKey !== undefined) {
+        markExtendedIdentityDead(connection, connectionId, logicalKey);
+      }
+      const bareMutationId = attemptMutationId(logicalKey, BARE_MUTATION_ID_SUFFIX);
       return connection.sendCommandToConnection({
         command: 'create_session',
         data: { protocolVersion: 1 },

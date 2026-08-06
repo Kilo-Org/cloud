@@ -547,6 +547,40 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
+  it('surfaces a typed retryable internal error when the completed settle fails after a successful DO registration', async () => {
+    // The DO registered the session and admitted the initial turn, but the
+    // terminal ledger settle failed. The create must NOT return success while
+    // the row stays non-terminal: it surfaces a typed retryable internal error
+    // and the recorded canonical IDs let the next same-key retry reconcile.
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await expect(
+      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
+        operationKey: OPERATION_KEY,
+        startedAt: 1_700_000_000_000,
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'session_creation_settle_failed',
+      cause: expect.objectContaining({
+        error: 'SESSION_CREATE_SETTLE_FAILED',
+        retryable: true,
+      }),
+    });
+
+    // The create effect ran; the failure is the terminal settle, not the DO.
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    // Canonical IDs were recorded before the DO call, so the next same-key
+    // retry reconciles them instead of allocating a second session.
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+    });
+  });
+
   it('replays the settled create for a duplicate_settled admission', async () => {
     admitOperationMock.mockResolvedValueOnce({
       admission: 'duplicate_settled',
@@ -884,6 +918,49 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
+  });
+
+  it('surfaces a typed retryable internal error instead of replaying when the reconcile settle fails', async () => {
+    // The authoritative reconcile proved the session live and the initial
+    // message admitted, but the terminal ledger settle failed. The retry must
+    // NOT replay success while the row stays non-terminal: it surfaces the
+    // typed retryable internal error, and the row keeps its canonical IDs for
+    // the next reconcile.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+
+    await expect(
+      createSessionWithLedger(
+        makeRequest({ options: { operationKey: OPERATION_KEY } }),
+        ctx,
+        takeoverOptions
+      )
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'session_creation_settle_failed',
+      cause: expect.objectContaining({
+        error: 'SESSION_CREATE_SETTLE_FAILED',
+        retryable: true,
+      }),
+    });
+
+    // The reconcile read the DO state and attempted the completed settle, but
+    // the create effect was never re-run.
+    expect(doStub.getMetadata).toHaveBeenCalledTimes(1);
+    expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rowId: ROW_ID, status: 'completed', outcomeCode: 'ok' })
+    );
   });
 
   it('returns CONFLICT when the recorded initial message is not admitted', async () => {

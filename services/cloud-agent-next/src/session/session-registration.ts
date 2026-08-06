@@ -24,6 +24,7 @@ import {
   recordOperationProgress,
   settleOperation,
   type OutboxEventInput,
+  type SettleOperationInput,
 } from '@kilocode/db/operation-ledger';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 
@@ -211,6 +212,52 @@ function rethrowAllocationFailure(
 /** tRPC CONFLICT with the stable `creation_in_progress` message (plan P1-A-08b). */
 function creationInProgressError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: 'creation_in_progress' });
+}
+
+/** Typed client code for a terminal ledger settle failure after a confirmed success. */
+const SESSION_CREATE_SETTLE_FAILED_CODE = 'SESSION_CREATE_SETTLE_FAILED';
+
+/** Stable message for the typed retryable internal settle-failure error. */
+const SESSION_CREATE_SETTLE_FAILED_MESSAGE = 'session_creation_settle_failed';
+
+/**
+ * Typed retryable internal error for a terminal `completed` settle failure
+ * after the create effect succeeded (DO registration + initial admission, or
+ * an authoritative reconcile). The ledger row stays non-terminal with the
+ * canonical IDs recorded by progress, so the same-key retry ladder must
+ * reconcile it — the caller must never report success or replay while the row
+ * is not terminal. Thrown as a TRPCError so the router's error formatter
+ * projects the typed retryable client error.
+ */
+function ledgerSettleFailureError(cause: unknown): TRPCError {
+  logger
+    .withFields({ error: cause instanceof Error ? cause.message : String(cause) })
+    .error('Failed to settle session create operation ledger row after a confirmed success');
+  return new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: SESSION_CREATE_SETTLE_FAILED_MESSAGE,
+    cause: {
+      error: SESSION_CREATE_SETTLE_FAILED_CODE,
+      message: SESSION_CREATE_SETTLE_FAILED_MESSAGE,
+      retryable: true,
+    },
+  });
+}
+
+/**
+ * Terminal `completed` settle for a confirmed-success create. Unlike the
+ * best-effort failure hooks, a settle failure here must not be swallowed:
+ * the row would stay non-terminal while the caller reports success. It
+ * surfaces the typed retryable internal error instead; the canonical IDs
+ * already recorded by progress keep the same-key retry on the reconcile
+ * ladder.
+ */
+async function settleConfirmedSuccess(db: WorkerDb, input: SettleOperationInput): Promise<void> {
+  try {
+    await settleOperation(db, input);
+  } catch (error) {
+    throw ledgerSettleFailureError(error);
+  }
 }
 
 /**
@@ -764,24 +811,22 @@ async function executeLedgerCreate(
         })
       ),
     onSuccess: result =>
-      bestEffortLedgerWrite(() =>
-        settleOperation(db, {
-          rowId: row.id,
-          status: 'completed',
-          outcomeCode: 'ok',
-          canonicalResult: {
-            cloudAgentSessionId: result.cloudAgentSessionId,
-            kiloSessionId: result.kiloSessionId,
-          },
-          outboxEvent: sessionCreateSettledOutboxEvent({
-            distinctId,
-            outcome: 'completed',
-            admission: admissionKind,
-            startedAt: options.startedAt,
-            inOrganization,
-          }),
-        })
-      ),
+      settleConfirmedSuccess(db, {
+        rowId: row.id,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: {
+          cloudAgentSessionId: result.cloudAgentSessionId,
+          kiloSessionId: result.kiloSessionId,
+        },
+        outboxEvent: sessionCreateSettledOutboxEvent({
+          distinctId,
+          outcome: 'completed',
+          admission: admissionKind,
+          startedAt: options.startedAt,
+          inOrganization,
+        }),
+      }),
   };
 
   const result = await startNewSession(input, ctx, { billingOrigin: options.billingOrigin }, hooks);
@@ -953,20 +998,18 @@ async function confirmInitialMessageAdmitted(
   }
 
   const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
-  await bestEffortLedgerWrite(() =>
-    settleOperation(db, {
-      rowId: row.id,
-      status: 'completed',
-      outcomeCode: 'ok',
-      canonicalResult: { cloudAgentSessionId, kiloSessionId },
-      outboxEvent: sessionCreateSettledOutboxEvent({
-        distinctId,
-        outcome: 'completed',
-        admission: 'takeover',
-        startedAt: options.startedAt,
-        inOrganization: input.options?.kilocodeOrganizationId != null,
-      }),
-    })
-  );
+  await settleConfirmedSuccess(db, {
+    rowId: row.id,
+    status: 'completed',
+    outcomeCode: 'ok',
+    canonicalResult: { cloudAgentSessionId, kiloSessionId },
+    outboxEvent: sessionCreateSettledOutboxEvent({
+      distinctId,
+      outcome: 'completed',
+      admission: 'takeover',
+      startedAt: options.startedAt,
+      inOrganization: input.options?.kilocodeOrganizationId != null,
+    }),
+  });
   return { cloudAgentSessionId, kiloSessionId, replayed: true };
 }

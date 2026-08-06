@@ -61,6 +61,18 @@ export async function hasClipboardImage(): Promise<boolean> {
   }
 }
 
+/**
+ * Read the clipboard text. Returns `''` when the clipboard holds no text,
+ * the read was denied, or the read failed.
+ */
+export async function readClipboardText(): Promise<string> {
+  try {
+    return await Clipboard.getStringAsync();
+  } catch {
+    return '';
+  }
+}
+
 export type ClipboardImageFile = { uri: string; name: string; mimeType: string };
 
 /**

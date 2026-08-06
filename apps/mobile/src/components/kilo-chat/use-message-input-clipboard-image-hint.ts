@@ -1,6 +1,6 @@
 import { toast } from 'sonner-native';
 
-import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
+import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 import { buildAttachmentUnreadableToast } from './message-attachment-state';
 import { type ComposerAttachmentQueue } from './message-input-types';
 
@@ -17,7 +17,7 @@ export function useMessageInputClipboardImageHint({
   voiceInputActive,
   attachmentQueue,
 }: UseMessageInputClipboardImageHintInputs) {
-  return useClipboardImageHint({
+  return useClipboardPaste({
     enabled: showAttachmentButton && !controlsDisabled && !voiceInputActive,
     addFile: async file => {
       await attachmentQueue?.addClipboardImage(file);

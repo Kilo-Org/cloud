@@ -15,6 +15,7 @@ import {
   type LayoutChangeEvent,
   Platform,
   type TextInput,
+  type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -23,7 +24,6 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { AttachmentPasteHint } from '@/components/agents/attachment-paste-hint';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
@@ -34,6 +34,10 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import {
+  type ComposerSelection,
+  pasteTextIntoComposer,
+} from '@/components/agents/composer-paste-text';
 import {
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   resolveComposerTextContentWidth,
@@ -57,7 +61,7 @@ import {
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardImageHint } from '@/lib/agent-attachments/use-clipboard-image-hint';
+import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
@@ -159,6 +163,9 @@ export function ChatComposer({
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
+  // Last caret the input reported. Paste inserts here so the button behaves
+  // like the platform paste.
+  const selectionRef = useRef<ComposerSelection | null>(null);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -246,6 +253,7 @@ export function ChatComposer({
       text: draft,
       selection: { start: draft.length, end: draft.length },
     });
+    selectionRef.current = { start: draft.length, end: draft.length };
     setHasText(draft.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(draft));
     measureRef.current.setText(draft);
@@ -329,10 +337,26 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
-  const hint = useClipboardImageHint({
-    enabled: attachmentsEnabled && !control.paperclipDisabled,
+  const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await upload.addCandidates([file]);
+    },
+    addText: text => {
+      // Same-render race guard, as in `handleSelectSlashCommand`: the button is
+      // disabled while sending, but a press committed before that render — or
+      // during the clipboard read — must not mutate a draft being submitted.
+      // `inputEditable` adds the voice session, which the send lock does not
+      // cover and whose next transcript would overwrite the pasted text.
+      if (sendLockRef.current.isLocked() || !control.inputEditable) {
+        return;
+      }
+      selectionRef.current = pasteTextIntoComposer(text, {
+        input: inputRef.current,
+        draft: textRef.current,
+        selection: selectionRef.current,
+        maxLength: 4000,
+        onChangeText: handleChangeText,
+      });
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -564,6 +588,10 @@ export function ChatComposer({
     }
   }
 
+  function handleSelectionChange(event: TextInputSelectionChangeEvent) {
+    selectionRef.current = event.nativeEvent.selection;
+  }
+
   function handleSelectSlashCommand(command: SlashCommandInfo) {
     // Same-render race guard: a suggestion row rendered before the send started
     // can be tapped while the lock is held. Because the lock is the authority
@@ -581,6 +609,7 @@ export function ChatComposer({
       text: value,
       selection: { start: value.length, end: value.length },
     });
+    selectionRef.current = { start: value.length, end: value.length };
     inputRef.current?.focus();
   }
 
@@ -689,6 +718,8 @@ export function ChatComposer({
             modelOptions={modelOptions}
             onModelSelect={onModelSelect}
             disabled={control.toolbarDisabled}
+            onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+            pasteDisabled={!control.inputEditable}
           />
         </Animated.View>
       ) : null}
@@ -698,14 +729,6 @@ export function ChatComposer({
           attachments={upload.attachments}
           onRemove={removeAttachment}
           onRetry={retryAttachment}
-        />
-      ) : null}
-
-      {hint.visible ? (
-        <AttachmentPasteHint
-          onPress={() => {
-            hint.paste();
-          }}
         />
       ) : null}
 
@@ -747,9 +770,9 @@ export function ChatComposer({
             onInputFocus={() => {
               inputFocusedRef.current = true;
               setIsFocused(true);
-              hint.refresh();
             }}
             onInputLayout={handleInputLayout}
+            onSelectionChange={handleSelectionChange}
             onStop={handleStop}
             onSubmit={() => {
               void submit();

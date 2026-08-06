@@ -27,6 +27,7 @@ function listPayload(overrides: Record<string, unknown> = {}) {
         {
           SeatID: 'seat-123',
           UserName: 'seat-user',
+          IdentityDetail: 'seat-user',
           BizInfo: 'lite',
           SeatStatus: '2',
           BillingStatus: 2,
@@ -93,6 +94,50 @@ describe('BytePlus control-plane client', () => {
         },
       })
     );
+  });
+
+  it('post-filters all returned seats by the plain-text IdentityDetail username', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      jsonResponse({
+        Result: {
+          Data: [
+            {
+              SeatID: 'seat-one',
+              IdentityDetail: 'other-user',
+              ProjectName: 'default',
+              BizInfo: 'Lite',
+              SeatStatus: 2,
+              BillingStatus: 2,
+              ApiKey: 'other-key',
+            },
+            {
+              SeatID: 'seat-target',
+              IdentityDetail: 'assigned-user',
+              ProjectName: 'default',
+              BizInfo: 'Lite',
+              SeatStatus: 2,
+              BillingStatus: 2,
+              ApiKey: 'target-key',
+            },
+          ],
+          Total: 2,
+        },
+      })
+    );
+
+    const result = await listBytePlusSeatsByUsername('assigned-user', 'Lite');
+
+    expect(result).toEqual([
+      {
+        seatId: 'seat-target',
+        bizInfo: 'Lite',
+        seatStatus: 2,
+        billingStatus: 2,
+        apiKey: 'target-key',
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain('assigned-user');
+    expect(JSON.stringify(result)).not.toContain('other-user');
   });
 
   it('uses exact seat filters and field-picks the live ListSeatInfos response', async () => {

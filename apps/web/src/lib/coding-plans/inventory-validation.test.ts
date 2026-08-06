@@ -32,6 +32,10 @@ jest.mock('@/lib/utils.server', () => ({
 
 const mockedGenerateText = jest.mocked(generateText);
 const mockedListBytePlusSeatsByUsername = jest.mocked(listBytePlusSeatsByUsername);
+const mockedSentryLogger = jest.mocked(
+  jest.requireMock('@/lib/utils.server').sentryLogger as () => jest.Mock
+);
+const mockLogWarning = mockedSentryLogger.mock.results[0]?.value as jest.Mock;
 
 beforeEach(() => {
   mockedListBytePlusSeatsByUsername.mockResolvedValue([
@@ -182,6 +186,58 @@ describe('validateCodingPlanCredential', () => {
     });
   });
 
+  it.each([
+    [[], 'no_matching_seat', 0],
+    [
+      [
+        {
+          seatId: 'seat-one',
+          bizInfo: 'Lite' as const,
+          seatStatus: 2 as const,
+          billingStatus: 2 as const,
+          apiKey: 'byteplus-inventory-key',
+        },
+        {
+          seatId: 'seat-two',
+          bizInfo: 'Lite' as const,
+          seatStatus: 2 as const,
+          billingStatus: 2 as const,
+          apiKey: 'byteplus-inventory-key',
+        },
+      ],
+      'multiple_matching_seats',
+      2,
+    ],
+  ])('logs a safe %s seat-count diagnostic', async (seats, reason, returnedSeatCount) => {
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+    mockedListBytePlusSeatsByUsername.mockResolvedValueOnce(seats);
+
+    await expect(
+      validateCodingPlanCredential({
+        apiKey: 'byteplus-inventory-key',
+        planId: 'byteplus-coding-plan-team-lite',
+        providerId: 'byteplus-coding',
+        upstreamPlanId: 'byteplus-plan-123',
+      })
+    ).resolves.toEqual({ valid: false });
+
+    expect(mockLogWarning).toHaveBeenCalledWith(
+      'BytePlus coding plan inventory validation failed',
+      {
+        providerId: 'byteplus-coding',
+        stage: 'seat_match',
+        reason,
+        expectedTier: 'Lite',
+        returnedSeatCount,
+      }
+    );
+    const serializedLog = JSON.stringify(mockLogWarning.mock.calls);
+    expect(serializedLog).not.toContain('byteplus-inventory-key');
+    expect(serializedLog).not.toContain('byteplus-plan-123');
+    expect(serializedLog).not.toContain('seat-one');
+    expect(serializedLog).not.toContain('seat-two');
+  });
+
   it('rejects a BytePlus seat without a verifiable matching inference key', async () => {
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
     mockedListBytePlusSeatsByUsername.mockResolvedValueOnce([
@@ -202,5 +258,19 @@ describe('validateCodingPlanCredential', () => {
         upstreamPlanId: 'byteplus-plan-123',
       })
     ).resolves.toEqual({ valid: false });
+
+    expect(mockLogWarning).toHaveBeenCalledWith(
+      'BytePlus coding plan inventory validation failed',
+      {
+        providerId: 'byteplus-coding',
+        stage: 'seat_match',
+        reason: 'seat_api_key_mismatch',
+      }
+    );
+    const serializedLog = JSON.stringify(mockLogWarning.mock.calls);
+    expect(serializedLog).not.toContain('byteplus-inventory-key');
+    expect(serializedLog).not.toContain('different-key');
+    expect(serializedLog).not.toContain('seat-mismatch');
+    expect(serializedLog).not.toContain('byteplus-plan-123');
   });
 });

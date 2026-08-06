@@ -25,6 +25,32 @@ import { sentryLogger } from '@/lib/utils.server';
 const logWarning = sentryLogger('coding-plans-inventory-validation', 'warning');
 const MINIMAX_PROVIDER_ID = 'minimax';
 
+type BytePlusValidationStage = 'configuration' | 'inference' | 'seat_lookup' | 'seat_match';
+type BytePlusValidationReason =
+  | 'missing_management_credentials'
+  | 'inference_request_failed'
+  | 'unexpected_finish_reason'
+  | 'seat_lookup_failed'
+  | 'unsupported_plan'
+  | 'no_matching_seat'
+  | 'multiple_matching_seats'
+  | 'seat_attributes_mismatch'
+  | 'seat_api_key_missing'
+  | 'seat_api_key_mismatch';
+
+function logBytePlusValidationFailure(
+  stage: BytePlusValidationStage,
+  reason: BytePlusValidationReason,
+  details: { code?: string; expectedTier?: 'Lite' | 'Pro'; returnedSeatCount?: number } = {}
+): void {
+  logWarning('BytePlus coding plan inventory validation failed', {
+    providerId: 'byteplus-coding',
+    stage,
+    reason,
+    ...details,
+  });
+}
+
 export type CodingPlanCredentialValidationInput = {
   apiKey: string;
   planId: CodingPlanId;
@@ -70,24 +96,42 @@ async function validateBytePlusCodingPlanCredential(
   upstreamUsername: string
 ): Promise<CodingPlanCredentialValidationResult> {
   if (!BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID || !BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY) {
-    throw new BytePlusControlPlaneError('configuration');
-  }
-
-  const output = await generateText({
-    model: createAiSdkProvider(byteplusCoding, apiKey)('bytedance-seed-code'),
-    prompt: 'Say hi',
-    maxOutputTokens: 1,
-  });
-
-  if (output.finishReason !== 'stop' && output.finishReason !== 'length') {
+    logBytePlusValidationFailure('configuration', 'missing_management_credentials', {
+      code: 'configuration',
+    });
     return { valid: false };
   }
 
-  const upstreamUsageId = await resolveBytePlusSeatId({
-    apiKey,
-    planId,
-    upstreamUsername,
-  });
+  let output: Awaited<ReturnType<typeof generateText>>;
+  try {
+    output = await generateText({
+      model: createAiSdkProvider(byteplusCoding, apiKey)('bytedance-seed-code'),
+      prompt: 'Say hi',
+      maxOutputTokens: 1,
+    });
+  } catch {
+    logBytePlusValidationFailure('inference', 'inference_request_failed');
+    return { valid: false };
+  }
+
+  if (output.finishReason !== 'stop' && output.finishReason !== 'length') {
+    logBytePlusValidationFailure('inference', 'unexpected_finish_reason');
+    return { valid: false };
+  }
+
+  let upstreamUsageId: string | null;
+  try {
+    upstreamUsageId = await resolveBytePlusSeatId({
+      apiKey,
+      planId,
+      upstreamUsername,
+    });
+  } catch (error) {
+    logBytePlusValidationFailure('seat_lookup', 'seat_lookup_failed', {
+      code: error instanceof BytePlusControlPlaneError ? error.code : 'unexpected',
+    });
+    return { valid: false };
+  }
   return upstreamUsageId ? { valid: true, upstreamUsageId } : { valid: false };
 }
 
@@ -97,23 +141,47 @@ export async function resolveBytePlusSeatId(input: {
   upstreamUsername: string;
 }): Promise<string | null> {
   const expectedTier = getBytePlusPlanTier(input.planId);
-  if (!expectedTier) return null;
+  if (!expectedTier) {
+    logBytePlusValidationFailure('seat_match', 'unsupported_plan');
+    return null;
+  }
 
   const seats = await listBytePlusSeatsByUsername({
     username: input.upstreamUsername,
     bizInfo: expectedTier,
   });
-  if (seats.length !== 1) return null;
+  if (seats.length === 0) {
+    logBytePlusValidationFailure('seat_match', 'no_matching_seat', {
+      expectedTier,
+      returnedSeatCount: 0,
+    });
+    return null;
+  }
+  if (seats.length > 1) {
+    logBytePlusValidationFailure('seat_match', 'multiple_matching_seats', {
+      expectedTier,
+      returnedSeatCount: seats.length,
+    });
+    return null;
+  }
 
   const [seat] = seats;
   if (seat.bizInfo !== expectedTier || seat.seatStatus !== 2 || seat.billingStatus !== 2) {
+    logBytePlusValidationFailure('seat_match', 'seat_attributes_mismatch');
     return null;
   }
 
   // A missing or masked provider key cannot prove that the uploaded inference
   // key belongs to this seat. Fail closed until BytePlus exposes a safe key
   // identity that can be supplied with inventory instead.
-  if (!seat.apiKey || !constantTimeEqual(seat.apiKey, input.apiKey)) return null;
+  if (!seat.apiKey) {
+    logBytePlusValidationFailure('seat_match', 'seat_api_key_missing');
+    return null;
+  }
+  if (!constantTimeEqual(seat.apiKey, input.apiKey)) {
+    logBytePlusValidationFailure('seat_match', 'seat_api_key_mismatch');
+    return null;
+  }
 
   return seat.seatId;
 }

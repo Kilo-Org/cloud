@@ -4,7 +4,7 @@ import { orderOpenCodeSettings, orderOpenCodeVariants } from './order-opencode-v
 const variant = { reasoning: { enabled: true } };
 
 describe('orderOpenCodeVariants', () => {
-  it('orders reasoning effort variants from most to least intensive', () => {
+  it('orders reasoning effort variants from least to most intensive', () => {
     const variants = {
       max: variant,
       medium: variant,
@@ -16,13 +16,13 @@ describe('orderOpenCodeVariants', () => {
     };
 
     expect(Object.keys(orderOpenCodeVariants(variants))).toEqual([
-      'max',
-      'xhigh',
-      'high',
-      'medium',
-      'low',
-      'minimal',
       'none',
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
     ]);
     expect(Object.keys(variants)).toEqual([
       'max',
@@ -47,7 +47,7 @@ describe('orderOpenCodeVariants', () => {
       Object.keys(
         orderOpenCodeVariants({ high: variant, medium: variant, instant: variant, low: variant })
       )
-    ).toEqual(['instant', 'high', 'medium', 'low']);
+    ).toEqual(['instant', 'low', 'medium', 'high']);
   });
 
   it('orders arbitrary and mixed variant names alphabetically', () => {

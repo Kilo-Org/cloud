@@ -1,9 +1,9 @@
 import type { OpenCodeSettings } from '@kilocode/db/schema-types';
 
 const VARIANT_ORDERS = [
-  ['max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none'],
+  ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   ['instant', 'thinking'],
-  ['instant', 'high', 'medium', 'low'],
+  ['instant', 'low', 'medium', 'high'],
 ] as const;
 
 function compareNames(a: string, b: string): number {

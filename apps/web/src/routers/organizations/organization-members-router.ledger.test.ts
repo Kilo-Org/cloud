@@ -94,10 +94,12 @@ const mockDbState = {
   roleReadBack: [] as unknown[],
   removeTargetMember: [] as unknown[],
   memberReadBack: [] as unknown[],
+  markerUpdateValues: null as Record<string, unknown> | null,
 };
 const tx = { __tx: true };
 const mockDb = {
   select: jest.fn<() => unknown>(),
+  update: jest.fn<() => unknown>(),
   transaction: jest.fn<(callback: (tx: unknown) => unknown) => unknown>(),
 };
 
@@ -127,6 +129,15 @@ beforeEach(() => {
   mockDbState.roleReadBack = [];
   mockDbState.removeTargetMember = [];
   mockDbState.memberReadBack = [];
+  mockDbState.markerUpdateValues = null;
+  mockDb.update.mockImplementation(() => ({
+    set: (values: Record<string, unknown>) => {
+      mockDbState.markerUpdateValues = values;
+      return {
+        where: jest.fn<() => Promise<{ rowCount: number }>>().mockResolvedValue({ rowCount: 1 }),
+      };
+    },
+  }));
   mockDb.select.mockImplementation(() => ({
     from: () => ({
       where: () => {
@@ -664,7 +675,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
           rowId: 'org-ledger-row-id',
           status: 'completed',
           outcomeCode: 'ok',
-          canonicalResult: { updated: MEMBER_ID },
+          canonicalResult: { updated: MEMBER_ID, cleanup: 'pending' },
         })
       );
       const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
@@ -726,6 +737,79 @@ describe('organizations members ledger (P1-A-08e)', () => {
       const result = await caller.remove(input);
 
       expect(result).toEqual({ success: true, updated: MEMBER_ID, replayed: true });
+      expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
+      expect(mockSettleOperation).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('retries gateway revocation on a same-key replay after the first cleanup failed', async () => {
+      // First attempt: the removal commits and settles completed, then the
+      // gateway revocation fails. The settle ran before the cleanup, so the
+      // settled row records the cleanup as pending.
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'admitted',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        }),
+      });
+      mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
+      mockRevokeGatewayStateForOrganizationMember.mockRejectedValueOnce(
+        new Error('gateway revocation failed')
+      );
+
+      await expect(caller.remove(input)).rejects.toThrow('gateway revocation failed');
+
+      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
+        canonicalResult: { updated: string; cleanup: string };
+      };
+      expect(settleCall?.canonicalResult).toEqual({ updated: MEMBER_ID, cleanup: 'pending' });
+      expect(mockRevokeGatewayStateForOrganizationMember).toHaveBeenCalledTimes(1);
+
+      // Replay: the row is settled completed but its cleanup was never
+      // recorded complete, so the replay retries the cleanup instead of
+      // replaying a false success.
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+          status: 'completed',
+          canonical_result: { updated: MEMBER_ID, cleanup: 'pending' },
+        }),
+      });
+
+      const result = await caller.remove(input);
+
+      expect(result).toEqual({ success: true, updated: MEMBER_ID, replayed: true });
+      expect(mockRevokeGatewayStateForOrganizationMember).toHaveBeenCalledTimes(2);
+      expect(mockRemoveUserFromOrganization).toHaveBeenCalledTimes(1);
+      expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+      expect(mockCreateAuditLog).toHaveBeenCalledTimes(1);
+      // The successful replay records the cleanup as complete in the row.
+      expect(mockDbState.markerUpdateValues).toEqual({
+        canonical_result: { updated: MEMBER_ID, cleanup: 'complete' },
+      });
+    });
+
+    it('replays a settled member removal without re-running cleanup when cleanup is already complete', async () => {
+      mockAdmitOperation.mockResolvedValue({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          intent: 'member_remove',
+          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+          status: 'completed',
+          canonical_result: { updated: MEMBER_ID, cleanup: 'complete' },
+        }),
+      });
+      mockDbState.removeTargetMember = [];
+
+      const result = await caller.remove(input);
+
+      expect(result).toEqual({ success: true, updated: MEMBER_ID, replayed: true });
+      expect(mockRevokeGatewayStateForOrganizationMember).not.toHaveBeenCalled();
+      expect(mockDestroyOrgInstancesForUser).not.toHaveBeenCalled();
+      expect(mockDb.update).not.toHaveBeenCalled();
       expect(mockRemoveUserFromOrganization).not.toHaveBeenCalled();
       expect(mockSettleOperation).not.toHaveBeenCalled();
       expect(mockCreateAuditLog).not.toHaveBeenCalled();

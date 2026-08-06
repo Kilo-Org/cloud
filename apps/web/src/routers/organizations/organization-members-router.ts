@@ -13,6 +13,7 @@ import {
   organization_invitations,
   kilocode_users,
   organizations,
+  operation_ledgers,
   type OperationLedgerRow,
 } from '@kilocode/db/schema';
 import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
@@ -155,8 +156,13 @@ async function getDirectOrganizationRole(
 // after the original success, and a takeover read-back that finds the member
 // gone (the keyed path reads membership only after admission, so an absent
 // read-back means the member was removed after the original success) completes
-// the record as completed and replays. The membership helpers and the
-// `dailyUsageLimitUsd` path are unchanged.
+// the record as completed and replays. A completed `member_remove` row records
+// its post-removal gateway cleanup in the canonical result (`cleanup:
+// 'pending'` until the revocation succeeds, then `'complete'`); a same-key
+// replay of a row whose cleanup is not recorded complete retries the idempotent
+// cleanup before replaying, so a gateway revocation failure after the settle
+// is repaired by the retry instead of being skipped. The membership helpers
+// and the `dailyUsageLimitUsd` path are unchanged.
 
 const ORG_LEDGER_DOMAIN = 'organization' as const;
 /** The in-flight window: while an `admitted` row holds a live lease, same-key
@@ -169,6 +175,12 @@ type OrgLedgerIntent = (typeof ORG_LEDGER_INTENTS)[number];
 const ORG_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
 const ORG_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
 const ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
+// Member-removal cleanup marker recorded in a settled row's canonical result.
+// `completeOrgMemberRemoval` settles with `cleanup: 'pending'` and flips it to
+// `'complete'` only after the post-removal gateway revocation succeeds, so a
+// same-key replay can tell whether the required cleanup still needs retrying.
+const ORG_MEMBER_REMOVAL_CLEANUP_PENDING = 'pending';
+const ORG_MEMBER_REMOVAL_CLEANUP_COMPLETE = 'complete';
 // A provider-confirmed outcome whose ledger settle failed: the membership
 // helper DID commit, but the row was not settled. Never surface a success
 // receipt for an un-recorded row — a same-key retry repairs by read-back.
@@ -246,6 +258,41 @@ function replaySettledOrgRow<T>(row: OperationLedgerRow): T {
     return { success: true, ...(row.canonical_result ?? {}), replayed: true } as T;
   }
   throw new TRPCError({ code: 'BAD_REQUEST', message: ORG_REPLAY_FAILED_MESSAGE });
+}
+
+/**
+ * Replays a settled `member_remove` row. The removal itself is never re-run,
+ * but the post-removal gateway revocation IS retried when it was not recorded
+ * complete: a first attempt whose cleanup failed settled the row with
+ * `cleanup: 'pending'`, and rows settled before this marker predate it, so the
+ * absence of `cleanup: 'complete'` also counts as incomplete. The cleanup is
+ * idempotent, so re-running it over an already-complete cleanup is harmless. A
+ * cleanup retry that fails again keeps the row retryable and surfaces the
+ * failure instead of replaying a false success.
+ */
+async function replaySettledOrgMemberRemoval(args: {
+  row: OperationLedgerRow;
+  organizationId: string;
+  memberId: string;
+}): Promise<SuccessResult<{ updated: string }>> {
+  const { row, organizationId, memberId } = args;
+  if (row.status !== 'completed' && row.status !== 'no_op') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ORG_REPLAY_FAILED_MESSAGE });
+  }
+  const canonicalResult = row.canonical_result as {
+    updated?: unknown;
+    cleanup?: unknown;
+  } | null;
+  if (canonicalResult?.cleanup !== ORG_MEMBER_REMOVAL_CLEANUP_COMPLETE) {
+    await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
+    await cleanupRemovedMemberInstances(memberId, organizationId);
+    await markOrgMemberRemovalCleanupComplete(row.id, memberId);
+  }
+  return {
+    success: true,
+    updated: typeof canonicalResult?.updated === 'string' ? canonicalResult.updated : memberId,
+    replayed: true,
+  } as SuccessResult<{ updated: string }>;
 }
 
 /**
@@ -534,7 +581,10 @@ async function completeOrgMemberRemoval(args: {
     await settleOrgCompletedInTransaction({
       tx,
       row: args.row,
-      canonicalResult: { updated: args.memberId },
+      canonicalResult: {
+        updated: args.memberId,
+        cleanup: ORG_MEMBER_REMOVAL_CLEANUP_PENDING,
+      },
       outboxEvent: orgSettledOutboxEvent({
         distinctId,
         intent: 'member_remove',
@@ -543,10 +593,41 @@ async function completeOrgMemberRemoval(args: {
     });
   });
 
+  // Required gateway revocation runs after the terminal settle. If it fails,
+  // the settled row keeps `cleanup: 'pending'`, so a same-key replay retries
+  // the cleanup (see `replaySettledOrgMemberRemoval`) instead of replaying a
+  // success that never revoked. KiloClaw instance cleanup behavior is unchanged.
   await revokeGatewayStateForOrganizationMember(db, args.organizationId, args.memberId);
   await cleanupRemovedMemberInstances(args.memberId, args.organizationId);
+  await markOrgMemberRemovalCleanupComplete(args.row.id, args.memberId);
 
   return successResult({ updated: args.memberId });
+}
+
+/**
+ * Best-effort marker write after the post-removal cleanup succeeds. A failure
+ * here never fails the removal response: it only means a later same-key replay
+ * re-runs the idempotent cleanup (an already-complete cleanup is harmless) and
+ * tries the marker again.
+ */
+async function markOrgMemberRemovalCleanupComplete(rowId: string, memberId: string): Promise<void> {
+  try {
+    await db
+      .update(operation_ledgers)
+      .set({
+        canonical_result: {
+          updated: memberId,
+          cleanup: ORG_MEMBER_REMOVAL_CLEANUP_COMPLETE,
+        },
+      })
+      .where(eq(operation_ledgers.id, rowId));
+  } catch (error) {
+    console.error(
+      `Failed to mark organization member removal cleanup complete for ledger row ${rowId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
 }
 
 /** Best-effort failed settle for a role-change row; never masks the typed rejection. */
@@ -1239,7 +1320,13 @@ export const organizationsMembersRouter = createTRPCRouter({
             memberId,
           });
         case 'duplicate_settled':
-          return replaySettledOrgRow(admission.row);
+          // A settled completed removal whose gateway revocation was not
+          // recorded complete retries the idempotent cleanup before replaying.
+          return replaySettledOrgMemberRemoval({
+            row: admission.row,
+            organizationId,
+            memberId,
+          });
         case 'duplicate_in_flight':
         case 'duplicate_reconcile_in_progress':
           throw orgOperationInProgressError();

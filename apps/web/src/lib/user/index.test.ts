@@ -896,6 +896,50 @@ describe('User', () => {
       ).toHaveLength(1);
     });
 
+    it('deletes fallback-identity analytics outbox rows keyed by the user id while preserving another user row', async () => {
+      // Outbox writers fall back to the user id as distinct_id when the email
+      // lookup fails. Those rows are keyed by the user id, not the email, so
+      // the email-only delete never touches them.
+      const user = await insertTestUser({ google_user_email: 'fallback-outbox@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [fallbackOutbox, otherOutbox] = await db
+        .insert(analytics_event_outbox)
+        .values([
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'organization_write_settled',
+            distinct_id: user.id,
+            properties: { source: 'web' },
+          },
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'organization_write_settled',
+            distinct_id: otherUser.google_user_email,
+            properties: { source: 'web' },
+          },
+        ])
+        .returning();
+      if (!fallbackOutbox || !otherOutbox) {
+        throw new Error('Failed to seed fallback-identity outbox rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(eq(analytics_event_outbox.id, fallbackOutbox.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(eq(analytics_event_outbox.id, otherOutbox.id))
+      ).toHaveLength(1);
+    });
+
     it('anonymizes recommendation dismissal actor references', async () => {
       const organizationOwner = await insertTestUser();
       const dismissingUser = await insertTestUser();

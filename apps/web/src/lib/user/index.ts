@@ -996,7 +996,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_notification_preferences)
  * - operation_ledgers (per-intent dedupe rows, keyed by kilo_user_id)
  * - analytics_event_outbox (pending analytics delivery rows, keyed by the
- *   user's email as distinct_id)
+ *   user's email as distinct_id, plus fallback-identity rows keyed by the
+ *   user id when the email lookup fails)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1048,13 +1049,21 @@ export async function softDeleteUser(userId: string) {
 
     // ── 0b. Operation ledger and analytics outbox ────────────────────────
     // Ledger rows are keyed by kilo_user_id; delete them so the dedupe
-    // identity dies with the account. Outbox rows are keyed by the user's
-    // email as distinct_id — delete by the original email captured before
-    // the user row is anonymized below.
+    // identity dies with the account. Outbox rows are keyed by distinct_id:
+    // normally the user's email (captured before the user row is anonymized
+    // below), but outbox writers fall back to the user id when the email
+    // lookup fails — delete rows matching either identity. The email clause
+    // matches nothing for users without an email, so the id clause is what
+    // catches their fallback-identity rows.
     await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
     await tx
       .delete(analytics_event_outbox)
-      .where(eq(analytics_event_outbox.distinct_id, originalEmail));
+      .where(
+        or(
+          eq(analytics_event_outbox.distinct_id, originalEmail),
+          eq(analytics_event_outbox.distinct_id, userId)
+        )
+      );
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx

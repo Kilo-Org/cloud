@@ -5,6 +5,7 @@ import {
   type ClipboardImageFile,
   hasClipboardImage,
   readClipboardImageFile,
+  readClipboardText,
 } from './clipboard-image';
 
 type UseClipboardImageHintOptions = {
@@ -14,9 +15,14 @@ type UseClipboardImageHintOptions = {
   /** Called with the written cache file; the composer's upload pipeline owns
    *  every toast from this point on. */
   addFile: (file: ClipboardImageFile) => Promise<void>;
-  /** Called when the clipboard read failed (empty, denied, or unsupported type).
-   *  The caller supplies its own unreadable-toast copy to match that composer's
-   *  existing pick-path message. */
+  /** Called with the clipboard text when the clipboard holds no readable image.
+   *  Supply it wherever the paste control is always present: the user can press
+   *  paste with text on the clipboard, and an unreadable-image toast would be
+   *  wrong there. Omit it to keep the image-only behavior. */
+  addText?: (text: string) => void;
+  /** Called when neither an image nor text could be read (empty, denied, or
+   *  unsupported type). The caller supplies its own unreadable-toast copy to
+   *  match that composer's existing pick-path message. */
   onUnreadable: () => void;
 };
 
@@ -27,8 +33,10 @@ type UseClipboardImageHintReturn = {
    *  Call this on input focus. */
   refresh: () => void;
   /** Read the clipboard image, write a cache file, and route it through
-   *  `addFile`. Hides the hint on entry; only a subsequent refresh can show
-   *  it again. Guards against a double tap with a synchronous ref. */
+   *  `addFile`. With no readable image, route the clipboard text through
+   *  `addText` when the caller supplied it. Hides the hint on entry; only a
+   *  subsequent refresh can show it again. Guards against a double tap with a
+   *  synchronous ref. */
   paste: () => void;
 };
 
@@ -48,9 +56,11 @@ export function useClipboardImageHint(
   // Hold callbacks in refs so callers do not need to memoize them and no
   // effect re-subscribes when a parent re-renders.
   const addFileRef = useRef(options.addFile);
+  const addTextRef = useRef(options.addText);
   const onUnreadableRef = useRef(options.onUnreadable);
   useEffect(() => {
     addFileRef.current = options.addFile;
+    addTextRef.current = options.addText;
     onUnreadableRef.current = options.onUnreadable;
   });
 
@@ -115,6 +125,14 @@ export function useClipboardImageHint(
       try {
         const file = await readClipboardImageFile();
         if (!file) {
+          // No readable image. A caller with an always-present paste control
+          // accepts text, so a text clipboard pastes instead of toasting.
+          const addText = addTextRef.current;
+          const text = addText ? await readClipboardText() : '';
+          if (addText && text !== '') {
+            addText(text);
+            return;
+          }
           onUnreadableRef.current();
           return;
         }

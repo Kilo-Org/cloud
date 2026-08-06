@@ -174,10 +174,18 @@ export function NewSessionPrompt({
 
   const paperclipDisabled = control.paperclipDisabled;
 
-  const { paste: pasteClipboardImage } = useClipboardImageHint({
+  const { paste: pasteClipboard } = useClipboardImageHint({
     enabled: !paperclipDisabled,
     addFile: async file => {
       await onPrefillAttachments([file]);
+    },
+    addText: text => {
+      applyVoiceDraftToInput({
+        input: promptInputRef.current,
+        draft: promptRef.current + text,
+        maxLength: PROMPT_INPUT_MAX_CHARS,
+        onChangeText: handlePromptChange,
+      });
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -247,7 +255,7 @@ export function NewSessionPrompt({
             >
               <Paperclip size={18} color={colors.mutedForeground} />
             </Pressable>
-            <ComposerPasteButton onPress={pasteClipboardImage} disabled={paperclipDisabled} />
+            <ComposerPasteButton onPress={pasteClipboard} disabled={paperclipDisabled} />
           </View>
           {voiceInput.available ? (
             <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">

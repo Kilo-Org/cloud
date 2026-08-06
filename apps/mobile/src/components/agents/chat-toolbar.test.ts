@@ -50,20 +50,20 @@ function defaultProps() {
 }
 
 describe('ChatToolbar', () => {
-  it('renders no paste button without onPasteImage', () => {
+  it('renders no paste button without onPaste', () => {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar(defaultProps()) as Node;
 
     expect(findElementByType(element, 'ComposerPasteButton')).toBeNull();
   });
 
-  it('forwards onPasteImage and the disabled state to the paste button', () => {
-    const onPasteImage = vi.fn(() => undefined);
+  it('forwards onPaste and the disabled state to the paste button', () => {
+    const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({
       ...defaultProps(),
-      onPasteImage,
-      pasteImageDisabled: true,
+      onPaste,
+      pasteDisabled: true,
     }) as Node;
 
     const pasteButtonProps = findElementByType(element, 'ComposerPasteButton');
@@ -71,13 +71,13 @@ describe('ChatToolbar', () => {
     const props = pasteButtonProps ?? {};
     expect(props.size).toBe('sm');
     expect(props.disabled).toBe(true);
-    expect(props.onPress).toBe(onPasteImage);
+    expect(props.onPress).toBe(onPaste);
   });
 
   it('defaults the paste button disabled state to false when omitted', () => {
-    const onPasteImage = vi.fn(() => undefined);
+    const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = ChatToolbar({ ...defaultProps(), onPasteImage }) as Node;
+    const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
 
     const pasteButtonProps = findElementByType(element, 'ComposerPasteButton');
     expect(pasteButtonProps).not.toBeNull();

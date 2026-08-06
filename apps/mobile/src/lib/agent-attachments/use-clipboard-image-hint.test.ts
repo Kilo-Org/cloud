@@ -8,11 +8,13 @@ const hasClipboardImageMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const readClipboardImageFileMock = vi.hoisted(() =>
   vi.fn<() => Promise<{ uri: string; name: string; mimeType: string } | null>>()
 );
+const readClipboardTextMock = vi.hoisted(() => vi.fn<() => Promise<string>>());
 const setHasImageMock = vi.hoisted(() => vi.fn<(value: boolean) => void>());
 
 vi.mock('./clipboard-image', () => ({
   hasClipboardImage: hasClipboardImageMock,
   readClipboardImageFile: readClipboardImageFileMock,
+  readClipboardText: readClipboardTextMock,
 }));
 
 vi.mock('react-native', () => ({
@@ -39,11 +41,13 @@ vi.mock('react', () => ({
 function makeOptions(overrides?: {
   enabled?: boolean;
   addFile?: () => Promise<void>;
+  addText?: (text: string) => void;
   onUnreadable?: () => void;
 }) {
   return {
     enabled: overrides?.enabled ?? true,
     addFile: overrides?.addFile ?? vi.fn().mockResolvedValue(undefined),
+    addText: overrides?.addText,
     onUnreadable: overrides?.onUnreadable ?? vi.fn<() => void>(),
   };
 }
@@ -194,6 +198,55 @@ describe('useClipboardImageHint', () => {
     hook.refresh();
     await flushMicrotasks();
     expect(lastSetHasImageArg()).toBe(true);
+  });
+
+  // ── Text fallback: paste is always available, so text must paste ────────
+
+  it('pastes clipboard text when the clipboard holds no readable image', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('https://example.com/spec');
+
+    const addText = vi.fn<(text: string) => void>();
+    const onUnreadable = vi.fn<() => void>();
+    const hook = useClipboardImageHint(makeOptions({ addText, onUnreadable }));
+
+    hook.paste();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(addText).toHaveBeenCalledWith('https://example.com/spec');
+    expect(onUnreadable).not.toHaveBeenCalled();
+  });
+
+  it('toasts unreadable when neither an image nor text is on the clipboard', async () => {
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('');
+
+    const addText = vi.fn<(text: string) => void>();
+    const onUnreadable = vi.fn<() => void>();
+    const hook = useClipboardImageHint(makeOptions({ addText, onUnreadable }));
+
+    hook.paste();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(addText).not.toHaveBeenCalled();
+    expect(onUnreadable).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the image-only behavior when the caller omits addText', async () => {
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('some text');
+
+    const onUnreadable = vi.fn<() => void>();
+    const hook = useClipboardImageHint(makeOptions({ onUnreadable }));
+
+    hook.paste();
+    await flushMicrotasks();
+
+    expect(readClipboardTextMock).not.toHaveBeenCalled();
+    expect(onUnreadable).toHaveBeenCalledOnce();
   });
 
   // ── Non-retryable unhappy: addFile rejection still consumes ─────────────

@@ -23,7 +23,7 @@ type RenderProps = {
 };
 
 function findPasteButton(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  return root.find(node => node.props.accessibilityLabel === 'Paste image from clipboard');
+  return root.find(node => node.props.accessibilityLabel === 'Paste from clipboard');
 }
 
 async function renderButton(props: RenderProps) {
@@ -47,7 +47,7 @@ describe('ComposerPasteButton mounted', () => {
 
     const node = findPasteButton(renderer.root);
     expect(node.props.accessibilityRole).toBe('button');
-    expect(node.props.accessibilityLabel).toBe('Paste image from clipboard');
+    expect(node.props.accessibilityLabel).toBe('Paste from clipboard');
   });
 
   it('maps disabled to the Pressable props and defaults to false when omitted', async () => {

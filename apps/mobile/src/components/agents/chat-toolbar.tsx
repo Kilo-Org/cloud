@@ -19,9 +19,9 @@ type ChatToolbarProps = {
   isLoadingModels?: boolean;
   order?: ChatToolbarOrder;
   /** When set, an always-present paste button renders at the row's trailing edge. */
-  onPasteImage?: () => void;
+  onPaste?: () => void;
   /** Disabled state for the paste button; the composer's paperclip rule owns it. */
-  pasteImageDisabled?: boolean;
+  pasteDisabled?: boolean;
   className?: string;
 };
 
@@ -35,8 +35,8 @@ export function ChatToolbar({
   disabled = false,
   isLoadingModels = false,
   order = 'mode-first',
-  onPasteImage,
-  pasteImageDisabled = false,
+  onPaste,
+  pasteDisabled = false,
   className,
 }: Readonly<ChatToolbarProps>) {
   const modeSelector = <ModeSelector value={mode} onChange={onModeChange} disabled={disabled} />;
@@ -61,11 +61,11 @@ export function ChatToolbar({
     >
       {order === 'model-first' ? modelSelector : modeSelector}
       {order === 'model-first' ? modeSelector : modelSelector}
-      {onPasteImage ? (
+      {onPaste ? (
         <ComposerPasteButton
           size="sm"
-          onPress={onPasteImage}
-          disabled={pasteImageDisabled}
+          onPress={onPaste}
+          disabled={pasteDisabled}
           className="ml-auto"
         />
       ) : null}

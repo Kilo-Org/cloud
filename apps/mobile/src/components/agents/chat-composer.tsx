@@ -329,10 +329,18 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
-  const { paste: pasteClipboardImage } = useClipboardImageHint({
+  const { paste: pasteClipboard } = useClipboardImageHint({
     enabled: attachmentsEnabled && !control.paperclipDisabled,
     addFile: async file => {
       await upload.addCandidates([file]);
+    },
+    addText: text => {
+      applyVoiceDraftToInput({
+        input: inputRef.current,
+        draft: textRef.current + text,
+        maxLength: 4000,
+        onChangeText: handleChangeText,
+      });
     },
     onUnreadable: () => {
       toast.error(describeClassificationFailure('unreadable'));
@@ -689,8 +697,8 @@ export function ChatComposer({
             modelOptions={modelOptions}
             onModelSelect={onModelSelect}
             disabled={control.toolbarDisabled}
-            onPasteImage={control.pasteButtonVisible ? pasteClipboardImage : undefined}
-            pasteImageDisabled={control.pasteButtonDisabled}
+            onPaste={control.pasteButtonVisible ? pasteClipboard : undefined}
+            pasteDisabled={control.pasteButtonDisabled}
           />
         </Animated.View>
       ) : null}

@@ -21,10 +21,10 @@ type ComposerPasteButtonProps = {
  * image-detected `AttachmentPasteHint` row: the button never appears or
  * disappears with clipboard state, so the row it lives in keeps a stable
  * footprint. The caller owns presence (attachment capability) and the disabled
- * state (the composer's paperclip rule). Pressing reads the clipboard image
- * through the shared `useClipboardImageHint` paste path, which routes a
- * readable image through the attachment upload pipeline and toasts when the
- * clipboard has no readable image.
+ * state (the composer's paperclip rule). Pressing reads the clipboard through
+ * the shared `useClipboardImageHint` paste path, which routes a readable image
+ * through the attachment upload pipeline, appends clipboard text to the draft,
+ * and toasts only when the clipboard holds neither.
  */
 export function ComposerPasteButton({
   onPress,
@@ -45,7 +45,7 @@ export function ComposerPasteButton({
         className
       )}
       accessibilityRole="button"
-      accessibilityLabel="Paste image from clipboard"
+      accessibilityLabel="Paste from clipboard"
       accessibilityState={{ disabled }}
     >
       <ClipboardPaste size={18} color={colors.mutedForeground} />

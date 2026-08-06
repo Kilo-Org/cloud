@@ -70,6 +70,7 @@ import {
   WorkspaceCapacityAdmissionRejectedError,
   WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
+import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../../shared/kilo-server-env.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
 import {
   buildSandboxBillingInput,
@@ -112,6 +113,21 @@ function buildToolCgroupEnv(env: Env, orgId: string | undefined): ToolCgroupEnv 
     if (value) vars[key] = value;
   }
   return vars;
+}
+
+/**
+ * Worker-owned `KILO_*` knobs to pass through to the wrapper (and from there
+ * to the Kilo server), e.g. the experimental bash default timeout. Not
+ * org-gated: presence of the Worker var is the rollout control. Undefined
+ * when no passthrough keys are set.
+ */
+function buildKiloServerEnv(env: Env): KiloServerEnv | undefined {
+  const vars: KiloServerEnv = {};
+  for (const key of KILO_SERVER_ENV_KEYS) {
+    const value = env[key];
+    if (value) vars[key] = value;
+  }
+  return Object.keys(vars).length > 0 ? vars : undefined;
 }
 
 function reportWorkspaceBackupProgress(
@@ -614,6 +630,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
         );
       }
       const toolCgroupEnv = buildToolCgroupEnv(this.env, orgId);
+      const kiloServerEnv = buildKiloServerEnv(this.env);
       let wrapper: Awaited<ReturnType<typeof WrapperClient.ensureWrapper>>;
       try {
         wrapper = await WrapperClient.ensureWrapper(sandbox, preparedWorkspace.session, {
@@ -626,6 +643,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           fixedPort: preparedWorkspace.ready.devcontainer.wrapperPort,
           ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
           ...(toolCgroupEnv ? { toolCgroupEnv } : {}),
+          ...(kiloServerEnv ? { kiloServerEnv } : {}),
         });
       } catch (error) {
         throw ExecutionError.wrapperStartFailed(
@@ -674,11 +692,13 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       cwd: '/',
     });
     const bootstrapToolCgroupEnv = buildToolCgroupEnv(this.env, orgId);
+    const bootstrapKiloServerEnv = buildKiloServerEnv(this.env);
     const wrapper = await WrapperClient.ensureBootstrapWrapper(sandbox, bootstrapSession, {
       agentSessionId: sessionId,
       userId,
       ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
       ...(bootstrapToolCgroupEnv ? { toolCgroupEnv: bootstrapToolCgroupEnv } : {}),
+      ...(bootstrapKiloServerEnv ? { kiloServerEnv: bootstrapKiloServerEnv } : {}),
     });
     if (!prepared.readyRequest) {
       return { status: 'wrapper-running' as const, client: wrapper.client };

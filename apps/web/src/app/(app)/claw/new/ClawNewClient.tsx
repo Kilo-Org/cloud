@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useTRPC } from '@/lib/trpc/utils';
+import { KiloClawSignupUnavailable } from '@/components/subscriptions/kiloclaw/KiloClawSignupUnavailable';
 import {
   ClawOnboardingFlow,
   type ClawOnboardingMode,
@@ -12,7 +13,6 @@ import {
 } from '../components';
 import type { ClawOnboardingRenderStep } from '../components/ClawOnboardingFlow.state';
 import { ClawOnboardingFakeWalkthrough } from '../components/ClawOnboardingFakeWalkthrough';
-import { WelcomePage } from '../components/billing/WelcomePage';
 import { getClawNewStatusQueryForBoundary } from './ClawNewClient.state';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
@@ -125,17 +125,14 @@ function ClawNewLiveClient() {
   }
 
   const billing = billingQuery.data;
-  const isNewUser =
-    billing &&
-    !billing.hasAccess &&
-    billing.instance === null &&
-    !billing.earlybird &&
-    !billing.trial?.expired;
 
-  if (isNewUser && !billing.trialEligible) {
+  if (billing && !billing.hasCurrentPersonalSubscription) {
     return (
-      <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-        <WelcomePage />
+      <div
+        className="container m-auto flex w-full max-w-[1140px] items-center justify-center p-4 md:p-6"
+        style={{ minHeight: '50vh' }}
+      >
+        <KiloClawSignupUnavailable />
       </div>
     );
   }

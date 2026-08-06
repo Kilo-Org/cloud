@@ -54,6 +54,7 @@ const SCOPE_BYTES_SQL = 'SELECT COALESCE(SUM(bytes), 0) AS total FROM kv WHERE s
 const LIST_ENTRIES_SQL =
   'SELECT k, bytes, updated_at FROM kv WHERE scope = ? ORDER BY updated_at ASC';
 const PROBE_SQL = 'SELECT count(*) FROM sqlite_master';
+const CIPHER_VERSION_SQL = 'PRAGMA cipher_version';
 
 /** One entry of {@link listEntries}; values are intentionally not returned. */
 export type KVPair = {
@@ -111,6 +112,33 @@ async function generateAndStoreKey(): Promise<string> {
   return key;
 }
 
+/**
+ * Thrown when the native build has no SQLCipher. Distinct from every other
+ * open failure because delete-and-recreate cannot fix it: only a native
+ * rebuild can.
+ */
+export class MissingSQLCipherError extends Error {
+  constructor() {
+    super('encrypted-kv: the native build has no SQLCipher; refusing to open a plaintext database');
+    this.name = 'MissingSQLCipherError';
+  }
+}
+
+/**
+ * Proves SQLCipher is linked into the build before any key is set.
+ *
+ * Plain SQLite ignores an unrecognized pragma without an error, so a
+ * successful `PRAGMA key` proves nothing: on a build without SQLCipher the
+ * file would open in plaintext and still pass the `sqlite_master` probe.
+ * `PRAGMA cipher_version` returns a row only when SQLCipher is present.
+ */
+async function assertSQLCipher(db: SQLite.SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ cipher_version?: string }>(CIPHER_VERSION_SQL);
+  if (!row?.cipher_version) {
+    throw new MissingSQLCipherError();
+  }
+}
+
 async function openWithKey(key: string): Promise<SQLite.SQLiteDatabase> {
   if (!isValidDbKey(key)) {
     // A malformed or tampered key never reaches PRAGMA interpolation; the
@@ -119,6 +147,7 @@ async function openWithKey(key: string): Promise<SQLite.SQLiteDatabase> {
   }
   const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
   try {
+    await assertSQLCipher(db);
     await db.execAsync(`PRAGMA key = "x'${key}'"`);
     return db;
   } catch (error) {
@@ -147,6 +176,15 @@ async function openEncryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
     await probeAndCreateSchema(db);
     return db;
   } catch (openError) {
+    if (openError instanceof MissingSQLCipherError) {
+      // Deleting and recreating cannot add SQLCipher to the build, and the
+      // existing file may hold the user's drafts. Fail loud, touch nothing.
+      Sentry.captureException(openError, {
+        level: 'error',
+        extra: { database: DATABASE_NAME, reason: 'encrypted-kv build has no SQLCipher' },
+      });
+      throw openError;
+    }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are
     // recoverable losses. Close, delete the file, regenerate the key, and
     // reopen (DEC-01 step 4).

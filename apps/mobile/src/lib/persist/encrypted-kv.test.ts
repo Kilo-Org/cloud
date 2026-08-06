@@ -18,6 +18,12 @@ let failNextProbe = false;
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
+// Simulates a native build without SQLCipher: `PRAGMA cipher_version` returns
+// no row, exactly as plain SQLite does for an unrecognized pragma.
+let hasSQLCipher = true;
+// Number of exec calls that had happened when `cipher_version` was probed;
+// -1 when it was never probed. Proves the probe precedes `PRAGMA key`.
+let cipherProbedAtExecCount = -1;
 let closeCallCount = 0;
 
 type FakeDatabase = {
@@ -50,6 +56,12 @@ function createFakeDatabase(): FakeDatabase {
       native.exec(source);
     },
     getFirstAsync: async (source, ...params) => {
+      // SQLCipher presence seam. node:sqlite has no `cipher_version` pragma,
+      // so the fake answers it directly.
+      if (source === 'PRAGMA cipher_version') {
+        cipherProbedAtExecCount = execLog.length;
+        return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
+      }
       // Probe failure seam: a wrong key or corrupt file throws at the probe.
       if (source.includes('sqlite_master')) {
         if (failNextProbe) {
@@ -105,6 +117,7 @@ import {
   getItem,
   isValidDbKey,
   listEntries,
+  MissingSQLCipherError,
   removeItem,
   resetEncryptedKvOpenForTests,
   scopeBytes,
@@ -124,6 +137,8 @@ beforeEach(() => {
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
+  hasSQLCipher = true;
+  cipherProbedAtExecCount = -1;
   closeCallCount = 0;
   resetEncryptedKvOpenForTests();
 });
@@ -167,6 +182,29 @@ describe('scope and key validation', () => {
     expect(() => {
       validateItemKey('s', 'agent-composer:new');
     }).not.toThrow();
+  });
+});
+
+describe('SQLCipher presence', () => {
+  it('probes cipher_version before setting the key', async () => {
+    await setItem('s', 'a', 'x');
+    const keyIndex = execLog.findIndex(source => source.startsWith('PRAGMA key'));
+    expect(keyIndex).toBeGreaterThanOrEqual(0);
+    // The probe ran while no exec had happened yet, so it precedes the key.
+    expect(cipherProbedAtExecCount).toBe(0);
+  });
+
+  it('refuses to open a plaintext database when the build has no SQLCipher', async () => {
+    hasSQLCipher = false;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow(MissingSQLCipherError);
+    // No key is ever set on an unencrypted handle.
+    expect(execLog.some(source => source.startsWith('PRAGMA key'))).toBe(false);
+  });
+
+  it('never deletes the database when the build has no SQLCipher', async () => {
+    hasSQLCipher = false;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow(MissingSQLCipherError);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
   });
 });
 

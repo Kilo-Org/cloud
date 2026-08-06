@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the classifier/spawner suite pins the SDK create-session contract in one file. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
@@ -251,7 +252,10 @@ describe('createSessionSpawner', () => {
 
   it('spawn forwards CreateRemoteSessionInput to createRemoteSessionOnConnection', async () => {
     // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
-    const send = vi.fn(async () => ({ protocolVersion: 1, sessionID: VALID_SESSION_ID }));
+    const send = vi.fn(async (_input: unknown) => ({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    }));
     const spawner = createSessionSpawner(makeConnection(send));
     const opts = {
       agent: 'code',
@@ -283,6 +287,50 @@ describe('createSessionSpawner', () => {
     });
   });
 
+  it('spawn forwards the caller operationKey as the SDK mutationId (ext attempt)', async () => {
+    // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
+    const send = vi.fn(async () => ({ protocolVersion: 1, sessionID: VALID_SESSION_ID }));
+    const spawner = createSessionSpawner(makeConnection(send));
+    await spawner.spawn('cli-owner-1', { agent: 'code' }, { operationKey: 'op-key-1' });
+    expect(send).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'op-key-1:ext',
+    });
+  });
+
+  it('spawn forwards the operationKey even when no create opts are given', async () => {
+    // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
+    const send = vi.fn(async () => ({ protocolVersion: 1, sessionID: VALID_SESSION_ID }));
+    const spawner = createSessionSpawner(makeConnection(send));
+    await spawner.spawn('cli-owner-1', undefined, { operationKey: 'op-key-2' });
+    expect(send).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'op-key-2:ext',
+    });
+  });
+
+  it('omits mutationId from the wire when no operationKey is supplied', async () => {
+    // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
+    const send = vi.fn(async (_input: unknown) => ({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    }));
+    const spawner = createSessionSpawner(makeConnection(send));
+    await spawner.spawn('cli-owner-1', { agent: 'code' });
+    // Prove the command was actually sent with the expected command/data/
+    // connection before asserting the mutationId field is absent.
+    expect(send).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    expect(send.mock.calls[0]?.[0]).not.toHaveProperty('mutationId');
+  });
+
   it('spawn wraps delivered bare-string errors via the classifier', async () => {
     const spawner = createSessionSpawner(
       // eslint-disable-next-line typescript-eslint/require-await -- no await needed; throw is the whole point
@@ -303,5 +351,24 @@ describe('createSessionSpawner', () => {
     );
     const outcome = await spawner.spawn('cli-owner-1');
     expect(outcome.status).toBe('retryable');
+  });
+
+  it('classifies a replayed durable envelope identically to the live envelope', () => {
+    // D8 replay contract: the relay returns the stored terminal result under
+    // the retry request's mutationId with exactly the live envelope's shape,
+    // so the classifier must produce the identical outcome for both. The live
+    // and replayed envelopes are constructed independently so the comparison
+    // proves shape equivalence, not object identity.
+    const liveReady = { protocolVersion: 1, sessionID: VALID_SESSION_ID };
+    const replayedReady = { protocolVersion: 1, sessionID: VALID_SESSION_ID };
+    expect(classifyCreateSessionResult({ status: 'fulfilled', value: liveReady })).toEqual(
+      classifyCreateSessionResult({ status: 'fulfilled', value: replayedReady })
+    );
+
+    const liveFailure = new CommandDeliveredError('failed to create session');
+    const replayedFailure = new CommandDeliveredError('failed to create session');
+    expect(classifyCreateSessionResult({ status: 'rejected', reason: liveFailure })).toEqual(
+      classifyCreateSessionResult({ status: 'rejected', reason: replayedFailure })
+    );
   });
 });

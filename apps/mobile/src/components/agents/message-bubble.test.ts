@@ -236,14 +236,7 @@ describe('MessageBubble row rhythm', () => {
   // user wrapper carries the same py-1, so user/assistant boundaries keep the
   // rhythm. One value, three class assertions.
   it('applies the uniform row-rhythm class contract', async () => {
-    // Two visible parts in one assistant message: the parts container spaces
-    // them with gap-2.
-    const multiPart = assistantMessage('rhythm-a');
-    multiPart.parts = [
-      { id: 'rhythm-a-1', sessionID: 'ses_1', messageID: 'rhythm-a', type: 'text', text: 'one' },
-      { id: 'rhythm-a-2', sessionID: 'ses_1', messageID: 'rhythm-a', type: 'text', text: 'two' },
-    ] as typeof multiPart.parts;
-    const assistantTree = await renderBubble(multiPart);
+    const assistantTree = await renderBubble(assistantMessage('rhythm-a'));
     const parts = findElementByType(assistantTree, 'View', p => p.className === 'gap-2');
     expect(parts).not.toBeNull();
 

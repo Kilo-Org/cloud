@@ -46,10 +46,7 @@ const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
 
-type RevokeDeviceSessionOutcome =
-  | { outcome: 'revoked' }
-  | { outcome: 'already_revoked' }
-  | 'not_found';
+type RevokeDeviceSessionOutcome = 'revoked' | 'already_revoked' | 'not_found';
 
 /**
  * Revoke a device session owned by `userId`, race-safe without a transaction.
@@ -79,7 +76,7 @@ async function revokeOwnedDeviceSession(
     .returning({ id: device_sessions.id });
 
   if (revoked.length > 0) {
-    return { outcome: 'revoked' };
+    return 'revoked';
   }
 
   const [row] = await db
@@ -88,11 +85,7 @@ async function revokeOwnedDeviceSession(
     .where(and(eq(device_sessions.id, sessionId), eq(device_sessions.kilo_user_id, userId)))
     .limit(1);
 
-  if (row?.revoked_at) {
-    return { outcome: 'already_revoked' };
-  }
-
-  return 'not_found';
+  return row?.revoked_at ? 'already_revoked' : 'not_found';
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -471,7 +464,7 @@ export const userRouter = createTRPCRouter({
       if (outcome === 'not_found') {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Device session not found' });
       }
-      return outcome;
+      return { outcome };
     }),
 
   revokeCurrentDeviceSession: baseProcedure.mutation(async ({ ctx }) => {
@@ -482,7 +475,7 @@ export const userRouter = createTRPCRouter({
     if (outcome === 'not_found') {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Device session not found' });
     }
-    return outcome;
+    return { outcome };
   }),
 
   getCreditBlocks: baseProcedure

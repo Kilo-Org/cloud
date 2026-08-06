@@ -446,3 +446,36 @@ describe('createRemoteSessionOnConnection', () => {
     expect(replayedOutcome).toEqual({ status: 'ready', sessionID: VALID_SESSION_ID });
   });
 });
+
+describe('classifyCreateSessionResult', () => {
+  it('returns retryable for a COMMAND_ALREADY_PENDING same-key in-flight dedupe', () => {
+    // The relay emits this structured code when a same-mutationId duplicate
+    // arrives while the command is in flight or its durable entry is pending.
+    // The intent is NOT terminal: the retry must keep the operation key so
+    // the DO replays the durable terminal result instead of dispatching a
+    // second command (which a key rotation's new mutation identity would do).
+    const cause = new UserWebCommandError({
+      code: 'COMMAND_ALREADY_PENDING',
+      message: 'Command is already in flight',
+    });
+    const outcome = classifyCreateSessionResult({ status: 'rejected', reason: cause });
+    expect(outcome).toEqual({
+      status: 'retryable',
+      reason: 'Command is already in flight',
+      cause,
+    });
+  });
+
+  it('returns nonRetryable for a structured UserWebCommandError with any other code', () => {
+    const cause = new UserWebCommandError({
+      code: 'SESSION_OWNER_CHANGED',
+      message: 'Session owner changed',
+    });
+    const outcome = classifyCreateSessionResult({ status: 'rejected', reason: cause });
+    expect(outcome).toEqual({
+      status: 'nonRetryable',
+      reason: 'Session owner changed',
+      cause,
+    });
+  });
+});

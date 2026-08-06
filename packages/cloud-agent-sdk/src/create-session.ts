@@ -150,15 +150,26 @@ export type CreateSessionOutcome =
   | { status: 'nonRetryable'; reason: string; cause: unknown };
 
 /**
+ * Relay-emitted structured code (`UserConnectionDO`) for a same-key duplicate
+ * whose command is already in flight or whose durable entry is still pending.
+ * Semantically the intent is NOT terminal: the retry must keep the caller's
+ * operation key so it rides the same durable identity and the DO replays the
+ * stored terminal result instead of dispatching a second command. Classified
+ * as `retryable`, never `nonRetryable`.
+ */
+export const COMMAND_ALREADY_PENDING_CODE = 'COMMAND_ALREADY_PENDING';
+
+/**
  * Classify the resolved-or-rejected outcome of `createRemoteSessionOnConnection`
  * into the spawn flow's state space:
  *
  *   - `ready`        — a fresh `KiloSessionId` was provisioned by the CLI
- *   - `retryable`    — either a transport-level failure (timeout, destroyed
- *                      connection, socket gone) OR the relay-emitted literal
- *                      `'Session owner not found'`
+ *   - `retryable`    — a transport-level failure (timeout, destroyed
+ *                      connection, socket gone), the relay-emitted literal
+ *                      `'Session owner not found'`, or the relay's
+ *                      `COMMAND_ALREADY_PENDING` same-key in-flight dedupe
  *   - `nonRetryable` — anything else: a malformed response envelope, a
- *                      delivered CLI string error, or any structured
+ *                      delivered CLI string error, or any other structured
  *                      `UserWebCommandError`
  *
  * A durable D8 replay of a terminal envelope carries exactly the live
@@ -186,9 +197,19 @@ export function classifyCreateSessionResult(
   // result.status === 'rejected'
   const cause: unknown = result.reason;
 
-  // Structured relay error: keep `.code` available; the classifier still
-  // intentionally maps all such errors to `nonRetryable`.
+  // Structured relay error: keep `.code` available; every code maps to
+  // `nonRetryable` EXCEPT `COMMAND_ALREADY_PENDING`, the relay's same-key
+  // in-flight dedupe marker. That marker means the intent is still pending
+  // on the DO, so the caller must keep its operation key and retry to get
+  // the durable replay (see `COMMAND_ALREADY_PENDING_CODE`).
   if (cause instanceof UserWebCommandError) {
+    if (cause.code === COMMAND_ALREADY_PENDING_CODE) {
+      return {
+        status: 'retryable',
+        reason: cause.message || cause.code,
+        cause,
+      };
+    }
     return {
       status: 'nonRetryable',
       reason: cause.message || cause.code,

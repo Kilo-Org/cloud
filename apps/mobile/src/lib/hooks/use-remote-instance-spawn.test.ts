@@ -87,6 +87,24 @@ describe('classifyCreateSessionResult', () => {
     }
   });
 
+  it('returns retryable for a structured COMMAND_ALREADY_PENDING same-key in-flight dedupe', () => {
+    // The relay emits this code when a same-mutationId duplicate arrives while
+    // the command is in flight or its durable entry is still pending. The
+    // intent is NOT terminal: the retry must keep the operation key so the DO
+    // replays the durable terminal result instead of dispatching a second
+    // command under a new mutation identity.
+    const cause = new UserWebCommandError({
+      code: 'COMMAND_ALREADY_PENDING',
+      message: 'Command is already in flight',
+    });
+    const result = classifyCreateSessionResult({ status: 'rejected', reason: cause });
+    expect(result).toEqual({
+      status: 'retryable',
+      reason: 'Command is already in flight',
+      cause,
+    });
+  });
+
   it('returns nonRetryable for any other structured UserWebCommandError code', () => {
     const cause = new UserWebCommandError({
       code: 'SESSION_OWNER_CHANGED',

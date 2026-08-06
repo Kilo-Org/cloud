@@ -9,6 +9,7 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { UserWebCommandError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 import {
   buildCreateRemoteSessionInput,
   type CreateSessionOutcome,
@@ -383,6 +384,38 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       cause: new Error('Connection destroyed'),
     };
     spawnMock.mockResolvedValueOnce(retryable).mockResolvedValueOnce(retryable);
+    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+    });
+    onStart();
+    await vi.waitFor(() => {
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+    });
+
+    const first = spawnMock.mock.calls[0]?.[2] as { operationKey?: string } | undefined;
+    const second = spawnMock.mock.calls[1]?.[2] as { operationKey?: string } | undefined;
+    expect(first?.operationKey).toBeDefined();
+    expect(second?.operationKey).toBe(first?.operationKey);
+  });
+
+  it('keeps the same operationKey for a COMMAND_ALREADY_PENDING in-flight dedupe', async () => {
+    // The relay rejects a same-key duplicate while the command is in flight
+    // with this structured error. The classifier maps it to `retryable`, so
+    // the dispatch must KEEP the key: a rotation would mint a new mutation
+    // identity and let the relay dispatch a second command instead of
+    // replaying the durable terminal result under the same identity.
+    const alreadyPending = {
+      status: 'retryable' as const,
+      reason: 'Command is already in flight',
+      cause: new UserWebCommandError({
+        code: 'COMMAND_ALREADY_PENDING',
+        message: 'Command is already in flight',
+      }),
+    };
+    spawnMock.mockResolvedValueOnce(alreadyPending).mockResolvedValueOnce(alreadyPending);
     const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
 
     onStart();

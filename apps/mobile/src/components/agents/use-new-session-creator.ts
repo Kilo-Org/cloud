@@ -79,6 +79,16 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // The wire payload is the exact attachment input the create carries (the
+    // upload path plus every uploaded remote filename). Include it in the
+    // intent fingerprint so a changed attachment set becomes a fresh intent
+    // with a fresh key — otherwise a same-key retry after the user swapped
+    // files would replay the previous intent's ledger result. Computed once,
+    // before the fingerprint, and reused for the create body so the two
+    // cannot disagree. At submit time the screen has already gated on
+    // `attachments.isUploading` / `attachments.hasFailedAttachments`, so the
+    // payload is stable across retries of the same intent.
+    const attachmentWire = attachments.toWirePayload();
     const intentFingerprint = JSON.stringify({
       prompt,
       mode,
@@ -86,6 +96,7 @@ export function useNewSessionCreator({
       variant: variant || undefined,
       repo: selectedRepo,
       organizationId: organizationId ?? null,
+      attachments: attachmentWire ?? null,
     });
     const operationKey = getKey(intentFingerprint);
 
@@ -113,9 +124,8 @@ export function useNewSessionCreator({
         autoInitiate: true,
         operationKey,
       };
-      const wireAttachments = attachments.toWirePayload();
-      if (wireAttachments) {
-        baseInput.attachments = wireAttachments;
+      if (attachmentWire) {
+        baseInput.attachments = attachmentWire;
       }
 
       const result = organizationId

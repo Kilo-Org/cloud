@@ -64,6 +64,11 @@ vi.mock('expo-crypto', () => {
 
 import { useNewSessionCreator } from './use-new-session-creator';
 
+// Simulated attachment wire payload (`{path, files}`). Each test sets this
+// before a submit; the fake `toWirePayload` below reads it at call time so a
+// test can change attachments between two submits.
+let attachmentsWire: { path: string; files: string[] } | null = null;
+
 function creationInProgressError(): Error {
   return Object.assign(new Error('creation_in_progress'), { data: { code: 'CONFLICT' } });
 }
@@ -119,7 +124,7 @@ function runCreator(args: {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape, never read by the create path
       attachments: {
         attachments: [],
-        toWirePayload: () => null,
+        toWirePayload: () => attachmentsWire,
       } as never,
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',
@@ -147,6 +152,7 @@ describe('useNewSessionCreator operationKey', () => {
     routerPush.mockClear();
     navigationDispatch.mockClear();
     toastError.mockClear();
+    attachmentsWire = null;
   });
 
   it('keeps the same operationKey across retryable creation_in_progress failures', async () => {
@@ -215,6 +221,46 @@ describe('useNewSessionCreator operationKey', () => {
     creator.promptRef.current = 'hello';
     await creator.createSessionFromDraft();
     creator.promptRef.current = 'hello, changed';
+    await creator.createSessionFromDraft();
+
+    const keys = usedOperationKeys();
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it('keeps the same operationKey across retryable failures when attachments are unchanged', async () => {
+    prepareSessionMutate
+      .mockRejectedValueOnce(creationInProgressError())
+      .mockRejectedValueOnce(creationInProgressError());
+    const creator = runCreator({});
+    attachmentsWire = { path: 'p-1', files: ['a-1'] };
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    await creator.createSessionFromDraft();
+
+    const keys = usedOperationKeys();
+    expect(keys[0]).toBeDefined();
+    expect(keys[1]).toBe(keys[0]);
+    // The wire payload the fingerprint read is the payload the create body
+    // carries, so the fingerprint and the mutation agree on the intent.
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      attachments: { path: 'p-1', files: ['a-1'] },
+    });
+  });
+
+  it('treats changed attachments as a new intent with a new key', async () => {
+    prepareSessionMutate
+      .mockRejectedValueOnce(creationInProgressError())
+      .mockRejectedValueOnce(creationInProgressError());
+    const creator = runCreator({});
+    attachmentsWire = { path: 'p-1', files: ['a-1'] };
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    // The user swapped the attachment; the next submit is a fresh intent
+    // with a fresh key, otherwise the same-key retry would replay the
+    // previous intent's ledger result instead of creating with the new file.
+    attachmentsWire = { path: 'p-1', files: ['a-2'] };
     await creator.createSessionFromDraft();
 
     const keys = usedOperationKeys();

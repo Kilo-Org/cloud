@@ -21,6 +21,7 @@ import {
   UserWebCommandError,
 } from '@kilocode/cloud-agent-sdk/user-web-connection';
 import {
+  COMMAND_ALREADY_PENDING_CODE,
   type CreateRemoteSessionInput,
   createRemoteSessionOnConnection,
   parseCreateSessionResponse,
@@ -38,15 +39,18 @@ export type { CreateRemoteSessionInput };
  * the caller needs:
  *
  *   - `ready`        — a fresh `KiloSessionId` was provisioned by the CLI
- *   - `retryable`    — either a transport-level failure (timeout, destroyed
- *                      connection, socket gone) OR the DO-emitted literal
- *                      `'Session owner not found'`, which is semantically
- *                      "the instance disconnected" and should follow the
- *                      same recovery path as a transport failure
+ *   - `retryable`    — a transport-level failure (timeout, destroyed
+ *                      connection, socket gone), the DO-emitted literal
+ *                      `'Session owner not found'` (semantically "the
+ *                      instance disconnected", same recovery path as a
+ *                      transport failure), OR the relay's
+ *                      `COMMAND_ALREADY_PENDING` same-key in-flight dedupe
+ *                      (the intent is still pending; keep the operation key
+ *                      and wait for the durable replay)
  *   - `nonRetryable` — anything else: a malformed response envelope, a
  *                      delivered CLI string error (e.g. `'failed to create
- *                      session'`), or any structured `UserWebCommandError`
- *                      (including `CLI_UPGRADE_REQUIRED`)
+ *                      session'`), or any other structured
+ *                      `UserWebCommandError` (including `CLI_UPGRADE_REQUIRED`)
  *
  * Note on intentionally-unreachable structured codes: relay-sourced codes
  * that are semantically transient (`COMMAND_EXPIRED`, `PENDING_COMMAND_LIMIT`)
@@ -96,9 +100,19 @@ export function classifyCreateSessionResult(
   // result.status === 'rejected'
   const cause: unknown = result.reason;
 
-  // Structured relay error: keep `.code` available; the classifier still
-  // intentionally maps all such errors to `nonRetryable` (see header).
+  // Structured relay error: keep `.code` available; every code maps to
+  // `nonRetryable` EXCEPT `COMMAND_ALREADY_PENDING`, the relay's same-key
+  // in-flight dedupe marker. That marker means the intent is still pending
+  // on the DO, so the caller must keep its operation key and retry to get
+  // the durable replay (see `COMMAND_ALREADY_PENDING_CODE`).
   if (cause instanceof UserWebCommandError) {
+    if (cause.code === COMMAND_ALREADY_PENDING_CODE) {
+      return {
+        status: 'retryable',
+        reason: cause.message || cause.code,
+        cause,
+      };
+    }
     return {
       status: 'nonRetryable',
       reason: cause.message || cause.code,

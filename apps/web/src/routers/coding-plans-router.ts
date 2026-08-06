@@ -4,6 +4,7 @@ import * as z from 'zod';
 
 import {
   cancelCodingPlanSubscription,
+  CodingPlanInventoryUploadError,
   getAvailableCodingPlanIds,
   getCodingPlanAvailabilityIntentCounts,
   getCodingPlanAvailabilityIntentPlanIds,
@@ -387,7 +388,11 @@ export const codingPlansRouter = createTRPCRouter({
         ) {
           throw new TRPCError({ code: 'BAD_REQUEST', message });
         }
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+        const safeMessage =
+          error instanceof CodingPlanInventoryUploadError
+            ? error.message
+            : 'Unable to upload Coding Plan inventory.';
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: safeMessage });
       }
     }),
 

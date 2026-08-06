@@ -30,6 +30,24 @@ import {
 const logInfo = sentryLogger('coding-plans', 'info');
 const logError = sentryLogger('coding-plans', 'error');
 
+export class CodingPlanInventoryUploadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodingPlanInventoryUploadError';
+  }
+}
+
+function databaseConstraint(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    if ('constraint' in current && typeof current.constraint === 'string') {
+      return current.constraint;
+    }
+    current = 'cause' in current ? current.cause : null;
+  }
+  return null;
+}
+
 // Credential validation calls the live provider API per key. Bound the fan-out so
 // large inventory uploads finish within the request budget without overwhelming
 // the upstream provider with one unbounded burst of requests.
@@ -515,16 +533,18 @@ export async function uploadKeysToInventory(
       return insertedCount;
     });
   } catch (error) {
-    const constraint =
-      typeof error === 'object' && error !== null && 'constraint' in error
-        ? String(error.constraint)
-        : typeof error === 'object' && error !== null && 'cause' in error
-          ? String((error as { cause?: { constraint?: unknown } }).cause?.constraint ?? '')
-          : '';
-    if (constraint === 'UQ_coding_plan_key_inv_provider_usage_id') {
-      throw new Error('One or more BytePlus seats are already attached to inventory.');
+    if (error instanceof CodingPlanInventoryUploadError) throw error;
+    if (error instanceof Error && error.message.includes('already present in inventory')) {
+      throw new CodingPlanInventoryUploadError(error.message);
     }
-    throw error;
+    if (databaseConstraint(error) === 'UQ_coding_plan_key_inv_provider_usage_id') {
+      throw new CodingPlanInventoryUploadError(
+        'One or more BytePlus seats are already attached to inventory.'
+      );
+    }
+    throw new CodingPlanInventoryUploadError(
+      'Unable to store Coding Plan inventory due to a database error.'
+    );
   }
 
   logInfo('Validated managed credentials uploaded to coding plan inventory', {

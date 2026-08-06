@@ -64,6 +64,7 @@ const BytePlusSeatIdSchema = z.string().trim().min(1).max(256);
 const BytePlusSeatSchema = z.object({
   SeatID: z.string().trim().min(1).max(256),
   UserName: z.string().trim().min(1).max(256).optional(),
+  IdentityDetail: z.string().trim().min(1).max(256),
   ProjectName: z.string().trim().min(1).max(128).optional(),
   BizInfo: BytePlusScalarSchema,
   SeatStatus: BytePlusScalarSchema,
@@ -365,17 +366,17 @@ async function callBytePlusControlPlane(
   return parsed;
 }
 
-function parseBytePlusSeat(value: z.infer<typeof BytePlusSeatSchema>): BytePlusSeat & {
-  userName?: string;
-  projectName?: string;
-} {
+function parseBytePlusSeat(
+  value: z.infer<typeof BytePlusSeatSchema>,
+  username: string
+): BytePlusSeat & { usernameMatches: boolean; projectName?: string } {
   return {
     seatId: value.SeatID,
     bizInfo: normalizeTier(value.BizInfo),
     seatStatus: normalizeSeatStatus(value.SeatStatus),
     billingStatus: normalizeBillingStatus(value.BillingStatus),
     ...(value.ApiKey ? { apiKey: value.ApiKey } : {}),
-    ...(value.UserName ? { userName: value.UserName } : {}),
+    usernameMatches: value.IdentityDetail === username || value.UserName === username,
     ...(value.ProjectName ? { projectName: value.ProjectName } : {}),
   };
 }
@@ -392,19 +393,19 @@ export async function listBytePlusSeatsByUsername(
     throw new BytePlusControlPlaneError('invalid_response');
   }
 
-  const parsed = BytePlusListResponseSchema.safeParse(
-    await callBytePlusControlPlane('ListSeatInfos', {
-      Filter: {
-        BizInfo: bizInfo,
-        UserName: username,
-        SeatStatus: 2,
-        BillingStatus: [2],
-      },
-      PageNum: 1,
-      PageSize: BYTEPLUS_LIST_SEATS_PAGE_SIZE,
-      ProjectName: BYTEPLUS_CONTROL_PLANE_PROJECT,
-    })
-  );
+  const rawResponse = await callBytePlusControlPlane('ListSeatInfos', {
+    Filter: {
+      BizInfo: bizInfo,
+      UserName: username,
+      SeatStatus: 2,
+      BillingStatus: [2],
+    },
+    PageNum: 1,
+    PageSize: BYTEPLUS_LIST_SEATS_PAGE_SIZE,
+    ProjectName: BYTEPLUS_CONTROL_PLANE_PROJECT,
+  });
+
+  const parsed = BytePlusListResponseSchema.safeParse(rawResponse);
   if (!parsed.success) {
     throw new BytePlusControlPlaneError('invalid_response');
   }
@@ -417,18 +418,21 @@ export async function listBytePlusSeatsByUsername(
   }
 
   try {
-    return parsed.data.Result.Data.map(parseBytePlusSeat).map(seat => {
-      // UserName and ProjectName are optional in some API responses. When
-      // present, they must still agree with the exact filter supplied by Kilo.
-      if (
-        (seat.userName !== undefined && seat.userName !== username) ||
-        (seat.projectName !== undefined && seat.projectName !== BYTEPLUS_CONTROL_PLANE_PROJECT)
-      ) {
-        throw new BytePlusControlPlaneError('invalid_response');
-      }
-      const { userName: _userName, projectName: _projectName, ...fieldPickedSeat } = seat;
-      return fieldPickedSeat;
-    });
+    const matchingSeats = parsed.data.Result.Data.map(seat => parseBytePlusSeat(seat, username))
+      .filter(
+        seat =>
+          seat.usernameMatches &&
+          (seat.projectName === undefined || seat.projectName === BYTEPLUS_CONTROL_PLANE_PROJECT)
+      )
+      .map(seat => {
+        const {
+          usernameMatches: _usernameMatches,
+          projectName: _projectName,
+          ...fieldPickedSeat
+        } = seat;
+        return fieldPickedSeat;
+      });
+    return matchingSeats;
   } catch (error) {
     throw new BytePlusControlPlaneError(safeBytePlusErrorCode(error));
   }

@@ -128,6 +128,12 @@ overrides:
   sharp: '>=0.35.0'
   tar: 7.5.21
   shell-quote: 1.10.0
+  # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
+  # @slack/oauth and @slack/socket-mode still ask for ^7.15.0, so without this we
+  # end up with two copies of the WebClient. apps/web also depends on it directly
+  # and constructs its own WebClient, so the versions must agree. 7.x is the
+  # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
+  '@slack/web-api': 7.19.0
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).

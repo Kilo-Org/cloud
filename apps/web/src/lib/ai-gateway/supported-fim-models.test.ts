@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type {
   NormalizedOpenRouterResponse,
+  OpenRouterModel,
   OpenRouterProvider,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
@@ -26,10 +27,12 @@ function provider(slug: string): OpenRouterProvider {
 }
 
 function makeProviderModelData() {
-  return ['mistral', 'inception', 'other'].map(slug => ({
-    provider: provider(slug),
-    models: [],
-  }));
+  return ['mistral', 'inception', 'other'].map(
+    (slug): { provider: OpenRouterProvider; models: OpenRouterModel[] } => ({
+      provider: provider(slug),
+      models: [],
+    })
+  );
 }
 
 function makeSnapshot(): NormalizedOpenRouterResponse {
@@ -66,6 +69,49 @@ describe('supported FIM models', () => {
     injectSupportedFimModels(providerModelData);
 
     expect(providerModelData.flatMap(item => item.models)).toHaveLength(2);
+  });
+
+  it('warns when a direct provider is missing from the upstream snapshot', () => {
+    const providerModelData = makeProviderModelData().filter(
+      item => item.provider.slug !== 'inception'
+    );
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    try {
+      injectSupportedFimModels(providerModelData);
+
+      expect(warn).toHaveBeenCalledWith(
+        '[injectSupportedFimModels] Missing provider %s for supported FIM model %s',
+        'inception',
+        MERCURY_EDIT_FIM_MODEL_ID
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not share mutable snapshot metadata with the supported-model catalog', () => {
+    const providerModelData = makeProviderModelData();
+    injectSupportedFimModels(providerModelData);
+
+    const injectedModel = providerModelData
+      .find(item => item.provider.slug === 'mistral')
+      ?.models.find(model => model.slug === CODESTRAL_FIM_MODEL_ID);
+    const catalogModel = findSupportedFimModel(CODESTRAL_FIM_MODEL_ID)?.snapshotModel;
+    if (!injectedModel?.endpoint || !catalogModel?.endpoint) {
+      throw new Error('Expected Codestral snapshot metadata');
+    }
+
+    expect(injectedModel.endpoint).not.toBe(catalogModel.endpoint);
+    expect(injectedModel.endpoint.pricing).not.toBe(catalogModel.endpoint.pricing);
+    expect(injectedModel.input_modalities).not.toBe(catalogModel.input_modalities);
+    expect(injectedModel.output_modalities).not.toBe(catalogModel.output_modalities);
+
+    injectedModel.endpoint.data_policy = { training: true, retainsPrompts: true };
+    injectedModel.endpoint.pricing.prompt = 'mutated';
+
+    expect(catalogModel.endpoint.data_policy).toBeUndefined();
+    expect(catalogModel.endpoint.pricing.prompt).toBe('0.000000300000');
   });
 
   it('indexes the exact provider associations used by Enterprise restrictions', () => {

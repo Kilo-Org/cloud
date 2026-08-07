@@ -82,9 +82,28 @@ export function injectSupportedFimModels(providerModelData: ProviderModels): voi
     const providerData = providerModelData.find(
       data => data.provider.slug === supportedModel.provider
     );
-    if (!providerData) continue;
+    if (!providerData) {
+      console.warn(
+        '[injectSupportedFimModels] Missing provider %s for supported FIM model %s',
+        supportedModel.provider,
+        supportedModel.id
+      );
+      continue;
+    }
     if (providerData.models.some(model => model.slug === supportedModel.id)) continue;
 
-    providerData.models.unshift({ ...supportedModel.snapshotModel });
+    const endpoint: OpenRouterModel['endpoint'] = supportedModel.snapshotModel.endpoint;
+    providerData.models.unshift({
+      ...supportedModel.snapshotModel,
+      input_modalities: [...supportedModel.snapshotModel.input_modalities],
+      output_modalities: [...supportedModel.snapshotModel.output_modalities],
+      endpoint: endpoint
+        ? {
+            ...endpoint,
+            pricing: { ...endpoint.pricing },
+            data_policy: endpoint.data_policy ? { ...endpoint.data_policy } : endpoint.data_policy,
+          }
+        : null,
+    });
   }
 }

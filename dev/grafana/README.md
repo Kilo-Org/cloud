@@ -28,7 +28,7 @@ In normal use, you only need to provide the Cloudflare API token. The recommende
 CF_AE_TOKEN=<cloudflare-api-token>
 ```
 
-When Grafana is started via `pnpm dev:start`, the runner passes `--env-file .env.local` to docker compose, so the token reaches the Grafana container as an environment variable. The file's values are scoped to that compose invocation — they are _not_ loaded into the runner's process env or inherited by sibling services.
+When Grafana is started via `pnpm dev:start`, the runner writes a small `dev/.env.compose-secrets` file with only the Compose-interpolated keys from `.env.local` (including `CF_AE_TOKEN`) and passes that via `--env-file`. The full Vercel pull is not passed to Compose, because its parser rejects JSON values with unescaped inner quotes. Those values are scoped to that compose invocation — they are _not_ loaded into the runner's process env or inherited by sibling services.
 
 Shell exports still take precedence over file values (docker compose's standard `--env-file` behaviour), so you can temporarily override with `CF_AE_TOKEN=<other> pnpm dev:start observability`.
 

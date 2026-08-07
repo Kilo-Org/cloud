@@ -514,6 +514,21 @@ export function trackedEnvFiles(repoRoot: string): string[] {
     });
 }
 
+/**
+ * Strip one matching pair of surrounding quotes. Users often paste dotenv-style
+ * values (`"secret"`) into the prompt; those quotes must not be stored in Vercel
+ * or `vercel env pull` writes broken / double-quoted assignments.
+ */
+export function stripSurroundingQuotes(value: string): string {
+  if (value.length < 2) return value;
+  const first = value[0];
+  const last = value[value.length - 1];
+  if ((first === '"' || first === "'") && first === last) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
 export function setEnvDefault(file: string, name: string, value: string): void {
   const content = readFileSync(file, 'utf8');
   const lines = content.split('\n');

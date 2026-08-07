@@ -91,6 +91,56 @@ describe('custom LLM thought signature mapping configuration', () => {
   );
 });
 
+describe('custom LLM thought content mapping configuration', () => {
+  const config = {
+    internal_id: 'upstream-model',
+    base_url: 'https://llm.example.com/v1',
+  };
+
+  it('accepts a dot-separated property path', () => {
+    expect(
+      CustomLlmApiConfigSchema.safeParse({
+        ...config,
+        thought_content_mapping: 'extra_content.flags.thought',
+      }).success
+    ).toBe(true);
+  });
+
+  it.each(['', 'extra_content..thought', 'constructor.prototype.thought'])(
+    'rejects unsafe property path %p',
+    thought_content_mapping => {
+      expect(
+        CustomLlmApiConfigSchema.safeParse({ ...config, thought_content_mapping }).success
+      ).toBe(false);
+    }
+  );
+});
+
+describe('buildDirectProvider response transforms', () => {
+  it('exposes the thought content property path without other upstream configuration', () => {
+    const provider = buildDirectProvider('custom', ['chat_completions'], {
+      internal_id: 'upstream-model',
+      base_url: 'https://llm.example.com/v1',
+      api_key: 'test-key',
+      thought_content_mapping: 'extra_content.flags.thought',
+    });
+
+    expect(provider.responseTransforms).toEqual({
+      thoughtContentMapping: 'extra_content.flags.thought',
+    });
+  });
+
+  it('sets response transforms to null when no mapping is configured', () => {
+    const provider = buildDirectProvider('custom', ['chat_completions'], {
+      internal_id: 'upstream-model',
+      base_url: 'https://llm.example.com/v1',
+      api_key: 'test-key',
+    });
+
+    expect(provider.responseTransforms).toBeNull();
+  });
+});
+
 describe('buildDirectProvider thought signature mapping', () => {
   it('maps assistant tool-call signatures and removes camel-case transport fields', async () => {
     const request = makeRequest();

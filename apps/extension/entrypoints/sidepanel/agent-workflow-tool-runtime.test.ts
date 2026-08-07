@@ -1,7 +1,18 @@
 /* eslint-disable max-lines, consistent-type-imports, no-unsafe-type-assertion, no-unsafe-assignment, no-useless-undefined, jest/no-untyped-mock-factory, jest/no-conditional-in-test, prefer-destructuring, import/first -- test mock factories and fixture coverage */
 import { describe, expect, it, vi } from 'vitest';
+import { getDefaultStore } from 'jotai';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
-import { WORKFLOW_SETTINGS_STORAGE_KEY } from '@/src/shared/agent-workflows-storage';
+import {
+  AGENT_WORKFLOWS_STORAGE_KEY,
+  PENDING_WORKFLOW_SAVE_STORAGE_KEY,
+  WORKFLOW_SETTINGS_STORAGE_KEY,
+} from '@/src/shared/agent-workflows-storage';
+import {
+  applyApprovalDecision,
+  pendingApprovalAtom,
+  pendingLockAtom,
+  requestApproval as realRequestApproval,
+} from './pending-approval';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
 import {
   executeWorkflowToolCall,
@@ -562,6 +573,92 @@ describe('save_workflow', () => {
         workflowId: 'new-wf-id',
       },
     });
+  });
+
+  it('reaches the real approval card and completes the save when the settings read fails', async () => {
+    // Wire the real requestApproval. When the settings read fails inside it,
+    // The save must fall back to the approval card instead of failing.
+    const controller = new AbortController();
+    const values = new Map<string, unknown>([[AGENT_WORKFLOWS_STORAGE_KEY, []]]);
+    const storage = {
+      getItem: (key: string): Promise<unknown> => {
+        if (key === WORKFLOW_SETTINGS_STORAGE_KEY) {
+          return Promise.reject(new Error('settings read failed'));
+        }
+        return Promise.resolve(values.get(key));
+      },
+      removeItem: (key: string): Promise<void> => {
+        values.delete(key);
+        return Promise.resolve(undefined);
+      },
+      setItem: (key: string, value: unknown): Promise<void> => {
+        values.set(key, value);
+        return Promise.resolve(undefined);
+      },
+    };
+
+    const ctx = createBaseCtx({
+      requestApproval: (kind, draft) =>
+        realRequestApproval(storage, kind, draft, controller.signal),
+      storage,
+    });
+
+    const resultPromise = executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    // Wait for the real requestApproval to persist the draft and show the card.
+    const atomStore = getDefaultStore();
+    await vi.waitFor(() => {
+      if (atomStore.get(pendingApprovalAtom) === undefined) {
+        throw new Error('approval card not shown yet');
+      }
+    });
+
+    const entry = atomStore.get(pendingApprovalAtom);
+    if (entry === undefined) {
+      throw new Error('expected an approval card entry');
+    }
+    expect({
+      draftPersisted: values.has(PENDING_WORKFLOW_SAVE_STORAGE_KEY),
+      kind: entry.kind,
+    }).toStrictEqual({ draftPersisted: true, kind: 'workflow' });
+
+    // Approve on the card through the same path the card uses.
+    const outcome = await applyApprovalDecision(storage, 'workflow', entry.draft, true);
+    if (outcome.status !== 'approved') {
+      throw new Error('expected an approved outcome');
+    }
+    entry.settle(outcome);
+
+    const result = await resultPromise;
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: outcome.savedId,
+      },
+    });
+
+    // The workflow is stored, the draft cleared, and the lock released.
+    const workflows = values.get(AGENT_WORKFLOWS_STORAGE_KEY) as Record<string, unknown>[];
+    expect({
+      count: workflows.length,
+      draftCleared: !values.has(PENDING_WORKFLOW_SAVE_STORAGE_KEY),
+    }).toStrictEqual({ count: 1, draftCleared: true });
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
   });
 
   it('approved save reports autoApproved true when the outcome was auto-approved', async () => {

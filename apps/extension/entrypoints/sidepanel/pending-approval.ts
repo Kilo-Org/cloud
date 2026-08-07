@@ -213,7 +213,8 @@ export const applyApprovalDecision = async (
  *
  * Workflow saves check the auto-approve setting before persisting the draft. When the
  * setting enables it, the save applies immediately without a card and returns approved
- * with autoApproved true. A settings read or hash failure returns failed.
+ * with autoApproved true. A failed settings read falls back to the approval card (the
+ * cautious path, since auto-approve cannot be verified); a hash failure returns failed.
  *
  * Single-flight: if another approval is already pending, returns failed immediately.
  * Persist failure: returns failed without setting the atom — the card never shows.
@@ -240,12 +241,10 @@ export const requestApproval = async (
     let autoApproveWorkflowChanges = false;
     try {
       ({ autoApproveWorkflowChanges } = await loadWorkflowSettings(storage));
-    } catch (error) {
-      atomStore.set(pendingLockAtom, false);
-      return {
-        reason: error instanceof Error ? error.message : 'Failed to read workflow settings.',
-        status: 'failed',
-      };
+    } catch {
+      // A failed settings read must not block the save.
+      // Auto-approve cannot be verified, so fall through to the approval card.
+      autoApproveWorkflowChanges = false;
     }
 
     if (autoApproveWorkflowChanges) {

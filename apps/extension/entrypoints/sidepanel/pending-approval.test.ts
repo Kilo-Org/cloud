@@ -788,20 +788,46 @@ describe(requestApproval, () => {
     expect(atomStore.get(pendingLockAtom)).toBe(false);
   });
 
-  it('auto-approve returns failed when settings cannot be read and releases the lock', async () => {
+  it('falls back to the approval card when the auto-approve settings cannot be read', async () => {
     const storage = createStorage();
     // Any storage read fails, which surfaces at the settings read (the first storage call).
     storage.getItem = () => {
       throw new Error('Settings read failed.');
     };
 
-    const outcome = await requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
-    expect(outcome).toStrictEqual({ reason: 'Settings read failed.', status: 'failed' });
+    const promise = requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
 
-    // No card and the lock released.
+    // Wait for requestApproval to persist the draft and set the atom.
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    // The card shows despite the failed settings read: draft persisted, atom set.
     const atomStore = getDefaultStore();
-    expect(atomStore.get(pendingApprovalAtom)).toBeUndefined();
-    expect(atomStore.get(pendingLockAtom)).toBe(false);
+    expect({
+      draft: storage.values.has('local:kiloPendingWorkflowSave'),
+      kind: atomStore.get(pendingApprovalAtom)?.kind,
+    }).toStrictEqual({ draft: true, kind: 'workflow' });
+
+    // Auto-approve did not run: no workflow was saved.
+    expect(storage.values.has('local:kiloAgentWorkflows')).toBe(false);
+
+    // A card approval settles approved with autoApproved false and releases the lock.
+    atomStore.get(pendingApprovalAtom)?.settle({
+      autoApproved: false,
+      savedId: 'wf-card',
+      status: 'approved',
+    });
+    const outcome = await promise;
+    expect(outcome).toStrictEqual({
+      autoApproved: false,
+      savedId: 'wf-card',
+      status: 'approved',
+    });
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
   });
 
   it('abort during the settings read releases the lock when the load resolves', async () => {
@@ -833,14 +859,21 @@ describe(requestApproval, () => {
     }).toStrictEqual({ atom: undefined, lock: false });
   });
 
-  it('a card request succeeds after a settings-read failure', async () => {
-    // The first request fails at the settings read. The next request must still work.
-    const failingStorage = createStorage();
+  it('a card request succeeds after a settings read that also failed to persist', async () => {
+    // The first request fails at the settings read and at the draft persist.
+    // It returns failed and releases the lock. The next request must still work.
+    const failingStorage = createStorage({ failSetItem: true });
     failingStorage.getItem = () => {
       throw new Error('Settings read failed.');
     };
     const first = await requestApproval(failingStorage, 'workflow', workflowDraft(), abortSignal());
-    expect(first).toStrictEqual({ reason: 'Settings read failed.', status: 'failed' });
+    expect(first).toStrictEqual({ reason: 'Storage write failed.', status: 'failed' });
+
+    const atomStore = getDefaultStore();
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
 
     // A new request with auto-approve off shows the card and persists the draft.
     const storage = createStorage();
@@ -855,7 +888,6 @@ describe(requestApproval, () => {
       setTimeout(resolve, 0);
     });
 
-    const atomStore = getDefaultStore();
     expect({
       draft: storage.values.has('local:kiloPendingWorkflowSave'),
       kind: atomStore.get(pendingApprovalAtom)?.kind,

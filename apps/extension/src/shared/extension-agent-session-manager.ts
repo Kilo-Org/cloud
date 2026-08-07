@@ -235,28 +235,27 @@ async function readPageInEndGraceWindow(
 }
 
 /**
- * Re-read liveness briefly when the first active-sessions lookup missed the
- * session.
+ * Re-read liveness briefly when the initial page is empty and the session is
+ * not confirmed working.
  *
- * The one-shot liveness gate can miss the active row while it registers or
- * while the active-sessions read model refreshes, and a missed busy session
- * would then latch an empty transcript that later persistence can never fill.
- * This bounded probe keeps re-checking until the row appears (busy → run the
- * full active-history retry, idle → resolve empty) or the window expires
- * (genuinely inactive → resolve empty). It re-reads liveness only; the history
- * page is not re-read here, so an inactive session still resolves its empty
- * page without a page retry.
+ * A reopened running session can be listed idle or miss its active row while
+ * the active-sessions read model refreshes or while the CLI batches
+ * session-ingest until the turn completes. A one-shot idle or missing read
+ * would latch an empty transcript that later persistence can never fill. This
+ * bounded probe re-checks `activeSessions.list` for a fixed number of reads:
+ * the session becomes busy → run the full active-history retry; the session
+ * stays stably idle (or stays absent) for the whole window → resolve the empty
+ * page. It re-reads liveness only; the history page is not re-read here, so an
+ * inactive session still resolves its empty page without a page retry.
  */
 async function readActiveHistoryWithLivenessGrace(
   initialResult: SessionMessagesPageResult,
   {
     fetchActiveSessions,
-    isSessionListedIdle,
     isSessionWorking,
     queryPage,
   }: {
     fetchActiveSessions: () => Promise<ActiveSessionsResult>;
-    isSessionListedIdle: (active: ActiveSessionsResult) => boolean;
     isSessionWorking: (active: ActiveSessionsResult) => boolean;
     queryPage: () => Promise<SessionMessagesPageResult>;
   }
@@ -273,9 +272,6 @@ async function readActiveHistoryWithLivenessGrace(
         isSessionWorking,
         queryPage,
       });
-    }
-    if (isSessionListedIdle(current)) {
-      return result;
     }
   }
   return result;
@@ -345,40 +341,34 @@ async function fetchExtensionSessionSnapshotPage(
     });
   const isSessionWorking = (active: ActiveSessionsResult): boolean =>
     active.sessions.some(session => session.id === kiloSessionId && session.status !== 'idle');
-  const isSessionListedIdle = (active: ActiveSessionsResult): boolean =>
-    active.sessions.some(session => session.id === kiloSessionId && session.status === 'idle');
 
   let result = await queryPage();
   if (options.cursor === undefined && isPageWithoutPersistedMessages(pageHistory(result))) {
     /*
-     * Only a non-idle session gets the delayed-history retry. A freshly
-     * created session is idle on its first read: its history is empty by
-     * definition, and its own first prompt is sent immediately after this
-     * page resolves and rendered via the live CLI echo — blocking there
-     * would delay the very send that starts the turn. A reopened running
-     * session has a persisted user message that only this page can replay,
-     * so keep reading until session-ingest persistence catches up.
+     * An empty first page can mean a freshly created idle session (empty by
+     * definition, whose first prompt is sent immediately after this page
+     * resolves and rendered via the live CLI echo) or a reopened running
+     * session whose persisted page has not been materialized yet. The CLI
+     * batches session-ingest until the turn completes and the active-sessions
+     * read model can briefly list a starting session as idle or omit it, so a
+     * single idle or missing liveness read must not latch the empty
+     * transcript. Confirm liveness with a bounded probe: the session becomes
+     * busy → keep reading until session-ingest persistence catches up; it
+     * stays stably idle or absent → resolve the empty page without an
+     * unbounded wait.
      */
     const active = await fetchActiveSessions();
-    if (isSessionWorking(active)) {
-      result = await readActiveHistoryWithRetry(result, {
-        fetchActiveSessions,
-        isSessionWorking,
-        queryPage,
-      });
-    } else if (!isSessionListedIdle(active)) {
-      /*
-       * The session is not in the active list at all. It may be a running
-       * session whose active row has not registered yet, so a one-shot miss
-       * must not latch the empty page; keep checking liveness briefly.
-       */
-      result = await readActiveHistoryWithLivenessGrace(result, {
-        fetchActiveSessions,
-        isSessionListedIdle,
-        isSessionWorking,
-        queryPage,
-      });
-    }
+    result = isSessionWorking(active)
+      ? await readActiveHistoryWithRetry(result, {
+          fetchActiveSessions,
+          isSessionWorking,
+          queryPage,
+        })
+      : await readActiveHistoryWithLivenessGrace(result, {
+          fetchActiveSessions,
+          isSessionWorking,
+          queryPage,
+        });
   }
 
   const history = pageHistory(result);

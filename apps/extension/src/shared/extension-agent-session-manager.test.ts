@@ -954,24 +954,79 @@ describe('createExtensionAgentSessionManager', () => {
       }
     });
 
-    it('does not retry a listed but idle session (a fresh session start is not delayed)', async () => {
+    it('probes a listed-idle session that becomes busy and returns the persisted user message', async () => {
       vi.useFakeTimers();
       try {
         const trpc = makeTrpcMock();
-        trpc.activeSessions.list.query = mockQuery({
-          sessions: [{ id: SESSION_ID, status: 'idle' }],
+        /*
+         * Round-9 regression state: the reopened CLI session lists idle on
+         * the gate's first read (session-ingest persistence has not caught up
+         * yet), then turns busy on the bounded liveness probe read. The old
+         * code latched the empty page after that single idle read, so the
+         * batched nonce-bearing user message never reached the reopened UI.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'idle' }] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        /*
+         * The persisted page lags the turn: the initial read and the first
+         * retry read are empty, then the persisted user message arrives.
+         */
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Liveness probe sleep + the two retry sleeps.
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
         });
+        expect(pageQuery).toHaveBeenCalledTimes(3);
+        expect(listQuery).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('returns the empty page within the bound when the session stays stably idle', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'idle' }] });
+        trpc.activeSessions.list.query = listQuery;
         const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
         trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
         const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
         createExtensionAgentSessionManager(opts);
 
         const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
-        // Advance the timers so the removed idle-gate loop can settle.
-        // The assertion below then distinguishes the two.
+        // The bounded liveness probe: one gate read plus three probe reads.
         await vi.advanceTimersByTimeAsync(10_000);
-        const result = await resultPromise;
 
+        const result = await resultPromise;
         expect(result).toStrictEqual({
           info: { id: SESSION_ID },
           kind: 'success',
@@ -980,11 +1035,16 @@ describe('createExtensionAgentSessionManager', () => {
           omittedItemCount: 0,
         });
         /*
-         * No delayed-history retry runs for an idle session. The page
-         * resolves on the first read, so the session's own first send is
-         * never blocked.
+         * No page retry runs for a stably idle session: the page resolves on
+         * the first read, so the fresh session's own first send is not held
+         * beyond the liveness bound.
          */
         expect(pageQuery).toHaveBeenCalledTimes(1);
+        /*
+         * The bounded probe rechecks activeSessions.list for the whole window
+         * before latching the empty page.
+         */
+        expect(listQuery).toHaveBeenCalledTimes(4);
       } finally {
         vi.useRealTimers();
       }

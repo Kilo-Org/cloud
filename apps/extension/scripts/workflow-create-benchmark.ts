@@ -936,63 +936,158 @@ const openFlightsTab = async (context: BrowserContext, budget: SetupBudget): Pro
   return flightsPage;
 };
 
-const readTabOptions = async (select: ReturnType<Page['locator']>): Promise<string[]> => {
-  const value = await select.evaluate(element => {
-    if (!(element instanceof HTMLSelectElement)) {
-      return [];
-    }
-    return [...element.options].map(option => option.value);
-  });
-  if (!Array.isArray(value)) {
-    return [];
+// Reads the target-tab option list as aligned label/value pairs in one
+// evaluate, so the label and its value can never be read from two different
+// tab-list snapshots. A non-select element returns null (still settling); any
+// malformed option entry rejects the whole list instead of selecting blindly.
+const readTargetTabOptions = async (
+  select: ReturnType<Page['locator']>
+): Promise<readonly { label: string; value: string }[] | null> => {
+  const value = await select.evaluate((element): unknown =>
+    element instanceof HTMLSelectElement
+      ? [...element.options].map(option => ({
+          label: option.textContent?.trim() ?? '',
+          value: option.value,
+        }))
+      : null
+  );
+  if (value === null) {
+    return null;
   }
-  return value.filter((entry): entry is string => typeof entry === 'string');
+  if (
+    !Array.isArray(value) ||
+    value.some(
+      entry =>
+        !isRecord(entry) || typeof entry['label'] !== 'string' || typeof entry['value'] !== 'string'
+    )
+  ) {
+    throw new Error('The target tab option list contains malformed option data.');
+  }
+  return value as readonly { label: string; value: string }[];
 };
 
-const readTabLabels = async (select: ReturnType<Page['locator']>): Promise<string[]> => {
-  const value = await select.evaluate(element => {
-    if (!(element instanceof HTMLSelectElement)) {
-      return [];
-    }
-    return [...element.options].map(option => option.textContent?.trim() ?? '');
-  });
-  if (!Array.isArray(value)) {
-    return [];
+// Queries the extension's own inspectable-tab list (the same protocol the side
+// panel uses) so the selected tab can be verified by its real URL, not by its
+// display label.
+const readInspectableTabs = async (
+  sidePanel: Page
+): Promise<readonly { id: number; url: string }[]> => {
+  const response = await sidePanel.evaluate(
+    () =>
+      new Promise<unknown>(resolve => {
+        const chromeApi = (
+          globalThis as typeof globalThis & {
+            chrome?: {
+              runtime?: {
+                sendMessage?: (
+                  message: { readonly type: string },
+                  callback: (responseValue: unknown) => void
+                ) => void;
+              };
+            };
+          }
+        ).chrome;
+        const sendMessage = chromeApi?.runtime?.sendMessage;
+        if (sendMessage === undefined) {
+          resolve(null);
+          return;
+        }
+        sendMessage({ type: 'kilo.tabs.listInspectable' }, responseValue => {
+          resolve(responseValue);
+        });
+      })
+  );
+  if (!isRecord(response) || response['ok'] !== true) {
+    throw new Error('The extension could not list inspectable tabs for target verification.');
   }
-  return value.filter((entry): entry is string => typeof entry === 'string');
+  const tabs = response['tabs'];
+  if (!Array.isArray(tabs)) {
+    throw new TypeError('The inspectable tab list response has an invalid shape.');
+  }
+  const tabEntries: { id: number; url: string }[] = [];
+  for (const entry of tabs) {
+    if (isRecord(entry) && typeof entry['id'] === 'number' && typeof entry['url'] === 'string') {
+      tabEntries.push({ id: entry['id'], url: entry['url'] });
+    }
+  }
+  return tabEntries;
+};
+
+const verifyTargetTabUrl = async (sidePanel: Page, selectedValue: string): Promise<void> => {
+  const tabId = Number(selectedValue);
+  if (!Number.isInteger(tabId)) {
+    throw new TypeError(`The selected target tab id is not an integer: "${selectedValue}".`);
+  }
+  const tabs = await readInspectableTabs(sidePanel);
+  const target = tabs.find(tab => tab.id === tabId);
+  if (target === undefined) {
+    throw new Error(
+      `The selected target tab (id ${String(tabId)}) is missing from the inspectable tab list.`
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(target.url);
+  } catch {
+    throw new Error(`The selected target tab has an invalid URL: "${target.url}".`);
+  }
+  if (parsed.origin !== TARGET_SCOPE_ORIGIN || parsed.pathname !== TARGET_PATH_PREFIX) {
+    throw new Error(
+      `Selected target tab is not Google Flights: ${target.url}; expected ${targetUrl}.`
+    );
+  }
 };
 
 const selectTargetTab = async (sidePanel: Page, budget: SetupBudget): Promise<void> => {
   const targetTab = sidePanel.locator('select[aria-label="Target tab"]');
   await targetTab.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
 
-  const findFlightsValue = async (): Promise<string | undefined> => {
-    const labels = await readTabLabels(targetTab);
-    const index = labels.findIndex(label => label !== '' && /flights/iu.test(label));
-    if (index === -1) {
+  const findFlightsOption = async (): Promise<{ label: string; value: string } | undefined> => {
+    const options = await readTargetTabOptions(targetTab);
+    if (options === null) {
       return undefined;
     }
-    const values = await readTabOptions(targetTab);
-    return values[index];
+    const option = options.find(
+      candidate => candidate.label.trim() !== '' && /flights/iu.test(candidate.label)
+    );
+    if (option === undefined) {
+      return undefined;
+    }
+    if (option.value === '') {
+      throw new Error('The Google Flights tab option has no selectable value.');
+    }
+    return option;
   };
 
-  await expect.poll(findFlightsValue, { timeout: budget.waitTimeoutFor(30_000) }).toBeDefined();
+  await expect.poll(findFlightsOption, { timeout: budget.waitTimeoutFor(30_000) }).toBeDefined();
 
-  const flightsValue = await findFlightsValue();
-  if (flightsValue === undefined) {
+  const flightsOption = await findFlightsOption();
+  if (flightsOption === undefined) {
     throw new Error('The Google Flights tab is not present in the target tab list.');
   }
-  await targetTab.selectOption({ value: flightsValue });
+  await targetTab.selectOption({ value: flightsOption.value });
 
-  const selectedLabel = await targetTab.evaluate(element => {
+  // Verify the selected option is the intended one by value identity, then
+  // verify its tab URL against the exact Google Flights origin and path.
+  const selected = await targetTab.evaluate((element): { label: string; value: string } | null => {
     if (!(element instanceof HTMLSelectElement)) {
-      return '';
+      return null;
     }
-    return element.selectedOptions[0]?.textContent?.trim() ?? '';
+    const option = element.selectedOptions[0];
+    if (option === undefined) {
+      return null;
+    }
+    return { label: option.textContent?.trim() ?? '', value: option.value };
   });
-  if (!/flights/iu.test(selectedLabel)) {
-    throw new Error(`Selected target tab is not Google Flights: "${selectedLabel}".`);
+  if (selected === null || selected.value !== flightsOption.value) {
+    throw new Error(
+      'The selected target tab value does not match the intended Google Flights tab.'
+    );
   }
+  if (!/flights/iu.test(selected.label)) {
+    throw new Error(`Selected target tab is not Google Flights: "${selected.label}".`);
+  }
+  await verifyTargetTabUrl(sidePanel, selected.value);
 };
 
 const selectCreditAccount = async (sidePanel: Page, budget: SetupBudget): Promise<string> => {
@@ -1773,12 +1868,17 @@ const cleanupAttempt = async (
     }
   };
 
+  // A failed context close can leave a live browser process holding the token
+  // profile, so it is never silently accepted: the failure is recorded, the
+  // profile removal and absence verification still run (cleanup guarantees are
+  // not weakened), and the attempt then fails as a cleanup blocker.
+  let contextCloseFailure: string | null = null;
   try {
     if (context !== undefined) {
       try {
         await runStep('context close', context.close());
-      } catch {
-        // Best-effort close; the profile-dir absence check is the real gate.
+      } catch (error) {
+        contextCloseFailure = error instanceof Error ? error.message : String(error);
       }
     }
     if (exceeded()) {
@@ -1812,6 +1912,9 @@ const cleanupAttempt = async (
     }
     if (!gone) {
       throw new CleanupBlockerError(`profile directory survived cleanup: ${userDataDir}`);
+    }
+    if (contextCloseFailure !== null) {
+      throw new CleanupBlockerError(`context close failed: ${contextCloseFailure}`);
     }
   } catch (error) {
     cleanupController.abort();
@@ -1870,6 +1973,7 @@ const buildFailedAttemptRecord = (input: {
   let readCallsBeforeFirstSave = 0;
   let saveWorkflowCallCount = 0;
   let autoRunObserved = false;
+  let failureReason = input.failureReason;
   try {
     const internal = validateEvents(input.collector.events);
     const bench = internal.map(toBenchEvent);
@@ -1884,8 +1988,13 @@ const buildFailedAttemptRecord = (input: {
     saveWorkflowCallCount = metrics.saveWorkflowCallCount;
     autoRunObserved = hasOkRealRun(bench);
     transcript = redactTranscript(internal, input.collector.offsetByEventId, correlation);
-  } catch {
-    // Partial or inconsistent store on a failed attempt; keep defaults.
+  } catch (error) {
+    // A storage validation failure must surface as `storage-parse`, not as a
+    // silent default artifact. The sanitized defaults above stay: no raw
+    // storage content ever enters a failed attempt artifact.
+    if (error instanceof StorageParseError) {
+      failureReason = 'storage-parse';
+    }
   }
   return {
     attempt: input.attempt,
@@ -1919,7 +2028,7 @@ const buildFailedAttemptRecord = (input: {
     followUpSent: input.followUpSent,
     correctness: null,
     success: false,
-    failureReason: input.failureReason,
+    failureReason,
     transcript,
   };
 };
@@ -2269,12 +2378,6 @@ const main = async (): Promise<number> => {
   }
 
   const batchStartedAtMs = Date.now();
-  let gitHead = 'unknown';
-  try {
-    gitHead = getGitHead();
-  } catch {
-    gitHead = 'unknown';
-  }
 
   let outDir: string;
   try {
@@ -2285,6 +2388,25 @@ const main = async (): Promise<number> => {
       'build',
       `could not create the output directory: ${errorToReason(error)}`
     );
+  }
+
+  let gitHead: string;
+  try {
+    gitHead = getGitHead();
+  } catch (error) {
+    // An unverifiable head would corrupt batch identity, so the batch stops
+    // before measurement with a blocker artifact and exit code 2. The blocker
+    // carries an empty head because the head could not be read at all.
+    const blocker = makeBlockerRecord({
+      stage: 'build',
+      reason: `could not determine the git head: ${errorToReason(error)}`,
+      attempt: null,
+      httpStatus: null,
+      gitHead: '',
+      batchStartedAtMs,
+    });
+    await writeBlockerArtifact(outDir, blocker);
+    return 2;
   }
 
   let batchOrgIdHash: string | null = null;

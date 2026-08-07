@@ -392,6 +392,16 @@ describe('agent LLM harness', () => {
     );
   });
 
+  it('gives a safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'When the user asks you to create a workflow in safe mode, read the page once with get_page_snapshot, use find_in_page for targeted follow-ups instead of re-snapshotting unchanged state, declare values that vary between runs as params, and save the workflow scoped to the current page origin and path.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain('Google Flights');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'When the user asks you to create a workflow: in dangerous mode, first perform the task once with the page tools to verify the steps, then save the workflow, then verify it with run_workflow dryRun: true and report the planned actions. Follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user. Never start a real run of a workflow whose actions buy, send, delete, or otherwise change data without asking the user first.'
+    );
+  });
+
   it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {
     const definitions = createWorkflowToolDefinitions({ mode: 'dangerous' });
     const runWorkflow = definitions.find(tool => tool.function.name === 'run_workflow');

@@ -44,6 +44,6 @@ export type Provider = {
   apiUrl: string;
   apiKey: string;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
-  responseTransforms?: ProviderResponseTransforms;
+  responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;
 };

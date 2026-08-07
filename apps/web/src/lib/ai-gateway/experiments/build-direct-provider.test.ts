@@ -130,14 +130,14 @@ describe('buildDirectProvider response transforms', () => {
     });
   });
 
-  it('omits response transforms when no mapping is configured', () => {
+  it('sets response transforms to null when no mapping is configured', () => {
     const provider = buildDirectProvider('custom', ['chat_completions'], {
       internal_id: 'upstream-model',
       base_url: 'https://llm.example.com/v1',
       api_key: 'test-key',
     });
 
-    expect(provider.responseTransforms).toBeUndefined();
+    expect(provider.responseTransforms).toBeNull();
   });
 });
 

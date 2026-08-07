@@ -204,7 +204,7 @@ export function buildDirectProvider(
     supportedChatApis,
     responseTransforms: upstream.thought_content_mapping
       ? { thoughtContentMapping: upstream.thought_content_mapping }
-      : undefined,
+      : null,
     async transformRequest(context) {
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;

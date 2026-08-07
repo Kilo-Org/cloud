@@ -384,7 +384,7 @@ export async function rewriteModelResponse_ChatCompletions(
   removeCost: boolean,
   capture: RequestLogCapture | null,
   vercelRequestId: string | null,
-  responseTransforms?: ProviderResponseTransforms
+  responseTransforms: ProviderResponseTransforms | null = null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -872,7 +872,7 @@ export async function rewriteModelResponse(
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
   logging: RequestLoggingParams,
-  responseTransforms?: ProviderResponseTransforms
+  responseTransforms: ProviderResponseTransforms | null = null
 ): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const requiresCostRemoval =

@@ -134,6 +134,7 @@ const provider = {
   apiUrl: 'https://openrouter.ai/api/v1',
   apiKey: 'test-key',
   supportedChatApis: ['chat_completions', 'responses', 'messages'],
+  responseTransforms: null,
   transformRequest: jest.fn(),
 } satisfies Provider;
 
@@ -292,7 +293,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       expect.anything(),
       expect.anything(),
       expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
-      undefined
+      null
     );
   });
 

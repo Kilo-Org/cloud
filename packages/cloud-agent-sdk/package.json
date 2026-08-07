@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./context-usage": "./src/context-usage.ts",
     "./create-session": "./src/create-session.ts",
+    "./instance-model-catalog": "./src/instance-model-catalog.ts",
     "./message-id": "./src/message-id.ts",
     "./preparation-attempts": "./src/preparation-attempts.ts",
     "./remote-command-catalog": "./src/remote-command-catalog.ts",

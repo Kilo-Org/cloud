@@ -553,7 +553,8 @@ type ExtendedProfile = Profile & {
 
 const posthogClient = PostHogClient();
 const logger: LoggerInstance = {
-  debug: logExceptInTest,
+  // NextAuth debug payloads can include OAuth credentials; never ship them to logs.
+  debug: () => {},
   warn: sentryLogger('NEXTAUTH', 'warning'),
   error: sentryLogger('NEXTAUTH', 'error'),
 };
@@ -939,6 +940,19 @@ export const authOptions: NextAuthOptions = {
           // mutate the profile to track if its new (only for new user registrations)
           extendedProfile.isNewUser = 'isNew' in result ? result.isNew : false; // Add isNewUser to the profile
         }
+
+        if (result.user.is_admin) {
+          // Keep this event free of OAuth tokens and PII; Vercel ships it to Axiom.
+          logExceptInTest(
+            JSON.stringify({
+              event: 'admin_login_succeeded',
+              kiloUserId: result.user.id,
+              provider: accountInfo.provider,
+              isSuperAdmin: result.user.is_super_admin,
+            })
+          );
+        }
+
         return true;
       } catch (error) {
         const operation = isAccountLinking ? 'account_linking' : 'user_creation';
@@ -1035,7 +1049,7 @@ export const authOptions: NextAuthOptions = {
     signIn: '/users/sign_in',
     error: '/users/sign_in',
   },
-  debug: !!getEnvVariable('DEBUG_AUTH'),
+  debug: false,
 };
 
 export const nextAuthHttpHandler = NextAuth(authOptions);

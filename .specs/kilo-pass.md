@@ -242,18 +242,23 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 
 ### Projections and UI
 
-38. The Kilo Pass state read path MUST compute current-period and next-period UI bonus projections from tier, cadence,
-    streak, first-time-subscriber status, provider, and stored initial welcome-promo reason.
+38. The Kilo Pass state read path MUST keep actual issuance amounts and projected amounts separate. It MUST compute
+    current-period and next-period projections from tier, cadence, streak, first-time-subscriber status, provider, and
+    stored initial welcome-promo reason.
 39. Current-period Kilo Pass state projection MUST use current streak. Next-period Kilo Pass state projection MUST use
     current streak plus one.
-40. Current-period unlock state MUST report whether the latest issuance contains any bonus-like item. Current-period
-    projected dollars remain formula-based and do not substitute an existing `referral_bonus` item's actual amount.
-41. Renewal UI without a scheduled change MUST display the server-projected next-period bonus.
-42. Renewal UI with a scheduled change MUST recompute bonus against the displayed refill's selected tier and cadence on
+40. The latest current-period issuance MUST report the actual kind and amount of its bonus-like item. When that item has
+    been issued, current-period UI and the available-credit total MUST use its actual amount rather than a projection.
+41. Before a current-period bonus-like item is issued, UI MAY show the projected amount only when a normal `bonus` remains
+    available to be issued. A `referral_bonus` MUST be labeled "Referral bonus". Existing bonus-like items MUST continue to
+    suppress another bonus grant; these rules MUST NOT be read to permit double bonuses in one issuance.
+42. Renewal UI without a scheduled change MUST display the server-projected next-period bonus as an unissued amount, using
+    "up to" or equivalent wording. It MUST remain a next-period projection even when the current-period issuance has an
+    actual bonus-like amount.
+43. Renewal UI with a scheduled change MUST recompute bonus against the displayed refill's selected tier and cadence on
     the client. For monthly subscriptions it applies the target tier and cadence. For yearly subscriptions it applies
-    the target only when the scheduled effective instant matches the displayed refill instant.
-43. Scheduled-change client recomputation does not apply the stored Stripe welcome-promo reason. It MUST NOT be
-    described as guaranteed equal to eventual issuance.
+    target only when the scheduled effective instant matches the displayed refill instant. The result is a next-period
+    projection, MUST use "up to" or equivalent wording, and MUST NOT be described as guaranteed equal to eventual issuance.
 44. KiloClaw pending-balance projection MUST run only after effective threshold crossing and MUST return zero unless
     selected state is `active`. For monthly cadence it uses the monthly ramp only; for yearly cadence it uses flat 50%.
 45. KiloClaw pending-balance projection does not inspect issuance headers, base issuance items, existing bonus-like

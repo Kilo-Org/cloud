@@ -116,12 +116,8 @@ function dataObjects(sse: string): unknown[] {
     .map(payload => JSON.parse(payload));
 }
 
-const rewriteChatCompletionsWithoutTransforms: typeof rewriteModelResponse_Messages = (
-  response,
-  removeCost,
-  capture,
-  vercelRequestId
-) => rewriteModelResponse_ChatCompletions(response, removeCost, capture, vercelRequestId, null);
+const rewriteChatCompletionsWithoutTransforms: typeof rewriteModelResponse_Messages = params =>
+  rewriteModelResponse_ChatCompletions({ ...params, responseTransforms: null });
 
 const rewriters = [
   ['Chat Completions', rewriteChatCompletionsWithoutTransforms],
@@ -134,7 +130,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     ['ResponseAborted', 'upstream_disconnect', 'disconnected'],
     ['TimeoutError', 'timeout', 'timed out'],
   ])('returns structured JSON for %s', async (errorName, errorType, messageFragment) => {
-    const result = await rewrite(failingResponse('application/json', errorName), true, null, null);
+    const result = await rewrite({
+      response: failingResponse('application/json', errorName),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
 
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({
@@ -145,12 +146,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   });
 
   test('includes the vercel request id only in the JSON read error message', async () => {
-    const result = await rewrite(
-      failingResponse('application/json', 'ResponseAborted'),
-      true,
-      null,
-      'iad1::iad1::request-id'
-    );
+    const result = await rewrite({
+      response: failingResponse('application/json', 'ResponseAborted'),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: 'iad1::iad1::request-id',
+    });
 
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({
@@ -163,12 +164,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   });
 
   test('includes the vercel request id only in the stream error message', async () => {
-    const result = await rewrite(
-      failingResponse('text/event-stream', 'ResponseAborted'),
-      true,
-      null,
-      'iad1::iad1::request-id'
-    );
+    const result = await rewrite({
+      response: failingResponse('text/event-stream', 'ResponseAborted'),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: 'iad1::iad1::request-id',
+    });
     const events = dataObjects(await readOutputStream(result)) as {
       error: { message: string };
     }[];
@@ -181,12 +182,12 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   });
 
   test('omits the request id suffix when no vercel request id is available', async () => {
-    const result = await rewrite(
-      failingResponse('text/event-stream', 'ResponseAborted'),
-      true,
-      null,
-      null
-    );
+    const result = await rewrite({
+      response: failingResponse('text/event-stream', 'ResponseAborted'),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const events = dataObjects(await readOutputStream(result)) as {
       error: { message: string };
     }[];
@@ -213,7 +214,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const json = await result.json();
 
       expect(json.model).toBe('upstream-model');
@@ -236,7 +243,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const json = await result.json();
 
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
@@ -249,7 +262,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'application/json' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
 
       expect(result.status).toBe(502);
       expect(await result.text()).toBe('not-json{');
@@ -277,7 +296,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       );
 
       try {
-        const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+        const result = await rewriteModelResponse_ChatCompletions({
+          response: upstream,
+          removeCost: true,
+          capture: null,
+          vercelRequestId: null,
+          responseTransforms: null,
+        });
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
         await reader?.read();
@@ -302,7 +327,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const sse = await readOutputStream(result);
       const events = dataObjects(sse) as Array<{ error?: { code: number; type: string } }>;
 
@@ -318,7 +349,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -337,8 +374,14 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, {
-        thoughtContentMapping: 'extra_content.flags.thought',
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          thoughtContentMapping: 'extra_content.flags.thought',
+        },
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
         choices: Array<{ delta: Record<string, unknown> }>;
@@ -359,7 +402,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const sse = await readOutputStream(result);
 
       expect(sse).toContain('still streaming');
@@ -374,13 +423,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"id":"ignored","model":"upstream-model","choices":[]}\n\n';
       const { response: upstream, cancel } = hangingSseResponse(body);
 
-      const result = await rewriteModelResponse_ChatCompletions(
-        upstream,
-        true,
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
         capture,
-        'iad1::terminal-request',
-        null
-      );
+        vercelRequestId: 'iad1::terminal-request',
+        responseTransforms: null,
+      });
       const sse = await readOutputStream(result);
 
       expect(dataObjects(sse)).toEqual([{ id: 'gen-chat', model: 'upstream-model', choices: [] }]);
@@ -404,7 +453,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"model":"upstream-model","usage":{"cost":1,"is_byok":true,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{}}}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -428,7 +483,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         ': openrouter heartbeat\n\n' + 'data: {"model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
       const sse = await readOutputStream(result);
 
       expect(sse).toContain(': KILO PROCESSING');
@@ -440,7 +501,13 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'text/event-stream' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
 
       expect(await readOutputStream(result)).toBe('');
     });
@@ -452,16 +519,16 @@ describe('rewriteModelResponse_Messages', () => {
     ['ResponseAborted', 'upstream_disconnect'],
     ['TimeoutError', 'timeout'],
   ])('emits an Anthropic SSE error for %s', async (errorName, errorType) => {
-    const result = await rewriteModelResponse_Messages(
-      failingResponse(
+    const result = await rewriteModelResponse_Messages({
+      response: failingResponse(
         'text/event-stream',
         errorName,
         'data: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n'
       ),
-      true,
-      null,
-      null
-    );
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
 
     expect(sse).toContain('event: error\n');
@@ -498,7 +565,12 @@ describe('rewriteModelResponse_Messages', () => {
       },
     });
 
-    const result = await rewriteModelResponse_Messages(upstream, true, null, null);
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const json = await result.json();
 
     expect(json.model).toBe('upstream-model');
@@ -514,7 +586,12 @@ describe('rewriteModelResponse_Messages', () => {
       headers: { 'content-type': 'application/json' },
     });
 
-    const result = await rewriteModelResponse_Messages(upstream, true, null, null);
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
 
     expect(result.status).toBe(500);
     expect(await result.text()).toBe('}{');
@@ -527,7 +604,12 @@ describe('rewriteModelResponse_Messages', () => {
         'data: [DONE]\n\n'
     );
 
-    const result = await rewriteModelResponse_Messages(upstream, true, null, null);
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
     const events = dataObjects(sse) as Array<{
       type: string;
@@ -556,7 +638,12 @@ describe('rewriteModelResponse_Messages', () => {
       'data: {"type":"message_delta","usage":{"output_tokens":9},"delta":{}}\n\n'
     );
 
-    const result = await rewriteModelResponse_Messages(upstream, true, null, null);
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
 
     expect(dataPayloads(sse)).not.toContain('[DONE]');
@@ -569,7 +656,12 @@ describe('rewriteModelResponse_Messages', () => {
       'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
     const { response: upstream, cancel } = hangingSseResponse(body);
 
-    const result = await rewriteModelResponse_Messages(upstream, true, capture, null);
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
 
     expect(dataObjects(sse)).toEqual([{ type: 'message_stop' }]);
@@ -595,7 +687,12 @@ describe('rewriteModelResponse_Messages', () => {
       'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":10},"delta":{}}\n\n';
     const { response: upstream, cancel } = hangingSseResponse(body);
 
-    const result = await rewriteModelResponse_Messages(upstream, true, capture, null);
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
 
     expect(dataObjects(sse)).toEqual([]);
@@ -611,16 +708,16 @@ describe('rewriteModelResponse_Responses', () => {
     ['ResponseAborted', 'upstream_disconnect'],
     ['TimeoutError', 'timeout'],
   ])('emits an OpenAI Responses SSE error for %s', async (errorName, errorType) => {
-    const result = await rewriteModelResponse_Responses(
-      failingResponse(
+    const result = await rewriteModelResponse_Responses({
+      response: failingResponse(
         'text/event-stream',
         errorName,
         'data: {"type":"response.created","sequence_number":4,"response":{"id":"gen-response"}}\n\n'
       ),
-      true,
-      null,
-      null
-    );
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
 
     expect(sse).toContain('event: error\n');
@@ -657,7 +754,12 @@ describe('rewriteModelResponse_Responses', () => {
       },
     });
 
-    const result = await rewriteModelResponse_Responses(upstream, true, null, null);
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const json = await result.json();
 
     expect(json.model).toBe('upstream-model');
@@ -673,7 +775,12 @@ describe('rewriteModelResponse_Responses', () => {
         'data: [DONE]\n\n'
     );
 
-    const result = await rewriteModelResponse_Responses(upstream, true, null, null);
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+    });
     const sse = await readOutputStream(result);
     const [event] = dataObjects(sse) as Array<{
       type: string;
@@ -704,7 +811,12 @@ describe('rewriteModelResponse_Responses', () => {
         'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"ignored"}\n\n';
       const { response: upstream, cancel } = hangingSseResponse(body);
 
-      const result = await rewriteModelResponse_Responses(upstream, true, capture, null);
+      const result = await rewriteModelResponse_Responses({
+        response: upstream,
+        removeCost: true,
+        capture,
+        vercelRequestId: null,
+      });
       const sse = await readOutputStream(result);
 
       expect(dataObjects(sse)).toEqual([{ type }]);
@@ -757,7 +869,12 @@ describe.each([
       const body = initialEvent + errorEvent + 'data: {"ignored":true}\n\n';
       const { response: upstream, cancel } = hangingSseResponse(body);
 
-      const result = await rewrite(upstream, true, capture, 'iad1::error-request');
+      const result = await rewrite({
+        response: upstream,
+        removeCost: true,
+        capture,
+        vercelRequestId: 'iad1::error-request',
+      });
       const sse = await readOutputStream(result);
 
       expect(sse).toContain('rate limited');
@@ -791,8 +908,8 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
 
 describe('rewriteModelResponse', () => {
   test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {
-    const result = await rewriteModelResponse(
-      jsonResponse({
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
         model: 'openai/gpt-5',
         usage: {
           cost: 0.5,
@@ -800,12 +917,12 @@ describe('rewriteModelResponse', () => {
           is_byok: false,
         },
       }),
-      'openai/gpt-5',
-      'openrouter',
-      'chat_completions',
-      makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
-      null
-    );
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
+      responseTransforms: null,
+    });
 
     expect(result).not.toBeNull();
     expect(await result?.json()).toMatchObject({
@@ -818,8 +935,8 @@ describe('rewriteModelResponse', () => {
   });
 
   test('rewrites paid-model traffic for other organizations without stripping cost', async () => {
-    const result = await rewriteModelResponse(
-      jsonResponse({
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
         model: 'openai/gpt-5',
         usage: {
           cost: 0.5,
@@ -827,12 +944,12 @@ describe('rewriteModelResponse', () => {
           is_byok: false,
         },
       }),
-      'openai/gpt-5',
-      'openrouter',
-      'chat_completions',
-      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
-      null
-    );
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      responseTransforms: null,
+    });
 
     expect(await result.json()).toMatchObject({
       usage: {
@@ -844,17 +961,17 @@ describe('rewriteModelResponse', () => {
   });
 
   test('continues stripping cost for free models outside the Kilo organization', async () => {
-    const result = await rewriteModelResponse(
-      jsonResponse({
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
         model: 'google/gemma-4-26b-a4b-it:free',
         usage: { cost: 0, is_byok: false },
       }),
-      'google/gemma-4-26b-a4b-it:free',
-      'openrouter',
-      'chat_completions',
-      makeLogging(),
-      null
-    );
+      model: 'google/gemma-4-26b-a4b-it:free',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
 
     expect(result).not.toBeNull();
     expect(await result?.json()).toEqual({
@@ -864,17 +981,17 @@ describe('rewriteModelResponse', () => {
   });
 
   test('strips cost for models with custom pricing', async () => {
-    const result = await rewriteModelResponse(
-      jsonResponse({
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
         model: QWEN37_PLUS_MODEL_ID,
         usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
       }),
-      QWEN37_PLUS_MODEL_ID,
-      'openrouter',
-      'chat_completions',
-      makeLogging(),
-      null
-    );
+      model: QWEN37_PLUS_MODEL_ID,
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
 
     // The upstream-reported cost does not reflect the custom pricing, so it
     // must be removed just like for free models.
@@ -886,14 +1003,14 @@ describe('rewriteModelResponse', () => {
 
   test('processes paid-model responses when request logging is enabled', async () => {
     mockedOptIn.mockResolvedValueOnce(true);
-    const result = await rewriteModelResponse(
-      jsonResponse({ model: 'openai/gpt-5' }),
-      'openai/gpt-5',
-      'openrouter',
-      'chat_completions',
-      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
-      null
-    );
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'openai/gpt-5' }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      responseTransforms: null,
+    });
 
     expect(result).not.toBeNull();
   });
@@ -908,7 +1025,12 @@ describe('request log capture', () => {
     const capture = makeCapture();
     const body = { model: 'upstream-model' };
 
-    const result = await rewrite(jsonResponse(body), true, capture, null);
+    const result = await rewrite({
+      response: jsonResponse(body),
+      removeCost: true,
+      capture,
+      vercelRequestId: null,
+    });
 
     expect(result.status).toBe(200);
     expect(capture.setBody).toHaveBeenCalledTimes(1);
@@ -921,7 +1043,12 @@ describe('request log capture', () => {
     const sseBody =
       'data: {"id":"gen-1","model":"upstream-model","choices":[]}\n\n' + 'data: [DONE]\n\n';
 
-    const result = await rewrite(sseResponse(sseBody), true, capture, null);
+    const result = await rewrite({
+      response: sseResponse(sseBody),
+      removeCost: true,
+      capture,
+      vercelRequestId: null,
+    });
     await readOutputStream(result);
 
     expect(capture.setBody).toHaveBeenCalledTimes(1);
@@ -934,12 +1061,12 @@ describe('request log capture', () => {
     async (_name, rewrite) => {
       const capture = makeCapture();
 
-      const result = await rewrite(
-        new Response(null, { headers: { 'content-type': 'text/event-stream' } }),
-        true,
+      const result = await rewrite({
+        response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }),
+        removeCost: true,
         capture,
-        null
-      );
+        vercelRequestId: null,
+      });
       await readOutputStream(result);
 
       expect(capture.setBody).toHaveBeenCalledWith('');
@@ -953,12 +1080,12 @@ describe('request log capture', () => {
       const capture = makeCapture();
       const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
 
-      const result = await rewrite(
-        failingResponse('text/event-stream', 'ResponseAborted', receivedChunks),
-        true,
+      const result = await rewrite({
+        response: failingResponse('text/event-stream', 'ResponseAborted', receivedChunks),
+        removeCost: true,
         capture,
-        null
-      );
+        vercelRequestId: null,
+      });
       await readOutputStream(result);
 
       expect(capture.setReadError).toHaveBeenCalledTimes(1);
@@ -972,12 +1099,12 @@ describe('request log capture', () => {
     async (_name, rewrite) => {
       const capture = makeCapture();
 
-      const result = await rewrite(
-        failingResponse('text/event-stream', 'ResponseAborted'),
-        true,
+      const result = await rewrite({
+        response: failingResponse('text/event-stream', 'ResponseAborted'),
+        removeCost: true,
         capture,
-        null
-      );
+        vercelRequestId: null,
+      });
       await readOutputStream(result);
 
       expect(capture.setReadError).toHaveBeenCalledTimes(1);
@@ -991,12 +1118,12 @@ describe('request log capture', () => {
     async (_name, rewrite) => {
       const capture = makeCapture();
 
-      const result = await rewrite(
-        failingResponse('application/json', 'TimeoutError'),
-        true,
+      const result = await rewrite({
+        response: failingResponse('application/json', 'TimeoutError'),
+        removeCost: true,
         capture,
-        null
-      );
+        vercelRequestId: null,
+      });
 
       expect(result.status).toBe(503);
       expect(capture.setReadError).toHaveBeenCalledTimes(1);
@@ -1010,7 +1137,13 @@ describe('request log capture', () => {
       headers: { 'content-type': 'text/event-stream' },
     });
 
-    const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null, null);
+    const result = await rewriteModelResponse_ChatCompletions({
+      response: upstream,
+      removeCost: true,
+      capture,
+      vercelRequestId: null,
+      responseTransforms: null,
+    });
     const reader = result.body?.getReader();
     await reader?.cancel();
 
@@ -1025,7 +1158,12 @@ describe('request log capture', () => {
       const receivedChunks = 'data: {"id":"gen-1","choices":[]}\n\n';
       const { response: upstream } = hangingSseResponse(receivedChunks);
 
-      const result = await rewrite(upstream, true, capture, null);
+      const result = await rewrite({
+        response: upstream,
+        removeCost: true,
+        capture,
+        vercelRequestId: null,
+      });
       const reader = result.body?.getReader();
       await reader?.read();
       await reader?.cancel();

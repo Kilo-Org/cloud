@@ -13,8 +13,12 @@ design, invariants, and rollout/rollback.
   (`@kilocode/auto-routing-contracts/classifier`), grades per-field, and derives
   the cheapest above-threshold model as the classifier winner.
 - **Decider benchmark** — runs 180 golden tasks per candidate through the real
-  `kilo` CLI inside a Cloudflare Container, grades mechanically, and publishes a
-  per-taxonomy-route routing table.
+  `kilo` CLI inside a Cloudflare Container and grades mechanically. Every result
+  lands in the **global decider registry** (`benchmark_profiles`), keyed by exact
+  `(model, variant)` under the live engine identity and repetitions. Both the
+  platform routing table and each owner's custom table are assembled from that
+  one registry, so a model wanted by the platform list and by an owner pool is
+  measured once.
 - Normalized results live in D1 (`BENCH_DB`); published artifacts are cached in
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
@@ -28,7 +32,9 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
-| `POST /admin/runs` | Start a **platform** run (`{kind, force}`); returns 409 if one of that kind is already running |
+| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
+| `GET /admin/registry` | Registry row counts per queue under the live engine identity |
+| `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
@@ -44,18 +50,30 @@ in the auto-routing Durable Object; this worker owns **global Benchmark
 profiles** — per-route measurements for each exact pair under the current
 benchmark engine identity and decider repetitions.
 
-### Profile purpose runs vs platform runs
+### The two registry queues
 
-| | Platform run | Profile run |
+A registry row records who wants the measurement: `platform_requested` (the
+saved decider list) and `user_requested` (owner pools). Both can be set — the
+row is global, so the pair is benchmarked once and serves both.
+
+| | Platform queue | User queue |
 |---|---|---|
-| Trigger | Admin `POST /admin/runs`, scheduled auto-decider sync | Single-slot drain of pending registry rows |
-| `benchmark_runs.purpose` | `platform` (default) | `profile` |
-| Model set | Saved admin config | Explicit entry snapshot from pending profiles |
-| On completion | Publishes platform routing table / classifier winner; clears platform KV keys | Marks claimed profiles `ready` (or `failed`); **never** replaces the platform artifact |
-| Slot | Shares the one-active-decider constraint | Same single slot; never preempts a platform run |
+| Filled by | `syncPlatformRegistry` from the saved decider list (config save + daily cron) | `POST /admin/profiles/register` from owner pools (quota-charged) |
+| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
+| `benchmark_runs.purpose` | `platform` | `user` |
+| Container budget | `maxConcurrency` | `userMaxConcurrency` |
+| Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
 
-Rollback: turning off owner pools (or clearing a pool) leaves the platform
-default table untouched — profile runs never wrote it.
+The two budgets must sum to at most `BENCHMARK_CONTAINER_BUDGET` (200, the
+wrangler `max_instances`); the config contract rejects a larger pair.
+
+Neither queue publishes anything itself. After any decider run completes, the
+platform routing table is reassembled from ready+current registry rows for the
+configured decider list. Publishing is skipped (previous table stays live) when
+the registry cannot yet fill every taxonomy route.
+
+Rollback: turning off owner pools (or clearing a pool) leaves the platform table
+untouched — it only ever draws on rows the platform list asks for.
 
 ### Request ledger and admission
 
@@ -81,9 +99,9 @@ pending → running → ready
                  ↘ failed (bounded failure_reason; Retry re-admits)
 ```
 
-- **running**: set when a profile run claims the entries at `startRun`.
-- **ready**: set when that profile run completes successfully (`run_id`
-  provenance points at the measuring run).
+- **running**: set when a decider run of either queue claims the entries at `startRun`.
+- **ready**: set when that run completes successfully (`run_id` provenance
+  points at the measuring run).
 - **failed**: set when the run fails (enqueue, timeout sweep, etc.) — or, at
   profile-run completion, per entry whose lane dead-lettered while the run's
   other entries become `ready`. Only rows still pointing at that `run_id`
@@ -93,24 +111,25 @@ Currency: a profile is current only when `engine_identity`, `repetitions`, and
 exact variant match the live decider engine. Stale rows are never returned as
 Ready or assembled into custom tables.
 
-**Single-slot drain** (after any decider terminal state — completion *or*
-failure — and when the scheduled handler has no platform start to claim):
+**Per-queue drain** (after any decider terminal state, on the admin's manual
+trigger, and on the 15-minute cron):
 
-1. If a decider run is already active → log and leave pending rows alone.
-2. Else take pending current-engine rows oldest-`requested_at`-first, capped by
-   the existing container budget (`entries × repetitions ≤ maxConcurrency`).
-3. `startRun(purpose: 'profile', entries: snapshot)`.
+1. If that queue's run is already active → log and leave its pending rows alone.
+   The other queue is unaffected.
+2. Else take that queue's pending current-engine rows oldest-`requested_at`-first,
+   capped by its own container budget (`entries × repetitions ≤ budget`).
+3. `startRun(purpose: queue, entries: snapshot)`.
 
-**Scheduled auto-decider sync ordering** (platform priority on a free slot):
+A row wanted by both queues appears in both listings; whichever run claims it
+first flips it to `running`, so it is still measured exactly once.
 
-1. Sweep stale runs (cleanup only — not a slot claim).
-2. Sync auto-decider candidates from the web API.
-3. If models changed **and** a config exists → platform `startRun` claims the
-   free slot; **no** pending-profile drain this cycle (terminal transition
-   drains later). Profile work never preempts platform start.
-4. If no platform start (no change, or no config) → drain pending profiles now
-   so stranded work recovers.
-5. If the slot is already occupied → log/skip; leave pending rows untouched.
+**Scheduled handlers:**
+
+- `*/15 * * * *` — sweep stale runs, then drain both queues.
+- `0 5 * * *` — sweep, refresh auto-decider candidates, reconcile the platform
+  queue with the resulting decider list, drain both queues, republish the
+  platform table (so a *removed* model leaves the live table even when nothing
+  new needed measuring).
 
 Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1.
 
@@ -217,15 +236,17 @@ The worker consumes the DLQ itself: each dead message is recorded in
 every (model, variant, rep) lane has either all its case rows or a recorded
 lane death — a single dead model can no longer wedge the whole run.
 
-- **Profile runs** complete per-entry: entries whose lanes all finished go
-  `ready`; entries with a dead lane go `failed` ("Benchmark lane
-  dead-lettered…"; the owner's Retry re-admits them, quota-charged).
-- **Platform runs** fail fast with the dead lane named in the run error —
-  publishing a partial routing table would silently drop a candidate from
-  routing decisions, so the previous table stays live.
-- **Backstop**: the 6h stale sweep still fails wedged `running` rows on the
-  next `GET /admin/runs` / run start / scheduled sync, for failures that never
-  reach the DLQ (e.g. a throwing consumer).
+- **Decider runs of either queue** complete per-entry: entries whose lanes all
+  finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
+  not finish…"). A requeue re-admits them — the owner's Retry (quota-charged) or
+  the admin's `POST /admin/registry/requeue` (free). One failing model never
+  discards the results of the others, which matters because each one cost real
+  money to produce.
+- **Classifier runs** still fail fast on a dead lane: their models are not
+  registry-tracked and the winner must come from one comparable set.
+- **Backstop**: the 6h stale sweep *salvages* a wedged decider run rather than
+  failing it wholesale — lanes with a full set of case rows are settled `ready`,
+  and only the unfinished lanes' entries go `failed`.
 
 To inspect:
 
@@ -233,9 +254,9 @@ To inspect:
   `auto-routing-benchmark-dlq`); the message body is the JSON job (`runId`,
   `model`, `rep`, `shard`, `chunk`, case ids). Recorded lane deaths are
   queryable: `SELECT * FROM run_lane_failures WHERE run_id = '…'`.
-- **Replay**: failed profile entries re-admit via the owner's Retry; platform
-  candidates re-measure on the next run (carried summaries mean only models
-  without current results re-run).
+- **Replay**: failed entries re-admit via the owner's Retry or the admin's
+  requeue endpoint, and the next drain of their queue measures them. Entries that
+  are already `ready` are never re-measured.
 
 ## Commands
 

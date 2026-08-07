@@ -73,6 +73,7 @@ const validConfig = {
   switchCostFactor: 3,
   bestAccuracySwitchThreshold: 0.05,
   maxConcurrency: 4,
+  userMaxConcurrency: 100,
   benchmarkUserId: null,
   benchmarkOrgId: null,
   classifierRepetitions: 1,

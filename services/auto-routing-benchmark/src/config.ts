@@ -16,6 +16,7 @@ export function mapConfigRows(
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
     max_concurrency: number;
+    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
@@ -62,6 +63,7 @@ export function mapConfigRows(
     switchCostFactor: configRow.switch_cost_factor,
     bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
     maxConcurrency: configRow.max_concurrency,
+    userMaxConcurrency: configRow.user_max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
     benchmarkOrgId: configRow.benchmark_org_id,
     classifierRepetitions: configRow.classifier_repetitions,
@@ -107,6 +109,7 @@ export async function saveBenchmarkConfig(
       switch_cost_factor: config.switchCostFactor,
       best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
       max_concurrency: config.maxConcurrency,
+      user_max_concurrency: config.userMaxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
       benchmark_org_id: config.benchmarkOrgId,
       classifier_repetitions: config.classifierRepetitions,

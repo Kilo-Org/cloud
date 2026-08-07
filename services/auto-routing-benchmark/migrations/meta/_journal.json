@@ -64,6 +64,13 @@
       "when": 1786106641954,
       "tag": "0008_easy_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786129493996,
+      "tag": "0009_powerful_hawkeye",
+      "breakpoints": true
     }
   ]
 }

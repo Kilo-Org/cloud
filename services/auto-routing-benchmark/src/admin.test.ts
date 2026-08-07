@@ -3,29 +3,12 @@ import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   type BenchmarkConfig,
-  type BenchmarkModelSummary,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
-import { computeEngineIdentity } from './run';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
-
-function makeSummary(model: string): BenchmarkModelSummary {
-  return {
-    model,
-    routeKey: 'implementation/code_generation',
-    accuracy: 0.9,
-    avgCostUsd: 0.001,
-    avgLatencyMs: 100,
-    p50LatencyMs: 90,
-    p95LatencyMs: 120,
-    cases: 10,
-    errors: 0,
-    timeouts: 0,
-  };
-}
 
 const TEST_CONFIG: BenchmarkConfig = {
   classifierModels: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
@@ -37,6 +20,7 @@ const TEST_CONFIG: BenchmarkConfig = {
   switchCostFactor: 3,
   bestAccuracySwitchThreshold: 0.05,
   maxConcurrency: 100,
+  userMaxConcurrency: 100,
   benchmarkUserId: null,
   benchmarkOrgId: null,
   classifierRepetitions: 1,
@@ -56,6 +40,7 @@ const TEST_CONFIG_ROWS = {
     switch_cost_factor: TEST_CONFIG.switchCostFactor,
     best_accuracy_switch_threshold: TEST_CONFIG.bestAccuracySwitchThreshold,
     max_concurrency: TEST_CONFIG.maxConcurrency,
+    user_max_concurrency: TEST_CONFIG.userMaxConcurrency,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
@@ -92,8 +77,13 @@ vi.mock('./db', async importOriginal => {
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
-    listStaleRunningDeciderRunIds: vi.fn(),
+    listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    syncPlatformRegistryRows: vi.fn(),
+    listReadyCurrentProfilesForEntries: vi.fn(),
+    getSummariesForRuns: vi.fn(),
+    countCurrentProfilesByStatus: vi.fn(),
+    requeueFailedCurrentProfiles: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
@@ -112,7 +102,6 @@ vi.mock('./profiles', async importOriginal => {
 });
 
 import {
-  exactPairKey,
   getConfigRows,
   getClassifierWinner,
   getLatestRoutingTable,
@@ -121,8 +110,11 @@ import {
   existsNewerCompletedRun,
   insertRun,
   listPendingCurrentProfiles,
+  listReadyCurrentProfilesForEntries,
+  getSummariesForRuns,
+  syncPlatformRegistryRows,
   listRuns,
-  listStaleRunningDeciderRunIds,
+  listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceConfig,
 } from './db';
@@ -192,8 +184,11 @@ beforeEach(() => {
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
-  vi.mocked(listStaleRunningDeciderRunIds).mockResolvedValue([]);
+  vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+  vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
+  vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+  vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
@@ -252,6 +247,7 @@ describe('GET /admin/config', () => {
         classifier_max_p95_latency_ms: null,
         auto_decider_min_cost_usd: 12,
         auto_decider_max_cost_usd: 24,
+        user_max_concurrency: 100,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
@@ -470,239 +466,97 @@ describe('POST /admin/runs', () => {
     });
   });
 
-  it('starts a decider run with default benchmark identity when overrides are null', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        benchmark_user_id: null,
-        benchmark_org_id: null,
-      },
-      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
-    });
+  it('drains the platform queue after reconciling it with the decider list', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
 
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'platform' });
+
     expect(res.status).toBe(200);
-    expect(insertRun).toHaveBeenCalledOnce();
+    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'platform'
+    );
+    const body = (await res.json()) as { runId: string; startedRuns: { purpose: string }[] };
+    expect(body.startedRuns.map(run => run.purpose)).toEqual(['platform']);
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
+    expect(runArg.purpose).toBe('platform');
     expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
     expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
   });
 
-  it('carries a decider model only when its benchmark identity still matches', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: [
-        { model: 'vendor/a', reasoning_effort: null },
-        { model: 'vendor/b', reasoning_effort: null },
-      ],
-    });
-    // vendor/a has a prior result measured under the current engine identity,
-    // matching repetitions and reasoning_effort → carried (skipped). vendor/b
-    // has none → enqueued.
-    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
-      new Map([
-        [
-          exactPairKey('vendor/a', null),
-          {
-            engineIdentity: computeEngineIdentity('decider'),
-            repetitions: 1,
-            variant: null,
-            reasoningEffort: null,
-            summaries: [makeSummary('vendor/a')],
-          },
-        ],
-      ])
-    );
+  it('drains the user queue without touching the platform queue', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
 
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
-    expect(body.skippedModels).toEqual(['vendor/a']);
-    expect(body.enqueuedModels).toBe(1);
+    // Owner-requested work must not silently re-admit platform models.
+    expect(syncPlatformRegistryRows).not.toHaveBeenCalled();
+    expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('user');
   });
 
-  it('re-benchmarks a model whose prior reasoning_effort differs (no stale carry)', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
-    });
-    // Prior result was measured at variant 'high'; current config runs it at
-    // null, so the carry is invalidated and the model is re-enqueued.
-    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
-      new Map([
-        [
-          exactPairKey('vendor/a', 'high'),
-          {
-            engineIdentity: computeEngineIdentity('decider'),
-            repetitions: 1,
-            variant: 'high',
-            reasoningEffort: 'high',
-            summaries: [makeSummary('vendor/a')],
-          },
-        ],
-      ])
-    );
+  it('starts one run per queue for queue=both', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'shared/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
 
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
-    expect(body.skippedModels).toEqual([]);
-    expect(body.enqueuedModels).toBe(1);
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
+
+    const body = (await res.json()) as { startedRuns: { purpose: string; entryCount: number }[] };
+    expect(body.startedRuns.map(run => run.purpose)).toEqual(['platform', 'user']);
+    expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual([
+      'platform',
+      'user',
+    ]);
   });
 
-  it('does not carry a prior summary when only the variant differs', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: [{ model: 'vendor/a', reasoning_effort: 'high' }],
-    });
-    // Same model/engine/reps but prior was measured at a different variant.
-    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
-      new Map([
-        [
-          exactPairKey('vendor/a', 'low'),
-          {
-            engineIdentity: computeEngineIdentity('decider'),
-            repetitions: 1,
-            variant: 'low',
-            reasoningEffort: 'low',
-            summaries: [makeSummary('vendor/a')],
-          },
-        ],
-      ])
-    );
+  it('reports an empty queue honestly instead of inventing a run', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+    vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue([]);
 
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
+
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
-    expect(body.skippedModels).toEqual([]);
-    expect(body.enqueuedModels).toBe(1);
-  });
-
-  it('carries a prior summary when the exact pair matches (legacy effort key)', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      // vendor/b has no prior → stays enqueued so we do not hit the all-carried
-      // finalize path (which needs a real D1 client in unit tests).
-      deciderModels: [
-        { model: 'vendor/a', reasoning_effort: 'high' },
-        { model: 'vendor/b', reasoning_effort: null },
-      ],
-    });
-    // Legacy rows store variant from reasoning_effort; exact pair high matches.
-    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
-      new Map([
-        [
-          exactPairKey('vendor/a', 'high'),
-          {
-            engineIdentity: computeEngineIdentity('decider'),
-            repetitions: 1,
-            variant: 'high',
-            reasoningEffort: 'high',
-            summaries: [makeSummary('vendor/a')],
-          },
-        ],
-      ])
-    );
-
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
-    expect(body.skippedModels).toEqual(['vendor/a']);
-    expect(body.enqueuedModels).toBe(1);
-  });
-
-  it('seeds sharded decider lanes bounded by the container cap', async () => {
-    // Later chunks are chained by processJob within each shard lane. Start
-    // seeds as many lanes as fit under the 100-container cap so the benchmark
-    // runs much faster without creating one live container per chunk.
-    const manyModels = Array.from({ length: 7 }, (_, i) => ({
-      id: `vendor/model-${i}`,
-      reasoningEffort: null,
-    }));
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
-    });
-
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
-    expect(res.status).toBe(200);
-
-    expect(queueSendBatch).toHaveBeenCalledTimes(1);
-    const batchSizes = queueSendBatch.mock.calls.map(([batch]) => (batch as unknown[]).length);
-    expect(batchSizes).toEqual([98]);
-    for (const size of batchSizes) expect(size).toBeLessThanOrEqual(100);
-    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
-    for (const message of queuedMessages) {
-      expect(message).toMatchObject({
-        body: {
-          kind: 'decider',
-          shardCount: 14,
-        },
-      });
-    }
-  });
-
-  it('keeps 10 decider models with 3 repetitions under the 100-container cap', async () => {
-    const manyModels = Array.from({ length: 10 }, (_, i) => ({
-      id: `vendor/model-${i}`,
-      reasoningEffort: null,
-    }));
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        benchmark_user_id: 'user-123',
-        benchmark_org_id: 'org-123',
-        decider_repetitions: 3,
-      },
-      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
-    });
-
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
-    expect(res.status).toBe(200);
-
-    expect(queueSendBatch).toHaveBeenCalledTimes(1);
-    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
-    expect(queuedMessages).toHaveLength(90);
-    for (const message of queuedMessages) {
-      expect(message).toMatchObject({
-        body: {
-          kind: 'decider',
-          shardCount: 3,
-        },
-      });
-    }
-  });
-
-  it('rejects decider starts when model repetitions alone exceed the container cap', async () => {
-    const tooManyModels = Array.from({ length: 21 }, (_, i) => ({
-      id: `vendor/model-${i}`,
-      reasoningEffort: null,
-    }));
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        benchmark_user_id: 'user-123',
-        benchmark_org_id: 'org-123',
-        decider_repetitions: 5,
-      },
-      deciderModels: tooManyModels.map(m => ({ model: m.id, reasoning_effort: null })),
-    });
-
-    const res = await authedPost('/admin/runs', { kind: 'decider' });
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining('requires at least one live container lane'),
+    expect(await res.json()).toMatchObject({
+      runId: null,
+      enqueuedModels: 0,
+      startedRuns: [],
     });
     expect(insertRun).not.toHaveBeenCalled();
-    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('caps a queue batch by that queue container budget', async () => {
+    // user budget 4, repetitions 2 → floor(4/2) = 2 entries per run.
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        user_max_concurrency: 4,
+        decider_repetitions: 2,
+      },
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+      { model: 'm/2', variant: '', requested_at: '2026-06-01T00:00:01.000Z' },
+      { model: 'm/3', variant: '', requested_at: '2026-06-01T00:00:02.000Z' },
+    ]);
+
+    await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows.map(m => m.model)).toEqual(['m/1', 'm/2']);
   });
 });
 

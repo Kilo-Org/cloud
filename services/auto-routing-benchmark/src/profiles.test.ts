@@ -132,6 +132,8 @@ vi.mock('drizzle-orm/d1', () => {
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
+      platform_requested: row.platform_requested === true,
+      user_requested: row.user_requested !== false,
     };
   }
 
@@ -369,6 +371,8 @@ function profileRow(
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,
+    platform_requested: false,
+    user_requested: true,
     ...partial,
   };
 }

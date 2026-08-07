@@ -1,7 +1,9 @@
 import type {
   BenchmarkKind,
   BenchmarkModelSummary,
+  BenchmarkProfileStatus,
   BenchmarkRun,
+  BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
   RoutingTable,
@@ -10,7 +12,7 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt, ne, not, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -94,6 +96,7 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
   return {
     id: row.id,
     kind: row.kind,
+    purpose: row.purpose === 'user' ? 'user' : 'platform',
     status: row.status,
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -138,6 +141,7 @@ export async function replaceConfig(
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
     max_concurrency: number;
+    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
@@ -201,8 +205,8 @@ export async function replaceAutoDeciderModels(
 // Runs
 // ---------------------------------------------------------------------------
 
-/** Run purpose: platform publishes default artifacts; profile updates the registry only. */
-export type BenchmarkRunPurpose = 'platform' | 'profile';
+/** Which registry queue a run drains: the platform decider list, or owner pools. */
+export type { BenchmarkRunPurpose };
 
 export async function insertRun(
   db: D1Database,
@@ -436,11 +440,24 @@ export async function getSummaries(
   return rows.map(mapSummaryRow);
 }
 
-export async function listRuns(db: D1Database, limit: number): Promise<BenchmarkRun[]> {
+export async function listRuns(
+  db: D1Database,
+  limit: number,
+  // Classifier, platform-decider and profile-decider runs interleave in one
+  // table and profile runs are by far the most frequent, so the admin list
+  // filters server-side instead of slicing a mixed page client-side.
+  filter: { kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
+): Promise<BenchmarkRun[]> {
   const orm = drizzle(db);
   const runRows = await orm
     .select()
     .from(benchmarkRuns)
+    .where(
+      and(
+        filter.kind ? eq(benchmarkRuns.kind, filter.kind) : undefined,
+        filter.purpose ? eq(benchmarkRuns.purpose, filter.purpose) : undefined
+      )
+    )
     .orderBy(desc(benchmarkRuns.started_at))
     .limit(limit);
 
@@ -485,22 +502,34 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
 }
 
-// The currently-running run of a kind, if any (used for the one-active-run-per-kind
-// admission pre-check). Stale runs are swept to 'failed' before this is consulted.
+// The currently-running run of a (kind, purpose), if any (used for the
+// one-active-run-per-slot admission pre-check). Platform and profile hold
+// independent slots. Stale runs are swept to 'failed' before this is consulted.
 export async function getRunningRun(
   db: D1Database,
-  kind: BenchmarkKind
+  kind: BenchmarkKind,
+  purpose: BenchmarkRunPurpose
 ): Promise<RunRow | undefined> {
   return drizzle(db)
     .select()
     .from(benchmarkRuns)
-    .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'running')))
+    .where(
+      and(
+        eq(benchmarkRuns.kind, kind),
+        eq(benchmarkRuns.purpose, purpose),
+        eq(benchmarkRuns.status, 'running')
+      )
+    )
     .get();
 }
 
 // True when a run of the same kind started later than this one has already
 // completed. Used to skip publishing so a slow older run can't overwrite a
 // newer run's published routing table / classifier winner.
+// Only platform runs publish, so only a newer completed PLATFORM run may
+// suppress this run's publication. Profile runs share the decider kind and
+// complete on their own cadence; counting them here would silently skip
+// publishing a perfectly good platform table.
 export async function existsNewerCompletedRun(
   db: D1Database,
   kind: BenchmarkKind,
@@ -513,6 +542,7 @@ export async function existsNewerCompletedRun(
     .where(
       and(
         eq(benchmarkRuns.kind, kind),
+        eq(benchmarkRuns.purpose, 'platform'),
         eq(benchmarkRuns.status, 'completed'),
         gt(benchmarkRuns.started_at, startedAt),
         ne(benchmarkRuns.id, runId)
@@ -758,12 +788,15 @@ export async function listLaneFailures(
 }
 
 /**
- * Pending current-engine profile rows, oldest request first. Used by the single
- * decider-slot drain to claim the next batch.
+ * Pending current-engine registry rows for one queue, oldest request first.
+ * Used by the per-queue drain to claim the next batch. A row wanted by both
+ * queues appears in both listings — whichever run claims it first flips it to
+ * `running`, so it is still measured exactly once.
  */
 export async function listPendingCurrentProfiles(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number }
+  current: { engineIdentity: string; repetitions: number },
+  queue: BenchmarkRunPurpose
 ): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
   return drizzle(db)
     .select({
@@ -776,7 +809,10 @@ export async function listPendingCurrentProfiles(
       and(
         eq(benchmarkProfiles.status, 'pending'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
-        eq(benchmarkProfiles.repetitions, current.repetitions)
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        queue === 'platform'
+          ? eq(benchmarkProfiles.platform_requested, true)
+          : eq(benchmarkProfiles.user_requested, true)
       )
     )
     .orderBy(
@@ -784,6 +820,145 @@ export async function listPendingCurrentProfiles(
       asc(benchmarkProfiles.model),
       asc(benchmarkProfiles.variant)
     );
+}
+
+/** Registry row counts per status for one queue's current-engine rows. */
+export async function countCurrentProfilesByStatus(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  queue: BenchmarkRunPurpose
+): Promise<Array<{ status: BenchmarkProfileStatus; count: number }>> {
+  const rows = await drizzle(db)
+    .select({ status: benchmarkProfiles.status, n: count() })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        queue === 'platform'
+          ? eq(benchmarkProfiles.platform_requested, true)
+          : eq(benchmarkProfiles.user_requested, true)
+      )
+    )
+    .groupBy(benchmarkProfiles.status);
+  return rows.map(row => ({ status: row.status, count: row.n }));
+}
+
+/**
+ * Admin requeue: put failed current-engine rows of a queue back to `pending`.
+ * Charges no owner quota — this is the admin's own escape hatch, distinct from
+ * an owner's Retry. Returns how many rows moved.
+ */
+export async function requeueFailedCurrentProfiles(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  queue: BenchmarkRunPurpose | 'both',
+  nowIso: string = new Date().toISOString()
+): Promise<number> {
+  const queueFilter =
+    queue === 'both'
+      ? or(
+          eq(benchmarkProfiles.platform_requested, true),
+          eq(benchmarkProfiles.user_requested, true)
+        )
+      : queue === 'platform'
+        ? eq(benchmarkProfiles.platform_requested, true)
+        : eq(benchmarkProfiles.user_requested, true);
+  const result = await drizzle(db)
+    .update(benchmarkProfiles)
+    .set({
+      status: 'pending',
+      run_id: null,
+      failure_reason: null,
+      requested_at: nowIso,
+      updated_at: nowIso,
+      completed_at: null,
+    })
+    .where(
+      and(
+        eq(benchmarkProfiles.status, 'failed'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        queueFilter
+      )
+    );
+  return result.meta.changes ?? 0;
+}
+
+/**
+ * Reconcile the platform queue with the saved decider model list: every desired
+ * exact pair gets a current-engine registry row flagged platform_requested, and
+ * pairs that left the list lose the flag. Existing measurements are never
+ * discarded — a `ready` row only gains the flag, so a pair already measured for
+ * an owner pool is reused by the platform table instead of re-benchmarked.
+ */
+export async function syncPlatformRegistryRows(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  desired: readonly { model: string; variant: string | null }[],
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  const orm = drizzle(db);
+  const desiredKeys = desired.map(entry => ({
+    model: entry.model,
+    variant: variantToStorage(entry.variant),
+  }));
+
+  const stmts: BatchItem<'sqlite'>[] = desiredKeys.map(
+    entry =>
+      orm
+        .insert(benchmarkProfiles)
+        .values({
+          model: entry.model,
+          variant: entry.variant,
+          engine_identity: current.engineIdentity,
+          repetitions: current.repetitions,
+          status: 'pending',
+          run_id: null,
+          failure_reason: null,
+          requested_at: nowIso,
+          updated_at: nowIso,
+          completed_at: null,
+          platform_requested: true,
+          user_requested: false,
+        })
+        // Only claim the flag on an existing row. Status is left alone so a
+        // ready measurement stays ready and a failed one stays failed until
+        // someone requeues it.
+        .onConflictDoUpdate({
+          target: [
+            benchmarkProfiles.model,
+            benchmarkProfiles.variant,
+            benchmarkProfiles.engine_identity,
+            benchmarkProfiles.repetitions,
+          ],
+          set: { platform_requested: true, updated_at: nowIso },
+        }) as BatchItem<'sqlite'>
+  );
+
+  // Drop the flag from current-engine rows the platform list no longer wants.
+  // An empty desired list leaves `matchesDesired` undefined, which correctly
+  // clears the flag from every current-engine row.
+  const matchesDesired = or(
+    ...desiredKeys.map(entry =>
+      and(eq(benchmarkProfiles.model, entry.model), eq(benchmarkProfiles.variant, entry.variant))
+    )
+  );
+  stmts.push(
+    orm
+      .update(benchmarkProfiles)
+      .set({ platform_requested: false, updated_at: nowIso })
+      .where(
+        and(
+          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+          eq(benchmarkProfiles.repetitions, current.repetitions),
+          eq(benchmarkProfiles.platform_requested, true),
+          matchesDesired ? not(matchesDesired) : undefined
+        )
+      ) as BatchItem<'sqlite'>
+  );
+
+  await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
 /**
@@ -845,12 +1020,12 @@ export async function getSummariesForRuns(
  * Running decider run ids older than the stale threshold (for profile fail-over
  * after the bulk stale sweep).
  */
-export async function listStaleRunningDeciderRunIds(
+export async function listStaleRunningDeciderRuns(
   db: D1Database,
   olderThanIso: string
-): Promise<string[]> {
+): Promise<Array<{ id: string; purpose: BenchmarkRunPurpose }>> {
   const rows = await drizzle(db)
-    .select({ id: benchmarkRuns.id })
+    .select({ id: benchmarkRuns.id, purpose: benchmarkRuns.purpose })
     .from(benchmarkRuns)
     .where(
       and(
@@ -859,7 +1034,7 @@ export async function listStaleRunningDeciderRunIds(
         lt(benchmarkRuns.started_at, olderThanIso)
       )
     );
-  return rows.map(r => r.id);
+  return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));
 }
 
 // ---------------------------------------------------------------------------

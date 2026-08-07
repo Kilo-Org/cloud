@@ -4,10 +4,19 @@ import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import { syncAutoDeciderModels } from './auto-decider-sync';
 import type { HonoEnv } from './hono-env';
-import { processDeadLetter, processJob, type BenchmarkJobMessage } from './run';
+import {
+  processDeadLetter,
+  processJob,
+  sweepStaleRunsAndDrain,
+  type BenchmarkJobMessage,
+} from './run';
 
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
+
+// Daily platform cadence: refresh auto decider candidates and start a platform
+// run when they changed. Every other cron tick only drains profile work.
+const PLATFORM_SYNC_CRON = '0 5 * * *';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
 export { BenchRunnerContainer } from './bench-runner-container';
@@ -24,6 +33,20 @@ app.onError(createErrorHandler());
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    // Each queue holds its own slot and container budget, so the frequent tick
+    // starts pending registry work without waiting for the platform cadence.
+    if (controller.cron !== PLATFORM_SYNC_CRON) {
+      const result = await sweepStaleRunsAndDrain(env);
+      console.log(
+        JSON.stringify({
+          event: 'benchmark_queue_drain_tick_completed',
+          cron: controller.cron,
+          staleRunIds: result.staleRunIds,
+          drained: result.drained,
+        })
+      );
+      return;
+    }
     const result = await syncAutoDeciderModels(env);
     console.log(
       JSON.stringify({

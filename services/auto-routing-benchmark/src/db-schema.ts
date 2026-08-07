@@ -11,6 +11,7 @@ import {
 import type {
   BenchmarkKind,
   BenchmarkProfileStatus,
+  BenchmarkRunPurpose,
   BenchmarkRunStatus,
 } from '@kilocode/auto-routing-contracts';
 
@@ -23,6 +24,10 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   max_concurrency: integer('max_concurrency').notNull(),
+  // Live container budget for user-queue runs, independent of max_concurrency
+  // (the platform-queue budget). The two must sum to at most the platform
+  // container cap; the config contract enforces that at the write boundary.
+  user_max_concurrency: integer('user_max_concurrency').notNull().default(100),
   benchmark_user_id: text('benchmark_user_id'),
   benchmark_org_id: text('benchmark_org_id'),
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
@@ -78,17 +83,17 @@ export const benchmarkRuns = sqliteTable(
     // dataset, grading, or CLI/image pinning re-benchmark instead of pairing
     // current serving config with measurements taken under different conditions.
     engine_identity: text('engine_identity').notNull().default(''),
-    // 'platform' (default): publishes the default routing table / classifier winner.
-    // 'profile': measures exact Pool entries for the global Benchmark-profile
-    // registry and never replaces the platform artifact.
-    purpose: text('purpose').notNull().default('platform'),
+    // Which registry queue this run drained: 'platform' (saved platform decider
+    // list) or 'user' (owner pools). Classifier runs are always 'platform'.
+    purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
   },
   table => [
-    // At most one running run per kind — the atomic backstop for the
-    // server-side "one active run per kind" admission rule (concurrent POSTs /
-    // multiple tabs that slip past the pre-check still can't both claim).
-    uniqueIndex('UQ_benchmark_runs_one_running_per_kind')
-      .on(table.kind)
+    // At most one running run per (kind, purpose) — the atomic backstop for the
+    // server-side admission rule (concurrent POSTs / multiple tabs that slip
+    // past the pre-check still can't both claim). The platform and user queues
+    // hold independent slots, so a user drain never blocks a platform run.
+    uniqueIndex('UQ_benchmark_runs_one_running_per_kind_purpose')
+      .on(table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]
 );
@@ -215,6 +220,14 @@ export const benchmarkProfiles = sqliteTable(
     requested_at: text('requested_at').notNull(),
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),
+    // Who wants this measurement. Both can be set — the registry row is global
+    // and shared, so a pair wanted by the platform list and by an owner pool is
+    // measured once and serves both.
+    // ponytail: set-once flags, not reference counts. A pending row an owner has
+    // since dropped from their pool is still measured. Add refcounting only if
+    // wasted runs show up in the numbers.
+    platform_requested: integer('platform_requested', { mode: 'boolean' }).notNull().default(false),
+    user_requested: integer('user_requested', { mode: 'boolean' }).notNull().default(true),
   },
   table => [
     primaryKey({

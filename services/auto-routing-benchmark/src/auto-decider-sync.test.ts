@@ -12,8 +12,11 @@ vi.mock('./db', async importOriginal => {
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
-    listStaleRunningDeciderRunIds: vi.fn(),
+    listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    syncPlatformRegistryRows: vi.fn(),
+    listReadyCurrentProfilesForEntries: vi.fn(),
+    getSummariesForRuns: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
@@ -25,8 +28,11 @@ import {
   getLatestSummariesByModel,
   getRunningRun,
   insertRun,
+  getSummariesForRuns,
   listPendingCurrentProfiles,
-  listStaleRunningDeciderRunIds,
+  listReadyCurrentProfilesForEntries,
+  syncPlatformRegistryRows,
+  listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceAutoDeciderModels,
 } from './db';
@@ -57,6 +63,7 @@ const config = {
   classifier_max_p95_latency_ms: 1000,
   auto_decider_min_cost_usd: 12,
   auto_decider_max_cost_usd: 24,
+  user_max_concurrency: 100,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
 };
@@ -92,8 +99,11 @@ describe('syncAutoDeciderModels', () => {
     });
     vi.mocked(replaceAutoDeciderModels).mockResolvedValue(undefined);
     vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
-    vi.mocked(listStaleRunningDeciderRunIds).mockResolvedValue([]);
+    vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+    vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue([]);
     vi.mocked(getRunningRun).mockResolvedValue(undefined);
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
     vi.mocked(insertRun).mockResolvedValue(undefined);
@@ -113,15 +123,16 @@ describe('syncAutoDeciderModels', () => {
       expect.objectContaining({ model: 'auto/existing', reasoning_effort: 'high' }),
       expect.objectContaining({ model: 'auto/new', reasoning_effort: null }),
     ]);
-    expect(insertRun).toHaveBeenCalledOnce();
+    // Newly configured models enter the registry queue; nothing is measured
+    // straight from the config list.
+    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
     expect(result).toMatchObject({
       addedModels: ['auto/new'],
       removedModels: [],
-      startedRun: true,
     });
   });
 
-  it('does not fail the sync when a decider run is already active', async () => {
+  it('does not fail the sync when both queue slots are already active', async () => {
     vi.mocked(getRunningRun).mockResolvedValue({
       id: 'decider-active',
       kind: 'decider',
@@ -146,10 +157,7 @@ describe('syncAutoDeciderModels', () => {
     expect(result).toMatchObject({
       addedModels: ['auto/new'],
       removedModels: [],
-      startedRun: false,
-      runId: null,
-      skippedReason: 'active-run',
-      activeRunId: 'decider-active',
+      startedRuns: [],
     });
     expect(insertRun).not.toHaveBeenCalled();
   });
@@ -184,63 +192,61 @@ describe('syncAutoDeciderModels', () => {
 
     const result = await syncAutoDeciderModels(env, { fetchImpl });
 
-    expect(result.startedRun).toBe(false);
-    expect(result.profileDrainRunId).toMatch(/^profile-/);
-    expect(insertRun).toHaveBeenCalledOnce();
-    expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('profile');
+    // Pending work drains even when the model list did not change.
+    expect(result.startedRuns.map(run => run.purpose)).toEqual(['platform', 'user']);
+    expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual([
+      'platform',
+      'user',
+    ]);
   });
 
-  it('platform start claims free slot over pending profiles when models changed', async () => {
-    // Free slot + pending profiles + changed models → PLATFORM run starts;
-    // no profile drain this cycle (terminal transition drains later).
+  it('reconciles the platform queue with the decider list before draining', async () => {
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'pending/m', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
 
     const result = await syncAutoDeciderModels(env, { fetchImpl });
 
-    expect(result.startedRun).toBe(true);
-    expect(result.runId).toBeTruthy();
-    expect(result.profileDrainRunId).toBeNull();
-    expect(insertRun).toHaveBeenCalledOnce();
-    expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
-    // Drain must not have claimed pending entries this cycle.
-    expect(listPendingCurrentProfiles).not.toHaveBeenCalled();
+    // Configured models become registry rows; nothing is measured directly from
+    // the config list any more.
+    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+    const [, , desired] = vi.mocked(syncPlatformRegistryRows).mock.calls[0];
+    expect(desired.length).toBe(result.platformEntries);
+    expect(desired.length).toBeGreaterThan(0);
+    expect(result.startedRuns.map(run => run.purpose)).toEqual(['platform', 'user']);
   });
 
-  it('occupied slot skips without draining pending profiles', async () => {
-    vi.mocked(getRunningRun).mockResolvedValue({
-      id: 'decider-active',
-      kind: 'decider',
-      status: 'running',
-      started_at: '2026-06-01T00:00:00.000Z',
-      completed_at: null,
-      error: null,
-      min_accuracy: 0.7,
-      switch_cost_factor: 3,
-      best_accuracy_switch_threshold: 0.05,
-      max_concurrency: 100,
-      benchmark_user_id: 'user-123',
-      benchmark_org_id: null,
-      repetitions: 1,
-      classifier_max_p95_latency_ms: null,
-      engine_identity: 'v1:test',
-      purpose: 'platform',
-    });
+  it('an occupied platform slot still lets the user queue run', async () => {
+    vi.mocked(getRunningRun).mockImplementation(async (_db, _kind, purpose) =>
+      purpose === 'user'
+        ? undefined
+        : ({
+            id: 'decider-active',
+            kind: 'decider',
+            status: 'running',
+            started_at: '2026-06-01T00:00:00.000Z',
+            completed_at: null,
+            error: null,
+            min_accuracy: 0.7,
+            switch_cost_factor: 3,
+            best_accuracy_switch_threshold: 0.05,
+            max_concurrency: 100,
+            benchmark_user_id: 'user-123',
+            benchmark_org_id: null,
+            repetitions: 1,
+            classifier_max_p95_latency_ms: null,
+            engine_identity: 'v1:test',
+            purpose: 'platform',
+          } as Awaited<ReturnType<typeof getRunningRun>>)
+    );
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'pending/m', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
 
     const result = await syncAutoDeciderModels(env, { fetchImpl });
 
-    expect(result).toMatchObject({
-      startedRun: false,
-      skippedReason: 'active-run',
-      activeRunId: 'decider-active',
-      profileDrainRunId: null,
-    });
-    expect(insertRun).not.toHaveBeenCalled();
-    // Slot occupied → leave pending rows untouched (no drain attempt).
-    expect(listPendingCurrentProfiles).not.toHaveBeenCalled();
+    // The platform slot is taken, so only the user queue starts a run.
+    expect(result.startedRuns.map(run => run.purpose)).toEqual(['user']);
+    expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual(['user']);
   });
 });

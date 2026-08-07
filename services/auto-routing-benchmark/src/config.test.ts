@@ -15,6 +15,7 @@ const configRow = {
   classifier_max_p95_latency_ms: null,
   auto_decider_min_cost_usd: 12,
   auto_decider_max_cost_usd: 24,
+  user_max_concurrency: 100,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: 'admin@example.com',
 };

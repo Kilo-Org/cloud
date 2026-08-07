@@ -23,6 +23,8 @@ import { getCloudAgentWsUrl } from './cloud-agent-config';
 const FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS = 1000;
 /** Match the mobile `SPAWNED_NOT_FOUND_MAX_ATTEMPTS` for NOT_FOUND retry parity. */
 const SPAWNED_NOT_FOUND_MAX_ATTEMPTS = 8;
+/** Session-ingest persistence can lag while an active CLI turn is running. */
+const ACTIVE_HISTORY_MAX_RETRIES = 8;
 
 const skipBatchOptions = { context: { skipBatch: true } } as const;
 
@@ -156,12 +158,35 @@ function pinPageToSession(
 async function fetchExtensionSessionSnapshotPage(
   trpcClient: TrpcClient,
   kiloSessionId: KiloSessionId,
-  options: { cursor?: string }
+  options: { cursor?: string; organizationId: string | null }
 ): Promise<SessionSnapshotPageOutcome | null> {
-  const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
-    session_id: kiloSessionId,
-    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-  });
+  const queryPage = (): Promise<
+    Awaited<ReturnType<TrpcClient['cliSessionsV2']['getSessionMessagesPage']['query']>>
+  > =>
+    trpcClient.cliSessionsV2.getSessionMessagesPage.query({
+      session_id: kiloSessionId,
+      ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+    });
+
+  let result = await queryPage();
+  if (result.history === null && options.cursor === undefined) {
+    const active = await trpcClient.activeSessions.list.query({
+      includeCloudAgentSessions: true,
+      organizationId: options.organizationId,
+    });
+    const isActive = active.sessions.some(session => session.id === kiloSessionId);
+    if (isActive) {
+      for (let attempt = 0; attempt < ACTIVE_HISTORY_MAX_RETRIES; attempt += 1) {
+        // eslint-disable-next-line no-await-in-loop -- retry persistence after a fixed delay
+        await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+        // eslint-disable-next-line no-await-in-loop -- retries must observe ordered history
+        result = await queryPage();
+        if (result.history !== null) {
+          break;
+        }
+      }
+    }
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
   const history = result.history as KiloSdkMessageHistory | null;
@@ -371,7 +396,10 @@ export function createExtensionAgentSessionManager({
 
     // ---- fetchSnapshotPage ----
     fetchSnapshotPage: (kiloSessionId, options) =>
-      fetchExtensionSessionSnapshotPage(trpcClient, kiloSessionId, options),
+      fetchExtensionSessionSnapshotPage(trpcClient, kiloSessionId, {
+        ...options,
+        organizationId,
+      }),
 
     // ---- getTicket ----
     getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {

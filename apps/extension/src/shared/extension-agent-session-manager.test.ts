@@ -560,10 +560,8 @@ describe('createExtensionAgentSessionManager', () => {
   describe('fetchSnapshotPage', () => {
     it('returns empty success when history is null', async () => {
       const trpc = makeTrpcMock();
-      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
-        history: null,
-        kiloSessionId: SESSION_ID,
-      });
+      const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+      trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
       const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
       createExtensionAgentSessionManager(opts);
       const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
@@ -574,6 +572,8 @@ describe('createExtensionAgentSessionManager', () => {
         nextCursor: null,
         omittedItemCount: 0,
       });
+      // An inactive session must not trigger the delayed-page retry.
+      expect(pageQuery).toHaveBeenCalledTimes(1);
     });
 
     it('returns success page when history has messages array', async () => {
@@ -673,7 +673,7 @@ describe('createExtensionAgentSessionManager', () => {
       });
     });
 
-    it('passes cursor to query', async () => {
+    it('passes cursor to query without retrying', async () => {
       const trpc = makeTrpcMock();
       const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
       trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
@@ -681,6 +681,79 @@ describe('createExtensionAgentSessionManager', () => {
       createExtensionAgentSessionManager(opts);
       await capturedConfig!.fetchSnapshotPage!(SESSION_ID, { cursor: 'my-cursor' });
       expect(pageQuery).toHaveBeenCalledWith({ cursor: 'my-cursor', session_id: SESSION_ID });
+      // Cursor pages must not be retried or checked against active sessions.
+      expect(pageQuery).toHaveBeenCalledTimes(1);
+      expect(trpc.activeSessions.list.query).not.toHaveBeenCalled();
+    });
+
+    it('retries an empty page while the session is active', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID }] });
+        trpc.activeSessions.list.query = listQuery;
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [
+            {
+              info: { sessionID: SESSION_ID },
+            },
+          ],
+        });
+        expect(pageQuery).toHaveBeenCalledTimes(2);
+        // The retry's active lookup must include cloud-agent sessions.
+        expect(listQuery).toHaveBeenCalledWith({
+          includeCloudAgentSessions: true,
+          organizationId: null,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('passes organizationId and includeCloudAgentSessions in the retry active lookup when org is set', async () => {
+      const trpc = makeTrpcMock();
+      const listQuery = mockQuery({ sessions: [] });
+      trpc.activeSessions.list.query = listQuery;
+      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+        history: null,
+        kiloSessionId: SESSION_ID,
+      });
+      const opts = {
+        ...makeDefaultOptions(),
+        organizationId: '550e8400-e29b-41d4-a716-446655440000',
+        trpcClient: trpc as never,
+      };
+      createExtensionAgentSessionManager(opts);
+      await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(listQuery).toHaveBeenCalledWith({
+        includeCloudAgentSessions: true,
+        organizationId: '550e8400-e29b-41d4-a716-446655440000',
+      });
     });
   });
 

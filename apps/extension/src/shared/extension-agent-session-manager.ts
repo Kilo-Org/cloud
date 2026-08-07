@@ -39,6 +39,14 @@ const ACTIVE_HISTORY_RECHECK_INTERVAL = 5;
  * page.
  */
 const ACTIVE_HISTORY_END_GRACE_READS = 5;
+/**
+ * Bound for the not-yet-listed liveness probe. A running session can miss
+ * its own row in `activeSessions.list` while the row registers or while the
+ * active-sessions read model refreshes. A one-shot miss would latch an empty
+ * page for a session that is actually running, so the gate re-checks liveness
+ * for this many reads before treating the session as inactive.
+ */
+const ACTIVE_HISTORY_LIVENESS_GRACE_READS = 3;
 
 const skipBatchOptions = { context: { skipBatch: true } } as const;
 
@@ -227,6 +235,53 @@ async function readPageInEndGraceWindow(
 }
 
 /**
+ * Re-read liveness briefly when the first active-sessions lookup missed the
+ * session.
+ *
+ * The one-shot liveness gate can miss the active row while it registers or
+ * while the active-sessions read model refreshes, and a missed busy session
+ * would then latch an empty transcript that later persistence can never fill.
+ * This bounded probe keeps re-checking until the row appears (busy → run the
+ * full active-history retry, idle → resolve empty) or the window expires
+ * (genuinely inactive → resolve empty). It re-reads liveness only; the history
+ * page is not re-read here, so an inactive session still resolves its empty
+ * page without a page retry.
+ */
+async function readActiveHistoryWithLivenessGrace(
+  initialResult: SessionMessagesPageResult,
+  {
+    fetchActiveSessions,
+    isSessionListedIdle,
+    isSessionWorking,
+    queryPage,
+  }: {
+    fetchActiveSessions: () => Promise<ActiveSessionsResult>;
+    isSessionListedIdle: (active: ActiveSessionsResult) => boolean;
+    isSessionWorking: (active: ActiveSessionsResult) => boolean;
+    queryPage: () => Promise<SessionMessagesPageResult>;
+  }
+): Promise<SessionMessagesPageResult> {
+  const result = initialResult;
+  for (let attempt = 0; attempt < ACTIVE_HISTORY_LIVENESS_GRACE_READS; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
+    const current = await fetchActiveSessions();
+    if (isSessionWorking(current)) {
+      return readActiveHistoryWithRetry(result, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
+    }
+    if (isSessionListedIdle(current)) {
+      return result;
+    }
+  }
+  return result;
+}
+
+/**
  * Pin a replayed page to the active kilo session.
  *
  * The manager renders the root transcript only for messages whose
@@ -284,6 +339,8 @@ async function fetchExtensionSessionSnapshotPage(
     });
   const isSessionWorking = (active: ActiveSessionsResult): boolean =>
     active.sessions.some(session => session.id === kiloSessionId && session.status !== 'idle');
+  const isSessionListedIdle = (active: ActiveSessionsResult): boolean =>
+    active.sessions.some(session => session.id === kiloSessionId && session.status === 'idle');
 
   let result = await queryPage();
   if (options.cursor === undefined && isPageWithoutPersistedMessages(pageHistory(result))) {
@@ -300,6 +357,18 @@ async function fetchExtensionSessionSnapshotPage(
     if (isSessionWorking(active)) {
       result = await readActiveHistoryWithRetry(result, {
         fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
+    } else if (!isSessionListedIdle(active)) {
+      /*
+       * The session is not in the active list at all. It may be a running
+       * session whose active row has not registered yet, so a one-shot miss
+       * must not latch the empty page; keep checking liveness briefly.
+       */
+      result = await readActiveHistoryWithLivenessGrace(result, {
+        fetchActiveSessions,
+        isSessionListedIdle,
         isSessionWorking,
         queryPage,
       });

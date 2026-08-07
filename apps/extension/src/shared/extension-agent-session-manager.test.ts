@@ -559,21 +559,29 @@ describe('createExtensionAgentSessionManager', () => {
 
   describe('fetchSnapshotPage', () => {
     it('returns empty success when history is null', async () => {
-      const trpc = makeTrpcMock();
-      const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
-      trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
-      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
-      createExtensionAgentSessionManager(opts);
-      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
-      expect(result).toStrictEqual({
-        info: { id: SESSION_ID },
-        kind: 'success',
-        messages: [],
-        nextCursor: null,
-        omittedItemCount: 0,
-      });
-      // An inactive session must not trigger the delayed-page retry.
-      expect(pageQuery).toHaveBeenCalledTimes(1);
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Let the bounded liveness grace probe expire without a page retry.
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await resultPromise;
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+        // An inactive session must not trigger the delayed-page retry.
+        expect(pageQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('returns success page when history has messages array', async () => {
@@ -825,6 +833,60 @@ describe('createExtensionAgentSessionManager', () => {
       }
     });
 
+    it('keeps checking liveness when the first lookup misses the active row', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * The active row is missing on the gate's first read (registration
+         * or refresh race), then appears as busy on the liveness grace read.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        /*
+         * The initial page is empty and stays empty through the first retry
+         * read, then the persisted messages arrive on the third read.
+         */
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Liveness grace sleep + the first retry sleep + the second retry sleep.
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        expect(pageQuery).toHaveBeenCalledTimes(3);
+        expect(listQuery).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('does not retry a listed but idle session (a fresh session start is not delayed)', async () => {
       vi.useFakeTimers();
       try {
@@ -893,24 +955,31 @@ describe('createExtensionAgentSessionManager', () => {
     });
 
     it('passes organizationId and includeCloudAgentSessions in the retry active lookup when org is set', async () => {
-      const trpc = makeTrpcMock();
-      const listQuery = mockQuery({ sessions: [] });
-      trpc.activeSessions.list.query = listQuery;
-      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
-        history: null,
-        kiloSessionId: SESSION_ID,
-      });
-      const opts = {
-        ...makeDefaultOptions(),
-        organizationId: '550e8400-e29b-41d4-a716-446655440000',
-        trpcClient: trpc as never,
-      };
-      createExtensionAgentSessionManager(opts);
-      await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
-      expect(listQuery).toHaveBeenCalledWith({
-        includeCloudAgentSessions: true,
-        organizationId: '550e8400-e29b-41d4-a716-446655440000',
-      });
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const listQuery = mockQuery({ sessions: [] });
+        trpc.activeSessions.list.query = listQuery;
+        trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+          history: null,
+          kiloSessionId: SESSION_ID,
+        });
+        const opts = {
+          ...makeDefaultOptions(),
+          organizationId: '550e8400-e29b-41d4-a716-446655440000',
+          trpcClient: trpc as never,
+        };
+        createExtensionAgentSessionManager(opts);
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(10_000);
+        await resultPromise;
+        expect(listQuery).toHaveBeenCalledWith({
+          includeCloudAgentSessions: true,
+          organizationId: '550e8400-e29b-41d4-a716-446655440000',
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

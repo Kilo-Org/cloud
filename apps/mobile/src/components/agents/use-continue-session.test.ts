@@ -36,6 +36,16 @@ const routerPush = vi.hoisted(() => vi.fn());
 const queryClientFetchQuery = vi.hoisted(() => vi.fn());
 const showActionSheetWithOptions = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
+// Post-success side effects; tests reject them to pin the containment
+// boundary around the successful cloud prepare.
+const invalidateAgentSessionQueriesMock = vi.hoisted(() => vi.fn());
+// Not a `vi.fn()`: vitest attaches its own rejection handler to any promise a
+// mock returns, which would mask a leaked haptics rejection. A plain module
+// export returning a real promise keeps `unhandledRejection` detection honest.
+const hapticsMock = vi.hoisted(() => ({
+  calls: 0,
+  rejectWith: undefined as Error | undefined,
+}));
 // Destination list handed back by the mocked resolver; each test sets the
 // single destination the continue flow should execute against.
 const destinationsRef = vi.hoisted(() => ({ value: [] as unknown[] }));
@@ -69,7 +79,13 @@ vi.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
   generateMessageId: () => 'msg-1',
 }));
 vi.mock('expo-haptics', () => ({
-  notificationAsync: vi.fn(),
+  notificationAsync: async (): Promise<void> => {
+    hapticsMock.calls += 1;
+    await Promise.resolve();
+    if (hapticsMock.rejectWith !== undefined) {
+      throw hapticsMock.rejectWith;
+    }
+  },
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('sonner-native', () => ({
@@ -80,7 +96,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_CREATED_EVENT: 'session_created',
 }));
 vi.mock('@/lib/agent-session-cache', () => ({
-  invalidateAgentSessionQueries: vi.fn(),
+  invalidateAgentSessionQueries: invalidateAgentSessionQueriesMock,
 }));
 vi.mock('@/lib/share-payload', () => ({
   putSharePayload: () => 'share-1',
@@ -308,6 +324,9 @@ describe('useContinueSession cloud operationKey', () => {
     routerPush.mockClear();
     queryClientFetchQuery.mockReset();
     toastError.mockClear();
+    invalidateAgentSessionQueriesMock.mockReset();
+    hapticsMock.calls = 0;
+    hapticsMock.rejectWith = undefined;
     destinationsRef.value = [CLOUD_DESTINATION];
     // fetchQuery: first call is the repositories query, second the instances
     // query (Promise.all preserves call order). Both must resolve for the
@@ -372,6 +391,73 @@ describe('useContinueSession cloud operationKey', () => {
     const keys = usedCloudKeys();
     expect(keys[0]).toBeDefined();
     expect(keys[1]).not.toBe(keys[0]);
+  });
+});
+
+describe('useContinueSession post-success failure containment', () => {
+  beforeEach(() => {
+    prepareSessionMutate.mockReset();
+    remoteSpawnMock.mockReset();
+    routerPush.mockClear();
+    queryClientFetchQuery.mockReset();
+    toastError.mockClear();
+    invalidateAgentSessionQueriesMock.mockReset();
+    hapticsMock.calls = 0;
+    hapticsMock.rejectWith = undefined;
+    destinationsRef.value = [CLOUD_DESTINATION];
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    queryClientFetchQuery.mockImplementation((options: { queryKey?: string[] }) => {
+      if (options.queryKey?.[0] === 'instances') {
+        return Promise.resolve({ instances: [] });
+      }
+      return Promise.resolve({ repositories: [] });
+    });
+  });
+
+  it('still navigates and shows no create-failure toast when cache invalidation fails', async () => {
+    prepareSessionMutate.mockResolvedValueOnce({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    invalidateAgentSessionQueriesMock.mockRejectedValueOnce(new Error('cache invalidation failed'));
+    const hook = runContinueSession({ organizationId: 'org-1' });
+
+    await hook.continueSession(FIELDS);
+
+    // The cloud prepare succeeded; the cache failure must not block
+    // navigation and must not surface as a create failure.
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('still navigates and shows no create-failure toast when haptics rejects', async () => {
+    prepareSessionMutate.mockResolvedValueOnce({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    hapticsMock.rejectWith = new Error('haptics unavailable');
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    try {
+      const hook = runContinueSession({ organizationId: 'org-1' });
+      await hook.continueSession(FIELDS);
+      // Give the runtime a turn to flag an unhandled rejection if the hook
+      // ever leaks the haptics promise's rejection.
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+
+      // The rejected haptics call is contained: no unhandled rejection, no
+      // create-failure toast, and the navigation still runs.
+      expect(hapticsMock.calls).toBe(1);
+      expect(routerPush).toHaveBeenCalledTimes(1);
+      expect(toastError).not.toHaveBeenCalled();
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+    }
   });
 });
 

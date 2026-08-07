@@ -107,15 +107,43 @@ export function useContinueSession(args: {
               organizationId: args.organizationId,
             })
           : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
-        // The intent settled; the next submit is a fresh intent.
+        // The intent settled; the next submit is a fresh intent. Rotate
+        // before the post-success work so a UI failure cannot keep the
+        // successful key for a retry or rotate it a second time.
         cloudOperationKey.rotateKey();
-        captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-        await invalidateAgentSessionQueries(queryClient, trpc);
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push(getAgentSessionPath(result.kiloSessionId, args.organizationId));
+
+        // Post-success work is outside the server failure boundary: the
+        // cloud operation is already successful, so a cache-invalidation,
+        // haptics, or navigation failure must not report the create as
+        // failed or invite a duplicate retry. Each step is contained on its
+        // own so one failure cannot skip the navigation to the session.
+        try {
+          captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
+        } catch {
+          // Analytics is best-effort; stay silent.
+        }
+        try {
+          await invalidateAgentSessionQueries(queryClient, trpc);
+        } catch {
+          // A failed cache invalidation is cosmetic; the session exists and
+          // navigation must still run.
+        }
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {
+          // A failed haptics call is cosmetic; stay silent and navigate.
+        }
+        try {
+          router.push(getAgentSessionPath(result.kiloSessionId, args.organizationId));
+        } catch {
+          // The session already exists; a navigation failure is not a
+          // create failure.
+        }
       } catch (error) {
-        // A typed terminal rejection ends the intent; retryable failures
-        // (transport and `creation_in_progress`) keep the key.
+        // Only `prepareSession` errors can reach here; post-success
+        // failures are swallowed above. A typed terminal rejection ends the
+        // intent; retryable failures (transport and `creation_in_progress`)
+        // keep the key.
         if (!isCloudPrepareRetryableError(error)) {
           cloudOperationKey.rotateKey();
         }

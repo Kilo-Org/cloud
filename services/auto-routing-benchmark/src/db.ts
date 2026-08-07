@@ -652,6 +652,12 @@ export function markProfilesFailedForEntriesStatement(
   failureReason: string,
   nowIso: string
 ) {
+  // or(...[]) evaluates to undefined and the WHERE would degrade to run_id +
+  // status='running', failing every running entry of the run. Refuse the
+  // destructive form at the boundary instead of relying on caller guards.
+  if (entries.length === 0) {
+    throw new Error('markProfilesFailedForEntriesStatement requires at least one entry');
+  }
   return orm
     .update(benchmarkProfiles)
     .set({

@@ -233,6 +233,14 @@ describe('markProfilesFailedForEntriesStatement (real SQLite)', () => {
     ]);
   });
 
+  it('throws on empty entries instead of degrading to the whole-run form', () => {
+    // or(...[]) would drop the entry filter and fail every running row of the
+    // run; the builder must refuse before any statement exists.
+    expect(() => markProfilesFailedForEntriesStatement(orm, 'run-1', [], 'lane dead', now)).toThrow(
+      /at least one entry/
+    );
+  });
+
   it('matches entries on the exact (model, variant) pair', () => {
     insertProfile(db, { model: 'm/x', variant: 'high', status: 'running', run_id: 'run-1' });
     insertProfile(db, { model: 'm/x', variant: 'low', status: 'running', run_id: 'run-1' });

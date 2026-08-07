@@ -21,6 +21,7 @@ import {
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
   CLAUDE_OPUS_LATEST_MODEL_ALIAS,
   CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+  DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_PRO_LATEST_MODEL_ALIAS,
   GPT_LATEST_MODEL_ALIAS,
@@ -43,6 +44,7 @@ describe('mapModelIdToVercel', () => {
       [GEMINI_PRO_LATEST_MODEL_ALIAS, GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
       [GEMINI_FLASH_LATEST_MODEL_ALIAS, GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
       [GROK_LATEST_MODEL_ALIAS, GROK_CURRENT_VERCEL_MODEL_ID],
+      [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-flash-0731'],
     ])('maps %s to the current Vercel model id', (input, expected) => {
       expect(mapModelIdToVercel(input)).toBe(expected);
     });
@@ -59,19 +61,19 @@ describe('mapModelIdToVercel', () => {
         GEMINI_PRO_LATEST_MODEL_ALIAS,
         GEMINI_FLASH_LATEST_MODEL_ALIAS,
         GROK_LATEST_MODEL_ALIAS,
+        DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
       ]);
     });
 
     it('does not map a latest alias that is missing the leading tilde', () => {
-      expect(mapModelIdToVercel('anthropic/claude-opus-latest')).toBe(
-        'anthropic/claude-opus-latest'
+      expect(mapModelIdToVercel('deepseek/deepseek-v4-flash-latest')).toBe(
+        'deepseek/deepseek-v4-flash-latest'
       );
     });
   });
 
   describe('hardcoded OpenRouter → Vercel mapping', () => {
     it.each([
-      ['deepseek/deepseek-v4-flash-latest', 'deepseek/deepseek-v4-flash-0731'],
       ['mistralai/codestral-2508', 'mistral/codestral'],
       ['mistralai/devstral-2512', 'mistral/devstral-2'],
       ['mistralai/mistral-embed-2312', 'mistral/mistral-embed'],

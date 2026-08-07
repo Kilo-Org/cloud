@@ -8,6 +8,7 @@ export const KIMI_LATEST_MODEL_ALIAS = '~moonshotai/kimi-latest';
 export const GEMINI_PRO_LATEST_MODEL_ALIAS = '~google/gemini-pro-latest';
 export const GEMINI_FLASH_LATEST_MODEL_ALIAS = '~google/gemini-flash-latest';
 export const GROK_LATEST_MODEL_ALIAS = '~x-ai/grok-latest';
+export const DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS = '~deepseek/deepseek-v4-flash-latest';
 
 export const LATEST_MODEL_ALIASES = [
   CLAUDE_FABLE_LATEST_MODEL_ALIAS,
@@ -20,10 +21,11 @@ export const LATEST_MODEL_ALIASES = [
   GEMINI_PRO_LATEST_MODEL_ALIAS,
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GROK_LATEST_MODEL_ALIAS,
+  DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
 ] as const;
 
 const latestModelAliasSet = new Set<string>(LATEST_MODEL_ALIASES);
 
 export function isLatestModelAlias(modelId: string): boolean {
-  return latestModelAliasSet.has(modelId.trim().toLowerCase());
+  return latestModelAliasSet.has(modelId);
 }

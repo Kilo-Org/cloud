@@ -211,7 +211,7 @@ describe('applyVercelSettings Tencent free model API key', () => {
     });
   });
 
-  it('uses TENCENT_FREE_API_KEY when referenced by internal id in the non-user-byok case', async () => {
+  it('does not use TENCENT_FREE_API_KEY when referenced by internal id in the non-user-byok case', async () => {
     process.env.TENCENT_FREE_API_KEY = 'test-tencent-free-key';
 
     const request: GatewayRequest = {
@@ -225,9 +225,7 @@ describe('applyVercelSettings Tencent free model API key', () => {
     await applyVercelSettings('tencent/hy3', request, null);
 
     expect(request.body.model).toBe('tencent/hy3');
-    expect(request.body.providerOptions?.gateway?.byok).toEqual({
-      tencent: [{ apiKey: 'test-tencent-free-key' }],
-    });
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
   });
 
   it('does not set byok when TENCENT_FREE_API_KEY is not set', async () => {
@@ -263,23 +261,24 @@ describe('applyVercelSettings Tencent free model API key', () => {
     expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
   });
 
-  it('does not override userByok with TENCENT_FREE_API_KEY when userByok is provided', async () => {
+  it('does not use TENCENT_FREE_API_KEY when userByok is provided for the free Tencent model', async () => {
     process.env.TENCENT_FREE_API_KEY = 'test-tencent-free-key';
 
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
-        model: 'anthropic/claude-sonnet-4.5',
+        model: 'tencent/hy3:free',
         messages: [{ role: 'user', content: 'hello' }],
       },
     };
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'user-anthropic-key', providerId: 'anthropic' },
+    await applyVercelSettings('tencent/hy3:free', request, [
+      { decryptedAPIKey: 'user-novita-key', providerId: 'novita' },
     ]);
 
+    expect(request.body.model).toBe('tencent/hy3');
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
-      anthropic: [{ apiKey: 'user-anthropic-key' }],
+      novita: [{ apiKey: 'user-novita-key' }],
     });
   });
 });

@@ -16,5 +16,5 @@ export const tencent_hy3_free_model: KiloExclusiveModel = {
 };
 
 export function isTencentFreeModel(model: string): boolean {
-  return model === tencent_hy3_free_model.public_id || model === tencent_hy3_free_model.internal_id;
+  return model === tencent_hy3_free_model.public_id;
 }

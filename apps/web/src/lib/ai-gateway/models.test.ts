@@ -84,7 +84,7 @@ describe('isFreeModel', () => {
         tencent_hy3_free_model.public_id
       );
       expect(isTencentFreeModel('tencent/hy3:free')).toBe(true);
-      expect(isTencentFreeModel('tencent/hy3')).toBe(true);
+      expect(isTencentFreeModel('tencent/hy3')).toBe(false);
       expect(isTencentFreeModel('stepfun/step-3.7-flash:free')).toBe(false);
     });
 

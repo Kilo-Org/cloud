@@ -269,15 +269,23 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
 }
 
 /**
- * Sweep stale runs, then drain both registry queues. Used by the scheduled
- * handler so a failed final queue message cannot strand pending work. Never
- * throws for drain/slot contention.
+ * Sweep stale runs, reconcile the platform queue, then drain both registry
+ * queues. Used by the scheduled handler so a failed final queue message cannot
+ * strand pending work. Never throws for drain/slot contention.
  */
 export async function sweepStaleRunsAndDrain(env: Env): Promise<{
   staleRunIds: string[];
   drained: StartedQueueRun[];
 }> {
   const staleRunIds = await sweepStaleRuns(env);
+  // `platform_requested` is what makes a pending row visible to the platform
+  // drain and to the publish guard, and only a reconcile sets it. Without this
+  // the timer could not pick up a newly configured decider model at all, and
+  // the guard would count a pending platform pair as settled and publish a
+  // table missing it.
+  await syncPlatformRegistry(env).catch(error => {
+    console.warn(JSON.stringify({ event: 'platform_registry_sync_failed', ...formatError(error) }));
+  });
   const drained = await drainQueues(env, 'both');
   return { staleRunIds, drained };
 }

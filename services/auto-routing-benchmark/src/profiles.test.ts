@@ -274,9 +274,9 @@ vi.mock('drizzle-orm/d1', () => {
 
   function applyStmt(stmt: PendingStmt) {
     if (stmt.kind === 'claim_user_requested') {
-      for (const row of store.profiles.values()) {
-        if (stmt.entries.includes(row.model)) row.user_requested = true;
-      }
+      // Not simulated: this mock does not read the claim's WHERE tree, so it
+      // cannot know which rows to touch. What the claim updates is verified
+      // against real SQLite in profiles-sql.test.ts.
       return;
     }
     if (stmt.kind === 'event') {

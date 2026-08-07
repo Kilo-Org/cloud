@@ -705,4 +705,17 @@ describe('sweepStaleRunsAndDrain', () => {
     const result = await sweepStaleRunsAndDrain(env);
     expect(result.drained).toEqual([]);
   });
+
+  it('reconciles the platform queue before draining', async () => {
+    // Only a reconcile sets `platform_requested`, and the timer is the sole
+    // path that runs unattended. Without it a decider model added to the config
+    // is invisible to the platform drain, and the publish guard counts its
+    // pending row as settled and publishes a table missing it.
+    await sweepStaleRunsAndDrain(env);
+
+    expect(syncPlatformRegistryRows).toHaveBeenCalled();
+    expect(vi.mocked(syncPlatformRegistryRows).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(listPendingCurrentProfiles).mock.invocationCallOrder[0]
+    );
+  });
 });

@@ -204,13 +204,22 @@ describe('0010 registry backfill (real SQLite)', () => {
   it('does not touch rows a live run still owns', () => {
     // A running run settles its own entries. Readying them here would hand the
     // same rows to two writers.
+    //
+    // The older completed run is the point: it makes this pair adoptable, so
+    // only the upsert's status guard keeps the live claim. Without it the row
+    // is re-pointed at the old run while the live run is still measuring it.
     seedRun('live-run', 'running', 'profile', '2026-08-07T19:42:00.000Z');
     seedSummary('live-run', 'm/in-flight', CASES);
     seedProfile('m/in-flight', 'running', 'live-run');
+    seedRun('older-run', 'completed', 'platform', '2026-08-01T00:00:00.000Z');
+    seedSummary('older-run', 'm/in-flight', CASES);
 
     applyMigration();
 
-    expect(profileRow('m/in-flight').status).toBe('running');
+    expect(profileRow('m/in-flight')).toMatchObject({
+      status: 'running',
+      run_id: 'live-run',
+    });
   });
 
   it('leaves an already-ready row on its own provenance', () => {

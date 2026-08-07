@@ -196,9 +196,22 @@ const reopenRunningSession = async ({
               return true;
             }
 
-            await conversationPane.evaluate(element => {
-              element.scrollTop = 0;
-            });
+            await conversationPane.evaluate(
+              element =>
+                new Promise<void>(resolve => {
+                  let remainingFrames = 6;
+                  const forceTop = (): void => {
+                    element.scrollTop = 0;
+                    remainingFrames -= 1;
+                    if (remainingFrames === 0) {
+                      resolve();
+                      return;
+                    }
+                    requestAnimationFrame(forceTop);
+                  };
+                  requestAnimationFrame(forceTop);
+                })
+            );
 
             if (await nonceRow.isVisible().catch(() => false)) {
               return true;

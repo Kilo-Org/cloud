@@ -941,45 +941,58 @@ export async function syncPlatformRegistryRows(
   ];
 
   for (const entry of desired) {
-    stmts.push(
-      orm
-        .insert(benchmarkProfiles)
-        .values({
-          model: entry.model,
-          variant: variantToStorage(entry.variant),
-          engine_identity: current.engineIdentity,
-          repetitions: current.repetitions,
-          status: 'pending',
-          run_id: null,
-          failure_reason: null,
-          requested_at: nowIso,
-          updated_at: nowIso,
-          completed_at: null,
-          platform_requested: true,
-          user_requested: false,
-        })
-        // Only claim the flag on an existing row. Status is left alone so a
-        // ready measurement stays ready and a failed one stays failed until
-        // someone requeues it.
-        .onConflictDoUpdate({
-          target: [
-            benchmarkProfiles.model,
-            benchmarkProfiles.variant,
-            benchmarkProfiles.engine_identity,
-            benchmarkProfiles.repetitions,
-          ],
-          // updated_at is deliberately NOT bumped here. It times the row's
-          // measurement lifecycle — claim, settle — and the orphaned-claim
-          // reaper only touches rows untouched for hours. This reconcile runs
-          // every 15 minutes, so bumping it would hold every platform row
-          // permanently below the reaper's age guard and an orphaned claim
-          // would keep the queue unsettled forever.
-          set: { platform_requested: true },
-        }) as BatchItem<'sqlite'>
-    );
+    stmts.push(claimPlatformRequestedStatement(orm, entry, current, nowIso) as BatchItem<'sqlite'>);
   }
 
   await orm.batch(stmts);
+}
+
+/**
+ * Claim `platform_requested` for one desired pair, creating the row as pending
+ * when it does not exist yet. Exported for the reconcile-vs-reaper test.
+ */
+export function claimPlatformRequestedStatement(
+  orm: ReturnType<typeof drizzle>,
+  entry: { model: string; variant: string | null },
+  current: { engineIdentity: string; repetitions: number },
+  nowIso: string
+) {
+  return (
+    orm
+      .insert(benchmarkProfiles)
+      .values({
+        model: entry.model,
+        variant: variantToStorage(entry.variant),
+        engine_identity: current.engineIdentity,
+        repetitions: current.repetitions,
+        status: 'pending',
+        run_id: null,
+        failure_reason: null,
+        requested_at: nowIso,
+        updated_at: nowIso,
+        completed_at: null,
+        platform_requested: true,
+        user_requested: false,
+      })
+      // Only claim the flag on an existing row. Status is left alone so a
+      // ready measurement stays ready and a failed one stays failed until
+      // someone requeues it.
+      .onConflictDoUpdate({
+        target: [
+          benchmarkProfiles.model,
+          benchmarkProfiles.variant,
+          benchmarkProfiles.engine_identity,
+          benchmarkProfiles.repetitions,
+        ],
+        // updated_at is deliberately NOT bumped here. It times the row's
+        // measurement lifecycle — claim, settle — and the orphaned-claim
+        // reaper only touches rows untouched for hours. This reconcile runs
+        // every 15 minutes, so bumping it would hold every platform row
+        // permanently below the reaper's age guard and an orphaned claim
+        // would keep the queue unsettled forever.
+        set: { platform_requested: true },
+      })
+  );
 }
 
 /**

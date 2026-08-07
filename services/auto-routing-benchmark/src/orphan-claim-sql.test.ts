@@ -10,7 +10,11 @@
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
-import { clearPlatformRequestedStatement, failOrphanedRunningProfilesStatement } from './db';
+import {
+  claimPlatformRequestedStatement,
+  clearPlatformRequestedStatement,
+  failOrphanedRunningProfilesStatement,
+} from './db';
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_profiles (
@@ -156,21 +160,35 @@ describe('failOrphanedRunningProfilesStatement (real SQLite)', () => {
   });
 
   it('still reaps after a platform reconcile has run', () => {
-    // The reconcile runs every 15 minutes and touches every platform row. If it
-    // bumped updated_at, no platform row could ever reach the reaper's age
-    // guard, and an orphaned claim would keep the platform queue unsettled —
-    // and the routing table unpublishable — forever.
-    seedClaim('m/orphan-platform', 'run-that-does-not-exist', LONG_AGO, 1);
+    // The reconcile runs every 15 minutes and touches every platform row. If
+    // either half bumped updated_at, no platform row could ever reach the
+    // reaper's age guard, and an orphaned claim would keep the platform queue
+    // unsettled — and the routing table unpublishable — forever.
+    //
+    // Both halves run: the clear hits every flagged row, and the claim's upsert
+    // hits every row still on the desired list. m/orphan-desired is on the
+    // list, m/orphan-dropped is not, so one row exercises each.
+    seedClaim('m/orphan-desired', 'run-that-does-not-exist', LONG_AGO, 1);
+    seedClaim('m/orphan-dropped', 'run-that-does-not-exist', LONG_AGO, 1);
 
-    const reconcile = clearPlatformRequestedStatement(drizzle({} as D1Database), {
-      engineIdentity: 'v-test:engine',
-      repetitions: 1,
-    }).toSQL();
-    exec(reconcile.sql, reconcile.params);
+    const orm = drizzle({} as D1Database);
+    const current = { engineIdentity: 'v-test:engine', repetitions: 1 };
+    for (const query of [
+      clearPlatformRequestedStatement(orm, current).toSQL(),
+      claimPlatformRequestedStatement(
+        orm,
+        { model: 'm/orphan-desired', variant: null },
+        current,
+        NOW
+      ).toSQL(),
+    ]) {
+      exec(query.sql, query.params);
+    }
 
     reap();
 
-    expect(statusOf('m/orphan-platform')).toBe('failed');
+    expect(statusOf('m/orphan-desired')).toBe('failed');
+    expect(statusOf('m/orphan-dropped')).toBe('failed');
   });
 
   it('leaves rows that are not claimed at all', () => {

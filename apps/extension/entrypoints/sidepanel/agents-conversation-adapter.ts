@@ -13,6 +13,31 @@ export const isMessageStreaming = (message: StoredMessage): boolean =>
   message.info.time.completed === undefined &&
   !message.info.error;
 
+/** True when every part is the hidden synthetic snapshot progress, so the
+ *  message shows no live output while it streams. */
+export const isSnapshotOnlyMessage = (message: StoredMessage): boolean =>
+  message.parts.length > 0 && message.parts.every(part => isSnapshotProgressPart(part));
+
+/**
+ * True when the agent is running but the newest message shows no live
+ * assistant output — the gap between sending a prompt and the first
+ * assistant token. A streaming message with only the hidden synthetic
+ * snapshot progress also shows no live output. The indicator fills the gap.
+ */
+export const shouldShowWorkingIndicator = (
+  isStreaming: boolean,
+  messages: StoredMessage[]
+): boolean => {
+  if (!isStreaming) {
+    return false;
+  }
+  const last = messages.at(-1);
+  if (last === undefined) {
+    return true;
+  }
+  return !isMessageStreaming(last) || isSnapshotOnlyMessage(last);
+};
+
 const buildToolExchange = (
   part: Extract<Part, { type: 'tool' }>
 ): Extract<GroupedConversationItem, { readonly type: 'tool-exchange' }> => {

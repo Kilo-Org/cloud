@@ -165,7 +165,6 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
-        'inclusionai/ling-3.0-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
       });
     });
@@ -176,7 +175,7 @@ describe('isFreeModel', () => {
 
       for (const candidate of autoFreeModels) {
         if (!candidate.model.includes('laguna')) {
-          expect(candidate.weight).toBe(3);
+          expect(candidate.weight).toBe(9);
         }
       }
     });

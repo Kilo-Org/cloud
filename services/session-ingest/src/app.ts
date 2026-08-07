@@ -16,6 +16,7 @@ import { getSessionExport } from './services/session-export';
 import { withDORetry } from '@kilocode/worker-utils';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
+const publicSessionAccessEnabled: boolean = false;
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),
@@ -78,6 +79,10 @@ app.get('/session/:sessionId', async c => {
       { success: false, error: 'Invalid sessionId', issues: parsedSessionId.error.issues },
       400
     );
+  }
+
+  if (!publicSessionAccessEnabled) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);

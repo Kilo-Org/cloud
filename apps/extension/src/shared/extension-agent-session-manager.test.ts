@@ -584,6 +584,29 @@ describe('createExtensionAgentSessionManager', () => {
       }
     });
 
+    it('keeps the empty first page usable when the liveness probe rejects', async () => {
+      const trpc = makeTrpcMock();
+      const probeError = new Error('active sessions unavailable');
+      vi.spyOn(trpc.activeSessions.list, 'query').mockImplementation(async () => {
+        throw probeError;
+      });
+      const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+      trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+
+      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      // The rejected probe must not trigger a page retry.
+      expect(pageQuery).toHaveBeenCalledTimes(1);
+    });
+
     it('forwards the event-log watermark on an empty page so a reopened running session replays persisted events', async () => {
       vi.useFakeTimers();
       try {

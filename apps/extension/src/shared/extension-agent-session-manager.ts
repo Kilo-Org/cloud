@@ -357,18 +357,32 @@ async function fetchExtensionSessionSnapshotPage(
      * stays stably idle or absent → resolve the empty page without an
      * unbounded wait.
      */
-    const active = await fetchActiveSessions();
-    result = isSessionWorking(active)
-      ? await readActiveHistoryWithRetry(result, {
-          fetchActiveSessions,
-          isSessionWorking,
-          queryPage,
-        })
-      : await readActiveHistoryWithLivenessGrace(result, {
-          fetchActiveSessions,
-          isSessionWorking,
-          queryPage,
-        });
+    let active: ActiveSessionsResult | null = null;
+    try {
+      active = await fetchActiveSessions();
+    } catch {
+      /*
+       * A rejected liveness read leaves the session's working state unknown.
+       * Treat it as inactive so the empty page stays usable: resolve the
+       * original empty page without a page retry instead of letting the probe
+       * rejection block the transcript. Only the probe is guarded here; the
+       * initial page query and every later retry page query still propagate
+       * their own failures.
+       */
+    }
+    if (active !== null) {
+      result = isSessionWorking(active)
+        ? await readActiveHistoryWithRetry(result, {
+            fetchActiveSessions,
+            isSessionWorking,
+            queryPage,
+          })
+        : await readActiveHistoryWithLivenessGrace(result, {
+            fetchActiveSessions,
+            isSessionWorking,
+            queryPage,
+          });
+    }
   }
 
   const history = pageHistory(result);

@@ -30,6 +30,7 @@ import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { findSupportedFimModel } from '@/lib/ai-gateway/supported-fim-models';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -44,13 +45,12 @@ function resolveEditProvider(model: string): {
   provider: EditProvider;
   upstreamModel: string;
 } | null {
-  if (model.startsWith('inception/')) {
-    return {
-      provider: 'inception',
-      upstreamModel: model.slice('inception/'.length),
-    };
-  }
-  return null;
+  const supportedModel = findSupportedFimModel(model);
+  if (supportedModel?.provider !== 'inception') return null;
+  return {
+    provider: supportedModel.provider,
+    upstreamModel: supportedModel.upstreamModel,
+  };
 }
 
 function getSystemApiKey(provider: EditProvider): string | null {

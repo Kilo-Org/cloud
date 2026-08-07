@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { APP_URL } from '@/lib/constants';
-import { getKeyInventoryCounts } from '@/lib/coding-plans';
+import { getCodingPlanAvailabilityIntentCounts, getKeyInventoryCounts } from '@/lib/coding-plans';
 import { getCodingPlanCatalog } from '@/lib/coding-plans/pricing';
 import {
   sendAdminSlackNotification,
@@ -15,12 +15,18 @@ export type CodingPlanInventoryCount = {
   count: number;
 };
 
+export type CodingPlanWaitlistCount = {
+  planId: string;
+  count: number;
+};
+
 type InventoryPlanSummary = {
   providerId: string;
   providerName: string;
   planId: string;
   displayName: string;
   loaded: number;
+  waitlist: number;
   statusCounts: Record<string, number>;
 };
 
@@ -28,6 +34,7 @@ export type CodingPlanInventoryTotals = {
   loaded: number;
   assigned: number;
   available: number;
+  waitlist: number;
   revocationPending: number;
   revocationFailed: number;
   revoked: number;
@@ -47,6 +54,14 @@ function statusCount(summary: InventoryPlanSummary, status: string): number {
 
 function escapeSlackText(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function escapeSlackLabel(value: string): string {
+  return escapeSlackText(value).replaceAll('`', "'").replaceAll('\n', ' ');
+}
+
+function formatCount(count: number): string {
+  return `\`${count}\``;
 }
 
 function humanizeStatus(status: string): string {
@@ -71,6 +86,7 @@ function summarizeInventory(counts: CodingPlanInventoryCount[]): InventoryPlanSu
       planId: item.planId,
       displayName: catalogPlan?.name ?? item.planId,
       loaded: 0,
+      waitlist: 0,
       statusCounts: {},
     };
 
@@ -90,12 +106,47 @@ function summarizeInventory(counts: CodingPlanInventoryCount[]): InventoryPlanSu
   });
 }
 
+function addWaitlistCounts(
+  summaries: InventoryPlanSummary[],
+  counts: CodingPlanWaitlistCount[]
+): InventoryPlanSummary[] {
+  const catalog = getCodingPlanCatalog();
+  const catalogByPlanId = new Map<string, (typeof catalog)[number]>(
+    catalog.map(plan => [plan.planId, plan])
+  );
+  const summariesByPlanId = new Map(summaries.map(summary => [summary.planId, summary]));
+
+  for (const item of counts) {
+    const existing = summariesByPlanId.get(item.planId);
+    if (existing) {
+      existing.waitlist = item.count;
+      continue;
+    }
+
+    const catalogPlan = catalogByPlanId.get(item.planId);
+    const summary: InventoryPlanSummary = {
+      providerId: catalogPlan?.providerId ?? 'unknown',
+      providerName: catalogPlan?.providerName ?? 'Unknown provider',
+      planId: item.planId,
+      displayName: catalogPlan?.name ?? item.planId,
+      loaded: 0,
+      waitlist: item.count,
+      statusCounts: {},
+    };
+    summariesByPlanId.set(item.planId, summary);
+    summaries.push(summary);
+  }
+
+  return summaries;
+}
+
 function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventoryTotals {
   return summaries.reduce<CodingPlanInventoryTotals>(
     (totals, summary) => ({
       loaded: totals.loaded + summary.loaded,
       assigned: totals.assigned + statusCount(summary, 'assigned'),
       available: totals.available + statusCount(summary, 'available'),
+      waitlist: totals.waitlist + summary.waitlist,
       revocationPending: totals.revocationPending + statusCount(summary, 'revocation_pending'),
       revocationFailed: totals.revocationFailed + statusCount(summary, 'revocation_failed'),
       revoked: totals.revoked + statusCount(summary, 'revoked'),
@@ -104,6 +155,7 @@ function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventory
       loaded: 0,
       assigned: 0,
       available: 0,
+      waitlist: 0,
       revocationPending: 0,
       revocationFailed: 0,
       revoked: 0,
@@ -111,42 +163,58 @@ function inventoryTotals(summaries: InventoryPlanSummary[]): CodingPlanInventory
   );
 }
 
-function formatPlanSummary(summary: InventoryPlanSummary): string {
-  const available = statusCount(summary, 'available');
-  const assigned = statusCount(summary, 'assigned');
-  const pending = statusCount(summary, 'revocation_pending');
-  const failed = statusCount(summary, 'revocation_failed');
-  const revoked = statusCount(summary, 'revoked');
-  const isCatalogPlan = getCodingPlanCatalog().some(plan => plan.planId === summary.planId);
-  const displayName = isCatalogPlan
-    ? escapeSlackText(summary.displayName)
-    : `\`${escapeSlackText(summary.displayName.replaceAll('`', "'"))}\``;
-  const lines = [
-    `*${displayName}*`,
-    `${available} available · ${assigned} assigned · ${summary.loaded} loaded`,
-  ];
+function formatInventoryTotals(totals: CodingPlanInventoryTotals): string {
+  return `*Total* · Available ${formatCount(totals.available)} · Assigned ${formatCount(totals.assigned)} · Loaded ${formatCount(totals.loaded)} · Waitlist ${formatCount(totals.waitlist)}`;
+}
 
-  const lifecycleParts = [
-    failed > 0 ? `${failed} failed revocation` : null,
-    pending > 0 ? `${pending} pending revocation` : null,
-    revoked > 0 ? `${revoked} revoked` : null,
-  ].filter((value): value is string => value !== null);
-  if (lifecycleParts.length > 0) {
-    lines.push(`${failed > 0 || pending > 0 ? ':warning: ' : ''}${lifecycleParts.join(' · ')}`);
+function groupSummariesByProvider(
+  summaries: InventoryPlanSummary[]
+): Map<string, InventoryPlanSummary[]> {
+  const providerGroups = new Map<string, InventoryPlanSummary[]>();
+
+  for (const summary of summaries) {
+    const providerSummaries = providerGroups.get(summary.providerName) ?? [];
+    providerSummaries.push(summary);
+    providerGroups.set(summary.providerName, providerSummaries);
   }
 
-  const unknownStatuses = Object.entries(summary.statusCounts)
-    .filter(([status]) => !KNOWN_STATUSES.has(status))
-    .sort(([left], [right]) => left.localeCompare(right));
-  if (unknownStatuses.length > 0) {
-    lines.push(
-      unknownStatuses
-        .map(([status, count]) => `${count} ${escapeSlackText(humanizeStatus(status))}`)
-        .join(' · ')
-    );
-  }
+  return providerGroups;
+}
 
-  return lines.join('\n');
+function formatProviderSummary(providerName: string, summaries: InventoryPlanSummary[]): string {
+  const planLines = summaries.map(
+    summary =>
+      `${escapeSlackLabel(summary.displayName)} · Available ${formatCount(statusCount(summary, 'available'))} · Assigned ${formatCount(statusCount(summary, 'assigned'))} · Loaded ${formatCount(summary.loaded)} · Waitlist ${formatCount(summary.waitlist)}`
+  );
+
+  return [`*${escapeSlackLabel(providerName)}*`, ...planLines].join('\n');
+}
+
+function formatUnknownStatuses(summaries: InventoryPlanSummary[]): string | null {
+  const unknownStatuses = summaries.flatMap(summary =>
+    Object.entries(summary.statusCounts)
+      .filter(([status]) => !KNOWN_STATUSES.has(status))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([status, count]) => {
+        const plan = `${summary.providerName} ${summary.displayName}`;
+        return `${escapeSlackLabel(plan)}: ${formatCount(count)} ${escapeSlackText(humanizeStatus(status))}`;
+      })
+  );
+
+  return unknownStatuses.length > 0 ? `*Other statuses:* ${unknownStatuses.join(' · ')}` : null;
+}
+
+function formatRevocationCallout(totals: CodingPlanInventoryTotals): string {
+  return [
+    totals.revocationFailed > 0
+      ? `:rotating_light: *Action required:* ${formatCount(totals.revocationFailed)} credential${totals.revocationFailed === 1 ? '' : 's'} failed revocation.`
+      : null,
+    totals.revocationPending > 0
+      ? `:warning: *${formatCount(totals.revocationPending)} credential${totals.revocationPending === 1 ? ' is' : 's are'} pending revocation.*`
+      : null,
+  ]
+    .filter((value): value is string => value !== null)
+    .join('\n');
 }
 
 function formatSnapshotTime(timestamp: Date): string {
@@ -158,24 +226,32 @@ function formatSnapshotTime(timestamp: Date): string {
 
 export function buildCodingPlanInventorySlackNotification(
   counts: CodingPlanInventoryCount[],
+  waitlistCounts: CodingPlanWaitlistCount[] = [],
   timestamp = new Date()
 ): { notification: AdminSlackNotification; totals: CodingPlanInventoryTotals } {
-  const summaries = summarizeInventory(counts);
+  const summaries = addWaitlistCounts(summarizeInventory(counts), waitlistCounts);
   const totals = inventoryTotals(summaries);
   const needsAttention = totals.revocationFailed + totals.revocationPending;
   const providerNames = Array.from(new Set(summaries.map(summary => summary.providerName)));
   const providerLabel = providerNames.length > 0 ? providerNames.join(', ') : 'All providers';
   const planAvailability = summaries
-    .map(summary => `${summary.displayName}: ${statusCount(summary, 'available')} available`)
+    .map(
+      summary =>
+        `${summary.providerName} ${summary.displayName}: ${formatCount(statusCount(summary, 'available'))} available, ${formatCount(statusCount(summary, 'assigned'))} assigned, ${formatCount(summary.loaded)} loaded, ${formatCount(summary.waitlist)} waitlist`
+    )
     .join('. ');
   const attentionFallback = [
-    totals.revocationFailed > 0 ? `${totals.revocationFailed} failed revocation` : null,
-    totals.revocationPending > 0 ? `${totals.revocationPending} pending revocation` : null,
+    totals.revocationFailed > 0
+      ? `${formatCount(totals.revocationFailed)} failed revocation`
+      : null,
+    totals.revocationPending > 0
+      ? `${formatCount(totals.revocationPending)} pending revocation`
+      : null,
   ]
     .filter((value): value is string => value !== null)
     .join(', ');
   const text = [
-    `Coding Plans inventory: ${totals.available} available, ${totals.assigned} assigned, ${totals.loaded} loaded`,
+    `Coding Plans inventory: ${formatCount(totals.available)} available, ${formatCount(totals.assigned)} assigned, ${formatCount(totals.loaded)} loaded, ${formatCount(totals.waitlist)} waitlisted`,
     attentionFallback || null,
     planAvailability || 'No inventory recorded',
   ]
@@ -192,42 +268,43 @@ export function buildCodingPlanInventorySlackNotification(
       type: 'context',
       elements: [{ type: 'mrkdwn', text: `${escapeSlackText(providerLabel)} · Current snapshot` }],
     },
-    {
-      type: 'section',
-      fields: [
-        { type: 'mrkdwn', text: `*${totals.available}*\nAvailable` },
-        { type: 'mrkdwn', text: `*${totals.assigned}*\nAssigned` },
-        { type: 'mrkdwn', text: `*${totals.loaded}*\nLoaded` },
-        { type: 'mrkdwn', text: `*${needsAttention}*\nNeeds attention` },
-      ],
-    },
     { type: 'divider' },
   ];
 
-  if (summaries.length === 0) {
+  if (counts.length === 0) {
     blocks.push({
       type: 'section',
       text: { type: 'mrkdwn', text: 'No Coding Plans inventory is currently recorded.' },
     });
-  } else {
-    for (const summary of summaries) {
+  }
+
+  if (summaries.length > 0) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: formatInventoryTotals(totals) },
+    });
+
+    for (const [providerName, providerSummaries] of groupSummariesByProvider(summaries)) {
       blocks.push({
         type: 'section',
-        text: { type: 'mrkdwn', text: formatPlanSummary(summary) },
+        text: {
+          type: 'mrkdwn',
+          text: formatProviderSummary(providerName, providerSummaries),
+        },
       });
+    }
+
+    const unknownStatuses = formatUnknownStatuses(summaries);
+    if (unknownStatuses) {
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: unknownStatuses } });
     }
   }
 
   if (needsAttention > 0) {
-    const attentionLines = [
-      totals.revocationFailed > 0
-        ? `:rotating_light: *Action required:* ${totals.revocationFailed} credential${totals.revocationFailed === 1 ? '' : 's'} failed revocation.`
-        : null,
-      totals.revocationPending > 0
-        ? `:warning: *${totals.revocationPending} credential${totals.revocationPending === 1 ? ' is' : 's are'} pending revocation.*`
-        : null,
-    ].filter((value): value is string => value !== null);
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: attentionLines.join('\n') } });
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: formatRevocationCallout(totals) },
+    });
   }
 
   blocks.push({
@@ -248,15 +325,20 @@ export function buildCodingPlanInventorySlackNotification(
 
 type InventorySummaryDependencies = {
   getCounts?: typeof getKeyInventoryCounts;
+  getWaitlistCounts?: typeof getCodingPlanAvailabilityIntentCounts;
   sendNotification?: typeof sendAdminSlackNotification;
 };
 
 export async function sendCodingPlanInventorySlackSummary({
   getCounts = getKeyInventoryCounts,
+  getWaitlistCounts = getCodingPlanAvailabilityIntentCounts,
   sendNotification = sendAdminSlackNotification,
 }: InventorySummaryDependencies = {}): Promise<CodingPlanInventoryTotals> {
-  const counts = await getCounts();
-  const { notification, totals } = buildCodingPlanInventorySlackNotification(counts);
+  const [counts, waitlistCounts] = await Promise.all([getCounts(), getWaitlistCounts()]);
+  const { notification, totals } = buildCodingPlanInventorySlackNotification(
+    counts,
+    waitlistCounts
+  );
   await sendNotification(notification);
   return totals;
 }

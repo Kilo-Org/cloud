@@ -20,6 +20,9 @@ import {
   organization_user_limits,
   organization_user_usage,
   organization_audit_logs,
+  organization_groups,
+  organization_group_memberships,
+  organization_group_policy_settings,
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
@@ -29,6 +32,10 @@ import {
   cloud_agent_feedback,
   user_admin_notes,
   magic_link_tokens,
+  device_sessions,
+  device_refresh_tokens,
+  native_attested_keys,
+  native_admission_challenges,
   stytch_fingerprints,
   kiloclaw_instances,
   kiloclaw_google_oauth_connections,
@@ -74,6 +81,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  github_install_states,
   code_review_feedback_events,
   code_review_memory_proposals,
   user_github_app_tokens,
@@ -119,7 +127,7 @@ import {
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
@@ -523,6 +531,289 @@ describe('User', () => {
       expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
       expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+    });
+
+    it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {
+      const user = await insertTestUserAndGoogleAuth({
+        google_user_email: 'existing-defer@example.com',
+        google_user_name: 'Deferred Existing',
+        hosted_domain: 'test.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'existing-defer@example.com',
+          google_user_name: 'Deferred Existing',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+        },
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.deferredSignInEvent).toEqual({
+        distinctId: 'existing-defer@example.com',
+        event: 'user_signed_in',
+        properties: {
+          name: 'Deferred Existing',
+          hosted_domain: null, // synced from user row by findAndSyncExistingUser
+          provider: 'google',
+          id: user.id,
+        },
+      });
+      expect(result.user.id).toBe(user.id);
+      expect(result.isNew).toBe(false);
+    });
+
+    it('skips deferredSignInEvent when deferSignInAnalytics is not passed (backward compat)', async () => {
+      const user = await insertTestUserAndGoogleAuth({
+        google_user_email: 'no-defer@example.com',
+        google_user_name: 'No Defer',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-defer@example.com',
+          google_user_name: 'No Defer',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.deferredSignInEvent).toBeUndefined();
+    });
+
+    it('returns deferredSignInEvent for auto-linked user when deferSignInAnalytics is true', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'autolink-defer@example.com',
+        google_user_name: 'Original Name',
+        hosted_domain: 'original.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'autolink-defer@example.com',
+          google_user_name: 'New Name',
+          google_user_image_url: 'https://example.com/new.png',
+          hosted_domain: 'new.com',
+          provider: 'google',
+          provider_account_id: 'google-autolink-new',
+        },
+        undefined,
+        true, // autoLinkToExistingUser
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.deferredSignInEvent).toEqual({
+        distinctId: 'autolink-defer@example.com',
+        event: 'user_signed_in_with_different_id_and_auto_linked',
+        properties: {
+          existing_name: 'Original Name',
+          existing_hosted_domain: 'original.com',
+          existing_id: existing.id,
+          new_provider: 'google',
+          new_provider_account_id: 'google-autolink-new',
+          new_name: 'New Name',
+          new_email: 'autolink-defer@example.com',
+          new_image_url: 'https://example.com/new.png',
+          new_hosted_domain: 'new.com',
+        },
+      });
+      expect(result.user.id).toBe(existing.id);
+      expect(result.isNew).toBe(false);
+    });
+
+    it('links a magic-link sign-in to an existing user with a google provider', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'link-email@example.com',
+        google_user_name: 'Google First',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'link-email@example.com',
+          google_user_name: 'Google First',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: 'link-email@example.com',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      expect(result.isNew).toBe(false);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(providerRows.some(row => row.provider === 'email')).toBe(true);
+    });
+
+    it('links a google sign-in to an existing magic-link user', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'link-google@example.com',
+        google_user_name: 'Email First',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'email',
+        provider_account_id: 'link-google@example.com',
+        email: 'link-google@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'link-google@example.com',
+          google_user_name: 'Email First',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-link-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      expect(result.isNew).toBe(false);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(
+        providerRows.some(
+          row => row.provider === 'google' && row.provider_account_id === 'google-link-new'
+        )
+      ).toBe(true);
+    });
+
+    it('refuses to auto-link when the credential does not prove the email', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'no-proof@example.com',
+        google_user_name: 'No Proof',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-proof@example.com',
+          google_user_name: 'No Proof',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-no-proof',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+    });
+
+    it('refuses a same-provider different-account sign-in even with proof', async () => {
+      await insertTestUserAndGoogleAuth({
+        google_user_email: 'same-provider@example.com',
+        google_user_name: 'Same Provider',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'same-provider@example.com',
+          google_user_name: 'Same Provider',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-other-sub',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+    });
+
+    it('keeps the dev-only upgrade path: any provider links to a user whose only provider is fake-login', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'fake-upgrade@example.com',
+        google_user_name: 'Fake Upgrade',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'fake-login',
+        provider_account_id: 'fake-fake-upgrade@example.com',
+        email: 'fake-upgrade@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: '@@fake@@',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'fake-upgrade@example.com',
+          google_user_name: 'Fake Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-fake-upgrade',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(providerRows.some(row => row.provider === 'github')).toBe(true);
     });
   });
 
@@ -1903,6 +2194,53 @@ describe('User', () => {
       ).toBe(1);
     });
 
+    it('should delete github_install_states for the soft-deleted user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      // Insert install states for both users
+      await db.insert(github_install_states).values([
+        {
+          token: 'soft-delete-test-token-' + Date.now(),
+          kilo_user_id: user.id,
+          owner_type: 'user',
+          owner_id: user.id,
+          github_app_type: 'standard',
+          return_to: '/github-app',
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+        },
+        {
+          token: 'soft-delete-test-token-other-' + Date.now(),
+          kilo_user_id: otherUser.id,
+          owner_type: 'org',
+          owner_id: 'org-999',
+          github_app_type: 'lite',
+          return_to: null,
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      // The deleted user's install states must be gone
+      expect(
+        await db
+          .select({ count: count() })
+          .from(github_install_states)
+          .where(eq(github_install_states.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      // The other user's install states must remain
+      expect(
+        await db
+          .select({ count: count() })
+          .from(github_install_states)
+          .where(eq(github_install_states.kilo_user_id, otherUser.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
     it('should delete organization memberships and usage data', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
@@ -2056,6 +2394,55 @@ describe('User', () => {
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
       expect(logs[0].message).toBe('User joined org'); // message preserved
+    });
+
+    it('should clear organization group attribution fields', async () => {
+      const actor = await insertTestUser();
+      const member = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Group attribution org', plan: 'enterprise' })
+        .returning();
+      await db.insert(organization_memberships).values([
+        { organization_id: organization.id, kilo_user_id: actor.id, role: 'member' },
+        { organization_id: organization.id, kilo_user_id: member.id, role: 'member' },
+      ]);
+      const [group] = await db
+        .insert(organization_groups)
+        .values({
+          organization_id: organization.id,
+          name: 'Engineering',
+          created_by_kilo_user_id: actor.id,
+        })
+        .returning();
+      await db.insert(organization_group_memberships).values({
+        organization_id: organization.id,
+        group_id: group.id,
+        kilo_user_id: member.id,
+        assigned_by_kilo_user_id: actor.id,
+      });
+      await db.insert(organization_group_policy_settings).values({
+        organization_id: organization.id,
+        updated_by_kilo_user_id: actor.id,
+      });
+
+      await softDeleteUser(actor.id);
+
+      const [storedGroup] = await db
+        .select()
+        .from(organization_groups)
+        .where(eq(organization_groups.id, group.id));
+      const [storedAssignment] = await db
+        .select()
+        .from(organization_group_memberships)
+        .where(eq(organization_group_memberships.group_id, group.id));
+      const [storedSettings] = await db
+        .select()
+        .from(organization_group_policy_settings)
+        .where(eq(organization_group_policy_settings.organization_id, organization.id));
+      expect(storedGroup.created_by_kilo_user_id).toBeNull();
+      expect(storedAssignment.assigned_by_kilo_user_id).toBeNull();
+      expect(storedSettings.updated_by_kilo_user_id).toBeNull();
     });
 
     it('should anonymize security audit logs where user is actor', async () => {
@@ -3870,6 +4257,46 @@ describe('User', () => {
       expect(retainedLogs[0].organization_id).toBe(orgId);
     });
 
+    it('should allow soft-delete when a transferred past-due KiloClaw predecessor has a canceled current successor', async () => {
+      const user = await insertTestUser();
+      const successorId = randomUUID();
+      await db.insert(kiloclaw_subscriptions).values({
+        id: successorId,
+        user_id: user.id,
+        plan: 'standard',
+        status: 'canceled',
+      });
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'past_due',
+        transferred_to_subscription_id: successorId,
+      });
+
+      await expect(assertUserCanBeSoftDeleted(user.id)).resolves.toBeUndefined();
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+
+      const softDeleted = await findUserById(user.id);
+      expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('should throw SoftDeletePreconditionError for a current past-due KiloClaw subscription', async () => {
+      const user = await insertTestUser();
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'past_due',
+        transferred_to_subscription_id: null,
+      });
+
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
+      await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
+      const userAfter = await findUserById(user.id);
+      expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {
       const user = await insertTestUser();
       await db.insert(kiloclaw_subscriptions).values({
@@ -3987,6 +4414,120 @@ describe('User', () => {
         .from(byok_api_keys)
         .where(eq(byok_api_keys.kilo_user_id, user.id));
       expect(byokKeys).toHaveLength(0);
+    });
+
+    it('should delete device sessions and refresh tokens', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      // Create a device session for the user
+      const [session] = await db
+        .insert(device_sessions)
+        .values({
+          kilo_user_id: user.id,
+          user_agent: 'TestAgent/1.0',
+        })
+        .returning({ id: device_sessions.id });
+
+      // Create a refresh token for the session
+      await db.insert(device_refresh_tokens).values({
+        token_hash: 'test-hash-1',
+        device_session_id: session.id,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      // Create a session for the other user
+      const [otherSession] = await db
+        .insert(device_sessions)
+        .values({
+          kilo_user_id: otherUser.id,
+          user_agent: 'OtherAgent/1.0',
+        })
+        .returning({ id: device_sessions.id });
+
+      await db.insert(device_refresh_tokens).values({
+        token_hash: 'test-hash-2',
+        device_session_id: otherSession.id,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      // User's sessions and tokens must be gone
+      expect(
+        await db
+          .select({ count: count() })
+          .from(device_sessions)
+          .where(eq(device_sessions.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      // Other user's sessions and tokens must remain
+      expect(
+        await db
+          .select({ count: count() })
+          .from(device_sessions)
+          .where(eq(device_sessions.kilo_user_id, otherUser.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, otherSession.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete native attested keys and admission challenges', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      // Insert a native attested key for the user
+      await db.insert(native_attested_keys).values({
+        key_id: 'test-key-1',
+        kilo_user_id: user.id,
+        platform: 'ios',
+        public_key: 'base64pubkey1',
+        sign_count: 5,
+        attested_at: new Date().toISOString(),
+      });
+
+      // Insert a native attested key for the other user
+      await db.insert(native_attested_keys).values({
+        key_id: 'test-key-2',
+        kilo_user_id: otherUser.id,
+        platform: 'android',
+        public_key: 'base64pubkey2',
+        sign_count: 3,
+        attested_at: new Date().toISOString(),
+      });
+
+      // Insert an admission challenge (ephemeral, no user FK)
+      await db.insert(native_admission_challenges).values({
+        challenge: 'test-challenge-1',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      // User's key must be gone
+      const userKey = await db.query.native_attested_keys.findFirst({
+        where: eq(native_attested_keys.key_id, 'test-key-1'),
+      });
+      expect(userKey).toBeUndefined();
+
+      // Other user's key must remain
+      const otherKey = await db.query.native_attested_keys.findFirst({
+        where: eq(native_attested_keys.key_id, 'test-key-2'),
+      });
+      expect(otherKey).toBeDefined();
+
+      // Challenge persists (cleaned by cron, not by soft-delete)
+      const challenge = await db.query.native_admission_challenges.findFirst({
+        where: eq(native_admission_challenges.challenge, 'test-challenge-1'),
+      });
+      expect(challenge).toBeDefined();
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {

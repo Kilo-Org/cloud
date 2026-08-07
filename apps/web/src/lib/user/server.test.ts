@@ -5,11 +5,14 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
 
-import { beforeAll, beforeEach, describe, test, expect } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, test, expect } from '@jest/globals';
 import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
   parseLinkedInProfileName,
+  parseAnacondaProfile,
+  profileProvesEmailOwnership,
+  authOptions,
   getUserUUID,
   uuidSchema,
   parseSignInRedirectContext,
@@ -17,6 +20,7 @@ import {
   getUserFromAuth,
 } from './server';
 import { db } from '@/lib/drizzle';
+import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import { kilocode_users, organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -214,6 +218,91 @@ describe('parseLinkedInProfileName', () => {
       expect(result).not.toBe(true);
       expect(result).not.toBe(false);
     });
+  });
+});
+
+describe('Anaconda OAuth provider', () => {
+  test('maps a valid profile and uses sub as the stable account id', () => {
+    expect(
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        iss: 'https://auth.anaconda.com/api/auth',
+        aud: 'kilo-client-id',
+        email: 'user@example.com',
+        email_verified: true,
+        given_name: 'Anaconda',
+        family_name: 'User',
+        picture: 'https://example.com/avatar.png',
+      })
+    ).toEqual({
+      id: 'anaconda-user-123',
+      email: 'user@example.com',
+      name: 'Anaconda User',
+      image: 'https://example.com/avatar.png',
+    });
+  });
+
+  test('uses the email local part when the profile omits a name', () => {
+    expect(
+      parseAnacondaProfile({
+        sub: 'anaconda-user-123',
+        email: 'local-part@example.com',
+        email_verified: true,
+      })
+    ).toMatchObject({ name: 'local-part' });
+  });
+
+  test.each([
+    [{ email: 'user@example.com', email_verified: true }, 'missing subject'],
+    [{ sub: 'anaconda-user-123', email_verified: true }, 'missing email'],
+    [{ sub: '', email: 'user@example.com', email_verified: true }, 'empty subject'],
+    [{ sub: 'anaconda-user-123', email: 'not-an-email', email_verified: true }, 'invalid email'],
+  ])('rejects a profile with %s (%s)', (profile, _reason) => {
+    expect(() => parseAnacondaProfile(profile)).toThrow();
+  });
+
+  test.each([
+    ['missing', { sub: 'anaconda-user-123', email: 'user@example.com' }],
+    ['false', { sub: 'anaconda-user-123', email: 'user@example.com', email_verified: false }],
+  ])('rejects an email_verified claim that is %s', (_claimState, profile) => {
+    expect(() => parseAnacondaProfile(profile)).toThrow();
+  });
+
+  test('registers discovery, ID tokens, OIDC checks, and client secret POST authentication', () => {
+    expect(authOptions.providers.find(provider => provider.id === 'anaconda')).toMatchObject({
+      issuer: 'https://auth.anaconda.com/api/auth',
+      wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
+      authorization: { params: { scope: 'openid profile email' } },
+      idToken: true,
+      checks: ['pkce', 'state', 'nonce'],
+      client: { token_endpoint_auth_method: 'client_secret_post' },
+    });
+  });
+});
+
+describe('profileProvesEmailOwnership', () => {
+  test('accepts a boolean true email_verified claim', () => {
+    expect(profileProvesEmailOwnership({ email_verified: true })).toBe(true);
+  });
+
+  test('accepts the string "true" email_verified claim (Apple)', () => {
+    expect(profileProvesEmailOwnership({ email_verified: 'true' })).toBe(true);
+  });
+
+  test('rejects a boolean false email_verified claim', () => {
+    expect(profileProvesEmailOwnership({ email_verified: false })).toBe(false);
+  });
+
+  test('rejects the string "false" email_verified claim', () => {
+    expect(profileProvesEmailOwnership({ email_verified: 'false' })).toBe(false);
+  });
+
+  test('rejects a profile without the email_verified claim', () => {
+    expect(profileProvesEmailOwnership({})).toBe(false);
+  });
+
+  test('rejects undefined', () => {
+    expect(profileProvesEmailOwnership(undefined)).toBe(false);
   });
 });
 
@@ -486,6 +575,82 @@ describe('getUserFromAuth', () => {
     const afterGrant = await getUserFromAuth({ adminOnly: true });
     expect(afterGrant.authFailedResponse).not.toBeNull();
     expect(afterGrant.user).toBeNull();
+  });
+});
+
+describe('getUserFromAuth admin_access telemetry (REST)', () => {
+  let events: AdminAccessEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+  });
+
+  test('emits one rest/token event for an authorized admin via API token', async () => {
+    const admin = await insertTestUser({
+      google_user_email: `rest-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      is_super_admin: true,
+      api_token_pepper: 'rest-admin-pepper',
+    });
+    const token = generateApiToken(admin);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        'x-pathname': '/admin/api/safety-identifiers',
+        'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      event: 'admin_access',
+      surface: 'rest',
+      authVia: 'token',
+      adminTier: 'super_admin',
+      kiloUserId: admin.id,
+      email: admin.google_user_email,
+      route: '/admin/api/safety-identifiers',
+      method: null,
+      ip: '203.0.113.7',
+      tokenSource: null,
+    });
+  });
+
+  test('does not emit when a non-admin token hits an admin-only check', async () => {
+    const nonAdmin = await insertTestUser({
+      is_admin: false,
+      api_token_pepper: 'rest-nonadmin-pepper',
+    });
+    const token = generateApiToken(nonAdmin);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.authFailedResponse).not.toBeNull();
+    expect(events).toHaveLength(0);
+  });
+
+  test('does not emit for adminOnly:false calls even for an admin', async () => {
+    const admin = await insertTestUser({
+      is_admin: true,
+      api_token_pepper: 'rest-admin-noemit-pepper',
+    });
+    const token = generateApiToken(admin);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events).toHaveLength(0);
   });
 });
 

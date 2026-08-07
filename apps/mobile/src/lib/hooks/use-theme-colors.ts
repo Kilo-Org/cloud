@@ -26,6 +26,7 @@ export const lightColors = {
   accentSoftForeground: '#1A1A10',
   good: '#278150',
   warn: '#9F6612',
+  warnForeground: '#FFFFFF',
   info: '#2563EB',
 
   // Per-agent hues (full-opacity only — tile bg/border live in CSS tokens)
@@ -59,6 +60,7 @@ export const darkColors = {
   accentSoftForeground: '#1A1A10',
   good: '#5FCB8E',
   warn: '#F2B05F',
+  warnForeground: '#1A1A10',
   info: '#60A5FA',
 
   // Per-agent hues

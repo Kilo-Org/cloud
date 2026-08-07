@@ -36,6 +36,12 @@ import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+  KiloPassOrgPurchaseChannel,
+  KiloPassOrgProcessingRunState,
+  KiloPassOrgBonusMode,
+  KiloPassOrgIssuanceKind,
   FeedbackFor,
   FeedbackSource,
   CliSessionSharedState,
@@ -85,13 +91,6 @@ import {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
-  CostInsightSpendCategory,
-  CostInsightSpendSource,
-  CostInsightRollupDegradedReason,
-  CostInsightEventType,
-  CostInsightAlertKind,
-  CostInsightSuggestionKind,
-  CostInsightNotificationStatus,
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
@@ -131,6 +130,7 @@ import type {
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
   OrganizationModeConfig,
+  OrganizationGroupPolicies,
   OrganizationPlan,
   OrganizationRole,
   OrganizationSettings,
@@ -202,6 +202,12 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+  KiloPassOrgPurchaseChannel,
+  KiloPassOrgProcessingRunState,
+  KiloPassOrgBonusMode,
+  KiloPassOrgIssuanceKind,
   CliSessionSharedState,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
@@ -247,13 +253,6 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
-  CostInsightSpendCategory,
-  CostInsightSpendSource,
-  CostInsightRollupDegradedReason,
-  CostInsightEventType,
-  CostInsightAlertKind,
-  CostInsightSuggestionKind,
-  CostInsightNotificationStatus,
   CodeReviewAnalyticsCaptureStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
@@ -2744,25 +2743,79 @@ export const organizations = pgTable(
 
 export type Organization = typeof organizations.$inferSelect;
 
-export const cost_insight_owner_hour_totals = pgTable(
-  'cost_insight_owner_hour_totals',
+export const kilo_pass_org_term_versions = pgTable(
+  'kilo_pass_org_term_versions',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
+    version_key: text().notNull(),
+    tier: text().notNull().$type<KiloPassTier>(),
+    cadence: text().notNull().$type<KiloPassCadence>(),
+    billing_price_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    base_credit_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    bonus_credit_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    unlock_spend_microdollars_per_pass: bigint({ mode: 'number' }).notNull(),
+    bonus_mode: text().notNull().$type<KiloPassOrgBonusMode>(),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
-    total_microdollars: bigint({ mode: 'number' }).notNull(),
-    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_term_versions_version_key').on(table.version_key),
+    check(
+      'kilo_pass_org_term_versions_amounts_non_negative_check',
+      sql`${table.billing_price_microdollars_per_pass} >= 0 AND ${table.base_credit_microdollars_per_pass} >= 0 AND ${table.bonus_credit_microdollars_per_pass} >= 0 AND ${table.unlock_spend_microdollars_per_pass} >= 0`
+    ),
+    enumCheck('kilo_pass_org_term_versions_tier_check', table.tier, KiloPassTier),
+    enumCheck('kilo_pass_org_term_versions_cadence_check', table.cadence, KiloPassCadence),
+    enumCheck(
+      'kilo_pass_org_term_versions_bonus_mode_check',
+      table.bonus_mode,
+      KiloPassOrgBonusMode
+    ),
+  ]
+);
+
+export const kilo_pass_org_agreements = pgTable(
+  'kilo_pass_org_agreements',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    parent_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    state: text().notNull().$type<KiloPassOrgAgreementState>(),
+    processing_condition: text()
+      .notNull()
+      .$type<KiloPassOrgProcessingCondition>()
+      .default(KiloPassOrgProcessingCondition.Ready),
+    purchase_channel: text().notNull().$type<KiloPassOrgPurchaseChannel>(),
+    cadence: text().notNull().$type<KiloPassCadence>(),
+    purchased_pass_capacity: integer().notNull(),
+    next_purchased_pass_capacity: integer(),
+    next_capacity_effective_at: timestamp({ withTimezone: true, mode: 'string' }),
+    paid_from: timestamp({ withTimezone: true, mode: 'string' }),
+    paid_until: timestamp({ withTimezone: true, mode: 'string' }),
+    issuance_anchor_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    provider_subscription_id: text(),
+    provider_seat_add_on_item_id: text(),
+    activation_provider_event_id: text(),
+    external_contract_id: text(),
+    payment_review_required_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancellation_effective_at: timestamp({ withTimezone: true, mode: 'string' }),
+    manually_issued_through: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -2770,289 +2823,173 @@ export const cost_insight_owner_hour_totals = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    uniqueIndex('UQ_cost_insight_owner_hour_totals_user')
-      .on(table.owned_by_user_id, table.hour_start, table.spend_category)
-      .where(isNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_cost_insight_owner_hour_totals_org')
-      .on(table.owned_by_organization_id, table.hour_start, table.spend_category)
-      .where(isNull(table.owned_by_user_id)),
-    index('IDX_cost_insight_owner_hour_totals_hour').on(table.hour_start),
+    uniqueIndex('UQ_kilo_pass_org_agreements_one_non_ended_parent')
+      .on(table.parent_organization_id)
+      .where(sql`${table.state} <> 'ended'`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_provider_subscription')
+      .on(table.provider_subscription_id)
+      .where(sql`${table.provider_subscription_id} IS NOT NULL AND ${table.state} <> 'ended'`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_provider_seat_add_on_item')
+      .on(table.provider_seat_add_on_item_id)
+      .where(sql`${table.provider_seat_add_on_item_id} IS NOT NULL AND ${table.state} <> 'ended'`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_external_contract')
+      .on(table.external_contract_id)
+      .where(sql`${table.external_contract_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_org_agreements_activation_provider_event')
+      .on(table.activation_provider_event_id)
+      .where(sql`${table.activation_provider_event_id} IS NOT NULL`),
+    index('IDX_kilo_pass_org_agreements_processing').on(table.processing_condition),
     check(
-      'cost_insight_owner_hour_totals_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+      'kilo_pass_org_agreements_purchased_capacity_non_negative_check',
+      sql`${table.purchased_pass_capacity} >= 0`
     ),
     check(
-      'cost_insight_owner_hour_totals_hour_check',
-      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+      'kilo_pass_org_agreements_next_capacity_check',
+      sql`(${table.next_purchased_pass_capacity} IS NULL AND ${table.next_capacity_effective_at} IS NULL) OR (${table.next_purchased_pass_capacity} >= 0 AND ${table.next_capacity_effective_at} IS NOT NULL)`
+    ),
+    check(
+      'kilo_pass_org_agreements_paid_interval_check',
+      sql`(${table.paid_from} IS NULL AND ${table.paid_until} IS NULL) OR (${table.paid_from} IS NOT NULL AND ${table.paid_until} IS NOT NULL AND ${table.paid_from} < ${table.paid_until})`
+    ),
+    enumCheck('kilo_pass_org_agreements_state_check', table.state, KiloPassOrgAgreementState),
+    enumCheck(
+      'kilo_pass_org_agreements_processing_condition_check',
+      table.processing_condition,
+      KiloPassOrgProcessingCondition
     ),
     enumCheck(
-      'cost_insight_owner_hour_totals_category_check',
-      table.spend_category,
-      CostInsightSpendCategory
+      'kilo_pass_org_agreements_purchase_channel_check',
+      table.purchase_channel,
+      KiloPassOrgPurchaseChannel
     ),
-    check(
-      'cost_insight_owner_hour_totals_amount_positive_check',
-      sql`${table.total_microdollars} > 0`
-    ),
-    check(
-      'cost_insight_owner_hour_totals_amount_safe_check',
-      sql`${table.total_microdollars} <= 9007199254740991`
-    ),
-    check(
-      'cost_insight_owner_hour_totals_count_positive_check',
-      sql`${table.spend_record_count} > 0`
-    ),
-    check(
-      'cost_insight_owner_hour_totals_count_safe_check',
-      sql`${table.spend_record_count} <= 9007199254740991`
-    ),
+    enumCheck('kilo_pass_org_agreements_cadence_check', table.cadence, KiloPassCadence),
   ]
 );
 
-export type CostInsightOwnerHourTotal = typeof cost_insight_owner_hour_totals.$inferSelect;
-
-export const cost_insight_owner_hour_driver_buckets = pgTable(
-  'cost_insight_owner_hour_driver_buckets',
+export const kilo_pass_org_term_transitions = pgTable(
+  'kilo_pass_org_term_transitions',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
-    driver_key: text().notNull(),
-    source: text().$type<CostInsightSpendSource>().notNull(),
-    product_key: text().notNull(),
-    feature_key: text().notNull(),
-    model_or_plan_key: text().notNull(),
-    provider_key: text().notNull(),
-    actor_user_id: text()
+    agreement_id: uuid()
       .notNull()
-      .references(() => kilocode_users.id, { onUpdate: 'cascade' }),
-    total_microdollars: bigint({ mode: 'number' }).notNull(),
-    spend_record_count: bigint({ mode: 'number' }).notNull(),
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    from_term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    to_term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    effective_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    reason: text().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    uniqueIndex('UQ_cost_insight_driver_buckets_user')
-      .on(table.owned_by_user_id, table.hour_start, table.spend_category, table.driver_key)
-      .where(isNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_cost_insight_driver_buckets_org')
-      .on(table.owned_by_organization_id, table.hour_start, table.spend_category, table.driver_key)
-      .where(isNull(table.owned_by_user_id)),
-    index('IDX_cost_insight_driver_buckets_hour').on(table.hour_start),
-    check(
-      'cost_insight_driver_buckets_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    unique('UQ_kilo_pass_org_term_transitions_agreement_effective').on(
+      table.agreement_id,
+      table.effective_at
     ),
     check(
-      'cost_insight_driver_buckets_hour_check',
-      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
-    ),
-    enumCheck(
-      'cost_insight_driver_buckets_category_check',
-      table.spend_category,
-      CostInsightSpendCategory
-    ),
-    enumCheck('cost_insight_driver_buckets_source_check', table.source, CostInsightSpendSource),
-    check(
-      'cost_insight_driver_buckets_driver_key_check',
-      sql`${table.driver_key} ~ '^[0-9a-f]{64}$'`
-    ),
-    check(
-      'cost_insight_driver_buckets_product_key_check',
-      sql`char_length(${table.product_key}) BETWEEN 1 AND 128`
-    ),
-    check(
-      'cost_insight_driver_buckets_feature_key_check',
-      sql`char_length(${table.feature_key}) BETWEEN 1 AND 128`
-    ),
-    check(
-      'cost_insight_driver_buckets_model_key_check',
-      sql`char_length(${table.model_or_plan_key}) BETWEEN 1 AND 128`
-    ),
-    check(
-      'cost_insight_driver_buckets_provider_key_check',
-      sql`char_length(${table.provider_key}) BETWEEN 1 AND 128`
-    ),
-    check(
-      'cost_insight_driver_buckets_amount_positive_check',
-      sql`${table.total_microdollars} > 0`
-    ),
-    check(
-      'cost_insight_driver_buckets_amount_safe_check',
-      sql`${table.total_microdollars} <= 9007199254740991`
-    ),
-    check('cost_insight_driver_buckets_count_positive_check', sql`${table.spend_record_count} > 0`),
-    check(
-      'cost_insight_driver_buckets_count_safe_check',
-      sql`${table.spend_record_count} <= 9007199254740991`
+      'kilo_pass_org_term_transitions_changes_version_check',
+      sql`${table.from_term_version_id} <> ${table.to_term_version_id}`
     ),
   ]
 );
 
-export type CostInsightOwnerHourDriverBucket =
-  typeof cost_insight_owner_hour_driver_buckets.$inferSelect;
-
-export const cost_insight_evaluation_dirty_owners = pgTable(
-  'cost_insight_evaluation_dirty_owners',
+export const kilo_pass_org_allocation_plans = pgTable(
+  'kilo_pass_org_allocation_plans',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    generation: bigint({ mode: 'number' })
-      .default(sql`'1'`)
-      .notNull(),
-    dirty_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    claim_token: uuid(),
-    attempt_count: integer().default(0).notNull(),
-    last_error_redacted: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
+    agreement_id: uuid()
       .notNull()
-      .$onUpdateFn(() => sql`now()`),
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    effective_window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    version: integer().notNull(),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    uniqueIndex('UQ_cost_insight_evaluation_dirty_owners_user')
-      .on(table.owned_by_user_id)
-      .where(isNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_cost_insight_evaluation_dirty_owners_org')
-      .on(table.owned_by_organization_id)
-      .where(isNull(table.owned_by_user_id)),
-    index('IDX_cost_insight_evaluation_dirty_owners_claim').on(
-      table.next_attempt_at,
-      table.claimed_at,
-      table.dirty_at,
-      table.id
+    unique('UQ_kilo_pass_org_allocation_plans_agreement_window').on(
+      table.agreement_id,
+      table.effective_window_start
     ),
-    check(
-      'cost_insight_evaluation_dirty_owners_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    unique('UQ_kilo_pass_org_allocation_plans_agreement_version').on(
+      table.agreement_id,
+      table.version
     ),
-    check(
-      'cost_insight_evaluation_dirty_owners_generation_check',
-      sql`${table.generation} > 0 AND ${table.generation} <= 9007199254740991`
-    ),
-    check(
-      'cost_insight_evaluation_dirty_owners_attempt_count_check',
-      sql`${table.attempt_count} >= 0`
-    ),
-    check(
-      'cost_insight_evaluation_dirty_owners_claim_token_check',
-      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
-    ),
+    check('kilo_pass_org_allocation_plans_version_positive_check', sql`${table.version} > 0`),
   ]
 );
 
-export type CostInsightEvaluationDirtyOwner =
-  typeof cost_insight_evaluation_dirty_owners.$inferSelect;
-
-export const cost_insight_rollup_repairs = pgTable(
-  'cost_insight_rollup_repairs',
+export const kilo_pass_org_allocation_plan_rows = pgTable(
+  'kilo_pass_org_allocation_plan_rows',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    usage_id: uuid()
+    allocation_plan_id: uuid()
       .notNull()
-      .unique()
-      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    generation: bigint({ mode: 'number' })
-      .default(sql`'1'`)
-      .notNull(),
-    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    claim_token: uuid(),
-    attempt_count: integer().default(0).notNull(),
-    last_error_redacted: text(),
+      .references(() => kilo_pass_org_allocation_plans.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    allocation_container_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    pass_capacity: integer().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    index('IDX_cost_insight_rollup_repairs_user_hour').on(table.owned_by_user_id, table.hour_start),
-    index('IDX_cost_insight_rollup_repairs_org_hour').on(
-      table.owned_by_organization_id,
-      table.hour_start
+    unique('UQ_kilo_pass_org_allocation_plan_rows_plan_container').on(
+      table.allocation_plan_id,
+      table.allocation_container_organization_id
     ),
-    index('IDX_cost_insight_rollup_repairs_claim').on(
-      table.attempt_count,
-      table.next_attempt_at,
-      table.claimed_at,
-      table.hour_start,
-      table.id
-    ),
+    index('IDX_kilo_pass_org_allocation_plan_rows_positive_container')
+      .on(table.allocation_container_organization_id)
+      .where(sql`${table.pass_capacity} > 0`),
     check(
-      'cost_insight_rollup_repairs_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
-    ),
-    check(
-      'cost_insight_rollup_repairs_hour_check',
-      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
-    ),
-    check(
-      'cost_insight_rollup_repairs_generation_check',
-      sql`${table.generation} > 0 AND ${table.generation} <= 9007199254740991`
-    ),
-    check('cost_insight_rollup_repairs_attempt_count_check', sql`${table.attempt_count} >= 0`),
-    check(
-      'cost_insight_rollup_repairs_claim_token_check',
-      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+      'kilo_pass_org_allocation_plan_rows_capacity_non_negative_check',
+      sql`${table.pass_capacity} >= 0`
     ),
   ]
 );
 
-export type CostInsightRollupRepair = typeof cost_insight_rollup_repairs.$inferSelect;
-
-export const cost_insight_hourly_sweep_checkpoints = pgTable(
-  'cost_insight_hourly_sweep_checkpoints',
+export const kilo_pass_org_processing_runs = pgTable(
+  'kilo_pass_org_processing_runs',
   {
-    job_name: text().primaryKey().notNull(),
-    cycle_id: uuid(),
-    cycle_as_of: timestamp({ withTimezone: true, mode: 'string' }),
-    cohort_created_before: timestamp({ withTimezone: true, mode: 'string' }),
-    cursor_owner_type: text().$type<'user' | 'organization'>(),
-    cursor_owner_id: text(),
-    lease_token: uuid(),
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    state: text().notNull().$type<KiloPassOrgProcessingRunState>(),
+    idempotency_key: text().notNull(),
     lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attempt_count: integer().notNull().default(0),
+    failure_code: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -3060,553 +2997,48 @@ export const cost_insight_hourly_sweep_checkpoints = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    check('cost_insight_hourly_sweep_job_name_check', sql`${table.job_name} <> ''`),
+    unique('UQ_kilo_pass_org_processing_runs_agreement_window').on(
+      table.agreement_id,
+      table.window_start
+    ),
+    unique('UQ_kilo_pass_org_processing_runs_idempotency').on(table.idempotency_key),
+    index('IDX_kilo_pass_org_processing_runs_state_lease').on(table.state, table.lease_expires_at),
     check(
-      'cost_insight_hourly_sweep_cursor_owner_type_check',
-      sql`${table.cursor_owner_type} IS NULL OR ${table.cursor_owner_type} IN ('user', 'organization')`
+      'kilo_pass_org_processing_runs_window_check',
+      sql`${table.window_start} < ${table.window_end}`
     ),
     check(
-      'cost_insight_hourly_sweep_cursor_check',
-      sql`(${table.cursor_owner_type} IS NULL AND ${table.cursor_owner_id} IS NULL) OR (${table.cursor_owner_type} IS NOT NULL AND ${table.cursor_owner_id} IS NOT NULL)`
-    ),
-    check(
-      'cost_insight_hourly_sweep_lease_check',
-      sql`(${table.lease_token} IS NULL AND ${table.lease_expires_at} IS NULL) OR (${table.lease_token} IS NOT NULL AND ${table.lease_expires_at} IS NOT NULL)`
-    ),
-    check(
-      'cost_insight_hourly_sweep_cycle_check',
-      sql`(${table.cycle_id} IS NULL AND ${table.cycle_as_of} IS NULL AND ${table.cohort_created_before} IS NULL AND ${table.started_at} IS NULL) OR (${table.cycle_id} IS NOT NULL AND ${table.cycle_as_of} IS NOT NULL AND ${table.cohort_created_before} IS NOT NULL AND ${table.started_at} IS NOT NULL)`
-    ),
-  ]
-);
-
-export type CostInsightHourlySweepCheckpoint =
-  typeof cost_insight_hourly_sweep_checkpoints.$inferSelect;
-
-export const cost_insight_rollup_coverage = pgTable(
-  'cost_insight_rollup_coverage',
-  {
-    rollup_version: smallint().primaryKey().notNull(),
-    live_capture_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
-    coverage_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
-    last_reconciled_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    check('cost_insight_rollup_coverage_version_check', sql`${table.rollup_version} > 0`),
-    check(
-      'cost_insight_rollup_coverage_live_hour_check',
-      sql`${table.live_capture_start_hour} IS NULL OR ${table.live_capture_start_hour} = date_trunc('hour', ${table.live_capture_start_hour}, 'UTC')`
-    ),
-    check(
-      'cost_insight_rollup_coverage_start_hour_check',
-      sql`${table.coverage_start_hour} IS NULL OR ${table.coverage_start_hour} = date_trunc('hour', ${table.coverage_start_hour}, 'UTC')`
-    ),
-    check(
-      'cost_insight_rollup_coverage_range_check',
-      sql`${table.coverage_start_hour} IS NULL OR (${table.live_capture_start_hour} IS NOT NULL AND ${table.coverage_start_hour} <= ${table.live_capture_start_hour})`
-    ),
-  ]
-);
-
-export type CostInsightRollupCoverage = typeof cost_insight_rollup_coverage.$inferSelect;
-
-export const cost_insight_rollup_degraded_intervals = pgTable(
-  'cost_insight_rollup_degraded_intervals',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    start_hour: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    end_hour_exclusive: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    source: text().$type<CostInsightSpendSource>(),
-    reason: text().$type<CostInsightRollupDegradedReason>().notNull(),
-    detected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    resolved_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    index('IDX_cost_insight_degraded_intervals_unresolved')
-      .on(table.start_hour, table.end_hour_exclusive)
-      .where(isNull(table.resolved_at)),
-    check(
-      'cost_insight_degraded_intervals_start_hour_check',
-      sql`${table.start_hour} = date_trunc('hour', ${table.start_hour}, 'UTC')`
-    ),
-    check(
-      'cost_insight_degraded_intervals_end_hour_check',
-      sql`${table.end_hour_exclusive} = date_trunc('hour', ${table.end_hour_exclusive}, 'UTC')`
-    ),
-    check(
-      'cost_insight_degraded_intervals_range_check',
-      sql`${table.end_hour_exclusive} > ${table.start_hour}`
-    ),
-    check(
-      'cost_insight_degraded_intervals_resolution_check',
-      sql`${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.detected_at}`
-    ),
-    enumCheck('cost_insight_degraded_intervals_source_check', table.source, CostInsightSpendSource),
-    enumCheck(
-      'cost_insight_degraded_intervals_reason_check',
-      table.reason,
-      CostInsightRollupDegradedReason
-    ),
-  ]
-);
-
-export type CostInsightRollupDegradedInterval =
-  typeof cost_insight_rollup_degraded_intervals.$inferSelect;
-
-const CostInsightSafeIntegerSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-const CostInsightPositiveSafeIntegerSchema = z
-  .number()
-  .int()
-  .positive()
-  .max(Number.MAX_SAFE_INTEGER);
-const CostInsightTimestampSchema = z.string().refine(value => Number.isFinite(Date.parse(value)), {
-  message: 'Expected parseable timestamp.',
-});
-const CostInsightDriverDimensionSchema = z.string().min(1).max(128);
-
-export const CostInsightEventSnapshotSchema = z.object({
-  thresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  thresholdWindow: z.enum(['rolling_24h', 'rolling_7d', 'rolling_30d']).optional(),
-  rolling24HourMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  rolling7DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  rolling30DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  currentHourVariableMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  anomalyBaselineMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  anomalyThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
-  topDrivers: z
-    .array(
-      z.object({
-        spendCategory: z.enum(['variable', 'scheduled']),
-        source: z.enum(['ai_gateway', 'kiloclaw', 'coding_plan', 'other']),
-        productKey: CostInsightDriverDimensionSchema,
-        featureKey: CostInsightDriverDimensionSchema,
-        modelOrPlanKey: CostInsightDriverDimensionSchema,
-        providerKey: CostInsightDriverDimensionSchema,
-        actorUserId: z.string().min(1).nullable(),
-        totalMicrodollars: CostInsightPositiveSafeIntegerSchema,
-        spendRecordCount: CostInsightPositiveSafeIntegerSchema,
-      })
-    )
-    .max(5)
-    .optional(),
-  topDriversWindow: z
-    .object({
-      startInclusive: CostInsightTimestampSchema,
-      endExclusive: CostInsightTimestampSchema,
-      spendCategory: z.enum(['variable', 'scheduled']).optional(),
-    })
-    .refine(value => Date.parse(value.endExclusive) > Date.parse(value.startInclusive), {
-      message: 'Expected topDriversWindow endExclusive to be after startInclusive.',
-    })
-    .optional(),
-  changedFields: z.record(z.string(), z.object({ old: z.unknown(), new: z.unknown() })).optional(),
-  settings: z
-    .object({
-      spendAlertsEnabled: z.boolean(),
-      anomalyAlertsEnabled: z.boolean(),
-      costSuggestionsEnabled: z.boolean(),
-      spendThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
-      spend7DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
-      spend30DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
-    })
-    .optional(),
-  suggestion: z
-    .object({
-      suggestionKey: z.string().regex(/^[0-9a-f]{64}$/),
-      evidenceWindowStart: CostInsightTimestampSchema,
-      evidenceWindowEnd: CostInsightTimestampSchema,
-      observedMicrodollars: CostInsightPositiveSafeIntegerSchema,
-      ctaHref: z.string().min(1),
-    })
-    .refine(value => Date.parse(value.evidenceWindowEnd) > Date.parse(value.evidenceWindowStart), {
-      message: 'Expected suggestion evidence window end to be after start.',
-    })
-    .optional(),
-});
-
-export type CostInsightEventSnapshot = z.infer<typeof CostInsightEventSnapshotSchema>;
-
-export const cost_insight_owner_configs = pgTable(
-  'cost_insight_owner_configs',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    spend_alerts_enabled: boolean().default(false).notNull(),
-    anomaly_alerts_enabled: boolean().default(true).notNull(),
-    cost_suggestions_enabled: boolean().default(true).notNull(),
-    spend_threshold_microdollars: bigint({ mode: 'number' }),
-    spend_7_day_threshold_microdollars: bigint({ mode: 'number' }),
-    spend_30_day_threshold_microdollars: bigint({ mode: 'number' }),
-    spend_alerts_enabled_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    uniqueIndex('UQ_cost_insight_owner_configs_user')
-      .on(table.owned_by_user_id)
-      .where(isNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_cost_insight_owner_configs_org')
-      .on(table.owned_by_organization_id)
-      .where(isNull(table.owned_by_user_id)),
-    index('IDX_cost_insight_owner_configs_evaluation')
-      .on(table.updated_at, table.id)
-      .where(sql`${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE`),
-    index('IDX_cost_insight_owner_configs_user_active')
-      .on(table.owned_by_user_id)
-      .where(
-        sql`${table.owned_by_user_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
-      ),
-    index('IDX_cost_insight_owner_configs_org_active')
-      .on(table.owned_by_organization_id)
-      .where(
-        sql`${table.owned_by_organization_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
-      ),
-    check(
-      'cost_insight_owner_configs_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
-    ),
-    check(
-      'cost_insight_owner_configs_threshold_positive_check',
-      sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} > 0`
-    ),
-    check(
-      'cost_insight_owner_configs_threshold_safe_check',
-      sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} <= 9007199254740991`
-    ),
-    check(
-      'cost_insight_owner_configs_7_day_threshold_positive_check',
-      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} > 0`
-    ),
-    check(
-      'cost_insight_owner_configs_7_day_threshold_safe_check',
-      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} <= 9007199254740991`
-    ),
-    check(
-      'cost_insight_owner_configs_30_day_threshold_positive_check',
-      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} > 0`
-    ),
-    check(
-      'cost_insight_owner_configs_30_day_threshold_safe_check',
-      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} <= 9007199254740991`
-    ),
-    check(
-      'cost_insight_owner_configs_enabled_at_check',
-      sql`${table.spend_alerts_enabled} = TRUE OR ${table.spend_alerts_enabled_at} IS NULL`
-    ),
-  ]
-);
-
-export type CostInsightOwnerConfig = typeof cost_insight_owner_configs.$inferSelect;
-export type NewCostInsightOwnerConfig = typeof cost_insight_owner_configs.$inferInsert;
-
-export const cost_insight_active_suggestions = pgTable(
-  'cost_insight_active_suggestions',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    suggestion_kind: text().$type<CostInsightSuggestionKind>().notNull(),
-    suggestion_key: text().notNull(),
-    title: text().notNull(),
-    description: text().notNull(),
-    cta_label: text().notNull(),
-    cta_href: text().notNull(),
-    evidence_window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    evidence_window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    observed_microdollars: bigint({ mode: 'number' }).notNull(),
-    benefit_label: text().notNull(),
-    benefit_detail: text().notNull(),
-    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    dismissed_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    uniqueIndex('UQ_cost_insight_active_suggestions_user_key')
-      .on(table.owned_by_user_id, table.suggestion_key)
-      .where(isNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_cost_insight_active_suggestions_org_key')
-      .on(table.owned_by_organization_id, table.suggestion_key)
-      .where(isNull(table.owned_by_user_id)),
-    index('IDX_cost_insight_active_suggestions_user_active')
-      .on(table.owned_by_user_id, table.created_at.desc())
-      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.dismissed_at} IS NULL`),
-    index('IDX_cost_insight_active_suggestions_org_active')
-      .on(table.owned_by_organization_id, table.created_at.desc())
-      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.dismissed_at} IS NULL`),
-    check(
-      'cost_insight_active_suggestions_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+      'kilo_pass_org_processing_runs_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
     ),
     enumCheck(
-      'cost_insight_active_suggestions_kind_check',
-      table.suggestion_kind,
-      CostInsightSuggestionKind
-    ),
-    check(
-      'cost_insight_active_suggestions_key_check',
-      sql`${table.suggestion_key} ~ '^[0-9a-f]{64}$'`
-    ),
-    check(
-      'cost_insight_active_suggestions_window_check',
-      sql`${table.evidence_window_end} > ${table.evidence_window_start}`
-    ),
-    check(
-      'cost_insight_active_suggestions_observed_positive_check',
-      sql`${table.observed_microdollars} > 0`
-    ),
-    check(
-      'cost_insight_active_suggestions_observed_safe_check',
-      sql`${table.observed_microdollars} <= 9007199254740991`
-    ),
-    check(
-      'cost_insight_active_suggestions_dismissed_by_check',
-      sql`${table.dismissed_at} IS NOT NULL OR ${table.dismissed_by_user_id} IS NULL`
+      'kilo_pass_org_processing_runs_state_check',
+      table.state,
+      KiloPassOrgProcessingRunState
     ),
   ]
 );
 
-export type CostInsightActiveSuggestion = typeof cost_insight_active_suggestions.$inferSelect;
-export type NewCostInsightActiveSuggestion = typeof cost_insight_active_suggestions.$inferInsert;
-
-export const cost_insight_events = pgTable(
-  'cost_insight_events',
+export const kilo_pass_org_notification_deliveries = pgTable(
+  'kilo_pass_org_notification_deliveries',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    event_type: text().$type<CostInsightEventType>().notNull(),
-    alert_kind: text().$type<CostInsightAlertKind>(),
-    suggestion_kind: text().$type<CostInsightSuggestionKind>(),
-    active_suggestion_id: uuid().references(() => cost_insight_active_suggestions.id, {
-      onDelete: 'set null',
-    }),
-    actor_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
-    title: text().notNull(),
-    description: text().notNull(),
-    snapshot: jsonb().$type<CostInsightEventSnapshot>().default({}).notNull(),
-    dedupe_key: text(),
-    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_cost_insight_events_user_occurred').on(
-      table.owned_by_user_id,
-      table.occurred_at.desc(),
-      table.id
-    ),
-    index('IDX_cost_insight_events_org_occurred').on(
-      table.owned_by_organization_id,
-      table.occurred_at.desc(),
-      table.id
-    ),
-    index('IDX_cost_insight_events_occurred').on(table.occurred_at),
-    uniqueIndex('UQ_cost_insight_events_user_dedupe')
-      .on(table.owned_by_user_id, table.dedupe_key)
-      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.dedupe_key} IS NOT NULL`),
-    uniqueIndex('UQ_cost_insight_events_org_dedupe')
-      .on(table.owned_by_organization_id, table.dedupe_key)
-      .where(
-        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.dedupe_key} IS NOT NULL`
-      ),
-    check(
-      'cost_insight_events_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
-    ),
-    enumCheck('cost_insight_events_type_check', table.event_type, CostInsightEventType),
-    enumCheck('cost_insight_events_alert_kind_check', table.alert_kind, CostInsightAlertKind),
-    enumCheck(
-      'cost_insight_events_suggestion_kind_check',
-      table.suggestion_kind,
-      CostInsightSuggestionKind
-    ),
-    check(
-      'cost_insight_events_alert_kind_presence_check',
-      sql`(${table.event_type} IN ('anomaly_alert', 'threshold_crossed', 'alert_reviewed') AND ${table.alert_kind} IS NOT NULL) OR (${table.event_type} NOT IN ('anomaly_alert', 'threshold_crossed', 'alert_reviewed') AND ${table.alert_kind} IS NULL)`
-    ),
-    check(
-      'cost_insight_events_suggestion_kind_presence_check',
-      sql`(${table.event_type} IN ('suggestion_created', 'suggestion_dismissed') AND ${table.suggestion_kind} IS NOT NULL) OR (${table.event_type} NOT IN ('suggestion_created', 'suggestion_dismissed') AND ${table.suggestion_kind} IS NULL)`
-    ),
-  ]
-);
-
-export type CostInsightEvent = typeof cost_insight_events.$inferSelect;
-export type NewCostInsightEvent = typeof cost_insight_events.$inferInsert;
-
-export const cost_insight_owner_states = pgTable(
-  'cost_insight_owner_states',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
-    last_evaluated_at: timestamp({ withTimezone: true, mode: 'string' }),
-    active_anomaly_event_id: uuid().references(() => cost_insight_events.id, {
-      onDelete: 'set null',
-    }),
-    active_anomaly_episode_id: uuid(),
-    active_anomaly_hour_start: timestamp({ withTimezone: true, mode: 'string' }),
-    active_anomaly_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
-    active_anomaly_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    threshold_crossing_active: boolean().default(false).notNull(),
-    active_threshold_event_id: uuid().references(() => cost_insight_events.id, {
-      onDelete: 'set null',
-    }),
-    active_threshold_episode_id: uuid(),
-    threshold_crossing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    active_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
-    threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
-    rolling_7_day_threshold_crossing_active: boolean().default(false).notNull(),
-    active_rolling_7_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
-      onDelete: 'set null',
-    }),
-    active_rolling_7_day_threshold_episode_id: uuid(),
-    rolling_7_day_threshold_crossing_started_at: timestamp({
-      withTimezone: true,
-      mode: 'string',
-    }),
-    active_rolling_7_day_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
-    rolling_7_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    rolling_7_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
-    rolling_30_day_threshold_crossing_active: boolean().default(false).notNull(),
-    active_rolling_30_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
-      onDelete: 'set null',
-    }),
-    active_rolling_30_day_threshold_episode_id: uuid(),
-    rolling_30_day_threshold_crossing_started_at: timestamp({
-      withTimezone: true,
-      mode: 'string',
-    }),
-    active_rolling_30_day_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
-    rolling_30_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    rolling_30_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
+    processing_run_id: uuid()
       .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    uniqueIndex('UQ_cost_insight_owner_states_user')
-      .on(table.owned_by_user_id)
-      .where(isNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_cost_insight_owner_states_org')
-      .on(table.owned_by_organization_id)
-      .where(isNull(table.owned_by_user_id)),
-    index('IDX_cost_insight_owner_states_unreviewed_user')
-      .on(table.owned_by_user_id, table.updated_at)
-      .where(
-        sql`${table.owned_by_user_id} IS NOT NULL AND ((${table.active_anomaly_episode_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_episode_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
-      ),
-    index('IDX_cost_insight_owner_states_unreviewed_org')
-      .on(table.owned_by_organization_id, table.updated_at)
-      .where(
-        sql`${table.owned_by_organization_id} IS NOT NULL AND ((${table.active_anomaly_episode_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_episode_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
-      ),
-    check(
-      'cost_insight_owner_states_owner_check',
-      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
-    ),
-    check(
-      'cost_insight_owner_states_anomaly_hour_check',
-      sql`${table.active_anomaly_hour_start} IS NULL OR ${table.active_anomaly_hour_start} = date_trunc('hour', ${table.active_anomaly_hour_start}, 'UTC')`
-    ),
-    check(
-      'cost_insight_owner_states_threshold_active_check',
-      sql`${table.threshold_crossing_active} = TRUE OR (${table.active_threshold_event_id} IS NULL AND ${table.active_threshold_episode_id} IS NULL AND ${table.threshold_crossing_started_at} IS NULL AND ${table.active_threshold_snapshot} IS NULL AND ${table.threshold_reviewed_at} IS NULL)`
-    ),
-    check(
-      'cost_insight_owner_states_7_day_threshold_active_check',
-      sql`${table.rolling_7_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_7_day_threshold_event_id} IS NULL AND ${table.active_rolling_7_day_threshold_episode_id} IS NULL AND ${table.rolling_7_day_threshold_crossing_started_at} IS NULL AND ${table.active_rolling_7_day_threshold_snapshot} IS NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL)`
-    ),
-    check(
-      'cost_insight_owner_states_30_day_threshold_active_check',
-      sql`${table.rolling_30_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_30_day_threshold_event_id} IS NULL AND ${table.active_rolling_30_day_threshold_episode_id} IS NULL AND ${table.rolling_30_day_threshold_crossing_started_at} IS NULL AND ${table.active_rolling_30_day_threshold_snapshot} IS NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL)`
-    ),
-  ]
-);
-
-export type CostInsightOwnerState = typeof cost_insight_owner_states.$inferSelect;
-export type NewCostInsightOwnerState = typeof cost_insight_owner_states.$inferInsert;
-
-export const cost_insight_notification_deliveries = pgTable(
-  'cost_insight_notification_deliveries',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    event_id: uuid()
+      .references(() => kilo_pass_org_processing_runs.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    recipient_kilo_user_id: text()
       .notNull()
-      .references(() => cost_insight_events.id, { onDelete: 'cascade' }),
-    recipient_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    channel: text().default('email').notNull(),
-    status: text().$type<CostInsightNotificationStatus>().default('pending').notNull(),
-    attempt_count: integer().default(0).notNull(),
-    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    status: text().notNull().default('pending').$type<'pending' | 'sending' | 'sent' | 'failed'>(),
+    attempt_count: integer().notNull().default(0),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }),
-    failed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    last_error_redacted: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -3614,42 +3046,209 @@ export const cost_insight_notification_deliveries = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    uniqueIndex('UQ_cost_insight_notification_deliveries_event_recipient_channel').on(
-      table.event_id,
-      table.recipient_user_id,
-      table.channel
+    unique('UQ_kilo_pass_org_notification_deliveries_run_recipient').on(
+      table.processing_run_id,
+      table.recipient_kilo_user_id
     ),
-    index('IDX_cost_insight_notification_deliveries_claim').on(
-      table.status,
-      table.next_attempt_at,
-      table.id
-    ),
-    index('IDX_cost_insight_notification_deliveries_event').on(table.event_id),
-    check('cost_insight_notification_deliveries_channel_check', sql`${table.channel} = 'email'`),
-    enumCheck(
-      'cost_insight_notification_deliveries_status_check',
-      table.status,
-      CostInsightNotificationStatus
+    index('IDX_kilo_pass_org_notification_deliveries_status').on(table.status, table.created_at),
+    check(
+      'kilo_pass_org_notification_deliveries_status_check',
+      sql`${table.status} IN ('pending', 'sending', 'sent', 'failed')`
     ),
     check(
-      'cost_insight_notification_deliveries_attempt_count_check',
+      'kilo_pass_org_notification_deliveries_attempt_count_check',
       sql`${table.attempt_count} >= 0`
     ),
     check(
-      'cost_insight_notification_deliveries_terminal_check',
-      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL) OR (${table.status} <> 'sent' AND ${table.sent_at} IS NULL)`
-    ),
-    check(
-      'cost_insight_notification_deliveries_failure_check',
-      sql`(${table.status} = 'failed' AND ${table.failed_at} IS NOT NULL) OR (${table.status} <> 'failed' AND ${table.failed_at} IS NULL)`
+      'kilo_pass_org_notification_deliveries_sent_check',
+      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL AND ${table.lease_expires_at} IS NULL) OR (${table.status} = 'sending' AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NOT NULL) OR (${table.status} IN ('pending', 'failed') AND ${table.sent_at} IS NULL AND ${table.lease_expires_at} IS NULL)`
     ),
   ]
 );
 
-export type CostInsightNotificationDelivery =
-  typeof cost_insight_notification_deliveries.$inferSelect;
-export type NewCostInsightNotificationDelivery =
-  typeof cost_insight_notification_deliveries.$inferInsert;
+export const kilo_pass_org_issuance_snapshots = pgTable(
+  'kilo_pass_org_issuance_snapshots',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_agreements.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    processing_run_id: uuid().references(() => kilo_pass_org_processing_runs.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    allocation_plan_id: uuid().references(() => kilo_pass_org_allocation_plans.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    term_version_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_term_versions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    allocation_container_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    qualifying_spend_starts_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    kind: text().notNull().$type<KiloPassOrgIssuanceKind>(),
+    tranche_key: text().notNull(),
+    allocated_pass_capacity: integer().notNull(),
+    base_credit_microdollars: bigint({ mode: 'number' }).notNull(),
+    bonus_credit_microdollars: bigint({ mode: 'number' }).notNull(),
+    unlock_spend_microdollars: bigint({ mode: 'number' }).notNull(),
+    qualifying_spend_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    bonus_mode: text().notNull().$type<KiloPassOrgBonusMode>(),
+    bonus_unlocked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    repair_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    bonus_credit_transaction_id: uuid().references(() => credit_transactions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    base_credit_transaction_id: uuid().references(() => credit_transactions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_issuance_snapshots_container_window_tranche').on(
+      table.agreement_id,
+      table.allocation_container_organization_id,
+      table.window_start,
+      table.tranche_key
+    ),
+    uniqueIndex('UQ_kilo_pass_org_issuance_snapshots_base_credit_transaction')
+      .on(table.base_credit_transaction_id)
+      .where(sql`${table.base_credit_transaction_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_org_issuance_snapshots_bonus_credit_transaction')
+      .on(table.bonus_credit_transaction_id)
+      .where(sql`${table.bonus_credit_transaction_id} IS NOT NULL`),
+    index('IDX_kilo_pass_org_issuance_snapshots_window').on(table.agreement_id, table.window_start),
+    check(
+      'kilo_pass_org_issuance_snapshots_window_check',
+      sql`${table.window_start} < ${table.window_end}`
+    ),
+    check(
+      'kilo_pass_org_issuance_snapshots_qualifying_spend_window_check',
+      sql`${table.window_start} <= ${table.qualifying_spend_starts_at} AND ${table.qualifying_spend_starts_at} < ${table.window_end}`
+    ),
+    check(
+      'kilo_pass_org_issuance_snapshots_values_non_negative_check',
+      sql`${table.allocated_pass_capacity} >= 0 AND ${table.base_credit_microdollars} >= 0 AND ${table.bonus_credit_microdollars} >= 0 AND ${table.unlock_spend_microdollars} >= 0 AND ${table.qualifying_spend_microdollars} >= 0`
+    ),
+    enumCheck('kilo_pass_org_issuance_snapshots_kind_check', table.kind, KiloPassOrgIssuanceKind),
+    enumCheck(
+      'kilo_pass_org_issuance_snapshots_bonus_mode_check',
+      table.bonus_mode,
+      KiloPassOrgBonusMode
+    ),
+  ]
+);
+
+export const kilo_pass_org_supplements = pgTable(
+  'kilo_pass_org_supplements',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    issuance_snapshot_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_issuance_snapshots.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    provider_invoice_line_id: text().notNull(),
+    remaining_service_numerator: bigint({ mode: 'number' }).notNull(),
+    remaining_service_denominator: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_supplements_provider_invoice_line').on(table.provider_invoice_line_id),
+    check(
+      'kilo_pass_org_supplements_ratio_check',
+      sql`${table.remaining_service_numerator} > 0 AND ${table.remaining_service_denominator} > 0 AND ${table.remaining_service_numerator} <= ${table.remaining_service_denominator}`
+    ),
+  ]
+);
+
+export const kilo_pass_org_qualifying_spend_events = pgTable(
+  'kilo_pass_org_qualifying_spend_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    issuance_snapshot_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_org_issuance_snapshots.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    allocation_container_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    credit_transaction_id: uuid()
+      .notNull()
+      .references(() => credit_transactions.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    spent_microdollars: bigint({ mode: 'number' }).notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_org_qualifying_spend_events_snapshot_credit_transaction').on(
+      table.issuance_snapshot_id,
+      table.credit_transaction_id
+    ),
+    index('IDX_kilo_pass_org_qualifying_spend_events_snapshot_occurred').on(
+      table.issuance_snapshot_id,
+      table.occurred_at
+    ),
+    check(
+      'kilo_pass_org_qualifying_spend_events_amount_positive_check',
+      sql`${table.spent_microdollars} > 0`
+    ),
+  ]
+);
+
+export const kilo_pass_org_audit_records = pgTable(
+  'kilo_pass_org_audit_records',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    agreement_id: uuid().references(() => kilo_pass_org_agreements.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    actor_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    action: text().notNull(),
+    reason: text(),
+    before_json: jsonb().$type<Record<string, unknown> | null>(),
+    after_json: jsonb().$type<Record<string, unknown> | null>(),
+    idempotency_key: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_org_audit_records_idempotency')
+      .on(table.idempotency_key)
+      .where(sql`${table.idempotency_key} IS NOT NULL`),
+    index('IDX_kilo_pass_org_audit_records_agreement_created').on(
+      table.agreement_id,
+      table.created_at
+    ),
+  ]
+);
 
 export const organization_memberships = pgTable(
   'organization_memberships',
@@ -3674,6 +3273,106 @@ export const organization_memberships = pgTable(
 );
 
 export type OrganizationMembership = typeof organization_memberships.$inferSelect;
+
+export const organization_groups = pgTable(
+  'organization_groups',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    description: text(),
+    policies: jsonb().$type<OrganizationGroupPolicies>().default([]).notNull(),
+    created_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_groups_organization_id_id').on(table.organization_id, table.id),
+    uniqueIndex('UQ_organization_groups_organization_id_canonical_name').on(
+      table.organization_id,
+      sql`lower(btrim(${table.name}))`
+    ),
+    index('IDX_organization_groups_organization_id').on(table.organization_id),
+    check(
+      'organization_groups_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 80`
+    ),
+    check(
+      'organization_groups_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 500`
+    ),
+  ]
+);
+
+export type OrganizationGroup = typeof organization_groups.$inferSelect;
+export type NewOrganizationGroup = typeof organization_groups.$inferInsert;
+
+export const organization_group_memberships = pgTable(
+  'organization_group_memberships',
+  {
+    organization_id: uuid().notNull(),
+    group_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    assigned_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.group_id, table.kilo_user_id],
+      name: 'PK_organization_group_memberships',
+    }),
+    foreignKey({
+      columns: [table.organization_id, table.group_id],
+      foreignColumns: [organization_groups.organization_id, organization_groups.id],
+      name: 'FK_organization_group_memberships_group',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kilo_user_id],
+      foreignColumns: [
+        organization_memberships.organization_id,
+        organization_memberships.kilo_user_id,
+      ],
+      name: 'FK_organization_group_memberships_member',
+    }).onDelete('cascade'),
+    index('IDX_organization_group_memberships_organization_user').on(
+      table.organization_id,
+      table.kilo_user_id
+    ),
+  ]
+);
+
+export type OrganizationGroupMembership = typeof organization_group_memberships.$inferSelect;
+
+export const organization_group_policy_settings = pgTable(
+  'organization_group_policy_settings',
+  {
+    organization_id: uuid()
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    default_policies: jsonb()
+      .$type<OrganizationGroupPolicies>()
+      .default([{ type: 'model_access', data: { mode: 'all' } }])
+      .notNull(),
+    policy_revision: integer().default(1).notNull(),
+    updated_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('organization_group_policy_settings_revision_check', sql`${table.policy_revision} >= 1`),
+  ]
+);
+
+export type OrganizationGroupPolicySettings =
+  typeof organization_group_policy_settings.$inferSelect;
 
 export const organization_membership_removals = pgTable(
   'organization_membership_removals',
@@ -4032,6 +3731,10 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_github_platform_inst')
+      .on(table.platform, table.github_app_type, table.platform_installation_id)
+      .concurrently()
+      .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
@@ -4723,11 +4426,17 @@ export const magic_link_tokens = pgTable(
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     attempts: integer().default(0).notNull(),
+    reserved_until: timestamp({ withTimezone: true, mode: 'string' }),
     purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
+    challenge_id: uuid(),
   },
   table => [
     index('idx_magic_link_tokens_email').on(table.email),
     index('idx_magic_link_tokens_expires_at').on(table.expires_at),
+    uniqueIndex('UQ_magic_link_tokens_challenge_id')
+      .on(table.challenge_id)
+      .concurrently()
+      .where(sql`${table.challenge_id} IS NOT NULL`),
     check('check_expires_at_future', sql`${table.expires_at} > ${table.created_at}`),
   ]
 );
@@ -5868,11 +5577,14 @@ export const device_auth_requests = pgTable(
       onDelete: 'cascade',
     }),
     status: text()
-      .$type<'pending' | 'approved' | 'denied' | 'expired'>()
+      .$type<'pending' | 'approved' | 'denied' | 'expired' | 'consumed'>()
       .notNull()
       .default('pending'),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     approved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    user_code: text(),
+    device_code_hash: text(),
     user_agent: text(),
     ip_address: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -5886,10 +5598,62 @@ export const device_auth_requests = pgTable(
     index('IDX_device_auth_requests_status').on(table.status),
     index('IDX_device_auth_requests_expires_at').on(table.expires_at),
     index('IDX_device_auth_requests_kilo_user_id').on(table.kilo_user_id),
+    uniqueIndex('UQ_device_auth_requests_device_code_hash')
+      .on(table.device_code_hash)
+      .concurrently()
+      .where(sql`${table.device_code_hash} IS NOT NULL`),
+    index('IDX_device_auth_requests_user_code')
+      .on(table.user_code)
+      .concurrently()
+      .where(sql`${table.user_code} IS NOT NULL`),
   ]
 );
 
 export type DeviceAuthRequest = typeof device_auth_requests.$inferSelect;
+
+export const device_sessions = pgTable(
+  'device_sessions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    device_auth_request_id: uuid(),
+    user_agent: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_reason: text(),
+  },
+  table => [
+    index('IDX_device_sessions_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_device_sessions_revoked_at').on(table.revoked_at),
+  ]
+);
+
+export type DeviceSession = typeof device_sessions.$inferSelect;
+
+export const device_refresh_tokens = pgTable(
+  'device_refresh_tokens',
+  {
+    token_hash: text().primaryKey().notNull(),
+    device_session_id: uuid()
+      .notNull()
+      .references(() => device_sessions.id, { onDelete: 'cascade' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_device_refresh_tokens_device_session_id').on(table.device_session_id),
+    index('IDX_device_refresh_tokens_expires_at').on(table.expires_at),
+  ]
+);
+
+export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
 
 // App Builder Projects
 export const app_builder_projects = pgTable(
@@ -7669,11 +7433,10 @@ export const kiloclaw_instances = pgTable(
       .on(table.organization_id, table.created_at)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
     // Non-partial index over all rows (including destroyed) so we can answer
-    // "what is this user's earliest instance" without a sequential scan. Used
-    // by `userIsWithinFirstKiloClawInstanceWindow` on the AI gateway hot path;
-    // the existing partial-by-user indexes can't serve it because they exclude
-    // destroyed rows, and destroyed rows must still count for "first instance"
-    // semantics.
+    // "what is this user's earliest instance" and user-instance listings that
+    // include destroyed rows without a sequential scan. The existing
+    // partial-by-user indexes can't serve these because they exclude destroyed
+    // rows.
     index('IDX_kiloclaw_instances_user_id_created_at').on(table.user_id, table.created_at),
     // Powers admin "instances on version X" filter; partial since destroyed rows are excluded.
     index('IDX_kiloclaw_instances_tracked_image_tag')
@@ -8760,6 +8523,7 @@ export const coding_plan_key_inventory = pgTable(
     plan_id: text().notNull(),
     provider_id: text().notNull(),
     upstream_plan_id: text().notNull(),
+    upstream_usage_id: text(),
     encrypted_api_key: jsonb().$type<EncryptedData>(),
     credential_fingerprint: text().notNull(),
     status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),
@@ -8779,6 +8543,9 @@ export const coding_plan_key_inventory = pgTable(
   },
   table => [
     uniqueIndex('UQ_coding_plan_key_inv_fingerprint').on(table.credential_fingerprint),
+    uniqueIndex('UQ_coding_plan_key_inv_provider_usage_id')
+      .on(table.provider_id, table.upstream_usage_id)
+      .where(sql`${table.upstream_usage_id} IS NOT NULL`),
     index('IDX_coding_plan_key_inv_plan_status').on(table.plan_id, table.status),
     index('IDX_coding_plan_key_inv_available')
       .on(table.plan_id)
@@ -10077,6 +9844,7 @@ export type NewCloudBillingSku = typeof cloud_billing_sku.$inferInsert;
 export type ContainerUsageSubjectType = 'user' | 'org';
 export type ContainerUsageActorType = 'user' | 'bot';
 export type ContainerUsageIntervalStatus = 'open' | 'closed';
+export type ContainerUsageBillingMode = 'shadow' | 'paid';
 export type ContainerUsageCloseReason =
   | 'exit'
   | 'runtime_signal'
@@ -10107,6 +9875,10 @@ export const container_usage_interval = pgTable(
     last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_heartbeat_seq: integer().notNull().default(0),
     confirmed_seconds: integer().notNull().default(0),
+    billing_mode: text().$type<ContainerUsageBillingMode>().notNull().default('shadow'),
+    // Paid intervals retain the accepted SKU price even after the SKU is superseded.
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }),
+    settled_billable_seconds: integer().notNull().default(0),
     stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     close_reason: text().$type<ContainerUsageCloseReason>(),
     exit_code: integer(),
@@ -10136,6 +9908,14 @@ export const container_usage_interval = pgTable(
     ),
     check('container_usage_interval_status', sql`${table.status} IN ('open', 'closed')`),
     check(
+      'container_usage_interval_billing_mode',
+      sql`${table.billing_mode} IN ('shadow', 'paid')`
+    ),
+    check(
+      'container_usage_interval_paid_rate',
+      sql`(${table.billing_mode} = 'shadow' AND ${table.rate_cents_per_unit} IS NULL) OR (${table.billing_mode} = 'paid' AND ${table.rate_cents_per_unit} > 0)`
+    ),
+    check(
       'container_usage_interval_open_closed_shape',
       sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL)`
     ),
@@ -10150,6 +9930,10 @@ export const container_usage_interval = pgTable(
     check(
       'container_usage_interval_confirmed_seconds_nonnegative',
       sql`${table.confirmed_seconds} >= 0`
+    ),
+    check(
+      'container_usage_interval_settled_billable_seconds_nonnegative',
+      sql`${table.settled_billable_seconds} >= 0 AND ${table.settled_billable_seconds} <= ${table.confirmed_seconds}`
     ),
     check(
       'container_usage_interval_final_stop_seq_positive',
@@ -10190,4 +9974,106 @@ export const container_usage_segment = pgTable(
 );
 
 export type ContainerUsageSegment = typeof container_usage_segment.$inferSelect;
+
+export const github_install_states = pgTable(
+  'github_install_states',
+  {
+    token: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owner_type: text().notNull(),
+    owner_id: text().notNull(),
+    github_app_type: text().notNull(),
+    return_to: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_github_install_states_expires_at').on(table.expires_at),
+    check('github_install_states_owner_type_check', sql`${table.owner_type} IN ('org', 'user')`),
+  ]
+);
+
+export type GitHubInstallState = typeof github_install_states.$inferSelect;
+
+// C14: native admission attestation
+export const native_admission_challenges = pgTable(
+  'native_admission_challenges',
+  {
+    challenge: text().primaryKey().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('IDX_native_admission_challenges_expires_at').on(table.expires_at)]
+);
+
+export type NativeAdmissionChallenge = typeof native_admission_challenges.$inferSelect;
+
+export const native_attested_keys = pgTable(
+  'native_attested_keys',
+  {
+    key_id: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().notNull().$type<'ios' | 'android'>(),
+    public_key: text().notNull(),
+    sign_count: integer().notNull().default(0),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attested_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_native_attested_keys_kilo_user_id').on(table.kilo_user_id),
+    check('native_attested_keys_platform_check', sql`${table.platform} IN ('ios', 'android')`),
+  ]
+);
+
+export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
+
+// Immutable metered-infrastructure debit ledger, partitioned monthly on the
+// source's immutable effective timestamp. Source domains own their own
+// idempotency and cumulative-settlement state.
+export const compute_usage_charge = pgTable(
+  'compute_usage_charge',
+  {
+    usage_source: text().notNull(),
+    usage_source_id: text().notNull(),
+    user_id: text().references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    cloud_billing_sku_id: text()
+      .notNull()
+      .references(() => cloud_billing_sku.id, { onDelete: 'restrict' }),
+    quantity: decimal({ precision: 24, scale: 12 }).notNull(),
+    settled_quantity_after: decimal({ precision: 24, scale: 12 }),
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }).notNull(),
+    amount_microdollars: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.usage_source, table.usage_source_id, table.created_at] }),
+    index('IDX_compute_usage_charge_user_created').on(table.user_id, table.created_at),
+    index('IDX_compute_usage_charge_organization_created').on(
+      table.organization_id,
+      table.created_at
+    ),
+    check(
+      'compute_usage_charge_exactly_one_payer',
+      sql`(${table.user_id} IS NULL) <> (${table.organization_id} IS NULL)`
+    ),
+    check('compute_usage_charge_quantity_positive', sql`${table.quantity} > 0`),
+    check(
+      'compute_usage_charge_settled_quantity_positive',
+      sql`${table.settled_quantity_after} IS NULL OR ${table.settled_quantity_after} > 0`
+    ),
+    check('compute_usage_charge_rate_positive', sql`${table.rate_cents_per_unit} > 0`),
+    check('compute_usage_charge_amount_positive', sql`${table.amount_microdollars} > 0`),
+  ]
+);
+
+export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
+export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;

@@ -31,7 +31,8 @@ import {
 } from '@/components/subscriptions/helpers';
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
-import { MiniMaxPlanIcon } from './MiniMaxPlanIcon';
+import { CodingPlanProviderIcon } from './CodingPlanProviderIcon';
+import { CodingPlanUsage } from './CodingPlanUsage';
 
 export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string }) {
   const trpc = useTRPC();
@@ -114,7 +115,7 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
         backHref="/subscriptions#coding-plans"
         backLabel="Back to subscriptions"
         title={subscriptionTitle}
-        icon={<MiniMaxPlanIcon />}
+        icon={<CodingPlanProviderIcon providerId={subscription.providerId} />}
         status={displayStatus}
       />
 
@@ -141,8 +142,8 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
               <CalendarClock />
               <AlertDescription>
                 {subscription.planName} remains active through {periodEnd}. Kilo deletes the
-                installed MiniMax key if unchanged and revokes the issued credential when billing
-                ends.
+                installed {subscription.providerName} key if unchanged and revokes the issued
+                credential when billing ends.
               </AlertDescription>
             </Alert>
           ) : isPastDue ? (
@@ -150,8 +151,9 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
               <CalendarClock />
               <AlertDescription>
                 Renewal requires Kilo Credits. If payment recovery fails by {formattedBillingDate},
-                {subscription.planName} ends and Kilo revokes its issued MiniMax credential. A
-                MiniMax key you replaced or created yourself is not deleted.
+                {subscription.planName} ends and Kilo revokes its issued {subscription.providerName}{' '}
+                credential. A {subscription.providerName} key you replaced or created yourself is
+                not deleted.
               </AlertDescription>
             </Alert>
           ) : isCanceled ? (
@@ -159,12 +161,17 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
               <CalendarClock />
               <AlertDescription>
                 {subscription.planName} ended on {formattedBillingDate}. Kilo has initiated
-                revocation of the MiniMax credential issued for this subscription.
+                revocation of the {subscription.providerName} credential issued for this
+                subscription.
               </AlertDescription>
             </Alert>
           ) : null}
         </CardContent>
       </Card>
+
+      {subscription.canQueryUsage ? (
+        <CodingPlanUsage subscriptionId={subscription.id} variant="full" />
+      ) : null}
 
       <Card>
         <CardHeader className="pb-4">
@@ -248,8 +255,8 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
             <AlertDialogTitle>Cancel {subscription.planName} at period end?</AlertDialogTitle>
             <AlertDialogDescription>
               Your {subscriptionTitle} subscription remains active through {periodEnd}. At that
-              point, billing stops, Kilo deletes the installed MiniMax key if you have not replaced
-              it, and revokes the credential issued for this subscription.
+              point, billing stops, Kilo deletes the installed {subscription.providerName} key if
+              you have not replaced it, and revokes the credential issued for this subscription.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

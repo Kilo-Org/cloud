@@ -7,20 +7,24 @@ Accepted
 ## Context
 
 `kilo-auto/*` virtual models route a request to a concrete model on the user's
-behalf. The existing `balanced` tier picks a single fixed default (Qwen). We want
-a tier that routes each request to the *cheapest model proven accurate enough for
-that request's difficulty*, where "proven" means measured by our own benchmarks
-rather than asserted by hand.
+behalf. The `balanced` and `efficient` IDs now use the same benchmark-driven
+decision engine. The `balanced` ID remains as a compatibility alias.
+
+This change retires two legacy behaviors. The `kilo/auto` compatibility ID is
+no longer treated as an auto model (upstream OpenClaw stopped hardcoding it),
+and the KiloClaw first-instance setup promo (the free `:clawsetup` Sonnet
+variant served from the legacy balanced branch) is removed; balanced requests
+resolve through the benchmark classifier like efficient ones.
 
 This requires three capabilities the codebase did not have: a way to benchmark
 candidate models reproducibly, a way to turn benchmark results into a routing
-decision per request, and a way to bill the routing overhead honestly. The model
-must ship hidden so it can be validated on Kilo team traffic before it competes
-with `balanced` for real users.
+decision per request, and a way to bill the routing overhead honestly. The
+`efficient` ID must remain hidden until team validation completes; `balanced` is
+the public compatibility alias for the same routing behavior.
 
 ## Decision
 
-Introduce a hidden virtual model `kilo-auto/efficient` backed by a
+Use the virtual models `kilo-auto/efficient` and `kilo-auto/balanced` with the same
 benchmark-driven decision engine. Ownership is split across three components with
 strict, one-directional dependencies:
 
@@ -32,10 +36,9 @@ strict, one-directional dependencies:
   endpoint classifies the request, derives a difficulty tier, and reads (never
   writes) the published artifacts to pick a model. Session stickiness lives in a
   Durable Object here.
-- **`apps/web` gateway** owns *exposure and billing*. It resolves
-  `kilo-auto/efficient`, blocks on `/decide`, falls back to balanced Qwen, bills
-  the classifier cost, and hosts the admin panel (proxied to the benchmark worker
-  with the internal secret).
+- **`apps/web` gateway** owns *exposure and billing*. It resolves both public IDs,
+  blocks on `/decide`, falls back to balanced Qwen, bills the classifier cost, and
+  hosts the admin panel (proxied to the benchmark worker with the internal secret).
 
 Shared request-classification code (prompt, parsing, taxonomy, tier derivation,
 routing-table schema) lives in `packages/auto-routing-contracts` so the benchmark
@@ -69,9 +72,8 @@ replays the exact code production runs.
 6. **One active run per kind.** A partial unique index plus a server-side check
    admit at most one `running` classifier and one `running` decider run; a second
    start returns 409, not 500. Stale runs are swept to `failed` on run listing.
-7. **The model stays hidden** (excluded from `/models`, usable by id) until team
-   validation graduates it. Graduation criteria live in the rollout section
-   below, not in code.
+7. **The efficient model stays hidden** (excluded from `/models`, usable by id)
+   until team validation graduates it. The balanced alias remains public.
 8. **Token boundary.** The decider CLI authenticates as a real Kilo user via a 6h
    token minted by `apps/web`'s internal endpoint (gated by
    `INTERNAL_API_SECRET`). The token only ever lives in a child-process env var —
@@ -81,7 +83,7 @@ replays the exact code production runs.
 
 The classifier LLM runs on Kilo's OpenRouter credential during model resolution,
 so its cost is owed regardless of how the request ends. It is billed as a separate
-microdollar usage row (`requested_model: kilo-auto/efficient`, model
+microdollar usage row (`requested_model` set to the requested auto ID, model
 `auto-routing/classifier`) to the authenticated requesting user, scheduled as soon
 as auth resolves so it survives every downstream rejection path (abuse block,
 provider/api-kind rejection, balance/org checks, upstream 4xx). It is billed even
@@ -139,8 +141,8 @@ fallbacks never re-anchor the session's model.
 
 ### Rollback
 
-`kilo-auto/efficient` is hidden and additive, so rollback is containment, not
-revert:
+`kilo-auto/efficient` is hidden and additive, while `kilo-auto/balanced` remains
+the public compatibility alias. Rollback is containment, not revert:
 
 - **Disable the model**: stop routing to it. Because it is hidden, no `/models`
   consumer depends on it; the gateway already serves balanced on any null

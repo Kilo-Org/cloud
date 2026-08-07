@@ -169,4 +169,17 @@ describe('validateWrapperDispatchTicket', () => {
       error: 'Invalid ticket signature',
     });
   });
+
+  it('accepts a legacy Kilo JWT carrying deviceSessionId claim', async () => {
+    const legacyToken = jwt.sign(
+      { version: 3, kiloUserId: 'user-1', deviceSessionId: 'session-xyz-999' },
+      secret,
+      { algorithm: 'HS256', expiresIn: '1 minute' }
+    );
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${legacyToken}`, secret)).resolves.toEqual({
+      success: true,
+      claims: { type: 'legacy_kilo_token', userId: 'user-1' },
+    });
+  });
 });

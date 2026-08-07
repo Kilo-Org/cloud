@@ -60,6 +60,7 @@ const WORKSPACE_FAILURE_MESSAGES = {
   git_clone_timeout: 'Repository clone timed out',
   git_checkout_timeout: 'Repository checkout timed out',
   git_authentication_failed: 'Repository authentication failed',
+  git_rate_limited: 'Repository request was rate limited',
   git_network_failed: 'Repository network request failed',
   git_pack_corrupt: 'Repository data is corrupt',
   git_checkout_conflict: 'Repository checkout conflict',

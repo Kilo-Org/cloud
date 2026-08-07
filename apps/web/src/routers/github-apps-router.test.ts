@@ -3,6 +3,7 @@ import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
+import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
 
 type TestIntegration = {
   id: string;
@@ -22,7 +23,9 @@ type InstallationDetails = {
 const mockGetIntegrationForOwner =
   jest.fn<(owner: Owner, platform: string) => Promise<TestIntegration | null>>();
 const mockUpsertPlatformIntegrationForOwner =
-  jest.fn<(owner: Owner, details: Record<string, unknown>) => Promise<void>>();
+  jest.fn<
+    (owner: Owner, details: Record<string, unknown>) => Promise<UpsertPlatformIntegrationResult>
+  >();
 const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 const mockFetchGitHubInstallationDetails =
@@ -87,7 +90,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
       created_at: '2026-01-01T00:00:00.000Z',
     });
     mockFetchGitHubRepositories.mockResolvedValue([]);
-    mockUpsertPlatformIntegrationForOwner.mockResolvedValue(undefined);
+    mockUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockUpdateRepositoriesForIntegration.mockResolvedValue(undefined);
   });
 

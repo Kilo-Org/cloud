@@ -1,5 +1,6 @@
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { Octokit } from '@octokit/rest';
 
 /**
  * Type of GitHub App to use
@@ -82,4 +83,47 @@ export function getGitHubAppName(appType: GitHubAppType): string {
     return process.env.NEXT_PUBLIC_GITHUB_LITE_APP_NAME || 'KiloConnect-Lite';
   }
   return process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
+}
+
+/**
+ * Asserts that the GitHub user administers the given installation.
+ *
+ * Calls GET /user/installations with the user access token through Octokit.
+ * Paginates through all results. Returns true when installationId appears.
+ *
+ * @param params.accessToken - A user-scoped OAuth access token.
+ * @param params.installationId - The GitHub App installation ID to check.
+ * @returns true when the user administers the installation.
+ * @throws Error for network or API failures — never returns false for those.
+ */
+export async function assertUserAdministersInstallation(params: {
+  accessToken: string;
+  installationId: number | string;
+}): Promise<boolean> {
+  const { accessToken, installationId } = params;
+  const targetId =
+    typeof installationId === 'string' ? parseInt(installationId, 10) : installationId;
+
+  const octokit = new Octokit({ auth: accessToken });
+
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const { data } = await octokit.rest.apps.listInstallationsForAuthenticatedUser({
+      per_page: perPage,
+      page,
+    });
+
+    for (const installation of data.installations) {
+      if (installation.id === targetId) {
+        return true;
+      }
+    }
+
+    if (data.installations.length < perPage) break;
+    page++;
+  }
+
+  return false;
 }

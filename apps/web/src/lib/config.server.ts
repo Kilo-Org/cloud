@@ -11,6 +11,8 @@ export const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY');
 export const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID');
 export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
 export const GOOGLE_CLIENT_SECRET = getEnvVariable('GOOGLE_CLIENT_SECRET');
+export const ANACONDA_CLIENT_ID = getEnvVariable('ANACONDA_CLIENT_ID');
+export const ANACONDA_CLIENT_SECRET = getEnvVariable('ANACONDA_CLIENT_SECRET');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_ID = getEnvVariable('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET = getEnvVariable(
   'GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
@@ -84,6 +86,16 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 // the feature can ship dark; set CODING_PLANS_PURCHASE_ENABLED=true to reveal it.
 export const CODING_PLANS_PURCHASE_ENABLED =
   getEnvVariable('CODING_PLANS_PURCHASE_ENABLED') === 'true';
+
+// Optional at module initialization so unrelated web processes can start
+// without BytePlus control-plane credentials. BytePlus operations fail closed
+// when either value is absent.
+export const BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID = getEnvVariable(
+  'BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID'
+);
+export const BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY = getEnvVariable(
+  'BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY'
+);
 
 export function isLocalCodeReviewDevelopmentEnabled(): boolean {
   return (
@@ -212,9 +224,24 @@ export const APPLE_CLIENT_ID = getEnvVariable('APPLE_CLIENT_ID');
 export const APPLE_TEAM_ID = getEnvVariable('APPLE_TEAM_ID');
 export const APPLE_KEY_ID = getEnvVariable('APPLE_KEY_ID');
 export const APPLE_PRIVATE_KEY = getEnvVariable('APPLE_PRIVATE_KEY');
+export const APPLE_APP_BUNDLE_ID = getEnvVariable('APPLE_APP_BUNDLE_ID');
 
 // Native Google client is a separate OAuth client from the web GOOGLE_CLIENT_ID.
 export const GOOGLE_IOS_CLIENT_ID = getEnvVariable('GOOGLE_IOS_CLIENT_ID');
+
+// Play Integrity verification config
+export const GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME = getEnvVariable(
+  'GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME'
+);
+export const GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS = getEnvVariable(
+  'GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS'
+);
+export const GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER = getEnvVariable(
+  'GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER'
+);
+export const GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = getEnvVariable(
+  'GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY'
+);
 
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.

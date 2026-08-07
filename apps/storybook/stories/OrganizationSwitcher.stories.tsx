@@ -28,7 +28,7 @@ const organizations: OrganizationSwitcherOrganization[] = [
   },
   {
     organizationId: 'org-long',
-    organizationName: '[seed:cost-insights] Northstar Labs',
+    organizationName: 'Northstar Laboratories and Research Group',
     role: 'owner',
   },
 ];

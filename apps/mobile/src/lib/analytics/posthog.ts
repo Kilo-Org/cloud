@@ -1,9 +1,16 @@
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
-import PostHog from 'posthog-react-native';
+import PostHog, { PostHogPersistedProperty } from 'posthog-react-native';
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { POSTHOG_API_KEY } from '@/lib/config';
+import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
+import {
+  posthogCustomStorage,
+  purgePostHogPersistence,
+  sealPostHogStorage,
+  unsealPostHogStorage,
+} from '@/lib/telemetry/posthog-storage';
 
 /**
  * Product analytics events. Same PostHog project as the web app, so
@@ -43,6 +50,7 @@ export const ORGANIZATION_MEMBER_INVITED_EVENT = 'organization_member_invited';
 export const KILO_PASS_PURCHASE_STARTED_EVENT = 'kilo_pass_purchase_started';
 export const KILO_PASS_PURCHASE_COMPLETED_EVENT = 'kilo_pass_purchase_completed';
 export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
+export const APP_STARTUP_EVENT = 'app_startup';
 
 export type AnalyticsSurface = 'claw' | 'cloud-agent' | 'remote-session';
 
@@ -51,12 +59,59 @@ export type AnalyticsSurface = 'claw' | 'cloud-agent' | 'remote-session';
 export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
 
 let client: PostHog | null = null;
+/** Generation that created the client. Stale events from a prior account
+ *  are dropped — they must not transmit under the new identity. */
+let clientGeneration: number | null = null;
 
 // `useFeatureFlag` subscribers register here rather than on `client`, because
 // the client is created lazily (after consent) — a component that mounts before
 // init would otherwise subscribe to a null client and never re-render when
 // flags later load. init wires the client's single update into this registry.
 const flagListeners = new Set<() => void>();
+
+// Subscriber registry so layout-drain can re-trigger once the client is
+// created or cleared.  `initPostHog` and `discardPostHog` fire these
+// after the client reference changes.
+const readyListeners = new Set<() => void>();
+
+// Track every discard completion so resumePostHog can await all prior
+// work.  Each discard appends to this chain; resumePostHog captures the
+// tail at call time.  Discards that begin after resume are not waited on.
+// oxlint-disable-next-line promise/prefer-await-to-then -- seed value
+let discardChain: Promise<void> = Promise.resolve();
+
+/** True when `initPostHog` has created the client.  Layout-drain uses
+ *  this to defer `takeStartupTimings` until capture can succeed. */
+export function isPostHogReady(): boolean {
+  return client !== null;
+}
+
+/** Register a listener that fires when the client becomes ready (after
+ *  `initPostHog`) or not ready (after `discardPostHog`). */
+export function subscribeToPostHogReady(listener: () => void): () => void {
+  readyListeners.add(listener);
+  return () => {
+    readyListeners.delete(listener);
+  };
+}
+
+function notifyPostHogReady(): void {
+  for (const listener of readyListeners) {
+    listener();
+  }
+}
+
+/** Serialize a discard after the chain tail.  Always continues the chain
+ *  even when the prior step rejects, so one failed optOut cannot break
+ *  later discards or recovery. */
+async function chainDiscard(prev: Promise<void>, next: Promise<void>): Promise<void> {
+  try {
+    await prev;
+  } catch {
+    // previous discard failed — continue the chain.
+  }
+  await next;
+}
 
 // App version + build for PostHog. Both are strings; `app_build` is a monotonic
 // integer-as-string, so it's the reliable field for "release >= N" flag rules
@@ -94,19 +149,34 @@ function deviceFormFactor(): 'phone' | 'tablet' | 'desktop' | 'tv' | 'unknown' {
   return 'unknown';
 }
 
+/**
+ * Allowed person properties and event super properties (hard). Custom fields:
+ * `platform`, `device_form_factor`, `app_version`, `app_build`. SDK stock
+ * auto-captured fields: `$device_manufacturer`, `$device_name`, `$os_name`,
+ * `$os_version`, `$is_emulator`, `$device_type`, `$app_name`, `$app_version`,
+ * `$app_build`, `$app_namespace`, `$locale`, `$timezone`, `$screen_width`,
+ * `$screen_height`. Anything outside this list needs a DEC-02 amendment.
+ */
 export function initPostHog(): void {
+  if (!allowsOptional()) {
+    return;
+  }
   if (client) {
     return;
   }
   client = new PostHog(POSTHOG_API_KEY, {
     host: 'https://us.i.posthog.com',
+    disableGeoip: true,
     // No events are sent from dev builds.
     disabled: __DEV__,
     customAppProperties: properties => ({
       ...properties,
       device_form_factor: deviceFormFactor(),
     }),
+    customStorage: posthogCustomStorage,
   });
+  clientGeneration = currentGeneration();
+  notifyPostHogReady();
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.
   void client.register({ platform: 'mobile' });
@@ -124,23 +194,121 @@ export function captureEvent(
   name: string,
   properties?: Record<string, string | number | boolean>
 ): void {
+  if (!allowsOptional() || currentGeneration() !== clientGeneration) {
+    return;
+  }
   client?.capture(name, properties);
 }
 
 export function captureScreen(name: string): void {
+  if (!allowsOptional() || currentGeneration() !== clientGeneration) {
+    return;
+  }
   void client?.screen(name);
 }
 
 export function identifyUser(email: string): void {
+  if (!allowsOptional() || currentGeneration() !== clientGeneration) {
+    return;
+  }
   // Persist version/build on the person profile too, so cohorts and insights
-  // can segment by release (not just flag targeting).
-  client?.identify(email, { email, ...appVersionProperties() });
+  // can segment by release (not just flag targeting). No email or name — the
+  // allowed-field list above this function governs person properties.
+  client?.identify(email, appVersionProperties());
   // Pull the freshly-identified user's flags so gated UI resolves promptly.
   void client?.reloadFeatureFlags();
 }
 
 export function resetAnalyticsUser(): void {
   client?.reset();
+}
+
+/**
+ * Discard all pending events and tear down the SDK. Never calls `shutdown()`
+ * or `flush()` — both drain queues, and the purpose of this discard is to drop
+ * them unread. The sequence:
+ *
+ * 1. `sealPostHogStorage()` — sync, first. No debounced persist from the
+ *    old client can recreate files after the purge.
+ * 2. Clear all three queues (`Queue`, `LogsQueue`, `AiQueue`) so a flush
+ *    timer that fires after this step has nothing to send.
+ * 3. Drop the module-level `client` reference so concurrent code cannot
+ *    capture through the stale instance, and a concurrent `initPostHog()`
+ *    can create a fresh client.
+ * 4. Flag listeners persist — like ready listeners, they must survive the
+ *    discard so mounted `useFeatureFlag` subscribers receive updates when
+ *    a later `initPostHog` re-creates the client.
+ * 5. `optOut` so a relaunch does not resume capture on the stored anonymous
+ *    id. The completion is appended to `discardChain` so `resumePostHog()`
+ *    can await every prior discard before unsealing storage.
+ *
+
+ * EV-01: An HTTP request already in flight when discard begins cannot be
+ * recalled. The risk is bounded to one batch.
+ */
+// oxlint-disable-next-line require-await -- await is inside the IIFE
+export async function discardPostHog(): Promise<void> {
+  sealPostHogStorage();
+
+  const completion = (async () => {
+    const c = client;
+    if (typeof c?.setPersistedProperty !== 'function') {
+      client = null;
+      notifyPostHogReady();
+      return;
+    }
+
+    c.setPersistedProperty(PostHogPersistedProperty.Queue, null);
+    c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
+    c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
+
+    // Drop the live reference before any async work so concurrent code
+    // cannot capture through the stale instance. Flag listeners persist —
+    // like ready listeners, they must survive the discard so mounted
+    // useFeatureFlag subscribers receive updates when the client is
+    // re-created by a later initPostHog.
+    // Ready listeners persist — they must observe both the false transition
+    // now and a true transition from a later initPostHog.
+    client = null;
+    notifyPostHogReady();
+
+    try {
+      await c.optOut();
+    } catch {
+      // optOut might reject — drop everything regardless.
+    }
+  })();
+
+  // Serialize: chain this completion after every prior discard so
+  // resumePostHog can await the tail and be certain every discard
+  // that began before it has finished.
+  // Memory: each discard creates one extra promise. The chain is at most
+  // the number of consent transitions in a session, which is bounded.
+  discardChain = chainDiscard(discardChain, completion);
+
+  return completion;
+}
+
+/**
+ * Await every discard that began before this call, then wait for the SDK's
+ * 100 ms persistence debounce (`PERSIST_DEBOUNCE_MS` in `dist/storage.js`),
+ * then unseal storage so a later `initPostHog()` can persist again.
+ * Capturing the chain tail at call time guarantees every pending debounced
+ * write from the old client has fired against the sealed sink and been
+ * rejected before the new client is allowed to write.
+ */
+export async function resumePostHog(): Promise<void> {
+  // Capture the chain tail so a discard that begins after this call does
+  // not delay the upcoming init.
+  await discardChain;
+  // Wait for the SDK's 100 ms persistence debounce. The sealed sink drops the
+  // old client's scheduled write. Purge then removes its stale on-disk queue
+  // before a new client can preload it.
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 110);
+  });
+  purgePostHogPersistence();
+  unsealPostHogStorage();
 }
 
 function isFeatureEnabled(key: string, defaultValue: boolean): boolean {

@@ -5,6 +5,7 @@ import { OrganizationInfoCard } from './OrganizationInfoCard';
 import { OrganizationAdminMembers } from './OrganizationMembersCard';
 import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard';
 import { SeatUsageCard } from './SeatUsageCard';
+import { KiloPassUsageCard } from './KiloPassUsageCard';
 import { SSOSignupCard } from './SSOSignupCard';
 import { LockableContainer } from './LockableContainer';
 import { OrganizationAdminContextProvider } from './OrganizationContextWrapper';
@@ -12,7 +13,10 @@ import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationWelcomeHeader } from './OrganizationWelcomeHeader';
 import { NewOrganizationWelcomeHeader } from './NewOrganizationWelcomeHeader';
 import { OrganizationTopupSuccessHeader } from './OrganizationTopupSuccessHeader';
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
@@ -155,7 +159,7 @@ export function OrganizationDashboard({
                 ) : (
                   <OrganizationProvidersAndModelsConfigurationCard
                     organizationId={organizationId}
-                    readonly={!(currentRole === 'owner' || isKiloAdmin)}
+                    readonly={!(canManageOrganization(currentRole) || isKiloAdmin)}
                   />
                 )}
               </>
@@ -166,6 +170,10 @@ export function OrganizationDashboard({
               <OrganizationAdminMembers organizationId={organizationId} />
             </LockableContainer>
             <SeatUsageCard organizationId={organizationId} />
+            {canManageOrganizationBilling(currentRole) &&
+              organizationData?.parent_organization_id === null && (
+                <KiloPassUsageCard organizationId={organizationId} />
+              )}
             {canManageOrganizationBilling(currentRole) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}
@@ -174,7 +182,7 @@ export function OrganizationDashboard({
                 <SSOSignupCard organization={organizationData} role={currentRole} />
               </LockableContainer>
             )}
-            {(currentRole === 'owner' || isKiloAdmin) && (
+            {(canManageOrganization(currentRole) || isKiloAdmin) && (
               <OrganizationEmailPreferencesCard organizationId={organizationId} />
             )}
             <Card>

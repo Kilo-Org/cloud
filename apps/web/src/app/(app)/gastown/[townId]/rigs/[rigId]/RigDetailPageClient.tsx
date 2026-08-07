@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { sortAgentsByStatus } from '@/lib/gastown/sort-agents';
 import { toast } from 'sonner';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BeadBoard } from '@/components/gastown/BeadBoard';
 import { AgentCard } from '@/components/gastown/AgentCard';
@@ -166,10 +166,10 @@ export function RigDetailPageClient({
             <Settings className="size-4" />
           </Link>
           <Button
-            variant="primary"
+            variant="default"
             size="sm"
             onClick={() => setIsCreateBeadOpen(true)}
-            className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+            className="gap-1.5"
           >
             <Plus className="size-3.5" />
             New Bead

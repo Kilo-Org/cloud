@@ -171,6 +171,13 @@ type PreservedFields = {
   lastActivityAt: string | undefined;
   /** Sticky like the three above: WS payloads never carry an org id. */
   organizationId: string | null | undefined;
+  /**
+   * Sticky: WS payloads never carry total cost. Preserved only when a
+   * numeric value exists — absent when the poll never set it (no invented
+   * null preservation, exactly the `lastActivityAt` pattern with a number
+   * guard).
+   */
+  totalCostMicrodollars: number | undefined;
 };
 
 function readEnrichment(current: CachedActiveSession | undefined): PreservedFields {
@@ -185,6 +192,10 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
     // collapse with a `typeof === 'string'` guard — that would hide every
     // personal row from the personal tray (see filter helper).
     organizationId: current?.organizationId,
+    totalCostMicrodollars:
+      typeof current?.totalCostMicrodollars === 'number'
+        ? current.totalCostMicrodollars
+        : undefined,
   };
 }
 
@@ -341,6 +352,18 @@ export function filterActiveSessionsByOrganization<T extends { organizationId?: 
     return [...sessions];
   }
   return sessions.filter(session => session.organizationId === organizationId);
+}
+
+/**
+ * Ids of every row in the active-sessions cache, WITHOUT the org-context
+ * filter. Used to exclude active sessions from stored history the moment the
+ * live state exists in the cache — including WS-written rows not yet
+ * org-attributed — so a live session never renders as a stored-history twin
+ * while it waits for enrichment. The pinned tray itself stays org-filtered,
+ * so the pinned set is always a subset of this exclusion set.
+ */
+export function selectActiveExclusionIds(sessions: readonly { id: string }[]): Set<string> {
+  return new Set(sessions.map(s => s.id));
 }
 
 /**

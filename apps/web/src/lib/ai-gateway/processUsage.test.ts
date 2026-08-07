@@ -26,10 +26,6 @@ import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
 import {
-  cost_insight_owner_hour_driver_buckets,
-  cost_insight_owner_hour_totals,
-  cost_insight_rollup_degraded_intervals,
-  cost_insight_rollup_repairs,
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_daily_repairs,
@@ -613,34 +609,6 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(false);
     expect(usageRecord?.created_at).toBeTruthy();
     expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
-
-    await waitForExpectation(async () => {
-      const [total] = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
-      expect(total).toMatchObject({
-        owned_by_organization_id: null,
-        spend_category: 'variable',
-        total_microdollars: 500,
-        spend_record_count: 1,
-      });
-
-      const [driver] = await db
-        .select()
-        .from(cost_insight_owner_hour_driver_buckets)
-        .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
-      expect(driver).toMatchObject({
-        source: 'ai_gateway',
-        product_key: 'vscode-extension',
-        feature_key: 'chat_completions',
-        model_or_plan_key: 'anthropic/claude-3.7-sonnet',
-        provider_key: 'Provider',
-        actor_user_id: user.id,
-        total_microdollars: 500,
-        spend_record_count: 1,
-      });
-    });
   });
 
   test('stores session_id when provided', async () => {
@@ -748,12 +716,6 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(true);
     expect(usageRecord?.model).toBe('openai/gpt-4.1');
     expect(metadataRecord?.has_middle_out_transform).toBe(false);
-
-    const totals = await db
-      .select()
-      .from(cost_insight_owner_hour_totals)
-      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
-    expect(totals).toHaveLength(0);
   });
 
   test('keeps AI source rows when legacy usage owner does not exist', async () => {
@@ -773,83 +735,7 @@ describe('logMicrodollarUsage', () => {
         .from(microdollar_usage)
         .where(eq(microdollar_usage.kilo_user_id, missingUserId));
       expect(sourceRows).toHaveLength(1);
-
-      await new Promise(resolve => setImmediate(resolve));
-      await new Promise(resolve => setImmediate(resolve));
-
-      const totals = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
-      expect(totals).toHaveLength(0);
-
-      const degradedIntervals = await db
-        .select()
-        .from(cost_insight_rollup_degraded_intervals)
-        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
-      expect(degradedIntervals).toHaveLength(0);
     } finally {
-      consoleErrorSpy.mockRestore();
-    }
-  });
-
-  test('keeps usage and balance write and enqueues owner-hour repair after capture fails', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const user = await insertTestUser({
-      id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
-      microdollars_used: 0,
-      google_user_email: 'cost-insight-failure@example.com',
-    });
-    const organization = await createTestOrganization(
-      'Cost insight capture failure organization',
-      user.id,
-      10_000
-    );
-    const { core, metadata } = await defineMicrodollarUsage();
-
-    try {
-      const result = await insertUsageRecord(
-        { ...core, kilo_user_id: user.id, organization_id: organization.id, cost: 1000 },
-        metadata
-      );
-
-      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
-
-      const sourceRows = await db
-        .select()
-        .from(microdollar_usage)
-        .where(eq(microdollar_usage.kilo_user_id, user.id));
-      expect(sourceRows).toHaveLength(1);
-
-      await new Promise(resolve => setImmediate(resolve));
-      await new Promise(resolve => setImmediate(resolve));
-
-      const totals = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
-      expect(totals).toHaveLength(0);
-
-      const degradedIntervals = await db
-        .select()
-        .from(cost_insight_rollup_degraded_intervals)
-        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
-      expect(degradedIntervals).toHaveLength(0);
-
-      const repairs = await db
-        .select()
-        .from(cost_insight_rollup_repairs)
-        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
-      expect(repairs).toHaveLength(1);
-      expect(repairs[0].usage_id).toBe(core.id);
-      expect(new Date(repairs[0].hour_start).toISOString()).toBe(
-        new Date(Math.floor(Date.parse(core.created_at) / 3_600_000) * 3_600_000).toISOString()
-      );
-      expect(Date.parse(repairs[0].next_attempt_at)).toBeGreaterThan(Date.parse(core.created_at));
-    } finally {
-      await db
-        .delete(cost_insight_rollup_repairs)
-        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
       consoleErrorSpy.mockRestore();
     }
   });
@@ -1041,17 +927,6 @@ describe('logMicrodollarUsage', () => {
         kilo_user_id: user.id,
         microdollar_usage: 500,
       });
-
-      const [total] = await db
-        .select()
-        .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
-      expect(total).toMatchObject({
-        owned_by_user_id: null,
-        spend_category: 'variable',
-        total_microdollars: 500,
-        spend_record_count: 1,
-      });
     });
   });
 
@@ -1229,6 +1104,126 @@ describe('logMicrodollarUsage', () => {
       .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id))
       .orderBy(microdollar_usage_daily_repairs.usage_date);
     expect(repairRows).toEqual([{ usage_date: '2025-08-15' }, { usage_date: '2025-08-16' }]);
+  });
+
+  test('applies negative organization corrections to balance and member daily usage', async () => {
+    const user = await insertTestUser({
+      id: 'test-org-negative-correction-user',
+      microdollars_used: 0,
+      google_user_email: 'org-negative-correction@example.com',
+    });
+    const organization = await createTestOrganization(
+      'Negative correction organization',
+      user.id,
+      10_000
+    );
+    const { core, metadata } = await defineMicrodollarUsage();
+
+    await insertUsageRecord(
+      {
+        ...core,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        cost: 500,
+      },
+      metadata
+    );
+    const { core: correctionCore, metadata: correctionMetadata } = await defineMicrodollarUsage();
+    await insertUsageRecord(
+      {
+        ...correctionCore,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        cost: -200,
+      },
+      correctionMetadata
+    );
+
+    const [correctedOrganization] = await db
+      .select({
+        microdollarsUsed: organizations.microdollars_used,
+        microdollarsBalance: organizations.microdollars_balance,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(correctedOrganization).toMatchObject({
+      microdollarsUsed: 300,
+      microdollarsBalance: 9_700,
+    });
+    const [memberUsage] = await db
+      .select({ microdollarUsage: organization_user_usage.microdollar_usage })
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, organization.id));
+    expect(memberUsage?.microdollarUsage).toBe(300);
+  });
+
+  // A redelivery of the same usage id can reach the write while, or after, the
+  // first delivery commits: `recordUsageInPrimaryRegion` retries a 10s attempt
+  // timeout, and after exhausting its retries the SFO caller falls back to
+  // writing locally with the same `core.id`. The row is billed exactly once, so
+  // the second write must report the identity rather than a failure — otherwise
+  // the caller treats billed usage as unrecorded and skips dependent writes.
+  test('insertUsageRecord reports a redelivered usage id as recorded and bills it once', async () => {
+    const user = await insertTestUser({
+      id: 'test-usage-redelivery-user',
+      microdollars_used: 0,
+      google_user_email: 'usage-redelivery@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+    const usage = { ...core, kilo_user_id: user.id, cost: 700 };
+
+    const first = await insertUsageRecord(usage, metadata);
+    expect(first).toMatchObject({ usageId: usage.id, newMicrodollarsUsed: 700 });
+
+    const redelivery = await insertUsageRecord(usage, metadata);
+    expect(redelivery).toMatchObject({ usageId: usage.id, createdAt: usage.created_at });
+
+    const rows = await db
+      .select({ id: microdollar_usage.id })
+      .from(microdollar_usage)
+      .where(eq(microdollar_usage.kilo_user_id, user.id));
+    expect(rows).toHaveLength(1);
+    expect((await findUserById(user.id))?.microdollars_used).toBe(700);
+  });
+
+  // The same redelivery can also arrive while the first write is still open: the
+  // client's attempt timeout fires long before the database gives up. One
+  // transaction then loses on the primary key (or is picked as a deadlock victim
+  // and retried into that collision), and the surviving caller must still learn
+  // the identity of the single billed row.
+  test('insertUsageRecord bills a concurrent redelivery once and reports the identity', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const user = await insertTestUser({
+        id: 'test-usage-concurrent-redelivery-user',
+        microdollars_used: 0,
+        google_user_email: 'usage-concurrent-redelivery@example.com',
+      });
+      const { core, metadata } = await defineMicrodollarUsage();
+      const usage = { ...core, kilo_user_id: user.id, cost: 900 };
+
+      const outcomes = await Promise.all([
+        insertUsageRecord(usage, metadata),
+        insertUsageRecord(usage, metadata),
+      ]);
+
+      // Neither caller may be told the usage was lost: the row is committed, so
+      // both must be able to attach dependent writes to it. Only `usageId` is
+      // asserted because the winning transaction reports the database's own
+      // `created_at` rendering, which `logMicrodollarUsage` discards in favour of
+      // the ISO 8601 value it constructed.
+      for (const outcome of outcomes) {
+        expect(outcome?.usageId).toBe(usage.id);
+      }
+      const rows = await db
+        .select({ id: microdollar_usage.id })
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(rows).toHaveLength(1);
+      expect((await findUserById(user.id))?.microdollars_used).toBe(900);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {

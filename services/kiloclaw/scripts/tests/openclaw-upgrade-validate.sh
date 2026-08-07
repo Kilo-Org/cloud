@@ -23,8 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Shared credential lookup so preflight decides "is a key available?" exactly the
-# way smoke-live-provider.sh does (active provider's token, not any occurrence).
-source "$SCRIPT_DIR/provider-creds.sh"
+# way single-image/live-provider.sh does (active provider's token, not any occurrence).
+source "$SCRIPT_DIR/lib/provider-creds.sh"
 
 hr() { printf -- '----------------------------------------------------------------------\n'; }
 section() { echo; hr; echo "$1"; hr; }
@@ -119,7 +119,7 @@ else
 fi
 
 # Credential for Phase 2: env var, or the ACTIVE provider's token in the Kilo CLI
-# config (matching smoke-live-provider.sh — a stale/inactive-provider token does
+# config (matching single-image/live-provider.sh — a stale/inactive-provider token does
 # not count, so preflight never schedules Phase 2 for creds the smoke would reject).
 HAVE_KEY=0
 if [ -n "${KILOCODE_API_KEY:-}" ]; then
@@ -192,7 +192,7 @@ fi
 
 # ── Phase 1: keyless verification ────────────────────────────────────────────
 section "Phase 1/2 — keyless verification (build, patches, config, CVE scan)"
-bash "$SCRIPT_DIR/openclaw-upgrade-image-checks.sh" 2>&1 | tee "$PHASE1_LOG"
+bash "$SCRIPT_DIR/upgrade/image-checks.sh" 2>&1 | tee "$PHASE1_LOG"
 if [ "${PIPESTATUS[0]}" -eq 0 ]; then
   VERIFY_RESULT="passed"
   echo
@@ -229,7 +229,7 @@ else
   # smoke run when before/after pin the same version (mechanics mode).
   ALLOW_DIRTY_CHECKOUT="${ALLOW_DIRTY_CHECKOUT:-true}" \
     ALLOW_SAME_OPENCLAW_VERSION="$SMOKE_SAME_VERSION" \
-    bash "$SCRIPT_DIR/openclaw-upgrade-smoke.sh" 2>&1 | tee "$PHASE2_LOG"
+    bash "$SCRIPT_DIR/upgrade/smoke.sh" 2>&1 | tee "$PHASE2_LOG"
   if [ "${PIPESTATUS[0]}" -eq 0 ]; then
     if [ "$PHASE2_MODE" = "mechanics" ]; then
       SMOKE_RESULT="passed (mechanics only)"

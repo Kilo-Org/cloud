@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SHARE_PAYLOAD_MAX_ENTRIES } from './share-payload';
 import {
   __resetPendingShareNavigationForTests,
+  appendShareParams,
   isShareNavigationTargetFocused,
   navigationContainsShareGate,
   parseShareHrefParams,
@@ -166,5 +167,36 @@ describe('navigationContainsShareGate', () => {
         routes: [{ name: '(app)', state: { routes: [{ name: '(tabs)' }] } }],
       })
     ).toBe(false);
+  });
+});
+
+describe('appendShareParams', () => {
+  it('appends shareId to a path with no existing query', () => {
+    expect(appendShareParams('/(app)/agent-chat/new', 'abc123')).toBe(
+      '/(app)/agent-chat/new?shareId=abc123'
+    );
+  });
+
+  it('appends shareId to a path with an existing query', () => {
+    expect(appendShareParams('/(app)/agent-chat/new?organizationId=org_1', 'abc123')).toBe(
+      '/(app)/agent-chat/new?organizationId=org_1&shareId=abc123'
+    );
+  });
+
+  it('appends autoSend=1 when autoSend is true', () => {
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { autoSend: true })).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123&autoSend=1'
+    );
+  });
+
+  it('does not append autoSend when autoSend is false', () => {
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { autoSend: false })).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123'
+    );
+  });
+
+  it('URL-encodes the shareId', () => {
+    const encoded = appendShareParams('/(app)/agent-chat/new', 'id with spaces');
+    expect(encoded).toBe('/(app)/agent-chat/new?shareId=id%20with%20spaces');
   });
 });

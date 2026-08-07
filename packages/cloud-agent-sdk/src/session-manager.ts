@@ -81,10 +81,17 @@ type SessionConfig = {
   repository: string;
   mode: string;
   model: string;
-  providerID?: string | null;
-  variant?: string | null;
+  providerID?: string | null | undefined;
+  variant?: string | null | undefined;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
-  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+  runtimeAgents?:
+    | Array<{
+        slug: string;
+        name: string;
+        model?: string | undefined;
+        variant?: string | undefined;
+      }>
+    | undefined;
 };
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
@@ -101,7 +108,7 @@ type StandaloneSuggestion = {
   text: string;
   actions: SuggestionAction[];
   /** Tool call ID that emitted this suggestion, when available. */
-  callId?: string;
+  callId?: string | undefined;
 };
 type ChildSessionHydrationState =
   | { status: 'idle' }
@@ -253,13 +260,20 @@ type SessionManagerConfig = {
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string, displayMessage?: string, error?: unknown) => void;
   /**
-   * Optional sink for image attachment bytes, called just before the chat
-   * processor strips a completed tool part's image data URLs for storage.
+   * Optional sink for tool attachment bytes, called just before the chat
+   * processor strips a completed tool part's attachment data URLs for storage.
+   *
+   * - Images (any tool): emitted unchanged.
+   * - Non-images: emitted only when `part.tool === 'send_file'`.
+   *
    * Receives the raw data URL exactly once per processor pass; consumers use
    * it to persist bytes outside the in-memory store (e.g. mobile's
    * file-system cache). Web never passes it, so web behaviour is unchanged.
    */
-  onImageAttachment?: (partId: string, mime: string, dataUrl: string) => void;
+  onToolAttachment?: (
+    partId: string,
+    attachment: { mime: string; filename?: string; dataUrl: string }
+  ) => void;
   onRemoteSessionOpened?: (data: { kiloSessionId: KiloSessionId }) => void;
   onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
@@ -288,6 +302,10 @@ type SessionManagerAtoms = {
   question: W<QuestionState | null>;
   activeQuestion: W<StandaloneQuestion | null>;
   activePermission: W<StandalonePermission | null>;
+  /** Every pending question, oldest first. `activeQuestion` is the head. */
+  pendingQuestions: W<readonly StandaloneQuestion[]>;
+  /** Every pending permission, oldest first. `activePermission` is the head. */
+  pendingPermissions: W<readonly StandalonePermission[]>;
   activeSuggestion: W<StandaloneSuggestion | null>;
   sessionInfo: W<SessionInfo | null>;
   sessionId: W<CloudAgentSessionId | null>;
@@ -484,6 +502,26 @@ function modelSelectionsEqual(a: ModelSelection | null, b: ModelSelection | null
   return modelRefsEqual(a.model, b.model) && a.variant === b.variant;
 }
 
+function upsertPendingRequest<T extends { requestId: string }>(
+  list: readonly T[],
+  next: T
+): readonly T[] {
+  const index = list.findIndex(entry => entry.requestId === next.requestId);
+  if (index === -1) return [...list, next];
+  const copy = [...list];
+  copy[index] = next;
+  return copy;
+}
+
+function removePendingRequest<T extends { requestId: string }>(
+  list: readonly T[],
+  requestId: string
+): readonly T[] {
+  return list.some(entry => entry.requestId === requestId)
+    ? list.filter(entry => entry.requestId !== requestId)
+    : list;
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
@@ -524,6 +562,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activeQuestionAtom = atom<StandaloneQuestion | null>(null);
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
+  const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
+  const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
@@ -608,7 +648,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * reported any (older CLIs, mid-reconnect, or a session that the active
    * CLI no longer claims).
    */
-  let currentCapabilities: { attachments?: boolean } | undefined = undefined;
+  let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
   let observedModelSource: ObservedModelSource | null = null;
   // True while a connect/reconnect cycle is still replaying its message
   // history; false once live events are flowing. See clearOverrideIfDiverged.
@@ -703,6 +743,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
+    store.set(pendingQuestionsAtom, []);
+    store.set(pendingPermissionsAtom, []);
     store.set(suggestionAtom, null);
     store.set(activeSuggestionAtom, null);
     store.set(pendingMessagesAtom, new Map());
@@ -769,7 +811,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
 
         const chatProcessor = createChatProcessor(storage, {
-          onImageAttachment: config.onImageAttachment,
+          onToolAttachment: config.onToolAttachment,
         });
         for (const message of snapshot.messages) {
           chatProcessor.process({ type: 'message.updated', info: message.info });
@@ -1045,7 +1087,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!storage) return false;
 
     const chatProcessor = createChatProcessor(storage, {
-      onImageAttachment: config.onImageAttachment,
+      onToolAttachment: config.onToolAttachment,
     });
     for (const message of outcome.messages) {
       chatProcessor.process({ type: 'message.updated', info: message.info });
@@ -1220,9 +1262,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
       },
-      websocketBaseUrl: config.websocketBaseUrl,
+      ...(config.websocketBaseUrl ? { websocketBaseUrl: config.websocketBaseUrl } : {}),
       storage: jotaiStorage,
-      onImageAttachment: config.onImageAttachment,
+      onToolAttachment: config.onToolAttachment,
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message
@@ -1262,28 +1304,35 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
       },
       onQuestionAsked: (requestId, questions) => {
-        if (questions) {
-          store.set(activeQuestionAtom, { requestId, questions });
-        }
+        if (!questions) return;
+        const next = upsertPendingRequest(store.get(pendingQuestionsAtom), {
+          requestId,
+          questions,
+        });
+        store.set(pendingQuestionsAtom, next);
+        store.set(activeQuestionAtom, next[0] ?? null);
       },
       onQuestionResolved: requestId => {
-        const aq = store.get(activeQuestionAtom);
-        if (aq?.requestId === requestId) store.set(activeQuestionAtom, null);
+        const next = removePendingRequest(store.get(pendingQuestionsAtom), requestId);
+        store.set(pendingQuestionsAtom, next);
+        store.set(activeQuestionAtom, next[0] ?? null);
       },
       onPermissionAsked: (requestId, permission, patterns, metadata, always) => {
-        if (permission) {
-          store.set(activePermissionAtom, {
-            requestId,
-            permission,
-            patterns: patterns ?? [],
-            metadata: metadata ?? {},
-            always: always ?? [],
-          });
-        }
+        if (!permission) return;
+        const next = upsertPendingRequest(store.get(pendingPermissionsAtom), {
+          requestId,
+          permission,
+          patterns: patterns ?? [],
+          metadata: metadata ?? {},
+          always: always ?? [],
+        });
+        store.set(pendingPermissionsAtom, next);
+        store.set(activePermissionAtom, next[0] ?? null);
       },
       onPermissionResolved: requestId => {
-        const ap = store.get(activePermissionAtom);
-        if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
+        const next = removePendingRequest(store.get(pendingPermissionsAtom), requestId);
+        store.set(pendingPermissionsAtom, next);
+        store.set(activePermissionAtom, next[0] ?? null);
       },
       onSuggestionAsked: (requestId, text, actions, callId) => {
         store.set(activeSuggestionAtom, { requestId, text, actions, callId });
@@ -1813,6 +1862,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activeQuestion: activeQuestionAtom,
       permission: permissionAtom,
       activePermission: activePermissionAtom,
+      pendingQuestions: pendingQuestionsAtom,
+      pendingPermissions: pendingPermissionsAtom,
       suggestion: suggestionAtom,
       activeSuggestion: activeSuggestionAtom,
       pendingMessages: pendingMessagesAtom,

@@ -272,7 +272,12 @@ export type GetSessionOutput = {
   upstreamBranch?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
-  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+  runtimeAgents?: Array<{
+    slug: string;
+    name: string;
+    model?: string;
+    variant?: string;
+  }>;
 
   // Execution status (grouped for cleaner API)
   execution: ExecutionStatus;
@@ -292,6 +297,11 @@ export type GetSessionOutput = {
   // Versioning
   timestamp: number;
   version: number;
+
+  // Latest persisted event ID from the Cloud Agent event log. Numeric and
+  // present after at least one event has been persisted. Null when no events
+  // exist, and absent when the DO cannot be reached (fails open).
+  latestEventId?: number | null;
 };
 
 /**
@@ -395,7 +405,10 @@ function isInsufficientCreditsError(err: unknown): boolean {
     if (httpStatus === 402) {
       return true;
     }
-    const cause = err.cause as { error?: { status?: number }; suppressed?: { status?: number } };
+    const cause = err.cause as {
+      error?: { status?: number };
+      suppressed?: { status?: number };
+    };
     if (cause?.error?.status === 402 || cause?.suppressed?.status === 402) {
       return true;
     }
@@ -583,7 +596,10 @@ export class CloudAgentNextClient {
     } catch (error) {
       console.error(`Error interrupting session ${sessionId}:`, error);
       captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'interruptSession' },
+        tags: {
+          source: 'cloud-agent-next-client',
+          endpoint: 'interruptSession',
+        },
         extra: { sessionId },
       });
       throw error;
@@ -686,7 +702,10 @@ export class CloudAgentNextClient {
       }
 
       captureException(normalizedError, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'initiateFromPreparedSession' },
+        tags: {
+          source: 'cloud-agent-next-client',
+          endpoint: 'initiateFromPreparedSession',
+        },
         extra: { input },
       });
       throw normalizedError;
@@ -736,7 +755,10 @@ export class CloudAgentNextClient {
     } catch (error) {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'resizeTerminal' },
-        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+        extra: {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: input.ptyId,
+        },
       });
       throw error;
     }
@@ -748,7 +770,10 @@ export class CloudAgentNextClient {
     } catch (error) {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'closeTerminal' },
-        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+        extra: {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: input.ptyId,
+        },
       });
       throw error;
     }
@@ -783,7 +808,10 @@ export class CloudAgentNextClient {
       return await this.client.answerPermission.mutate(input);
     } catch (error) {
       captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'answerPermission' },
+        tags: {
+          source: 'cloud-agent-next-client',
+          endpoint: 'answerPermission',
+        },
         extra: { sessionId: input.sessionId, permissionId: input.permissionId },
       });
       throw error;

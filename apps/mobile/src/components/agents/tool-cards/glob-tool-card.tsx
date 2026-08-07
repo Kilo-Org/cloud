@@ -1,48 +1,50 @@
+import { View } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
-import { Text } from '@/components/ui/text';
+import { SelectableText } from '@/components/ui/selectable-text';
 
-import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
+import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
-import { ToolCardShell } from '../tool-card-shell';
+import { useOpenPartDetail } from '../open-part-detail-context';
+import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
-function countOutputLines(output: string): number {
-  if (output.length === 0) {
-    return 0;
-  }
-  return output.split('\n').filter(line => line.trim().length > 0).length;
-}
-
-export function GlobToolCard({ part }: Readonly<{ part: ToolPart }>) {
-  const textSelectable = useTranscriptTextSelectable();
-  const input = part.state.input;
-  const pattern = typeof input.pattern === 'string' ? input.pattern : '';
-
-  const subtitle = pattern || 'glob';
-
+/**
+ * Sheet body for a glob tool part: the output block and the error. The pattern
+ * lives in the sheet title. Renders only inside the detail sheet — attachments
+ * and the pending/running status line live in `ToolPartDetailBody`.
+ */
+export function GlobToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
 
-  const matchCount = output ? countOutputLines(output) : undefined;
-  const badge = matchCount !== undefined ? `${matchCount} files` : undefined;
+  return (
+    <View className="gap-2">
+      {output ? <MonoScrollBlock content={output} textClassName="text-foreground" /> : null}
+      {error ? <SelectableText className="text-xs text-destructive">{error}</SelectableText> : null}
+    </View>
+  );
+}
+
+export function GlobToolCard({ part }: Readonly<{ part: ToolPart }>) {
+  const openPartDetail = useOpenPartDetail();
+  const display = getToolDisplay(part);
+  const hasDetails = toolPartHasDetails(part);
 
   return (
-    <ToolCardShell
+    <FixedPartRow
       icon={Search}
-      title="glob"
-      subtitle={subtitle}
-      badge={badge}
+      label={display.subtitle ?? display.title}
+      {...(display.badge ? { badge: display.badge } : {})}
       status={part.state.status}
-    >
-      {output ? (
-        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
-      ) : null}
-      {error ? (
-        <Text selectable={textSelectable} className="text-xs text-destructive">
-          {error}
-        </Text>
-      ) : null}
-    </ToolCardShell>
+      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      onPress={
+        hasDetails && openPartDetail
+          ? () => {
+              openPartDetail(part.id);
+            }
+          : undefined
+      }
+    />
   );
 }

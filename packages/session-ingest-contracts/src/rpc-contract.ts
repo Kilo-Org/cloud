@@ -503,8 +503,8 @@ function normalizePersistedKiloSdkParts(value: unknown): {
   for (const part of value) {
     if (
       isRecord(part) &&
-      typeof part.type === 'string' &&
-      !isKnownKiloSdkPartType(part.type) &&
+      typeof part['type'] === 'string' &&
+      !isKnownKiloSdkPartType(part['type']) &&
       sdkPartBaseSchema.safeParse(part).success
     ) {
       omittedItemCount += 1;
@@ -519,12 +519,12 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
   if (!isRecord(value)) {
     return { message: value, omittedItemCount: 0 };
   }
-  const normalizedParts = normalizePersistedKiloSdkParts(value.parts);
+  const normalizedParts = normalizePersistedKiloSdkParts(value['parts']);
   const message = { ...value, parts: normalizedParts.parts };
-  if (!isRecord(value.info) || value.info.role !== 'user') {
+  if (!isRecord(value['info']) || value['info']['role'] !== 'user') {
     return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
-  const summary = value.info.summary;
+  const summary = value['info']['summary'];
   if (!isRecord(summary) || !('diffs' in summary)) {
     return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
@@ -532,10 +532,10 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
     message: {
       ...message,
       info: {
-        ...value.info,
+        ...value['info'],
         summary: {
           ...summary,
-          diffs: normalizePersistedSnapshotFileDiffs(summary.diffs),
+          diffs: normalizePersistedSnapshotFileDiffs(summary['diffs']),
         },
       },
     },
@@ -544,15 +544,15 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
 }
 
 function normalizePersistedKiloSdkMessageHistory(value: unknown): unknown {
-  if (!isRecord(value) || !Array.isArray(value.messages)) {
+  if (!isRecord(value) || !Array.isArray(value['messages'])) {
     return value;
   }
-  const normalizedMessages = value.messages.map(normalizePersistedKiloSdkStoredMessage);
+  const normalizedMessages = value['messages'].map(normalizePersistedKiloSdkStoredMessage);
   const additionalOmittedItemCount = normalizedMessages.reduce(
     (count, message) => count + message.omittedItemCount,
     0
   );
-  const omittedItemCount = z.number().int().nonnegative().safeParse(value.omittedItemCount);
+  const omittedItemCount = z.number().int().nonnegative().safeParse(value['omittedItemCount']);
   return {
     ...value,
     messages: normalizedMessages.map(message => message.message),
@@ -561,9 +561,9 @@ function normalizePersistedKiloSdkMessageHistory(value: unknown): unknown {
       : {
           omittedItemCount: omittedItemCount.success
             ? omittedItemCount.data + additionalOmittedItemCount
-            : value.omittedItemCount === undefined
+            : value['omittedItemCount'] === undefined
               ? additionalOmittedItemCount
-              : value.omittedItemCount,
+              : value['omittedItemCount'],
         }),
   };
 }

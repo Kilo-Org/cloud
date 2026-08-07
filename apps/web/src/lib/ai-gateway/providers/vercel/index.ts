@@ -27,7 +27,6 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { isOpenRouterGpt56PromoModel } from '@/lib/ai-gateway/providers/openai';
 
 type VercelRoutingPercentages = {
   paid: number;
@@ -97,13 +96,6 @@ export async function shouldRouteToVercel(
 ) {
   // BYOK in the Vercel AI Gateway was not working for Laguna models.
   if (requestedModel.includes('laguna')) {
-    return false;
-  }
-
-  if (isOpenRouterGpt56PromoModel(requestedModel)) {
-    console.debug(
-      `[shouldRouteToVercel] routing ${requestedModel} to OpenRouter for the GPT-5.6 promotion`
-    );
     return false;
   }
 
@@ -259,11 +251,32 @@ export async function applyVercelSettings(
     if (userByok.length === 0) {
       throw new Error('Invalid state: userByok should be null or not empty');
     }
-    const byokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    // Only honor the caller's own `provider.ignore` here. The organization /
+    // group `provider.only` allow-list must NOT constrain BYOK selection:
+    // direct BYOK uses the user's own credentials and is intentionally exempt
+    // from organization model/provider restrictions (see ai-gateway AGENTS.md).
+    // Filtering by it also silently drops providers whose OpenRouter slug has
+    // no Vercel BYOK equivalent, turning previously working requests into hard
+    // failures.
+    const ignoredProviders = new Set(
+      (requestToMutate.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
+    );
+    const allByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    const retainedByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
     for (const provider of userByok) {
       const [key, list] = getVercelInferenceProviderConfigForUserByok(provider);
-      byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
+      allByokProviders[key] = [...(allByokProviders[key] ?? []), ...list];
+      if (!ignoredProviders.has(key)) {
+        retainedByokProviders[key] = [...(retainedByokProviders[key] ?? []), ...list];
+      }
     }
+    // `provider.ignore` is a routing preference, not an authorization boundary,
+    // so it must never remove the last BYOK credential. An empty map would send
+    // `only: []` with `byok: {}`, dropping BYOK pinning so inference bills Kilo's
+    // Vercel account, while the request still counts as BYOK downstream and skips
+    // the zero-balance rejection in the gateway route.
+    const byokProviders =
+      Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
     // this is vercel specific BYOK configuration to force vercel gateway to use the BYOK API key
     // for the user/org. If the key is invalid the request will faill - it will not fall back to bill our API key.

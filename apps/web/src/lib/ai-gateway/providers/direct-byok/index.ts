@@ -11,7 +11,8 @@ import { readDb } from '@/lib/drizzle';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
-import { getAiSdkProvider, getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
+import { getAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
+import { getFallbackModelVariants } from '@/lib/ai-gateway/providers/variants';
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
@@ -62,7 +63,9 @@ function convertModel(
     hasUserByokAvailable: true,
     opencode: {
       ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
-      variants: model.variants ?? getModelVariants(id),
+      variants:
+        model.variants ??
+        (model.flags?.includes('reasoning') ? getFallbackModelVariants(id) : undefined),
     } satisfies OpenCodeSettings,
   };
 }

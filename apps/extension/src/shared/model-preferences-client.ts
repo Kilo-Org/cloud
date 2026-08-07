@@ -229,7 +229,10 @@ export const fetchModelPreferences = async ({
   organizationId,
   signal,
   token,
-}: ModelPreferencesClientOptions): Promise<{ favorites: string[] }> => {
+}: ModelPreferencesClientOptions): Promise<{
+  favorites: string[];
+  lastSelected: unknown;
+}> => {
   const data = await requestModelPreferences({
     apiBaseUrl,
     dataSchema: favoritesDataSchema,
@@ -241,7 +244,7 @@ export const fetchModelPreferences = async ({
     ...(signal === undefined ? {} : { signal }),
   });
 
-  return { favorites: data.favorites };
+  return { favorites: data.favorites, lastSelected: data.lastSelected };
 };
 
 export const addModelFavorite = async ({

@@ -18,10 +18,11 @@ import { getBlockingInteraction } from '@/components/agents/agent-interaction-po
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
-import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
+import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -29,6 +30,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
@@ -46,6 +48,8 @@ import {
   shouldShowFooterWorkingIndicator,
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
+import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
+import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
@@ -70,6 +74,7 @@ import {
   openChildSessionSheet,
   releaseChildSessionSheet,
 } from '@/components/agents/child-session-sheet-state';
+import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
@@ -87,16 +92,17 @@ import {
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
 import { moveA11yFocus } from '@/lib/a11y/announce';
-import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useContinueSession } from '@/components/agents/use-continue-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -110,6 +116,8 @@ type SessionDetailContentProps = {
   openedVia?: 'push' | 'app';
   /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
   shareId?: string;
+  /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
+  autoSend?: boolean;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -117,10 +125,13 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
   finalizing: 'Wrapping up...',
 };
 
+const EMPTY_IDS: ReadonlySet<string> = new Set();
+
 export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
   shareId,
+  autoSend,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -152,6 +163,8 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
+  const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -176,7 +189,6 @@ export function SessionDetailContent({
     useState<ContextSheetIdentity | null>(null);
   const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
-  const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
 
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
@@ -210,6 +222,7 @@ export function SessionDetailContent({
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
   const sessionModels = useSessionModelOptions({
@@ -222,6 +235,12 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
+  const { continueSession, isContinuing } = useContinueSession({
+    organizationId,
+    manager,
+    models: modelOptions,
+    modelsLoading: gatewayModelsLoading,
+  });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
@@ -395,10 +414,28 @@ export function SessionDetailContent({
     [messages, preparationAttempts]
   );
 
+  // Render-phase state adjustment: hold queued ids across queue → dequeue
+  // transitions while streaming so the badge row never unmounts and bubble
+  // height stays stable. Stream end releases every hold in one uniform commit.
+  const [heldQueuedIds, setHeldQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [prevSessionId, setPrevSessionId] = useState(sessionId);
+  if (prevSessionId !== sessionId) {
+    setPrevSessionId(sessionId);
+    setHeldQueuedIds(EMPTY_IDS);
+  } else {
+    const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
+    if (next !== heldQueuedIds) {
+      setHeldQueuedIds(next);
+    }
+  }
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
+      }
+      if (item.type === 'time') {
+        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
       }
       // Look up delivery state by message id. The map is keyed by user-message
       // id and may briefly contain an entry before the bubble has rendered
@@ -416,6 +453,7 @@ export function SessionDetailContent({
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
           onLongPressDetails={setDetailsMessage}
+          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
         />
       );
     },
@@ -426,6 +464,7 @@ export function SessionDetailContent({
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
+      heldQueuedIds,
     ]
   );
 
@@ -545,6 +584,9 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+  // One number for both kinds: the user must see every waiting request, not
+  // only the ones of the kind currently on screen.
+  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
 
   // When a blocking question/permission card dismisses, hand screen-reader
   // focus back to the transcript so the user does not get stranded on a
@@ -699,6 +741,19 @@ export function SessionDetailContent({
     return result.success;
   }, [manager, router, organizationId]);
 
+  const handleRestartSession = useCallback(async () => {
+    const result = await restartAgentSession({
+      create: manager.createRemoteSession.bind(manager),
+      exit: manager.exitRemoteSession.bind(manager),
+      router,
+      organizationId,
+      onError: message => {
+        toast.error(message);
+      },
+    });
+    return result.success;
+  }, [manager, router, organizationId]);
+
   const handleExitSession = useCallback(
     async (
       onAccepted: () => void,
@@ -716,103 +771,120 @@ export function SessionDetailContent({
     [manager, router]
   );
 
+  const handleContinueInNewSession = useCallback(() => {
+    void continueSession({
+      gitUrl: fetchedData?.gitUrl,
+      mode: currentMode,
+      model: currentModel,
+      variant: currentVariant,
+    });
+  }, [continueSession, fetchedData?.gitUrl, currentMode, currentModel, currentVariant]);
+
   const isFocused = useIsFocused();
-  // Focus bounds the awake window to the visible working UI; a backgrounded
-  // or covered screen must not hold the OS idle timer.
-  const keepScreenAwake =
-    isFocused && agentStatus.type !== 'disconnected' && (isStreaming || pendingMessages.size > 0);
+  const keepScreenAwake = shouldKeepSessionAwake({
+    keepScreenOn,
+    preferenceLoaded: keepScreenOnLoaded,
+    isFocused,
+    isDisconnected: agentStatus.type === 'disconnected',
+    isStreaming,
+    pendingMessageCount: pendingMessages.size,
+  });
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={rename.title}
-        headerRight={headerRight}
-        {...(rename.isTitleInteractive
-          ? {
-              onTitlePress: rename.openModal,
-              onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
-            }
-          : {})}
-      />
-      {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+    <PartDetailSheetHost messages={messages}>
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={rename.title}
+          headerRight={headerRight}
+          {...(rename.isTitleInteractive
+            ? {
+                onTitlePress: rename.openModal,
+                onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+              }
+            : {})}
+        />
+        <SessionConnectionIndicator
+          activeSessionType={activeSessionType}
+          agentStatusType={agentStatus.type}
+        />
+        {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-      {!isConnected && <ConnectivityBanner />}
+        {keyboardContainerKind === 'app-aware-padding' ? (
+          <AppAwareKeyboardPaddingView className="flex-1">
+            {renderKeyboardBody()}
+          </AppAwareKeyboardPaddingView>
+        ) : (
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {renderKeyboardBody()}
+          </KeyboardAvoidingView>
+        )}
 
-      {keyboardContainerKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">
-          {renderKeyboardBody()}
-        </AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {renderKeyboardBody()}
-        </KeyboardAvoidingView>
-      )}
+        {isComposerVisible ? (
+          <BlurBar className="border-t-0">
+            <View style={{ height: bottom }} />
+          </BlurBar>
+        ) : (
+          <View style={{ height: bottom }} className="bg-background" />
+        )}
 
-      {isComposerVisible ? (
-        <BlurBar className="border-t-0">
-          <View style={{ height: bottom }} />
-        </BlurBar>
-      ) : (
-        <View style={{ height: bottom }} className="bg-background" />
-      )}
+        {sheetMountState.mounted ? (
+          <SessionContextSheet
+            visible={sheetMountState.visible}
+            info={sheetMountState.info}
+            modelDisplay={contextModelAndProvider.model}
+            providerDisplay={contextModelAndProvider.provider}
+            totalCostMicrodollars={totalMicrodollars}
+            breakdownCostUsd={breakdownCostUsd}
+            messages={messages}
+            modelOptions={modelOptions}
+            onClose={() => {
+              setOpenContextSheetIdentity(null);
+            }}
+          />
+        ) : null}
 
-      {sheetMountState.mounted ? (
-        <SessionContextSheet
-          visible={sheetMountState.visible}
-          info={sheetMountState.info}
-          modelDisplay={contextModelAndProvider.model}
-          providerDisplay={contextModelAndProvider.provider}
-          totalCostMicrodollars={totalMicrodollars}
-          breakdownCostUsd={breakdownCostUsd}
-          messages={messages}
+        <MessageDetailsSheet
+          visible={detailsMessage !== null}
+          message={detailsMessage}
           modelOptions={modelOptions}
           onClose={() => {
-            setOpenContextSheetIdentity(null);
+            setDetailsMessage(null);
           }}
         />
-      ) : null}
 
-      <MessageDetailsSheet
-        visible={detailsMessage !== null}
-        message={detailsMessage}
-        modelOptions={modelOptions}
-        onClose={() => {
-          setDetailsMessage(null);
-        }}
-      />
+        {childSessionSheet.sheet ? (
+          <ChildSessionSheet
+            visible={childSessionSheet.visible}
+            sessionId={childSessionSheet.sheet.sessionId}
+            title={childSessionSheet.sheet.title}
+            getChildMessages={getChildMessages}
+            hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+            isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            renderPart={props => <PartRenderer {...props} />}
+            onOpenChildSession={handleOpenChildSession}
+            onRetry={() => {
+              const openSheet = childSessionSheet.sheet;
+              if (!openSheet) {
+                return;
+              }
+              void manager.hydrateChildSession(openSheet.sessionId);
+            }}
+            onClose={handleCloseChildSession}
+            onDismiss={handleChildSheetDismiss}
+          />
+        ) : null}
 
-      {childSessionSheet.sheet ? (
-        <ChildSessionSheet
-          visible={childSessionSheet.visible}
-          sessionId={childSessionSheet.sheet.sessionId}
-          title={childSessionSheet.sheet.title}
-          getChildMessages={getChildMessages}
-          hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
-          isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
-          renderPart={props => <PartRenderer {...props} />}
-          onOpenChildSession={handleOpenChildSession}
-          onRetry={() => {
-            const openSheet = childSessionSheet.sheet;
-            if (!openSheet) {
-              return;
-            }
-            void manager.hydrateChildSession(openSheet.sessionId);
-          }}
-          onClose={handleCloseChildSession}
-          onDismiss={handleChildSheetDismiss}
-        />
-      ) : null}
-
-      {rename.isTitleInteractive && rename.isModalOpen ? (
-        <RenameModal
-          title="Rename session"
-          placeholder="Session name"
-          initialValue={rename.modalInitialValue}
-          onSave={handleRenameSave}
-          onClose={handleRenameClose}
-        />
-      ) : null}
-    </View>
+        {rename.isTitleInteractive && rename.isModalOpen ? (
+          <RenameModal
+            title="Rename session"
+            placeholder="Session name"
+            initialValue={rename.modalInitialValue}
+            onSave={handleRenameSave}
+            onClose={handleRenameClose}
+          />
+        ) : null}
+      </View>
+    </PartDetailSheetHost>
   );
 
   function renderKeyboardBody() {
@@ -859,6 +931,7 @@ export function SessionDetailContent({
             isSubmitting={isAnswering}
             requestId={activeQuestion.requestId}
             submissionError={questionSubmissionError}
+            pendingCount={blockingRequestCount}
           />
         ) : null}
 
@@ -874,14 +947,24 @@ export function SessionDetailContent({
             isSubmitting={isRespondingToPermission}
             requestId={activePermission.requestId}
             submissionError={permissionSubmissionError}
+            pendingCount={blockingRequestCount}
           />
         ) : null}
 
         {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
-          <View className="border-t border-border bg-secondary px-4 py-3">
+          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               This is a read-only session
             </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              accessibilityLabel="Continue in a new session"
+              disabled={isContinuing}
+              onPress={handleContinueInNewSession}
+            >
+              <Text>Continue in a new session</Text>
+            </Button>
           </View>
         ) : null}
 
@@ -899,6 +982,7 @@ export function SessionDetailContent({
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
+                onRestartSession={handleRestartSession}
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
@@ -916,6 +1000,7 @@ export function SessionDetailContent({
                 commands={availableCommands}
                 commandState={remoteCommandState}
                 shareId={shareId}
+                autoSend={autoSend}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

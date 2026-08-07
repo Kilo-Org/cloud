@@ -74,6 +74,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Social OAuth Clients
 
+- `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
+- `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -151,6 +153,13 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `APPLE_IAP_ISSUER_ID` - Apple IAP issuer (team) ID. `[SECRET]`
 - `APPLE_IAP_PRIVATE_KEY` - Apple IAP private key (PEM/ES256) for receipt validation. `[SECRET]`
 - `APPLE_ROOT_CERTIFICATES_PEM` - Apple root CA certs (PEM) for validating IAP receipts. [SERVER]
+- `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
+- `NATIVE_ADMISSION_MODE` - Native admission enforcement mode: `off` (default), `report`, or `enforce`. [SERVER]
+- `NATIVE_ADMISSION_SIMULATOR_BYPASS` - When `true` in non-production, bypasses Play Integrity API verification. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
+- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 signing certificate digests (hex) accepted for the Android app. [SERVER]
 
 ### Ablation / Experimentation
 
@@ -176,6 +185,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Encryption & Secrets
 
 - `BYOK_ENCRYPTION_KEY` - Base64 encryption key for Bring-Your-Own-Key encryption of sensitive app data. `[SECRET]`
+- `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`
+- `BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY` - Server-only BytePlus secret access key for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY`. `[SECRET]`
 - `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Encryption key for credit category labels/values. `[SECRET]`
 - `AGENT_ENV_VARS_PUBLIC_KEY` - RSA public key (base64) used to encrypt agent environment variables. [SERVER]
 - `AGENT_ENV_VARS_PRIVATE_KEY` - Legacy alias for the above — the actual private key used to decrypt agent env vars (kept server-side). `[SECRET]`
@@ -364,6 +375,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 - `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
 - `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
+- `VITE_CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production Cloud Agent endpoint otherwise. [PUBLIC]
+- `VITE_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the extension; read in `apps/extension/src/shared/cloud-agent-config.ts`. Falls back to localhost during `wxt serve` and the production session ingest endpoint otherwise. [PUBLIC]
 
 ## Mobile
 
@@ -387,6 +400,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]
 - `CF_AE_TOKEN` - Cloudflare Account/Enterprise API token for the local dev CLI (`dev/local/cli.ts`). `[SECRET]`
 - `KILO_PORT_OFFSET` - Port offset for the local dev tmux dashboard; applied by `dev/local/cli.ts` and `dev/local/services.ts` to prevent port conflicts. [SERVER]
+- `COMPOSE_PROJECT_NAME` - Docker Compose project for the local infrastructure; written to `dev/.env` by `dev/local/infra-env.ts` so a worktree with a port offset owns its own containers and volumes. [SERVER]
+- `KILO_POSTGRES_PORT`, `KILO_REDIS_PORT`, `KILO_REDIS_HTTP_PORT`, `KILO_GRAFANA_PORT` - Host ports for the local infrastructure containers; written to `dev/.env` by `dev/local/infra-env.ts`, read by `dev/docker-compose.yml`. Default to 5432, 6379, 8079, and 4000. [SERVER]
+- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` - Overrides the `localConnectionString` each `wrangler.jsonc` commits, so a worktree's workers reach that worktree's database; set on every worker command by `dev/local/services.ts`. [SERVER]
 
 ## E2E
 

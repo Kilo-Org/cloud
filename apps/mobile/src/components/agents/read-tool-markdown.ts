@@ -1,8 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
-/** Inline preview cap. Matches the maxLength ReadToolCard already gives MonoScrollBlock. */
-export const MARKDOWN_INLINE_MAX_CHARS = 2000;
-
 export type ReadFileDisplay = {
   path: string;
   text: string;
@@ -12,13 +9,9 @@ export type ReadFileDisplay = {
   truncated: boolean;
 };
 
-export type MarkdownPreview = {
-  path: string;
-  /** Full markdown for the reader, code fences balanced. */
+export type MarkdownBody = {
+  /** Full markdown for the sheet body, code fences balanced. */
   text: string;
-  /** Capped copy for the card, code fences balanced. */
-  inlineText: string;
-  inlineTruncated: boolean;
   /** e.g. 'lines 201–400 of 1,450'. Undefined for a complete, untruncated read. */
   footer: string | undefined;
 };
@@ -203,19 +196,7 @@ function buildFooter(display: ReadFileDisplay): string | undefined {
   return `lines ${a}–${b} of ${n}`;
 }
 
-function buildInlineText(text: string): { inlineText: string; inlineTruncated: boolean } {
-  if (text.length <= MARKDOWN_INLINE_MAX_CHARS) {
-    return { inlineText: text, inlineTruncated: false };
-  }
-  let slice = text.slice(0, MARKDOWN_INLINE_MAX_CHARS);
-  const lastNewline = slice.lastIndexOf('\n');
-  if (lastNewline !== -1) {
-    slice = slice.slice(0, lastNewline);
-  }
-  return { inlineText: balanceCodeFences(slice), inlineTruncated: true };
-}
-
-export function resolveMarkdownPreview(part: ToolPart): MarkdownPreview | undefined {
+export function resolveMarkdownBody(part: ToolPart): MarkdownBody | undefined {
   if (part.state.status !== 'completed') {
     return undefined;
   }
@@ -225,19 +206,5 @@ export function resolveMarkdownPreview(part: ToolPart): MarkdownPreview | undefi
     return undefined;
   }
 
-  const input = part.state.input;
-  const inputPath = typeof input.filePath === 'string' ? input.filePath : '';
-  const path = inputPath !== '' ? inputPath : display.path;
-
-  const text = balanceCodeFences(display.text);
-  const { inlineText, inlineTruncated } = buildInlineText(text);
-  const footer = buildFooter(display);
-
-  return {
-    path,
-    text,
-    inlineText,
-    inlineTruncated,
-    footer,
-  };
+  return { text: balanceCodeFences(display.text), footer: buildFooter(display) };
 }

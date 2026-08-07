@@ -42,7 +42,7 @@ export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
 export { reduce } from './reducer';
 
 export { createChatProcessor } from './chat-processor';
-export type { ChatProcessor } from './chat-processor';
+export type { ChatProcessor, ChatProcessorOptions } from './chat-processor';
 
 export { configureCloudAgentSdkRuntime } from './runtime';
 export type { CloudAgentSdkRuntimeOverrides } from './runtime';
@@ -81,7 +81,7 @@ export type {
   UserWebSystemEvent,
 } from './user-web-connection';
 
-export { createRemoteSessionOnConnection } from './create-session';
+export { createRemoteSessionOnConnection, parseCreateSessionResponse } from './create-session';
 
 export {
   REMOTE_MODEL_IDENTITY_MAX_LENGTH,

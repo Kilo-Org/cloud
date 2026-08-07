@@ -69,6 +69,7 @@ function createExitSubmissionHarness() {
               onExitSession,
               onSendCommand: vi.fn(),
               onCreateSession: vi.fn(),
+              onRestartSession: vi.fn(),
               onSendPrompt: vi.fn(),
             },
             { clearDraft, dismiss, resetAttachments }

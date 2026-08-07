@@ -7,6 +7,7 @@ import Link from 'next/link';
 const ROLE_OPTIONS: { value: OrganizationRole | 'KILO ADMIN'; label: string }[] = [
   { value: 'KILO ADMIN', label: 'Kilo Admin' },
   { value: 'owner', label: 'Owner' },
+  { value: 'admin', label: 'Admin' },
   { value: 'billing_manager', label: 'Billing Manager' },
   { value: 'member', label: 'Member' },
 ];

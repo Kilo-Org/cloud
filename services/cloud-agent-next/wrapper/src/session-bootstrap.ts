@@ -37,7 +37,7 @@ const PROGRESS_UPDATE_INTERVAL_MS = 5_000;
 const SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES = 4_096;
 const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
-const MAX_ATTACHMENT_BYTES = 5_242_880;
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
 
 function cleanTerminalOutput(text: string): string {
@@ -176,6 +176,12 @@ const GIT_FAILURE_PATTERNS = [
   {
     subtype: 'git_authentication_failed',
     pattern: /authentication failed|could not read username|http 401|http 403/i,
+  },
+  {
+    subtype: 'git_rate_limited',
+    // Anchor 429 to an HTTP-error context: clones run with --progress, so a bare
+    // 429 also matches object counts (e.g. "remote: Total 429 (delta 12)").
+    pattern: /(?:error|http|status(?:\s+code)?)\s*:?\s*429\b|too many requests|rate limit(?:ed)?/i,
   },
   {
     subtype: 'git_network_failed',
@@ -1027,7 +1033,9 @@ async function downloadBounded(
 
   if (overflowed) {
     await safeUnlink(filePath);
-    throw new Error('Attachment too large: bytes exceeded the 5 MiB cap');
+    throw new Error(
+      `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
+    );
   }
 
   return { bytesWritten };

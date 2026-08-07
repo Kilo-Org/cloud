@@ -14,10 +14,35 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import { parseGitHubOwnerRepo, computeSearchNextCursor } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
+
+// Mock the cloud agent client for watermark and runtime-state tests.
+const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
+
+jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+  createCloudAgentNextClient: jest.fn(() => ({
+    getSession: mockGetSession,
+  })),
+  rethrowAsPaymentRequired: jest.fn(),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {
+    constructor(message = 'Insufficient credits') {
+      super(message);
+      this.name = 'InsufficientCreditsError';
+    }
+  },
+}));
+
+jest.mock('@/lib/tokens', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/tokens');
+  return {
+    ...actual,
+    generateApiToken: jest.fn(() => 'test-api-token'),
+    generateInternalServiceToken: jest.fn(() => 'test-internal-token'),
+  };
+});
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
@@ -167,7 +192,9 @@ describe('cli-sessions-v2-router', () => {
     it('returns validated snapshot info together with messages', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+      const result = await caller.cliSessionsV2.getSessionMessages({
+        session_id: sessionId,
+      });
 
       expect(result).toEqual({
         info: {
@@ -225,7 +252,10 @@ describe('cli-sessions-v2-router', () => {
               role: 'user' as const,
               time: { created: 1761000000100 },
               agent: 'build',
-              model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+              model: {
+                providerID: 'openrouter',
+                modelID: 'anthropic/claude-sonnet-4',
+              },
             },
             parts: [
               {
@@ -241,7 +271,10 @@ describe('cli-sessions-v2-router', () => {
         nextCursor: 'opaque-cursor',
         omittedItemCount: 0,
       };
-      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history,
+      });
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getSessionMessagesPage({
@@ -249,7 +282,11 @@ describe('cli-sessions-v2-router', () => {
         limit: 50,
       });
 
-      expect(result).toEqual({ kiloSessionId: sessionId, history });
+      expect(result).toEqual({
+        kiloSessionId: sessionId,
+        history,
+        watermarkEventId: null,
+      });
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
       });
@@ -285,7 +322,9 @@ describe('cli-sessions-v2-router', () => {
       });
 
       const caller = await createCallerForUser(regularUser.id);
-      await caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId });
+      await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+      });
 
       // The tRPC input schema must fill in the shared default before the
       // client is called so the worker's bounded reader always sees a
@@ -318,8 +357,14 @@ describe('cli-sessions-v2-router', () => {
     });
 
     it('preserves retryable_failure so the UI can offer Retry', async () => {
-      const history = { kind: 'retryable_failure' as const, phase: 'page_parts' as const };
-      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+      const history = {
+        kind: 'retryable_failure' as const,
+        phase: 'page_parts' as const,
+      };
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history,
+      });
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getSessionMessagesPage({
@@ -327,7 +372,11 @@ describe('cli-sessions-v2-router', () => {
         limit: 10,
       });
 
-      expect(result).toEqual({ kiloSessionId: sessionId, history });
+      expect(result).toEqual({
+        kiloSessionId: sessionId,
+        history,
+        watermarkEventId: null,
+      });
     });
 
     it('preserves too_large and invalid_data as non-retryable outcomes', async () => {
@@ -340,13 +389,20 @@ describe('cli-sessions-v2-router', () => {
         { kind: 'invalid_data' as const },
       ]) {
         fetchSessionMessagesPage.mockReset();
-        fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: sessionId,
+          history,
+        });
         const caller = await createCallerForUser(regularUser.id);
         const result = await caller.cliSessionsV2.getSessionMessagesPage({
           session_id: sessionId,
           limit: 10,
         });
-        expect(result).toEqual({ kiloSessionId: sessionId, history });
+        expect(result).toEqual({
+          kiloSessionId: sessionId,
+          history,
+          watermarkEventId: null,
+        });
       }
     });
 
@@ -365,6 +421,7 @@ describe('cli-sessions-v2-router', () => {
       expect(result).toEqual({
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
       });
     });
 
@@ -372,7 +429,10 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(otherUser.id);
 
       await expect(
-        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 50,
+        })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
@@ -404,7 +464,10 @@ describe('cli-sessions-v2-router', () => {
 
         const caller = await createCallerForUser(regularUser.id);
         await expect(
-          caller.cliSessionsV2.getSessionMessagesPage({ session_id: orgSessionId, limit: 50 })
+          caller.cliSessionsV2.getSessionMessagesPage({
+            session_id: orgSessionId,
+            limit: 50,
+          })
         ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
         expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
       } finally {
@@ -416,7 +479,10 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
-        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 101 })
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 101,
+        })
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
@@ -425,7 +491,10 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
-        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 0 })
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 0,
+        })
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
@@ -472,7 +541,10 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
-        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, cursor: 'bad' })
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          cursor: 'bad',
+        })
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
@@ -494,9 +566,190 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
-        caller.cliSessionsV2.getSessionMessagesPage({ session_id: 'not-a-session', limit: 50 })
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: 'not-a-session',
+          limit: 50,
+        })
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    describe('watermark', () => {
+      const cloudAgentSessionId = 'agent_wm123456-1234-1234-1234-123456789abc';
+      const watermarkSessionId = 'ses_watermark_test_123456';
+
+      beforeEach(async () => {
+        mockGetSession.mockReset().mockRejectedValue(new Error('not mocked'));
+        await db.insert(cli_sessions_v2).values({
+          session_id: watermarkSessionId,
+          cloud_agent_session_id: cloudAgentSessionId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+        });
+      });
+
+      afterEach(async () => {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, watermarkSessionId));
+      });
+
+      it('carries a present watermark on the initial page response', async () => {
+        mockGetSession.mockResolvedValue({ latestEventId: 42 });
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: watermarkSessionId,
+          limit: 50,
+        });
+
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: 42,
+        });
+        expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        // Verify both the watermark and the page were fetched.
+        expect(fetchSessionMessagesPage).toHaveBeenCalled();
+      });
+
+      it('carries null watermark when the DO has no events', async () => {
+        mockGetSession.mockResolvedValue({ latestEventId: null });
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: watermarkSessionId,
+          limit: 50,
+        });
+
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: null,
+        });
+      });
+
+      it('fails open: a watermark read failure returns null and page still succeeds', async () => {
+        mockGetSession.mockRejectedValue(new Error('DO unreachable'));
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: watermarkSessionId,
+          limit: 50,
+        });
+
+        // The page must succeed with null watermark — no INTERNAL_SERVER_ERROR.
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: null,
+        });
+      });
+
+      it('skips the watermark read when the session has no cloud_agent_session_id', async () => {
+        // Remove the CA session ID and test that no watermark fetch happens.
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_session_id: null })
+          .where(eq(cli_sessions_v2.session_id, watermarkSessionId));
+
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: watermarkSessionId,
+          limit: 50,
+        });
+
+        expect(mockGetSession).not.toHaveBeenCalled();
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: null,
+        });
+      });
+
+      it('skips the watermark read on cursor pages (continuation reads)', async () => {
+        mockGetSession.mockRejectedValue(new Error('must not be called'));
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+
+        const caller = await createCallerForUser(regularUser.id);
+        const validCursor = btoa(
+          JSON.stringify({ id: 'msg_user_01', time: 1761000000100 })
+        ).replace(/=+$/, '');
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: watermarkSessionId,
+          limit: 50,
+          cursor: validCursor,
+        });
+
+        // Cursor pages must skip the Cloud Agent read entirely.
+        expect(mockGetSession).not.toHaveBeenCalled();
+        expect(result.watermarkEventId).toBeNull();
+      });
+
+      it('resolves getSession before fetchSessionMessagesPage starts (deferred-promise order proof)', async () => {
+        // Deferred promise proves the router awaits getSession before calling
+        // fetchSessionMessagesPage. Without this ordering, the watermark
+        // read could race with the page fetch.
+        let getSessionResolved = false;
+        let resolveGetSession!: (value: { latestEventId: number }) => void;
+
+        const getSessionPromise = new Promise<{ latestEventId: number }>(resolve => {
+          resolveGetSession = resolve;
+        });
+        mockGetSession.mockReturnValue(getSessionPromise);
+
+        let fetchPageCalled = false;
+        let pageResolved = false;
+        fetchSessionMessagesPage.mockImplementationOnce(async () => {
+          fetchPageCalled = true;
+          // If getSession hasn't resolved yet, the ordering is broken.
+          expect(getSessionResolved).toBe(true);
+          pageResolved = true;
+          return {
+            kiloSessionId: watermarkSessionId,
+            history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          };
+        });
+
+        const caller = await createCallerForUser(regularUser.id);
+        const resultPromise = caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: watermarkSessionId,
+          limit: 50,
+        });
+
+        // Let the router reach the getSession call.
+        await new Promise(r => setTimeout(r, 0));
+
+        // Neither getSession nor fetchPage has resolved yet.
+        expect(getSessionResolved).toBe(false);
+        expect(fetchPageCalled).toBe(false);
+
+        // Resolve getSession — the router must then call fetchSessionMessagesPage.
+        getSessionResolved = true;
+        resolveGetSession({ latestEventId: 99 });
+
+        const result = await resultPromise;
+        expect(result.watermarkEventId).toBe(99);
+        expect(pageResolved).toBe(true);
+      });
     });
   });
 
@@ -1009,7 +1262,9 @@ describe('cli-sessions-v2-router', () => {
         const caller = await createCallerForUser(regularUser.id);
 
         await expect(
-          caller.cliSessionsV2.getSessionMessages({ session_id: organizationSessionId })
+          caller.cliSessionsV2.getSessionMessages({
+            session_id: organizationSessionId,
+          })
         ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
         expect(fetchSpy).not.toHaveBeenCalled();
       } finally {
@@ -1175,7 +1430,9 @@ describe('cli-sessions-v2-router', () => {
       try {
         const caller = await createCallerForUser(regularUser.id);
         await expect(
-          caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr })
+          caller.cliSessionsV2.getWithRuntimeState({
+            session_id: sessionWithPr,
+          })
         ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
       } finally {
         await db
@@ -1373,7 +1630,9 @@ describe('cli-sessions-v2-router', () => {
 
     it('search returns associatedPr per row matching the search string', async () => {
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.search({ search_string: 'session' });
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+      });
 
       const withPr = result.results.find(s => s.session_id === sessionWithPr);
       const withoutPr = result.results.find(s => s.session_id === sessionWithoutPr);
@@ -1459,7 +1718,9 @@ describe('cli-sessions-v2-router', () => {
       });
 
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
 
       expect(mockedFetchPullRequestForBranch).toHaveBeenCalledTimes(1);
       expect(mockedFetchPullRequestForBranch).toHaveBeenCalledWith({
@@ -1505,7 +1766,9 @@ describe('cli-sessions-v2-router', () => {
       mockedFetchPullRequestForBranch.mockResolvedValue(null);
 
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
 
       expect(result.associatedPr).toBeNull();
       const rows = await readCacheRows();
@@ -1537,7 +1800,9 @@ describe('cli-sessions-v2-router', () => {
       expect(mockedFetchPullRequestForBranch).toHaveBeenCalledTimes(1);
 
       // Second call within the throttle window short-circuits.
-      const second = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+      const second = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
       expect(mockedFetchPullRequestForBranch).toHaveBeenCalledTimes(1);
       expect(second.associatedPr).toBeNull();
     });
@@ -1555,7 +1820,9 @@ describe('cli-sessions-v2-router', () => {
       });
 
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
 
       expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
       expect(result.associatedPr).toMatchObject({ number: 99, state: 'open' });
@@ -1764,7 +2031,9 @@ describe('cli-sessions-v2-router', () => {
 
     it('defaults search to updated_at descending', async () => {
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.search({ search_string: searchableTitle });
+      const result = await caller.cliSessionsV2.search({
+        search_string: searchableTitle,
+      });
 
       expect(result.results.map(session => session.session_id)).toEqual([
         olderCreatedNewerUpdated,
@@ -1783,6 +2052,121 @@ describe('cli-sessions-v2-router', () => {
         newerCreatedOlderUpdated,
         olderCreatedNewerUpdated,
       ]);
+    });
+  });
+
+  describe('search cursor paging', () => {
+    const needle = 'cursor-paging-search-fixture';
+    const sessionA = 'ses_cursor_paging_a_0001';
+    const sessionB = 'ses_cursor_paging_b_0001';
+    const sessionC = 'ses_cursor_paging_c_0001';
+    const allIds = [sessionA, sessionB, sessionC];
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionA,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} alpha`,
+          updated_at: '2026-01-03T10:00:00.000Z',
+        },
+        {
+          session_id: sessionB,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} beta`,
+          updated_at: '2026-01-02T10:00:00.000Z',
+        },
+        {
+          session_id: sessionC,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: `${needle} gamma`,
+          updated_at: '2026-01-01T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allIds));
+    });
+
+    it('returns the first page with nextCursor pointing at the remaining rows', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.offset).toBe(0);
+      expect(result.nextCursor).toBe(2);
+      // Default sort is updated_at descending.
+      expect(result.results.map(s => s.session_id)).toEqual([sessionA, sessionB]);
+    });
+
+    it('returns the remaining row with nextCursor null on the cursor page', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const page1 = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
+      const page1Ids = new Set(page1.results.map(s => s.session_id));
+
+      const page2 = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 2,
+      });
+
+      expect(page2.results).toHaveLength(1);
+      expect(page2.total).toBe(3);
+      expect(page2.offset).toBe(2);
+      expect(page2.nextCursor).toBeNull();
+      expect(page1Ids.has(page2.results[0].session_id)).toBe(false);
+      expect(page2.results[0].session_id).toBe(sessionC);
+    });
+
+    it('prefers cursor over legacy offset when both arrive', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 2,
+        offset: 0,
+      });
+
+      expect(result.offset).toBe(2);
+      expect(result.results).toHaveLength(1);
+    });
+
+    it('offsets from zero when only legacy offset is supplied', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        offset: 0,
+      });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.offset).toBe(0);
+    });
+
+    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
+      // Empty page: results.length === 0, nextOffset === pageOffset.
+      // When pageOffset (2) < total (3), the naive formula
+      //   nextOffset < total ? nextOffset : null
+      // returns 2 — a non-null cursor that would cause an infinite loop.
+      // The empty-results guard prevents this.
+      const resultsLength = 0;
+      const nextOffset = 2;
+      const total = 3;
+
+      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
+      expect(withGuard).toBeNull();
+
+      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
+      // Empty guard:  resultsLength > 0 → false → null (correct)
+      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
+      expect(oldFormula).toBe(nextOffset);
+      expect(withGuard).not.toBe(oldFormula);
     });
   });
 
@@ -1893,7 +2277,10 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       // Fixtures are ordered by created_at; placeholders sit between visible
       // rows. limit=2 over created_at should page only visible rows.
-      const page1 = await caller.cliSessionsV2.list({ limit: 2, orderBy: 'created_at' });
+      const page1 = await caller.cliSessionsV2.list({
+        limit: 2,
+        orderBy: 'created_at',
+      });
       const page1Ids = page1.cliSessions.map(session => session.session_id);
 
       expect(page1Ids).toEqual([normalCliId, costOnlyZeroId]);
@@ -1913,7 +2300,9 @@ describe('cli-sessions-v2-router', () => {
 
     it('search by exact session_id does not return a bare placeholder', async () => {
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.search({ search_string: placeholderId });
+      const result = await caller.cliSessionsV2.search({
+        search_string: placeholderId,
+      });
 
       expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
       expect(result.total).toBe(0);

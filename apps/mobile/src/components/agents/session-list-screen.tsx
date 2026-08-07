@@ -1,39 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Plus } from 'lucide-react-native';
 
 import { ActiveNowSection } from '@/components/agents/active-now-section';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import { AgentSessionListContent } from '@/components/agents/session-list-content';
+import {
+  AgentSessionListContent,
+  FAB_MARGIN,
+  FAB_SIZE,
+} from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
-import {
-  type ProjectFilterOption,
-  SessionFilterChips,
-  SessionFilterModal,
-} from '@/components/agents/platform-filter-modal';
-import {
-  excludeActiveFromGroups,
-  expandPlatformFilter,
-  formatGitUrlProject,
-  selectPinnedActiveSessions,
-  type SessionSection,
-} from '@/components/agents/session-list-helpers';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
+import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
+import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { ScreenHeader } from '@/components/screen-header';
-import {
-  useAgentSessions,
-  useAgentSessionSearch,
-  useRecentAgentRepositories,
-} from '@/lib/hooks/use-agent-sessions';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { useOrganization } from '@/lib/organization-context';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 
 export function AgentSessionListScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+
+  const tabBarHeight = useMemo(
+    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
+    [bottom, fontScale]
+  );
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -51,146 +55,71 @@ export function AgentSessionListScreen() {
     searchQuery,
     searchInputRef,
     hasText,
+    awaitingCommit,
     handleSearchInputChange,
     handleClearSearchInput,
     clearSearchInput,
     searchController,
   } = useSessionSearchInput();
 
-  const createdOnPlatform = useMemo(
-    () => (platformFilter.length > 0 ? expandPlatformFilter(platformFilter) : undefined),
-    [platformFilter]
-  );
-  const gitUrl = useMemo(
-    () => (projectFilter.length > 0 ? projectFilter : undefined),
-    [projectFilter]
-  );
-
   const ready = filtersLoaded && orgLoaded;
+
   const {
     storedSessions,
-    dateGroups,
     activeSessions,
-    activeSessionIds,
     activeIsError,
     isLoading,
-    storedIsError,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
+    paging,
     refetch,
-  } = useAgentSessions({
-    createdOnPlatform,
-    gitUrl,
+    handleRetry,
+    handleRefetch,
+    isSearching,
+    search,
+    projectOptions,
+    contentIsError,
+    pinnedActive,
+    sections,
+  } = useAgentSessionListData({
     organizationId,
-    enabled: ready,
+    platformFilter,
+    projectFilter,
     sortBy,
-  });
-  const isSearching = searchQuery.length > 0;
-  const search = useAgentSessionSearch({
+    ready,
     searchQuery,
-    createdOnPlatform,
-    gitUrl,
-    organizationId,
-    enabled: ready && isSearching,
-    sortBy,
   });
-  const { data: recentRepositories } = useRecentAgentRepositories({
-    organizationId,
-    enabled: ready,
-  });
-
-  // The body's error/empty state is driven only by the query that actually
-  // fills the body: the search query while searching, otherwise the stored
-  // (history) list. A transient active-poll blip must never fold into this —
-  // it surfaces solely through the inline "Couldn't refresh" line via
-  // `activeIsError`. Retrying still hits whichever query is really in error
-  // instead of always refetching the base list underneath a failed search;
-  // an active-only failure during search additionally retries the active poll
-  // so the inline staleness line clears.
-  const contentIsError = isSearching ? search.isError : storedIsError;
-  const isSearchPending = isSearching && search.isPending;
-  const searchRefetch = search.refetch;
-  const handleRetry = useCallback(() => {
-    if (!isSearching) {
-      void refetch();
-      return;
-    }
-    if (activeIsError) {
-      // search is the body, active is the tray — retry both.
-      void (async () => {
-        await Promise.all([searchRefetch(), refetch()]);
-      })();
-      return;
-    }
-    void searchRefetch();
-  }, [activeIsError, isSearching, refetch, searchRefetch]);
-
-  // Pull-to-refresh must also retry the search query while one is active —
-  // it's the query actually driving what's on screen.
-  const handleRefetch = useCallback(async () => {
-    if (!isSearching) {
-      await refetch();
-      return;
-    }
-    await Promise.all([searchRefetch(), refetch()]);
-  }, [isSearching, refetch, searchRefetch]);
-
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
   }, [refetch]);
-
   useFocusEffect(
     useCallback(() => {
       void refetchRef.current();
     }, [])
   );
 
-  const projectOptions = useMemo((): ProjectFilterOption[] => {
-    const byGitUrl = new Map<string, ProjectFilterOption>();
-
-    const repositories = recentRepositories?.repositories ?? [];
-    for (const project of repositories.slice(0, 3)) {
-      byGitUrl.set(project.gitUrl, {
-        gitUrl: project.gitUrl,
-        displayName: formatGitUrlProject(project.gitUrl),
-      });
-    }
-
-    for (const selectedGitUrl of projectFilter) {
-      if (!byGitUrl.has(selectedGitUrl)) {
-        byGitUrl.set(selectedGitUrl, {
-          gitUrl: selectedGitUrl,
-          displayName: formatGitUrlProject(selectedGitUrl),
-        });
+  // App-foreground refresh for the Agents list. The stored query opts out of
+  // React Query's native window-focus refetch (`refetchOnWindowFocus: false`
+  // from the list hook), so an OS foreground transition must be driven here —
+  // through the same wrapped `refetch` as navigation focus — to keep every
+  // stored refetch serialized by the shared operation coordinator (backfill
+  // and departure never overlap a refetch).
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        void refetchRef.current();
       }
-    }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
-    return [...byGitUrl.values()];
-  }, [projectFilter, recentRepositories?.repositories]);
+  const showSearchBusy = selectShowSearchBusy({
+    awaitingCommit,
+    isSearching,
+    isFetching: search.isFetching,
+  });
 
-  // While the first fetch for this search text is still in flight (no
-  // keepPreviousData to fall back on yet), render as if no search were
-  // applied instead of blanking to an empty/mismatched list —
-  // `isSearchPending` drives a lightweight inline indicator instead.
-  const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
-
-  // Pinned "Active now" tray. The committed effective search query narrows
-  // the tray together with the history data source (blank while the first
-  // fetch for the text is pending), in conjunction with the platform/project
-  // filters, so the tray never shows a session the user has searched or
-  // filtered away.
-  const pinnedActive = useMemo(
-    () =>
-      selectPinnedActiveSessions({
-        activeSessions,
-        projectFilter,
-        platformFilter,
-        searchQuery: effectiveSearchQuery,
-      }),
-    [activeSessions, effectiveSearchQuery, platformFilter, projectFilter]
-  );
   const hasPinnedActive = pinnedActive.length > 0;
 
   const organizationIdBySessionId = useMemo(
@@ -198,61 +127,57 @@ export function AgentSessionListScreen() {
     [storedSessions]
   );
 
-  // History sections only. The pinned tray takes over for active sessions
-  // and `excludeActiveFromGroups` keeps history exclusivity.
-  const sections = useMemo<SessionSection[]>(() => {
-    // Stored sessions are cursor-paginated, so a client-side filter would only
-    // see the loaded pages. When a query is active, use the server search
-    // results (which cover the full history) instead.
-    const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
-    return excludeActiveFromGroups(storedGroups, activeSessionIds).map(group => ({
-      title: group.label,
-      data: group.sessions,
-    }));
-  }, [activeSessionIds, dateGroups, effectiveSearchQuery, search.dateGroups]);
-
-  const navigateToSession = useCallback(
-    (sessionId: string, sessionOrgId?: string | null) => {
-      const path = sessionOrgId
-        ? `/(app)/agent-chat/${sessionId}?organizationId=${sessionOrgId}`
-        : `/(app)/agent-chat/${sessionId}`;
-      router.push(path as Href);
-    },
-    [router]
-  );
+  const navigateToSession = useAgentSessionNavigator();
 
   const handleEndReached = useCallback(() => {
-    if (!isSearching && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
+    if (shouldLoadMoreSessions(paging)) {
+      void paging.fetchNextPage();
     }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
+  }, [paging]);
 
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
-  // Search header is rendered at the screen level (above the scrolling list)
-  // so it stays reachable without scrolling. The Active now tray scrolls
-  // inside the list header. Recompute the body's `showInlineError` here
-  // via the SAME pure selector, with the same inputs, so the inline
-  // "Couldn't refresh" line stays identical and the body-model test keeps
-  // covering it.
+  // Inline error recomputed here (same pure selector, same inputs) so the
+  // body-model test continues covering it.
   const showInlineError = useMemo(
     () =>
       selectSessionListBodyModel({
         hasHistoryContent: sections.length > 0,
+        hasStoredSessions: storedSessions.length > 0,
+        hasMoreHistory: paging.hasNextPage,
         hasPinnedActive,
         hasActiveQuery: isSearching || hasActiveFilter,
         isSearching,
         isError: contentIsError,
         activeIsError,
       }).showInlineError,
-    [activeIsError, contentIsError, hasActiveFilter, hasPinnedActive, isSearching, sections]
+    [
+      activeIsError,
+      contentIsError,
+      hasActiveFilter,
+      hasPinnedActive,
+      isSearching,
+      paging.hasNextPage,
+      sections,
+      storedSessions,
+    ]
   );
 
   const handleClearQuery = useCallback(() => {
     clearSearchInput();
     searchController.clearBroadly(setFilters);
   }, [clearSearchInput, searchController, setFilters]);
+
+  const fabStyle = useMemo(
+    () => ({
+      bottom: tabBarHeight + FAB_MARGIN,
+      right: 20,
+      width: FAB_SIZE,
+      height: FAB_SIZE,
+    }),
+    [tabBarHeight]
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -291,7 +216,7 @@ export function AgentSessionListScreen() {
         <SessionListSearchHeader
           inputRef={searchInputRef}
           hasText={hasText}
-          isSearchPending={isSearchPending}
+          showSearchBusy={showSearchBusy}
           showInlineError={showInlineError}
           onChangeText={handleSearchInputChange}
           onClearSearch={handleClearSearchInput}
@@ -305,7 +230,9 @@ export function AgentSessionListScreen() {
           isLoading={isLoading || !ready}
           isError={contentIsError}
           activeIsError={activeIsError}
-          isFetchingNextPage={isFetchingNextPage}
+          hasStoredSessions={storedSessions.length > 0}
+          hasMoreHistory={paging.hasNextPage}
+          isFetchingNextPage={paging.isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}
           onEndReached={handleEndReached}
@@ -340,6 +267,21 @@ export function AgentSessionListScreen() {
             setFilters(filters);
           }}
         />
+      )}
+      {/* FAB visible when there are sessions — empty state already owns the creation CTA. */}
+      {hasAnySessions && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New session"
+          testID="agents-new-session-fab"
+          onPress={() => {
+            router.push(getNewAgentSessionPath(organizationId) as Href);
+          }}
+          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80"
+          style={fabStyle}
+        >
+          <Plus size={24} color={colors.primaryForeground} />
+        </Pressable>
       )}
     </View>
   );

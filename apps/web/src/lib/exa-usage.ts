@@ -2,19 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import {
-  mutateOrganizationUsage,
-  scheduleOrganizationLowBalanceAlert,
-} from '@/lib/organizations/organization-usage';
+import { scheduleOrganizationLowBalanceAlert } from '@/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
-import {
-  captureCostInsightSpend,
-  COST_INSIGHT_DRIVER_FALLBACK,
-  COST_INSIGHT_EXA_PRODUCT_KEY,
-} from '@kilocode/db/cost-insights-rollups';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
-import { getExaCostInsightFeatureKey } from '@/lib/exa-paths';
+import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */
@@ -66,8 +57,8 @@ export async function getExaMonthlyUsage(
 }
 
 /**
- * Records the source row, monthly counter, charged owner mutation, and Cost Insights
- * rollup atomically. Low-balance notification scheduling happens only after commit.
+ * Records the source row, monthly counter, and charged owner mutation atomically.
+ * Low-balance notification scheduling happens only after commit.
  */
 export async function recordExaUsage(params: {
   userId: string;
@@ -122,21 +113,7 @@ export async function recordExaUsage(params: {
       organizationId,
       occurredAt,
       costMicrodollars,
-    });
-
-    await captureCostInsightSpend(tx, {
-      owner: organizationId
-        ? { type: 'organization', id: organizationId }
-        : { type: 'user', id: userId },
-      actorUserId: userId,
-      occurredAt,
-      amountMicrodollars: costMicrodollars,
-      category: 'variable',
-      source: 'other',
-      productKey: COST_INSIGHT_EXA_PRODUCT_KEY,
-      featureKey: getExaCostInsightFeatureKey(path),
-      modelOrPlanKey: COST_INSIGHT_DRIVER_FALLBACK,
-      providerKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+      sourceId,
     });
 
     return result;
@@ -144,11 +121,6 @@ export async function recordExaUsage(params: {
 
   if (organizationId && organizationUsage) {
     scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
-  }
-  if (chargedToBalance && costMicrodollars > 0) {
-    scheduleCostInsightEvaluationAfterSpend(
-      organizationId ? { type: 'organization', id: organizationId } : { type: 'user', id: userId }
-    );
   }
 }
 
@@ -219,23 +191,33 @@ async function deductFromBalance(
     organizationId: string | undefined;
     occurredAt: string;
     costMicrodollars: number;
+    sourceId: string;
   }
 ): Promise<OrganizationUsageMutationResult | null> {
-  const { userId, organizationId, occurredAt, costMicrodollars } = params;
+  const { userId, organizationId, occurredAt, costMicrodollars, sourceId } = params;
   if (organizationId) {
-    return mutateOrganizationUsage(tx, {
-      kilo_user_id: userId,
-      organization_id: organizationId,
-      cost: costMicrodollars,
-      created_at: occurredAt,
+    const result = await recordOrganizationConsumption(tx, {
+      organizationId,
+      kiloUserId: userId,
+      amountMicrodollars: costMicrodollars,
+      occurredAt,
+      source: 'exa',
+      sourceId,
     });
+    return result.organizationUsage;
   }
 
-  await tx
+  const updated = await tx
     .update(kilocode_users)
     .set({
       microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
     })
     .where(eq(kilocode_users.id, userId));
+  // Charged usage must never commit without its balance debit. The organization
+  // branch already fails when its row disappears; this keeps the personal branch
+  // atomic now that it no longer depends on a mandatory Cost Insights capture.
+  if ((updated.rowCount ?? 0) === 0) {
+    throw new Error('user disappeared during Exa consumption');
+  }
   return null;
 }

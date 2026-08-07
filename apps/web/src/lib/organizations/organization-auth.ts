@@ -14,8 +14,14 @@ import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
-const parentOrganizationAccessRoles = ['owner', 'billing_manager'] satisfies OrganizationRole[];
-const rolePriority = ['owner', 'billing_manager', 'member'] satisfies OrganizationRole[];
+// Mirrors routers/organizations/utils.ts: parent-organization roles that
+// inherit access to child organizations.
+const parentOrganizationAccessRoles = [
+  'owner',
+  'admin',
+  'billing_manager',
+] satisfies OrganizationRole[];
+const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 type UserWithRole = User & {
   readonly role: OrganizationRole;

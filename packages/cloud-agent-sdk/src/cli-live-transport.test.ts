@@ -1240,7 +1240,19 @@ describe('CliLiveTransport unified user web connection', () => {
       'respondToPermission',
       () => ({ requestId: 'p-1', response: 'always' }),
       'permission_respond',
-      { requestID: 'p-1', reply: 'always' },
+      { requestID: 'p-1', reply: 'always', interactive: true },
+    ],
+    [
+      'respondToPermission',
+      () => ({ requestId: 'p-2', response: 'once' }),
+      'permission_respond',
+      { requestID: 'p-2', reply: 'once', interactive: true },
+    ],
+    [
+      'respondToPermission',
+      () => ({ requestId: 'p-3', response: 'reject' }),
+      'permission_respond',
+      { requestID: 'p-3', reply: 'reject', interactive: true },
     ],
     [
       'acceptSuggestion',
@@ -2347,7 +2359,8 @@ describe('CliLiveTransport createSession', () => {
       KILO_SESSION_ID,
       'create_session',
       { protocolVersion: 1 },
-      'owner'
+      'owner',
+      expect.any(String) as string
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
@@ -2474,7 +2487,8 @@ describe('CliLiveTransport createSession', () => {
       KILO_SESSION_ID,
       'create_session',
       { protocolVersion: 1 },
-      'owner-a'
+      'owner-a',
+      expect.any(String) as string
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
@@ -2533,7 +2547,8 @@ describe('CliLiveTransport createSession', () => {
         model: { providerID: 'anthropic', modelID: 'claude-sonnet-4', variant: 'high' },
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
-      'owner'
+      'owner',
+      expect.any(String) as string
     );
     transport.destroy();
   });
@@ -2638,6 +2653,39 @@ describe('CliLiveTransport createSession', () => {
         .mocked(userWebConnection.sendCommand)
         .mock.calls.filter(([, command]) => command === 'create_session')
     ).toHaveLength(2);
+    transport.destroy();
+  });
+
+  it('uses a fresh mutationId for the bare retry so the DO treats it as a new command', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+
+    await transport.createSession?.({ agent: 'code' });
+
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls).toHaveLength(2);
+
+    // The second call (bare retry) must have a mutationId that differs
+    // from the first call's mutationId.
+    const firstMutationId = createCalls[0]?.[4];
+    const secondMutationId = createCalls[1]?.[4];
+    expect(firstMutationId).toBeDefined();
+    expect(secondMutationId).toBeDefined();
+    expect(secondMutationId).not.toBe(firstMutationId);
     transport.destroy();
   });
 });

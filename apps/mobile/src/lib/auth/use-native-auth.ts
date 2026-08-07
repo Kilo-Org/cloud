@@ -1,77 +1,71 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { CryptoDigestAlgorithm, digestStringAsync, getRandomBytesAsync } from 'expo-crypto';
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
-import { API_BASE_URL, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
+import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { useAuth } from '@/lib/auth/auth-context';
+import { hasStringCode, postAuth } from '@/lib/auth/auth-fetch';
 import {
-  parseAuthErrorCode,
+  ADMISSION_CHALLENGE_FAILED,
+  type AdmissionPayload,
+  getAdmission,
+} from '@/lib/auth/admission';
+import {
+  buildChallengeEntry,
   parseEmailCodeResponse,
-  parseTokenResponse,
+  parseTokenPair,
+  selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 
-const AUTH_ERROR_MESSAGES: Record<string, string> = {
+export const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'EMAIL-ALREADY-USED':
     "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
   'DIFFERENT-OAUTH':
     "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
   SSO_ERROR: "Your organization requires SSO. Use 'More sign-in options'.",
+  // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains
   BLOCKED: 'This account has been blocked. Please contact support.',
   'SIGNUP-RATE-LIMITED': 'Too many attempts. Please try again later.',
   INVALID_CODE: 'That code is incorrect. Please try again.',
+  CODE_IN_PROGRESS: 'Your code is being processed. Wait a moment and try again.',
   TOO_MANY_ATTEMPTS: 'Too many attempts. Please request a new code.',
   INVALID_TOKEN: 'Sign-in failed. Please try again.',
   INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',
   INVALID_REQUEST: 'Check your email address and try again.',
   EMAIL_DELIVERY_FAILED: 'Email delivery is temporarily unavailable. Please try again later.',
+  // Admission: server refuses the device under enforce mode — non-retryable.
+  ADMISSION_REQUIRED:
+    "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
 };
 
-const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
+export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
+export const RETRYABLE_ADMISSION_ERROR =
+  'We could not verify this device. Check your connection and try again.';
 
-function mapError(errorCode: string | undefined): string {
+export function mapError(errorCode: string | undefined): string {
   return (errorCode && AUTH_ERROR_MESSAGES[errorCode]) ?? DEFAULT_ERROR_MESSAGE;
 }
 
-// Only the callers we have need the error code + parsed body; a generic
-// fetch client would be speculative for two endpoints.
-async function postAuth(
-  path: string,
-  body: unknown
-): Promise<{ ok: true; data: unknown } | { ok: false; errorCode: string | undefined }> {
+export async function resolveAdmission(): Promise<
+  { admission: AdmissionPayload } | { admission: undefined }
+> {
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    let json: unknown = undefined;
-    try {
-      json = await response.json();
-    } catch {
-      json = undefined;
+    const admission = await getAdmission();
+    if (admission) {
+      return { admission };
     }
-
-    if (!response.ok) {
-      return { ok: false, errorCode: parseAuthErrorCode(json) };
-    }
-
-    return { ok: true, data: json };
+    return { admission: undefined };
   } catch {
-    return { ok: false, errorCode: undefined };
+    // Normalize every challenge/provider failure to the retryable message.
+    // Network errors, JSON parse failures, and !response.ok all abort sign-in;
+    // every path must show the retryable toast and throw a consistent sentinel.
+    toast.error(RETRYABLE_ADMISSION_ERROR);
+    throw new Error(ADMISSION_CHALLENGE_FAILED);
   }
-}
-
-function hasStringCode(error: unknown): error is { code: string } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code: unknown }).code === 'string'
-  );
 }
 
 // Module-level guard — GoogleSignin.configure() is cheap but re-calling it
@@ -86,6 +80,7 @@ function ensureGoogleConfigured() {
   GoogleSignin.configure({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     iosClientId: GOOGLE_IOS_CLIENT_ID,
+    offlineAccess: true,
   });
   googleSignInConfigured = true;
 }
@@ -105,6 +100,7 @@ export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
+  const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
 
   const startAction = useCallback((action: Exclude<BusyAction, undefined>) => {
     if (busyRef.current) {
@@ -130,11 +126,20 @@ export function useNativeAuth(): NativeAuthResult {
       return;
     }
     try {
+      // Generate a raw nonce and its SHA-256 digest.  The digest is passed to
+      // AppleAuthentication.signInAsync.  Apple embeds the digest in the identity
+      // token payload as-is.  The server must compute SHA-256 of the raw nonce
+      // and compare against payload.nonce.
+      const rawNonceBytes = await getRandomBytesAsync(32);
+      const rawNonce = [...rawNonceBytes].map(b => b.toString(16).padStart(2, '0')).join('');
+      const nonceDigest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, rawNonce);
+
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: nonceDigest,
       });
 
       if (!credential.identityToken) {
@@ -147,19 +152,33 @@ export function useNativeAuth(): NativeAuthResult {
         ? AppleAuthentication.formatFullName(credential.fullName) || undefined
         : undefined;
 
+      let admissionBody: Record<string, unknown> = {};
+      try {
+        admissionBody = await resolveAdmission();
+      } catch {
+        return;
+      }
+
       const result = await postAuth('/api/auth/native/token', {
         provider: 'apple',
+        ...admissionBody,
         idToken: credential.identityToken,
+        nonce: rawNonce,
+        supportsRefresh: true,
         ...(fullName ? { fullName } : {}),
       });
 
       if (result.ok) {
-        const parsed = parseTokenResponse(result.data);
+        const parsed = parseTokenPair(result.data);
         if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return;
         }
-        await signIn(parsed.token);
+        await signIn(
+          parsed.token,
+          'refreshToken' in parsed ? parsed.refreshToken : undefined,
+          'expiresIn' in parsed ? parsed.expiresIn : undefined
+        );
       } else {
         toast.error(mapError(result.errorCode));
       }
@@ -187,24 +206,47 @@ export function useNativeAuth(): NativeAuthResult {
         return;
       }
 
+      const serverAuthCode = response.data.serverAuthCode;
       const idToken = response.data.idToken;
-      if (!idToken) {
+
+      if (!serverAuthCode && !idToken) {
         toast.error(DEFAULT_ERROR_MESSAGE);
         return;
       }
 
-      const result = await postAuth('/api/auth/native/token', {
+      const body: Record<string, unknown> = {
         provider: 'google',
-        idToken,
-      });
+        supportsRefresh: true,
+      };
+
+      if (serverAuthCode) {
+        body.serverAuthCode = serverAuthCode;
+        body.googleClientId = GOOGLE_WEB_CLIENT_ID;
+      } else {
+        body.idToken = idToken;
+      }
+
+      let admissionBody: Record<string, unknown> = {};
+      try {
+        admissionBody = await resolveAdmission();
+      } catch {
+        return;
+      }
+      Object.assign(body, admissionBody);
+
+      const result = await postAuth('/api/auth/native/token', body);
 
       if (result.ok) {
-        const parsed = parseTokenResponse(result.data);
+        const parsed = parseTokenPair(result.data);
         if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return;
         }
-        await signIn(parsed.token);
+        await signIn(
+          parsed.token,
+          'refreshToken' in parsed ? parsed.refreshToken : undefined,
+          'expiresIn' in parsed ? parsed.expiresIn : undefined
+        );
       } else {
         toast.error(mapError(result.errorCode));
       }
@@ -232,10 +274,16 @@ export function useNativeAuth(): NativeAuthResult {
           toast.error(mapError(result.errorCode));
           return false;
         }
-        if (!parseEmailCodeResponse(result.data)) {
+        const parsed = parseEmailCodeResponse(result.data);
+        if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return false;
         }
+        // Hold the challenge for the current email so verifyEmailCode can
+        // send it back. Discard a stale challenge when the email changes:
+        // a code requested for one address must never be verified against
+        // another's challenge.
+        challengeRef.current = buildChallengeEntry(parsed, email);
         return true;
       } finally {
         finishAction('otp-send');
@@ -251,21 +299,39 @@ export function useNativeAuth(): NativeAuthResult {
         return false;
       }
       try {
+        // Only send a challengeId when the email matches. A mismatched
+        // email means the challenge was generated for a different address.
+        const challengeId = selectChallengeId(challengeRef.current, email);
+
+        let admissionBody: Record<string, unknown> = {};
+        try {
+          admissionBody = await resolveAdmission();
+        } catch {
+          return false;
+        }
+
         const result = await postAuth('/api/auth/native/token', {
           provider: 'email',
+          ...admissionBody,
           email,
           code,
+          supportsRefresh: true,
+          ...(challengeId ? { challengeId } : {}),
         });
         if (!result.ok) {
           toast.error(mapError(result.errorCode));
           return false;
         }
-        const parsed = parseTokenResponse(result.data);
+        const parsed = parseTokenPair(result.data);
         if (!parsed) {
           toast.error(DEFAULT_ERROR_MESSAGE);
           return false;
         }
-        await signIn(parsed.token);
+        await signIn(
+          parsed.token,
+          'refreshToken' in parsed ? parsed.refreshToken : undefined,
+          'expiresIn' in parsed ? parsed.expiresIn : undefined
+        );
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry

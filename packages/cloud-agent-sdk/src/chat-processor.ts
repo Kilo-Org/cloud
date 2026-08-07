@@ -19,7 +19,21 @@ type ChatProcessor = {
 };
 
 type ChatProcessorOptions = {
-  onImageAttachment?: (partId: string, mime: string, dataUrl: string) => void;
+  /**
+   * Optional sink for tool attachment bytes, called just before the chat
+   * processor strips completed tool part attachment data URLs for storage.
+   *
+   * - Images (any tool): emitted unchanged.
+   * - Non-images: emitted only when `part.tool === 'send_file'`.
+   *
+   * The callback receives the raw data URL exactly once per processor pass;
+   * consumers use it to persist bytes outside the in-memory store (e.g.
+   * mobile's file-system cache). Web never passes it, so web behaviour is
+   * unchanged. Sink failures are caught and must not interrupt processing.
+   */
+  onToolAttachment?:
+    | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
+    | undefined;
 };
 
 function hasTextField(part: { text?: string } | unknown): part is { text: string } {
@@ -32,20 +46,24 @@ function isSyntheticPart(part: unknown): boolean {
   );
 }
 
-function emitImageAttachmentsBeforeStrip(
+function emitToolAttachmentsBeforeStrip(
   part: Part,
-  onImageAttachment: NonNullable<ChatProcessorOptions['onImageAttachment']>
+  onToolAttachment: NonNullable<ChatProcessorOptions['onToolAttachment']>
 ): void {
   if (part.type !== 'tool') return;
   const toolPart = part;
   if (toolPart.state.status !== 'completed' || !toolPart.state.attachments) return;
 
   for (const attachment of toolPart.state.attachments) {
-    if (!attachment.mime.startsWith('image/') || attachment.url === '') {
-      continue;
-    }
+    const isImage = attachment.mime.startsWith('image/');
+    if (!isImage && toolPart.tool !== 'send_file') continue;
+    if (attachment.url === '') continue;
     try {
-      onImageAttachment(toolPart.id, attachment.mime, attachment.url);
+      onToolAttachment(toolPart.id, {
+        mime: attachment.mime,
+        ...(attachment.filename ? { filename: attachment.filename } : {}),
+        dataUrl: attachment.url,
+      });
     } catch {
       // Sink failures must not break chat processing.
     }
@@ -53,35 +71,35 @@ function emitImageAttachmentsBeforeStrip(
 }
 
 function createChatProcessor(
-  storage: SessionStorage,
+  sessionStorage: SessionStorage,
   options?: ChatProcessorOptions
 ): ChatProcessor {
   return {
     process(event) {
       switch (event.type) {
         case 'message.updated':
-          storage.upsertMessage(event.info);
+          sessionStorage.upsertMessage(event.info);
           break;
         case 'message.part.updated': {
-          if (options?.onImageAttachment) {
-            emitImageAttachmentsBeforeStrip(event.part, options.onImageAttachment);
+          if (options?.onToolAttachment) {
+            emitToolAttachmentsBeforeStrip(event.part, options.onToolAttachment);
           }
           const stripped = stripPartContentIfFile(event.part);
           if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
-            const existingParts = storage.getParts(stripped.messageID);
+            const existingParts = sessionStorage.getParts(stripped.messageID);
             const existing = existingParts.find(p => p.id === stripped.id);
             if (existing && hasTextField(existing) && existing.text.length > 0) {
               break;
             }
           }
-          storage.upsertPart(stripped.messageID, stripped);
+          sessionStorage.upsertPart(stripped.messageID, stripped);
           break;
         }
         case 'message.part.delta':
-          storage.applyPartDelta(event.messageId, event.partId, event.field, event.delta);
+          sessionStorage.applyPartDelta(event.messageId, event.partId, event.field, event.delta);
           break;
         case 'message.part.removed':
-          storage.deletePart(event.messageId, event.partId);
+          sessionStorage.deletePart(event.messageId, event.partId);
           break;
       }
     },
@@ -90,7 +108,7 @@ function createChatProcessor(
       // Empty or missing content can't form a renderable user message; wait for
       // the authoritative `message.updated` payload from the wrapper instead.
       if (!content) return;
-      if (storage.getMessageInfo(messageId)) return;
+      if (sessionStorage.getMessageInfo(messageId)) return;
 
       const syntheticMessage: UserMessage = {
         id: messageId,
@@ -100,7 +118,7 @@ function createChatProcessor(
         agent: '',
         model: { providerID: '', modelID: '' },
       };
-      storage.upsertMessage(syntheticMessage);
+      sessionStorage.upsertMessage(syntheticMessage);
 
       const syntheticPart: TextPart = {
         id: `${messageId}-text`,
@@ -110,7 +128,7 @@ function createChatProcessor(
         text: content,
         synthetic: true,
       };
-      storage.upsertPart(messageId, syntheticPart);
+      sessionStorage.upsertPart(messageId, syntheticPart);
     },
   };
 }

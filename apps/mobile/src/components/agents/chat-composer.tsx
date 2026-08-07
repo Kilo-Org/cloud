@@ -15,6 +15,7 @@ import {
   type LayoutChangeEvent,
   Platform,
   type TextInput,
+  type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -33,7 +34,15 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
+import {
+  type ComposerSelection,
+  pasteTextIntoComposer,
+} from '@/components/agents/composer-paste-text';
+import {
+  COMPOSER_INPUT_PADDING_HORIZONTAL,
+  resolveComposerTextContentWidth,
+  shouldEnableComposerInputScroll,
+} from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
@@ -51,11 +60,17 @@ import {
   type AgentAttachmentWire,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
+import {
+  shouldArmAutoSendOnDelivery,
+  shouldAutoSendPrefilledShare,
+} from '@/lib/composer-auto-send';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -64,7 +79,6 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
 const TEXT_INPUT_VERTICAL_PADDING = 24;
-const TEXT_INPUT_HORIZONTAL_PADDING = 32;
 const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
@@ -90,6 +104,7 @@ type ChatComposerProps = {
   ) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
+  onRestartSession: () => Promise<boolean>;
   onExitSession: (
     onAccepted: () => void,
     lock: { current: boolean },
@@ -116,12 +131,15 @@ type ChatComposerProps = {
   commandState?: RemoteCommandState | null;
   /** Share-gate delivery id; composer takes the payload and clears the route param. */
   shareId?: string;
+  /** Remote-spawn auto-send flag; fires one submit after share delivery completes. */
+  autoSend?: boolean;
 };
 
 export function ChatComposer({
   onSend,
   onSendCommand,
   onCreateSession,
+  onRestartSession,
   onExitSession,
   onStop,
   disabled = false,
@@ -139,11 +157,15 @@ export function ChatComposer({
   commands = [],
   commandState = null,
   shareId,
+  autoSend,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
+  // Last caret the input reported. Paste inserts here so the button behaves
+  // like the platform paste.
+  const selectionRef = useRef<ComposerSelection | null>(null);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -152,6 +174,14 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [autoSendArmed, setAutoSendArmed] = useState(false);
+  const autoSendRef = useRef(autoSend === true);
+  autoSendRef.current = autoSend === true;
+  const [shareDelivered, setShareDelivered] = useState(false);
+  // Ref copy of shareDelivered so handleChangeText (a regular function body)
+  // always reads the current value without depending on a state variable that
+  // React batches behind the render.
+  const shareDeliveredRef = useRef(false);
   // Remount the input row after Stop. iOS leaves the multiline TextInput
   // non-interactive after the editable=false→true flip that happens when
   // the SDK unlocks the composer post-interrupt (Item 14 E2E gate). Defer
@@ -200,7 +230,7 @@ export function ChatComposer({
     minHeight: TEXT_INPUT_MIN_HEIGHT,
     maxHeight: TEXT_INPUT_MAX_HEIGHT,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
-    textContentWidth: inputWidth - TEXT_INPUT_HORIZONTAL_PADDING,
+    textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
@@ -223,6 +253,7 @@ export function ChatComposer({
       text: draft,
       selection: { start: draft.length, end: draft.length },
     });
+    selectionRef.current = { start: draft.length, end: draft.length };
     setHasText(draft.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(draft));
     measureRef.current.setText(draft);
@@ -254,6 +285,13 @@ export function ChatComposer({
     measure.setText(value);
     setHasText(value.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(value));
+    // Delivery applies text BEFORE onDelivered fires, so any
+    // handleChangeText after shareDelivered is a user edit. Disarm
+    // so a later gate resolution (upload completion) cannot
+    // auto-send the user's modified draft.
+    if (shareDeliveredRef.current) {
+      setAutoSendArmed(false);
+    }
   }
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
@@ -264,6 +302,16 @@ export function ChatComposer({
     maxLength: 4000,
     onChangeText: handleChangeText,
     addCandidates,
+    onDelivered: () => {
+      setAutoSendArmed(
+        shouldArmAutoSendOnDelivery({
+          autoSend: autoSendRef.current,
+          deliveredText: textRef.current,
+        })
+      );
+      setShareDelivered(true);
+      shareDeliveredRef.current = true;
+    },
   });
 
   const voiceInput = useVoiceInput({
@@ -287,6 +335,32 @@ export function ChatComposer({
     isFocused,
     isSending,
     voiceInputActive: voiceInput.isActive,
+  });
+
+  const { paste: pasteClipboard } = useClipboardPaste({
+    addFile: async file => {
+      await upload.addCandidates([file]);
+    },
+    addText: text => {
+      // Same-render race guard, as in `handleSelectSlashCommand`: the button is
+      // disabled while sending, but a press committed before that render — or
+      // during the clipboard read — must not mutate a draft being submitted.
+      // `inputEditable` adds the voice session, which the send lock does not
+      // cover and whose next transcript would overwrite the pasted text.
+      if (sendLockRef.current.isLocked() || !control.inputEditable) {
+        return;
+      }
+      selectionRef.current = pasteTextIntoComposer(text, {
+        input: inputRef.current,
+        draft: textRef.current,
+        selection: selectionRef.current,
+        maxLength: 4000,
+        onChangeText: handleChangeText,
+      });
+    },
+    onUnreadable: () => {
+      toast.error(describeClassificationFailure('unreadable'));
+    },
   });
 
   const commandList = useMemo(
@@ -489,6 +563,7 @@ export function ChatComposer({
         {
           onSendCommand,
           onCreateSession,
+          onRestartSession,
           onExitSession: async onAccepted => {
             await onExitSession(onAccepted, submissionLockRef, voiceInput.settleBeforeSubmit);
           },
@@ -513,6 +588,10 @@ export function ChatComposer({
     }
   }
 
+  function handleSelectionChange(event: TextInputSelectionChangeEvent) {
+    selectionRef.current = event.nativeEvent.selection;
+  }
+
   function handleSelectSlashCommand(command: SlashCommandInfo) {
     // Same-render race guard: a suggestion row rendered before the send started
     // can be tapped while the lock is held. Because the lock is the authority
@@ -530,6 +609,7 @@ export function ChatComposer({
       text: value,
       selection: { start: value.length, end: value.length },
     });
+    selectionRef.current = { start: value.length, end: value.length };
     inputRef.current?.focus();
   }
 
@@ -546,6 +626,30 @@ export function ChatComposer({
       submit: handleSend,
     });
   }
+
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  const autoSendFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      !shouldAutoSendPrefilledShare({
+        autoSend: autoSendArmed,
+        alreadyFired: autoSendFiredRef.current,
+        shareDelivered,
+        hasText,
+        hasAttachments: upload.attachments.length > 0,
+        attachmentsEnabled,
+        canSend: control.canSend,
+        isUploading: upload.isUploading,
+        hasFailedAttachments: upload.hasFailedAttachments,
+      })
+    ) {
+      return;
+    }
+    autoSendFiredRef.current = true;
+    void submitRef.current();
+  }, [autoSendArmed, shareDelivered, hasText, attachmentsEnabled, control.canSend, upload]);
 
   function handleStop() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -577,7 +681,7 @@ export function ChatComposer({
   }
 
   function handleInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
+    const nextWidth = Math.max(Math.floor(event.nativeEvent.layout.width), 0);
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
@@ -594,7 +698,7 @@ export function ChatComposer({
     height: measure.height,
     includeFontPadding: false,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
-    paddingHorizontal: 16,
+    paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
     width: '100%',
@@ -614,6 +718,8 @@ export function ChatComposer({
             modelOptions={modelOptions}
             onModelSelect={onModelSelect}
             disabled={control.toolbarDisabled}
+            onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+            pasteDisabled={!control.inputEditable}
           />
         </Animated.View>
       ) : null}
@@ -666,6 +772,7 @@ export function ChatComposer({
               setIsFocused(true);
             }}
             onInputLayout={handleInputLayout}
+            onSelectionChange={handleSelectionChange}
             onStop={handleStop}
             onSubmit={() => {
               void submit();

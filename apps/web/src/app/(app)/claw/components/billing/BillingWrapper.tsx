@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { KiloClawSignupUnavailable } from '@/components/subscriptions/kiloclaw/KiloClawSignupUnavailable';
 import { BillingBanner } from './BillingBanner';
 import { AccessLockedDialog } from './AccessLockedDialog';
 import { PlanSelectionDialog } from './PlanSelectionDialog';
@@ -58,7 +59,9 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   const destroy = useMutation(
     trpc.kiloclaw.destroy.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.kiloclaw.getStatus.queryKey(),
+        });
         void queryClient.invalidateQueries({
           queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
         });
@@ -74,6 +77,14 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
 
   if (!billing) {
     return <>{children}</>;
+  }
+
+  if (!billing.hasCurrentPersonalSubscription && !billing.instance?.exists) {
+    return (
+      <div className="flex w-full flex-1 items-center justify-center p-4 md:p-6">
+        <KiloClawSignupUnavailable />
+      </div>
+    );
   }
 
   const lockReason = deriveLockReason(billing);
@@ -100,10 +111,14 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
               queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
             }),
             queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+              queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({
+                instanceId,
+              }),
             }),
             queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+              queryKey: trpc.kiloclaw.getBillingHistory.queryKey({
+                instanceId,
+              }),
             }),
           ]);
         },
@@ -130,7 +145,9 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
       {
         onSuccess: result => {
           void Promise.all([
-            queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getStatus.queryKey(),
+            }),
             queryClient.invalidateQueries({
               queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
             }),

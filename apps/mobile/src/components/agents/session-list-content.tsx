@@ -21,10 +21,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
-import {
-  selectSessionListBodyModel,
-  type SessionListBodyModel,
-} from '@/components/agents/session-list-body-model';
+import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
@@ -42,6 +39,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
+export const FAB_SIZE = 56;
+export const FAB_MARGIN = 16;
+
 type AgentSessionListContentProps = {
   sections: SessionSection[];
   hasAnySessions: boolean;
@@ -56,8 +56,16 @@ type AgentSessionListContentProps = {
    * via the body's `showInlineError` output, NEVER as the empty-state
    * message. */
   isError: boolean;
-  /** Active-poll failure — drives ONLY the inline staleness line. */
+  /** Active-poll failure — drives ONLY the inline staleness line and the
+   * cold `active-error-empty` surface. */
   activeIsError: boolean;
+  /** True when at least one stored row is loaded, including rows excluded
+   * from the sections by the active set. Drives the body model's
+   * `all-active` decision. */
+  hasStoredSessions: boolean;
+  /** True when the stored pagination reports more pages. Keeps the body
+   * rendered while the bounded backfill is in flight or at its bound. */
+  hasMoreHistory: boolean;
   isFetchingNextPage: boolean;
   refetch: () => Promise<void>;
   onRetry: () => void;
@@ -72,8 +80,9 @@ type AgentSessionListContentProps = {
   sortBy: AgentSessionSortBy;
   /**
    * Pinned "Active now" tray rendered as `ListHeaderComponent` so it scrolls
-   * with history in one continuous gesture. Not a virtualized cell — Reanimated
-   * layout transitions on the tray keep working. Pass `null` when empty.
+   * with history in one continuous gesture. The tray and its rows are fully
+   * atomic — no entering, exiting, or layout animations — so a session moving
+   * between history and the tray swaps in one commit. Pass `null` when empty.
    */
   activeNowSection: ReactElement | null;
 };
@@ -85,6 +94,8 @@ export function AgentSessionListContent({
   isLoading,
   isError,
   activeIsError,
+  hasStoredSessions,
+  hasMoreHistory,
   isFetchingNextPage,
   refetch,
   onRetry,
@@ -122,8 +133,26 @@ export function AgentSessionListContent({
   const [refreshing, setRefreshing] = useState(false);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
-  // must clear it or the last rows are stuck underneath it.
+  // must clear it or the last rows are stuck underneath it. The FAB adds its
+  // own inset so the last row scrolls clear of the button too.
   const tabBarClearanceStyle = useMemo(
+    () => ({
+      paddingBottom:
+        getEffectiveTabBarHeight({
+          bottomInset: bottom,
+          platform: Platform.OS,
+          fontScale,
+        }) +
+        FAB_SIZE +
+        FAB_MARGIN,
+    }),
+    [bottom, fontScale]
+  );
+
+  // Tab-bar-only clearance for the full-screen error and first-use empty
+  // containers — the FAB is hidden in those states so they must not include
+  // the FAB inset.
+  const tabBarOnlyClearanceStyle = useMemo(
     () => ({
       paddingBottom: getEffectiveTabBarHeight({
         bottomInset: bottom,
@@ -137,30 +166,25 @@ export function AgentSessionListContent({
   const hasHistoryContent = sections.length > 0;
 
   // Pure body decision — see `session-list-body-model.ts`.
-  const bodyModel = useMemo<SessionListBodyModel>(
-    () =>
-      selectSessionListBodyModel({
-        hasHistoryContent,
-        hasPinnedActive,
-        hasActiveQuery,
-        isSearching,
-        isError,
-        activeIsError,
-      }),
-    [activeIsError, hasActiveQuery, hasHistoryContent, hasPinnedActive, isError, isSearching]
-  );
+  const bodyModel = selectSessionListBodyModel({
+    hasHistoryContent,
+    hasStoredSessions,
+    hasMoreHistory,
+    hasPinnedActive,
+    hasActiveQuery,
+    isSearching,
+    isError,
+    activeIsError,
+  });
 
-  const surface = useMemo(
-    () =>
-      selectSessionListContentSurface({
-        isLoading,
-        isError,
-        hasAnySessions,
-        hasPinnedActive,
-        hasHistoryContent,
-      }),
-    [hasAnySessions, hasHistoryContent, hasPinnedActive, isError, isLoading]
-  );
+  const surface = selectSessionListContentSurface({
+    isLoading,
+    isError,
+    activeIsError,
+    hasAnySessions,
+    hasPinnedActive,
+    hasHistoryContent,
+  });
 
   const emptyStateAction = useMemo(
     () => (
@@ -244,9 +268,26 @@ export function AgentSessionListContent({
       <Animated.View
         entering={FadeIn.duration(200)}
         className="flex-1 items-center justify-center"
-        style={tabBarClearanceStyle}
+        style={tabBarOnlyClearanceStyle}
       >
         <QueryError message="Could not load sessions" onRetry={onRetry} />
+      </Animated.View>
+    );
+  }
+
+  // Cold active-only failure on an otherwise empty screen: the stored query
+  // succeeded (or returned nothing) but the active poll failed before any
+  // data. Same full-screen layout as full-screen-error — the FAB is hidden
+  // in both states, so only the tab bar needs clearing. `onRetry` refetches
+  // both queries.
+  if (surface.kind === 'active-error-empty') {
+    return (
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        className="flex-1 items-center justify-center"
+        style={tabBarOnlyClearanceStyle}
+      >
+        <QueryError message="Could not load active sessions" onRetry={onRetry} />
       </Animated.View>
     );
   }
@@ -261,7 +302,7 @@ export function AgentSessionListContent({
       <Animated.View
         entering={FadeIn.duration(200)}
         className="flex-1 items-center justify-center"
-        style={tabBarClearanceStyle}
+        style={tabBarOnlyClearanceStyle}
       >
         <EmptyState
           icon={Bot}
@@ -274,9 +315,10 @@ export function AgentSessionListContent({
   }
 
   // Single SectionList render site: tray stays in ListHeaderComponent across
-  // loading → rows so ActiveNowSection's local expanded state is not reset.
-  // While loading, sections are empty and skeletons fill ListEmptyComponent
-  // under the tray (active query may already have resolved).
+  // loading → rows, so the atomic tray never remounts while the body toggles
+  // between skeletons and rows. While loading, sections are empty and
+  // skeletons fill ListEmptyComponent under the tray (active query may
+  // already have resolved).
   let emptyComponent: ReactNode = null;
   if (surface.listEmpty === 'loading-skeletons') {
     emptyComponent = (
@@ -327,6 +369,10 @@ export function AgentSessionListContent({
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
       />
     </Animated.View>
   );

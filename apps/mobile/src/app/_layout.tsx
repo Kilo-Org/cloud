@@ -26,7 +26,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -36,6 +36,10 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
+import { shouldStartAnalytics } from '@/lib/analytics-consent';
+import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
+import { drainStartupTimings } from '@/lib/startup-drain';
+import { markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -65,6 +69,7 @@ import {
 } from '@/lib/share-payload';
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
@@ -75,15 +80,16 @@ const navigationIntegration = Sentry.reactNavigationIntegration({
 // No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
 installE2EWebSocketLatency();
 
-// Session replay, screenshots, and view-hierarchy capture are gated on
-// stored consent (see src/lib/sentry-consent.ts) — the consent copy only
-// promises anonymous performance/crash data. The RN SDK reads all of these
-// options only at Sentry.init() time (Mobile Replay has no runtime
-// start/stop API in 7.x), so `consented` starts `false` and every consent
-// transition goes through reinitSentryForConsent, which awaits
-// Sentry.close() first — the only way to stop an in-flight native replay
-// recording and dispose the previous client — before calling this again.
-function initSentry(consented: boolean) {
+// DEC-02 consent rule: crash and error reporting is mandatory, so
+// `initSentry(false)` runs at module scope — a crash during bootstrap
+// must still be reported. The optional group is `tracesSampleRate`
+// only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+//
+// In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
+// — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
+//   integration). The authoritative per-launch timing metric is the PostHog
+//   `app_startup` event in src/lib/startup-timing.ts.
+function initSentry(optionalConsented: boolean) {
   Sentry.init({
     dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
@@ -91,13 +97,16 @@ function initSentry(consented: boolean) {
 
     sendDefaultPii: false,
 
-    enableLogs: true,
-    tracesSampleRate: 0,
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
-    ...sentryOptionsForConsent(consented),
+    ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
+    integrations: [navigationIntegration],
     enableNativeFramesTracking: false,
+
+    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
+    beforeBreadcrumb: scrubBreadcrumb as NonNullable<
+      Parameters<typeof Sentry.init>[0]
+    >['beforeBreadcrumb'],
 
     spotlight: __DEV__,
   });
@@ -112,7 +121,7 @@ captureLaunchDeepLink();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();
-  const { updateRequired, isChecking: updateChecking } = useForceUpdate();
+  const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,
@@ -131,8 +140,15 @@ function RootLayoutNav() {
   } = useCurrentUserId({ enabled: token != null });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
+  // Flipped by every splash-hide site below, so the app_startup drain can
+  // depend on "startup finished" as an ordinary dependency.
+  const [startupFinished, setStartupFinished] = useState(false);
+  // Reactive snapshot so the drain effect re-triggers when the PostHog
+  // client becomes ready after async init.
+  const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
 
   useEffect(() => {
     if (fontsError) {
@@ -140,10 +156,36 @@ function RootLayoutNav() {
     }
   }, [fontsError]);
 
-  useSentryConsentSync(consentChecked && !needsConsent, initSentry);
+  useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
-  const isLoading = authLoading || updateChecking || !fontsReady || !themeHasLoaded;
+  // The force-update check is deliberately absent: it is a live network round
+  // trip that fails open in every branch (lib/hooks/use-force-update), so
+  // holding first paint for it only ever costs time. `updateRequired` starts
+  // false, first paint happens, and the effect below routes to /force-update
+  // if the check later says an update is required.
+  const isLoading = authLoading || !fontsReady || !themeHasLoaded;
+
+  // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
+  // effect re-runs freely as gates settle. `userIdLoading` is false while the
+  // query is disabled, so it only counts once there is a token.
+  useEffect(() => {
+    if (!authLoading) {
+      markStartup('auth_ready');
+    }
+    if (fontsReady) {
+      markStartup('fonts_ready');
+    }
+    if (themeHasLoaded) {
+      markStartup('theme_ready');
+    }
+    if (token != null && !userIdLoading) {
+      markStartup('user_ready');
+    }
+    if (consentChecked) {
+      markStartup('consent_ready');
+    }
+  }, [authLoading, fontsReady, themeHasLoaded, token, userIdLoading, consentChecked]);
 
   useEffect(() => {
     if (themeHasLoaded) {
@@ -194,6 +236,7 @@ function RootLayoutNav() {
       if (!token || !userId) {
         setConsentChecked(false);
         setNeedsConsent(false);
+        setOptionalConsentState(false);
         setConsentCheckError(null);
         return;
       }
@@ -206,11 +249,17 @@ function RootLayoutNav() {
       if (result.status === 'error') {
         Sentry.captureException(result.error);
         setNeedsConsent(false);
+        setOptionalConsentState(false);
         setConsentChecked(false);
         setConsentCheckError(result.error);
         return;
       }
 
+      if (result.status === 'accepted') {
+        setOptionalConsentState(result.optional);
+      } else {
+        setOptionalConsentState(false);
+      }
       setConsentCheckError(null);
       setNeedsConsent(result.status === 'needs-consent');
       setConsentChecked(true);
@@ -234,14 +283,25 @@ function RootLayoutNav() {
       }
 
       setNeedsConsent(!change.hasAccepted);
+      setOptionalConsentState(change.optional);
       setConsentChecked(true);
     });
 
     return unsubscribe;
   }, [token, userId]);
 
-  useTrackingPermissionPrompt(!isLoading);
-  useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
+  useTrackingPermissionPrompt(
+    optionalConsent &&
+      shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
+  );
+  useAnalyticsConsentGate({
+    hasToken: token != null,
+    consentChecked,
+    needsConsent,
+    email,
+    accountId: userId,
+    optionalConsent,
+  });
   useScreenTracking();
 
   useEffect(() => {
@@ -306,6 +366,8 @@ function RootLayoutNav() {
       if (!inForceUpdate) {
         router.replace('/force-update');
       } else {
+        markStartupComplete('force-update');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
       }
       return;
@@ -318,17 +380,23 @@ function RootLayoutNav() {
 
     if (!token) {
       if (inAuthGroup) {
+        markStartupComplete('login');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
       } else {
         router.replace('/(auth)/login');
       }
     } else {
       if (userIdError) {
+        markStartupComplete('user-error');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
         return;
       }
 
       if (consentCheckError) {
+        markStartupComplete('consent-error');
+        setStartupFinished(true);
         void SplashScreen.hideAsync();
         return;
       }
@@ -339,6 +407,8 @@ function RootLayoutNav() {
 
       if (needsConsent) {
         if (onConsentRoute) {
+          markStartupComplete('consent');
+          setStartupFinished(true);
           void SplashScreen.hideAsync();
         } else {
           router.replace('/(app)/consent' as Href);
@@ -351,6 +421,8 @@ function RootLayoutNav() {
         return;
       }
 
+      markStartupComplete('app');
+      setStartupFinished(true);
       void SplashScreen.hideAsync();
       // Navigate to pending deep link (cold start universal link / notification tap)
       const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
@@ -397,6 +469,27 @@ function RootLayoutNav() {
     }
     setPendingShareId(null);
   }, [pendingShareId, isShellReady, onGateRoute, router]);
+
+  // One `app_startup` event per launch, delegated to a drain helper so
+  // tests can drive the real guard logic without mounting the full layout.
+  // Whichever gate settles last triggers the send. Because
+  // `useSyncExternalStore` re-renders when the PostHog client becomes ready,
+  // this effect re-triggers even after consent/startup has already resolved.
+  //
+  // Must stay the LAST effect here — `takeStartupTimings()` is one-shot.
+  // Signed-out launches are never reported.
+  useEffect(() => {
+    if (!startupFinished) {
+      return;
+    }
+    drainStartupTimings({
+      hasToken: token != null,
+      consentChecked,
+      needsConsent,
+      optionalConsent,
+      postHogReady,
+    });
+  }, [startupFinished, token, consentChecked, needsConsent, optionalConsent, postHogReady]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;

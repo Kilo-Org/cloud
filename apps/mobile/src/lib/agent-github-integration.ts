@@ -1,19 +1,27 @@
 export function shouldShowGitHubIntegrationPrompt({
   isLoadingRepos,
   integrationInstalled,
-  repositoryCount,
 }: {
   isLoadingRepos: boolean;
   integrationInstalled: boolean | undefined;
-  repositoryCount?: number;
 }): boolean {
-  return !isLoadingRepos && (integrationInstalled === false || repositoryCount === 0);
+  return !isLoadingRepos && integrationInstalled === false;
 }
 
-export function getGitHubIntegrationUrl(webBaseUrl: string, organizationId?: string): string {
+export function getGitHubIntegrationUrl(
+  webBaseUrl: string,
+  organizationId?: string,
+  installStateToken?: string
+): string {
   const baseUrl = webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
-  if (!organizationId) {
-    return `${baseUrl}/github-app`;
+  const params = new URLSearchParams();
+  if (organizationId) {
+    params.set('organizationId', organizationId);
   }
-  return `${baseUrl}/github-app?organizationId=${encodeURIComponent(organizationId)}`;
+  if (installStateToken) {
+    params.set('installState', installStateToken);
+    params.set('fromApp', '1');
+  }
+  const query = params.toString();
+  return query ? `${baseUrl}/github-app?${query}` : `${baseUrl}/github-app`;
 }

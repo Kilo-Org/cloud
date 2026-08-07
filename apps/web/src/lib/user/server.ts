@@ -65,6 +65,8 @@ import {
   GITHUB_CLIENT_SECRET,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
+  ANACONDA_CLIENT_ID,
+  ANACONDA_CLIENT_SECRET,
   LINKEDIN_CLIENT_ID,
   LINKEDIN_CLIENT_SECRET,
   WORKOS_API_KEY,
@@ -84,6 +86,11 @@ import {
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
@@ -134,6 +141,30 @@ function generateAppleClientSecret(): string {
   );
 }
 
+const anacondaProfileSchema = z.object({
+  sub: z.string().trim().min(1),
+  email: z.string().email(),
+  email_verified: z.literal(true),
+  name: z.string().nullish(),
+  given_name: z.string().nullish(),
+  family_name: z.string().nullish(),
+  picture: z.string().url().nullish(),
+});
+
+export function parseAnacondaProfile(profile: unknown) {
+  const parsedProfile = anacondaProfileSchema.parse(profile);
+  const fullName = [parsedProfile.given_name?.trim(), parsedProfile.family_name?.trim()]
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    id: parsedProfile.sub,
+    email: parsedProfile.email,
+    name: parsedProfile.name?.trim() || fullName || parsedProfile.email.split('@')[0],
+    image: parsedProfile.picture ?? null,
+  };
+}
+
 function createGoogleAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -153,6 +184,24 @@ function createGoogleAccountInfo(
     provider: account.provider,
     provider_account_id: account.providerAccountId,
     display_name: null, // Google OAuth does not provide a public profile URL
+  };
+}
+
+function createAnacondaAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'anaconda') return null;
+  assert(user.email, 'User email is required for Anaconda auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.anaconda,
+    provider: account.provider,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
   };
 }
 
@@ -316,6 +365,17 @@ export function parseLinkedInProfileName(profile: {
   );
 }
 
+/**
+ * An OAuth/OIDC sign-in proves ownership of its email only when the provider
+ * asserts the `email_verified` claim in the raw profile. Apple delivers the
+ * claim as the string "true"; treat that as verified. Providers without the
+ * claim (GitHub, GitLab, Discord) never prove the email here.
+ */
+export function profileProvesEmailOwnership(profile: unknown): boolean {
+  const emailVerified = (profile as { email_verified?: unknown } | undefined)?.email_verified;
+  return emailVerified === true || emailVerified === 'true';
+}
+
 function createEmailAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
@@ -346,6 +406,7 @@ function createAccountInfo(
 ): CreateOrUpdateUserArgs {
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
+    createAnacondaAccountInfo(account, user) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
@@ -526,6 +587,24 @@ export const authOptions: NextAuthOptions = {
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
+    {
+      id: 'anaconda',
+      name: 'Anaconda',
+      type: 'oauth',
+      issuer: 'https://auth.anaconda.com/api/auth',
+      wellKnown: 'https://anaconda.com/.well-known/openid-configuration',
+      authorization: {
+        params: { scope: 'openid profile email' },
+      },
+      idToken: true,
+      checks: ['pkce', 'state', 'nonce'],
+      client: {
+        token_endpoint_auth_method: 'client_secret_post',
+      },
+      clientId: ANACONDA_CLIENT_ID,
+      clientSecret: ANACONDA_CLIENT_SECRET,
+      profile: parseAnacondaProfile,
+    },
     AppleProvider({
       clientId: APPLE_CLIENT_ID ?? '',
       clientSecret: generateAppleClientSecret(),
@@ -792,9 +871,12 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Check if this is an account linking operation
-        // For email (magic link) auth, we auto-link to existing users since magic link
-        // is verified by email ownership
-        const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
+        // Auto-link only when the credential proves ownership of the email:
+        // a magic link consumes an inbox token; fake-login is dev-only; an
+        // OAuth profile proves it via the provider's email_verified claim.
+        // Methods without proof keep the DIFFERENT-OAUTH refusal.
+        const autoLinkToExistingUser =
+          isEmailAuth || isFakeLogin || profileProvesEmailOwnership(profile);
         if (isAccountLinking) {
           logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
             provider: accountInfo.provider,
@@ -927,6 +1009,20 @@ export const authOptions: NextAuthOptions = {
           );
           token.ssoSourceOrganizationId = ssoAuthority.sourceOrganizationId;
         }
+
+        if (existingUser.is_admin) {
+          // Admin audit trail: identify which Kilocode admin authenticated.
+          // Emitted only after JWT creation is guaranteed to succeed.
+          logExceptInTest(
+            JSON.stringify({
+              event: 'admin_login_succeeded',
+              kiloUserId: existingUser.id,
+              email: existingUser.google_user_email,
+              provider: accountInfo.provider,
+              adminTier: existingUser.is_super_admin ? 'super_admin' : 'platform_admin',
+            })
+          );
+        }
       } catch (error) {
         captureException(error, {
           tags: {
@@ -990,7 +1086,31 @@ type GetAuthResponse =
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = await headers();
+  const result = await resolveUserFromAuth(opts, headersList);
 
+  // Admin audit trail: emit exactly one identity-attributed event per authorized
+  // admin request. Guarded strictly on adminOnly so the millions of
+  // adminOnly:false calls never log.
+  if (opts.adminOnly === true && result.user) {
+    emitAdminAccessEvent({
+      surface: 'rest',
+      user: result.user,
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      route: headersList.get('x-pathname') ?? headersList.get('x-matched-path') ?? null,
+      // No reliable HTTP method header is available here; do not fabricate one.
+      method: null,
+      ip: clientIpFromHeaders(headersList),
+    });
+  }
+
+  return result;
+}
+
+async function resolveUserFromAuth(
+  opts: RequiredPermissions,
+  headersList: Awaited<ReturnType<typeof headers>>
+): Promise<GetAuthResponse> {
   // This path is executed for non-next-auth requests
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path

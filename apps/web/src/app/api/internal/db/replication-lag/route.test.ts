@@ -56,6 +56,8 @@ describe('GET /api/internal/db/replication-lag', () => {
             status: 'unreachable',
             in_recovery: null,
             replay_lsn: null,
+            receive_lsn: null,
+            receive_replay_gap_bytes: null,
             last_xact_replay_timestamp: null,
             replay_delay_seconds: null,
             error: 'connection timeout',

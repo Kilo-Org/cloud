@@ -4,6 +4,7 @@ export type ModelRow = {
   providerSlugs: string[];
   preferredIndex: number | undefined;
   sourceIndex: number;
+  unavailableReason?: string;
 };
 
 export type PolicyPillVariant = 'trains' | 'retainsPrompts';
@@ -17,6 +18,7 @@ export type ProviderRow = {
   retainsPrompts: boolean;
   headquarters?: string;
   datacenters?: string[];
+  unavailableReason?: string;
 };
 
 export type ProviderOffering = {

@@ -1,10 +1,32 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildActiveSessionsInput,
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
+import { buildStoredSessionsQueryOptions } from '@/lib/hooks/use-agent-sessions';
+
+// The hook module transitively imports react-native (via the user-web-
+// connection lifecycle) and the real tRPC client (via `@/lib/trpc`), which the
+// node vitest pipeline cannot transform. The options builder itself is pure,
+// so only the module-load chain needs these mocks; no hook is mounted.
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => false,
+}));
+
+vi.mock('@/lib/active-sessions-live-sync', () => ({
+  refreshActiveSessionsNow: vi.fn().mockResolvedValue(false),
+}));
+
+function createTrpcStub(infiniteQueryOptions: unknown) {
+  const stub = { cliSessionsV2: { list: { infiniteQueryOptions } } };
+  return stub as never;
+}
 
 describe('buildAgentSessionListInput', () => {
   it('defaults to updated_at when sortBy is omitted (matches pre-feature behavior)', () => {
@@ -90,7 +112,7 @@ describe('buildAgentSessionSearchInput', () => {
     expect(buildAgentSessionSearchInput({ searchQuery: 'hello' })).toMatchObject({
       search_string: 'hello',
       orderBy: 'updated_at',
-      limit: 50,
+      limit: 30,
       includeChildren: false,
     });
   });
@@ -101,7 +123,7 @@ describe('buildAgentSessionSearchInput', () => {
     ).toMatchObject({
       search_string: 'hello',
       orderBy: 'created_at',
-      limit: 50,
+      limit: 30,
     });
   });
 
@@ -125,12 +147,55 @@ describe('buildAgentSessionSearchInput', () => {
       })
     ).toEqual({
       search_string: 'hello',
-      limit: 50,
+      limit: 30,
       orderBy: 'created_at',
       includeChildren: false,
       createdOnPlatform: 'cli',
       gitUrl: 'https://github.com/foo/bar',
       organizationId: 'org-1',
     });
+  });
+
+  it('has no cursor key — the query framework injects it', () => {
+    const input = buildAgentSessionSearchInput({
+      searchQuery: 'hello',
+      organizationId: 'org-1',
+    });
+    expect(input).not.toHaveProperty('cursor');
+  });
+});
+
+describe('buildStoredSessionsQueryOptions', () => {
+  it('keeps the native window-focus refetch by default (Home and Share Gate)', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    expect(infiniteQueryOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 30 }),
+      expect.objectContaining({ refetchOnWindowFocus: true })
+    );
+    expect(result.refetchOnWindowFocus).toBe(true);
+  });
+
+  it('disables the native window-focus refetch only for the Agents list configuration', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
+      refetchOnWindowFocus: false,
+    });
+
+    expect(infiniteQueryOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 30 }),
+      expect.objectContaining({ refetchOnWindowFocus: false })
+    );
+    expect(result.refetchOnWindowFocus).toBe(false);
+  });
+
+  it('keeps the explicit fetch paths enabled (enabled passthrough)', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
+      enabled: false,
+    });
+
+    expect(result.enabled).toBe(false);
   });
 });

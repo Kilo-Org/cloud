@@ -4,10 +4,11 @@
 // Architecture:
 //   * A single FlashList with mixed item kinds (see `pr-diff-list-items`)
 //   * `usePrReviewFileListQuery` drives a tRPC infinite query for `listFiles`
+//     and produces a deduped `files` array via `flattenFilePages`
 //   * `usePrReviewViewedFiles` reads + toggles the per-PR viewed set
-//   * `useFetchToCompletion` lets S6c's navigator drive the query to its end
+//   * `useFetchToCompletion` lets the navigator drive the query to its end
 //   * `subscribeFileNavigatorRequest` is consumed here so a "scroll to file"
-//     request (emitted by S6c) snaps the list to the right section
+//     request from the navigator sheet snaps the list to the right section
 //   * S7a adds diff-line selection: tapping a line runs the pure
 //     `selectLine` reducer; the result is mirrored into the
 //     `diff-selection-bridge` (so the comment composer can read it on
@@ -23,8 +24,8 @@
 // makes cold match warm.
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, type ViewStyle } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
 import {
@@ -40,13 +41,9 @@ import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
-import {
-  EmptyFilesView,
-  LIST_CONTENT_STYLE,
-  TabStateMessage,
-} from '@/components/pr-review/diff/pr-diff-rows';
-import { dedupeFilesByPath } from '@/lib/pr-review/diff/dedupe-file-pages';
-import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
+import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
+import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
+import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -55,7 +52,6 @@ import {
   usePrReviewFileListQuery,
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
-import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
@@ -85,7 +81,7 @@ export function PrReviewFileList({
   // diff rows receive the live scale and resize to fit.
   const diffFontMetrics = useBoundedDiffFontMetrics();
 
-  const { query, firstPageErrorState } = usePrReviewFileListQuery({
+  const { query, files, firstPageErrorState } = usePrReviewFileListQuery({
     owner,
     repo,
     number,
@@ -116,17 +112,24 @@ export function PrReviewFileList({
   // list always starts with no selection.
   useEffect(() => clearDiffSelection, []);
 
-  const files = useMemo(() => {
-    const all: PrReviewFile[] = [];
-    for (const page of query.data?.pages ?? []) {
-      for (const f of page.files) {
-        all.push(f);
+  // Measured floating-bar height (null until the first layout event).
+  const [barHeight, setBarHeight] = useState<number | null>(null);
+
+  // Stable callback: ignore sub-one-point noise to avoid unnecessary
+  // re-renders.  Layout events can fire with fractional-pixel deltas.
+  const handleHeightChange = useCallback((height: number) => {
+    setBarHeight(prev => {
+      if (prev !== null && Math.abs(prev - height) < 1) {
+        return prev;
       }
-    }
-    // Dedupe by path (first wins) so retry/refetch races cannot emit
-    // duplicate `file-header:<path>` keys into FlashList.
-    return dedupeFilesByPath(all);
-  }, [query.data]);
+      return height;
+    });
+  }, []);
+
+  const contentContainerStyle = useMemo<ViewStyle>(
+    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
+    [barHeight]
+  );
 
   const viewedCount = useMemo(() => {
     let count = 0;
@@ -138,9 +141,11 @@ export function PrReviewFileList({
     return count;
   }, [files, viewed]);
 
-  const items = useMemo(
+  const effectiveViewMode = isTablet ? viewMode : 'unified';
+
+  const fileItems = useMemo(
     () =>
-      buildItems({
+      buildFileItems({
         files,
         expanded,
         expandedContext,
@@ -150,14 +155,15 @@ export function PrReviewFileList({
         repo,
         number,
         changedFiles,
-        isLoading: query.isLoading,
-        isFetchingNextPage: query.isFetchingNextPage,
-        hasNextPage: query.hasNextPage,
-        laterPageError: query.isError && files.length > 0,
-        fetchToCompletionRunning: fetchToCompletion.isRunning,
-        fetchToCompletionLoaded: fetchToCompletion.loadedFiles,
-        totalFiles: changedFiles,
-        viewMode: isTablet ? viewMode : 'unified',
+        viewMode: effectiveViewMode,
+        // Pagination fields — required by BuildItemsArgs but unused by buildFileItems.
+        isLoading: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        laterPageError: false,
+        fetchToCompletionRunning: false,
+        fetchToCompletionLoaded: 0,
+        totalFiles: null,
       }),
     [
       files,
@@ -169,33 +175,76 @@ export function PrReviewFileList({
       repo,
       number,
       changedFiles,
+      effectiveViewMode,
+    ]
+  );
+
+  const paginationItem = useMemo(
+    () =>
+      buildPaginationItem({
+        files,
+        expanded,
+        expandedContext,
+        viewed: viewed.isViewed,
+        headSha,
+        owner,
+        repo,
+        number,
+        changedFiles,
+        viewMode: effectiveViewMode,
+        isLoading: query.isLoading,
+        isFetchingNextPage: query.isFetchingNextPage,
+        hasNextPage: query.hasNextPage,
+        laterPageError: query.isError && files.length > 0,
+        fetchToCompletionRunning: fetchToCompletion.isRunning,
+        fetchToCompletionLoaded: fetchToCompletion.loadedFiles,
+        totalFiles: changedFiles,
+      }),
+    // buildPaginationItem only reads the pagination-specific fields below;
+    // the other fields are required by BuildItemsArgs but unused by this
+    // builder so they must not force a rebuild when file-level state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
       query.isLoading,
       query.isFetchingNextPage,
       query.hasNextPage,
       query.isError,
+      files.length,
       fetchToCompletion.isRunning,
       fetchToCompletion.loadedFiles,
-      viewMode,
-      isTablet,
+      changedFiles,
     ]
   );
 
+  const items = useMemo(() => [...fileItems, paginationItem], [fileItems, paginationItem]);
+
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 
-  const { handleContentSizeChange } = usePrDiffListScroll({
+  usePrDiffListScroll({
     owner,
     repo,
     number,
-    filesLength: files.length,
     items,
     listRef,
     setExpanded,
   });
 
+  const onFetchAll = useCallback(() => {
+    void fetchToCompletion.run();
+    // fetchToCompletion.run is a stable useCallback reference; the full
+    // fetchToCompletion object would change every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchToCompletion.run]);
+
   const renderItem = useDiffRenderItem({
     viewed,
-    query,
-    fetchToCompletion,
+    onRetryPage: useCallback(() => {
+      void query.fetchNextPage();
+      // query.fetchNextPage is a stable reference in React Query v5;
+      // depending on `query` would make this callback new on every render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query.fetchNextPage]),
+    onFetchAll,
     handleLoadContext,
     setExpanded,
     onLineTap: handleLineTap,
@@ -246,7 +295,6 @@ export function PrReviewFileList({
   }
 
   const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
-  const effectiveViewMode = isTablet ? viewMode : 'unified';
   // First page still in flight: keep FlashList unmounted. A list that first
   // lays out a single loading pagination-row and later receives the real file
   // rows can measure full content height without mounting cells until scroll.
@@ -281,14 +329,13 @@ export function PrReviewFileList({
             maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
-            onContentSizeChange={handleContentSizeChange}
             onEndReached={() => {
               if (query.hasNextPage && !query.isFetchingNextPage) {
                 void query.fetchNextPage();
               }
             }}
             onEndReachedThreshold={0.5}
-            contentContainerStyle={LIST_CONTENT_STYLE}
+            contentContainerStyle={contentContainerStyle}
             ItemSeparatorComponent={null}
           />
         )}
@@ -299,6 +346,7 @@ export function PrReviewFileList({
           viewMode={effectiveViewMode}
           selection={selection}
           onClearSelection={clearSelection}
+          onHeightChange={handleHeightChange}
         />
       </View>
     </DiffFontMetricsContext.Provider>

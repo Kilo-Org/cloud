@@ -3,18 +3,21 @@ import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import {
-  createAllowPredicateFromRestrictions,
-  hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
 import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { KILO_AUTO_FREE_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { isOrganizationAutoConfigured } from '@/lib/organizations/organization-auto-model';
+import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+} from '@/lib/organizations/effective-model-access.server';
 
 type DefaultsResponse = {
   defaultModel: string;
-  defaultFreeModel: string;
+  // `null` when the organization's policy blocks the free model. Clients must
+  // not fall back to `defaultModel` for free-tier requests, since that may be a
+  // paid model; a null value signals no free model is permitted.
+  defaultFreeModel: string | null;
 };
 
 export async function GET(
@@ -27,14 +30,26 @@ export async function GET(
     return nextResponse;
   }
 
-  const { organization } = data;
+  const { organization, user } = data;
 
   // Get organization's default model setting
   let defaultModel = organization.settings?.default_model;
 
-  const restrictions = getEffectiveModelRestrictions(organization);
-
-  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
+  const policy = evaluateEffectiveModelAccessPolicy(
+    await getOrganizationGroupPolicyContext({
+      organizationId,
+      // `getAuthorizedOrgContext` also authorizes Kilo admins and parent-organization
+      // owners, who hold no membership row here. They belong to no group, so they
+      // resolve against organization-level policy rather than being rejected.
+      subject: { type: 'member', kiloUserId: user.id, allowNonMember: true },
+      // Evaluate against the organization this request already authorized, so the
+      // deny list and provider allow-list driving these defaults are the ones the
+      // endpoint resolved rather than a second read of the same row.
+      organization,
+    })
+  );
+  const isAllowed = async (modelId: string) =>
+    (await getEffectiveModelDecision(policy, modelId)).allowed;
 
   const findFirstAllowedModel = async (modelIds: readonly string[]) => {
     for (const modelId of modelIds) {
@@ -71,9 +86,16 @@ export async function GET(
   // If organization has a default model set, validate it against allowed models.
   // Organization Auto is a virtual organization-only default, so its eligibility
   // is validated from persisted organization settings rather than provider policy.
-  if (defaultModel === ORG_AUTO_MODEL.id && !isOrganizationAutoConfigured(organization)) {
-    console.warn('organization_auto_invalid_default', { organizationId: organization.id });
-    defaultModel = undefined;
+  if (defaultModel === ORG_AUTO_MODEL.id) {
+    const fallbackModel = organization.settings.org_auto_model?.fallback_model;
+    if (
+      !isOrganizationAutoConfigured(organization) ||
+      !fallbackModel ||
+      !(await isAllowed(fallbackModel))
+    ) {
+      console.warn('organization_auto_invalid_default', { organizationId: organization.id });
+      defaultModel = undefined;
+    }
   } else if (
     defaultModel &&
     defaultModel !== ORG_AUTO_MODEL.id &&
@@ -85,7 +107,11 @@ export async function GET(
 
   // Fallback to global default if no organization default is set or it's not allowed
   if (!defaultModel) {
-    if (!hasActiveModelRestrictions(restrictions)) {
+    if (
+      policy.memberGrant.mode === 'unrestricted' &&
+      policy.organizationModelDenyList.length === 0 &&
+      !policy.organizationProviderCeiling
+    ) {
       // No restrictions - use PRIMARY_DEFAULT_MODEL directly
       defaultModel = PRIMARY_DEFAULT_MODEL;
     } else {
@@ -111,8 +137,15 @@ export async function GET(
     }
   }
 
+  // Keep the free-model contract honest: only return the free model when the
+  // policy allows it, otherwise null. Never substitute the (possibly paid)
+  // `defaultModel`.
+  const defaultFreeModel = (await isAllowed(KILO_AUTO_FREE_MODEL.id))
+    ? KILO_AUTO_FREE_MODEL.id
+    : null;
+
   return NextResponse.json({
     defaultModel,
-    defaultFreeModel: KILO_AUTO_FREE_MODEL.id,
+    defaultFreeModel,
   });
 }

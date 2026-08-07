@@ -6,22 +6,46 @@ import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
-  type MiniMaxCodingPlanCredentialValidationInput,
-  validateMiniMaxCodingPlanCredential,
+  getCodingPlanValidationResult,
+  type CodingPlanCredentialValidationInput,
+  type CodingPlanCredentialValidationResult,
+  validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
-import { isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';
 
 type InventoryCredentialValidator = (
-  input: MiniMaxCodingPlanCredentialValidationInput
-) => Promise<boolean>;
+  input: CodingPlanCredentialValidationInput
+) => Promise<CodingPlanCredentialValidationResult | boolean>;
 
 type ManualCredentialReplacementOptions = {
   validateCredential?: InventoryCredentialValidator;
 };
+
+export class ManualCredentialReplacementError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ManualCredentialReplacementError';
+  }
+}
+
+function replacementError(message: string): ManualCredentialReplacementError {
+  return new ManualCredentialReplacementError(message);
+}
+
+function databaseConstraint(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    if ('constraint' in current && typeof current.constraint === 'string') {
+      return current.constraint;
+    }
+    current = 'cause' in current ? current.cause : null;
+  }
+  return null;
+}
 
 export async function listManualCredentialRevocations(input: {
   planId?: CodingPlanId;
@@ -31,7 +55,7 @@ export async function listManualCredentialRevocations(input: {
     inventoryKeyId: string;
     planId: string;
     providerId: string;
-    upstreamPlanId: string;
+    upstreamPlanId: string | null;
     status: ManualRevocationStatus;
     revocationRequestedAt: string | null;
     subscriptionExpiresAt: string | null;
@@ -72,6 +96,9 @@ export async function listManualCredentialRevocations(input: {
 
   return rows.map(row => ({
     ...row,
+    // BytePlus stores the admin-supplied username in this column. It is only
+    // needed for server-side seat resolution and must never reach the admin UI.
+    upstreamPlanId: row.providerId === 'byteplus-coding' ? null : row.upstreamPlanId,
     status: row.status === 'revocation_failed' ? 'revocation_failed' : 'revocation_pending',
   }));
 }
@@ -104,18 +131,15 @@ export async function replaceManualCredentialRevocation(
   options: ManualCredentialReplacementOptions = {}
 ): Promise<void> {
   if (!BYOK_ENCRYPTION_KEY) {
-    throw new Error('BYOK encryption is not configured');
-  }
-
-  const normalizedApiKey = apiKey.trim();
-  if (!normalizedApiKey) {
-    throw new Error('A replacement MiniMax API key is required.');
+    throw replacementError('BYOK encryption is not configured');
   }
 
   const [credential] = await db
     .select({
       planId: coding_plan_key_inventory.plan_id,
+      providerId: coding_plan_key_inventory.provider_id,
       upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
+      upstreamUsageId: coding_plan_key_inventory.upstream_usage_id,
       credentialFingerprint: coding_plan_key_inventory.credential_fingerprint,
     })
     .from(coding_plan_key_inventory)
@@ -127,15 +151,23 @@ export async function replaceManualCredentialRevocation(
     )
     .limit(1);
   if (!credential) {
-    throw new Error('Credential is not eligible for replacement.');
+    throw replacementError('Credential is not eligible for replacement.');
   }
   if (!isCodingPlanId(credential.planId)) {
-    throw new Error('Credential has an unsupported Coding Plan ID.');
+    throw replacementError('Credential has an unsupported Coding Plan ID.');
+  }
+  const plan = getCodingPlanPrice(credential.planId);
+  if (!plan || plan.providerId !== credential.providerId) {
+    throw replacementError('Credential has an unsupported Coding Plan provider.');
+  }
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    throw replacementError(`A replacement ${plan.providerName} API key is required.`);
   }
   const replacementFingerprint = codingPlanCredentialFingerprint(normalizedApiKey);
   if (replacementFingerprint === credential.credentialFingerprint) {
-    throw new Error(
-      'Replacement MiniMax credential must be different from the current credential.'
+    throw replacementError(
+      `Replacement ${plan.providerName} credential must be different from the current credential.`
     );
   }
 
@@ -150,43 +182,63 @@ export async function replaceManualCredentialRevocation(
     )
     .limit(1);
   if (duplicateCredential) {
-    throw new Error('Replacement MiniMax credential is already present in inventory.');
-  }
-
-  const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
-  const isValid = await validateCredential({
-    apiKey: normalizedApiKey,
-    planId: credential.planId,
-    upstreamPlanId: credential.upstreamPlanId,
-  });
-  if (!isValid) {
-    throw new Error(
-      'Replacement MiniMax credential failed validation. Confirm plan access and supported model behavior, then try again.'
+    throw replacementError(
+      `Replacement ${plan.providerName} credential is already present in inventory.`
     );
   }
 
-  const result = await db
-    .update(coding_plan_key_inventory)
-    .set({
-      status: 'available',
-      encrypted_api_key: encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY),
-      credential_fingerprint: replacementFingerprint,
-      assigned_to_user_id: null,
-      assigned_at: null,
-      revocation_requested_at: null,
-      revoked_at: null,
-      revocation_attempt_count: sql`${coding_plan_key_inventory.revocation_attempt_count} + 1`,
-      last_revocation_error: null,
+  const validateCredential = options.validateCredential ?? validateCodingPlanCredential;
+  const validationResult = getCodingPlanValidationResult(
+    await validateCredential({
+      apiKey: normalizedApiKey,
+      planId: credential.planId,
+      providerId: plan.providerId,
+      upstreamPlanId: credential.upstreamPlanId,
     })
-    .where(
-      and(
-        eq(coding_plan_key_inventory.id, inventoryKeyId),
-        inArray(coding_plan_key_inventory.status, ['revocation_pending', 'revocation_failed'])
-      )
+  );
+  if (
+    !validationResult.valid ||
+    (plan.providerId === 'byteplus-coding' && !validationResult.upstreamUsageId)
+  ) {
+    throw replacementError(
+      `Replacement ${plan.providerName} credential failed validation. Confirm plan access and supported model behavior, then try again.`
     );
+  }
+
+  let result: { rowCount?: number | null };
+  try {
+    result = await db
+      .update(coding_plan_key_inventory)
+      .set({
+        status: 'available',
+        encrypted_api_key: encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: replacementFingerprint,
+        upstream_usage_id:
+          plan.providerId === 'byteplus-coding'
+            ? validationResult.upstreamUsageId
+            : credential.upstreamUsageId,
+        assigned_to_user_id: null,
+        assigned_at: null,
+        revocation_requested_at: null,
+        revoked_at: null,
+        revocation_attempt_count: sql`${coding_plan_key_inventory.revocation_attempt_count} + 1`,
+        last_revocation_error: null,
+      })
+      .where(
+        and(
+          eq(coding_plan_key_inventory.id, inventoryKeyId),
+          inArray(coding_plan_key_inventory.status, ['revocation_pending', 'revocation_failed'])
+        )
+      );
+  } catch (error) {
+    if (databaseConstraint(error) === 'UQ_coding_plan_key_inv_provider_usage_id') {
+      throw replacementError('The resolved BytePlus seat is already attached to inventory.');
+    }
+    throw replacementError('Unable to replace the credential due to a database error.');
+  }
 
   if ((result.rowCount ?? 0) === 0) {
-    throw new Error('Credential is not eligible for replacement.');
+    throw replacementError('Credential is not eligible for replacement.');
   }
 }
 

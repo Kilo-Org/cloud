@@ -1,8 +1,11 @@
 import {
   cloud_billing_sku,
+  compute_usage_charge,
   container_usage_interval,
   container_usage_segment,
   getWorkerDb,
+  kilocode_users,
+  organizations,
   type WorkerDb,
 } from '@kilocode/db';
 import { and, eq, gt, lt, ne, sql } from 'drizzle-orm';
@@ -14,6 +17,12 @@ import type {
   UsageContext,
 } from '@kilocode/container-usage';
 import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
+import {
+  billingModeFor,
+  MINIMUM_REMAINING_MICRODOLLARS,
+  SHADOW_ONLY_BILLING_CONFIG,
+  type BillingConfig,
+} from './billing-config';
 
 const POSTGRES_TIMEOUT_MS = 2_500;
 const STALE_INTERVAL_GRACE_MS = 15 * 60 * 1_000;
@@ -41,10 +50,21 @@ export function getContainerUsageDb(env: Cloudflare.Env): WorkerDb {
 }
 
 export type StartSkuAdmission =
-  | ApplyResult
+  | { kind: 'applied'; dedup: boolean; billingMode: 'shadow' | 'paid' }
   | { kind: 'rejected'; code: RecordStartFailureCode; message: string };
 
-export type ApplyResult = { kind: 'applied'; dedup: boolean };
+export type ApplyResult = {
+  kind: 'applied';
+  dedup: boolean;
+  billingMode: 'shadow' | 'paid';
+  budget:
+    | { verdict: 'continue' }
+    | {
+        verdict: 'warn' | 'stop';
+        remainingMicrodollars: number;
+        minimumRequiredMicrodollars: number;
+      };
+};
 
 function isPostgresConstraintError(error: unknown, code: string, constraint: string): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -75,7 +95,9 @@ function intervalValues(
   startEpochMs: number,
   context: UsageContext,
   contextFingerprint: string,
-  receivedAt: string
+  receivedAt: string,
+  billingMode: 'shadow' | 'paid' = 'shadow',
+  rateCentsPerUnit?: string
 ) {
   return {
     id: intervalId,
@@ -92,7 +114,153 @@ function intervalValues(
     metadata: context.metadata,
     started_at: receivedAt,
     last_seen_at: receivedAt,
+    billing_mode: billingMode,
+    ...(billingMode === 'paid' && rateCentsPerUnit
+      ? { rate_cents_per_unit: rateCentsPerUnit }
+      : {}),
   } as const;
+}
+
+async function balanceForSubject(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  subject: UsageContext['subject'],
+  lock = false
+): Promise<number> {
+  const query =
+    subject.type === 'user'
+      ? tx
+          .select({
+            remaining: sql<number>`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used}`,
+          })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, subject.id))
+          .limit(1)
+      : tx
+          .select({
+            remaining: sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
+          })
+          .from(organizations)
+          .where(eq(organizations.id, subject.id))
+          .limit(1);
+  const rows = lock ? await query.for('update') : await query;
+  const row = rows[0];
+  if (!row) throw new UsageMutationConflictError('Billing subject not found');
+  return Number(row.remaining);
+}
+
+function budgetForRemaining(
+  billingMode: 'shadow' | 'paid',
+  remainingMicrodollars: number,
+  warnRemainingMicrodollars: number
+): ApplyResult['budget'] {
+  if (billingMode === 'shadow') return { verdict: 'continue' };
+  if (remainingMicrodollars <= MINIMUM_REMAINING_MICRODOLLARS) {
+    return {
+      verdict: 'stop',
+      remainingMicrodollars,
+      minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    };
+  }
+  if (remainingMicrodollars < warnRemainingMicrodollars) {
+    return {
+      verdict: 'warn',
+      remainingMicrodollars,
+      minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    };
+  }
+  return { verdict: 'continue' };
+}
+
+async function settleSegment(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  interval: typeof container_usage_interval.$inferSelect,
+  usageSourceId: string,
+  appliedSeconds: number,
+  receivedAt: string,
+  billingConfig: BillingConfig
+): Promise<ApplyResult['budget']> {
+  if (interval.billing_mode === 'shadow') {
+    await tx
+      .update(container_usage_interval)
+      .set({
+        confirmed_seconds: sql`${container_usage_interval.confirmed_seconds} + ${appliedSeconds}`,
+      })
+      .where(eq(container_usage_interval.id, interval.id));
+    return { verdict: 'continue' };
+  }
+  if (!interval.rate_cents_per_unit) {
+    throw new UsageMutationConflictError('Paid usage interval is missing its rate snapshot');
+  }
+
+  const settledAfter = interval.settled_billable_seconds + appliedSeconds;
+  const [calculation] = await tx
+    .select({
+      amount: sql<number>`floor((${settledAfter}) * ${container_usage_interval.rate_cents_per_unit} * 10000) - floor(${interval.settled_billable_seconds} * ${container_usage_interval.rate_cents_per_unit} * 10000)`,
+    })
+    .from(container_usage_interval)
+    .where(eq(container_usage_interval.id, interval.id))
+    .limit(1);
+  if (!calculation) throw new Error('Usage interval disappeared during settlement');
+  const amountMicrodollars = Number(calculation.amount);
+
+  await tx
+    .update(container_usage_interval)
+    .set({
+      confirmed_seconds: sql`${container_usage_interval.confirmed_seconds} + ${appliedSeconds}`,
+      settled_billable_seconds: settledAfter,
+    })
+    .where(eq(container_usage_interval.id, interval.id));
+
+  let remainingMicrodollars: number;
+  if (amountMicrodollars > 0) {
+    const charge: typeof compute_usage_charge.$inferInsert = {
+      usage_source: 'container_usage_segment',
+      usage_source_id: usageSourceId,
+      user_id: interval.subject_type === 'user' ? interval.subject_id : undefined,
+      organization_id: interval.subject_type === 'org' ? interval.subject_id : undefined,
+      cloud_billing_sku_id: interval.cloud_billing_sku_id,
+      quantity: String(appliedSeconds),
+      settled_quantity_after: String(settledAfter),
+      rate_cents_per_unit: interval.rate_cents_per_unit,
+      amount_microdollars: amountMicrodollars,
+      created_at: receivedAt,
+    };
+    await tx.insert(compute_usage_charge).values(charge);
+    if (interval.subject_type === 'user') {
+      const [payer] = await tx
+        .update(kilocode_users)
+        .set({
+          microdollars_used: sql`${kilocode_users.microdollars_used} + ${amountMicrodollars}`,
+        })
+        .where(eq(kilocode_users.id, interval.subject_id))
+        .returning({
+          remaining: sql<number>`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used}`,
+        });
+      if (!payer) throw new UsageMutationConflictError('Billing subject not found');
+      remainingMicrodollars = Number(payer.remaining);
+    } else {
+      const [payer] = await tx
+        .update(organizations)
+        .set({
+          microdollars_used: sql`${organizations.microdollars_used} + ${amountMicrodollars}`,
+          // Keep the deprecated rollback column synchronized with aggregate usage.
+          microdollars_balance: sql`${organizations.microdollars_balance} - ${amountMicrodollars}`,
+        })
+        .where(eq(organizations.id, interval.subject_id))
+        .returning({
+          remaining: sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
+        });
+      if (!payer) throw new UsageMutationConflictError('Billing subject not found');
+      remainingMicrodollars = Number(payer.remaining);
+    }
+  } else {
+    remainingMicrodollars = await balanceForSubject(
+      tx,
+      { type: interval.subject_type, id: interval.subject_id },
+      true
+    );
+  }
+  return budgetForRemaining('paid', remainingMicrodollars, billingConfig.warnRemainingMicrodollars);
 }
 
 function assertMatchingContext(
@@ -168,14 +336,16 @@ export async function applyStart(
   input: RecordStartInput,
   intervalId: string,
   contextFingerprint: string,
-  receivedAtMs: number
+  receivedAtMs: number,
+  billingConfig: BillingConfig
 ): Promise<StartSkuAdmission> {
   return applyStartWithDb(
     getContainerUsageDb(env),
     input,
     intervalId,
     contextFingerprint,
-    receivedAtMs
+    receivedAtMs,
+    billingConfig
   );
 }
 
@@ -184,7 +354,8 @@ export async function applyStartWithDb(
   input: RecordStartInput,
   intervalId: string,
   contextFingerprint: string,
-  receivedAtMs: number
+  receivedAtMs: number,
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<StartSkuAdmission> {
   const operation: Promise<StartSkuAdmission> = db.transaction(async tx => {
     const [existing] = await tx
@@ -194,13 +365,14 @@ export async function applyStartWithDb(
       .limit(1);
     if (existing) {
       assertMatchingContext(existing, input, contextFingerprint);
-      return { kind: 'applied', dedup: true };
+      return { kind: 'applied', dedup: true, billingMode: existing.billing_mode };
     }
 
     const [sku] = await tx
       .select({
         unit: cloud_billing_sku.unit,
         acceptsNewUsage: cloud_billing_sku.accepts_new_usage,
+        rateCentsPerUnit: cloud_billing_sku.rate_cents_per_unit,
       })
       .from(cloud_billing_sku)
       .where(eq(cloud_billing_sku.id, input.sku))
@@ -221,6 +393,7 @@ export async function applyStartWithDb(
       };
     }
 
+    const billingMode = billingModeFor(billingConfig, input.service, input.subject);
     const [open] = await tx
       .select()
       .from(container_usage_interval)
@@ -238,6 +411,20 @@ export async function applyStartWithDb(
       if (open.start_epoch_ms > input.startEpochMs) {
         throw new UsageMutationConflictError('Cannot supersede a newer usage interval');
       }
+    }
+
+    if (billingMode === 'paid') {
+      const remaining = await balanceForSubject(tx, input.subject, true);
+      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
+        return {
+          kind: 'rejected',
+          code: 'insufficient_credits',
+          message: 'Container billing requires at least $5.00 in remaining credits',
+        };
+      }
+    }
+
+    if (open) {
       await tx
         .update(container_usage_interval)
         .set({
@@ -251,7 +438,17 @@ export async function applyStartWithDb(
     const receivedAt = timestamp(receivedAtMs);
     const [inserted] = await tx
       .insert(container_usage_interval)
-      .values(intervalValues(intervalId, input.startEpochMs, input, contextFingerprint, receivedAt))
+      .values(
+        intervalValues(
+          intervalId,
+          input.startEpochMs,
+          input,
+          contextFingerprint,
+          receivedAt,
+          billingMode,
+          billingMode === 'paid' ? sku.rateCentsPerUnit : undefined
+        )
+      )
       .onConflictDoNothing({ target: container_usage_interval.id })
       .returning({ id: container_usage_interval.id });
     if (!inserted) {
@@ -262,9 +459,9 @@ export async function applyStartWithDb(
         .limit(1);
       if (!winner) throw new Error('Container usage interval insert lost without a winner');
       assertMatchingContext(winner, input, contextFingerprint);
-      return { kind: 'applied', dedup: true };
+      return { kind: 'applied', dedup: true, billingMode: winner.billing_mode };
     }
-    return { kind: 'applied', dedup: false };
+    return { kind: 'applied', dedup: false, billingMode };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }
@@ -274,14 +471,16 @@ export async function applyHeartbeat(
   input: RecordHeartbeatInput,
   intervalId: string,
   contextFingerprint: string,
-  receivedAtMs: number
+  receivedAtMs: number,
+  billingConfig: BillingConfig
 ): Promise<ApplyResult> {
   return applyHeartbeatWithDb(
     getContainerUsageDb(env),
     input,
     intervalId,
     contextFingerprint,
-    receivedAtMs
+    receivedAtMs,
+    billingConfig
   );
 }
 
@@ -290,7 +489,8 @@ export async function applyHeartbeatWithDb(
   input: RecordHeartbeatInput,
   intervalId: string,
   contextFingerprint: string,
-  receivedAtMs: number
+  receivedAtMs: number,
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<ApplyResult> {
   const operation: Promise<ApplyResult> = db.transaction(async tx => {
     const [existingInterval] = await tx
@@ -328,7 +528,20 @@ export async function applyHeartbeatWithDb(
       ) {
         throw new UsageMutationConflictError('Heartbeat sequence has conflicting payload');
       }
-      return { kind: 'applied', dedup: true };
+      const remaining =
+        interval.billing_mode === 'paid'
+          ? await balanceForSubject(tx, input.context.subject, true)
+          : 0;
+      return {
+        kind: 'applied',
+        dedup: true,
+        billingMode: interval.billing_mode,
+        budget: budgetForRemaining(
+          interval.billing_mode,
+          remaining,
+          billingConfig.warnRemainingMicrodollars
+        ),
+      };
     }
     if (interval.status === 'closed' && interval.close_reason === 'unconfirmed') {
       const [newerGeneration] = await tx
@@ -368,15 +581,22 @@ export async function applyHeartbeatWithDb(
       usage_seconds: appliedSeconds,
       received_at: receivedAt,
     });
+    const budget = await settleSegment(
+      tx,
+      interval,
+      input.idempotencyKey,
+      appliedSeconds,
+      receivedAt,
+      billingConfig
+    );
     await tx
       .update(container_usage_interval)
       .set({
         last_seen_at: sql`GREATEST(${container_usage_interval.last_seen_at}, ${receivedAt})`,
         last_heartbeat_seq: sql`GREATEST(${container_usage_interval.last_heartbeat_seq}, ${input.seq})`,
-        confirmed_seconds: sql`${container_usage_interval.confirmed_seconds} + ${appliedSeconds}`,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { kind: 'applied', dedup: false };
+    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, budget };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }
@@ -386,14 +606,16 @@ export async function applyStop(
   input: RecordStopInput,
   intervalId: string,
   contextFingerprint: string,
-  receivedAtMs: number
+  receivedAtMs: number,
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<ApplyResult> {
   return applyStopWithDb(
     getContainerUsageDb(env),
     input,
     intervalId,
     contextFingerprint,
-    receivedAtMs
+    receivedAtMs,
+    billingConfig
   );
 }
 
@@ -402,7 +624,8 @@ export async function applyStopWithDb(
   input: RecordStopInput,
   intervalId: string,
   contextFingerprint: string,
-  receivedAtMs: number
+  receivedAtMs: number,
+  billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<ApplyResult> {
   const finalSegmentKey = heartbeatIdempotencyKey(
     input.service,
@@ -449,9 +672,23 @@ export async function applyStopWithDb(
       ) {
         throw new UsageMutationConflictError('Closed interval has conflicting stop details');
       }
-      return { kind: 'applied', dedup: true };
+      const remaining =
+        interval.billing_mode === 'paid'
+          ? await balanceForSubject(tx, input.context.subject, true)
+          : 0;
+      return {
+        kind: 'applied',
+        dedup: true,
+        billingMode: interval.billing_mode,
+        budget: budgetForRemaining(
+          interval.billing_mode,
+          remaining,
+          billingConfig.warnRemainingMicrodollars
+        ),
+      };
     }
     let finalSeconds = 0;
+    const receivedAt = timestamp(receivedAtMs);
     if (existingSegment) {
       if (
         existingSegment.idempotency_key !== finalSegmentKey ||
@@ -470,7 +707,7 @@ export async function applyStopWithDb(
         idempotency_key: finalSegmentKey,
         reported_seconds: input.usageSinceLast,
         usage_seconds: finalSeconds,
-        received_at: timestamp(receivedAtMs),
+        received_at: receivedAt,
       });
     }
 
@@ -478,6 +715,16 @@ export async function applyStopWithDb(
     const stopAt = wasReconciled
       ? (interval.stopped_at ?? interval.last_seen_at)
       : timestamp(Math.max(new Date(interval.last_seen_at).getTime(), receivedAtMs));
+
+    const budget = wasReconciled
+      ? interval.billing_mode === 'paid'
+        ? budgetForRemaining(
+            'paid',
+            await balanceForSubject(tx, input.context.subject, true),
+            billingConfig.warnRemainingMicrodollars
+          )
+        : { verdict: 'continue' as const }
+      : await settleSegment(tx, interval, finalSegmentKey, finalSeconds, receivedAt, billingConfig);
 
     await tx
       .update(container_usage_interval)
@@ -494,7 +741,7 @@ export async function applyStopWithDb(
           : interval.confirmed_seconds + finalSeconds,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { kind: 'applied', dedup: false };
+    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, budget };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }

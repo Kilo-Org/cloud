@@ -3,9 +3,10 @@ import { useEffect, useRef } from 'react';
 import { reinitSentryForConsent } from '@/lib/sentry-consent';
 
 /**
- * Applies the settled consent state to Sentry via close-then-init
+ * Applies the settled tracing-consent state to Sentry via close-then-init
  * transitions (see reinitSentryForConsent for why 7.x needs a full
- * teardown).
+ * teardown). `consented` is `consentChecked && !needsConsent && optionalConsent`,
+ * i.e. true only when optional performance tracing is permitted.
  */
 export function useSentryConsentSync(consented: boolean, init: (consented: boolean) => void) {
   // Starts `false` because module scope already ran init(false).

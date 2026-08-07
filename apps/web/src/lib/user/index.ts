@@ -27,6 +27,9 @@ import {
   referral_codes,
   organizations,
   organization_memberships,
+  organization_groups,
+  organization_group_memberships,
+  organization_group_policy_settings,
   organization_user_limits,
   organization_user_usage,
   organization_invitations,
@@ -35,6 +38,8 @@ import {
   organization_recommendation_dismissals,
   magic_link_tokens,
   device_auth_requests,
+  device_sessions,
+  native_attested_keys,
   auto_top_up_configs,
   platform_integrations,
   platform_oauth_credentials,
@@ -89,6 +94,7 @@ import {
   impact_conversion_reports,
   github_branch_pull_requests,
   user_github_app_tokens,
+  github_install_states,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -262,6 +268,12 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
+};
+
+export type DeferredSignInEvent = {
+  distinctId: string;
+  event: string;
+  properties: Record<string, unknown>;
 };
 
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
@@ -512,11 +524,31 @@ export async function createOrUpdateUser(
   autoLinkToExistingUser: boolean = false,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
-  trackingContext?: CreateOrUpdateUserTrackingContext
-): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
+  trackingContext?: CreateOrUpdateUserTrackingContext,
+  deferSignInAnalytics?: boolean
+): Promise<
+  Result<{ user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent }, AuthErrorType>
+> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
     void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
+
+    if (deferSignInAnalytics) {
+      return successResult({
+        user: existingUser,
+        isNew: false,
+        deferredSignInEvent: {
+          distinctId: existingUser.google_user_email,
+          event: 'user_signed_in',
+          properties: {
+            name: existingUser.google_user_name,
+            hosted_domain: existingUser.hosted_domain,
+            provider: args.provider,
+            id: existingUser.id,
+          },
+        },
+      });
+    }
 
     // User signed in or is being updated
     posthogClient.capture({
@@ -539,17 +571,14 @@ export async function createOrUpdateUser(
     const hasThisProvider = existingProviders.some(p => p.provider === args.provider);
     const onlyHasFakeLogin =
       existingProviders.length === 1 && existingProviders[0].provider === 'fake-login';
-    const hasNoProviders = existingProviders.length === 0;
 
     // Link this new provider to the existing user if they don't already have it.
     // fake-login is placeholder auth (dev-only) - always allow upgrading from it.
-    // Otherwise, only link if autoLinkToExistingUser AND one of:
-    //   - User has no providers (clean slate after admin reset)
-    //   - Provider is WorkOS/fake-login (special upgrade paths)
-    const isUpgradeProvider = args.provider === 'workos' || args.provider === 'fake-login';
-    const shouldLink =
-      !hasThisProvider &&
-      (onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider)));
+    // Callers pass autoLinkToExistingUser=true only when the credential proves
+    // ownership of the email (consumed magic-link/code, or a provider-asserted
+    // email_verified claim). Proof authorizes the link; without proof the
+    // sign-in keeps the DIFFERENT-OAUTH refusal below.
+    const shouldLink = !hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser);
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -585,6 +614,28 @@ export async function createOrUpdateUser(
       }
       void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
+      if (deferSignInAnalytics) {
+        return successResult({
+          user: linkedUser,
+          isNew: false,
+          deferredSignInEvent: {
+            distinctId: userByEmail.google_user_email,
+            event: 'user_signed_in_with_different_id_and_auto_linked',
+            properties: {
+              existing_name: userByEmail.google_user_name,
+              existing_hosted_domain: userByEmail.hosted_domain,
+              existing_id: userByEmail.id,
+              new_provider: args.provider,
+              new_provider_account_id: args.provider_account_id,
+              new_name: args.google_user_name,
+              new_email: args.google_user_email,
+              new_image_url: args.google_user_image_url,
+              new_hosted_domain: args.hosted_domain,
+            },
+          },
+        });
+      }
+
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
         event: 'user_signed_in_with_different_id_and_auto_linked',
@@ -766,18 +817,22 @@ export async function linkAccountToExistingUser(
   });
 
   if (!linkResult.success) {
-    captureException(new Error(`Account linking failed: ${linkResult.error}`), {
-      tags: {
-        operation: 'account_linking',
-        provider: authProviderData.provider,
-      },
-      extra: {
-        existing_user_id: existingKiloUserId,
-        provider_email: authProviderData.google_user_email,
-        provider_account_id: authProviderData.provider_account_id,
-        error_code: linkResult.error,
-      },
-    });
+    // ACCOUNT-ALREADY-LINKED and PROVIDER-ALREADY-LINKED are expected user
+    // errors; only LINKING-FAILED indicates a system failure worth Sentry.
+    if (linkResult.error === 'LINKING-FAILED') {
+      captureException(new Error(`Account linking failed: ${linkResult.error}`), {
+        tags: {
+          operation: 'account_linking',
+          provider: authProviderData.provider,
+        },
+        extra: {
+          existing_user_id: existingKiloUserId,
+          provider_email: authProviderData.google_user_email,
+          provider_account_id: authProviderData.provider_account_id,
+          error_code: linkResult.error,
+        },
+      });
+    }
 
     return linkResult;
   }
@@ -836,7 +891,7 @@ async function assertNoLiveSubscriptionsForSoftDelete(
     );
   }
 
-  // Block soft-delete for any live KiloClaw subscription. This includes
+  // Block soft-delete for any current live KiloClaw subscription. This includes
   // trialing — the user may have a running Fly instance, and deleting the
   // row without destroying the instance would orphan it.
   const liveClawSubscriptions = await executor
@@ -848,6 +903,7 @@ async function assertNoLiveSubscriptionsForSoftDelete(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
       )
     );
@@ -874,7 +930,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *
  * Preconditions (will throw SoftDeletePreconditionError if violated):
  * - User must not have an active, non-cancelling Kilo Pass subscription
- * - User must not have a live KiloClaw subscription (active, past_due, unpaid, or trialing)
+ * - User must not have a current live KiloClaw subscription (active, past_due, unpaid, or trialing)
  *
  * What is kept:
  * - The kilocode_users row (anonymized)
@@ -1254,6 +1310,11 @@ export async function softDeleteUser(userId: string) {
       .delete(code_review_feedback_events)
       .where(eq(code_review_feedback_events.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
+    // device_sessions cascade deletes device_refresh_tokens via FK
+    await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
+    await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, userId));
+    // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
+    await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
     await tx
@@ -1366,6 +1427,19 @@ export async function softDeleteUser(userId: string) {
       .update(organization_audit_logs)
       .set({ actor_email: null, actor_name: null })
       .where(eq(organization_audit_logs.actor_id, userId));
+
+    await tx
+      .update(organization_groups)
+      .set({ created_by_kilo_user_id: null })
+      .where(eq(organization_groups.created_by_kilo_user_id, userId));
+    await tx
+      .update(organization_group_memberships)
+      .set({ assigned_by_kilo_user_id: null })
+      .where(eq(organization_group_memberships.assigned_by_kilo_user_id, userId));
+    await tx
+      .update(organization_group_policy_settings)
+      .set({ updated_by_kilo_user_id: null })
+      .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
 
     // Security audit logs: keep org-owned entries, strip actor PII
     // (user-owned entries are cascade-deleted via owned_by_user_id FK)

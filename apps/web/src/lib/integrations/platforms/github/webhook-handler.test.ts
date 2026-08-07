@@ -11,6 +11,10 @@ const mockHandlePRReviewComment = jest.fn();
 const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
 const mockRevokeStoredGitHubUserAuthorization = jest.fn();
+const mockHandleInstallationDeleted = jest.fn();
+const mockHandleInstallationSuspend = jest.fn();
+const mockHandleInstallationUnsuspend = jest.fn();
+const mockHandleInstallationRepositories = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -18,8 +22,11 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 }));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  findIntegrationByInstallationId: (platform: string, installationId: string | undefined) =>
-    mockFindIntegrationByInstallationId(platform, installationId),
+  findIntegrationByInstallationId: (
+    platform: string,
+    installationId: string | undefined,
+    githubAppType?: string
+  ) => mockFindIntegrationByInstallationId(platform, installationId, githubAppType),
 }));
 
 jest.mock('@/lib/integrations/db/webhook-events', () => ({
@@ -35,10 +42,14 @@ jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handleInstallationCreated: jest.fn(),
-  handleInstallationDeleted: jest.fn(),
-  handleInstallationRepositories: jest.fn(),
-  handleInstallationSuspend: jest.fn(),
-  handleInstallationUnsuspend: jest.fn(),
+  handleInstallationDeleted: (payload: unknown, appType: string) =>
+    mockHandleInstallationDeleted(payload, appType),
+  handleInstallationRepositories: (payload: unknown, appType: string) =>
+    mockHandleInstallationRepositories(payload, appType),
+  handleInstallationSuspend: (payload: unknown, appType: string) =>
+    mockHandleInstallationSuspend(payload, appType),
+  handleInstallationUnsuspend: (payload: unknown, appType: string) =>
+    mockHandleInstallationUnsuspend(payload, appType),
   handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
     mockHandleInstallationTargetRenamed(payload, integrationId, appType),
   handleIssue: jest.fn(),
@@ -191,6 +202,18 @@ describe('handleGitHubWebhook', () => {
       Response.json({ message: 'Installation target updated' })
     );
     mockRevokeStoredGitHubUserAuthorization.mockResolvedValue({ kiloUserId: 'user_1' });
+    mockHandleInstallationDeleted.mockResolvedValue(
+      Response.json({ message: 'Installation removed' })
+    );
+    mockHandleInstallationSuspend.mockResolvedValue(
+      Response.json({ message: 'Installation suspended' })
+    );
+    mockHandleInstallationUnsuspend.mockResolvedValue(
+      Response.json({ message: 'Installation unsuspended' })
+    );
+    mockHandleInstallationRepositories.mockResolvedValue(
+      Response.json({ message: 'Repositories updated' })
+    );
   });
 
   it('routes installation_target renamed events through authoritative login synchronization', async () => {
@@ -282,6 +305,16 @@ describe('handleGitHubWebhook', () => {
     expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
   });
 
+  it('scopes the integration lookup to the webhook app type', async () => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'lite'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+  });
+
   it('keeps pull_request webhooks on the code review path', async () => {
     const payload = pullRequestPayload();
     const response = await handleGitHubWebhook(
@@ -360,5 +393,73 @@ describe('handleGitHubWebhook', () => {
     expect(await response.json()).toEqual({ message: 'Event received' });
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('routes installation.deleted to the handler with the webhook app type', async () => {
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'lite'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'lite'
+    );
+  });
+
+  it('routes installation.suspend to the handler with the webhook app type', async () => {
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('routes installation.unsuspend to the handler with the webhook app type', async () => {
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'lite'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'lite'
+    );
+  });
+
+  it('routes installation_repositories to the handler with the webhook app type', async () => {
+    const payload = {
+      action: 'added',
+      installation: { id: 98765 },
+      repositories_added: [{ id: 1, name: 'widgets', full_name: 'acme/widgets', private: false }],
+    };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation_repositories', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockHandleInstallationRepositories).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
   });
 });

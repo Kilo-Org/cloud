@@ -62,11 +62,11 @@ type CloudAgentTransportConfig = {
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /** Called after a successful initial bounded page read. */
-  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
+  onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   websocketBaseUrl: string;
-  onError?: (message: string) => void;
-  lifecycleHooks?: ConnectionLifecycleHooks;
-  websocketHeaders?: WebSocketHeaders;
+  onError?: ((message: string) => void) | undefined;
+  lifecycleHooks?: ConnectionLifecycleHooks | undefined;
+  websocketHeaders?: WebSocketHeaders | undefined;
 };
 
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
@@ -85,11 +85,15 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     function buildWebsocketUrl(): string {
       const url = new URL('/stream', websocketBaseUrl);
       url.searchParams.set('cloudAgentSessionId', config.sessionId);
-      if (lastEventId === null) {
-        // First connect: messages are pre-loaded via REST, skip the full replay.
-        url.searchParams.set('replay', 'false');
-      } else {
+      if (lastEventId !== null) {
+        // Reconnect cursor or initial watermark: the DO replays everything
+        // after this id — either a live cursor from the wire, or the
+        // event-log watermark from the initial bounded page.
         url.searchParams.set('fromId', String(lastEventId));
+      } else {
+        // No cursor and no watermark: messages are pre-loaded via REST,
+        // skip the DO replay.
+        url.searchParams.set('replay', 'false');
       }
       return url.toString();
     }
@@ -145,6 +149,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           return null;
         }
         if (page.kind === 'success') {
+          // Seed lastEventId from the page's event-log watermark. A
+          // present watermark sets the cursor to 0 so the first
+          // WebSocket connect uses `fromId=0` — the DO replays every
+          // stored event, closing the gap when SessionIngest
+          // materialization lags behind the event-log high-water mark.
+          // On reconnect, wire events advance lastEventId past 0 and
+          // the live cursor takes over.
+          lastEventId = page.watermarkEventId != null ? 0 : null;
           config.onInitialPageLoaded?.(page);
           replayPage(page);
           return { ticket };
@@ -189,7 +201,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
         onEvent: raw => {
-          if (raw.eventId > 0) {
+          // Track high-water mark for reconnect fromId only. Do not filter
+          // by eventId: the DO entity-upserts tool/message parts under a
+          // stable row id and rebroadcasts that same (or older) id with a
+          // newer payload. Dropping those left live tools stuck on empty input.
+          // eventId 0 is a synthetic sentinel and never advances the cursor.
+          if (raw.eventId > 0 && (lastEventId === null || raw.eventId > lastEventId)) {
             lastEventId = raw.eventId;
           }
 

@@ -7,6 +7,7 @@ import {
   SessionDetailContent,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-content';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { QueryError } from '@/components/query-error';
@@ -23,6 +24,7 @@ export default function SessionDetailScreen() {
     via,
     spawned,
     shareId: shareIdParam,
+    autoSend: autoSendRaw,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -39,9 +41,11 @@ export default function SessionDetailScreen() {
      */
     spawned?: string;
     shareId?: string;
+    autoSend?: string;
   }>();
   // Param can be string | string[] depending on how the route was opened.
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
+  const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const trpc = useTRPC();
   const router = useRouter();
   const sessionQuery = useQuery({
@@ -92,6 +96,7 @@ export default function SessionDetailScreen() {
             />
           }
         />
+        <SessionConnectionIndicator />
         <SessionSkeletonMessages />
       </View>
     );
@@ -105,6 +110,7 @@ export default function SessionDetailScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Session" />
+        <SessionConnectionIndicator />
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
             variant={notFound ? 'not-found' : 'server'}
@@ -139,6 +145,7 @@ export default function SessionDetailScreen() {
         sessionId={sessionId as KiloSessionId}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}
+        autoSend={autoSendParam === '1'}
       />
     </AgentSessionProvider>
   );

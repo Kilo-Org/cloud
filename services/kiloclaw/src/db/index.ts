@@ -31,6 +31,7 @@ export async function findPepperByUserId(db: WorkerDb, userId: string) {
     .select({
       id: kilocode_users.id,
       api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_reason: kilocode_users.blocked_reason,
     })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, userId))
@@ -531,6 +532,16 @@ export async function claimScheduledActionTarget(
  * just records the per-target outcome and increments counters. A
  * follow-up sweep (or the next apply call when no targets remain) can
  * promote stage/parent statuses if their pending counts hit zero.
+ *
+ * Also the resolving half of the cancel/claim race: the admin cancel
+ * mutation defers its cancellation-notification decision for any target
+ * still 'running' at cancel time (unresolved — it doesn't yet know
+ * whether this call will land on 'applied' or something else). Once the
+ * real outcome is known, if it isn't 'applied' and the parent has since
+ * been marked 'cancelled', this function queues that target's
+ * cancellation notification itself. See the matching comment in
+ * apps/web/src/routers/admin-kiloclaw-instances-router.ts
+ * (cancelScheduledAction) for the other half of this handoff.
  */
 export async function recordScheduledActionTargetOutcome(
   db: WorkerDb,
@@ -607,6 +618,38 @@ export async function recordScheduledActionTargetOutcome(
         started_at: sql`COALESCE(${kiloclaw_scheduled_actions.started_at}, ${now})`,
       })
       .where(eq(kiloclaw_scheduled_actions.id, args.scheduled_action_id));
+
+    // Close the claim/dispatch race with the admin cancel mutation.
+    // claimScheduledActionTarget flips pending -> running *before* this
+    // function runs (dispatch happens in between). The cancel mutation's
+    // own UPDATE only touches 'pending' targets, so a target that was
+    // already claimed is left untouched by cancel — at the moment the
+    // cancel mutation decides who to notify, this target is still
+    // 'running', a genuinely unresolved state. Deciding "notify" or
+    // "don't notify" from that snapshot is wrong either way: the target
+    // might still resolve to 'applied' (no notification should exist)
+    // or to something else (a notification is owed). So the cancel
+    // mutation (and the sweep's markSent) both defer on 'running' targets
+    // — they exclude 'running' from their cancellation-notification
+    // insert, not just 'applied'. This is the other half: once we know
+    // the *actual* outcome, if it's not 'applied' and the parent is
+    // already 'cancelled' by now, queue the cancellation notice here.
+    // ON CONFLICT keeps this idempotent against an insert the cancel
+    // mutation or markSent already made for this (target, channel).
+    if (args.outcome !== 'applied') {
+      await tx.execute(sql`
+        INSERT INTO kiloclaw_scheduled_action_notifications
+          (target_id, channel, kind, status)
+        SELECT n.target_id, n.channel, 'cancelled', 'pending'
+        FROM kiloclaw_scheduled_action_notifications n
+        INNER JOIN kiloclaw_scheduled_actions a ON a.id = ${args.scheduled_action_id}
+        WHERE n.target_id = ${args.target_id}
+          AND n.kind = 'notice'
+          AND n.status = 'sent'
+          AND a.status = 'cancelled'
+        ON CONFLICT (target_id, kind, channel) DO NOTHING
+      `);
+    }
   });
 }
 

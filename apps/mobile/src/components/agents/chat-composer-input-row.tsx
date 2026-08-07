@@ -5,6 +5,7 @@ import {
   type LayoutChangeEvent,
   Pressable,
   TextInput,
+  type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
@@ -34,6 +35,7 @@ type ChatComposerInputRowProps = {
   onInputBlur: () => void;
   onInputFocus: () => void;
   onInputLayout: (event: LayoutChangeEvent) => void;
+  onSelectionChange: (event: TextInputSelectionChangeEvent) => void;
   onStop: () => void;
   onSubmit: () => void;
   onToggleVoice: () => void;
@@ -68,6 +70,7 @@ export function ChatComposerInputRow({
   onInputBlur,
   onInputFocus,
   onInputLayout,
+  onSelectionChange,
   onStop,
   onSubmit,
   onToggleVoice,
@@ -116,6 +119,7 @@ export function ChatComposerInputRow({
           onChangeText={onChangeText}
           onFocus={onInputFocus}
           onBlur={onInputBlur}
+          onSelectionChange={onSelectionChange}
           style={textInputStyle}
           scrollEnabled={inputScrollable}
           editable={inputEditable}

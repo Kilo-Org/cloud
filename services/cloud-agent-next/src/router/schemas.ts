@@ -976,6 +976,17 @@ export const GetSessionOutput = z.object({
   // Versioning
   timestamp: z.number().describe('Last update timestamp'),
   version: z.number().describe('Metadata version for cache invalidation'),
+
+  // Latest persisted event ID from the Cloud Agent event log. Used as a
+  // durability watermark: numeric and present after at least one event has
+  // been persisted. Null when no events exist or the session has no events yet.
+  latestEventId: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe('Latest persisted event ID, or null when no events exist'),
 });
 
 export type GetSessionResponse = z.infer<typeof GetSessionOutput>;

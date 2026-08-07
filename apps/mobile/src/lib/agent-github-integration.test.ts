@@ -25,19 +25,33 @@ describe('agent GitHub integration helpers', () => {
       shouldShowGitHubIntegrationPrompt({
         isLoadingRepos: false,
         integrationInstalled: true,
-        repositoryCount: 1,
       })
     ).toBe(false);
   });
 
-  it('shows the setup prompt when GitHub has no connected repositories', () => {
+  it('does not show the prompt when installed even with zero repositories', () => {
     expect(
       shouldShowGitHubIntegrationPrompt({
         isLoadingRepos: false,
         integrationInstalled: true,
-        repositoryCount: 0,
       })
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('does not show the prompt while loading', () => {
+    expect(
+      shouldShowGitHubIntegrationPrompt({
+        isLoadingRepos: true,
+        integrationInstalled: true,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldShowGitHubIntegrationPrompt({
+        isLoadingRepos: true,
+        integrationInstalled: undefined,
+      })
+    ).toBe(false);
   });
 
   it('builds personal and organization GitHub integration URLs', () => {
@@ -45,5 +59,31 @@ describe('agent GitHub integration helpers', () => {
     expect(getGitHubIntegrationUrl('https://app.kilo.ai/', 'org_123')).toBe(
       'https://app.kilo.ai/github-app?organizationId=org_123'
     );
+  });
+
+  it('builds app-initiated URLs with a pre-minted install state token', () => {
+    const url = getGitHubIntegrationUrl('https://app.kilo.ai', 'org_123', 'abc-token-123');
+    expect(url).toBe(
+      'https://app.kilo.ai/github-app?organizationId=org_123&installState=abc-token-123&fromApp=1'
+    );
+  });
+
+  it('builds app-initiated personal URLs with a pre-minted install state token', () => {
+    const url = getGitHubIntegrationUrl('https://app.kilo.ai/', undefined, 'abc-token-456');
+    expect(url).toBe('https://app.kilo.ai/github-app?installState=abc-token-456&fromApp=1');
+  });
+
+  it('never sets fromApp=1 when no installState token is provided', () => {
+    const url = getGitHubIntegrationUrl('https://app.kilo.ai', 'org_123');
+    expect(url).not.toContain('fromApp');
+  });
+
+  it('shows the prompt when integration status is unknown', () => {
+    expect(
+      shouldShowGitHubIntegrationPrompt({
+        isLoadingRepos: false,
+        integrationInstalled: undefined,
+      })
+    ).toBe(false);
   });
 });

@@ -6,6 +6,17 @@ export const MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER = 3;
 export const MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER = 1;
 export const FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 
+/**
+ * Statuses a review can hold while it still has work outstanding.
+ *
+ * Anything not listed here has reached a terminal state and will never move
+ * again. Callers that select or guard on "still in flight" should reference this
+ * rather than repeat the literals, so adding or renaming a status is a single
+ * edit. Several older call sites still inline the same array; they predate this
+ * constant and can adopt it as they are touched.
+ */
+export const NON_TERMINAL_CODE_REVIEW_STATUSES = ['pending', 'queued', 'running'] as const;
+
 export const STALE_QUEUED_CODE_REVIEW_MINUTES = 5;
 export const STALE_RUNNING_CODE_REVIEW_MINUTES = 90;
 export const CRON_PENDING_CODE_REVIEW_MIN_AGE_MINUTES = 60;

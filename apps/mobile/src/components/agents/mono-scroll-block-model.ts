@@ -12,6 +12,22 @@ export function prepareMonoScrollContent(
   return { displayText: content.slice(0, maxLength), isTruncated: true };
 }
 
+/**
+ * How a mono block displays inside the tool detail sheet: wrapped text or a
+ * horizontal scroller. Blocks outside the sheet keep today's `'scroll'`
+ * behavior via the context fallback.
+ */
+export type MonoScrollTextMode = 'wrap' | 'scroll';
+
+/** Segmented-control options; 'wrap' first because the sheet defaults to it. */
+export const MONO_SCROLL_TEXT_MODE_OPTIONS: readonly {
+  value: MonoScrollTextMode;
+  label: string;
+}[] = [
+  { value: 'wrap', label: 'Wrap' },
+  { value: 'scroll', label: 'Scroll' },
+];
+
 /** Measured ScrollView height keyed to the text it was measured for. */
 export type MonoScrollHeightPin = { text: string; height: number };
 

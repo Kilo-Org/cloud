@@ -94,9 +94,7 @@ function BeadCard({
         'group relative border-white/10 bg-white/[0.03] transition-[border-color,background-color,transform] hover:bg-white/[0.05]',
         onSelect ? 'cursor-pointer' : 'cursor-default',
         held ? 'border-amber-500/20 bg-amber-500/[0.03]' : '',
-        isSelected
-          ? 'border-[color:oklch(95%_0.15_108_/_0.45)] bg-[color:oklch(95%_0.15_108_/_0.06)]'
-          : ''
+        isSelected ? 'border-border bg-surface-selected' : ''
       )}
     >
       <div
@@ -106,9 +104,7 @@ function BeadCard({
         onKeyDown={handleKeyDown}
         className={cn(
           'w-full text-left',
-          onSelect
-            ? 'focus-visible:ring-2 focus-visible:ring-[color:oklch(95%_0.15_108_/_0.35)]'
-            : '',
+          onSelect ? 'focus-visible:ring-2 focus-visible:ring-white/25' : '',
           'focus-visible:ring-offset-0 focus-visible:outline-none'
         )}
       >

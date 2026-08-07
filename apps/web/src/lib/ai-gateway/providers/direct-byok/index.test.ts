@@ -15,7 +15,10 @@ jest.mock('@/lib/ai-gateway/models', () => ({
 
 jest.mock('@/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
-  getModelVariants: jest.fn(),
+}));
+
+jest.mock('@/lib/ai-gateway/providers/variants', () => ({
+  getFallbackModelVariants: jest.fn(),
 }));
 
 jest.mock('./direct-byok-definitions', () => ({
@@ -121,23 +124,22 @@ describe('getDirectByokModel', () => {
     });
   });
 
-  test('falls back to model-name variants when synced variants are unavailable', async () => {
+  test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
     const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
-    const { getModelVariants } = await import('@/lib/ai-gateway/providers/model-settings');
+    const { getFallbackModelVariants } = await import('@/lib/ai-gateway/providers/variants');
     const fallback = { thinking: { reasoning: { enabled: true, effort: 'high' as const } } };
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
-    jest.mocked(getModelVariants).mockReturnValue(fallback);
+    jest.mocked(getFallbackModelVariants).mockReturnValue(fallback);
 
     const models = await getDirectByokModelsForUser('user-id');
 
     expect(models[0].opencode.variants).toEqual({
       high: { reasoning: { enabled: true, effort: 'high' } },
     });
-    expect(models[1].opencode.variants).toBe(fallback);
-    expect(getModelVariants).toHaveBeenCalledTimes(1);
-    expect(getModelVariants).toHaveBeenCalledWith('chutes-byok/non-reasoning-model');
+    expect(models[1].opencode.variants).toBeUndefined();
+    expect(getFallbackModelVariants).not.toHaveBeenCalled();
   });
 });

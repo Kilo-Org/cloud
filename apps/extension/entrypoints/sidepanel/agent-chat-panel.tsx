@@ -2,7 +2,7 @@
 import { browser, storage } from '#imports';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import { getDefaultStore, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { AlertTriangle } from 'lucide-react';
 import {
   compactingConversationIdsAtom,
@@ -16,7 +16,9 @@ import {
 } from './agent-chat-atoms';
 import {
   createAssistantMessage,
+  createToolResult,
   createUserMessage,
+  createWorkflowToolCall,
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
@@ -53,6 +55,12 @@ import {
 import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
+import { createWorkflowToolDefinitions } from '@/src/shared/agent-llm-harness';
+import { formatAgentWorkflowIndex } from '@/src/shared/agent-workflows';
+import type { AgentWorkflow } from '@/src/shared/agent-workflows';
+import { loadWorkflowSettings } from '@/src/shared/agent-workflows-storage';
+import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
+import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { addSessionCost } from '@/src/shared/session-cost';
 import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
@@ -67,9 +75,14 @@ import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import { toRemoteMcpToolCallEvents } from './agent-tool-call-events';
 import { executeRemoteMcpToolCall } from './agent-remote-mcp-tool-runtime';
 import { useAgentMemories } from './use-agent-memories';
+import { useAgentWorkflows } from './use-agent-workflows';
 import type { AgentMemory } from '@/src/shared/agent-memories';
 import { formatAgentMemoryIndex } from '@/src/shared/agent-memories';
+import { requestApproval } from './pending-approval';
+import { workflowRunRequestAtom } from './workflow-settings-state';
+import { activeConversationIdAtom, conversationModeAtom } from './settings-dialog-state';
 import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-context-sanitize';
+import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
@@ -105,9 +118,11 @@ export const getSelectedInspectableTabId = ({
 export const formatSystemEnvironment = ({
   selectedTab,
   memories,
+  workflows,
 }: {
   readonly selectedTab: { readonly title: string; readonly url: string } | undefined;
   readonly memories: readonly AgentMemory[];
+  readonly workflows?: readonly AgentWorkflow[];
 }): string | undefined => {
   if (selectedTab === undefined) {
     return undefined;
@@ -120,7 +135,9 @@ export const formatSystemEnvironment = ({
     `Timezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}`,
   ];
   const memoryIndex = formatAgentMemoryIndex(memories);
-  const body = memoryIndex === undefined ? lines.join('\n') : `${lines.join('\n')}\n${memoryIndex}`;
+  const workflowIndex =
+    workflows === undefined ? undefined : formatAgentWorkflowIndex(workflows, selectedTab.url);
+  const body = [lines.join('\n'), memoryIndex, workflowIndex].filter(Boolean).join('\n');
 
   return `<system_environment>\n${body}\n</system_environment>`;
 };
@@ -131,7 +148,8 @@ export const formatSelectedTabSystemEnvironment = ({
 }: {
   readonly title: string;
   readonly url: string;
-}): string => formatSystemEnvironment({ memories: [], selectedTab: { title, url } }) ?? '';
+}): string =>
+  formatSystemEnvironment({ memories: [], selectedTab: { title, url }, workflows: [] }) ?? '';
 
 export const AgentChatPanel = ({
   auth,
@@ -146,12 +164,14 @@ export const AgentChatPanel = ({
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(emptyDefaultConversationEvents);
   const { memories } = useAgentMemories();
+  const { workflows } = useAgentWorkflows();
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
   const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
   const compactingConversationIds = useAtomValue(compactingConversationIdsAtom);
   const setCompactingConversationIds = useSetAtom(compactingConversationIdsAtom);
   const conversationStoreRef = useRef(conversationStore);
   const memoriesRef = useRef(memories);
+  const workflowsRef = useRef(workflows);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
   const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
@@ -199,6 +219,15 @@ export const AgentChatPanel = ({
   const activeSessionCostUsd = useAtomValue(sessionCostAtomFamily(activeConversationId));
   const streamingMessageId = useAtomValue(streamingMessageIdAtomFamily(activeConversationId));
   const contextLength = selectedModel?.contextLength;
+
+  // Wire the settings-dialog outreach atoms so WorkflowSettings can read the
+  // Active conversation's mode and id when the settings panel is open.
+  const setConversationMode = useSetAtom(conversationModeAtom);
+  const setActiveConversationId = useSetAtom(activeConversationIdAtom);
+  useEffect(() => {
+    setConversationMode(mode);
+    setActiveConversationId(activeConversationId);
+  }, [mode, activeConversationId, setConversationMode, setActiveConversationId]);
 
   const compactConversation = useCallback(
     async (
@@ -306,6 +335,7 @@ export const AgentChatPanel = ({
 
   conversationStoreRef.current = conversationStore;
   memoriesRef.current = memories;
+  workflowsRef.current = workflows;
 
   useEffect(
     () => () => {
@@ -492,40 +522,18 @@ export const AgentChatPanel = ({
     );
   };
 
-  const submitMessage = (text: string): void => {
-    const conversation = getActiveStoredConversation(conversationStoreRef.current);
-    const conversationId = conversation.id;
-    const conversationEvents = conversation.events;
-    const runModel = conversation.model ?? modelOptions[0]?.id ?? '';
-    const runSelectedModel = modelOptions.find(option => option.id === runModel);
-    const runThinkingOptions = runSelectedModel?.variants ?? [];
-    const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
-    const runSelectedTabId = getSelectedInspectableTabId({
-      activeTabId,
-      inspectableTabs,
-      selectedTabId: conversation.selectedTabId,
-    });
-    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
-    const userEvent = createUserMessage(
-      text,
-      formatSystemEnvironment({
-        memories: memoriesRef.current,
-        selectedTab:
-          selectedTab === undefined
-            ? undefined
-            : { title: selectedTab.title, url: selectedTab.url },
-      })
-    );
-    const conversationWithUserMessage = [...conversationEvents, userEvent];
+  interface RunState {
+    readonly abort: AbortController;
+    readonly runToken: number;
+    readonly isCurrentRun: () => boolean;
+    readonly appendRunEvents: (events: AgentConversationEvent[]) => void;
+    readonly updateRunAssistantMessage: (eventId: string, text: string) => void;
+    readonly updateRunThinkingBlock: (eventId: string, text: string) => void;
+    readonly updateRunUsage: (usage: TurnUsage) => void;
+    readonly currentRunHasUsage: () => boolean;
+  }
 
-    appendEvents(conversationId, [userEvent]);
-
-    if (runSelectedTabId === undefined) {
-      appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
-      return;
-    }
-
-    const runMode = conversation.mode ?? defaultMode;
+  const createRunState = (conversationId: string, runSelectedTabId: number): RunState => {
     const abort = new AbortController();
     const runToken = (runTokenRef.current += 1);
     const isCurrentRun = (): boolean =>
@@ -545,10 +553,10 @@ export const AgentChatPanel = ({
         updateThinkingBlock(conversationId, eventId, thinkingText);
       }
     };
-    let currentRunHasUsage = false;
+    let hasUsage = false;
     const updateRunUsage = (usage: TurnUsage): void => {
       if (isCurrentRun()) {
-        currentRunHasUsage = true;
+        hasUsage = true;
         store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });
         const previousCost = store.get(sessionCostAtomFamily(conversationId));
         store.set(
@@ -557,6 +565,7 @@ export const AgentChatPanel = ({
         );
       }
     };
+    const currentRunHasUsage = (): boolean => hasUsage;
 
     runStatesRef.current.set(conversationId, {
       abort,
@@ -567,77 +576,176 @@ export const AgentChatPanel = ({
       currentIds.includes(conversationId) ? currentIds : [...currentIds, conversationId]
     );
 
-    const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
-    const {
-      routes: remoteMcpRoutes,
-      tools: remoteMcpTools,
-      warning: remoteMcpWarning,
-    } = buildRemoteMcpToolDefinitions({ mode: runMode, servers: remoteMcpServers });
-    setRemoteMcpToolWarning(remoteMcpWarning);
+    return {
+      abort,
+      appendRunEvents,
+      currentRunHasUsage,
+      isCurrentRun,
+      runToken,
+      updateRunAssistantMessage,
+      updateRunThinkingBlock,
+      updateRunUsage,
+    };
+  };
 
-    void (async (): Promise<void> => {
-      try {
-        const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
+  const startTurn = async (
+    conversationId: string,
+    conversationEventsForGateway: AgentConversationEvent[],
+    runState: RunState
+  ): Promise<void> => {
+    const cleanupRun = (): void => {
+      if (!runState.isCurrentRun()) {
+        return;
+      }
 
-        captureEvent(MESSAGE_SENT_EVENT, { mode: runMode });
-        await runTurn({
-          apiBaseUrl,
-          appendEvents: appendRunEvents,
-          conversationEvents: conversationWithUserMessage,
-          executeRemoteMcpToolCall: event =>
-            executeRemoteMcpToolCall({
-              event,
-              // PLAIN global fetch: the MCP server is a third party and must never see the Kilo gateway token.
-              fetch: globalThis.fetch,
-              routes: remoteMcpRoutes,
-              servers: remoteMcpServers,
-              signal: abort.signal,
-              storageArea: storage,
-            }),
-          fetch: fetchFromWindow,
-          model: runModel,
-          onAssistantStreaming: eventId => {
-            if (isCurrentRun()) {
-              store.set(streamingMessageIdAtomFamily(conversationId), eventId);
-            }
-          },
-          onUsage: updateRunUsage,
-          organizationId,
-          remoteMcpTools,
-          selectedTabId: runSelectedTabId,
-          signal: abort.signal,
-          supportsImages: runSelectedModel?.supportsImages === true,
-          thinkingEffort: runThinkingEffort,
-          toRemoteMcpToolCallEvents: toolCalls =>
-            toRemoteMcpToolCallEvents(toolCalls, remoteMcpRoutes),
-          token: auth.token,
-          updateAssistantMessage: updateRunAssistantMessage,
-          updateThinkingBlock: updateRunThinkingBlock,
-        });
-      } finally {
-        if (isCurrentRun()) {
-          store.set(streamingMessageIdAtomFamily(conversationId), undefined);
-          runStatesRef.current.delete(conversationId);
-          setRunningConversationIds(currentIds =>
-            currentIds.filter(currentId => currentId !== conversationId)
-          );
+      store.set(streamingMessageIdAtomFamily(conversationId), undefined);
+      runStatesRef.current.delete(conversationId);
+      setRunningConversationIds(currentIds =>
+        currentIds.filter(currentId => currentId !== conversationId)
+      );
+    };
 
-          const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
-          const runContextLength = modelOptions.find(
-            option => option.id === runModel
-          )?.contextLength;
-          const ratio = getContextRatio(latest, runContextLength);
+    const conversation = conversationStoreRef.current.conversations.find(
+      candidate => candidate.id === conversationId
+    );
+    if (conversation === undefined) {
+      cleanupRun();
+      return;
+    }
 
-          /*
-           * Only auto-compact off a usage value this run actually produced; a run that fails
-           * before any usage chunk would otherwise compact on the prior run's stale count.
-           */
-          if (currentRunHasUsage && ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
-            void compactConversation(conversationId);
+    const runMode = conversation.mode ?? defaultMode;
+    const runModel = conversation.model ?? modelOptions[0]?.id ?? '';
+    const runSelectedModel = modelOptions.find(option => option.id === runModel);
+    const runThinkingOptions = runSelectedModel?.variants ?? [];
+    const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
+    const runStateEntry = runStatesRef.current.get(conversationId);
+    if (runStateEntry === undefined) {
+      cleanupRun();
+      return;
+    }
+    const runSelectedTabId = runStateEntry.selectedTabId;
+    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+
+    try {
+      const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
+      const {
+        routes: remoteMcpRoutes,
+        tools: remoteMcpTools,
+        warning: remoteMcpWarning,
+      } = buildRemoteMcpToolDefinitions({ mode: runMode, servers: remoteMcpServers });
+      setRemoteMcpToolWarning(remoteMcpWarning);
+
+      const settings = await loadWorkflowSettings(storage);
+      if (!runState.isCurrentRun() || runState.abort.signal.aborted) {
+        return;
+      }
+
+      const { allowWorkflowsInSafeMode } = settings;
+      const workflowTools = createWorkflowToolDefinitions({
+        allowWorkflows: allowWorkflowsInSafeMode,
+        mode: runMode,
+      });
+      const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
+
+      captureEvent(MESSAGE_SENT_EVENT, { mode: runMode });
+      await runTurn({
+        apiBaseUrl,
+        appendEvents: runState.appendRunEvents,
+        conversationEvents: conversationEventsForGateway,
+        executeRemoteMcpToolCall: event =>
+          executeRemoteMcpToolCall({
+            event,
+            fetch: globalThis.fetch,
+            routes: remoteMcpRoutes,
+            servers: remoteMcpServers,
+            signal: runState.abort.signal,
+            storageArea: storage,
+          }),
+        fetch: fetchFromWindow,
+        maxToolRounds: maxAgentToolRounds,
+        model: runModel,
+        onAssistantStreaming: eventId => {
+          if (runState.isCurrentRun()) {
+            store.set(streamingMessageIdAtomFamily(conversationId), eventId);
           }
+        },
+        onUsage: runState.updateRunUsage,
+        organizationId,
+        remoteMcpTools,
+        selectedTabId: runSelectedTabId,
+        signal: runState.abort.signal,
+        supportsImages: runSelectedModel?.supportsImages === true,
+        thinkingEffort: runThinkingEffort,
+        toRemoteMcpToolCallEvents: toolCalls =>
+          toRemoteMcpToolCallEvents(toolCalls, remoteMcpRoutes),
+        token: auth.token,
+        updateAssistantMessage: runState.updateRunAssistantMessage,
+        updateThinkingBlock: runState.updateRunThinkingBlock,
+        workflowToolContext: {
+          allowWorkflowsInSafeMode,
+          evalInTab,
+          getTabUrl,
+          mode: runMode,
+          navigateTab,
+          requestApproval: (kind, draft) =>
+            requestApproval(storage, kind, draft, runState.abort.signal),
+          selectedTabId: runSelectedTabId,
+          selectedTabTitle: selectedTab?.title ?? '',
+          selectedTabUrl: selectedTab?.url ?? '',
+          signal: runState.abort.signal,
+          storage,
+        },
+        workflowTools,
+      });
+    } finally {
+      if (runState.isCurrentRun()) {
+        const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
+        const runContextLength = modelOptions.find(option => option.id === runModel)?.contextLength;
+        const ratio = getContextRatio(latest, runContextLength);
+
+        // Clean up the run state first so compactConversation's running-conversation check passes.
+        cleanupRun();
+
+        if (runState.currentRunHasUsage() && ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
+          void compactConversation(conversationId);
         }
       }
-    })();
+    }
+  };
+
+  const submitMessage = (text: string): void => {
+    const conversation = getActiveStoredConversation(conversationStoreRef.current);
+    const conversationId = conversation.id;
+    const conversationEvents = conversation.events;
+    const runSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
+      inspectableTabs,
+      selectedTabId: conversation.selectedTabId,
+    });
+    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+    const userEvent = createUserMessage(
+      text,
+      formatSystemEnvironment({
+        memories: memoriesRef.current,
+        selectedTab:
+          selectedTab === undefined
+            ? undefined
+            : { title: selectedTab.title, url: selectedTab.url },
+        workflows: workflowsRef.current,
+      })
+    );
+    const conversationWithUserMessage = [...conversationEvents, userEvent];
+
+    appendEvents(conversationId, [userEvent]);
+
+    if (runSelectedTabId === undefined) {
+      appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
+      return;
+    }
+
+    const runState = createRunState(conversationId, runSelectedTabId);
+
+    void startTurn(conversationId, conversationWithUserMessage, runState);
   };
 
   const submitDraft = (): void => {
@@ -672,6 +780,163 @@ export const AgentChatPanel = ({
   const stopRun = (): void => {
     runStatesRef.current.get(activeConversationId)?.abort.abort();
   };
+
+  const workflowRunRequest = useAtomValue(workflowRunRequestAtom);
+
+  useEffect(() => {
+    if (workflowRunRequest === undefined) {
+      return;
+    }
+    const request = workflowRunRequest;
+
+    void (async (): Promise<void> => {
+      // Clear the request first so a re-render cannot double-fire.
+      getDefaultStore().set(workflowRunRequestAtom, undefined);
+
+      const conversation = conversationStoreRef.current.conversations.find(
+        candidate => candidate.id === activeConversationId
+      );
+      if (conversation === undefined) {
+        return;
+      }
+      const conversationId = conversation.id;
+      const runModel = conversation.model ?? modelOptions[0]?.id ?? '';
+      const runSelectedTabId = getSelectedInspectableTabId({
+        activeTabId,
+        inspectableTabs,
+        selectedTabId: conversation.selectedTabId,
+      });
+
+      // Preflight gates match run button disabled states — fail silently.
+      const isCompactingNow = store.get(compactingConversationIdsAtom).includes(conversationId);
+      const isRunningNow = store.get(runningConversationIdsAtom).includes(conversationId);
+
+      if (!isConversationStoreLoaded || runModel === '' || isCompactingNow || isRunningNow) {
+        return;
+      }
+
+      if (runSelectedTabId === undefined) {
+        appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
+        return;
+      }
+
+      const runState = createRunState(conversationId, runSelectedTabId);
+
+      // Clean up the run state whenever the runner exits before calling startTurn.
+      const cleanupUnstartedRun = (): void => {
+        if (!runState.isCurrentRun()) {
+          return;
+        }
+
+        runStatesRef.current.delete(conversationId);
+        setRunningConversationIds(currentIds =>
+          currentIds.filter(currentId => currentId !== conversationId)
+        );
+        store.set(streamingMessageIdAtomFamily(conversationId), undefined);
+      };
+
+      // Build user message with system environment including workflows index.
+      const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+      const workflow = workflows.find(wf => wf.id === request.workflowId);
+      const workflowName = workflow?.name ?? 'workflow';
+      const userEvent = createUserMessage(
+        `Run the workflow "${workflowName}".`,
+        formatSystemEnvironment({
+          memories: memoriesRef.current,
+          selectedTab:
+            selectedTab === undefined
+              ? undefined
+              : { title: selectedTab.title, url: selectedTab.url },
+          workflows: workflows,
+        })
+      );
+      appendEvents(conversationId, [userEvent]);
+
+      if (runState.abort.signal.aborted) {
+        cleanupUnstartedRun();
+        return;
+      }
+
+      // Execute the workflow as a tool call and append the result.
+      const toolCall = createWorkflowToolCall({
+        arguments: {
+          workflowId: request.workflowId,
+          ...(request.input === undefined ? {} : { input: request.input }),
+        },
+        name: 'run_workflow',
+        tabId: runSelectedTabId,
+      });
+
+      // eslint-disable-next-line init-declarations -- assigned in try block before any use; catch path returns.
+      let result: Awaited<ReturnType<typeof executeWorkflowToolCall>>;
+      try {
+        const settings = await loadWorkflowSettings(storage);
+        const runMode = conversation.mode ?? defaultMode;
+        result = await executeWorkflowToolCall(toolCall, {
+          allowWorkflowsInSafeMode: settings.allowWorkflowsInSafeMode,
+          evalInTab: (tabId, code) => evalInTab(tabId, code),
+          getTabUrl: tabId => getTabUrl(tabId),
+          mode: runMode,
+          navigateTab: (tabId, url) => navigateTab(tabId, url),
+          requestApproval: (kind, draft) =>
+            requestApproval(storage, kind, draft, runState.abort.signal),
+          selectedTabId: runSelectedTabId,
+          selectedTabTitle: selectedTab?.title ?? '',
+          selectedTabUrl: selectedTab?.url ?? '',
+          signal: runState.abort.signal,
+          storage,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (runState.isCurrentRun()) {
+          appendEvents(conversationId, [
+            toolCall,
+            createToolResult({
+              error: errorMessage,
+              ok: false,
+              toolCallId: toolCall.id,
+            }),
+          ]);
+        }
+        cleanupUnstartedRun();
+        return;
+      }
+
+      if (!runState.isCurrentRun()) {
+        return;
+      }
+
+      const resultEvent = createToolResult({
+        ok: result.ok,
+        toolCallId: toolCall.id,
+        ...(result.ok ? { value: result.value } : { error: result.error }),
+      });
+      appendEvents(conversationId, [toolCall, resultEvent]);
+
+      if (runState.abort.signal.aborted || !runState.isCurrentRun()) {
+        cleanupUnstartedRun();
+        return;
+      }
+
+      const conversationEventsWithToolExchange = [
+        ...conversation.events,
+        userEvent,
+        toolCall,
+        resultEvent,
+      ];
+      void startTurn(conversationId, conversationEventsWithToolExchange, runState);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps — createRunState/startTurn/appendEvents are intentionally defined at component scope and use Refs for latest values; adding them as deps would cause an infinite render loop.
+  }, [
+    workflowRunRequest,
+    activeConversationId,
+    activeTabId,
+    inspectableTabs,
+    isConversationStoreLoaded,
+    modelOptions,
+    store,
+    workflows,
+  ]);
 
   const createConversation = (): void => {
     if (!isConversationStoreLoaded || isCreateDefaultInFlightRef.current) {

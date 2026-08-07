@@ -1,4 +1,5 @@
 import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
+import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { redirect } from 'next/navigation';
 
 export default async function Home() {
@@ -6,5 +7,5 @@ export default async function Home() {
   if (!user) {
     redirect('/users/sign_in');
   }
-  redirect(await getProfileRedirectPath(user));
+  redirect(browserLandingPath(await getProfileRedirectPath(user)));
 }

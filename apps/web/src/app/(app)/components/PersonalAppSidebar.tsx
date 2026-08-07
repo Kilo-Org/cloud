@@ -30,7 +30,6 @@ import {
   Gift,
   ChevronLeft,
   ChevronRight,
-  ChartLine,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -46,10 +45,6 @@ import { useTRPC } from '@/lib/trpc/utils';
 
 const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
-function formatReviewItemBadge(count: number | undefined): string | undefined {
-  return count && count > 0 ? count.toLocaleString('en-US') : undefined;
-}
-
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
@@ -60,12 +55,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
     })
   );
-  const { data: costInsightsAttention } = useQuery({
-    ...trpc.costInsights.getAttentionState.queryOptions(),
-    enabled: Boolean(user?.is_admin),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-  });
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -78,7 +67,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
-    badge?: string;
     className?: string;
   }> = [
     {
@@ -96,16 +84,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: ChartColumnIncreasing,
       url: '/usage',
     },
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'Cost Insights',
-            icon: ChartLine,
-            url: '/cost-insights',
-            badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
-          },
-        ]
-      : []),
   ];
 
   // KiloClaw group
@@ -286,6 +264,10 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
+  const shouldShowKiloClaw =
+    kiloClawNavStateQuery.isSuccess &&
+    (kiloClawNavStateQuery.data.hasActiveInstance ||
+      kiloClawNavStateQuery.data.hasCurrentPersonalSubscription);
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
   const [sidebarMenuOverride, setSidebarMenuOverride] = useState<{
     pathname: string;
@@ -305,24 +287,26 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     onClick?: () => void;
     isActive: boolean;
     suffixIcon?: React.ElementType;
-  }> = hasKiloClawInstance
-    ? [
-        {
-          title: 'KiloClaw',
-          icon: MessageSquare,
-          onClick: () => setSidebarMenuOverride({ pathname, menu: 'kiloClaw' }),
-          isActive: isKiloClawPath,
-          suffixIcon: ChevronRight,
-        },
-      ]
-    : [
-        {
-          title: 'KiloClaw',
-          icon: MessageSquare,
-          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
-          isActive: isKiloClawPath,
-        },
-      ];
+  }> = !shouldShowKiloClaw
+    ? []
+    : hasKiloClawInstance
+      ? [
+          {
+            title: 'KiloClaw',
+            icon: MessageSquare,
+            onClick: () => setSidebarMenuOverride({ pathname, menu: 'kiloClaw' }),
+            isActive: isKiloClawPath,
+            suffixIcon: ChevronRight,
+          },
+        ]
+      : [
+          {
+            title: 'KiloClaw',
+            icon: MessageSquare,
+            url: `${kiloClawBaseUrl}/new`,
+            isActive: isKiloClawPath,
+          },
+        ];
 
   const backItems: Array<{
     title: string;
@@ -366,7 +350,9 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         ) : (
           <>
             <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
-            <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            {kiloClawEntryItems.length > 0 && (
+              <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            )}
             {cloudItems.length > 0 && (
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}

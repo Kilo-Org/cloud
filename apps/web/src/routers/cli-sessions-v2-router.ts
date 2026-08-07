@@ -355,6 +355,12 @@ const SearchInputSchema = z.object({
   search_string: z.string().min(1),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   offset: z.number().min(0).optional().default(0),
+  /**
+   * Row offset for `useInfiniteQuery`. The tRPC TanStack integration injects
+   * the page param under `cursor` and no other key, so offset paging has to
+   * name it that. Takes precedence over `offset` when both arrive.
+   */
+  cursor: z.number().int().min(0).optional(),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
@@ -511,6 +517,22 @@ function joinWithAnd(fragments: SQL[]): SQL {
 }
 
 /**
+ * Compute the cursor (next page offset) for search paging.
+ *
+ * Returns `null` on the last page or when the current page is empty.
+ * An empty page with a stale `total` larger than `pageOffset` would return
+ * the same cursor under the naive `nextOffset < total` formula and loop
+ * loading. The `resultsLength > 0` guard prevents this.
+ */
+export function computeSearchNextCursor(
+  resultsLength: number,
+  nextOffset: number,
+  total: number
+): number | null {
+  return resultsLength > 0 && nextOffset < total ? nextOffset : null;
+}
+
+/**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
  *
@@ -608,12 +630,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       search_string,
       limit,
       offset,
+      cursor,
       orderBy,
       createdOnPlatform,
       organizationId,
       includeChildren,
       gitUrl,
     } = input;
+
+    const pageOffset = cursor ?? offset;
 
     const orderColumn =
       orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
@@ -650,7 +675,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         .where(baseWhere)
         .orderBy(desc(orderColumn))
         .limit(limit)
-        .offset(offset),
+        .offset(pageOffset),
       db
         .select({ count: sql<string>`COUNT(*)` })
         .from(cli_sessions_v2)
@@ -659,12 +684,14 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     const results = rawResults.map(projectAssociatedPr);
     const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
+    const nextOffset = pageOffset + results.length;
 
     return {
       results,
       total,
       limit,
-      offset,
+      offset: pageOffset,
+      nextCursor: computeSearchNextCursor(results.length, nextOffset, total),
     };
   }),
 
@@ -686,7 +713,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       await addOrganizationCondition(whereConditions, ctx, input.organizationId);
 
-      const { rows } = await db.execute<{ git_url: string; last_used_at: string }>(sql`
+      const { rows } = await db.execute<{
+        git_url: string;
+        last_used_at: string;
+      }>(sql`
         SELECT ${cli_sessions_v2.git_url} AS git_url, MAX(${cli_sessions_v2.updated_at}) AS last_used_at
         FROM ${cli_sessions_v2}
         WHERE ${joinWithAnd(whereConditions)}
@@ -802,7 +832,28 @@ export const cliSessionsV2Router = createTRPCRouter({
   getSessionMessagesPage: baseProcedure
     .input(GetSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
-      await getSessionWithAccessCheck(input.session_id, ctx);
+      const session = await getSessionWithAccessCheck(input.session_id, ctx);
+
+      // Read the event-log watermark from the existing getSession response
+      // before the initial history page, so the transport can use `fromId`
+      // on its first WebSocket connect instead of `replay=false`. Cursor
+      // pages skip the Cloud Agent read — the watermark is only seeded once.
+      // Failures are swallowed and return null so the page endpoint is
+      // never blocked on an optional watermark read.
+      let watermarkEventId: number | null = null;
+      if (!input.cursor && session.cloud_agent_session_id) {
+        try {
+          const authToken = generateApiToken(ctx.user);
+          const client = createCloudAgentNextClient(authToken);
+          const sessionState = await client.getSession(session.cloud_agent_session_id);
+          watermarkEventId = sessionState.latestEventId ?? null;
+        } catch (error) {
+          console.warn(
+            `Failed to fetch watermark for session ${input.session_id}:`,
+            error instanceof Error ? error.message : error
+          );
+        }
+      }
 
       let result;
       try {
@@ -839,7 +890,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      return result;
+      return { ...result, watermarkEventId };
     }),
 
   /**
@@ -1047,7 +1098,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         .limit(1);
 
       if (!row) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Session not found',
+        });
       }
 
       const { session } = row;
@@ -1190,7 +1244,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       const normalizedGitUrl = normalizeGitUrl(gitUrl);
 
       const ownerValues = session.organization_id
-        ? { owned_by_organization_id: session.organization_id, owned_by_user_id: null }
+        ? {
+            owned_by_organization_id: session.organization_id,
+            owned_by_user_id: null,
+          }
         : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
 
       const conflictTarget = session.organization_id
@@ -1342,7 +1399,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         userId: ctx.user.id,
       }).catch(error => {
         captureException(error, {
-          tags: { source: 'cli-sessions-v2-router', endpoint: 'rename-notify' },
+          tags: {
+            source: 'cli-sessions-v2-router',
+            endpoint: 'rename-notify',
+          },
           extra: { sessionId: session_id },
         });
       })

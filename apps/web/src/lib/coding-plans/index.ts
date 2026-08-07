@@ -9,18 +9,15 @@ import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
-  type MiniMaxCodingPlanCredentialValidationInput,
-  validateMiniMaxCodingPlanCredential,
+  getCodingPlanValidationResult,
+  type CodingPlanCredentialValidationInput,
+  type CodingPlanCredentialValidationResult,
+  validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, type CodingPlanId } from '@/lib/coding-plans/pricing';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { db } from '@/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
-import {
-  captureCostInsightSpend,
-  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
-} from '@kilocode/db/cost-insights-rollups';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -33,10 +30,29 @@ import {
 const logInfo = sentryLogger('coding-plans', 'info');
 const logError = sentryLogger('coding-plans', 'error');
 
-// Credential validation calls the live MiniMax API per key. Bound the fan-out so
+export class CodingPlanInventoryUploadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodingPlanInventoryUploadError';
+  }
+}
+
+function databaseConstraint(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    if ('constraint' in current && typeof current.constraint === 'string') {
+      return current.constraint;
+    }
+    current = 'cause' in current ? current.cause : null;
+  }
+  return null;
+}
+
+// Credential validation calls the live provider API per key. Bound the fan-out so
 // large inventory uploads finish within the request budget without overwhelming
 // the upstream provider with one unbounded burst of requests.
 const INVENTORY_VALIDATION_CONCURRENCY = 10;
+const BYTEPLUS_INVENTORY_VALIDATION_CONCURRENCY = 2;
 
 type CancellationReason =
   | 'user_canceled'
@@ -48,6 +64,68 @@ type SubscriptionOutcome = {
   subscriptionId: string;
   charged: boolean;
 };
+
+export type CodingPlanUsageAssignmentContext =
+  | { providerId: 'minimax'; apiKey: string }
+  | { providerId: 'byteplus-coding'; seatId: string };
+
+export async function getAssignedCodingPlanUsageContext(input: {
+  inventoryId: string;
+  userId: string;
+  planId: string;
+  providerId: string;
+}): Promise<CodingPlanUsageAssignmentContext | null> {
+  const [assignment] = await db
+    .select({
+      planId: coding_plan_key_inventory.plan_id,
+      providerId: coding_plan_key_inventory.provider_id,
+      status: coding_plan_key_inventory.status,
+      assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
+      encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
+      upstreamUsageId: coding_plan_key_inventory.upstream_usage_id,
+    })
+    .from(coding_plan_key_inventory)
+    .where(eq(coding_plan_key_inventory.id, input.inventoryId))
+    .limit(1);
+  if (
+    !assignment ||
+    assignment.status !== 'assigned' ||
+    assignment.assignedToUserId !== input.userId ||
+    assignment.planId !== input.planId ||
+    assignment.providerId !== input.providerId
+  ) {
+    return null;
+  }
+
+  if (assignment.providerId === 'byteplus-coding') {
+    return assignment.upstreamUsageId
+      ? { providerId: 'byteplus-coding', seatId: assignment.upstreamUsageId }
+      : null;
+  }
+
+  if (assignment.providerId !== 'minimax' || !assignment.encryptedApiKey) return null;
+  try {
+    return {
+      providerId: 'minimax',
+      apiKey: decryptApiKey(assignment.encryptedApiKey, BYOK_ENCRYPTION_KEY),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Kept for callers that need the direct MiniMax managed credential. BytePlus
+// usage deliberately uses getAssignedCodingPlanUsageContext so its inference
+// key is never decrypted for a quota request.
+export async function getAssignedCodingPlanApiKey(input: {
+  inventoryId: string;
+  userId: string;
+  planId: string;
+  providerId: string;
+}): Promise<string | null> {
+  const context = await getAssignedCodingPlanUsageContext(input);
+  return context?.providerId === 'minimax' ? context.apiKey : null;
+}
 
 function idempotencyFingerprint(idempotencyKey: string): string {
   return createHash('sha256').update(idempotencyKey).digest('hex');
@@ -173,19 +251,6 @@ export async function subscribeToCodingPlan(
       original_baseline_microdollars_used: lockedUser.microdollars_used,
       created_at: periodStartIso,
     });
-    await captureCostInsightSpend(tx, {
-      owner: { type: 'user', id: userId },
-      actorUserId: userId,
-      occurredAt: periodStartIso,
-      amountMicrodollars: plan.costMicrodollars,
-      category: 'scheduled',
-      source: 'coding_plan',
-      productKey: COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
-      featureKey: 'activation',
-      modelOrPlanKey: plan.planId,
-      providerKey: plan.providerId,
-    });
-
     const { rows: inventoryRows } = await tx.execute<{
       id: string;
       encrypted_api_key: { iv: string; data: string; authTag: string } | null;
@@ -267,7 +332,6 @@ export async function subscribeToCodingPlan(
 
   if (outcome.charged) {
     await evaluateUsageBonus(userId);
-    scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: userId });
   }
   logInfo('Coding plan purchase processed', {
     user_id: userId,
@@ -364,8 +428,8 @@ export async function terminateCodingPlanImmediately(
 }
 
 type InventoryCredentialValidator = (
-  input: MiniMaxCodingPlanCredentialValidationInput
-) => Promise<boolean>;
+  input: CodingPlanCredentialValidationInput
+) => Promise<CodingPlanCredentialValidationResult | boolean>;
 
 type InventoryUploadOptions = {
   validateCredential?: InventoryCredentialValidator;
@@ -376,21 +440,23 @@ type InventoryCredentialEntry = {
   upstreamPlanId: string;
 };
 
-function parseInventoryCredentialEntry(entry: string): InventoryCredentialEntry {
+function parseInventoryCredentialEntry(
+  entry: string,
+  providerId: string
+): InventoryCredentialEntry {
+  const identifierLabel =
+    providerId === 'byteplus-coding' ? 'assigned BytePlus username' : 'upstream plan id';
+  const format = `<api key>::<${identifierLabel}>`;
   const segments = entry.split('::');
   if (segments.length !== 2) {
-    throw new Error(
-      'Each MiniMax inventory entry must use the format <api key>::<upstream plan id>.'
-    );
+    throw new Error(`Each inventory entry must use the format ${format}.`);
   }
 
   const [rawApiKey, rawUpstreamPlanId] = segments;
   const apiKey = rawApiKey?.trim();
   const upstreamPlanId = rawUpstreamPlanId?.trim();
   if (!apiKey || !upstreamPlanId) {
-    throw new Error(
-      'Each MiniMax inventory entry must use the format <api key>::<upstream plan id>.'
-    );
+    throw new Error(`Each inventory entry must use the format ${format}.`);
   }
 
   return { apiKey, upstreamPlanId };
@@ -413,46 +479,73 @@ export async function uploadKeysToInventory(
     throw new Error('BYOK encryption is not configured');
   }
 
-  const entries = rawEntries.map(parseInventoryCredentialEntry);
-  const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
-  const limit = pLimit(INVENTORY_VALIDATION_CONCURRENCY);
+  const entries = rawEntries.map(entry => parseInventoryCredentialEntry(entry, providerId));
+  const validateCredential = options.validateCredential ?? validateCodingPlanCredential;
+  const limit = pLimit(
+    providerId === 'byteplus-coding'
+      ? BYTEPLUS_INVENTORY_VALIDATION_CONCURRENCY
+      : INVENTORY_VALIDATION_CONCURRENCY
+  );
   const validationResults = await Promise.all(
     entries.map(entry =>
       limit(() =>
         validateCredential({
           apiKey: entry.apiKey,
           planId: plan.planId,
+          providerId: plan.providerId,
           upstreamPlanId: entry.upstreamPlanId,
         })
       )
     )
   );
-  if (validationResults.some(isValid => !isValid)) {
+  const normalizedResults = validationResults.map(getCodingPlanValidationResult);
+  if (
+    normalizedResults.some(
+      result => !result.valid || (providerId === 'byteplus-coding' && !result.upstreamUsageId)
+    )
+  ) {
     throw new Error(
-      'One or more MiniMax credentials failed validation. Confirm plan access and supported model behavior, then try again.'
+      `One or more ${plan.providerName} credentials failed validation. Confirm plan access and supported model behavior, then try again.`
     );
   }
 
-  const inserted = await db.transaction(async tx => {
-    const result = await tx
-      .insert(coding_plan_key_inventory)
-      .values(
-        entries.map(entry => ({
-          plan_id: plan.planId,
-          provider_id: providerId,
-          upstream_plan_id: entry.upstreamPlanId,
-          encrypted_api_key: encryptApiKey(entry.apiKey, BYOK_ENCRYPTION_KEY),
-          credential_fingerprint: codingPlanCredentialFingerprint(entry.apiKey),
-          status: 'available' as const,
-        }))
-      )
-      .onConflictDoNothing({ target: coding_plan_key_inventory.credential_fingerprint });
-    const insertedCount = result.rowCount ?? 0;
-    if (insertedCount !== entries.length) {
-      throw new Error('One or more managed credentials are already present in inventory.');
+  let inserted: number;
+  try {
+    inserted = await db.transaction(async tx => {
+      const result = await tx
+        .insert(coding_plan_key_inventory)
+        .values(
+          entries.map((entry, index) => ({
+            plan_id: plan.planId,
+            provider_id: providerId,
+            upstream_plan_id: entry.upstreamPlanId,
+            upstream_usage_id: normalizedResults[index]?.upstreamUsageId ?? null,
+            encrypted_api_key: encryptApiKey(entry.apiKey, BYOK_ENCRYPTION_KEY),
+            credential_fingerprint: codingPlanCredentialFingerprint(entry.apiKey),
+            status: 'available' as const,
+          }))
+        )
+        .onConflictDoNothing({ target: coding_plan_key_inventory.credential_fingerprint });
+      const insertedCount = result.rowCount ?? 0;
+      if (insertedCount !== entries.length) {
+        throw new Error('One or more managed credentials are already present in inventory.');
+      }
+      return insertedCount;
+    });
+  } catch (error) {
+    if (error instanceof CodingPlanInventoryUploadError) throw error;
+    if (error instanceof Error && error.message.includes('already present in inventory')) {
+      throw new CodingPlanInventoryUploadError(error.message);
     }
-    return insertedCount;
-  });
+    if (databaseConstraint(error) === 'UQ_coding_plan_key_inv_provider_usage_id') {
+      throw new CodingPlanInventoryUploadError(
+        'One or more BytePlus seats are already attached to inventory.'
+      );
+    }
+    throw new CodingPlanInventoryUploadError(
+      'Unable to store Coding Plan inventory due to a database error.'
+    );
+  }
 
   logInfo('Validated managed credentials uploaded to coding plan inventory', {
     planId,
@@ -475,6 +568,26 @@ export async function getCodingPlanAvailabilityIntentPlanIds(userId: string): Pr
     .from(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
   return rows.map(row => row.planId);
+}
+
+export async function getCodingPlanAvailabilityIntentCounts(): Promise<
+  Array<{ planId: string; count: number }>
+> {
+  const { rows } = await db.execute<{ plan_id: string; count: string }>(sql`
+    SELECT intents.plan_id, COUNT(DISTINCT intents.user_id) AS count
+    FROM coding_plan_availability_intents AS intents
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM coding_plan_terms AS terms
+      WHERE terms.user_id = intents.user_id
+        AND terms.plan_id = intents.plan_id
+        AND terms.kind = 'activation'
+        AND terms.created_at >= intents.created_at
+    )
+    GROUP BY intents.plan_id
+    ORDER BY intents.plan_id
+  `);
+  return rows.map(row => ({ planId: row.plan_id, count: Number.parseInt(row.count, 10) }));
 }
 
 export async function requestCodingPlanAvailabilityNotification(

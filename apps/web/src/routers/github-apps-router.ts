@@ -32,6 +32,7 @@ import {
   getGitHubUserAuthorizationStatus,
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
+import { createInstallState } from '@/lib/integrations/github/install-state';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -86,6 +87,35 @@ export const githubAppsRouter = createTRPCRouter({
     }
     return getGitHubAppTypeForOrganization(input?.organizationId ?? null);
   }),
+
+  // Mint a one-time install state token for the signed-in user.
+  mintInstallState: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        returnTo: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Any org member can start an install, matching the pre-C1 callback,
+      // which called ensureOrganizationAccess with no role filter.
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId, [
+        'owner',
+        'billing_manager',
+        'member',
+      ]);
+      const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
+
+      const token = await createInstallState({
+        kiloUserId: ctx.user.id,
+        ownerType: owner.type,
+        ownerId: owner.id,
+        githubAppType: appType,
+        returnTo: input.returnTo ?? null,
+      });
+
+      return { token };
+    }),
 
   // Get GitHub App installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
@@ -293,7 +323,7 @@ export const githubAppsRouter = createTRPCRouter({
       });
     }
 
-    await upsertPlatformIntegrationForOwner(owner, {
+    const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
       platform: 'github',
       integrationType: 'app',
       platformInstallationId: installationId,
@@ -303,7 +333,17 @@ export const githubAppsRouter = createTRPCRouter({
       scopes: installationDetails.events,
       repositoryAccess: installationDetails.repository_selection,
       installedAt: installationDetails.created_at,
+      // Keep the integration's app type so a lite refresh is never matched
+      // against (or converted into) the standard app's row.
+      githubAppType: appType,
     });
+
+    if (!upsertResult.ok) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'This GitHub installation is already claimed by another account.',
+      });
+    }
 
     const repositories = await fetchGitHubRepositories(installationId, appType);
     await updateRepositoriesForIntegration(integration.id, repositories);
@@ -348,7 +388,7 @@ export const githubAppsRouter = createTRPCRouter({
 
       const owner = resolveOwner(ctx, input.organizationId);
 
-      await upsertPlatformIntegrationForOwner(owner, {
+      const devUpsertResult = await upsertPlatformIntegrationForOwner(owner, {
         platform: 'github',
         integrationType: 'app',
         platformInstallationId: input.installationId,
@@ -360,6 +400,13 @@ export const githubAppsRouter = createTRPCRouter({
         installedAt: installationDetails.created_at,
         githubAppType: appType,
       });
+
+      if (!devUpsertResult.ok) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This GitHub installation is already claimed by another account.',
+        });
+      }
 
       const integration = await getIntegrationForOwner(owner, 'github');
       if (integration) {

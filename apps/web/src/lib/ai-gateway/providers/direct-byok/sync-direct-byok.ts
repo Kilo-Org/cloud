@@ -11,11 +11,11 @@ import {
   VerbositySchema,
   type OpenCodeSettings,
 } from '@kilocode/db/schema-types';
+import { getAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
 import {
-  getAiSdkProvider,
-  getModelVariants,
+  getFallbackModelVariants,
   REASONING_VARIANTS_BINARY,
-} from '@/lib/ai-gateway/providers/model-settings';
+} from '@/lib/ai-gateway/providers/variants';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -196,7 +196,7 @@ export function parseModelsDevProviderModels(
       const aiSdkProvider = getAiSdkProvider(modelId, providerId);
       const variants =
         modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []) ??
-        getModelVariants(modelId);
+        (model.reasoning ? getFallbackModelVariants(modelId) : undefined);
       return {
         id: model.id,
         name: shortenDisplayName(model.name),

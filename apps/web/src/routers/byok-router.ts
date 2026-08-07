@@ -1,4 +1,5 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -158,7 +159,7 @@ export const byokRouter = createTRPCRouter({
 
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
       // Encrypt the API key
@@ -210,7 +211,7 @@ export const byokRouter = createTRPCRouter({
 
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
       // Verify key exists and belongs to the organization or user
@@ -294,7 +295,7 @@ export const byokRouter = createTRPCRouter({
       const { organizationId, id, is_enabled } = input;
 
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
       const [existingKey] = await db
@@ -372,7 +373,7 @@ export const byokRouter = createTRPCRouter({
       const { organizationId, id } = input;
 
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
       const [existingKey] = await db
@@ -477,7 +478,7 @@ export const byokRouter = createTRPCRouter({
 
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
       // Verify key exists and belongs to the organization or user

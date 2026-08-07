@@ -137,6 +137,16 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showIn: ['extension', 'cli'],
     expiresAt: '2026-03-25T08:00:00Z',
   },
+  {
+    id: 'minimax-byteplus-credits-aug-6',
+    title: 'Buy Coding Plans with Kilo Credits',
+    message: 'Buy coding plans from MiniMax & Byteplus directly with your Kilo credits.',
+    action: {
+      actionText: 'View Subscriptions',
+      actionURL: 'https://app.kilo.ai/subscriptions',
+    },
+    showIn: ['extension', 'cli'],
+  },
 ];
 
 export async function generateUserNotifications(

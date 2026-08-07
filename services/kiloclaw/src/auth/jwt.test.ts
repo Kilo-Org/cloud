@@ -126,3 +126,23 @@ describe('validateKiloToken', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('C15 deviceSessionId compatibility', () => {
+  it('accepts a token carrying deviceSessionId claim', async () => {
+    const token = await signToken({
+      kiloUserId: 'user_123',
+      apiTokenPepper: 'pepper_abc',
+      version: KILO_TOKEN_VERSION,
+      env: 'development',
+      deviceSessionId: 'session-xyz-456',
+    });
+
+    const result = await validateKiloToken(token, TEST_SECRET, 'development');
+    expect(result).toEqual({
+      success: true,
+      userId: 'user_123',
+      token,
+      pepper: 'pepper_abc',
+    });
+  });
+});

@@ -66,6 +66,43 @@ package manifests before running repository JavaScript or package scripts. Load
 | UI and product design | `DESIGN.md`, relevant app `AGENTS.md`; for `apps/web`, the `kilo-design-cloud` skill synced from `Kilo-Org/kilo-design` |
 | Contribution and PR workflow | `CONTRIBUTING.md` and relevant Git or PR skill |
 
+## Vercel Function Regions
+
+Our functions only ever run in these regions, regardless of what request metadata
+suggests:
+
+| Vercel project | Function regions |
+|---|---|
+| `kilocode-app` | Frankfurt only |
+| `kilocode-global-app` | Frankfurt and us-west (SFO) |
+
+Treat this table as the source of truth for compute location, database
+round-trip latency, and replica reasoning. If an observed region is not `fra1` or
+`sfo1`, it is a proxy/edge hop, not the function. Confirm against the Vercel
+project's region list rather than inferring from a request or log field.
+
+Region fields are not interchangeable. Per Vercel's Log Drains reference:
+
+| Field | Meaning |
+|---|---|
+| `executionRegion` | Region where the request is executed |
+| `proxy.lambdaRegion` | Region where the function executed |
+| `proxy.region` | Region where the request is **processed** — the proxy/edge hop |
+
+So a `region` field on a log's proxy object is the edge, and `executionRegion` /
+`proxy.lambdaRegion` are the function. Do not quote a bare "region" from a log
+line as the compute location without checking which of these it maps to.
+
+`x-vercel-id` mixes both: Vercel documents it as "a list of Vercel regions your
+request hit, as well as the region the function was executed in". Never read its
+leading token as the compute location, especially for requests that pass through
+a rewrite to another Vercel app, where PoP hops accumulate.
+
+`VERCEL_REGION` is documented as "the ID of the Region where the app is running",
+i.e. the function region. Given the table above it should only ever be `fra1` or
+`sfo1`, which is what makes `isUSRegion` in `apps/web/src/lib/drizzle.ts` behave
+correctly for the SFO half of `kilocode-global-app`.
+
 ## Security Baseline
 
 - Never log tokens, credentials, API keys, authentication headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` when headers must be retained or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry.

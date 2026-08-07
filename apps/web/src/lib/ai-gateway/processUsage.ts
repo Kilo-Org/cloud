@@ -1,5 +1,11 @@
 import { randomUUID } from 'crypto';
-import { db } from '../drizzle';
+import { db, isUSRegion } from '../drizzle';
+import { recordUsageInPrimaryRegion } from './usage-record-client';
+import {
+  describeDatabaseError,
+  isUsageRowConflict,
+  stackFramesUnderHeader,
+} from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -17,7 +23,7 @@ import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
@@ -34,10 +40,6 @@ import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
-import {
-  acknowledgeCostInsightRollupCapture,
-  enqueueCostInsightRollupRepair,
-} from '@/lib/cost-insights/rollup-repairs';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
@@ -60,6 +62,8 @@ import type {
   OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
+  UsageRecordInsertResult,
+  UsageRecordWriteOutcome,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import {
@@ -84,18 +88,8 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
-import {
-  acquireCostInsightOwnerHourLock,
-  acquireCostInsightOwnerHourSharedLock,
-  captureCostInsightSpend,
-  getCostInsightUtcHourStart,
-} from '@kilocode/db/cost-insights-rollups';
-import {
-  getAiGatewayCostInsightFeatureKey,
-  getAiGatewayCostInsightProductKey,
-} from '@/lib/cost-insights/canonical-sources';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
+import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 
 const posthogClient = PostHogClient();
 
@@ -141,12 +135,6 @@ const extractMessageTextContent = (m: Message) =>
       : '';
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
-
-export type UsageRecordInsertResult = {
-  usageId: string;
-  createdAt: string;
-  newMicrodollarsUsed: number | null;
-};
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
@@ -311,18 +299,67 @@ export async function logMicrodollarUsage(
   return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
+/**
+ * Dispatches the usage write to whichever side of the Atlantic the PostgreSQL
+ * primary is on.
+ *
+ * `kilocode-global-app` executes in both Frankfurt and SFO while the primary is
+ * Frankfurt-only. This write holds row locks on `kilocode_users`,
+ * `organizations` and `organization_user_usage` across several sequential
+ * statements, so from SFO the lock hold is dominated by transatlantic round
+ * trips rather than by database work — which is what turns a contended counter
+ * row into a queue and, downstream, exhausts the connection pool.
+ *
+ * Frankfurt instances keep writing directly: a Frankfurt-to-Frankfurt HTTP hop
+ * would be pure overhead and a pointless new failure mode.
+ */
 async function saveUsageRelatedData(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null
 ): Promise<UsageRecordInsertResult | null> {
+  if (isUSRegion()) {
+    const outcome = await recordUsageInPrimaryRegion({
+      core: coreUsageFields,
+      metadata: metadataFields,
+      prior_microdollar_usage,
+      posthog_distinct_id,
+    });
+    // On `unavailable` fall through to the local write. It is slow from here,
+    // but a slow billing record beats a lost one. `recordUsageInPrimaryRegion`
+    // has already reported the failure.
+    if (outcome.kind === 'ok') return outcome.result;
+  }
+
+  return saveUsageRelatedDataLocally(
+    coreUsageFields,
+    metadataFields,
+    prior_microdollar_usage,
+    posthog_distinct_id
+  );
+}
+
+/**
+ * The write itself, always executed against the primary from wherever it runs.
+ * Exported so `POST /api/internal/usage/record` can invoke it in Frankfurt.
+ */
+export async function saveUsageRelatedDataLocally(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData,
+  prior_microdollar_usage: number,
+  posthog_distinct_id: string | null
+): Promise<UsageRecordWriteOutcome | null> {
+  // `isFirst` must be evaluated before the insert — afterwards this record is
+  // itself prior usage — but the event it drives is only emitted once the insert
+  // has committed. A redelivery that arrives while the first delivery's
+  // transaction is still open cannot see the uncommitted row either, so it also
+  // computes `isFirst`; emitting here would double-count `first_usage`.
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  if (isFirst && posthog_distinct_id)
-    await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
   const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
   if (!inserted) return null;
-  if (posthog_distinct_id) {
+  if (posthog_distinct_id && !inserted.wasRedelivery) {
+    if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
     await sendFirstMicrodollarUsageEventIfNeeded(
       inserted.newMicrodollarsUsed === null
         ? null
@@ -440,6 +477,7 @@ type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
 
 type UsageStatementResult = UsageRecordInsertResult & {
   kiloPassThreshold: number | null;
+  organizationUsage?: OrganizationUsageMutationResult;
 };
 
 type UsageTransactionResult = {
@@ -469,21 +507,26 @@ async function insertUsageTransaction(
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
     await setUsageTransactionIdleTimeout(tx);
-    if (coreUsageFields.cost > 0) {
-      const owner = coreUsageFields.organization_id
-        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
-        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
-      await acquireCostInsightOwnerHourSharedLock(
-        tx,
-        owner,
-        getCostInsightUtcHourStart(coreUsageFields.created_at)
-      );
-    }
     const inserted = await insertUsageAndMetadataWithBalanceUpdate(
       tx,
       coreUsageFields,
       metadataFields
     );
+    if (coreUsageFields.organization_id) {
+      if (coreUsageFields.cost > 0) {
+        const consumption = await recordOrganizationConsumption(tx, {
+          organizationId: coreUsageFields.organization_id,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          amountMicrodollars: coreUsageFields.cost,
+          occurredAt: coreUsageFields.created_at,
+          source: 'ai-gateway',
+          sourceId: coreUsageFields.id,
+        });
+        inserted.organizationUsage = consumption.organizationUsage;
+      } else if (coreUsageFields.cost < 0) {
+        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+      }
+    }
     if (coreUsageFields.cost !== 0) {
       await enqueueDailyUsageRollupRepair(tx, {
         usageId: coreUsageFields.id,
@@ -492,43 +535,8 @@ async function insertUsageTransaction(
         createdAt: coreUsageFields.created_at,
       });
     }
-    if (coreUsageFields.cost > 0) {
-      const owner = coreUsageFields.organization_id
-        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
-        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
-      await enqueueCostInsightRollupRepair(tx, {
-        usageId: coreUsageFields.id,
-        owner,
-        occurredAt: coreUsageFields.created_at,
-      });
-    }
     return { inserted };
   });
-}
-
-const COST_INSIGHT_CAPTURE_LOCK_TIMEOUT_MS = 2_000;
-const COST_INSIGHT_CAPTURE_STATEMENT_TIMEOUT_MS = 5_000;
-const COST_INSIGHT_CAPTURE_IDLE_TRANSACTION_TIMEOUT_MS = 10_000;
-
-async function setCostInsightCaptureTimeouts(tx: UsageStatementExecutor): Promise<void> {
-  await tx.execute(sql`
-    SELECT
-      pg_catalog.set_config(
-        'lock_timeout',
-        ${`${COST_INSIGHT_CAPTURE_LOCK_TIMEOUT_MS}ms`},
-        true
-      ),
-      pg_catalog.set_config(
-        'statement_timeout',
-        ${`${COST_INSIGHT_CAPTURE_STATEMENT_TIMEOUT_MS}ms`},
-        true
-      ),
-      pg_catalog.set_config(
-        'idle_in_transaction_session_timeout',
-        ${`${COST_INSIGHT_CAPTURE_IDLE_TRANSACTION_TIMEOUT_MS}ms`},
-        true
-      )
-  `);
 }
 
 function getPostgresErrorCode(error: unknown): string | null {
@@ -553,37 +561,16 @@ function reportPostCommitFailure(
   });
 }
 
-function scheduleCostInsightEvaluationSafely(
-  owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
-  usageId: string
-): void {
-  try {
-    scheduleCostInsightEvaluationAfterSpend(owner);
-  } catch (error) {
-    reportPostCommitFailure(
-      'post-commit cost insight evaluation scheduling failed',
-      error,
-      {
-        source: 'postCommitCostInsightEvaluationScheduling',
-        ownerType: owner.type,
-      },
-      usageId
-    );
-  }
-}
-
-function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
+function organizationUsageMutationTask(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult
+): BestEffortPostCommitTask | null {
   const organizationId = usage.organization_id;
-  if (!organizationId) return null;
+  const organizationUsage = result.organizationUsage;
+  if (!organizationId || !organizationUsage) return null;
 
   return {
-    run: async () => {
-      const result: OrganizationUsageMutationResult = await db.transaction(async tx => {
-        await setCostInsightCaptureTimeouts(tx);
-        return mutateOrganizationUsage(tx, usage);
-      });
-      scheduleOrganizationLowBalanceAlert(organizationId, result);
-    },
+    run: async () => scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage),
     reportError: error => {
       reportPostCommitFailure(
         'post-commit organization usage mutation failed',
@@ -595,65 +582,11 @@ function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostC
   };
 }
 
-function costInsightSpendCaptureTask(
-  usage: MicrodollarUsage,
-  metadataFields: UsageMetaData
-): BestEffortPostCommitTask | null {
-  if (usage.cost <= 0) return null;
-
-  const owner = usage.organization_id
-    ? { type: 'organization' as const, id: usage.organization_id }
-    : { type: 'user' as const, id: usage.kilo_user_id };
-
-  return {
-    run: async () => {
-      await db.transaction(async tx => {
-        await setCostInsightCaptureTimeouts(tx);
-        await acquireCostInsightOwnerHourLock(
-          tx,
-          owner,
-          getCostInsightUtcHourStart(usage.created_at)
-        );
-        if (!(await acknowledgeCostInsightRollupCapture(tx, usage.id))) return;
-        await captureCostInsightSpend(tx, {
-          owner,
-          actorUserId: usage.kilo_user_id,
-          occurredAt: usage.created_at,
-          amountMicrodollars: usage.cost,
-          category: 'variable',
-          source: 'ai_gateway',
-          productKey: getAiGatewayCostInsightProductKey(metadataFields.feature),
-          featureKey: getAiGatewayCostInsightFeatureKey(metadataFields.api_kind),
-          modelOrPlanKey: usage.requested_model || usage.model || 'other',
-          providerKey: usage.inference_provider || usage.provider || 'other',
-        });
-      });
-      scheduleCostInsightEvaluationSafely(owner, usage.id);
-    },
-    reportError: async error => {
-      reportPostCommitFailure(
-        'post-commit cost insight spend capture failed',
-        error,
-        {
-          source: 'postCommitCostInsightSpendCapture',
-          spendCategory: 'variable',
-          spendSource: 'ai_gateway',
-          ownerType: owner.type,
-        },
-        usage.id
-      );
-    },
-  };
-}
-
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  result: UsageStatementResult
 ): Promise<void> {
-  const tasks = [
-    organizationUsageMutationTask(usage),
-    costInsightSpendCaptureTask(usage, metadataFields),
-  ].filter(task => task !== null);
+  const tasks = [organizationUsageMutationTask(usage, result)].filter(task => task !== null);
   await runBestEffortPostCommitTasks(tasks);
 }
 
@@ -687,10 +620,57 @@ function scheduleKiloPassBonusIfNeeded(
   });
 }
 
+/**
+ * Identity of an already-persisted usage row, or null if it is not there.
+ *
+ * The same record can still reach this write twice. `recordUsageInPrimaryRegion`
+ * no longer retries an attempt timeout — doing so was the dominant source of
+ * collisions — but on timeout it falls back to writing locally with the same
+ * `core.id` while the remote delivery may still be committing. The losing
+ * transaction then collides on the `microdollar_usage` primary key and rolls back
+ * in full, so the usage is billed exactly once. Reporting that as a failure would
+ * make callers treat billed usage as unrecorded and skip dependent writes.
+ *
+ * The row's presence under this user is the proof, not the PostgreSQL error code:
+ * `id` is generated per delivery by `toInsertableDbUsageRecord`, and the row can
+ * only be visible if a delivery of this exact record committed its whole
+ * transaction. A deadlock victim that is retried into the collision therefore
+ * recovers the same way a plain primary-key violation does.
+ *
+ * `newMicrodollarsUsed` is not reconstructable here and is only consumed by
+ * best-effort PostHog attribution and the Kilo Pass threshold, both of which run
+ * on the delivery that committed.
+ */
+async function findAlreadyRecordedUsage(
+  coreUsageFields: MicrodollarUsage
+): Promise<UsageRecordWriteOutcome | null> {
+  const existing = await db
+    .select({ id: microdollar_usage.id })
+    .from(microdollar_usage)
+    .where(
+      and(
+        eq(microdollar_usage.id, coreUsageFields.id),
+        eq(microdollar_usage.kilo_user_id, coreUsageFields.kilo_user_id)
+      )
+    )
+    .limit(1);
+  if (existing.length === 0) return null;
+
+  // Report the JS-side identity, not the DB-returned timestamp: PostgreSQL
+  // renders `created_at` as "2026-04-29 01:16:12.945+00", which is not strict
+  // ISO 8601 and fails downstream datetime validators.
+  return {
+    usageId: coreUsageFields.id,
+    createdAt: coreUsageFields.created_at,
+    newMicrodollarsUsed: null,
+    wasRedelivery: true,
+  };
+}
+
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<UsageRecordInsertResult | null> {
+): Promise<UsageRecordWriteOutcome | null> {
   try {
     const result = await startSpan(
       {
@@ -705,11 +685,18 @@ export async function insertUsageRecord(
             // Every retry opens a fresh transaction for the usage and balance write.
             return await insertUsageTransaction(coreUsageFields, metadataFields);
           } catch (error) {
-            if (attempt >= 2) throw error;
-            sentryLogger('insertUsageRecord', 'warning')(
-              'insertUsageRecord concurrency failure',
-              error
-            );
+            // A collision on this record's own id can never be resolved by
+            // retrying — `id` is fixed for the delivery — so stop immediately and
+            // let the outer handler recover the committed row's identity. Retrying
+            // it burned three attempts and rebuilt the statement each time.
+            if (attempt >= 2 || isUsageRowConflict(error)) throw error;
+            // Never log the raw error: its message is the interpolated statement,
+            // roughly 30KB including prompt prefixes and the client IP.
+            sentryLogger('insertUsageRecord', 'warning')('insertUsageRecord concurrency failure', {
+              usageId: coreUsageFields.id,
+              attempt,
+              error: describeDatabaseError(error),
+            });
             await new Promise(r => setTimeout(r, Math.random() * 100));
             attempt++;
           }
@@ -717,23 +704,44 @@ export async function insertUsageRecord(
       }
     );
 
-    await runPostCommitUsageWork(coreUsageFields, metadataFields);
+    await runPostCommitUsageWork(coreUsageFields, result.inserted);
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
     return {
       usageId: result.inserted.usageId,
       createdAt: result.inserted.createdAt,
       newMicrodollarsUsed: result.inserted.newMicrodollarsUsed,
+      wasRedelivery: false,
     };
   } catch (error) {
-    console.error('insertUsageRecord failed', error);
-    captureException(error, {
+    // The lookup itself is best-effort: it must never mask the original failure,
+    // and it throws for a malformed `id`, which is a genuine failed write.
+    const alreadyRecorded = await findAlreadyRecordedUsage(coreUsageFields).catch(() => null);
+    if (alreadyRecorded) {
+      // Not an exception: this is the designed outcome of a redelivered write.
+      sentryLogger('insertUsageRecord', 'warning')(
+        'insertUsageRecord received a redelivery of an already-recorded usage id',
+        { usageId: coreUsageFields.id }
+      );
+      return alreadyRecorded;
+    }
+    // Report the redacted description rather than `error`, whose message carries
+    // the interpolated statement and its parameters. Only the original stack's
+    // frames are carried over: `error.stack` begins with `name: message`, so
+    // copying it verbatim would put the message straight back into the event.
+    const described = describeDatabaseError(error);
+    console.error('insertUsageRecord failed', { usageId: coreUsageFields.id, error: described });
+    const summary = `insertUsageRecord failed (code=${described.code ?? 'unknown'} constraint=${described.constraint ?? 'none'})`;
+    const redacted = new Error(summary);
+    redacted.stack = stackFramesUnderHeader(error, `Error: ${summary}`);
+    captureException(redacted, {
       tags: {
         source: 'insertUsageRecord',
         spendCategory: 'variable',
         spendSource: 'ai_gateway',
         ownerType: coreUsageFields.organization_id ? 'organization' : 'user',
+        databaseErrorCode: described.code ?? 'unknown',
       },
-      extra: { sourceRecordId: coreUsageFields.id },
+      extra: { sourceRecordId: coreUsageFields.id, databaseError: described },
     });
     return null;
   }

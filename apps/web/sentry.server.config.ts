@@ -4,6 +4,7 @@
 // But note tricky corner cases using vercel otel with sentry:
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 
+import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
 
 type DrizzleQueryError = Error & {
@@ -78,6 +79,99 @@ function isTRPC4xxError(error: unknown): boolean {
   );
 }
 
+// The GitHub OAuth callback uses `state` as a short-lived bearer token, and the
+// mobile app handoff carries a C1 bearer in `installState`. Sentry's automatic
+// request-data integration can capture either in the request URL or query
+// string, so strip both from both while keeping the rest of the request data.
+const REDACTED_QUERY_KEYS = new Set(['state', 'installState'].map(key => key.toLowerCase()));
+
+// Decode a raw query key the way URLSearchParams would, so percent-encoded
+// forms of the key are compared against their decoded value. Malformed
+// percent-encoding is not the redacted key and is left in its raw form.
+function decodeQueryKey(rawKey: string): string {
+  try {
+    return decodeURIComponent(rawKey.replace(/\+/g, ' '));
+  } catch {
+    return rawKey;
+  }
+}
+
+// One decoded-key predicate for every query form: URL, string, array, and
+// object. Keys are matched after URL-decoding and case-folding so percent-
+// encoded (`%73tate`) and mixed-case (`State`) forms cannot survive.
+function isRedactedQueryKey(rawKey: string): boolean {
+  return REDACTED_QUERY_KEYS.has(decodeQueryKey(rawKey).toLowerCase());
+}
+
+type SentryRequest = NonNullable<Event['request']>;
+type SentryQueryString = NonNullable<SentryRequest['query_string']>;
+
+function sanitizeStringQuery(queryString: string): string {
+  return queryString
+    .split('&')
+    .filter(part => !isRedactedQueryKey(part.split('=', 1)[0]))
+    .join('&');
+}
+
+// Relative URLs cannot be parsed with `new URL`; split off the query string
+// manually, reuse the same sanitizer, and preserve any fragment.
+function sanitizeRelativeRequestUrl(url: string): string {
+  const hashIndex = url.indexOf('#');
+  const fragment = hashIndex === -1 ? '' : url.slice(hashIndex);
+  const pathAndQuery = hashIndex === -1 ? url : url.slice(0, hashIndex);
+  const queryIndex = pathAndQuery.indexOf('?');
+  if (queryIndex === -1) {
+    return url;
+  }
+  const path = pathAndQuery.slice(0, queryIndex);
+  const sanitizedQuery = sanitizeStringQuery(pathAndQuery.slice(queryIndex + 1));
+  return sanitizedQuery.length > 0 ? `${path}?${sanitizedQuery}${fragment}` : `${path}${fragment}`;
+}
+
+function sanitizeRequestUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    for (const [key] of Array.from(parsed.searchParams)) {
+      if (isRedactedQueryKey(key)) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return sanitizeRelativeRequestUrl(url);
+  }
+}
+
+function sanitizeQueryString(queryString: SentryQueryString): SentryQueryString {
+  if (typeof queryString === 'string') {
+    return sanitizeStringQuery(queryString);
+  }
+  if (Array.isArray(queryString)) {
+    return queryString.filter(([key]) => !isRedactedQueryKey(key));
+  }
+  const kept: Record<string, string> = {};
+  for (const [key, value] of Object.entries(queryString)) {
+    if (!isRedactedQueryKey(key)) {
+      kept[key] = value;
+    }
+  }
+  return kept;
+}
+
+export function sanitizeSentryRequestData(event: Event): Event {
+  const request = event.request;
+  if (!request) {
+    return event;
+  }
+  if (typeof request.url === 'string') {
+    request.url = sanitizeRequestUrl(request.url);
+  }
+  if (request.query_string !== undefined) {
+    request.query_string = sanitizeQueryString(request.query_string);
+  }
+  return event;
+}
+
 if (process.env.NODE_ENV !== 'development') {
   init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -149,6 +243,11 @@ if (process.env.NODE_ENV !== 'development') {
           }
         }
       }
+
+      // Automatic request data can retain the GitHub OAuth `state` token or the
+      // app-flow `installState` bearer in the request URL or query string; strip
+      // them while keeping the rest.
+      sanitizeSentryRequestData(event);
 
       return event;
     },

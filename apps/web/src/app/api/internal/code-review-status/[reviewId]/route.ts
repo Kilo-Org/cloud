@@ -17,7 +17,7 @@
  */
 
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import * as z from 'zod';
 import {
   updateCodeReviewStatus,
@@ -52,15 +52,15 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import {
-  getValidGitLabProjectAccessToken,
-  getValidGitLabToken,
-} from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import {
+  getGitLabInstanceUrl,
+  resolveGitLabAccessToken,
+} from '@/lib/code-reviews/platform/gitlab-access';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
@@ -895,13 +895,36 @@ function getGitLabStatusDescription(
   return undefined;
 }
 
-async function upsertModelNotFoundSummary(
+/**
+ * Replace the PR summary comment with an outcome notice, collapsing whatever it
+ * held into the review history block first.
+ *
+ * A run that fails never reaches the agent's own comment update, so without this
+ * the thread still shows the previous run's summary as though it were current.
+ * Composing through `appendPreviousReviewSummaryHistory` keeps the same
+ * accumulating history the success path builds: each run's summary, review or
+ * failure notice, is pushed into the collapsed block rather than discarded.
+ *
+ * `notice` is trusted, pre-authored markdown. Never pass a raw `error_message`:
+ * this is published to the pull request, which may be public.
+ */
+async function upsertFailureSummaryComment(
   review: CloudAgentCodeReview,
   integration: PlatformIntegration,
+  notice: string,
   gitlabAccessToken?: string
 ): Promise<void> {
   const platform = parseCodeReviewPlatform(review.platform);
   if (platform === PLATFORM.BITBUCKET) return;
+
+  // `previous_summary_body` is snapshotted at dispatch, before the agent runs,
+  // so it is already populated by the time a failure lands here.
+  const body = appendPreviousReviewSummaryHistory(
+    notice,
+    review.previous_summary_body,
+    review.previous_summary_head_sha,
+    { maxBodyCharacters: GITHUB_COMMENT_MAX_CHARACTERS }
+  );
 
   if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
     const [repoOwner, repoName] = review.repo_full_name.split('/');
@@ -920,7 +943,7 @@ async function upsertModelNotFoundSummary(
         repoOwner,
         repoName,
         existing.commentId,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        body,
         appType
       );
     } else {
@@ -929,13 +952,13 @@ async function upsertModelNotFoundSummary(
         repoOwner,
         repoName,
         review.pr_number,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        body,
         appType
       );
     }
 
     logExceptInTest(
-      `[code-review-status] Upserted model unavailable summary on ${review.repo_full_name}#${review.pr_number}`
+      `[code-review-status] Upserted failure summary on ${review.repo_full_name}#${review.pr_number}`
     );
     return;
   }
@@ -958,59 +981,17 @@ async function upsertModelNotFoundSummary(
         review.repo_full_name,
         review.pr_number,
         existing.noteId,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        body,
         instanceUrl
       );
     } else {
-      await createMRNote(
-        accessToken,
-        review.repo_full_name,
-        review.pr_number,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
-        instanceUrl
-      );
+      await createMRNote(accessToken, review.repo_full_name, review.pr_number, body, instanceUrl);
     }
 
     logExceptInTest(
-      `[code-review-status] Upserted model unavailable summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+      `[code-review-status] Upserted failure summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
     );
   }
-}
-
-/**
- * Resolves a GitLab access token for a review's project.
- * Uses the exact project credential when a project ID is present.
- */
-async function resolveGitLabAccessToken(
-  integration: PlatformIntegration,
-  projectId: number | null
-): Promise<string> {
-  let userId: string;
-  let organizationId: string | undefined;
-  if (integration.owned_by_organization_id) {
-    organizationId = integration.owned_by_organization_id;
-    const botUserId = await getBotUserId(organizationId, 'code-review');
-    if (!botUserId) throw new Error('GitLab organization has no configured acting user');
-    userId = botUserId;
-  } else if (integration.owned_by_user_id) {
-    userId = integration.owned_by_user_id;
-  } else {
-    throw new Error('GitLab integration has no owner');
-  }
-  const actor = { userId, ...(organizationId ? { organizationId } : {}) };
-  return projectId
-    ? await getValidGitLabProjectAccessToken(integration, projectId, actor)
-    : await getValidGitLabToken(integration, actor);
-}
-
-/**
- * Extracts the GitLab instance URL from an integration's metadata.
- */
-function getGitLabInstanceUrl(integration: PlatformIntegration): string {
-  const metadata = integration.metadata as {
-    gitlab_instance_url?: string;
-  } | null;
-  return metadata?.gitlab_instance_url || 'https://gitlab.com';
 }
 
 /**
@@ -1631,17 +1612,32 @@ export async function POST(
       }
     }
 
-    if (integration && isModelNotFoundCancellation) {
+    // Outcome notice for the PR thread. Only reasons with authored copy qualify:
+    // the notice is published to a possibly public repository, so raw error
+    // messages are deliberately never surfaced here. Billing and action-required
+    // failures are excluded because they own separate comment paths that also
+    // disable Code Reviewer, and posting both would double up on the thread.
+    const failureSummaryNotice = isModelNotFoundCancellation
+      ? MODEL_NOT_FOUND_SUMMARY_BODY
+      : status === 'failed' &&
+          !getActionRequiredTerminalReason(terminalReason, errorMessage) &&
+          !isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+        ? (getCodeReviewTerminalReasonCopy(terminalReason)?.summaryBody ?? null)
+        : null;
+
+    if (integration && failureSummaryNotice) {
       try {
-        await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
-      } catch (summaryError) {
-        logExceptInTest(
-          '[code-review-status] Failed to upsert model unavailable summary:',
-          summaryError
+        await upsertFailureSummaryComment(
+          review,
+          integration,
+          failureSummaryNotice,
+          gitlabAccessToken
         );
+      } catch (summaryError) {
+        logExceptInTest('[code-review-status] Failed to upsert failure summary:', summaryError);
         captureException(summaryError, {
-          tags: { source: 'code-review-status-model-not-found-summary' },
-          extra: { reviewId, platform: reviewPlatform },
+          tags: { source: 'code-review-status-failure-summary' },
+          extra: { reviewId, platform: reviewPlatform, terminalReason: terminalReason ?? null },
         });
       }
     }
@@ -1658,17 +1654,25 @@ export async function POST(
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
       const ownerResolution = await getTerminalOwnerResolution();
       if (ownerResolution?.canDispatch) {
-        // Trigger dispatch in background (don't await - fire and forget)
-        tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
-          errorExceptInTest(
-            '[code-review-status] Error dispatching pending reviews:',
-            dispatchError
-          );
-          captureException(dispatchError, {
-            tags: { source: 'code-review-status-dispatch' },
-            extra: { reviewId, owner: ownerResolution.owner },
-          });
-        });
+        // Start dispatch immediately (don't wait behind the remaining
+        // provider work below), but hand the promise to `after()` so Vercel
+        // keeps the serverless invocation alive until it settles instead of
+        // freezing it once the response is sent. That freeze is what
+        // produced spurious worker-call/status-probe timeouts (in-flight
+        // fetches stall while the function is suspended).
+        const dispatchPromise = tryDispatchPendingReviews(ownerResolution.owner).catch(
+          dispatchError => {
+            errorExceptInTest(
+              '[code-review-status] Error dispatching pending reviews:',
+              dispatchError
+            );
+            captureException(dispatchError, {
+              tags: { source: 'code-review-status-dispatch' },
+              extra: { reviewId, owner: ownerResolution.owner },
+            });
+          }
+        );
+        after(dispatchPromise);
 
         logExceptInTest('[code-review-status] Triggered dispatch for pending reviews', {
           reviewId,

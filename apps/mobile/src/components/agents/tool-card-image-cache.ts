@@ -1,6 +1,8 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
 
+import { getSafeCacheFilename } from '@/lib/share-remote-file';
+
 const CACHE_DIR_NAME = 'tool-card-images';
 
 /** part ids currently writing or already written this process lifetime */
@@ -41,15 +43,28 @@ function ensureCacheDirectory(): Directory {
 }
 
 /**
- * Map an image mime to a file extension.
- * `image/jpeg` → `jpg`; other `image/*` subtypes use the subtype as-is.
+ * Map any MIME type to a file extension.
+ * `image/jpeg` → `jpg`; `application/pdf` → `pdf`; `text/plain` → `txt`.
+ * Falls back to `bin` when the MIME has no slash or an empty subtype.
  */
-export function extensionForImageMime(mime: string): string {
-  const subtype = mime.slice('image/'.length).toLowerCase();
+export function extensionForMime(mime: string): string {
+  const slashIdx = mime.indexOf('/');
+  if (slashIdx === -1) {
+    return 'bin';
+  }
+  const subtype = mime.slice(slashIdx + 1).toLowerCase();
   if (subtype === 'jpeg') {
     return 'jpg';
   }
   return subtype.length > 0 ? subtype : 'bin';
+}
+
+/**
+ * Map an image mime to a file extension.
+ * `image/jpeg` → `jpg`; other `image/*` subtypes use the subtype as-is.
+ */
+export function extensionForImageMime(mime: string): string {
+  return extensionForMime(mime);
 }
 
 /**
@@ -70,18 +85,42 @@ export function stripDataUrlBase64Prefix(dataUrl: string, mime: string): string 
   return dataUrl.slice(prefix.length);
 }
 
+/** Marker inserted before the extension so `getSafeCacheFilename`-processed
+ *  filenames can be restored to legacy `<partId>.<extension>` naming. */
+const DOT_MARKER = '_DOT_';
+
+function cacheFilenameForAttachment(partId: string, mime: string, filename?: string): string {
+  if (filename) {
+    return getSafeCacheFilename({ id: partId, filename });
+  }
+  const safe = getSafeCacheFilename({
+    id: partId,
+    filename: `${DOT_MARKER}${extensionForMime(mime)}`,
+  });
+  const pattern = DOT_MARKER.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return safe.replace(new RegExp(`-${pattern}(?!.*-${pattern})`), '.');
+}
+
 function recordUri(partId: string, uri: string): void {
   urisByPartId.set(partId, uri);
   emitChange();
 }
 
 /**
- * Fire-and-forget sink for completed tool-part image attachments.
- * Never throws. First image attachment wins for a multi-image part (no tool
- * emits multi-image parts today; documented, not handled specially beyond
+ * Fire-and-forget sink for completed tool-part attachments.
+ * Never throws. First attachment wins for a multi-attachment part (no tool
+ * emits multi-attachment parts today; documented, not handled specially beyond
  * the part-id Set which also covers that case).
+ *
+ * When `filename` is provided (non-image attachments), the cache filename is
+ * derived via `getSafeCacheFilename`. When absent (images), the legacy
+ * `partId.extensionForImageMime(mime)` naming is used. The partId→uri map and
+ * first-wins dedupe are unchanged.
  */
-export function cacheToolCardImage(partId: string, mime: string, dataUrl: string): void {
+export function cacheToolAttachment(
+  partId: string,
+  { mime, dataUrl, filename }: Readonly<{ mime: string; dataUrl: string; filename?: string }>
+): void {
   try {
     if (inFlightOrDone.has(partId)) {
       return;
@@ -97,8 +136,8 @@ export function cacheToolCardImage(partId: string, mime: string, dataUrl: string
     }
 
     const directory = ensureCacheDirectory();
-    const filename = `${partId}.${extensionForImageMime(mime)}`;
-    const file = new File(directory, filename);
+    const cacheFilename = cacheFilenameForAttachment(partId, mime, filename);
+    const file = new File(directory, cacheFilename);
 
     if (file.exists) {
       recordUri(partId, file.uri);
@@ -110,6 +149,16 @@ export function cacheToolCardImage(partId: string, mime: string, dataUrl: string
   } catch {
     inFlightOrDone.delete(partId);
   }
+}
+
+/**
+ * Backward-compatible alias. Calls {@link cacheToolAttachment} without a
+ * filename, using the legacy extension-based naming. Kept for existing
+ * consumers that don't pass a filename (call sites that only handle images).
+ *
+ */
+export function cacheToolCardImage(partId: string, mime: string, dataUrl: string): void {
+  cacheToolAttachment(partId, { mime, dataUrl });
 }
 
 /** Synchronous lookup used by the hook and by tests. */

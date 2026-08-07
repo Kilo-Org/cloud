@@ -207,8 +207,9 @@ export function SettingsClient({ wastelandId }: Props) {
       <Button
         onClick={handleSave}
         disabled={updateConfig.isPending}
+        variant="default"
         size="sm"
-        className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+        className="gap-1.5"
       >
         <Save className="size-3.5" />
         {updateConfig.isPending ? 'Saving...' : 'Save'}

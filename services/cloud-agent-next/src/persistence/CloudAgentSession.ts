@@ -97,6 +97,7 @@ import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-mo
 import { dispatchedKilocodeModelId } from './model-utils.js';
 
 import { resolveSecret, validateStreamTicket } from '../auth.js';
+import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
@@ -955,16 +956,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.ingestHandler;
   }
 
-  private isAllowedWebSocketOrigin(origin: string | null): boolean {
-    const allowedOrigins = (this.env.WS_ALLOWED_ORIGINS || '')
-      .split(',')
-      .map(value => value.trim())
-      .filter(Boolean);
-
-    const isRealOrigin = origin !== null && origin !== 'null';
-    return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
-  }
-
   // ---------------------------------------------------------------------------
   // HTTP/WebSocket Routing
   // ---------------------------------------------------------------------------
@@ -982,7 +973,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const ticket = url.searchParams.get('ticket');
       const origin = request.headers.get('Origin');
 
-      if (!this.isAllowedWebSocketOrigin(origin)) {
+      if (!isAllowedStreamWebSocketOrigin(origin, this.env.WS_ALLOWED_ORIGINS || '')) {
         logger
           .withFields({ origin, sessionId: sessionIdParam })
           .warn('DO /stream: Origin not allowed');
@@ -1354,6 +1345,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const metadata = await this.getMetadata();
     if (!metadata?.auth.kiloSessionId) return null;
     return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.auth.kiloSessionId);
+  }
+
+  /**
+   * Get the latest persisted event ID from the event log.
+   *
+   * Returns `null` when the DO has a pending deletion intent or when no
+   * events have been persisted yet.
+   */
+  async getLatestEventId(): Promise<number | null> {
+    if (await this.hasDeletionIntent()) return null;
+    return this.eventQueries.getLatestEventId();
   }
 
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {

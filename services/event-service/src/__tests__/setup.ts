@@ -5,7 +5,7 @@ vi.mock('@kilocode/db/client', () => ({
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [{ api_token_pepper: null }],
+          limit: async () => [{ api_token_pepper: null, blocked_reason: null }],
         }),
       }),
     }),

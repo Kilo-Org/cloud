@@ -172,6 +172,32 @@ async function requireOrgInstance(userId: string, orgId: string) {
   return instance;
 }
 
+async function hasCurrentOrganizationKiloClawSubscription(userId: string, orgId: string) {
+  const rows = await db
+    .select({ subscription: kiloclaw_subscriptions })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.organization_id, orgId)
+      )
+    );
+
+  return rows.some(
+    row => row.subscription.status === 'active' && row.subscription.suspended_at === null
+  );
+}
+
+function throwKiloClawProvisioningUnavailable(): never {
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'A current KiloClaw subscription is required to provision an instance.',
+  });
+}
+
 // ── Input schemas ──────────────────────────────────────────────────
 
 const kilocodeDefaultModelSchema = z
@@ -430,9 +456,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
   }),
 
   getNavState: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    const [instance, hasCurrentSubscription] = await Promise.all([
+      getActiveOrgInstance(ctx.user.id, input.organizationId),
+      hasCurrentOrganizationKiloClawSubscription(ctx.user.id, input.organizationId),
+    ]);
     return {
       hasActiveInstance: instance !== null,
+      hasCurrentSubscription,
     };
   }),
 
@@ -498,6 +528,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
           code: 'CONFLICT',
           message: 'You already have an active KiloClaw instance in this organization',
         });
+      }
+
+      if (!(await hasCurrentOrganizationKiloClawSubscription(ctx.user.id, input.organizationId))) {
+        throwKiloClawProvisioningUnavailable();
       }
 
       const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);

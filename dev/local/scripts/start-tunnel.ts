@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const devVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
@@ -155,190 +156,211 @@ function prefixAndWrite(label: string, chunk: Buffer): void {
   }
 }
 
-const port = process.argv[2] ?? '3000';
-const controllerPort = process.argv[3] ?? '8795';
-const kiloChatPort = process.argv[4] ?? '8808';
-const config = loadTunnelConfig();
-const provider = loadKiloClawProvider();
-
-const children: Array<{ label: string; child: ReturnType<typeof spawn> }> = [];
-
-function trackChild(label: string, child: ReturnType<typeof spawn>): void {
-  children.push({ label, child });
-}
-
-function stopAllChildren(signal: NodeJS.Signals): void {
-  for (const { child } of children) {
-    child.kill(signal);
-  }
-}
-
-let exiting = false;
-
-function exitAndStopOthers(originLabel: string, code: number | null): void {
-  if (exiting) return;
-  exiting = true;
-  for (const { label, child } of children) {
-    if (label !== originLabel) {
-      child.kill('SIGTERM');
-    }
-  }
-  process.exit(code ?? 1);
-}
-
-function startQuickTunnel(options: {
-  label: string;
-  localPort: string;
-  onUrl: (url: string) => void;
-}): void {
-  const { label, localPort, onUrl } = options;
-  const child = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${localPort}`], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  trackChild(label, child);
-
-  console.log(`Starting quick tunnel (${label}) -> http://localhost:${localPort}...`);
-
-  let captured = false;
-  const urlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
-  const handleOutput = (data: Buffer) => {
-    prefixAndWrite(label, data);
-
-    if (captured) return;
-    const match = data.toString().match(urlPattern);
-    if (!match) return;
-
-    captured = true;
-    onUrl(match[0]);
+export function buildDockerLocalEnvValues(
+  port: string,
+  controllerPort: string,
+  kiloChatPort: string
+): Record<string, string> {
+  return {
+    BACKEND_API_URL: `http://localhost:${port}`,
+    KILOCODE_API_BASE_URL: `http://${DOCKER_HOST_INTERNAL}:${port}/api/gateway/`,
+    KILOCLAW_CHECKIN_URL: `http://${DOCKER_HOST_INTERNAL}:${controllerPort}/api/controller/checkin`,
+    KILOCHAT_BASE_URL: `http://${DOCKER_HOST_INTERNAL}:${kiloChatPort}`,
   };
-
-  child.stdout.on('data', handleOutput);
-  child.stderr.on('data', handleOutput);
-  child.on('close', code => exitAndStopOthers(label, code));
 }
 
-if (provider === DOCKER_LOCAL_PROVIDER) {
-  const apiUrl = `http://${DOCKER_HOST_INTERNAL}:${port}/api/gateway/`;
-  const checkinUrl = `http://${DOCKER_HOST_INTERNAL}:${controllerPort}/api/controller/checkin`;
-  const kiloChatUrl = `http://${DOCKER_HOST_INTERNAL}:${kiloChatPort}`;
+function main(): void {
+  const port = process.argv[2] ?? '3000';
+  const controllerPort = process.argv[3] ?? '8795';
+  const kiloChatPort = process.argv[4] ?? '8808';
+  const config = loadTunnelConfig();
+  const provider = loadKiloClawProvider();
 
-  updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
-  updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
-  updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatUrl);
+  const children: Array<{ label: string; child: ReturnType<typeof spawn> }> = [];
 
-  console.log('Docker-local provider detected; skipping Cloudflare quick tunnels.');
-  console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
-  console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
-  console.log(`Set KILOCHAT_BASE_URL=${kiloChatUrl}`);
+  function trackChild(label: string, child: ReturnType<typeof spawn>): void {
+    children.push({ label, child });
+  }
 
-  setInterval(() => undefined, 60_000);
-} else if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
-  console.error(
-    'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
-  );
-  process.exit(1);
-}
-
-if (provider !== DOCKER_LOCAL_PROVIDER && (config.tunnelName || config.tunnelConfig)) {
-  const label = 'kiloclaw-tunnel';
-  const args = config.tunnelConfig
-    ? ['tunnel', '--config', config.tunnelConfig, 'run']
-    : ['tunnel', 'run', config.tunnelName];
-  const child = spawn('cloudflared', args, {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  trackChild(label, child);
-
-  const appOrigin = originFromHostname(config.appHostname);
-  const kiloclawOrigin = originFromHostname(config.kiloclawHostname);
-  const kiloChatOrigin = originFromHostname(config.kiloChatHostname);
-
-  console.log(
-    `Named tunnel: ${config.tunnelConfig || config.tunnelName}` +
-      `${appOrigin ? `\n  app      -> ${appOrigin}` : ''}` +
-      `${kiloclawOrigin ? `\n  kiloclaw -> ${kiloclawOrigin}` : ''}` +
-      `${kiloChatOrigin ? `\n  kilochat -> ${kiloChatOrigin}` : ''}`
-  );
-
-  if (appOrigin) {
-    const apiUrl = `${appOrigin}/api/gateway/`;
-    updateEnvValue(devVarsPath, 'BACKEND_API_URL', appOrigin);
-    updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
-    console.log(`Set BACKEND_API_URL=${appOrigin}`);
-    console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
-
-    if (config.updateAppEnv) {
-      updateEnvValue(envLocalPath, 'APP_URL_OVERRIDE', appOrigin);
-      updateEnvValue(envLocalPath, 'NEXTAUTH_URL', appOrigin);
-      console.log(`Set APP_URL_OVERRIDE=${appOrigin}`);
-      console.log(`Set NEXTAUTH_URL=${appOrigin}`);
+  function stopAllChildren(signal: NodeJS.Signals): void {
+    for (const { child } of children) {
+      child.kill(signal);
     }
   }
 
-  if (kiloclawOrigin) {
-    const checkinUrl = `${kiloclawOrigin}/api/controller/checkin`;
-    updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
-    console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+  let exiting = false;
 
-    if (config.updateAppEnv) {
-      updateEnvValue(envLocalPath, 'KILOCLAW_API_URL', kiloclawOrigin);
-      console.log(`Set KILOCLAW_API_URL=${kiloclawOrigin}`);
+  function exitAndStopOthers(originLabel: string, code: number | null): void {
+    if (exiting) return;
+    exiting = true;
+    for (const { label, child } of children) {
+      if (label !== originLabel) {
+        child.kill('SIGTERM');
+      }
     }
+    process.exit(code ?? 1);
   }
 
-  if (kiloChatOrigin) {
-    updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatOrigin);
-    console.log(`Set KILOCHAT_BASE_URL=${kiloChatOrigin}`);
+  function startQuickTunnel(options: {
+    label: string;
+    localPort: string;
+    onUrl: (url: string) => void;
+  }): void {
+    const { label, localPort, onUrl } = options;
+    const child = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${localPort}`], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    trackChild(label, child);
+
+    console.log(`Starting quick tunnel (${label}) -> http://localhost:${localPort}...`);
+
+    let captured = false;
+    const urlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+    const handleOutput = (data: Buffer) => {
+      prefixAndWrite(label, data);
+
+      if (captured) return;
+      const match = data.toString().match(urlPattern);
+      if (!match) return;
+
+      captured = true;
+      onUrl(match[0]);
+    };
+
+    child.stdout.on('data', handleOutput);
+    child.stderr.on('data', handleOutput);
+    child.on('close', code => exitAndStopOthers(label, code));
   }
 
-  appendEnvListValues(
-    devVarsPath,
-    'OPENCLAW_ALLOWED_ORIGINS',
-    [appOrigin, kiloclawOrigin, kiloChatOrigin].filter((origin): origin is string => !!origin)
-  );
+  if (provider === DOCKER_LOCAL_PROVIDER) {
+    const envValues = buildDockerLocalEnvValues(port, controllerPort, kiloChatPort);
 
-  child.stdout.on('data', data => prefixAndWrite(label, data));
-  child.stderr.on('data', data => prefixAndWrite(label, data));
-  child.on('close', code => exitAndStopOthers(label, code));
-} else if (provider !== DOCKER_LOCAL_PROVIDER) {
-  startQuickTunnel({
-    label: 'gateway',
-    localPort: port,
-    onUrl: url => {
-      const apiUrl = `${url}/api/gateway/`;
+    for (const [key, value] of Object.entries(envValues)) {
+      updateEnvValue(devVarsPath, key, value);
+    }
+
+    console.log('Docker-local provider detected; skipping Cloudflare quick tunnels.');
+    console.log(`Set BACKEND_API_URL=${envValues.BACKEND_API_URL}`);
+    console.log(`Set KILOCODE_API_BASE_URL=${envValues.KILOCODE_API_BASE_URL}`);
+    console.log(`Set KILOCLAW_CHECKIN_URL=${envValues.KILOCLAW_CHECKIN_URL}`);
+    console.log(`Set KILOCHAT_BASE_URL=${envValues.KILOCHAT_BASE_URL}`);
+
+    setInterval(() => undefined, 60_000);
+  } else if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
+    console.error(
+      'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
+    );
+    process.exit(1);
+  }
+
+  if (provider !== DOCKER_LOCAL_PROVIDER && (config.tunnelName || config.tunnelConfig)) {
+    const label = 'kiloclaw-tunnel';
+    const args = config.tunnelConfig
+      ? ['tunnel', '--config', config.tunnelConfig, 'run']
+      : ['tunnel', 'run', config.tunnelName];
+    const child = spawn('cloudflared', args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    trackChild(label, child);
+
+    const appOrigin = originFromHostname(config.appHostname);
+    const kiloclawOrigin = originFromHostname(config.kiloclawHostname);
+    const kiloChatOrigin = originFromHostname(config.kiloChatHostname);
+
+    console.log(
+      `Named tunnel: ${config.tunnelConfig || config.tunnelName}` +
+        `${appOrigin ? `\n  app      -> ${appOrigin}` : ''}` +
+        `${kiloclawOrigin ? `\n  kiloclaw -> ${kiloclawOrigin}` : ''}` +
+        `${kiloChatOrigin ? `\n  kilochat -> ${kiloChatOrigin}` : ''}`
+    );
+
+    if (appOrigin) {
+      const apiUrl = `${appOrigin}/api/gateway/`;
+      updateEnvValue(devVarsPath, 'BACKEND_API_URL', appOrigin);
       updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
-      console.log(`\nGateway tunnel URL: ${url}`);
+      console.log(`Set BACKEND_API_URL=${appOrigin}`);
       console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
-    },
-  });
 
-  startQuickTunnel({
-    label: 'controller',
-    localPort: controllerPort,
-    onUrl: url => {
-      const checkinUrl = `${url}/api/controller/checkin`;
+      if (config.updateAppEnv) {
+        updateEnvValue(envLocalPath, 'APP_URL_OVERRIDE', appOrigin);
+        updateEnvValue(envLocalPath, 'NEXTAUTH_URL', appOrigin);
+        console.log(`Set APP_URL_OVERRIDE=${appOrigin}`);
+        console.log(`Set NEXTAUTH_URL=${appOrigin}`);
+      }
+    }
+
+    if (kiloclawOrigin) {
+      const checkinUrl = `${kiloclawOrigin}/api/controller/checkin`;
       updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
-      console.log(`\nController tunnel URL: ${url}`);
       console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
-    },
-  });
 
-  startQuickTunnel({
-    label: 'kilo-chat',
-    localPort: kiloChatPort,
-    onUrl: url => {
-      updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', url);
-      console.log(`\nKilo-chat tunnel URL: ${url}`);
-      console.log(`Set KILOCHAT_BASE_URL=${url}`);
-    },
-  });
+      if (config.updateAppEnv) {
+        updateEnvValue(envLocalPath, 'KILOCLAW_API_URL', kiloclawOrigin);
+        console.log(`Set KILOCLAW_API_URL=${kiloclawOrigin}`);
+      }
+    }
+
+    if (kiloChatOrigin) {
+      updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatOrigin);
+      console.log(`Set KILOCHAT_BASE_URL=${kiloChatOrigin}`);
+    }
+
+    appendEnvListValues(
+      devVarsPath,
+      'OPENCLAW_ALLOWED_ORIGINS',
+      [appOrigin, kiloclawOrigin, kiloChatOrigin].filter((origin): origin is string => !!origin)
+    );
+
+    child.stdout.on('data', data => prefixAndWrite(label, data));
+    child.stderr.on('data', data => prefixAndWrite(label, data));
+    child.on('close', code => exitAndStopOthers(label, code));
+  } else if (provider !== DOCKER_LOCAL_PROVIDER) {
+    startQuickTunnel({
+      label: 'gateway',
+      localPort: port,
+      onUrl: url => {
+        const apiUrl = `${url}/api/gateway/`;
+        updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
+        console.log(`\nGateway tunnel URL: ${url}`);
+        console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
+      },
+    });
+
+    startQuickTunnel({
+      label: 'controller',
+      localPort: controllerPort,
+      onUrl: url => {
+        const checkinUrl = `${url}/api/controller/checkin`;
+        updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+        console.log(`\nController tunnel URL: ${url}`);
+        console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+      },
+    });
+
+    startQuickTunnel({
+      label: 'kilo-chat',
+      localPort: kiloChatPort,
+      onUrl: url => {
+        updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', url);
+        console.log(`\nKilo-chat tunnel URL: ${url}`);
+        console.log(`Set KILOCHAT_BASE_URL=${url}`);
+      },
+    });
+  }
+
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => {
+      stopAllChildren(signal);
+      if (children.length === 0) {
+        process.exit(0);
+      }
+    });
+  }
 }
 
-for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => {
-    stopAllChildren(signal);
-    if (children.length === 0) {
-      process.exit(0);
-    }
-  });
+if (
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+) {
+  main();
 }

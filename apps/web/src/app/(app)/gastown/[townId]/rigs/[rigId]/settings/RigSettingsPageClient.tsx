@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -252,9 +252,9 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
         <Button
           onClick={handleSave}
           disabled={updateConfig.isPending}
-          variant="primary"
+          variant="default"
           size="sm"
-          className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+          className="gap-1.5"
         >
           <Save className="size-3.5" />
           {updateConfig.isPending ? 'Saving...' : 'Save'}
@@ -911,9 +911,9 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
                 <Button
                   onClick={handleSave}
                   disabled={updateConfig.isPending}
-                  variant="primary"
+                  variant="default"
                   size="sm"
-                  className="w-full gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                  className="w-full gap-1.5"
                 >
                   <Save className="size-3" />
                   {updateConfig.isPending ? 'Saving...' : 'Save'}
@@ -1005,16 +1005,16 @@ function MergeStrategyOption({
       onClick={onSelect}
       className={`flex flex-1 items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
         selected
-          ? 'border-[color:oklch(95%_0.15_108_/_0.3)] bg-[color:oklch(95%_0.15_108_/_0.06)]'
+          ? 'border-border bg-surface-selected'
           : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
       }`}
     >
       <div
         className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
-          selected ? 'border-[color:oklch(95%_0.15_108_/_0.6)]' : 'border-white/20'
+          selected ? 'border-white/40' : 'border-white/20'
         }`}
       >
-        {selected && <div className="size-2 rounded-full bg-[color:oklch(95%_0.15_108)]" />}
+        {selected && <div className="size-2 rounded-full bg-white/70" />}
       </div>
       <div>
         <div className={`text-sm font-medium ${selected ? 'text-white/90' : 'text-white/60'}`}>

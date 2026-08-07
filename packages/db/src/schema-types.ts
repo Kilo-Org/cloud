@@ -99,6 +99,65 @@ export enum KiloPassScheduledChangeStatus {
   Canceled = 'canceled',
 }
 
+// --- Kilo Pass for Organizations enums ---
+
+export const KiloPassOrgAgreementState = {
+  PendingPayment: 'pending_payment',
+  Active: 'active',
+  CancelAtPeriodEnd: 'cancel_at_period_end',
+  Ended: 'ended',
+} as const;
+
+export type KiloPassOrgAgreementState =
+  (typeof KiloPassOrgAgreementState)[keyof typeof KiloPassOrgAgreementState];
+
+export const KiloPassOrgProcessingCondition = {
+  Ready: 'ready',
+  Manual: 'manual',
+  Blocked: 'blocked',
+  Overallocated: 'overallocated',
+  Failed: 'failed',
+  SuspendedForReview: 'suspended_for_review',
+} as const;
+
+export type KiloPassOrgProcessingCondition =
+  (typeof KiloPassOrgProcessingCondition)[keyof typeof KiloPassOrgProcessingCondition];
+
+export const KiloPassOrgPurchaseChannel = {
+  SelfServe: 'self_serve',
+  Manual: 'manual',
+} as const;
+
+export type KiloPassOrgPurchaseChannel =
+  (typeof KiloPassOrgPurchaseChannel)[keyof typeof KiloPassOrgPurchaseChannel];
+
+export const KiloPassOrgProcessingRunState = {
+  Pending: 'pending',
+  Running: 'running',
+  Succeeded: 'succeeded',
+  Blocked: 'blocked',
+  Failed: 'failed',
+} as const;
+
+export type KiloPassOrgProcessingRunState =
+  (typeof KiloPassOrgProcessingRunState)[keyof typeof KiloPassOrgProcessingRunState];
+
+export const KiloPassOrgBonusMode = {
+  AfterBase: 'after_base',
+  Upfront: 'upfront',
+} as const;
+
+export type KiloPassOrgBonusMode = (typeof KiloPassOrgBonusMode)[keyof typeof KiloPassOrgBonusMode];
+
+export const KiloPassOrgIssuanceKind = {
+  Regular: 'regular',
+  Bridge: 'bridge',
+  Supplement: 'supplement',
+} as const;
+
+export type KiloPassOrgIssuanceKind =
+  (typeof KiloPassOrgIssuanceKind)[keyof typeof KiloPassOrgIssuanceKind];
+
 // --- Feedback consts ---
 
 export const FeedbackFor = {
@@ -596,75 +655,6 @@ export const CodingPlanTermKind = {
 
 export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
 
-// --- Cost Insights enums ---
-
-export const CostInsightSpendCategory = {
-  Variable: 'variable',
-  Scheduled: 'scheduled',
-} as const;
-
-export type CostInsightSpendCategory =
-  (typeof CostInsightSpendCategory)[keyof typeof CostInsightSpendCategory];
-
-export const CostInsightSpendSource = {
-  AiGateway: 'ai_gateway',
-  KiloClaw: 'kiloclaw',
-  CodingPlan: 'coding_plan',
-  Other: 'other',
-} as const;
-
-export type CostInsightSpendSource =
-  (typeof CostInsightSpendSource)[keyof typeof CostInsightSpendSource];
-
-export const CostInsightRollupDegradedReason = {
-  CaptureBypass: 'capture_bypass',
-  ReconciliationMismatch: 'reconciliation_mismatch',
-  LateSourceData: 'late_source_data',
-} as const;
-
-export type CostInsightRollupDegradedReason =
-  (typeof CostInsightRollupDegradedReason)[keyof typeof CostInsightRollupDegradedReason];
-
-export const CostInsightEventType = {
-  ConfigChanged: 'config_changed',
-  AnomalyAlert: 'anomaly_alert',
-  ThresholdCrossed: 'threshold_crossed',
-  AlertReviewed: 'alert_reviewed',
-  SuggestionCreated: 'suggestion_created',
-  SuggestionDismissed: 'suggestion_dismissed',
-  Disabled: 'disabled',
-} as const;
-
-export type CostInsightEventType = (typeof CostInsightEventType)[keyof typeof CostInsightEventType];
-
-export const CostInsightAlertKind = {
-  Anomaly: 'anomaly',
-  Threshold: 'threshold',
-  Threshold7Day: 'threshold_7d',
-  Threshold30Day: 'threshold_30d',
-} as const;
-
-export type CostInsightAlertKind = (typeof CostInsightAlertKind)[keyof typeof CostInsightAlertKind];
-
-export const CostInsightSuggestionKind = {
-  CodingPlan: 'coding_plan',
-  KiloPass: 'kilo_pass',
-} as const;
-
-export type CostInsightSuggestionKind =
-  (typeof CostInsightSuggestionKind)[keyof typeof CostInsightSuggestionKind];
-
-export const CostInsightNotificationStatus = {
-  Pending: 'pending',
-  Sending: 'sending',
-  Sent: 'sent',
-  Failed: 'failed',
-  Skipped: 'skipped',
-} as const;
-
-export type CostInsightNotificationStatus =
-  (typeof CostInsightNotificationStatus)[keyof typeof CostInsightNotificationStatus];
-
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',
@@ -797,7 +787,7 @@ export type ContributorChampionTier =
 
 // --- Organization types ---
 
-export type OrganizationRole = 'owner' | 'member' | 'billing_manager';
+export type OrganizationRole = 'owner' | 'admin' | 'member' | 'billing_manager';
 
 export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 
@@ -873,6 +863,27 @@ const OrganizationSettingsSchema = z.object({
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
+
+export const MAX_ORGANIZATION_GROUPS = 100;
+export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
+
+// Persisted shape of organization group policies. The runtime Zod contracts,
+// per-policy schemas, limits, defaults, and helpers live in the web app
+// (`apps/web/src/lib/organizations/group-policies`) so this package stays
+// focused on database concerns. These structural types exist only to type the
+// `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
+export type OrganizationGroupPolicyType = 'model_access';
+
+export type OrganizationGroupModelAccessPolicy = {
+  type: 'model_access';
+  data:
+    | { mode: 'all' }
+    | { mode: 'none' }
+    | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
+};
+
+export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
+export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
@@ -1025,6 +1036,17 @@ export const AuditLogAction = z.enum([
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
+  'organization.group.create',
+  'organization.group.update',
+  'organization.group.delete',
+  'organization.group.members.set',
+  'organization.group.member_groups.set',
+  'organization.group.policy.set',
+  'organization.group.policy.remove',
+  'organization.group.default_policy.set',
+  'organization.group.default_policy.remove',
+  'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
+  'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
@@ -1044,6 +1066,7 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'
@@ -1901,6 +1924,20 @@ export const CustomLlmCompressionSchema = z.object({
 
 export type CustomLlmCompression = z.infer<typeof CustomLlmCompressionSchema>;
 
+const CustomLlmPropertyPathSchema = z
+  .string()
+  .min(1)
+  .refine(
+    path =>
+      path
+        .split('.')
+        .every(
+          segment =>
+            segment.length > 0 && !['__proto__', 'constructor', 'prototype'].includes(segment)
+        ),
+    'Must be a dot-separated property path'
+  );
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
@@ -1911,19 +1948,45 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
   compression: CustomLlmCompressionSchema.optional(),
+  thought_signature_mapping: CustomLlmPropertyPathSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
 
-export const CustomLlmDefinitionSchema = z
-  .object({
-    display_name: z.string(),
+export const GoogleServiceAccountKeySchema = z.object({
+  type: z.literal('service_account'),
+  project_id: z.string().min(1),
+  private_key_id: z.string().min(1),
+  private_key: z.string().min(1),
+  client_email: z.email(),
+  client_id: z.string().min(1),
+  auth_uri: z.url(),
+  token_uri: z.url(),
+  auth_provider_x509_cert_url: z.url(),
+  client_x509_cert_url: z.url(),
+  universe_domain: z.string().min(1).optional(),
+});
+
+export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
+
+const CustomLlmDefinitionBaseSchema = z.object({
+  ...CustomLlmMetadataSchema.shape,
+  ...CustomLlmApiConfigSchema.shape,
+  display_name: z.string(),
+  organization_ids: z.array(z.string()),
+  pricing: CustomLlmPricingSchema.optional(),
+});
+
+export const CustomLlmDefinitionSchema = z.union([
+  CustomLlmDefinitionBaseSchema.extend({
     api_key: z.string(),
-    organization_ids: z.array(z.string()),
-    pricing: CustomLlmPricingSchema.optional(),
-  })
-  .and(CustomLlmMetadataSchema)
-  .and(CustomLlmApiConfigSchema);
+    google_service_account: z.never().optional(),
+  }),
+  CustomLlmDefinitionBaseSchema.extend({
+    api_key: z.never().optional(),
+    google_service_account: GoogleServiceAccountKeySchema,
+  }),
+]);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
@@ -1933,6 +1996,13 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  reasoning: z
+    .object({
+      mandatory: z.boolean(),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
@@ -2038,6 +2108,10 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'session_import_failed',
   'setup_command_failed',
   'container_shutdown',
+  // Closed out by the stale review reaper because it sat in a non-terminal state
+  // past the reap threshold. Distinct from 'timeout', which means the agent
+  // itself timed out; this one means nothing ever reported back at all.
+  'abandoned',
   'unknown',
 ] as const;
 
@@ -2074,6 +2148,14 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  // Set only by the stale review reaper, which measures cleanup rather than the
+  // fault that stranded the review, so alerting on it would count janitorial work
+  // as incidents. Every stranded pending review measured on 2026-08-04 traced to
+  // customer-side state: Code Reviewer disabled, the platform integration
+  // suspended, or an action-required disable. The signal for genuinely stuck work
+  // is the live "Running > 90m" queue health counter, which is unaffected by this
+  // and does not depend on a review having been reaped yet.
+  'abandoned',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

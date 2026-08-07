@@ -10,7 +10,7 @@ type SessionListSearchHeaderProps = {
   /** Drives the in-field X's visibility. Derived from `onChangeText` by the
    * parent so the TextInput itself stays uncontrolled (iOS TextInput rules). */
   hasText: boolean;
-  isSearchPending: boolean;
+  showSearchBusy: boolean;
   showInlineError: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
@@ -19,7 +19,7 @@ type SessionListSearchHeaderProps = {
 export function SessionListSearchHeader({
   inputRef,
   hasText,
-  isSearchPending,
+  showSearchBusy,
   showInlineError,
   onChangeText,
   onClearSearch,
@@ -28,7 +28,18 @@ export function SessionListSearchHeader({
   return (
     <View>
       <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
-        <Search size={18} color={colors.mutedForeground} />
+        {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
+        <View className="h-[18px] w-[18px] items-center justify-center">
+          {showSearchBusy ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.mutedForeground}
+              accessibilityLabel="Searching"
+            />
+          ) : (
+            <Search size={18} color={colors.mutedForeground} />
+          )}
+        </View>
         <TextInput
           ref={inputRef}
           className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
@@ -51,14 +62,6 @@ export function SessionListSearchHeader({
           </Pressable>
         ) : null}
       </View>
-      {isSearchPending ? (
-        <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
-          <Text variant="muted" className="text-xs">
-            Searching…
-          </Text>
-        </View>
-      ) : null}
       {showInlineError ? (
         <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
           Couldn't refresh. Pull down to try again.

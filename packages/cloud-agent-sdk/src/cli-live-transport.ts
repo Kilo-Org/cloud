@@ -57,7 +57,7 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
-  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
@@ -74,11 +74,11 @@ type CliLiveTransportConfig = {
    * delayed-resync replays do NOT call this so the user's already-advanced
    * older-messages cursor is never reset to the latest 50.
    */
-  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
-  onError?: (message: string) => void;
-  onRemoteModelStateChange?: (state: RemoteModelState) => void;
-  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onCapabilityChange?: () => void;
+  onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
+  onRemoteModelStateChange?: ((state: RemoteModelState) => void) | undefined;
+  onRemoteCommandStateChange?: ((state: RemoteCommandState) => void) | undefined;
+  onCapabilityChange?: (() => void) | undefined;
   /**
    * Fired whenever the per-session capabilities advertised by the owning
    * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
@@ -87,7 +87,9 @@ type CliLiveTransportConfig = {
    * whose session list dropped this session). The session manager uses this
    * to recompute the `supportsAttachments` gate.
    */
-  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onCapabilitiesChange?:
+    | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
+    | undefined;
 };
 
 // How long after a reconnect to re-fetch the snapshot a second time. Covers
@@ -127,8 +129,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
      * payload that omitted this session). Compared structurally on every
      * new observation; only emitted on a real change.
      */
-    let currentCapabilities: { attachments?: boolean } | undefined = undefined;
-    function publishCapabilities(next: { attachments?: boolean } | undefined): void {
+    let currentCapabilities: { attachments?: boolean | undefined } | undefined = undefined;
+    function publishCapabilities(next: { attachments?: boolean | undefined } | undefined): void {
       const previousAttachments = currentCapabilities?.attachments;
       const nextAttachments = next?.attachments;
       if (previousAttachments === nextAttachments) return;
@@ -136,7 +138,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onCapabilitiesChange?.(next);
     }
     let catalogRequestGeneration = 0;
-    let catalogRequestInFlight: { ownerConnectionId: string; generation: number } | null = null;
+    let catalogRequestInFlight: {
+      ownerConnectionId: string;
+      generation: number;
+    } | null = null;
     // Command catalog discovery runs on its own generation so it stays
     // independent of model discovery: a model refresh that completes or
     // fails must not drop an in-flight command catalog request.
@@ -166,7 +171,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function publishRemoteCommandState(next: RemoteCommandState): void {
-      remoteCommandState = { ...next, commands: deepCopyCommands(next.commands) };
+      remoteCommandState = {
+        ...next,
+        commands: deepCopyCommands(next.commands),
+      };
       config.onRemoteCommandStateChange?.(next);
     }
 
@@ -182,7 +190,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // state callback each hold an independent snapshot.
       const snapshotted = deepCopyCommands(commands);
       lastValidCommands = snapshotted;
-      sink.onServiceEvent({ type: 'commands.available', commands: deepCopyCommands(snapshotted) });
+      sink.onServiceEvent({
+        type: 'commands.available',
+        commands: deepCopyCommands(snapshotted),
+      });
     }
 
     function snapshotCommands(): SlashCommandInfo[] {
@@ -587,7 +598,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       }
     }
 
-    async function sendCommand(command: string, data: unknown): Promise<unknown> {
+    async function sendCommand(
+      command: string,
+      data: unknown,
+      mutationId?: string
+    ): Promise<unknown> {
       const expectedOwnerConnectionId = ownerConnectionId;
       if (!expectedOwnerConnectionId) throw new Error('Remote session has no connected owner');
 
@@ -596,7 +611,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           config.kiloSessionId,
           command,
           data,
-          expectedOwnerConnectionId
+          expectedOwnerConnectionId,
+          ...(mutationId !== undefined ? [mutationId] : [])
         );
       } catch (error) {
         if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
@@ -859,6 +875,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
+        const mutationId = input?.mutationId ?? crypto.randomUUID();
         const wireData = buildCreateSessionWireData(input);
         const hasExtendedFields =
           wireData.agent !== undefined ||
@@ -866,7 +883,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           wireData.orgId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand('create_session', wireData);
+          result = await sendCommand('create_session', wireData, mutationId);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
@@ -875,7 +892,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             error instanceof CommandDeliveredError &&
             error.message === INVALID_CREATE_SESSION_COMMAND
           ) {
-            result = await sendCommand('create_session', { protocolVersion: 1 });
+            result = await sendCommand(
+              'create_session',
+              { protocolVersion: 1 },
+              crypto.randomUUID()
+            );
           } else {
             throw error;
           }
@@ -975,10 +996,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         sendCommand('question_reject', {
           requestID: payload.requestId,
         }),
+      // Human reply from the app UI: mark it interactive so the CLI's skill-shell
+      // gate accepts approvals (VS Code does the same for every human reply).
+      // Old CLIs zod-strip the unknown key, so this is safe for every CLI version.
       respondToPermission: payload =>
         sendCommand('permission_respond', {
           requestID: payload.requestId,
           reply: payload.response,
+          interactive: true,
         }),
       acceptSuggestion: payload =>
         sendCommand('suggestion_accept', {

@@ -20,7 +20,8 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
  *
  * Maps the shared `KiloSdkMessageHistory` union to the SDK's
  * `SessionSnapshotPageOutcome`:
- * - Page variant → success outcome with messages, cursor, and omitted count
+ * - Page variant → success outcome with messages, cursor, omitted count,
+ *   and the Cloud Agent event-log watermark
  * - Failure variants → passed through verbatim (retryable, too_large, invalid_data)
  * - Null history → empty success page (existing session with zero messages). A genuine
  *   NOT_FOUND is returned as a thrown/rejected TRPCError, never as `history === null`.
@@ -45,6 +46,7 @@ export async function fetchMobileSessionSnapshotPage(
       messages: [],
       nextCursor: null,
       omittedItemCount: 0,
+      watermarkEventId: result.watermarkEventId ?? undefined,
     };
   }
 
@@ -55,6 +57,7 @@ export async function fetchMobileSessionSnapshotPage(
       messages: history.messages as SessionSnapshotPage['messages'],
       nextCursor: history.nextCursor,
       omittedItemCount: history.omittedItemCount,
+      watermarkEventId: result.watermarkEventId ?? undefined,
     };
   }
 

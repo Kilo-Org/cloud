@@ -427,6 +427,7 @@ describe('registerConversationListCacheHandlers', () => {
     const listKey = conversationsKey(sandboxId);
     const messageKey = messagesKey(conversationId);
     let activityHandler: EventHandler<ConversationActivityEvent> | undefined;
+    let resyncHandler: (() => void) | undefined;
     const off = () => {};
 
     const kiloChatClient: HandlerOptions['kiloChatClient'] = {
@@ -440,7 +441,10 @@ describe('registerConversationListCacheHandlers', () => {
       },
     };
     const eventService: HandlerOptions['eventService'] = {
-      onReconnect: () => off,
+      onResync: handler => {
+        resyncHandler = handler;
+        return off;
+      },
     };
 
     queryClient.setQueryData(
@@ -457,6 +461,13 @@ describe('registerConversationListCacheHandlers', () => {
       queryKey: listKey,
       sandboxId,
     });
+
+    if (!resyncHandler) throw new Error('resync handler was not registered');
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(false);
+
+    // Resync invalidates the conversation list
+    resyncHandler();
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
 
     expect(queryClient.getQueryState(messageKey)?.isInvalidated).toBe(false);
     if (!activityHandler) throw new Error('activity handler was not registered');
@@ -476,6 +487,7 @@ describe('registerConversationListCacheHandlers', () => {
     const listKey = conversationsKey(sandboxId);
     const messageKey = messagesKey(conversationId);
     let activityHandler: EventHandler<ConversationActivityEvent> | undefined;
+    let resyncHandler: (() => void) | undefined;
     const off = () => {};
 
     const kiloChatClient: HandlerOptions['kiloChatClient'] = {
@@ -489,7 +501,10 @@ describe('registerConversationListCacheHandlers', () => {
       },
     };
     const eventService: HandlerOptions['eventService'] = {
-      onReconnect: () => off,
+      onResync: handler => {
+        resyncHandler = handler;
+        return off;
+      },
     };
 
     queryClient.setQueryData(
@@ -507,6 +522,13 @@ describe('registerConversationListCacheHandlers', () => {
       queryKey: listKey,
       sandboxId,
     });
+
+    if (!resyncHandler) throw new Error('resync handler was not registered');
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(false);
+
+    // Resync invalidates the conversation list
+    resyncHandler();
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
 
     if (!activityHandler) throw new Error('activity handler was not registered');
 

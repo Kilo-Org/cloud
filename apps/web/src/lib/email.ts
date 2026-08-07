@@ -59,8 +59,8 @@ export const subjects = {
   securityFindingNew: 'Kilo Security Agent: New finding',
   securityFindingSlaWarning: 'Kilo Security Agent: SLA warning',
   securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
-  costInsightSpendAlert: 'Kilo Cost Insights: Spend Alert',
   recommendationsDigest: 'Kilo: Your weekly recommendations',
+  kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -169,6 +169,20 @@ export async function sendOrgSubscriptionEmail(to: string, props: Props): Promis
   });
 }
 
+export async function sendKiloPassOrgBlockedEmail(
+  to: string,
+  props: { organizationId: string; organizationName: string }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'kiloPassOrgBlocked',
+    templateVars: {
+      organization_name: props.organizationName,
+      manage_url: `${NEXTAUTH_URL}/organizations/${props.organizationId}/subscriptions/kilo-pass`,
+    },
+  });
+}
+
 export async function sendOrgRenewedEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
@@ -271,31 +285,6 @@ export async function sendCodeReviewDisabledEmail(
       reason: props.reason,
       recovery_url: props.recoveryUrl,
       recovery_label: props.recoveryLabel,
-    },
-  });
-}
-
-export async function sendCostInsightSpendAlertEmail(
-  to: string,
-  props: {
-    ownerLabel: string;
-    alertTitle: string;
-    alertDescription: string;
-    primaryAmountLabel: string;
-    secondaryAmountLabel: string;
-    reviewUrl: string;
-  }
-): Promise<SendResult> {
-  return send({
-    to,
-    templateName: 'costInsightSpendAlert',
-    templateVars: {
-      owner_label: props.ownerLabel,
-      alert_title: props.alertTitle,
-      alert_description: props.alertDescription,
-      primary_amount_label: props.primaryAmountLabel,
-      secondary_amount_label: props.secondaryAmountLabel,
-      review_url: props.reviewUrl,
     },
   });
 }

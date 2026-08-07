@@ -35,6 +35,10 @@ KILO_PORT_OFFSET=auto pnpm dev:start <needed-group-or-service>
 
 After startup or reuse, obtain actual ports from `.dev-port`, `pnpm dev:status --json`, or `dev/logs/manifest.json`. Never assume defaults. Open web at `http://localhost:<reported-port>/`.
 
+A worktree on a port offset runs its own database container and starts empty. Run `pnpm test:db` for migrations, then seed the data the task needs. Read the connection string from this worktree's `.env.local`; never assume port 5432.
+
+Run `pnpm test:db` before `pnpm test` in a worktree. It writes this worktree's database to `apps/web/.env.test.local`, which is the only file the Jest setup loads that can hold it. Without that file, Jest runs against port 5432 and drops a sibling worktree's test databases.
+
 ## Fake login
 
 Use:

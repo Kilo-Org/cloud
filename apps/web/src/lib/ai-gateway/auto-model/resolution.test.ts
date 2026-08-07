@@ -4,15 +4,13 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
 }));
 
-jest.mock('@/lib/kiloclaw/setup-promo', () => ({
-  userIsWithinFirstKiloClawInstanceWindow: jest.fn(async () => false),
-}));
-
 import { resolveAutoModel } from './resolution';
 import {
   BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
+  KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
@@ -23,6 +21,7 @@ const baseParams = {
   featureHeader: null,
   sessionId: null,
   clientIp: null,
+  isAutoFreeCandidateAllowed: null,
 };
 
 const nullUserPromise = Promise.resolve(null);
@@ -38,6 +37,21 @@ const sampleDecision: AutoRoutingDecision = {
 };
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
+  it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_BALANCED_MODEL.id,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: sampleDecision.model } });
+  });
+
   it('resolves to decision.model when the thunk returns a decision', async () => {
     const result = await resolveAutoModel(
       {
@@ -164,7 +178,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   });
 
   it('applies complete catalog settings for variant xhigh (distinct from max)', async () => {
-    // Claude catalog: xhigh → effort xhigh + verbosity xhigh; max → effort xhigh + verbosity max
+    // Claude catalog: xhigh → effort xhigh + verbosity xhigh; max → effort max + verbosity max
     const claudeModel = 'anthropic/claude-sonnet-5';
     const xhighResult = await resolveAutoModel(
       {
@@ -205,7 +219,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       kind: 'ok',
       resolved: {
         model: claudeModel,
-        reasoning: { enabled: true, effort: 'xhigh' },
+        reasoning: { enabled: true, effort: 'max' },
         verbosity: 'max',
       },
     });
@@ -232,7 +246,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       kind: 'ok',
       resolved: {
         model: claudeModel,
-        reasoning: { enabled: true, effort: 'xhigh' },
+        reasoning: { enabled: true, effort: 'max' },
         verbosity: 'max',
       },
     });
@@ -276,15 +290,15 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   });
 
   it('applies exact thinking and instant variant settings', async () => {
-    // kimi-k2 uses REASONING_VARIANTS_BINARY: instant + thinking
-    const kimiModel = 'moonshotai/kimi-k2.5';
+    // Mistral uses REASONING_VARIANTS_BINARY: instant + thinking
+    const binaryModel = 'mistralai/mistral-medium-3-5';
     const thinkingResult = await resolveAutoModel(
       {
         ...baseParams,
         apiKind: 'chat_completions',
         efficientDecision: async () => ({
           ...sampleDecision,
-          model: kimiModel,
+          model: binaryModel,
           variant: 'thinking',
         }),
       },
@@ -297,7 +311,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
         apiKind: 'chat_completions',
         efficientDecision: async () => ({
           ...sampleDecision,
-          model: kimiModel,
+          model: binaryModel,
           variant: 'instant',
         }),
       },
@@ -308,14 +322,14 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(thinkingResult).toEqual({
       kind: 'ok',
       resolved: {
-        model: kimiModel,
+        model: binaryModel,
         reasoning: { enabled: true, effort: 'high' },
       },
     });
     expect(instantResult).toEqual({
       kind: 'ok',
       resolved: {
-        model: kimiModel,
+        model: binaryModel,
         reasoning: { enabled: false, effort: 'none' },
       },
     });
@@ -383,6 +397,49 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+});
+
+describe('resolveAutoModel — kilo-auto/free branch', () => {
+  it('excludes candidates denied by the effective organization policy', async () => {
+    const isAutoFreeCandidateAllowed = jest.fn(
+      async (modelId: string) => modelId === 'stepfun/step-3.7-flash:free'
+    );
+
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FREE_MODEL.id,
+        apiKind: 'chat_completions',
+        isAutoFreeCandidateAllowed,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: 'stepfun/step-3.7-flash:free',
+        reasoning: { enabled: true, effort: 'high' },
+      },
+    });
+    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
+  });
+
+  it('reports no free models when organization policy denies every candidate', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FREE_MODEL.id,
+        apiKind: 'chat_completions',
+        isAutoFreeCandidateAllowed: async () => false,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'no_free_models_available' });
   });
 });
 

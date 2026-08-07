@@ -19,6 +19,7 @@ import {
   services,
 } from './services';
 import { acquireProcessLock, withProcessLockAsync } from './process-lock';
+import { syncInfraEnv } from './infra-env';
 import { syncEnvVars } from './env-sync';
 import { getWranglerRegistryPath } from './wrangler-registry';
 import {
@@ -104,6 +105,28 @@ async function findPortConflicts(
   return { conflicts, reusedHostServices };
 }
 
+// Next.js rejects the X11 range. Keep automatic worktree offsets away from it
+// for every resolved listener, including worker inspector ports.
+const RESERVED_PORT_RANGES: readonly [number, number][] = [[6000, 6063]];
+
+function reservedPort(port: number): boolean {
+  return RESERVED_PORT_RANGES.some(([start, end]) => port >= start && port <= end);
+}
+
+function findReservedPorts(serviceNames: string[]): string[] {
+  const reserved: string[] = [];
+  for (const name of serviceNames) {
+    const service = getService(name);
+    if (service.port > 0 && reservedPort(service.port)) {
+      reserved.push(`${name}:${service.port}`);
+    }
+    if (service.type === 'worker' && reservedPort(service.port + 10_000)) {
+      reserved.push(`${name}-inspector:${service.port + 10_000}`);
+    }
+  }
+  return reserved;
+}
+
 function processIdentity(pid: number): string | undefined {
   try {
     return (
@@ -134,6 +157,7 @@ async function acquirePortOffsetLease(
 
   for (const candidate of candidates) {
     applyPortOffset(candidate);
+    if (!explicit && findReservedPorts(serviceNames).length > 0) continue;
     const claimPath = path.join(leasesRoot, `${candidate}.json`);
     let release: () => Promise<void>;
     try {
@@ -347,6 +371,11 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
 
   // --- Export port offset for child processes (e.g. scripts/dev.sh) ---
   process.env.KILO_PORT_OFFSET = String(portOffset);
+
+  // --- Publish this worktree's Compose project and infra endpoints ---
+  // After the offset is final: Compose and the app env must name the same
+  // database. An offset worktree runs its own containers on its own ports.
+  for (const line of syncInfraEnv(repoRoot)) console.log(`${DIM}${line}${RESET}`);
 
   // Repeated bundle setup calls reuse a complete stack without refreshing
   // secrets or restarting live panes.
@@ -1060,11 +1089,12 @@ async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
   }
   await releasePortOffsetClaims(repoRoot, sessionName);
 
-  // Docker Compose uses project name "dev" for every worktree, so containers
-  // (postgres, redis, grafana) are shared singletons. Tearing them down here
-  // would break any other worktree's running session — skip when siblings
-  // are active unless --force is passed.
-  const otherSessions = findOtherKiloDevSessions();
+  // A worktree that published dev/.env owns its Compose project, so its
+  // containers are nobody else's — always tear them down. Without that file the
+  // worktree shares the default project, and a teardown would drop another
+  // worktree's database connections; skip it while siblings are active.
+  const ownsComposeProject = fs.existsSync(path.join(repoRoot, 'dev', '.env'));
+  const otherSessions = ownsComposeProject ? [] : findOtherKiloDevSessions();
   if (otherSessions.length > 0 && !force) {
     console.log(
       `Leaving Docker infrastructure running (other sessions active: ${otherSessions.join(', ')})`
@@ -1085,6 +1115,13 @@ async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
 
 async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   const check = args.includes('--check') || args.includes('check');
+
+  // Runs before the sync: worker and Next.js env values are derived from this
+  // worktree's ports, and a fresh worktree has published none yet.
+  if (!check) {
+    for (const line of syncInfraEnv(repoRoot)) console.log(line);
+  }
+
   const yes = args.includes('--yes') || args.includes('-y');
   const targets = args.filter(a => !a.startsWith('-') && a !== 'check');
 

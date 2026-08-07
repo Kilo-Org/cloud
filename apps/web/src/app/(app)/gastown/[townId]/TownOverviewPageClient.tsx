@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { sortAgentsByStatus } from '@/lib/gastown/sort-agents';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
 import { ActivityFeedView } from '@/components/gastown/ActivityFeed';
@@ -262,10 +262,10 @@ export function TownOverviewPageClient({
           </button>
         </div>
         <Button
-          variant="primary"
+          variant="default"
           size="sm"
           onClick={() => setIsCreateRigOpen(true)}
-          className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+          className="gap-1.5"
         >
           <Plus className="size-3.5" />
           New Rig

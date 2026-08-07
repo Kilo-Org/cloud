@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { X, Terminal as TerminalIcon } from 'lucide-react';
 import { useXtermPty } from './useXtermPty';
 

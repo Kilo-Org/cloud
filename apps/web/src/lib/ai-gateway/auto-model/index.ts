@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
-  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -11,7 +10,6 @@ import {
   type Verbosity,
 } from '@kilocode/db/schema-types';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 export type AutoModel = {
   id: string;
@@ -33,8 +31,6 @@ export type ResolvedAutoModel = {
   reasoning?: OpenRouterReasoningConfig;
   verbosity?: Verbosity;
 };
-
-export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
 
 export const modeSchema = z.enum([
   'claw',
@@ -81,12 +77,6 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
-  model: claude_sonnet_clawsetup_model.public_id,
-  reasoning: { enabled: true, effort: 'high' },
-  verbosity: 'high',
-};
-
 // INVARIANT: the efficient static fallback must remain image-capable.
 // The capability-aware routing filter relies on this guarantee to make
 // image requests succeed even when no benchmark candidate is capable.
@@ -121,8 +111,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Auto Free',
   description:
-    'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n**In particular** ' +
-    NVIDIA_TRIAL_TOS,
+    'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',
@@ -195,9 +184,5 @@ export const AUTO_MODELS = [
 ];
 
 export function isKiloAutoModel(model: string) {
-  return (
-    AUTO_MODELS.some(m => m.id === model) ||
-    model === ORG_AUTO_MODEL.id ||
-    model === KILO_AUTO_LEGACY_MODEL
-  );
+  return AUTO_MODELS.some(m => m.id === model) || model === ORG_AUTO_MODEL.id;
 }

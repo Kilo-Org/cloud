@@ -1,5 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
-import { CodeReviewCouncilConfigSchema, OrganizationSettingsSchema } from './schema-types';
+import {
+  CodeReviewCouncilConfigSchema,
+  ModelsSchema,
+  OrganizationSettingsSchema,
+  StoredModelSchema,
+} from './schema-types';
+import type { StoredModel } from './schema-types';
 
 describe('CodeReviewCouncilConfigSchema', () => {
   const specialist = (id: string) => ({
@@ -64,5 +70,76 @@ describe('OrganizationSettingsSchema org_auto_model', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('ModelsSchema', () => {
+  it('preserves only supported reasoning metadata', () => {
+    const result = ModelsSchema.parse({
+      data: [
+        {
+          id: 'openai/gpt-5.2',
+          name: 'OpenAI: GPT-5.2',
+          reasoning: {
+            mandatory: false,
+            supported_efforts: ['high', 'medium', 'low', 'none'],
+            default_enabled: true,
+            default_effort: 'medium',
+          },
+        },
+      ],
+    });
+
+    expect(result.data[0].reasoning).toEqual({
+      mandatory: false,
+      supported_efforts: ['high', 'medium', 'low', 'none'],
+    });
+  });
+
+  it('allows reasoning metadata without supported efforts', () => {
+    const result = ModelsSchema.parse({
+      data: [
+        {
+          id: 'google/gemini-2.5-pro',
+          name: 'Google: Gemini 2.5 Pro',
+          reasoning: { mandatory: true },
+        },
+      ],
+    });
+
+    expect(result.data[0].reasoning).toEqual({ mandatory: true });
+  });
+
+  it('drops invalid reasoning metadata', () => {
+    const result = ModelsSchema.parse({
+      data: [
+        {
+          id: 'example/future-effort',
+          name: 'Future Effort',
+          reasoning: {
+            mandatory: false,
+            supported_efforts: ['future'],
+          },
+        },
+      ],
+    });
+
+    expect(result.data[0].reasoning).toBeUndefined();
+  });
+});
+
+describe('StoredModelSchema', () => {
+  it('includes model reasoning metadata', () => {
+    const storedModel: StoredModel = {
+      id: 'openai/gpt-5.2',
+      name: 'OpenAI: GPT-5.2',
+      reasoning: {
+        mandatory: false,
+        supported_efforts: ['high', 'medium', 'low', 'none'],
+      },
+      endpoints: [],
+    };
+
+    expect(StoredModelSchema.parse(storedModel).reasoning).toEqual(storedModel.reasoning);
   });
 });

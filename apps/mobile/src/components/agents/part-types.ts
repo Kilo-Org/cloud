@@ -45,12 +45,9 @@ export function isPartStreaming(part: Part): boolean {
   return false;
 }
 
-export function shouldRenderReasoningPart(part: Part, isStreaming: boolean): boolean {
+export function shouldRenderReasoningPart(part: Part, _isStreaming: boolean): boolean {
   if (!isReasoningPart(part)) {
     return false;
   }
-  if (part.text.trim() !== '') {
-    return true;
-  }
-  return isStreaming && isPartStreaming(part);
+  return part.text.trim() !== '';
 }

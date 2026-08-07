@@ -510,7 +510,8 @@ describe('remote session create and retry commands', () => {
       kiloId('ses-remote'),
       'create_session',
       { protocolVersion: 1 },
-      'owner'
+      'owner',
+      expect.any(String) as string
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     session.destroy();
@@ -544,7 +545,8 @@ describe('remote session create and retry commands', () => {
         model: { providerID: 'kilo', modelID: 'kilo-auto' },
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
-      'owner'
+      'owner',
+      expect.any(String) as string
     );
     session.destroy();
   });

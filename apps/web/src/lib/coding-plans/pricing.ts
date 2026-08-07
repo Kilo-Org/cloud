@@ -1,11 +1,17 @@
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import {
+  BYTEPLUS_CODING_MODEL_IDS,
+  BYTEPLUS_CODING_PROVIDER_ID,
+} from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 
 export const CODING_PLAN_IDS = [
   'minimax-token-plan-plus',
   'minimax-token-plan-max',
   'minimax-token-plan-ultra',
+  'byteplus-coding-plan-team-lite',
+  'byteplus-coding-plan-team-pro',
 ] as const;
-export const CODING_PLAN_PROVIDER_IDS = ['minimax'] as const;
+export const CODING_PLAN_PROVIDER_IDS = ['minimax', 'byteplus-coding'] as const;
 
 export type CodingPlanId = (typeof CODING_PLAN_IDS)[number];
 export type CodingPlanProviderId = (typeof CODING_PLAN_PROVIDER_IDS)[number];
@@ -65,6 +71,38 @@ export const CODING_PLAN_CATALOG = {
     costMicrodollars: 120_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~12.5B tokens per month of M3 usage.', 'Run 6-7 concurrent agents.'),
+  },
+  'byteplus-coding-plan-team-lite': {
+    planId: 'byteplus-coding-plan-team-lite',
+    providerName: 'BytePlus',
+    name: 'Coding Plan Lite',
+    providerId: BYTEPLUS_CODING_PROVIDER_ID,
+    coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
+    costMicrodollars: 20_000_000,
+    billingPeriodDays: 30,
+    features: [
+      'Kilo automatically configures BytePlus in your BYOK settings.',
+      'For moderate-intensity development use.',
+      'Approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per 30-day subscription period.',
+      'Access to the approved BytePlus coding model set.',
+      'Supported models share one plan quota; one prompt can use multiple model requests.',
+    ],
+  },
+  'byteplus-coding-plan-team-pro': {
+    planId: 'byteplus-coding-plan-team-pro',
+    providerName: 'BytePlus',
+    name: 'Coding Plan Pro',
+    providerId: BYTEPLUS_CODING_PROVIDER_ID,
+    coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
+    costMicrodollars: 100_000_000,
+    billingPeriodDays: 30,
+    features: [
+      'Kilo automatically configures BytePlus in your BYOK settings.',
+      'For complex, high-intensity development use.',
+      'Approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per 30-day subscription period.',
+      'Access to the approved BytePlus coding model set.',
+      'Supported models share one plan quota; one prompt can use multiple model requests.',
+    ],
   },
 } satisfies Record<CodingPlanId, CodingPlanCatalogEntry>;
 

@@ -21,11 +21,8 @@ export const VERCEL_ROUTING_REDIS_KEY = redisKey('ai-gateway:vercel-routing-perc
 
 export const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: redisKey('ai-gateway.metadata:all-providers'),
-  openrouterModels: redisKey('ai-gateway.metadata:openrouter-models'),
-  vercelModels: redisKey('ai-gateway.metadata:vercel-models'),
-  // Lightweight lists of language model ids, mirrored alongside the full
-  // catalogs above so existence checks don't need to load every model's
-  // metadata and endpoints.
+  // Lightweight lists of language model ids used for existence checks without
+  // loading every model's metadata and endpoints.
   openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
   vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
@@ -47,6 +44,17 @@ export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${
  */
 export const byokProvidersNotificationRedisKey = (userId: string) =>
   redisKey(`notification:byok-providers:${userId}`);
+
+export const codingPlanUsageRedisKey = (input: {
+  userId: string;
+  subscriptionId: string;
+  planId: string;
+  providerId: string;
+  inventoryId: string;
+}) =>
+  redisKey(
+    `coding-plan-usage:v1:${input.userId}:${input.subscriptionId}:${input.planId}:${input.providerId}:${input.inventoryId}`
+  );
 
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'

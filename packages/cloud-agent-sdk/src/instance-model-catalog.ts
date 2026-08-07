@@ -22,7 +22,6 @@ import {
   type UserWebConnection,
 } from './user-web-connection';
 
-export { remoteModelCatalogV1Schema } from './schemas';
 export type { RemoteModelCatalogV1 } from './schemas';
 
 /** Delivered error string an old CLI returns for a sessionless `list_models`. */

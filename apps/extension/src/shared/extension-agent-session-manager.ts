@@ -245,8 +245,10 @@ async function readPageInEndGraceWindow(
  * bounded probe re-checks `activeSessions.list` for a fixed number of reads:
  * the session becomes busy → run the full active-history retry; the session
  * stays stably idle (or stays absent) for the whole window → resolve the empty
- * page. It re-reads liveness only; the history page is not re-read here, so an
- * inactive session still resolves its empty page without a page retry.
+ * page. A rejected liveness read leaves the working state unknown, so the
+ * empty page resolves without the probe. It re-reads liveness only; the
+ * history page is not re-read here, so an inactive session still resolves its
+ * empty page without a page retry.
  */
 async function readActiveHistoryWithLivenessGrace(
   initialResult: SessionMessagesPageResult,
@@ -264,9 +266,20 @@ async function readActiveHistoryWithLivenessGrace(
   for (let attempt = 0; attempt < ACTIVE_HISTORY_LIVENESS_GRACE_READS; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
     await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
-    // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
-    const current = await fetchActiveSessions();
-    if (isSessionWorking(current)) {
+    let current: ActiveSessionsResult | null = null;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
+      current = await fetchActiveSessions();
+    } catch {
+      /*
+       * A rejected grace liveness read leaves the session's working state
+       * unknown. Resolve the original empty page without the probe, matching
+       * the rejected initial probe behavior, instead of letting the probe
+       * rejection block the transcript.
+       */
+      return result;
+    }
+    if (current !== null && isSessionWorking(current)) {
       return readActiveHistoryWithRetry(result, {
         fetchActiveSessions,
         isSessionWorking,
@@ -314,15 +327,18 @@ function pinPageToSession(
  *
  * A running CLI session can read empty for a long stretch: the CLI batches
  * session-ingest until the turn completes, so the persisted page lags the
- * live turn. For such a session the bounded retry keeps reading until the
- * page carries messages or the session stops running, instead of latching an
- * empty transcript that later persistence can never fill.
+ * live turn. A confirmed-running session resolves that empty page
+ * immediately — the bounded history retry would hold the snapshot (and the
+ * session switch) for up to `ACTIVE_HISTORY_MAX_RETRIES` seconds while the
+ * page stays empty for the whole turn. The bounded recovery still runs for a
+ * session that is not yet confirmed working and turns busy within the
+ * liveness window, where persistence typically catches up quickly.
  *
  * Both page outcomes forward the tRPC result's `watermarkEventId` (when the
  * server returned one) so the transport seeds its first WebSocket connect
  * with `fromId=0` and the ingest DO replays every stored event. That replay
- * is the safety net when a still-running session's empty page is latched:
- * the already-persisted user message still reaches the renderer.
+ * renders the persisted transcript for a reopened running session whose page
+ * resolved empty.
  */
 async function fetchExtensionSessionSnapshotPage(
   trpcClient: TrpcClient,
@@ -352,10 +368,22 @@ async function fetchExtensionSessionSnapshotPage(
      * batches session-ingest until the turn completes and the active-sessions
      * read model can briefly list a starting session as idle or omit it, so a
      * single idle or missing liveness read must not latch the empty
-     * transcript. Confirm liveness with a bounded probe: the session becomes
-     * busy → keep reading until session-ingest persistence catches up; it
-     * stays stably idle or absent → resolve the empty page without an
-     * unbounded wait.
+     * transcript.
+     *
+     * A confirmed-working session resolves its empty page immediately: the
+     * persisted page can stay empty for the whole turn, so the bounded
+     * history retry would hold the snapshot (and the session switch) for up
+     * to `ACTIVE_HISTORY_MAX_RETRIES` seconds while the transport never
+     * connects. Resolving promptly lets the transport connect and replay
+     * every stored event from the page watermark, so the persisted transcript
+     * still renders for a reopened running session without the page retry.
+     *
+     * Only a session that is not confirmed working gets the bounded liveness
+     * probe: it re-checks `activeSessions.list` for a fixed number of reads
+     * and runs the bounded history recovery when the session becomes busy; a
+     * stably idle or absent session resolves the empty page when the window
+     * expires. A rejected liveness read leaves the working state unknown, so
+     * the empty page is resolved without the probe.
      */
     let active: ActiveSessionsResult | null = null;
     try {
@@ -370,18 +398,12 @@ async function fetchExtensionSessionSnapshotPage(
        * their own failures.
        */
     }
-    if (active !== null) {
-      result = isSessionWorking(active)
-        ? await readActiveHistoryWithRetry(result, {
-            fetchActiveSessions,
-            isSessionWorking,
-            queryPage,
-          })
-        : await readActiveHistoryWithLivenessGrace(result, {
-            fetchActiveSessions,
-            isSessionWorking,
-            queryPage,
-          });
+    if (active !== null && !isSessionWorking(active)) {
+      result = await readActiveHistoryWithLivenessGrace(result, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
     }
   }
 

@@ -50,17 +50,6 @@ describe('modelSelectorBadges', () => {
     expect(badges.byok).toBe(false);
   });
 
-  it('shows no badges for an unavailable option without the flag', () => {
-    const badges = modelSelectorBadges({
-      id: 'remote-unavailable-model',
-      showGatewayMetadata: false,
-      unavailable: true,
-    });
-    expect(badges.byok).toBe(false);
-    expect(badges.free).toBe(false);
-    expect(badges.collectsData).toBe(false);
-  });
-
   it('shows no badges for an undefined option', () => {
     const badges = modelSelectorBadges(undefined);
     expect(badges.byok).toBe(false);

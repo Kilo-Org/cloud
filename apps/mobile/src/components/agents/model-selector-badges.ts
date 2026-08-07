@@ -7,7 +7,6 @@ import {
 
 type ModelBadgeOption = ModelDataDisclosure & {
   showGatewayMetadata: boolean;
-  unavailable?: boolean;
 };
 
 /**

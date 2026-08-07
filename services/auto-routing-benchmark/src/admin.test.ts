@@ -69,6 +69,7 @@ const TEST_CONFIG_ROWS = {
   classifierModels: TEST_CONFIG.classifierModels,
   deciderModels: TEST_CONFIG.deciderModels.map(m => ({
     model: m.id,
+    variant: null,
     reasoning_effort: m.reasoningEffort ?? null,
   })),
   autoDeciderModels: [],
@@ -236,6 +237,7 @@ describe('GET /admin/config', () => {
     const classifierModels = ['some/model'];
     const deciderModels = TEST_CONFIG.deciderModels.map(m => ({
       model: m.id,
+      variant: null,
       reasoning_effort: null,
     }));
     vi.mocked(getConfigRows).mockResolvedValueOnce({
@@ -349,7 +351,9 @@ describe('PUT /admin/config', () => {
     expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
-    expect(deciderModelRows).toEqual([{ model: 'manual/model', reasoning_effort: 'low' }]);
+    expect(deciderModelRows).toEqual([
+      { model: 'manual/model', variant: null, reasoning_effort: 'low' },
+    ]);
     expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
   });
 });
@@ -478,7 +482,7 @@ describe('POST /admin/runs', () => {
         benchmark_user_id: null,
         benchmark_org_id: null,
       },
-      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
+      deciderModels: [{ model: 'vendor/a', variant: null, reasoning_effort: null }],
     });
 
     const res = await authedPost('/admin/runs', { kind: 'decider' });
@@ -494,8 +498,8 @@ describe('POST /admin/runs', () => {
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
       deciderModels: [
-        { model: 'vendor/a', reasoning_effort: null },
-        { model: 'vendor/b', reasoning_effort: null },
+        { model: 'vendor/a', variant: null, reasoning_effort: null },
+        { model: 'vendor/b', variant: null, reasoning_effort: null },
       ],
     });
     // vendor/a has a prior result measured under the current engine identity,
@@ -527,7 +531,7 @@ describe('POST /admin/runs', () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
+      deciderModels: [{ model: 'vendor/a', variant: null, reasoning_effort: null }],
     });
     // Prior result was measured at variant 'high'; current config runs it at
     // null, so the carry is invalidated and the model is re-enqueued.
@@ -557,7 +561,7 @@ describe('POST /admin/runs', () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: [{ model: 'vendor/a', reasoning_effort: 'high' }],
+      deciderModels: [{ model: 'vendor/a', variant: null, reasoning_effort: 'high' }],
     });
     // Same model/engine/reps but prior was measured at a different variant.
     vi.mocked(getLatestSummariesByModel).mockResolvedValue(
@@ -589,8 +593,8 @@ describe('POST /admin/runs', () => {
       // vendor/b has no prior → stays enqueued so we do not hit the all-carried
       // finalize path (which needs a real D1 client in unit tests).
       deciderModels: [
-        { model: 'vendor/a', reasoning_effort: 'high' },
-        { model: 'vendor/b', reasoning_effort: null },
+        { model: 'vendor/a', variant: null, reasoning_effort: 'high' },
+        { model: 'vendor/b', variant: null, reasoning_effort: null },
       ],
     });
     // Legacy rows store variant from reasoning_effort; exact pair high matches.
@@ -627,7 +631,7 @@ describe('POST /admin/runs', () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
-      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+      deciderModels: manyModels.map(m => ({ model: m.id, variant: null, reasoning_effort: null })),
     });
 
     const res = await authedPost('/admin/runs', { kind: 'decider' });
@@ -661,7 +665,7 @@ describe('POST /admin/runs', () => {
         benchmark_org_id: 'org-123',
         decider_repetitions: 3,
       },
-      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+      deciderModels: manyModels.map(m => ({ model: m.id, variant: null, reasoning_effort: null })),
     });
 
     const res = await authedPost('/admin/runs', { kind: 'decider' });
@@ -693,7 +697,11 @@ describe('POST /admin/runs', () => {
         benchmark_org_id: 'org-123',
         decider_repetitions: 5,
       },
-      deciderModels: tooManyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+      deciderModels: tooManyModels.map(m => ({
+        model: m.id,
+        variant: null,
+        reasoning_effort: null,
+      })),
     });
 
     const res = await authedPost('/admin/runs', { kind: 'decider' });

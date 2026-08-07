@@ -4,7 +4,7 @@ import type {
   BenchmarkModelSummary,
   TaxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
-import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import { RoutingTableSchema, TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import { buildRoutingTable } from './routing-table-builder';
 
 const DECIDER_MODELS: BenchmarkDeciderModel[] = [
@@ -253,5 +253,44 @@ describe('buildRoutingTable', () => {
     });
 
     expect(table.routes['implementation/code_generation']).toHaveLength(3);
+  });
+
+  it('keeps the exact effort-only shape for an enum reasoningEffort snapshot', () => {
+    const table = buildRoutingTable({
+      runId: 'test-run-enum-shape',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: [{ id: 'model/value', variant: null, reasoningEffort: 'medium' }],
+      summaries: TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        ...summary('model/value', routeKey, 0.9, 0.002),
+        variant: 'medium',
+      })),
+    });
+    const cand = table.routes['implementation/code_generation']?.[0];
+    expect(cand?.reasoningEffort).toBe('medium');
+    expect(cand && 'variant' in cand ? cand.variant : undefined).toBeUndefined();
+  });
+
+  it('emits variant for a snapshot entry whose key is outside the effort enum', () => {
+    const table = buildRoutingTable({
+      runId: 'test-run-non-enum-variant',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: [{ id: 'model/max', variant: 'max', reasoningEffort: null }],
+      summaries: TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        ...summary('model/max', routeKey, 0.9, 0.002),
+        variant: 'max',
+      })),
+    });
+    const cand = table.routes['implementation/code_generation']?.[0];
+    expect(cand).toBeDefined();
+    expect(cand?.variant).toBe('max');
+    expect(cand?.reasoningEffort).toBeNull();
+    // The published artifact must satisfy the contract schema (variant field allowed).
+    expect(RoutingTableSchema.parse(table)).toEqual(table);
   });
 });

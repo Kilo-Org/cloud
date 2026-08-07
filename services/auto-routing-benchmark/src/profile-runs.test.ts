@@ -108,8 +108,8 @@ function mockConfig(overrides: Partial<typeof configRow> = {}) {
     // mapConfigRows requires non-empty classifier + decider lists.
     classifierModels: ['classifier/a'],
     deciderModels: [
-      { model: 'platform/a', reasoning_effort: null },
-      { model: 'platform/b', reasoning_effort: 'high' },
+      { model: 'platform/a', variant: null, reasoning_effort: null },
+      { model: 'platform/b', variant: null, reasoning_effort: 'high' },
     ],
     autoDeciderModels: [],
     excludedAutoDeciderModels: [],
@@ -189,6 +189,41 @@ describe('startRun — profile purpose', () => {
     expect(runArg.purpose).toBe('platform');
     expect(modelRows.map(m => m.model).sort()).toEqual(['platform/a', 'platform/b']);
     expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+  });
+
+  it('platform startRun maps a saved canonical variant into the run_models row', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: configRow,
+      classifierModels: ['classifier/a'],
+      deciderModels: [{ model: 'platform/a', variant: 'max', reasoning_effort: null }],
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
+    });
+
+    const result = await startRun(env, 'decider');
+    expect(result.runId).toMatch(/^decider-/);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toEqual([
+      expect.objectContaining({
+        model: 'platform/a',
+        variant: 'max',
+        enqueued: true,
+      }),
+    ]);
+  });
+
+  it("platform startRun keeps a legacy enum effort as today's exact row shape", async () => {
+    // mockConfig() default: platform/b holds reasoning_effort 'high' (legacy shape).
+    const result = await startRun(env, 'decider');
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    const row = modelRows.find(m => m.model === 'platform/b');
+    expect(row).toMatchObject({
+      model: 'platform/b',
+      variant: 'high',
+      enqueued: true,
+      reasoning_effort: 'high',
+    });
+    expect(result.enqueuedModels).toBe(2);
   });
 
   it('rejects profile runs that are not decider or lack entries', async () => {

@@ -1379,15 +1379,18 @@ async function finalizeRunIfComplete(
     try {
       // Built from the run's own model snapshot, not live config, so a mid-run
       // admin edit can't skew the published table. Platform tables still emit
-      // reasoningEffort (sourced from the run snapshot's effort key) — not
-      // variant — so the published artifact shape stays unchanged for rolling
-      // deploys of old auto-routing workers.
-      const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => ({
-        id: m.model,
-        reasoningEffort: parsePersistedReasoningEffort(
-          m.reasoning_effort ?? variantFromStorage(m.variant)
-        ),
-      }));
+      // reasoningEffort for enum efforts (sourced from the run snapshot's effort
+      // key) — not variant — so those published artifact shapes stay unchanged
+      // for rolling deploys of old auto-routing workers. A non-enum catalog
+      // variant can only be carried as `variant`; emitting effort would drop it.
+      const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => {
+        const key = m.reasoning_effort ?? variantFromStorage(m.variant);
+        const effort = parsePersistedReasoningEffort(key);
+        if (effort === null && key !== null) {
+          return { id: m.model, variant: key, reasoningEffort: null };
+        }
+        return { id: m.model, reasoningEffort: effort };
+      });
       const table = buildRoutingTable({
         runId,
         generatedAt,

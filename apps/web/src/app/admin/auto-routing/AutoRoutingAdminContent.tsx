@@ -452,6 +452,9 @@ export function AutoRoutingAdminContent() {
             void classifierModelQuery.refetch();
             void analyticsQuery.refetch();
             void openRouterModelsQuery.refetch();
+            // Invalidate the shared selector catalog the benchmark pickers read
+            // from (query key prefix ['openrouter-models']).
+            void queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
           }}
           disabled={isRefreshing}
           className="w-fit"

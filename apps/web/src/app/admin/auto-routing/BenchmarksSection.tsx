@@ -9,32 +9,29 @@ import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   StartBenchmarkRunResponseSchema,
+  type AutoBenchmarkDeciderModel,
   type BenchmarkConfig,
+  type BenchmarkDeciderModel,
   type BenchmarkKind,
+  type BenchmarkModelSummary,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
-  type BenchmarkModelSummary,
   type RankedCandidate,
-  type ReasoningEffort,
-  type AutoBenchmarkDeciderModel,
 } from '@kilocode/auto-routing-contracts';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, Save, Trash2 } from 'lucide-react';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -44,7 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { parseAdminResponse } from './admin-fetch';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +69,31 @@ export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'a
 export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
   const value = costPerAccuracy(candidate);
   return Number.isFinite(value) ? formatUsd(value) : '—';
+}
+
+// ---------------------------------------------------------------------------
+// Model picker helpers (exported for unit tests)
+// ---------------------------------------------------------------------------
+
+/** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
+export function pinnedModelFor(id: string): ModelOption {
+  return { id, name: id };
+}
+
+/**
+ * Variant keys offered for a decider row: the selected model's catalog keys,
+ * plus a saved key the catalog no longer lists (kept so an existing row stays
+ * editable and round-trips). Hides only when no key exists.
+ */
+export function variantOptionsForModel(
+  modelOption: ModelOption | undefined,
+  savedVariant: string | null
+): string[] {
+  const catalogKeys = modelOption?.variants ?? [];
+  if (savedVariant && !catalogKeys.includes(savedVariant)) {
+    return [...catalogKeys, savedVariant];
+  }
+  return catalogKeys;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,13 +142,13 @@ async function fetchBenchmarkRoutingTable() {
 
 type DeciderModelRow = {
   id: string;
-  reasoningEffort: ReasoningEffort | null;
+  variant: string | null;
 };
 
 type AutoDeciderModelRow = AutoBenchmarkDeciderModel;
 
 export function configToFormState(config: BenchmarkConfig | null): {
-  classifierModels: string;
+  classifierModels: string[];
   deciderModels: DeciderModelRow[];
   autoDeciderModels: AutoDeciderModelRow[];
   excludedAutoDeciderModels: string;
@@ -147,7 +168,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
     // No config saved yet: identity fields are overrides, so blank means the
     // worker uses its default benchmark user and org at run time.
     return {
-      classifierModels: '',
+      classifierModels: [],
       deciderModels: [],
       autoDeciderModels: [],
       excludedAutoDeciderModels: '',
@@ -165,10 +186,12 @@ export function configToFormState(config: BenchmarkConfig | null): {
     };
   }
   return {
-    classifierModels: config.classifierModels.join('\n'),
+    classifierModels: config.classifierModels,
     deciderModels: (config.manualDeciderModels ?? config.deciderModels).map(m => ({
       id: m.id,
-      reasoningEffort: m.reasoningEffort ?? null,
+      // Legacy reasoningEffort-only rows load as the canonical form variant so
+      // a save emits variant-only manual rows.
+      variant: m.variant ?? m.reasoningEffort ?? null,
     })),
     autoDeciderModels: config.autoDeciderModels ?? [],
     excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
@@ -202,12 +225,15 @@ export function effectiveDeciderModels({
   manualDeciderModels: DeciderModelRow[];
   autoDeciderModels: AutoDeciderModelRow[];
   excludedAutoDeciderModels: string[];
-}): DeciderModelRow[] {
+}): BenchmarkDeciderModel[] {
   const manual = manualDeciderModels
     .filter(row => row.id.trim().length > 0)
     .map(row => ({
       id: row.id.trim(),
-      reasoningEffort: row.reasoningEffort ?? null,
+      variant: row.variant ?? null,
+      // The contract type requires the legacy field; it stays null on
+      // variant-only rows (both non-null is malformed).
+      reasoningEffort: null,
     }));
   const manualIds = new Set(manual.map(model => model.id));
   const excludedAuto = new Set(excludedAutoDeciderModels);
@@ -218,6 +244,9 @@ export function effectiveDeciderModels({
       .filter(model => !manualIds.has(model.id))
       .map(model => ({
         id: model.id,
+        // Auto rows stay effort-only: the benchmark worker writes and reads the
+        // legacy reasoningEffort for synced rows, so never emit the canonical
+        // variant key here.
         reasoningEffort: model.reasoningEffort ?? null,
       })),
   ];
@@ -227,11 +256,17 @@ export function formStateToConfig(
   state: ReturnType<typeof configToFormState>,
   base: BenchmarkConfig | null
 ): BenchmarkConfig {
-  const classifierModels = parseModelLines(state.classifierModels);
+  const classifierModels = state.classifierModels.map(id => id.trim()).filter(id => id.length > 0);
   const excludedAutoDeciderModels = parseModelLines(state.excludedAutoDeciderModels);
   const manualDeciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
-    .map(row => ({ id: row.id.trim(), reasoningEffort: row.reasoningEffort ?? null }));
+    .map(row => ({
+      id: row.id.trim(),
+      variant: row.variant ?? null,
+      // Variant-only rows: the legacy effort field is always null so the two
+      // never collide (both non-null is malformed per the contract).
+      reasoningEffort: null,
+    }));
   const deciderModels = effectiveDeciderModels({
     manualDeciderModels,
     autoDeciderModels: state.autoDeciderModels,
@@ -270,9 +305,15 @@ export function formStateToConfig(
 function BenchmarkConfigEditor({
   config,
   onSaved,
+  modelOptions,
+  modelsLoading,
+  modelsError,
 }: {
   config: BenchmarkConfig | null;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
+  modelOptions: ModelOption[];
+  modelsLoading: boolean;
+  modelsError?: string;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -319,10 +360,37 @@ function BenchmarkConfigEditor({
     },
   });
 
+  const handleAddClassifierRow = useCallback(() => {
+    updateForm(prev => ({
+      ...prev,
+      classifierModels: [...prev.classifierModels, ''],
+    }));
+  }, [updateForm]);
+
+  const handleRemoveClassifierRow = useCallback(
+    (index: number) => {
+      updateForm(prev => ({
+        ...prev,
+        classifierModels: prev.classifierModels.filter((_, i) => i !== index),
+      }));
+    },
+    [updateForm]
+  );
+
+  const handleClassifierModelChange = useCallback(
+    (index: number, value: string) => {
+      updateForm(prev => ({
+        ...prev,
+        classifierModels: prev.classifierModels.map((id, i) => (i === index ? value : id)),
+      }));
+    },
+    [updateForm]
+  );
+
   const handleAddDeciderRow = useCallback(() => {
     updateForm(prev => ({
       ...prev,
-      deciderModels: [...prev.deciderModels, { id: '', reasoningEffort: null }],
+      deciderModels: [...prev.deciderModels, { id: '', variant: null }],
     }));
   }, [updateForm]);
 
@@ -378,17 +446,62 @@ function BenchmarkConfigEditor({
       <CardContent className="flex flex-col gap-4 p-4 pt-0">
         {/* Classifier models */}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="benchmark-classifier-models" className="text-sm font-medium">
-            Classifier models (one per line)
-          </Label>
-          <Textarea
-            id="benchmark-classifier-models"
-            value={form.classifierModels}
-            onChange={e => updateForm(prev => ({ ...prev, classifierModels: e.target.value }))}
-            rows={4}
-            className="font-mono text-xs"
-            placeholder="openai/gpt-4o-mini"
-          />
+          <Label className="text-sm font-medium">Classifier models</Label>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {form.classifierModels.map((modelId, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="py-2">
+                      <ModelCombobox
+                        variant="compact"
+                        models={modelOptions}
+                        value={modelId}
+                        onValueChange={value => handleClassifierModelChange(index, value)}
+                        pinnedModel={
+                          modelId && !modelOptions.some(option => option.id === modelId)
+                            ? pinnedModelFor(modelId)
+                            : undefined
+                        }
+                        isLoading={modelsLoading}
+                        error={modelsError}
+                        className="w-full"
+                        triggerAriaLabel={`Classifier model ${index + 1}`}
+                      />
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleRemoveClassifierRow(index)}
+                        aria-label={`Remove classifier model ${index + 1}`}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={handleAddClassifierRow}
+          >
+            <Plus className="size-3.5" />
+            Add model
+          </Button>
         </div>
 
         {/* Manual decider models table */}
@@ -398,61 +511,66 @@ function BenchmarkConfigEditor({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model ID</TableHead>
-                  <TableHead className="w-36">Reasoning effort</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="w-36">Variant</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {form.deciderModels.map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="py-2">
-                      <Input
-                        value={row.id}
-                        onChange={e => handleDeciderRowChange(index, { id: e.target.value })}
-                        className="h-8 font-mono text-xs"
-                        placeholder="openai/gpt-4o"
-                        aria-label={`Decider model ${index + 1} ID`}
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Select
-                        value={row.reasoningEffort ?? 'none'}
-                        onValueChange={value =>
-                          handleDeciderRowChange(index, {
-                            reasoningEffort: value === 'none' ? null : (value as ReasoningEffort),
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          className="h-8 text-xs"
-                          aria-label={`Model ${index + 1} reasoning effort`}
+                {form.deciderModels.map((row, index) => {
+                  const rowModel = modelOptions.find(option => option.id === row.id);
+                  const variantOptions = variantOptionsForModel(rowModel, row.variant);
+                  return (
+                    <TableRow key={index}>
+                      <TableCell className="py-2">
+                        <ModelCombobox
+                          variant="compact"
+                          models={modelOptions}
+                          value={row.id}
+                          onValueChange={value =>
+                            handleDeciderRowChange(index, { id: value, variant: null })
+                          }
+                          pinnedModel={
+                            row.id && !modelOptions.some(option => option.id === row.id)
+                              ? pinnedModelFor(row.id)
+                              : undefined
+                          }
+                          isLoading={modelsLoading}
+                          error={modelsError}
+                          className="w-full"
+                          triggerAriaLabel={`Decider model ${index + 1}`}
+                        />
+                      </TableCell>
+                      <TableCell className="py-2">
+                        {variantOptions.length > 0 ? (
+                          <VariantCombobox
+                            variants={variantOptions}
+                            value={row.variant ?? undefined}
+                            onValueChange={value =>
+                              handleDeciderRowChange(index, { variant: value })
+                            }
+                            className="w-full"
+                            triggerAriaLabel={`Decider model ${index + 1} variant`}
+                          />
+                        ) : row.id ? (
+                          <span className="text-muted-foreground text-xs">default</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveDeciderRow(index)}
+                          aria-label={`Remove decider model ${index + 1}`}
                         >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="minimal">minimal</SelectItem>
-                          <SelectItem value="low">low</SelectItem>
-                          <SelectItem value="medium">medium</SelectItem>
-                          <SelectItem value="high">high</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleRemoveDeciderRow(index)}
-                        aria-label={`Remove decider model ${index + 1}`}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -497,7 +615,7 @@ function BenchmarkConfigEditor({
                           {formatUsd(model.avgAttemptCostUsd)}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-xs">
-                          {model.reasoningEffort ?? 'default'}
+                          {model.variant ?? model.reasoningEffort ?? 'default'}
                         </TableCell>
                         <TableCell>
                           <Checkbox
@@ -967,7 +1085,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                 <TableHeader>
                   <TableRow>
                     <TableHead>Model</TableHead>
-                    <TableHead className="w-36">Reasoning effort</TableHead>
+                    <TableHead className="w-36">Variant</TableHead>
                     <TableHead className="text-right">Accuracy</TableHead>
                     <TableHead className="text-right">Avg cost</TableHead>
                     <TableHead className="text-right">Cost / accuracy</TableHead>
@@ -981,7 +1099,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                         {c.model}
                       </TableCell>
                       <TableCell className="capitalize text-xs">
-                        {c.reasoningEffort ?? 'default'}
+                        {c.variant ?? c.reasoningEffort ?? 'default'}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {formatAccuracy(c.accuracy)}
@@ -1016,6 +1134,13 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
 export function BenchmarksSection() {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
+
+  const modelsQuery = useModelSelectorList(undefined);
+  const modelOptions = useMemo(
+    () => toEligibleModelOptions(modelsQuery.data?.data ?? [], []),
+    [modelsQuery.data?.data]
+  );
+  const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
 
   const configQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-config'],
@@ -1109,7 +1234,13 @@ export function BenchmarksSection() {
             : 'Failed to load benchmark config'}
         </div>
       ) : configQuery.data ? (
-        <BenchmarkConfigEditor config={configQuery.data.config} onSaved={handleConfigSaved} />
+        <BenchmarkConfigEditor
+          config={configQuery.data.config}
+          onSaved={handleConfigSaved}
+          modelOptions={modelOptions}
+          modelsLoading={modelsQuery.isLoading}
+          modelsError={modelsError}
+        />
       ) : null}
 
       {/* Run controls */}

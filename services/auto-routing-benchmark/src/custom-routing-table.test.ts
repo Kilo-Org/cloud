@@ -3,7 +3,10 @@ import type { TaxonomyRouteKey } from '@kilocode/auto-routing-contracts';
 import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import type * as DbModule from './db';
 import type { BenchmarkModelSummaryWithRun } from './db';
-import { buildCustomRoutingTable, computeCustomRoutingTableVersion } from './routing-table-builder';
+import {
+  buildCustomRoutingTable,
+  computeRegistryRoutingTableVersion,
+} from './routing-table-builder';
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
@@ -131,9 +134,9 @@ describe('buildCustomRoutingTable', () => {
       avgCostUsd: 0.003,
     });
     // Deterministic version shape unchanged
-    expect(table!.version).toMatch(/^custom-[0-9a-f]{8}$/);
+    expect(table!.version).toMatch(/^registry-[0-9a-f]{8}$/);
     expect(table!.version).toBe(
-      computeCustomRoutingTableVersion([
+      computeRegistryRoutingTableVersion([
         { runId: 'run-r1', model: 'vendor/a', variant: 'high' },
         { runId: 'run-r2', model: 'vendor/b', variant: 'max' },
       ])
@@ -170,16 +173,16 @@ describe('buildCustomRoutingTable', () => {
       summaries: [...summaries].reverse(),
     });
     expect(t1!.version).toBe(t2!.version);
-    expect(t1!.version).toMatch(/^custom-[0-9a-f]{8}$/);
+    expect(t1!.version).toMatch(/^registry-[0-9a-f]{8}$/);
   });
 
-  it('computeCustomRoutingTableVersion is order-independent', () => {
+  it('computeRegistryRoutingTableVersion is order-independent', () => {
     const a = [
       { runId: 'r1', model: 'm', variant: 'x' as string | null },
       { runId: 'r2', model: 'n', variant: null },
     ];
-    expect(computeCustomRoutingTableVersion(a)).toBe(
-      computeCustomRoutingTableVersion([...a].reverse())
+    expect(computeRegistryRoutingTableVersion(a)).toBe(
+      computeRegistryRoutingTableVersion([...a].reverse())
     );
   });
 });

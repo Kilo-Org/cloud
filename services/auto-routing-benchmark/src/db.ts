@@ -12,7 +12,7 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, not, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt, ne, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -58,6 +58,11 @@ const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 // and an unchunked 33-row insert fails with "too many SQL variables", which
 // stranded every pending Benchmark profile in production.
 const RUN_MODEL_INSERT_BATCH_SIZE = 18;
+
+// Statements that name a set of exact pairs bind two variables per entry on top
+// of a small fixed clause. 30 keeps each one well inside D1's 100-variable
+// ceiling — the same ceiling that once stranded every pending profile in prod.
+const PROFILE_ENTRY_FILTER_BATCH_SIZE = 30;
 
 // ---------------------------------------------------------------------------
 // Row mapping helpers
@@ -575,11 +580,15 @@ export async function markProfilesRunningForRun(
   entries: readonly PoolEntry[],
   current: { engineIdentity: string; repetitions: number },
   nowIso: string = new Date().toISOString()
-): Promise<void> {
-  if (entries.length === 0) return;
+): Promise<PoolEntry[]> {
+  if (entries.length === 0) return [];
   const orm = drizzle(db);
+  // Returns the entries this run actually claimed. An entry already claimed by
+  // the other queue's run updates 0 rows and is dropped, so the pair is
+  // measured once instead of being benchmarked (and billed) twice.
+  const claimed: PoolEntry[] = [];
   for (const entry of entries) {
-    await orm
+    const result = await orm
       .update(benchmarkProfiles)
       .set({
         status: 'running',
@@ -600,7 +609,9 @@ export async function markProfilesRunningForRun(
           )
         )
       );
+    if ((result.meta.changes ?? 0) > 0) claimed.push(entry);
   }
+  return claimed;
 }
 
 /**
@@ -721,7 +732,18 @@ export async function markProfilesFailedForEntries(
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   if (entries.length === 0) return;
-  await markProfilesFailedForEntriesStatement(drizzle(db), runId, entries, failureReason, nowIso);
+  const orm = drizzle(db);
+  // Two bound variables per entry plus the fixed clause. A run can hold far
+  // more entries than D1's ceiling allows in one statement, so chunk.
+  for (let i = 0; i < entries.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    await markProfilesFailedForEntriesStatement(
+      orm,
+      runId,
+      entries.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE),
+      failureReason,
+      nowIso
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -899,18 +921,31 @@ export async function syncPlatformRegistryRows(
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   const orm = drizzle(db);
-  const desiredKeys = desired.map(entry => ({
-    model: entry.model,
-    variant: variantToStorage(entry.variant),
-  }));
 
-  const stmts: BatchItem<'sqlite'>[] = desiredKeys.map(
-    entry =>
+  // Clear every flag first, then re-set it per desired pair. Naming the desired
+  // set in one NOT(...) clause instead would bind two variables per model and
+  // blow D1's bound-variable ceiling once the decider list passes ~47 entries.
+  // Both statements run in one batch, so no drain sees a half-cleared queue.
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
+    orm
+      .update(benchmarkProfiles)
+      .set({ platform_requested: false, updated_at: nowIso })
+      .where(
+        and(
+          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+          eq(benchmarkProfiles.repetitions, current.repetitions),
+          eq(benchmarkProfiles.platform_requested, true)
+        )
+      ),
+  ];
+
+  for (const entry of desired) {
+    stmts.push(
       orm
         .insert(benchmarkProfiles)
         .values({
           model: entry.model,
-          variant: entry.variant,
+          variant: variantToStorage(entry.variant),
           engine_identity: current.engineIdentity,
           repetitions: current.repetitions,
           status: 'pending',
@@ -934,31 +969,10 @@ export async function syncPlatformRegistryRows(
           ],
           set: { platform_requested: true, updated_at: nowIso },
         }) as BatchItem<'sqlite'>
-  );
+    );
+  }
 
-  // Drop the flag from current-engine rows the platform list no longer wants.
-  // An empty desired list leaves `matchesDesired` undefined, which correctly
-  // clears the flag from every current-engine row.
-  const matchesDesired = or(
-    ...desiredKeys.map(entry =>
-      and(eq(benchmarkProfiles.model, entry.model), eq(benchmarkProfiles.variant, entry.variant))
-    )
-  );
-  stmts.push(
-    orm
-      .update(benchmarkProfiles)
-      .set({ platform_requested: false, updated_at: nowIso })
-      .where(
-        and(
-          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
-          eq(benchmarkProfiles.repetitions, current.repetitions),
-          eq(benchmarkProfiles.platform_requested, true),
-          matchesDesired ? not(matchesDesired) : undefined
-        )
-      ) as BatchItem<'sqlite'>
-  );
-
-  await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+  await orm.batch(stmts);
 }
 
 /**
@@ -971,24 +985,29 @@ export async function listReadyCurrentProfilesForEntries(
 ): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
   if (entries.length === 0) return [];
   const models = [...new Set(entries.map(e => e.model))];
-  const rows = await drizzle(db)
-    .select({
-      model: benchmarkProfiles.model,
-      variant: benchmarkProfiles.variant,
-      run_id: benchmarkProfiles.run_id,
-      engine_identity: benchmarkProfiles.engine_identity,
-      repetitions: benchmarkProfiles.repetitions,
-      status: benchmarkProfiles.status,
-    })
-    .from(benchmarkProfiles)
-    .where(
-      and(
-        inArray(benchmarkProfiles.model, models),
-        eq(benchmarkProfiles.status, 'ready'),
-        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
-        eq(benchmarkProfiles.repetitions, current.repetitions)
-      )
+  const orm = drizzle(db);
+  // One bound variable per model. The platform decider list is unbounded, so
+  // chunk rather than let a long list trip D1's ceiling.
+  const rows: Array<{ model: string; variant: string; run_id: string | null }> = [];
+  for (let i = 0; i < models.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    rows.push(
+      ...(await orm
+        .select({
+          model: benchmarkProfiles.model,
+          variant: benchmarkProfiles.variant,
+          run_id: benchmarkProfiles.run_id,
+        })
+        .from(benchmarkProfiles)
+        .where(
+          and(
+            inArray(benchmarkProfiles.model, models.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE)),
+            eq(benchmarkProfiles.status, 'ready'),
+            eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+            eq(benchmarkProfiles.repetitions, current.repetitions)
+          )
+        ))
     );
+  }
   const wanted = new Set(entries.map(e => exactPairKey(e.model, e.variant)));
   return rows
     .filter(row => wanted.has(exactPairKey(row.model, variantFromStorage(row.variant))))
@@ -1020,6 +1039,52 @@ export async function getSummariesForRuns(
  * Running decider run ids older than the stale threshold (for profile fail-over
  * after the bulk stale sweep).
  */
+/**
+ * Fail registry rows left `running` by a run that already reached a terminal
+ * state. Their transition threw (a D1 blip, a bound-variable failure) and
+ * nothing else can reach them: the drain wants `pending`, requeue wants
+ * `failed`, and the stale sweep only looks at runs that are still `running`.
+ * Without this they stay claimed forever and the owner's pool never resolves.
+ * Rows whose run has not been written yet (claimed moments before insert) are
+ * untouched, because the run id has no terminal row to match.
+ */
+export async function failOrphanedRunningProfiles(
+  db: D1Database,
+  failureReason: string,
+  nowIso: string = new Date().toISOString()
+): Promise<number> {
+  const orm = drizzle(db);
+  const result = await orm
+    .update(benchmarkProfiles)
+    .set({
+      status: 'failed',
+      failure_reason: boundProfileFailureReason(failureReason),
+      updated_at: nowIso,
+      completed_at: nowIso,
+    })
+    .where(
+      and(
+        eq(benchmarkProfiles.status, 'running'),
+        inArray(
+          benchmarkProfiles.run_id,
+          orm
+            .select({ id: benchmarkRuns.id })
+            .from(benchmarkRuns)
+            .where(inArray(benchmarkRuns.status, ['completed', 'failed']))
+        )
+      )
+    );
+  return result.meta.changes ?? 0;
+}
+
+/** Release rows this run claimed back to `pending` (claim made, run never written). */
+export async function releaseProfileClaims(db: D1Database, runId: string): Promise<void> {
+  await drizzle(db)
+    .update(benchmarkProfiles)
+    .set({ status: 'pending', run_id: null, updated_at: new Date().toISOString() })
+    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+}
+
 export async function listStaleRunningDeciderRuns(
   db: D1Database,
   olderThanIso: string

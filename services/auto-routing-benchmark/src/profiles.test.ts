@@ -24,6 +24,7 @@ type EventRow = {
 
 type PendingStmt =
   | { kind: 'event'; values: Omit<EventRow, 'id'>; guarded: boolean }
+  | { kind: 'claim_user_requested'; entries: string[] }
   | {
       kind: 'profile';
       values: ProfileRow;
@@ -173,6 +174,23 @@ vi.mock('drizzle-orm/d1', () => {
           },
         };
       },
+      update() {
+        const stmt: PendingStmt = { kind: 'claim_user_requested', entries: [] };
+        const builder = {
+          set() {
+            return builder;
+          },
+          where(clause: unknown) {
+            // The claim's WHERE is an or() of exact pairs; the operator mock
+            // reduces it to a 'models' descriptor carrying those model ids.
+            const models = (clause as { models?: string[] } | null)?.models;
+            if (models) stmt.entries = models;
+            return builder;
+          },
+          __stmt: stmt,
+        };
+        return builder;
+      },
       insert(table: { __tableName?: string }) {
         const isEvents = table.__tableName === 'profile_request_events';
         return {
@@ -253,6 +271,12 @@ vi.mock('drizzle-orm/d1', () => {
   }
 
   function applyStmt(stmt: PendingStmt) {
+    if (stmt.kind === 'claim_user_requested') {
+      for (const row of store.profiles.values()) {
+        if (stmt.entries.includes(row.model)) row.user_requested = true;
+      }
+      return;
+    }
     if (stmt.kind === 'event') {
       if (stmt.guarded && hasActiveCurrentProfile(stmt.values)) {
         // INSERT...SELECT...WHERE NOT EXISTS → zero rows.

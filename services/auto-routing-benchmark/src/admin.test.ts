@@ -110,6 +110,7 @@ import {
   existsNewerCompletedRun,
   insertRun,
   listPendingCurrentProfiles,
+  markProfilesRunningForRun,
   listReadyCurrentProfilesForEntries,
   getSummariesForRuns,
   syncPlatformRegistryRows,
@@ -186,6 +187,9 @@ beforeEach(() => {
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+  vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => [
+    ...entries,
+  ]);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);

@@ -8,6 +8,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
   BenchmarkKind,
   BenchmarkProfileStatus,
@@ -27,7 +28,9 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   // Live container budget for user-queue runs, independent of max_concurrency
   // (the platform-queue budget). The two must sum to at most the platform
   // container cap; the config contract enforces that at the write boundary.
-  user_max_concurrency: integer('user_max_concurrency').notNull().default(100),
+  user_max_concurrency: integer('user_max_concurrency')
+    .notNull()
+    .default(BENCHMARK_CONTAINER_BUDGET / 2),
   benchmark_user_id: text('benchmark_user_id'),
   benchmark_org_id: text('benchmark_org_id'),
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),

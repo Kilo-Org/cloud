@@ -12,9 +12,14 @@ UPDATE `benchmark_runs` SET `purpose` = 'user' WHERE `purpose` = 'profile';--> s
 --    registry, so the platform routing table keeps its candidates instead of
 --    re-benchmarking models that were measured with real money. Provenance
 --    points at the run whose model_summaries hold the numbers; ORDER BY
---    started_at DESC with INSERT OR IGNORE keeps the newest run per exact pair,
---    and skips pairs an owner pool already has a registry row for.
-INSERT OR IGNORE INTO `benchmark_profiles` (
+--    started_at DESC keeps the newest run per exact pair.
+--
+--    An owner pool may already hold a row for the same pair. A `pending` or
+--    `failed` row there means the measurement was going to be paid for again,
+--    so adopt the existing result into it. `ready` rows are left alone (they
+--    already have provenance) and so are `running` ones (a live run owns them
+--    and must stay able to settle its own entries).
+INSERT INTO `benchmark_profiles` (
   `model`, `variant`, `engine_identity`, `repetitions`, `status`, `run_id`,
   `failure_reason`, `requested_at`, `updated_at`, `completed_at`,
   `platform_requested`, `user_requested`
@@ -43,4 +48,12 @@ WHERE `r`.`kind` = 'decider'
       AND `ms`.`model` = `rm`.`model`
       AND `ms`.`variant` = `rm`.`variant`
   )
-ORDER BY `r`.`started_at` DESC;
+ORDER BY `r`.`started_at` DESC
+ON CONFLICT (`model`, `variant`, `engine_identity`, `repetitions`) DO UPDATE SET
+  `status` = 'ready',
+  `run_id` = excluded.`run_id`,
+  `failure_reason` = NULL,
+  `updated_at` = excluded.`updated_at`,
+  `completed_at` = excluded.`completed_at`,
+  `platform_requested` = 1
+WHERE `benchmark_profiles`.`status` IN ('pending', 'failed');

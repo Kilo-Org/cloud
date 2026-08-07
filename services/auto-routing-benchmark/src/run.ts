@@ -18,6 +18,7 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
+  countCurrentProfilesByStatus,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
@@ -25,6 +26,7 @@ import {
   getLatestSummariesByModel,
   getRunningRun,
   getRunWithModels,
+  getLatestRoutingTable,
   getSummaries,
   getSummariesForRuns,
   insertRun,
@@ -36,9 +38,11 @@ import {
   markProfilesFailedForRun,
   markProfilesReadyForRun,
   markProfilesRunningForRun,
+  releaseProfileClaims,
   markRunCompleted,
   markRunFailed,
   markStaleRunsFailed,
+  failOrphanedRunningProfiles,
   recordLaneFailure,
   replaceModelSummaries,
   saveRoutingTable,
@@ -52,7 +56,7 @@ import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
 import {
   buildRoutingTable,
-  computeCustomRoutingTableVersion,
+  computeRegistryRoutingTableVersion,
   filterSummariesByProvenance,
 } from './routing-table-builder';
 import {
@@ -114,11 +118,6 @@ const DECIDER_CHUNK_SIZE = 5;
 // keep it below Cloudflare Queues' 15-minute wall-clock limit.
 const CLASSIFIER_CHUNK_SIZE = 1;
 
-// Cloudflare Containers cap for the benchmark runner (wrangler max_instances).
-// Sharded decider fan-out uses this as the hard ceiling; the per-queue lane
-// budgets (maxConcurrency / userMaxConcurrency) share it.
-export const DECIDER_CONTAINER_INSTANCE_CAP = BENCHMARK_CONTAINER_BUDGET;
-
 // Cloudflare Queues caps a single sendBatch at 100 messages. Classifier fan-out
 // can exceed that because each classifier case is its own message, so dispatch
 // must be sliced.
@@ -136,7 +135,7 @@ export function computeDeciderShardCount({
   modelCount,
   repetitions,
   chunkCount,
-  maxLiveContainers = DECIDER_CONTAINER_INSTANCE_CAP,
+  maxLiveContainers = BENCHMARK_CONTAINER_BUDGET,
 }: {
   modelCount: number;
   repetitions: number;
@@ -222,6 +221,14 @@ export async function sweepStaleRuns(env: Env): Promise<string[]> {
     });
   }
   await markStaleRunsFailed(db, olderThanIso);
+  // Rows a terminal run left claimed (its transition threw) are unreachable by
+  // the drain, by requeue and by the stale sweep. Settle them so a pool entry
+  // can never sit `running` forever.
+  await failOrphanedRunningProfiles(db, PROFILE_ORPHANED_CLAIM_FAILURE_REASON).catch(error => {
+    console.warn(
+      JSON.stringify({ event: 'benchmark_profile_orphan_release_error', ...formatError(error) })
+    );
+  });
   for (const run of stale) {
     // No-ops for a salvaged run: its rows are already ready/failed.
     await markProfilesFailedForRun(db, run.id, 'timed out').catch(() => {});
@@ -341,9 +348,11 @@ export function platformRegistryEntries(
  * bound to its own measuring run's summaries — the same provenance rule owner
  * pools use, so platform and user tables read the one shared measurement set.
  *
- * Publishing is skipped (previous table stays live) when the registry cannot
- * fill every route yet; buildRoutingTable throws on an empty route rather than
- * silently dropping a candidate from routing.
+ * The table is published only once the platform queue has settled: no entry
+ * still pending or running. Publishing mid-measurement would put a table built
+ * from the handful of models measured so far in front of every user — after an
+ * engine bump that can be a single model taking all routes. A permanently
+ * failing model does not block publishing, because `failed` is settled.
  */
 export async function publishPlatformRoutingTable(env: Env): Promise<{ version: string } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB);
@@ -354,6 +363,20 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     repetitions: config.deciderRepetitions,
   };
   const desired = platformRegistryEntries(config);
+
+  // syncPlatformRegistry flags exactly the desired pairs, so the platform queue
+  // counts are this table's inputs.
+  const queueCounts = await countCurrentProfilesByStatus(env.BENCH_DB, current, 'platform');
+  const unsettled = queueCounts
+    .filter(row => row.status === 'pending' || row.status === 'running')
+    .reduce((total, row) => total + row.count, 0);
+  if (unsettled > 0) {
+    console.log(
+      JSON.stringify({ event: 'routing_table_publish_skipped_queue_unsettled', unsettled })
+    );
+    return null;
+  }
+
   const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, desired);
   const readyEntries = readyRows
     .filter((row): row is typeof row & { run_id: string } => Boolean(row.run_id))
@@ -377,7 +400,7 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     reasoningEffort: parsePersistedReasoningEffort(entry.variant),
   }));
   const table = buildRoutingTable({
-    version: computeCustomRoutingTableVersion(
+    version: computeRegistryRoutingTableVersion(
       readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant }))
     ),
     generatedAt,
@@ -387,6 +410,13 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
   });
+
+  // The version is a hash of the contributing registry rows, so an unchanged
+  // registry republishes an identical table. Skip the write and the cache flush.
+  const published = await getLatestRoutingTable(env.BENCH_DB).catch(() => null);
+  if (published?.table.version === table.version) {
+    return { version: table.version };
+  }
 
   await saveRoutingTable(env.BENCH_DB, table, generatedAt);
   // Clear KV so the auto-routing worker repopulates from D1 on next request.
@@ -451,7 +481,7 @@ export function buildDeciderMessages(
   models: readonly (string | RunModelEntry)[],
   repetitions: number,
   chunks: readonly (readonly { id: string }[])[],
-  maxLiveContainers: number = DECIDER_CONTAINER_INSTANCE_CAP
+  maxLiveContainers: number = BENCHMARK_CONTAINER_BUDGET
 ): { body: BenchmarkJobMessage }[] {
   const entries = normalizeRunModelEntries(models);
   const shardCount = computeDeciderShardCount({
@@ -528,6 +558,17 @@ export class RunAlreadyActiveError extends Error {
   ) {
     super(`a ${kind} benchmark run is already in progress (${activeRunId})`);
     this.name = 'RunAlreadyActiveError';
+  }
+}
+
+/**
+ * Thrown when every entry of a batch was already claimed by the other queue's
+ * run. Not a fault: the pairs are being measured, just not by this run.
+ */
+export class NoEntriesClaimedError extends Error {
+  constructor(readonly runId: string) {
+    super(`no registry entries left to claim for ${runId}`);
+    this.name = 'NoEntriesClaimedError';
   }
 }
 
@@ -644,12 +685,11 @@ export async function startRun(
   // shrinks a platform-queue run (and vice versa). The config schema keeps the
   // two budgets summing to at most the platform container cap.
   const laneBudget = purpose === 'user' ? config.userMaxConcurrency : config.maxConcurrency;
-  const maxLiveDeciderContainers = Math.min(laneBudget, DECIDER_CONTAINER_INSTANCE_CAP);
   if (kind === 'decider') {
     validateDeciderContainerBudget({
       modelCount: enqueuedEntries.length,
       repetitions,
-      maxLiveContainers: maxLiveDeciderContainers,
+      maxLiveContainers: laneBudget,
     });
   }
 
@@ -660,10 +700,32 @@ export async function startRun(
       ? `user-${startedAt.replace(/[:.]/g, '-')}`
       : `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
 
+  // Claim the registry rows BEFORE writing the run. Both queues drain from the
+  // same registry and their drains can overlap (cron, admin, run completion), so
+  // whichever claim lands first owns the pair; the loser drops it instead of
+  // paying to benchmark it a second time and then discarding the result.
+  let claimedEntries: RunModelEntry[] = modelEntries;
+  if (kind === 'decider') {
+    claimedEntries = await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
+      engineIdentity,
+      repetitions,
+    });
+    if (claimedEntries.length === 0) {
+      throw new NoEntriesClaimedError(runId);
+    }
+  }
+  const claimedPairKeys = new Set(claimedEntries.map(e => exactPairKey(e.model, e.variant)));
+  const runEntries = modelEntries.filter(e =>
+    claimedPairKeys.has(exactPairKey(e.model, e.variant))
+  );
+  const enqueuedRunEntries = enqueuedEntries.filter(e =>
+    claimedPairKeys.has(exactPairKey(e.model, e.variant))
+  );
+
   // Build run_models rows for ALL exact entries of this run. reasoning_effort is
   // a legacy mirror of the variant, kept for provenance and rollback.
-  const enqueuedPairKeys = new Set(enqueuedEntries.map(e => exactPairKey(e.model, e.variant)));
-  const runModelRows: RunModelRow[] = modelEntries.map(entry => ({
+  const enqueuedPairKeys = new Set(enqueuedRunEntries.map(e => exactPairKey(e.model, e.variant)));
+  const runModelRows: RunModelRow[] = runEntries.map(entry => ({
     run_id: runId,
     model: entry.model,
     variant: variantToStorage(entry.variant),
@@ -694,8 +756,22 @@ export async function startRun(
       carriedSummaries
     );
   } catch (error) {
+    // The claim is already made, so hand the rows back to the queue — otherwise
+    // they sit `running` under a run that was never written and nothing can
+    // reach them.
+    if (kind === 'decider') {
+      await releaseProfileClaims(env.BENCH_DB, runId).catch(releaseError => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_profile_claim_release_error',
+            runId,
+            ...formatError(releaseError),
+          })
+        );
+      });
+    }
     // The pre-check already passed, so an insert failure is almost certainly a
-    // race losing the one-running-per-kind unique index. Re-read the winner and
+    // race losing the one-running-per-slot unique index. Re-read the winner and
     // surface a clean conflict rather than a 500.
     const winner = await getRunningRun(env.BENCH_DB, kind, purpose).catch(() => undefined);
     if (winner && winner.id !== runId) {
@@ -704,37 +780,18 @@ export async function startRun(
     throw error;
   }
 
-  if (kind === 'decider') {
-    try {
-      await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
-        engineIdentity,
-        repetitions,
-      });
-    } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: 'benchmark_profile_running_transition_error',
-          runId,
-          ...formatError(error),
-        })
-      );
-      await failRunAndDrain(env, runId, formatError(error).error);
-      throw error;
-    }
-  }
-
   console.log(
     JSON.stringify({
       event: 'benchmark_run_started',
       runId,
       kind,
       purpose,
-      enqueuedModels: enqueuedEntries.map(e => e.model),
+      enqueuedModels: enqueuedRunEntries.map(e => e.model),
       skippedModels,
     })
   );
 
-  if (enqueuedEntries.length === 0) {
+  if (enqueuedRunEntries.length === 0) {
     // Everything already has results: complete immediately and republish the
     // aggregate so config-only changes (model removed, threshold tweaked)
     // take effect without re-running any model. The state mirrors the rows
@@ -758,9 +815,9 @@ export async function startRun(
 
   if (kind === 'classifier') {
     const chunks = chunkArray(CLASSIFIER_CASES, CLASSIFIER_CHUNK_SIZE);
-    const messages = buildClassifierMessages(runId, enqueuedEntries, repetitions, chunks);
+    const messages = buildClassifierMessages(runId, enqueuedRunEntries, repetitions, chunks);
     await enqueueRunMessages(env, runId, messages);
-    return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
+    return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
   }
 
   // Decider: seed as many shard lanes as fit under the live-container cap. Each
@@ -770,13 +827,13 @@ export async function startRun(
   const messages = buildDeciderMessages(
     runId,
     kind,
-    enqueuedEntries,
+    enqueuedRunEntries,
     repetitions,
     chunks,
-    maxLiveDeciderContainers
+    laneBudget
   );
   await enqueueRunMessages(env, runId, messages);
-  return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
+  return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
 /**
@@ -817,38 +874,13 @@ export async function drainQueue(
 
   // Oldest-first (query already ordered by requested_at). Cap by this queue's
   // container budget: modelCount * repetitions <= maxLiveContainers.
-  const maxLive = Math.min(
-    queue === 'user' ? config.userMaxConcurrency : config.maxConcurrency,
-    DECIDER_CONTAINER_INSTANCE_CAP
-  );
+  const maxLive = queue === 'user' ? config.userMaxConcurrency : config.maxConcurrency;
   const maxEntries = Math.max(1, Math.floor(maxLive / Math.max(1, repetitions)));
   const batch = pending.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
     model: row.model,
     variant: variantFromStorage(row.variant),
   }));
-
-  try {
-    validateDeciderContainerBudget({
-      modelCount: entries.length,
-      repetitions,
-      maxLiveContainers: maxLive,
-    });
-  } catch (error) {
-    // Even a single entry can exceed the budget when repetitions are huge;
-    // leave pending and log — scheduled sweep will retry after config fix.
-    console.warn(
-      JSON.stringify({
-        event: 'benchmark_queue_drain_budget_exceeded',
-        queue,
-        entryCount: entries.length,
-        repetitions,
-        maxLive,
-        ...formatError(error),
-      })
-    );
-    return null;
-  }
 
   try {
     const result = await startRun(env, 'decider', { purpose: queue, entries });
@@ -871,6 +903,12 @@ export async function drainQueue(
           activeRunId: error.activeRunId,
         })
       );
+      return null;
+    }
+    if (error instanceof NoEntriesClaimedError) {
+      // The other queue claimed this whole batch between our read and our
+      // claim. The pairs are being measured; nothing to do.
+      console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
       return null;
     }
     throw error;
@@ -1390,6 +1428,10 @@ function laneKey(model: string, variant: string, rep: number): string {
   return JSON.stringify([model, variant, rep]);
 }
 
+/** Failure reason for rows a terminal run left claimed. */
+export const PROFILE_ORPHANED_CLAIM_FAILURE_REASON =
+  'Benchmark run ended without settling this entry; requeue to re-measure.';
+
 /** Failure reason written to profile entries whose lane never finished. */
 export const PROFILE_LANE_DEAD_FAILURE_REASON =
   'Benchmark lane did not finish (queue retries exhausted or run timed out); retry to re-measure.';
@@ -1489,17 +1531,25 @@ async function finalizeRunIfComplete(
     const failedEntries = enqueuedModels
       .filter(m => failedEntryKeys.has(JSON.stringify([m.model, m.variant])))
       .map(m => ({ model: m.model, variant: m.variant }));
-    try {
-      if (failedEntries.length > 0) {
-        await markProfilesFailedForEntries(
-          env.BENCH_DB,
-          runId,
-          failedEntries,
-          PROFILE_LANE_DEAD_FAILURE_REASON
+    // Separate try blocks on purpose: if the per-entry failure throws, the ready
+    // sweep must still run, or every entry of a completed run stays `running`.
+    if (failedEntries.length > 0) {
+      await markProfilesFailedForEntries(
+        env.BENCH_DB,
+        runId,
+        failedEntries,
+        PROFILE_LANE_DEAD_FAILURE_REASON
+      ).catch(error => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_profile_failed_transition_error',
+            runId,
+            ...formatError(error),
+          })
         );
-      }
-      await markProfilesReadyForRun(env.BENCH_DB, runId);
-    } catch (error) {
+      });
+    }
+    await markProfilesReadyForRun(env.BENCH_DB, runId).catch(error => {
       console.warn(
         JSON.stringify({
           event: 'benchmark_profile_ready_transition_error',
@@ -1507,7 +1557,7 @@ async function finalizeRunIfComplete(
           ...formatError(error),
         })
       );
-    }
+    });
     console.log(
       JSON.stringify({
         event: 'benchmark_decider_run_completed',

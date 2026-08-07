@@ -40,8 +40,12 @@ vi.mock('./db', async importOriginal => {
     getRunWithModels: vi.fn(),
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    countCurrentProfilesByStatus: vi.fn(),
+    getLatestRoutingTable: vi.fn(),
     syncPlatformRegistryRows: vi.fn(),
     recordLaneFailure: vi.fn(),
+    failOrphanedRunningProfiles: vi.fn(),
+    releaseProfileClaims: vi.fn(),
   };
 });
 
@@ -59,8 +63,11 @@ import {
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
+  countCurrentProfilesByStatus,
+  getLatestRoutingTable,
   listReadyCurrentProfilesForEntries,
   listStaleRunningDeciderRuns,
+  failOrphanedRunningProfiles,
   recordLaneFailure,
   markProfilesFailedForEntries,
   markProfilesFailedForRun,
@@ -74,6 +81,7 @@ import {
   syncPlatformRegistryRows,
 } from './db';
 import {
+  NoEntriesClaimedError,
   drainQueue,
   drainQueues,
   failRunAndDrain,
@@ -135,7 +143,9 @@ beforeEach(() => {
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
-  vi.mocked(markProfilesRunningForRun).mockResolvedValue(undefined);
+  vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => [
+    ...entries,
+  ]);
   vi.mocked(markProfilesReadyForRun).mockResolvedValue(undefined);
   vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
   vi.mocked(markProfilesFailedForRun).mockResolvedValue(undefined);
@@ -148,9 +158,13 @@ beforeEach(() => {
   vi.mocked(saveRoutingTable).mockResolvedValue(undefined);
   vi.mocked(getCaseResults).mockResolvedValue([]);
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+  // Settled platform queue: nothing pending or running, so publishing is allowed.
+  vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
+  vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
+  vi.mocked(failOrphanedRunningProfiles).mockResolvedValue(0);
   vi.mocked(getSummaries).mockResolvedValue([]);
   vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
   queueSendBatch.mockResolvedValue(undefined);
@@ -248,7 +262,7 @@ describe('startRun — registry-backed decider runs', () => {
     );
   });
 
-  it('marks the run failed when the registry claim rejects', async () => {
+  it('writes no run at all when the registry claim rejects', async () => {
     const entries = [{ model: 'vendor/m', variant: 'xhigh' }];
     vi.mocked(markProfilesRunningForRun).mockRejectedValueOnce(new Error('claim failed'));
 
@@ -256,12 +270,38 @@ describe('startRun — registry-backed decider runs', () => {
       'claim failed'
     );
 
-    expect(markRunFailed).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.stringMatching(/^user-/),
-      'claim failed'
-    );
+    // The claim precedes the run row, so a failed claim leaves nothing behind.
+    expect(insertRun).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('drops entries another queue already claimed instead of measuring them twice', async () => {
+    // Both queues can want the same pair. Whoever claims it first owns it; this
+    // run must not pay to benchmark the pair a second time.
+    vi.mocked(markProfilesRunningForRun).mockResolvedValueOnce([
+      { model: 'a/mine', variant: null },
+    ]);
+
+    const result = await startRun(env, 'decider', {
+      purpose: 'user',
+      entries: [
+        { model: 'a/mine', variant: null },
+        { model: 'b/taken', variant: null },
+      ],
+    });
+
+    expect(result.enqueuedModels).toBe(1);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows.map(m => m.model)).toEqual(['a/mine']);
+  });
+
+  it('starts no run when the whole batch was already claimed', async () => {
+    vi.mocked(markProfilesRunningForRun).mockResolvedValueOnce([]);
+
+    await expect(
+      startRun(env, 'decider', { purpose: 'user', entries: [{ model: 'b/taken', variant: null }] })
+    ).rejects.toThrow(NoEntriesClaimedError);
+    expect(insertRun).not.toHaveBeenCalled();
   });
 });
 
@@ -467,7 +507,7 @@ describe('decider run completion', () => {
     const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
     expect(table.source).toBe('benchmark');
     // Version identifies the contributing registry rows, not a single run.
-    expect(table.version).toMatch(/^custom-/);
+    expect(table.version).toMatch(/^registry-/);
     expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);
     expect(kvDelete).toHaveBeenCalled();
   });

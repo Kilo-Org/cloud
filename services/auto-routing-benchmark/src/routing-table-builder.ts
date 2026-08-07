@@ -116,14 +116,16 @@ function fnv1aHex(input: string): string {
 }
 
 /**
- * Deterministic version id for a sparse custom table: hash of contributing
- * (runId, model, variant) triples so identical assembly inputs cache-hit.
+ * Deterministic version id for a table assembled from the registry: a hash of
+ * the contributing (runId, model, variant) triples, so identical assembly
+ * inputs produce the same id and cache-hit. Used by both the platform table and
+ * each owner's sparse custom table.
  */
-export function computeCustomRoutingTableVersion(
+export function computeRegistryRoutingTableVersion(
   contributors: readonly { runId: string; model: string; variant: string | null }[]
 ): string {
   const parts = [...contributors].map(c => `${c.runId}\0${c.model}\0${c.variant ?? ''}`).sort();
-  return `custom-${fnv1aHex(JSON.stringify(parts))}`;
+  return `registry-${fnv1aHex(JSON.stringify(parts))}`;
 }
 
 /**
@@ -202,7 +204,7 @@ export function buildCustomRoutingTable(params: {
 
   if (Object.keys(routes).length === 0) return null;
 
-  const version = computeCustomRoutingTableVersion(
+  const version = computeRegistryRoutingTableVersion(
     readyEntries.map(r => ({
       runId: r.runId,
       model: r.entry.model,

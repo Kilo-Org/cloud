@@ -454,11 +454,61 @@ export const mockAgentsApi = async (
       }
 
       if (proc === 'cliSessionsV2.getSessionMessagesPage') {
+        const inputRecord = isRecordObject(input) ? input : {};
+        const requestedId =
+          hasStringOptional(inputRecord, 'session_id') ?? 'ses_cloudsession00000000001';
+        const cloudSession = activeSessions.find(
+          (session): session is CloudAgentSessionSeed =>
+            isCloudAgentSessionSeed(session) && session.kiloSessionId === requestedId
+        );
+        if (cloudSession !== undefined) {
+          /**
+           * A running cloud session's persisted page must carry its first
+           * user message. The session manager retries an empty first page
+           * while the session is still listed as running, and an
+           * always-empty fixture page would keep the default cloud session
+           * on its loading skeleton. The message and part ids match the
+           * default stream's own user message, so the SDK upserts merge the
+           * page and the live stream without duplicating transcript rows.
+           */
+          return {
+            result: {
+              data: {
+                history: {
+                  messages: [
+                    {
+                      info: {
+                        agent: 'build',
+                        id: 'msg-u-1',
+                        model: { modelID: 'claude-sonnet-4', providerID: 'anthropic' },
+                        role: 'user',
+                        sessionID: requestedId,
+                        time: { created: Date.now() },
+                      },
+                      parts: [
+                        {
+                          id: 'p-u-1',
+                          messageID: 'msg-u-1',
+                          sessionID: requestedId,
+                          text: 'Fix the login bug',
+                          type: 'text',
+                        },
+                      ],
+                    },
+                  ],
+                  nextCursor: null,
+                  omittedItemCount: 0,
+                },
+                kiloSessionId: requestedId,
+              },
+            },
+          };
+        }
         return {
           result: {
             data: {
               history: { messages: [], nextCursor: null, omittedItemCount: 0 },
-              kiloSessionId: 'ses_cloudsession00000000001',
+              kiloSessionId: requestedId,
             },
           },
         };

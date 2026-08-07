@@ -19,7 +19,6 @@ import { ChatComposer } from '@/components/agents/chat-composer';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
-import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -31,6 +30,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
@@ -93,7 +93,6 @@ import {
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
 import { moveA11yFocus } from '@/lib/a11y/announce';
-import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -193,7 +192,6 @@ export function SessionDetailContent({
     useState<ContextSheetIdentity | null>(null);
   const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
-  const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
 
   // Durable composer draft: load the stored draft before the composer mounts
@@ -824,9 +822,11 @@ export function SessionDetailContent({
               }
             : {})}
         />
+        <SessionConnectionIndicator
+          activeSessionType={activeSessionType}
+          agentStatusType={agentStatus.type}
+        />
         {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
-
-        {!isConnected && <ConnectivityBanner />}
 
         {keyboardContainerKind === 'app-aware-padding' ? (
           <AppAwareKeyboardPaddingView className="flex-1">

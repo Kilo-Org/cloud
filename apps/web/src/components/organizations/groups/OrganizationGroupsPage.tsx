@@ -28,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 function GroupsPageContent({
   organizationId,
@@ -40,8 +41,8 @@ function GroupsPageContent({
   const drawer = useOrganizationGroupsDrawerStack();
   const queryClient = useQueryClient();
   const [groupSearch, setGroupSearch] = useState('');
-  const canManage = role === 'owner';
-  const canViewSettings = role === 'owner' || role === 'billing_manager';
+  const canManage = canManageOrganization(role);
+  const canViewSettings = canManageOrganization(role) || role === 'billing_manager';
   const groupsQuery = useQuery(trpc.organizations.groups.list.queryOptions({ organizationId }));
   const settingsQuery = useQuery({
     ...trpc.organizations.groups.getPolicySettings.queryOptions({ organizationId }),

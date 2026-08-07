@@ -26,6 +26,10 @@ export const getRoleLabel = (role: string) => {
   switch (role) {
     case 'owner':
       return 'Owner';
+    case 'admin':
+      return 'Admin';
+    case 'billing_manager':
+      return 'Billing Manager';
     case 'member':
       return 'Member';
     default:

@@ -11,7 +11,10 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import { bootstrapProvisionSubscriptionWithDb } from '../../../../../services/kiloclaw-billing/src/provision-bootstrap-shared';
+import {
+  bootstrapProvisionSubscriptionWithDb,
+  KiloClawProvisioningUnavailableError,
+} from '../../../../../services/kiloclaw-billing/src/provision-bootstrap-shared';
 
 const BOOTSTRAP_ACTOR = {
   actorType: 'system',
@@ -59,7 +62,7 @@ describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => 
     expect(logs).toHaveLength(0);
   });
 
-  it('keeps managed bootstrap for hard-expired organizations with a non-ended seat purchase', async () => {
+  it('rejects managed bootstrap without a current org subscription despite seat entitlement', async () => {
     const user = await insertTestUser({
       google_user_email: 'org-bootstrap-paid-hard-expired@example.com',
     });
@@ -86,23 +89,16 @@ describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => 
       sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
     });
 
-    const subscription = await bootstrapProvisionSubscriptionWithDb({
-      db,
-      input: { userId: user.id, instanceId, orgId: organization.id },
-      actor: BOOTSTRAP_ACTOR,
-    });
-
-    expect(subscription).toEqual(
-      expect.objectContaining({
-        instance_id: instanceId,
-        payment_source: 'credits',
-        plan: 'standard',
-        status: 'active',
+    await expect(
+      bootstrapProvisionSubscriptionWithDb({
+        db,
+        input: { userId: user.id, instanceId, orgId: organization.id },
+        actor: BOOTSTRAP_ACTOR,
       })
-    );
+    ).rejects.toBeInstanceOf(KiloClawProvisioningUnavailableError);
   });
 
-  it('keeps managed bootstrap for hard-expired organizations with trial enforcement disabled', async () => {
+  it('rejects managed bootstrap without a current org subscription despite trial exemption', async () => {
     const user = await insertTestUser({
       google_user_email: 'org-bootstrap-exempt-hard-expired@example.com',
     });
@@ -126,20 +122,13 @@ describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => 
       sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
     });
 
-    const subscription = await bootstrapProvisionSubscriptionWithDb({
-      db,
-      input: { userId: user.id, instanceId, orgId: organization.id },
-      actor: BOOTSTRAP_ACTOR,
-    });
-
-    expect(subscription).toEqual(
-      expect.objectContaining({
-        instance_id: instanceId,
-        payment_source: 'credits',
-        plan: 'standard',
-        status: 'active',
+    await expect(
+      bootstrapProvisionSubscriptionWithDb({
+        db,
+        input: { userId: user.id, instanceId, orgId: organization.id },
+        actor: BOOTSTRAP_ACTOR,
       })
-    );
+    ).rejects.toBeInstanceOf(KiloClawProvisioningUnavailableError);
   });
 
   it('transfers destroyed org predecessors to the new live row without touching personal or other-org rows', async () => {
@@ -307,6 +296,8 @@ describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => 
     const oldestDestroyedInstanceId = crypto.randomUUID();
     const newestDestroyedInstanceId = crypto.randomUUID();
     const liveInstanceId = crypto.randomUUID();
+    const oldestDestroyedSubscriptionId = crypto.randomUUID();
+    const newestDestroyedSubscriptionId = crypto.randomUUID();
 
     await db.insert(kiloclaw_instances).values([
       {
@@ -338,16 +329,19 @@ describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => 
       .insert(kiloclaw_subscriptions)
       .values([
         {
+          id: oldestDestroyedSubscriptionId,
           user_id: user.id,
           instance_id: oldestDestroyedInstanceId,
           plan: 'standard',
-          status: 'active',
+          status: 'canceled',
           payment_source: 'credits',
           cancel_at_period_end: false,
+          transferred_to_subscription_id: newestDestroyedSubscriptionId,
           created_at: '2026-02-01T00:00:00.000Z',
           updated_at: '2026-02-01T00:00:00.000Z',
         },
         {
+          id: newestDestroyedSubscriptionId,
           user_id: user.id,
           instance_id: newestDestroyedInstanceId,
           plan: 'standard',

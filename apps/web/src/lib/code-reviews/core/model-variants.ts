@@ -1,11 +1,3 @@
-import { getFallbackModelVariants } from '@/lib/ai-gateway/providers/variants';
-
-/** Returns the ordered list of thinking-effort variant names available for a model, or [] if the model has no variants. */
-export function getAvailableThinkingEfforts(modelSlug: string): string[] {
-  const variants = getFallbackModelVariants(modelSlug);
-  return variants ? Object.keys(variants) : [];
-}
-
 const VARIANT_LABELS: Record<string, string> = { xhigh: 'Extra High' };
 
 /** Human-readable label for a variant name. */

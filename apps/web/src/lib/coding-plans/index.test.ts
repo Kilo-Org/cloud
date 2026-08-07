@@ -42,7 +42,12 @@ const MAX_COST_MICRODOLLARS = 50_000_000;
 const ULTRA_COST_MICRODOLLARS = 120_000_000;
 const BYTEPLUS_PRO_COST_MICRODOLLARS = 100_000_000;
 
-const validatedInventoryUpload = { validateCredential: async () => true };
+const validatedInventoryUpload = {
+  validateCredential: async ({ providerId, planId }: { providerId: string; planId: string }) =>
+    providerId === BYTEPLUS_PROVIDER_ID
+      ? { valid: true, upstreamUsageId: `seat-${planId}` }
+      : { valid: true },
+};
 
 function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.randomUUID()}`) {
   return `${key}::${upstreamPlanId}`;
@@ -152,6 +157,10 @@ describe('coding plans', () => {
       .select()
       .from(byok_api_keys)
       .where(eq(byok_api_keys.id, subscription.installed_byok_key_id!));
+    const [inventory] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
 
     expect(subscription).toMatchObject({
       plan_id: BYTEPLUS_PLAN_ID,
@@ -162,6 +171,7 @@ describe('coding plans', () => {
       provider_id: BYTEPLUS_PROVIDER_ID,
       management_source: 'coding_plan',
     });
+    expect(inventory.upstream_usage_id).toBe(`seat-${BYTEPLUS_PLAN_ID}`);
   });
 
   it('activates an episode with one charged term and managed BYOK entry', async () => {
@@ -619,6 +629,53 @@ describe('coding plans', () => {
     expect(await getKeyInventoryCounts(PLAN_ID)).toEqual([
       { providerId: PROVIDER_ID, planId: PLAN_ID, status: 'available', count: 1 },
     ]);
+  });
+
+  it('sanitizes a BytePlus seat conflict during credential replacement', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS);
+    await uploadKeysToInventory(
+      BYTEPLUS_PROVIDER_ID,
+      BYTEPLUS_PLAN_ID,
+      [inventoryEntry('byteplus-original-key', 'byteplus-original-user')],
+      {
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-original' }),
+      }
+    );
+    await uploadKeysToInventory(
+      BYTEPLUS_PROVIDER_ID,
+      BYTEPLUS_PRO_PLAN_ID,
+      [inventoryEntry('byteplus-existing-key', 'byteplus-existing-user')],
+      {
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-already-used' }),
+      }
+    );
+    const activation = await subscribeToCodingPlan(
+      user.id,
+      BYTEPLUS_PLAN_ID,
+      'byteplus-replace-conflict'
+    );
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await terminateCodingPlanImmediately(activation.subscriptionId);
+
+    const replacement = replaceManualCredentialRevocation(
+      subscription.key_inventory_id!,
+      'byteplus-replacement-key',
+      {
+        validateCredential: async () => ({
+          valid: true,
+          upstreamUsageId: 'seat-already-used',
+        }),
+      }
+    );
+
+    await expect(replacement).rejects.toThrow(
+      'The resolved BytePlus seat is already attached to inventory.'
+    );
+    await expect(replacement).rejects.not.toThrow('seat-already-used');
+    await expect(replacement).rejects.not.toThrow('byteplus-replacement-key');
   });
 
   it('rejects invalid replacement credentials before returning stock to inventory', async () => {

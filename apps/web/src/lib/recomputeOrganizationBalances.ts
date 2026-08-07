@@ -17,6 +17,7 @@ import {
   credit_transactions,
   microdollar_usage,
   exa_usage_log,
+  compute_usage_charge,
   type Organization,
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
@@ -84,7 +85,21 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(exa_usage_log.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage);
+  const computeUsage = await db
+    .select({
+      cost: compute_usage_charge.amount_microdollars,
+      created_at: compute_usage_charge.created_at,
+    })
+    .from(compute_usage_charge)
+    .where(
+      and(
+        eq(compute_usage_charge.organization_id, args.organizationId),
+        gt(compute_usage_charge.amount_microdollars, 0)
+      )
+    )
+    .orderBy(asc(compute_usage_charge.created_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
 
   // Fetch all credit transactions for this org
   const creditTransactions = await db
@@ -105,7 +120,7 @@ export async function recomputeOrganizationBalances(args: {
     .orderBy(asc(credit_transactions.created_at));
 
   // Compute total usage AND original baselines in a single pass.
-  // usageRecords contains both LLM and Exa charged records, merge-sorted
+  // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
   // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;

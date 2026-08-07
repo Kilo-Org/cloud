@@ -13,7 +13,7 @@ import { type ClawBillingStatus } from '@/lib/hooks/use-kiloclaw-billing';
  */
 
 export type MobileOnboardingState =
-  | { state: 'trial_eligible' }
+  | { state: 'signup_unavailable' }
   | {
       state: 'has_access';
       accessReason: 'trial' | 'subscription' | 'earlybird';
@@ -52,8 +52,8 @@ export function deriveMobileOnboardingStateFromBilling(
     return { state: 'quarantined', instanceId: liveInstanceId };
   }
 
-  if (billing.trialEligible) {
-    return { state: 'trial_eligible' };
+  if (!billing.hasCurrentPersonalSubscription) {
+    return { state: 'signup_unavailable' };
   }
 
   return {

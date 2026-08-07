@@ -1,7 +1,13 @@
 import 'server-only';
+import { headers } from 'next/headers';
 import { getUserFromAuth } from '@/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
@@ -15,13 +21,21 @@ export { UpstreamApiError } from '@/lib/trpc/transport';
 export type TRPCContext = {
   user: User;
   deviceSessionId?: string;
+  // Admin audit signals threaded from the auth layer so `adminProcedure` can
+  // emit IP-independent, identity-attributed access telemetry. Optional so the
+  // many existing `{ user }` context constructors (tests, scripts) keep working;
+  // production `createTRPCContext` always populates them.
+  authViaToken?: boolean;
+  tokenSource?: string | null;
+  ip?: string | null;
 };
 
 /**
  * @see: https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (): Promise<TRPCContext> => {
-  const { user, deviceSessionId } = await getUserFromAuth({ adminOnly: false });
+  const headersList = await headers();
+  const { user, deviceSessionId, tokenSource } = await getUserFromAuth({ adminOnly: false });
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -36,6 +50,9 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
   return {
     user,
     deviceSessionId,
+    authViaToken: authViaTokenFromHeaders(headersList),
+    tokenSource: tokenSource ?? null,
+    ip: clientIpFromHeaders(headersList),
   };
 };
 
@@ -90,14 +107,26 @@ export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure.use(timingMiddleware).use(sentryMiddleware);
 
-// Admin-only procedure
-export const adminProcedure = baseProcedure.use(async ({ ctx, next }) => {
+// Admin-only procedure. creditManager/superadmin/sessionViewer chain on this,
+// so emitting here covers the whole admin.* tRPC surface with a single event.
+export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }) => {
   if (!ctx.user.is_admin) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Admin access required',
     });
   }
+  // Emit before next() so the access attempt is recorded even if the handler
+  // (or a chained sub-check) later throws.
+  emitAdminAccessEvent({
+    surface: 'trpc',
+    user: ctx.user,
+    authViaToken: ctx.authViaToken ?? false,
+    tokenSource: ctx.tokenSource ?? null,
+    route: path,
+    method: type,
+    ip: ctx.ip ?? null,
+  });
   return next();
 });
 

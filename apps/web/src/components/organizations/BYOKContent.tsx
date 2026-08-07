@@ -7,6 +7,7 @@ import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { BYOKKeysManager } from './byok/BYOKKeysManager';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 export function BYOKContent({
   organizationId,
@@ -21,8 +22,8 @@ export function BYOKContent({
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role || 'member';
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
 
-  // Check if user has permission to access BYOK (must be org owner)
-  const hasPermission = currentRole === 'owner';
+  // Check if user has permission to access BYOK (must be org owner or admin)
+  const hasPermission = canManageOrganization(currentRole);
 
   return (
     <OrganizationContextProvider value={{ userRole: currentRole, isKiloAdmin }}>

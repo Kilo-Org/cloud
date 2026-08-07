@@ -1,4 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { DistributeFundsPage } from './DistributeFundsPage';
 
 export default async function OrganizationDistributeFundsPage({
@@ -9,7 +10,7 @@ export default async function OrganizationDistributeFundsPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      roles={['owner', 'billing_manager']}
+      roles={ORGANIZATION_BILLING_ROLES}
       render={({ organization }) => <DistributeFundsPage organizationId={organization.id} />}
     />
   );

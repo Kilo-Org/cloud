@@ -6,7 +6,7 @@ import {
   savePendingAgentMemoryDraft,
 } from '@/src/shared/agent-memories-storage';
 import type { AgentMemoriesStorageArea } from '@/src/shared/agent-memories-storage';
-import type { PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
+import type { AgentWorkflowParam, PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
 import { hashWorkflowScript } from '@/src/shared/agent-workflows';
 import {
   addAgentWorkflow,
@@ -154,6 +154,7 @@ export const applyApprovalDecision = async (
     approvedScriptHash: string;
     description: string;
     name: string;
+    params?: AgentWorkflowParam[] | undefined;
     pathPrefix?: string | undefined;
     scopeOrigin: string;
     script: string;
@@ -166,7 +167,10 @@ export const applyApprovalDecision = async (
     script: workflowDraft.script,
     // Empty string is the "cleared" sentinel (survives JSON, never a valid real value).
     // Map it to undefined so updateAgentWorkflow detects the key via Object.hasOwn
-    // And removes the field from storage.
+    // And removes the field from storage. Params use the empty array the same way.
+    ...(workflowDraft.params === undefined
+      ? {}
+      : { params: workflowDraft.params.length === 0 ? undefined : workflowDraft.params }),
     ...(workflowDraft.pathPrefix === undefined || workflowDraft.pathPrefix === null
       ? {}
       : { pathPrefix: workflowDraft.pathPrefix === '' ? undefined : workflowDraft.pathPrefix }),

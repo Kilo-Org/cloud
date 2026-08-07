@@ -41,6 +41,7 @@ export function useOrganizationModels(organizationId?: string): UseOrganizationM
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : [],
       })) ?? []
     );
   }, [openRouterModels]);

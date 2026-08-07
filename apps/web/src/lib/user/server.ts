@@ -86,6 +86,11 @@ import {
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
@@ -358,6 +363,17 @@ export function parseLinkedInProfileName(profile: {
       ? `${profile.given_name} ${profile.family_name}`.trim()
       : profile.given_name || profile.family_name || 'LinkedIn User')
   );
+}
+
+/**
+ * An OAuth/OIDC sign-in proves ownership of its email only when the provider
+ * asserts the `email_verified` claim in the raw profile. Apple delivers the
+ * claim as the string "true"; treat that as verified. Providers without the
+ * claim (GitHub, GitLab, Discord) never prove the email here.
+ */
+export function profileProvesEmailOwnership(profile: unknown): boolean {
+  const emailVerified = (profile as { email_verified?: unknown } | undefined)?.email_verified;
+  return emailVerified === true || emailVerified === 'true';
 }
 
 function createEmailAccountInfo(
@@ -855,9 +871,12 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Check if this is an account linking operation
-        // For email (magic link) auth, we auto-link to existing users since magic link
-        // is verified by email ownership
-        const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
+        // Auto-link only when the credential proves ownership of the email:
+        // a magic link consumes an inbox token; fake-login is dev-only; an
+        // OAuth profile proves it via the provider's email_verified claim.
+        // Methods without proof keep the DIFFERENT-OAUTH refusal.
+        const autoLinkToExistingUser =
+          isEmailAuth || isFakeLogin || profileProvesEmailOwnership(profile);
         if (isAccountLinking) {
           logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
             provider: accountInfo.provider,
@@ -990,6 +1009,20 @@ export const authOptions: NextAuthOptions = {
           );
           token.ssoSourceOrganizationId = ssoAuthority.sourceOrganizationId;
         }
+
+        if (existingUser.is_admin) {
+          // Admin audit trail: identify which Kilocode admin authenticated.
+          // Emitted only after JWT creation is guaranteed to succeed.
+          logExceptInTest(
+            JSON.stringify({
+              event: 'admin_login_succeeded',
+              kiloUserId: existingUser.id,
+              email: existingUser.google_user_email,
+              provider: accountInfo.provider,
+              adminTier: existingUser.is_super_admin ? 'super_admin' : 'platform_admin',
+            })
+          );
+        }
       } catch (error) {
         captureException(error, {
           tags: {
@@ -1055,7 +1088,31 @@ type GetAuthResponse =
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = await headers();
+  const result = await resolveUserFromAuth(opts, headersList);
 
+  // Admin audit trail: emit exactly one identity-attributed event per authorized
+  // admin request. Guarded strictly on adminOnly so the millions of
+  // adminOnly:false calls never log.
+  if (opts.adminOnly === true && result.user) {
+    emitAdminAccessEvent({
+      surface: 'rest',
+      user: result.user,
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      route: headersList.get('x-pathname') ?? headersList.get('x-matched-path') ?? null,
+      // No reliable HTTP method header is available here; do not fabricate one.
+      method: null,
+      ip: clientIpFromHeaders(headersList),
+    });
+  }
+
+  return result;
+}
+
+async function resolveUserFromAuth(
+  opts: RequiredPermissions,
+  headersList: Awaited<ReturnType<typeof headers>>
+): Promise<GetAuthResponse> {
   // This path is executed for non-next-auth requests
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path

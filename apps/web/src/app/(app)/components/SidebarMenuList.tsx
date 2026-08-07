@@ -31,13 +31,17 @@ type SidebarMenuListProps = {
   allUrls?: string[];
 };
 
+function pathnameForMatch(url: string): string {
+  return url.split(/[?#]/, 1)[0] || url;
+}
+
 export default function SidebarMenuList({
   items,
   label = 'Dashboard',
   allUrls,
 }: SidebarMenuListProps) {
   const pathname = usePathname();
-  const urlsToCheck = allUrls ?? items.flatMap(i => (i.url ? [i.url] : []));
+  const urlsToCheck = (allUrls ?? items.flatMap(i => (i.url ? [i.url] : []))).map(pathnameForMatch);
 
   return (
     <SidebarGroup>
@@ -48,17 +52,18 @@ export default function SidebarMenuList({
         <SidebarMenu>
           {items.map(item => {
             const itemUrl = item.url;
+            const itemPathname = itemUrl ? pathnameForMatch(itemUrl) : undefined;
             const isNumericBadge = item.badge ? /^\d[\d,]*$/.test(item.badge) : false;
-            const matchesPrefix = itemUrl
-              ? pathname === itemUrl || pathname.startsWith(itemUrl + '/')
+            const matchesPrefix = itemPathname
+              ? pathname === itemPathname || pathname.startsWith(itemPathname + '/')
               : false;
             const hasMoreSpecificMatch =
               matchesPrefix &&
-              itemUrl &&
+              itemPathname &&
               urlsToCheck.some(
                 url =>
-                  url !== itemUrl &&
-                  url.length > itemUrl.length &&
+                  url !== itemPathname &&
+                  url.length > itemPathname.length &&
                   (pathname === url || pathname.startsWith(url + '/'))
               );
             const isActive = item.isActive ?? (matchesPrefix && !hasMoreSpecificMatch);

@@ -43,7 +43,10 @@ async function createSubscription(
     planId,
     [`cron-key-${crypto.randomUUID()}::minimax-plan-${crypto.randomUUID()}`],
     {
-      validateCredential: async () => true,
+      validateCredential: async ({ providerId, planId }) =>
+        providerId === 'byteplus-coding'
+          ? { valid: true, upstreamUsageId: `seat-${planId}` }
+          : { valid: true },
     }
   );
   const created = await subscribeToCodingPlan(user.id, planId, `activate-${crypto.randomUUID()}`);

@@ -1,0 +1,2 @@
+ALTER TABLE "coding_plan_key_inventory" ADD COLUMN "upstream_usage_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_coding_plan_key_inv_provider_usage_id" ON "coding_plan_key_inventory" USING btree ("provider_id","upstream_usage_id") WHERE "coding_plan_key_inventory"."upstream_usage_id" IS NOT NULL;

@@ -22,6 +22,7 @@ import {
   type AutoRoutingSettingsApiResponse,
 } from '@/lib/ai-gateway/auto-routing-pool-validation';
 import { getUserFromAuth } from '@/lib/user/server';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
-  const owner = await resolveOwner(request, ['owner', 'billing_manager']);
+  const owner = await resolveOwner(request, ORGANIZATION_BILLING_ROLES);
   if ('response' in owner) return owner.response;
   if (owner.ownerType === 'org') {
     try {

@@ -3,8 +3,9 @@ import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { AlertTriangle, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, GitPullRequest } from 'lucide-react';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
+import { displayRepoName } from './agents-format';
 import { useExtensionAgents } from './agents-provider';
 import { AgentsMessageList } from './agents-message-list';
 import { AgentsComposer } from './agents-composer';
@@ -27,9 +28,12 @@ const statusIndicatorClass = (type: string): string => {
 export const AgentsSessionView = ({
   kiloSessionId,
   onBack,
+  initialPrompt,
 }: {
   kiloSessionId: string;
   onBack: () => void;
+  /** Prompt to auto-send once the session accepts messages (CLI spawn flow). */
+  initialPrompt?: string | undefined;
 }): JSX.Element => {
   const { manager, organizationId } = useExtensionAgents();
   const { atoms } = manager;
@@ -53,6 +57,11 @@ export const AgentsSessionView = ({
   const [retryingPrompt, setRetryingPrompt] = useState(false);
   const [retryingSwitch, setRetryingSwitch] = useState(false);
   const [retrySucceeded, setRetrySucceeded] = useState(false);
+  /*
+   * A sent prompt reaches the agent before `isStreaming` flips. Without this
+   * the composer just goes dead and the transcript shows nothing happening.
+   */
+  const [isSending, setIsSending] = useState(false);
 
   // When a new failedPrompt appears, reset the retry-succeeded flag.
   useEffect(() => {
@@ -91,9 +100,17 @@ export const AgentsSessionView = ({
     };
   }, [kiloSessionId, manager]);
 
+  // The agent picked the prompt up, or it failed: stop claiming work.
+  useEffect(() => {
+    if (isStreaming || error !== null) {
+      setIsSending(false);
+    }
+  }, [isStreaming, error]);
+
   const handleSend = useCallback(
     async (text: string) => {
       setRetrySucceeded(false);
+      setIsSending(true);
       const rawMode = sessionConfig?.mode ?? '';
       const rawModel = sessionConfig?.model ?? '';
       const mode = rawMode === '' ? 'code' : rawMode;
@@ -111,9 +128,12 @@ export const AgentsSessionView = ({
         });
         if (ok) {
           setRetrySucceeded(true);
+        } else {
+          setIsSending(false);
         }
       } catch {
         // Keep failedPrompt row visible — the SDK sets error atom, caller retains card.
+        setIsSending(false);
       }
     },
     [manager, sessionConfig]
@@ -122,6 +142,19 @@ export const AgentsSessionView = ({
   const handleStop = useCallback(() => {
     void manager.interrupt();
   }, [manager]);
+
+  // CLI spawn flow: send the initial prompt once the transport accepts sends.
+  const initialPromptSentRef = useRef(false);
+  useEffect(() => {
+    if (initialPrompt === undefined || initialPromptSentRef.current) {
+      return;
+    }
+    if (isLoading || !canSend) {
+      return;
+    }
+    initialPromptSentRef.current = true;
+    void handleSend(initialPrompt);
+  }, [initialPrompt, isLoading, canSend, handleSend]);
 
   const handleRetryFailedPrompt = useCallback(async () => {
     if (failedPrompt === null) {
@@ -201,9 +234,14 @@ export const AgentsSessionView = ({
 
   const rawTitle = fetchedSessionData?.title ?? '';
   const title = rawTitle === '' ? 'Session' : rawTitle;
-  const repository = fetchedSessionData?.repository ?? fetchedSessionData?.gitUrl;
+  const rawRepository = fetchedSessionData?.repository ?? fetchedSessionData?.gitUrl;
+  const repository =
+    rawRepository === null || rawRepository === undefined || rawRepository === ''
+      ? null
+      : displayRepoName(rawRepository);
   const gitBranch = fetchedSessionData?.gitBranch;
   const hasRepoInfo = (repository ?? '') !== '' || (gitBranch ?? '') !== '';
+  const associatedPr = fetchedSessionData?.associatedPr ?? null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -226,6 +264,19 @@ export const AgentsSessionView = ({
               </p>
             ) : null}
           </div>
+          {associatedPr === null ? null : (
+            <a
+              aria-label={`Open pull request #${associatedPr.number}`}
+              className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+              href={associatedPr.url}
+              rel="noopener noreferrer"
+              target="_blank"
+              title={associatedPr.title ?? undefined}
+            >
+              <GitPullRequest aria-hidden="true" className="size-3.5" />
+              <span>#{associatedPr.number}</span>
+            </a>
+          )}
         </div>
       </div>
 
@@ -234,8 +285,8 @@ export const AgentsSessionView = ({
         <div
           className={`shrink-0 border-b px-4 py-2 type-label ${statusIndicatorClass(statusIndicator.type)}`}
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate">{statusIndicator.message}</span>
+          <div className="flex items-start justify-between gap-2">
+            <span className="min-w-0 break-words">{statusIndicator.message}</span>
             {(() => {
               if (statusIndicator.type === 'error' && !isCreditsStatus) {
                 return (
@@ -414,7 +465,7 @@ export const AgentsSessionView = ({
         </div>
       ) : (
         <>
-          <AgentsMessageList messages={messages} />
+          <AgentsMessageList isStreaming={isStreaming || isSending} messages={messages} />
           <AgentsComposer
             canSend={canSend}
             canInterrupt={canInterrupt}

@@ -1,12 +1,32 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/test/render-with-providers.tsx */
 import * as React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToolDiffPreview } from './tool-diff-preview';
 import { type ToolDiffModel } from './tool-diff-model';
+import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
+import { type DiffLine as DiffLineComponent } from '@/components/pr-review/diff/diff-line';
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Text: 'RNText',
+  Pressable: 'Pressable',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({
+    background: '#FBFAF5',
+    foreground: '#14130F',
+    good: '#278150',
+    destructive: '#BE4E3F',
+    mutedForeground: '#6F6A61',
+  }),
+}));
+vi.mock('@/lib/pr-review/diff/highlight', () => ({
+  highlightLine: (text: string) => [{ text, className: null }],
+}));
 vi.mock('@/components/pr-review/diff/diff-line', () => ({ DiffLine: 'DiffLine' }));
 
 function makeModel(overrides: Partial<ToolDiffModel> = {}): ToolDiffModel {
@@ -139,5 +159,67 @@ describe('ToolDiffPreview', () => {
     const root = rootElement(render(makeModel({ lines: [], language: null, truncated: false })));
     const diffLines = findByType(root, 'DiffLine');
     expect(diffLines).toHaveLength(0);
+  });
+});
+
+describe('DiffLine code container accessibility', () => {
+  // The E2E edit-detail hierarchy failed S3 because the code container's
+  // `accessibilityLabel` was set but the container was not marked
+  // `accessible`, so iOS exposed only the selectable code text. This test
+  // mounts the REAL `DiffLine` (bypassing the string mock used above) and
+  // proves the code container is the accessibility element carrying the
+  // status word + line number.
+  it('exposes the status word and line number on the rendered code container', async () => {
+    const { DiffLine } = await vi.importActual<{ DiffLine: typeof DiffLineComponent }>(
+      '@/components/pr-review/diff/diff-line'
+    );
+
+    const deletedLine: ParsedDiffLine = {
+      type: 'del',
+      oldLine: 1,
+      text: 'greeting = "hello"',
+      noNewlineAtEndOfFile: false,
+    };
+    const addedLine: ParsedDiffLine = {
+      type: 'add',
+      newLine: 1,
+      text: 'greeting = "goodbye"',
+      noNewlineAtEndOfFile: false,
+    };
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(DiffLine, { line: deletedLine, language: 'typescript', keyId: 'k0' }),
+          React.createElement(DiffLine, { line: addedLine, language: 'typescript', keyId: 'k1' })
+        )
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const codeContainers = renderer.root.findAll(node => {
+      const props = node.props as { accessibilityLabel?: string } | null;
+      return typeof props?.accessibilityLabel === 'string';
+    });
+    expect(codeContainers).toHaveLength(2);
+
+    const labels = codeContainers
+      .map(node => node.props as { accessibilityLabel: string; accessible?: boolean })
+      .toSorted((a, b) => a.accessibilityLabel.localeCompare(b.accessibilityLabel));
+
+    expect(labels[0]?.accessibilityLabel).toBe('Added line 1: greeting = "goodbye"');
+    expect(labels[1]?.accessibilityLabel).toBe('Deleted line 1: greeting = "hello"');
+    for (const host of labels) {
+      expect(host.accessible).toBe(true);
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { OrgKiloPassBillingHistory } from '@/components/subscriptions/org-kilo-pass/OrgKiloPassBillingHistory';
 import { OrgKiloPassDetail } from '@/components/subscriptions/org-kilo-pass/OrgKiloPassDetail';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 export default async function OrganizationKiloPassPage({
   params,
@@ -10,7 +11,7 @@ export default async function OrganizationKiloPassPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      roles={['owner', 'billing_manager']}
+      roles={ORGANIZATION_BILLING_ROLES}
       render={({ organization }) => (
         <div className="space-y-6">
           <OrgKiloPassDetail

@@ -31,15 +31,29 @@ const getRoleBadgeVariant = (role: string) => {
 
 const ROLE_LABELS = {
   owner: 'Owner',
+  admin: 'Admin',
   member: 'Member',
   billing_manager: 'Billing Manager',
 } as const;
 
+const ASSIGNABLE_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
+
+/**
+ * Mirrors the server rules in organization-members-router: owners and Kilo
+ * staff may assign any role, admins may assign every role except owner, and
+ * nobody else may change roles.
+ */
 const getAvailableRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  return isKiloAdmin || currentUserRole === 'owner' ? ['owner', 'member', 'billing_manager'] : [];
+  if (isKiloAdmin || currentUserRole === 'owner') {
+    return [...ASSIGNABLE_ROLES];
+  }
+  if (currentUserRole === 'admin') {
+    return ['admin', 'member', 'billing_manager'];
+  }
+  return [];
 };
 
 type MemberRoleDropdownProps = {
@@ -84,7 +98,8 @@ export function MemberRoleDropdown({
   };
 
   const availableRoles = getAvailableRoles(currentUserRole, isKiloAdmin);
-  const canEditRole = availableRoles.length > 0;
+  // An admin may not act on an owner's membership, so show it as read-only.
+  const canEditRole = availableRoles.length > 0 && availableRoles.includes(member.role);
 
   // Check if this member is the current user by comparing both ID and email
   const isCurrentUser =
@@ -118,7 +133,7 @@ export function MemberRoleDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {(['owner', 'member', 'billing_manager'] as const).map(role => {
+        {ASSIGNABLE_ROLES.map(role => {
           const isCurrentRole = member.role === role;
           const isAllowed = availableRoles.includes(role);
           const isDisabled = isCurrentRole || mutation.isPending || !isAllowed;

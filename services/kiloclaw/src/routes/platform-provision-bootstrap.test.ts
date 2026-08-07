@@ -326,6 +326,36 @@ describe('platform provision bootstrap quarantine', () => {
     });
   });
 
+  it('rejects fresh personal provisioning when billing reports signup is unavailable', async () => {
+    const { env, provision, beginFreshProvision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockRejectedValueOnce(
+      Object.assign(
+        new Error('A current KiloClaw subscription is required to provision an instance.'),
+        {
+          status: 403,
+          code: 'new_kiloclaw_instances_unavailable',
+        }
+      )
+    );
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', provider: 'fly' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'provision failed' });
+    expect(beginFreshProvision).not.toHaveBeenCalled();
+    expect(provision).not.toHaveBeenCalled();
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).not.toHaveBeenCalled();
+  });
+
   it('forwards user location to the instance provision config', async () => {
     const { env, provision } = makeEnv();
     const workerDb = createWorkerDb();

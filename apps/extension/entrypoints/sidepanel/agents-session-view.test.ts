@@ -13,7 +13,7 @@ import type {
 } from '@kilocode/cloud-agent-sdk';
 import { AgentsBlockingCards } from './agents-blocking-cards';
 import { AgentsComposer } from './agents-composer';
-import { AgentsMessageList } from './agents-message-list';
+import { AgentsMessageList, toolErrorSummary } from './agents-message-list';
 
 // ---- AgentsMessageList rendering ----
 
@@ -127,38 +127,107 @@ describe('agents message list rendering', () => {
     expect(container.textContent).toContain('completed');
   });
 
-  it('renders reasoning parts as muted label', () => {
+  it("shows the tool's own title and surfaces a failed tool's reason", () => {
+    const info = {
+      id: 'msg-tool',
+      sessionID: 'ses-1',
+      role: 'assistant',
+      time: { created: 3000, completed: 3200 },
+      parentID: 'msg-2',
+      modelID: 'test',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: '',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    } satisfies AssistantMessage;
     const messages: StoredMessage[] = [
       {
-        info: {
-          id: 'msg-4',
-          sessionID: 'ses-1',
-          role: 'assistant',
-          time: { created: 4000, completed: 4000 },
-          parentID: 'msg-3',
-          modelID: 'test',
-          providerID: 'kilo',
-          mode: 'code',
-          agent: '',
-          path: { cwd: '/', root: '/' },
-          cost: 0,
-          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        } satisfies AssistantMessage,
+        info,
         parts: [
           {
-            id: 'p-4',
+            id: 'p-ok',
             sessionID: 'ses-1',
-            messageID: 'msg-4',
-            type: 'reasoning' as const,
-            text: 'Let me think...',
-            time: { start: 4000, end: 4100 },
+            messageID: 'msg-tool',
+            type: 'tool' as const,
+            callID: 'call-ok',
+            tool: 'read',
+            state: {
+              status: 'completed' as const,
+              input: {},
+              output: 'contents',
+              title: 'README.md',
+              metadata: {},
+              time: { start: 3000, end: 3100 },
+            },
+          },
+          {
+            id: 'p-err',
+            sessionID: 'ses-1',
+            messageID: 'msg-tool',
+            type: 'tool' as const,
+            callID: 'call-err',
+            tool: 'read',
+            state: {
+              status: 'error' as const,
+              input: {},
+              error: 'ENOENT: no such file or directory\n    at open (fs.js:1)',
+              time: { start: 3100, end: 3150 },
+            },
           },
         ],
       },
     ];
 
     const { container } = render(h(AgentsMessageList, { messages }));
-    expect(container.textContent).toContain('Reasoning');
+    // The title says which file, so the row is not just "read completed".
+    expect(container.textContent).toContain('README.md');
+    // A failed tool states its reason instead of a bare "error".
+    expect(container.textContent).toContain('ENOENT: no such file or directory');
+    // The stack frame is dropped.
+    expect(container.textContent).not.toContain('at open (fs.js:1)');
+  });
+
+  it('hides reasoning parts on a completed message and shows the tail while streaming', () => {
+    const completedInfo = {
+      id: 'msg-4',
+      sessionID: 'ses-1',
+      role: 'assistant',
+      time: { created: 4000, completed: 4000 },
+      parentID: 'msg-3',
+      modelID: 'test',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: '',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    } satisfies AssistantMessage;
+    const reasoningParts = [
+      {
+        id: 'p-4',
+        sessionID: 'ses-1',
+        messageID: 'msg-4',
+        type: 'reasoning' as const,
+        text: 'Let me think...',
+        time: { start: 4000, end: 4100 },
+      },
+    ];
+    const messages: StoredMessage[] = [{ info: completedInfo, parts: reasoningParts }];
+
+    // Completed message: reasoning is noise and stays hidden.
+    const { container } = render(h(AgentsMessageList, { messages }));
+    expect(container.textContent).not.toContain('Reasoning');
+
+    // Streaming message: the trailing reasoning part renders as a live label.
+    const streamingInfo = {
+      ...completedInfo,
+      time: { created: 4000 },
+    } satisfies AssistantMessage;
+    const streaming: StoredMessage[] = [{ info: streamingInfo, parts: reasoningParts }];
+    const { container: streamingContainer } = render(h(AgentsMessageList, { messages: streaming }));
+    expect(streamingContainer.textContent).toContain('Reasoning');
   });
 });
 
@@ -1075,6 +1144,46 @@ describe('agents session view integration', () => {
     });
   });
 
+  it('shows Working while a send is in flight, before the stream starts', async () => {
+    storedAtomValues['sessionConfig'] = { mode: 'code', model: 'gpt-4' };
+    storedAtomValues['canSend'] = true;
+    storedAtomValues['isStreaming'] = false;
+
+    const { container } = await renderView();
+    expect(container.textContent).not.toContain('Working');
+
+    const textarea = container.querySelector('textarea');
+    fireEvent.change(textarea!, { target: { value: 'run the tests' } });
+    const sendBtn = [...container.querySelectorAll('button')].find(
+      b => b.textContent === 'Send message'
+    );
+    fireEvent.click(sendBtn!);
+
+    // The agent has the prompt but has not streamed yet: say so rather than
+    // Leaving a dead composer and an unchanged transcript.
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Working');
+    });
+  });
+
+  it('stops claiming work when the send fails', async () => {
+    mockManager.send.mockResolvedValue(false);
+    storedAtomValues['sessionConfig'] = { mode: 'code', model: 'gpt-4' };
+    storedAtomValues['canSend'] = true;
+    storedAtomValues['isStreaming'] = false;
+
+    const { container } = await renderView();
+    const textarea = container.querySelector('textarea');
+    fireEvent.change(textarea!, { target: { value: 'run the tests' } });
+    fireEvent.click(
+      [...container.querySelectorAll('button')].find(b => b.textContent === 'Send message')!
+    );
+
+    await vi.waitFor(() => {
+      expect(container.textContent).not.toContain('Working');
+    });
+  });
+
   it('keeps failed-prompt banner when composer send returns false', async () => {
     mockManager.send.mockResolvedValue(false);
 
@@ -1492,5 +1601,25 @@ describe('agents session view integration', () => {
     expect(mockManager.destroy).toHaveBeenCalledOnce();
 
     vi.useRealTimers();
+  });
+});
+
+describe('toolErrorSummary helper', () => {
+  it('returns a short single-line error unchanged', () => {
+    expect(toolErrorSummary('ENOENT: no such file')).toBe('ENOENT: no such file');
+  });
+
+  it('keeps only the first meaningful line of a stack trace', () => {
+    expect(toolErrorSummary('\n  Error: boom\n    at foo (bar.ts:1)\n')).toBe('Error: boom');
+  });
+
+  it('clamps a very long line so the transcript stays readable', () => {
+    const summary = toolErrorSummary('x'.repeat(500));
+    expect(summary).toHaveLength(201);
+    expect(summary.endsWith('…')).toBe(true);
+  });
+
+  it('returns an empty string for whitespace-only errors', () => {
+    expect(toolErrorSummary('   \n  ')).toBe('');
   });
 });

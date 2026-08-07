@@ -18,6 +18,7 @@ export function SubscriptionCard({
   isTerminal = false,
   warningTone,
   statusNote,
+  supplementalContent,
   action,
   actionPlacement = 'footer',
 }: {
@@ -33,10 +34,54 @@ export function SubscriptionCard({
   isTerminal?: boolean;
   warningTone?: 'warning' | 'info';
   statusNote?: string | null;
+  supplementalContent?: ReactNode;
   action?: ReactNode;
   actionPlacement?: 'footer' | 'top-right';
 }) {
   const hasTopRightAction = action && actionPlacement === 'top-right';
+  const summaryContent = (
+    <>
+      <div className="flex min-w-0 gap-3">
+        <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-xl">
+          {icon}
+        </div>
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="truncate font-semibold">{title}</h3>
+            <SubscriptionStatusBadge status={status} variant={isTerminal ? 'muted' : 'default'} />
+          </div>
+          {subtitle ? <p className="text-muted-foreground text-sm">{subtitle}</p> : null}
+          {statusNote ? (
+            <p
+              className={cn(
+                'text-sm font-medium',
+                warningTone === 'warning' ? 'text-amber-300' : 'text-muted-foreground'
+              )}
+            >
+              {statusNote}
+            </p>
+          ) : null}
+          <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div>
+              <span className="text-foreground font-medium">Price:</span> {price}
+            </div>
+            <div>
+              <span className="text-foreground font-medium">{billingDateLabel}:</span> {billingDate}
+            </div>
+            <div>
+              <span className="text-foreground font-medium">Payment:</span> {paymentMethod}
+            </div>
+          </div>
+        </div>
+      </div>
+      <ChevronRight
+        className={cn(
+          'text-muted-foreground size-5 shrink-0 self-center md:mt-3',
+          hasTopRightAction && 'md:absolute md:top-1/2 md:right-5 md:mt-0 md:-translate-y-1/2'
+        )}
+      />
+    </>
+  );
 
   return (
     <Card
@@ -53,53 +98,24 @@ export function SubscriptionCard({
       >
         <CardContent
           className={cn(
-            'flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between',
+            supplementalContent
+              ? 'space-y-4 p-5'
+              : 'flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between',
             hasTopRightAction && 'md:relative md:pr-72'
           )}
         >
-          <div className="flex min-w-0 gap-3">
-            <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-xl">
-              {icon}
-            </div>
-            <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate font-semibold">{title}</h3>
-                <SubscriptionStatusBadge
-                  status={status}
-                  variant={isTerminal ? 'muted' : 'default'}
-                />
+          {supplementalContent ? (
+            <>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                {summaryContent}
               </div>
-              {subtitle ? <p className="text-muted-foreground text-sm">{subtitle}</p> : null}
-              {statusNote ? (
-                <p
-                  className={cn(
-                    'text-sm font-medium',
-                    warningTone === 'warning' ? 'text-amber-300' : 'text-muted-foreground'
-                  )}
-                >
-                  {statusNote}
-                </p>
-              ) : null}
-              <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                <div>
-                  <span className="text-foreground font-medium">Price:</span> {price}
-                </div>
-                <div>
-                  <span className="text-foreground font-medium">{billingDateLabel}:</span>{' '}
-                  {billingDate}
-                </div>
-                <div>
-                  <span className="text-foreground font-medium">Payment:</span> {paymentMethod}
-                </div>
+              <div className="border-border border-t pt-4 md:ml-14 md:pr-8">
+                {supplementalContent}
               </div>
-            </div>
-          </div>
-          <ChevronRight
-            className={cn(
-              'text-muted-foreground size-5 shrink-0 self-center md:mt-3',
-              hasTopRightAction && 'md:absolute md:top-1/2 md:right-5 md:mt-0 md:-translate-y-1/2'
-            )}
-          />
+            </>
+          ) : (
+            summaryContent
+          )}
         </CardContent>
       </Link>
       {hasTopRightAction ? (

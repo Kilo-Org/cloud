@@ -10,6 +10,7 @@ import type {
   OrganizationRole,
   OrganizationWithMembers,
 } from '@/lib/organizations/organization-types';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type SSOSignupCardProps = {
   organization: OrganizationWithMembers;
@@ -152,7 +153,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
                       )}
                     </div>
                     {/* Verify Domain Link - only show to owners when domain is not verified */}
-                    {!isDomainVerified && role === 'owner' && (
+                    {!isDomainVerified && canManageOrganization(role) && (
                       <button
                         onClick={handleDomainVerification}
                         disabled={generatePortalLink.isPending}
@@ -188,7 +189,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
                         </span>
                       </div>
                       {/* Complete Setup Link - only show to owners when domain is verified */}
-                      {isDomainVerified && role === 'owner' && (
+                      {isDomainVerified && canManageOrganization(role) && (
                         <button
                           onClick={handleSSOConfiguration}
                           disabled={generatePortalLink.isPending}

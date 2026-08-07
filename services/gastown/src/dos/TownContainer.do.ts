@@ -530,11 +530,19 @@ export class TownContainerDO extends Container<Env> {
 
     const updated: OpenUsageInterval = {
       ...latest,
-      phase: latest.phase === 'starting' ? 'running' : latest.phase,
+      phase:
+        isGastownBillingEnforced(this.env) && ack.budget.verdict === 'stop'
+          ? 'stopping'
+          : latest.phase === 'starting'
+            ? 'running'
+            : latest.phase,
       seq: pending.seq,
       lastReportedAt: pending.observedAt,
       reportedUsageSeconds: (latest.reportedUsageSeconds ?? 0) + pending.usageSinceLast,
       latestBudget: ack.budget,
+      ...(ack.budget.verdict === 'stop'
+        ? { stopReason: 'runtime_signal' as const, stopObservedAt: Date.now() }
+        : {}),
     };
     delete updated.pendingHeartbeat;
     await this.ctx.storage.put(BILLING_STATE_KEY, updated);
@@ -738,6 +746,19 @@ export class TownContainerDO extends Container<Env> {
       throw new ContainerBillingError(
         'CONTAINER_PAUSED',
         'Automatic starts are paused for this Gas Town'
+      );
+    }
+    const billing = await this.getUsageState();
+    if (
+      billing.phase === 'stopping' ||
+      (billing.phase === 'idle' && billing.blocked) ||
+      (isGastownBillingEnforced(this.env) &&
+        billing.phase !== 'idle' &&
+        billing.latestBudget?.verdict === 'stop')
+    ) {
+      throw new ContainerBillingError(
+        'INSUFFICIENT_CREDITS',
+        'Container billing requires additional credits before automatic restart'
       );
     }
   }

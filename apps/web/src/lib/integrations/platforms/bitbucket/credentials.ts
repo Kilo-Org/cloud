@@ -8,6 +8,7 @@ import {
 import { db } from '@/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import {
   kilocode_users,
@@ -177,7 +178,7 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
             and(
               eq(organization_memberships.organization_id, input.owner.id),
               eq(organization_memberships.kilo_user_id, input.authorizedByUserId),
-              inArray(organization_memberships.role, ['owner', 'billing_manager'])
+              inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
             )
           )
           .for('update');

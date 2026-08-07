@@ -6,6 +6,7 @@ function surface(overrides: Partial<Parameters<typeof selectSessionListContentSu
   return selectSessionListContentSurface({
     isLoading: false,
     isError: false,
+    activeIsError: false,
     hasAnySessions: true,
     hasPinnedActive: false,
     hasHistoryContent: true,
@@ -113,6 +114,80 @@ describe('selectSessionListContentSurface', () => {
           hasHistoryContent: false,
         })
       ).toEqual({ kind: 'section-list', listEmpty: 'body-empty' });
+    });
+  });
+
+  describe('cold active-only failure (active-error-empty)', () => {
+    it('defaults activeIsError to false so a plain empty load is first-use empty', () => {
+      // The helper default (and the wiring default) must not turn an ordinary
+      // cold empty screen into the active-error surface.
+      expect(
+        surface({
+          hasAnySessions: false,
+          hasPinnedActive: false,
+          hasHistoryContent: false,
+        })
+      ).toEqual({ kind: 'first-use-empty' });
+    });
+
+    it('selects active-error-empty when the active poll failed on a cold empty screen', () => {
+      // Stored query succeeded empty, active poll failed before any data:
+      // retryable, so never claim "No sessions yet".
+      expect(
+        surface({
+          activeIsError: true,
+          hasAnySessions: false,
+          hasPinnedActive: false,
+          hasHistoryContent: false,
+        })
+      ).toEqual({ kind: 'active-error-empty' });
+    });
+
+    it('suppresses active-error-empty while still loading', () => {
+      // Cold open: the failed active poll must not surface its error under the
+      // skeleton state — loading keeps the single SectionList render site.
+      expect(
+        surface({
+          isLoading: true,
+          activeIsError: true,
+          hasAnySessions: false,
+          hasPinnedActive: false,
+          hasHistoryContent: false,
+        })
+      ).toEqual({ kind: 'section-list', listEmpty: 'loading-skeletons' });
+    });
+
+    it('keeps the stored full-screen error first when both queries failed', () => {
+      expect(
+        surface({
+          isError: true,
+          activeIsError: true,
+          hasAnySessions: false,
+          hasPinnedActive: false,
+          hasHistoryContent: false,
+        })
+      ).toEqual({ kind: 'full-screen-error' });
+    });
+
+    it('keeps the section-list surfaces when sessions are visible despite the active failure', () => {
+      // A failed active poll never overrides visible content: an empty body
+      // keeps body-empty and rendered history keeps no ListEmptyComponent.
+      expect(
+        surface({
+          activeIsError: true,
+          hasAnySessions: true,
+          hasPinnedActive: true,
+          hasHistoryContent: false,
+        })
+      ).toEqual({ kind: 'section-list', listEmpty: 'body-empty' });
+      expect(
+        surface({
+          activeIsError: true,
+          hasAnySessions: true,
+          hasPinnedActive: true,
+          hasHistoryContent: true,
+        })
+      ).toEqual({ kind: 'section-list', listEmpty: 'none' });
     });
   });
 

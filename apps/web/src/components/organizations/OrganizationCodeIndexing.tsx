@@ -7,6 +7,7 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { CodeIndexingView } from '@/components/code-indexing/CodeIndexingView';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink } from 'lucide-react';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type OrganizationCodebaseIndexingProps = {
   organizationId: string;
@@ -59,7 +60,7 @@ export function OrganizationCodeIndexing({
   }
 
   // Determine if user can delete branches
-  const canDelete = isAdminView || role === 'owner';
+  const canDelete = isAdminView || canManageOrganization(role);
 
   return (
     <div className="flex flex-col gap-y-6">

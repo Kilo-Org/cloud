@@ -3,9 +3,8 @@ import { View } from 'react-native';
 import { Pencil } from 'lucide-react-native';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
-import { Text } from '@/components/ui/text';
+import { SelectableText } from '@/components/ui/selectable-text';
 
-import { useTranscriptTextSelectable } from '../bubble-text-selection-context';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
@@ -44,7 +43,6 @@ function EditFallbackBody({
  * pending/running status line live in `ToolPartDetailBody`.
  */
 export function EditToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
-  const textSelectable = useTranscriptTextSelectable();
   const input = part.state.input;
   const oldString = typeof input.oldString === 'string' ? input.oldString : '';
   const newString = typeof input.newString === 'string' ? input.newString : '';
@@ -63,11 +61,7 @@ export function EditToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   return (
     <View className="gap-2">
       {body}
-      {error ? (
-        <Text selectable={textSelectable} className="text-xs text-destructive">
-          {error}
-        </Text>
-      ) : null}
+      {error ? <SelectableText className="text-xs text-destructive">{error}</SelectableText> : null}
     </View>
   );
 }

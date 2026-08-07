@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
-  CURRENT_KILOCLAW_PRICE_VERSION,
   LEGACY_KILOCLAW_PRICE_VERSION,
   type KiloClawPriceVersion,
   collapseOrphanPersonalSubscriptionsOnDestroy,
@@ -1220,7 +1219,7 @@ describe('personal subscription destroy collapse', () => {
     await expectCurrentHead({ subscriptionId: successor.id, userId: user.id });
   });
 
-  it('expired trial row + destroyed instance creates a fresh current trial', async () => {
+  it('rejects replacement provisioning for an expired trial on a destroyed instance', async () => {
     const user = await insertTestUser({
       google_user_email: 'destroy-expired-trial-blocks-provision@example.com',
     });
@@ -1251,24 +1250,16 @@ describe('personal subscription destroy collapse', () => {
       trialEndsAt: '2026-04-08T00:00:00.000Z',
     });
 
-    const created = await bootstrapProvisionSubscriptionWithDb({
-      db,
-      input: { userId: user.id, instanceId: newInstanceId, orgId: null },
-      actor: TEST_ACTOR,
-    });
-
-    expect(created).toEqual(
-      expect.objectContaining({
-        user_id: user.id,
-        instance_id: newInstanceId,
-        plan: 'trial',
-        status: 'trialing',
-        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    await expect(
+      bootstrapProvisionSubscriptionWithDb({
+        db,
+        input: { userId: user.id, instanceId: newInstanceId, orgId: null },
+        actor: TEST_ACTOR,
       })
-    );
+    ).rejects.toThrow('A current KiloClaw subscription is required to provision an instance.');
   });
 
-  it('past-due suspended row creates a fresh current trial', async () => {
+  it('rejects replacement provisioning for a suspended past-due row', async () => {
     const user = await insertTestUser({
       google_user_email: 'destroy-past-due-suspended-blocks-provision@example.com',
     });
@@ -1298,21 +1289,13 @@ describe('personal subscription destroy collapse', () => {
       suspendedAt: '2026-04-08T00:00:00.000Z',
     });
 
-    const created = await bootstrapProvisionSubscriptionWithDb({
-      db,
-      input: { userId: user.id, instanceId: newInstanceId, orgId: null },
-      actor: TEST_ACTOR,
-    });
-
-    expect(created).toEqual(
-      expect.objectContaining({
-        user_id: user.id,
-        instance_id: newInstanceId,
-        plan: 'trial',
-        status: 'trialing',
-        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    await expect(
+      bootstrapProvisionSubscriptionWithDb({
+        db,
+        input: { userId: user.id, instanceId: newInstanceId, orgId: null },
+        actor: TEST_ACTOR,
       })
-    );
+    ).rejects.toThrow('A current KiloClaw subscription is required to provision an instance.');
   });
 
   it('refuses collapse when multiple alive current funded personal rows exist', async () => {

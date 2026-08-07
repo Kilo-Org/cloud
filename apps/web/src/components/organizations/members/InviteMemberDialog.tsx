@@ -39,19 +39,23 @@ const emailSchema = z.email();
 
 const ROLE_LABELS = {
   owner: 'Owner',
+  admin: 'Admin',
   member: 'Member',
   billing_manager: 'Billing Manager',
 } as const;
 
 // Business rules for inviting members:
 // - Owners and Kilo admins can invite anyone
+// - Admins can invite anyone except an owner
 // - Billing managers can invite members only
 // - Members cannot invite anyone
 const getAvailableInviteRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  if (isKiloAdmin || currentUserRole === 'owner') return ['owner', 'member', 'billing_manager'];
+  if (isKiloAdmin || currentUserRole === 'owner')
+    return ['owner', 'admin', 'member', 'billing_manager'];
+  if (currentUserRole === 'admin') return ['admin', 'member', 'billing_manager'];
   if (currentUserRole === 'billing_manager') return ['member'];
 
   return [];
@@ -249,7 +253,7 @@ export function InviteMemberDialog({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {(['owner', 'member', 'billing_manager'] as const).map(
+                      {(['owner', 'admin', 'member', 'billing_manager'] as const).map(
                         (roleOption: OrganizationRole) => {
                           const isAvailable = availableRoles.includes(roleOption);
                           const isSelected = role === roleOption;

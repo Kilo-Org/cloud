@@ -42,7 +42,7 @@ describe('orderOpenCodeVariants', () => {
     ]);
   });
 
-  it('orders instant and effort variants from least to most intensive', () => {
+  it('orders instant and effort variants consistently with fallback variants', () => {
     expect(
       Object.keys(
         orderOpenCodeVariants({ high: variant, medium: variant, instant: variant, low: variant })
@@ -66,7 +66,7 @@ describe('orderOpenCodeSettings', () => {
 
     expect(orderOpenCodeSettings(settings)).toEqual({
       ai_sdk_provider: 'anthropic',
-      variants: { low: variant, high: variant },
+      variants: { high: variant, low: variant },
     });
   });
 

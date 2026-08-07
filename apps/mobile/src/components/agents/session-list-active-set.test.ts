@@ -1,12 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
 import { type AgentSessionDateGroup, groupAgentSessionsByDate } from '@/lib/agent-session-groups';
-import { excludeActiveFromGroups } from '@/components/agents/session-list-helpers';
+import {
+  filterActiveSessionsByOrganization,
+  selectActiveExclusionIds,
+} from '@/lib/active-sessions-live';
+import {
+  excludeActiveFromGroups,
+  selectPinnedActiveSessions,
+} from '@/components/agents/session-list-helpers';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
 type Row = { session_id: string; created_at: string; updated_at: string };
+
+/** Minimal `ActiveSession`-shaped row; `organizationId` is set only after enrichment. */
+type ActiveRow = {
+  id: string;
+  status: string;
+  title: string;
+  connectionId: string;
+  organizationId?: string | null;
+};
+
+function makeActive(id: string, over: { organizationId?: string | null } = {}): ActiveRow {
+  return { id, status: 'running', title: `Session ${id}`, connectionId: 'c1', ...over };
+}
 
 function makeSessions(ids: string[], baseTimestamp: string): Row[] {
   return ids.map((id, i) => ({
@@ -99,5 +119,122 @@ describe('active-set order regression', () => {
     const sections = activeAwareSections(groups, allIds);
 
     expect(sections).toEqual([]);
+  });
+});
+
+// ── first-history-then-active sequence ────────────────────────────────
+
+describe('first-history-then-active sequence', () => {
+  // `x` is the only stored row; the sequence below moves it between history
+  // and the tray as the live cache fills, enriches, and drops it.
+  const baseDate = '2026-01-01T12:00:00Z';
+  const sortBy: AgentSessionSortBy = 'updated_at';
+  const groups = groupAgentSessionsByDate(
+    makeSessions(['x'], baseDate),
+    sortBy,
+    new Date('2026-08-01T12:00:00Z')
+  );
+
+  /**
+   * Same composition as `useAgentSessionListData`: the tray side runs the
+   * org-filtered rows through `selectPinnedActiveSessions`; the history side
+   * drops ids in the chosen exclusion set from the stored groups. `narrowing`
+   * replicates the `sections` memo's switch — a committed search
+   * (`isSearching`, including the pending first-fetch window where the
+   * effective query is still `''`) or a platform/project filter selects the
+   * org-filtered set; none of the three selects the unfiltered cache set.
+   */
+  function reconcile(
+    cache: ActiveRow[],
+    narrowing: { isSearching?: boolean; platformFilter?: string[]; projectFilter?: string[] } = {}
+  ) {
+    const { isSearching = false, platformFilter = [], projectFilter = [] } = narrowing;
+    const trayRows = filterActiveSessionsByOrganization(cache, 'org-1');
+    const pinned = selectPinnedActiveSessions({
+      activeSessions: trayRows,
+      projectFilter: [],
+      platformFilter: [],
+      searchQuery: '',
+    });
+    const activeSessionIds = new Set(trayRows.map(s => s.id));
+    const activeExclusionIds = selectActiveExclusionIds(cache);
+    const narrowed = isSearching || platformFilter.length > 0 || projectFilter.length > 0;
+    const exclusionIds = narrowed ? activeSessionIds : activeExclusionIds;
+    return {
+      pinned: pinned.map(s => s.id),
+      history: rowOrder(excludeActiveFromGroups(groups, exclusionIds)),
+      exclusionIds,
+    };
+  }
+
+  it('moves a session from history to the tray through the unenriched window without duplicates', () => {
+    // 1. Live cache empty → `x` renders in history; the tray is empty.
+    let cache: ActiveRow[] = [];
+    let result = reconcile(cache);
+    expect(result.history).toEqual(['x']);
+    expect(result.pinned).toEqual([]);
+    expect(result.pinned.every(id => result.exclusionIds.has(id))).toBe(true);
+
+    // 2. WS write lands UNENRICHED (no `organizationId`): the org filter
+    //    hides it from the tray, and the unfiltered exclusion set drops it
+    //    from history — the direct-move window renders it in neither surface.
+    cache = [makeActive('x')];
+    result = reconcile(cache);
+    expect(filterActiveSessionsByOrganization(cache, 'org-1')).toEqual([]);
+    expect(result.pinned).toEqual([]);
+    expect(result.history).toEqual([]);
+    expect(result.pinned.every(id => result.exclusionIds.has(id))).toBe(true);
+
+    // 3. Enrichment attributes the row to org-1 → pinned in the tray, still
+    //    excluded from history.
+    cache = [makeActive('x', { organizationId: 'org-1' })];
+    result = reconcile(cache);
+    expect(result.pinned).toEqual(['x']);
+    expect(result.history).toEqual([]);
+    expect(result.pinned.every(id => result.exclusionIds.has(id))).toBe(true);
+
+    // 4. Departure drops the row from the cache → history re-renders it at
+    //    its original position; the tray is empty again.
+    cache = [];
+    result = reconcile(cache);
+    expect(result.pinned).toEqual([]);
+    expect(result.history).toEqual(['x']);
+    expect(result.pinned.every(id => result.exclusionIds.has(id))).toBe(true);
+  });
+
+  describe('narrowing matrix', () => {
+    it('full view excludes the unenriched row; every narrowed view keeps it in history', () => {
+      const cache = [makeActive('x')];
+
+      // None of the three narrowing inputs active → unfiltered cache set.
+      expect(reconcile(cache).history).toEqual([]);
+
+      // Committed search text — including the pending first-fetch window
+      // where the effective query is still `''` — keeps the org-filtered set.
+      expect(reconcile(cache, { isSearching: true }).history).toEqual(['x']);
+
+      // Platform filter.
+      expect(reconcile(cache, { platformFilter: ['cli'] }).history).toEqual(['x']);
+
+      // Project filter.
+      expect(reconcile(cache, { projectFilter: ['https://example.com/r'] }).history).toEqual(['x']);
+    });
+
+    it('narrowed views still exclude an org-attributed row (the org-filtered set covers it)', () => {
+      const cache = [makeActive('x', { organizationId: 'org-1' })];
+      expect(reconcile(cache, { isSearching: true }).history).toEqual([]);
+      expect(reconcile(cache, { platformFilter: ['cli'] }).history).toEqual([]);
+    });
+
+    it('keeps exclusivity in both modes: pinned is always a subset of the exclusion set', () => {
+      const unenriched = [makeActive('x')];
+      expect(
+        reconcile(unenriched).pinned.every(id => reconcile(unenriched).exclusionIds.has(id))
+      ).toBe(true);
+      const enriched = [makeActive('x', { organizationId: 'org-1' })];
+      expect(reconcile(enriched).pinned.every(id => reconcile(enriched).exclusionIds.has(id))).toBe(
+        true
+      );
+    });
   });
 });

@@ -8523,6 +8523,7 @@ export const coding_plan_key_inventory = pgTable(
     plan_id: text().notNull(),
     provider_id: text().notNull(),
     upstream_plan_id: text().notNull(),
+    upstream_usage_id: text(),
     encrypted_api_key: jsonb().$type<EncryptedData>(),
     credential_fingerprint: text().notNull(),
     status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),
@@ -8542,6 +8543,9 @@ export const coding_plan_key_inventory = pgTable(
   },
   table => [
     uniqueIndex('UQ_coding_plan_key_inv_fingerprint').on(table.credential_fingerprint),
+    uniqueIndex('UQ_coding_plan_key_inv_provider_usage_id')
+      .on(table.provider_id, table.upstream_usage_id)
+      .where(sql`${table.upstream_usage_id} IS NOT NULL`),
     index('IDX_coding_plan_key_inv_plan_status').on(table.plan_id, table.status),
     index('IDX_coding_plan_key_inv_available')
       .on(table.plan_id)
@@ -9840,6 +9844,7 @@ export type NewCloudBillingSku = typeof cloud_billing_sku.$inferInsert;
 export type ContainerUsageSubjectType = 'user' | 'org';
 export type ContainerUsageActorType = 'user' | 'bot';
 export type ContainerUsageIntervalStatus = 'open' | 'closed';
+export type ContainerUsageBillingMode = 'shadow' | 'paid';
 export type ContainerUsageCloseReason =
   | 'exit'
   | 'runtime_signal'
@@ -9870,6 +9875,10 @@ export const container_usage_interval = pgTable(
     last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_heartbeat_seq: integer().notNull().default(0),
     confirmed_seconds: integer().notNull().default(0),
+    billing_mode: text().$type<ContainerUsageBillingMode>().notNull().default('shadow'),
+    // Paid intervals retain the accepted SKU price even after the SKU is superseded.
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }),
+    settled_billable_seconds: integer().notNull().default(0),
     stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     close_reason: text().$type<ContainerUsageCloseReason>(),
     exit_code: integer(),
@@ -9899,6 +9908,14 @@ export const container_usage_interval = pgTable(
     ),
     check('container_usage_interval_status', sql`${table.status} IN ('open', 'closed')`),
     check(
+      'container_usage_interval_billing_mode',
+      sql`${table.billing_mode} IN ('shadow', 'paid')`
+    ),
+    check(
+      'container_usage_interval_paid_rate',
+      sql`(${table.billing_mode} = 'shadow' AND ${table.rate_cents_per_unit} IS NULL) OR (${table.billing_mode} = 'paid' AND ${table.rate_cents_per_unit} > 0)`
+    ),
+    check(
       'container_usage_interval_open_closed_shape',
       sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL)`
     ),
@@ -9913,6 +9930,10 @@ export const container_usage_interval = pgTable(
     check(
       'container_usage_interval_confirmed_seconds_nonnegative',
       sql`${table.confirmed_seconds} >= 0`
+    ),
+    check(
+      'container_usage_interval_settled_billable_seconds_nonnegative',
+      sql`${table.settled_billable_seconds} >= 0 AND ${table.settled_billable_seconds} <= ${table.confirmed_seconds}`
     ),
     check(
       'container_usage_interval_final_stop_seq_positive',
@@ -10013,3 +10034,46 @@ export const native_attested_keys = pgTable(
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
+
+// Immutable metered-infrastructure debit ledger, partitioned monthly on the
+// source's immutable effective timestamp. Source domains own their own
+// idempotency and cumulative-settlement state.
+export const compute_usage_charge = pgTable(
+  'compute_usage_charge',
+  {
+    usage_source: text().notNull(),
+    usage_source_id: text().notNull(),
+    user_id: text().references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    cloud_billing_sku_id: text()
+      .notNull()
+      .references(() => cloud_billing_sku.id, { onDelete: 'restrict' }),
+    quantity: decimal({ precision: 24, scale: 12 }).notNull(),
+    settled_quantity_after: decimal({ precision: 24, scale: 12 }),
+    rate_cents_per_unit: decimal({ precision: 24, scale: 12 }).notNull(),
+    amount_microdollars: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.usage_source, table.usage_source_id, table.created_at] }),
+    index('IDX_compute_usage_charge_user_created').on(table.user_id, table.created_at),
+    index('IDX_compute_usage_charge_organization_created').on(
+      table.organization_id,
+      table.created_at
+    ),
+    check(
+      'compute_usage_charge_exactly_one_payer',
+      sql`(${table.user_id} IS NULL) <> (${table.organization_id} IS NULL)`
+    ),
+    check('compute_usage_charge_quantity_positive', sql`${table.quantity} > 0`),
+    check(
+      'compute_usage_charge_settled_quantity_positive',
+      sql`${table.settled_quantity_after} IS NULL OR ${table.settled_quantity_after} > 0`
+    ),
+    check('compute_usage_charge_rate_positive', sql`${table.rate_cents_per_unit} > 0`),
+    check('compute_usage_charge_amount_positive', sql`${table.amount_microdollars} > 0`),
+  ]
+);
+
+export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
+export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;

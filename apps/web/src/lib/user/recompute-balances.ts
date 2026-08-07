@@ -10,6 +10,7 @@ import {
   credit_transactions,
   microdollar_usage,
   exa_usage_log,
+  compute_usage_charge,
   type User,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, asc } from 'drizzle-orm';
@@ -31,7 +32,9 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  * 6. Updates the user record and transaction baselines (unless dryRun is true).
  *
  * Postconditions:
- * - microdollars_used = sum(microdollar_usage) + sum(exa_usage_log where charged_to_balance, personal)
+ * - microdollars_used = sum(personal microdollar_usage.cost)
+ *   + sum(personal exa_usage_log.cost_microdollars where charged_to_balance)
+ *   + sum(compute_usage_charge.amount_microdollars where user_id matches)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
  */
@@ -106,7 +109,18 @@ async function fetchUserBalanceData(userId: string) {
     )
     .orderBy(asc(exa_usage_log.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage);
+  const computeUsage = await db
+    .select({
+      cost: compute_usage_charge.amount_microdollars,
+      created_at: compute_usage_charge.created_at,
+    })
+    .from(compute_usage_charge)
+    .where(
+      and(eq(compute_usage_charge.user_id, userId), gt(compute_usage_charge.amount_microdollars, 0))
+    )
+    .orderBy(asc(compute_usage_charge.created_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
 
   const creditTransactions = await db
     .select({
@@ -136,7 +150,7 @@ export function computeUserBalanceUpdates(
   const { user, usageRecords, creditTransactions } = data;
 
   // Compute total usage AND original baselines in a single pass.
-  // usageRecords contains both LLM and Exa charged records, merge-sorted
+  // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
   // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;
@@ -286,7 +300,7 @@ async function applyUserBalanceUpdates(updates: UserBalanceUpdates): Promise<boo
 
 type UsageRecord = { cost: number; created_at: string };
 
-/** Merge two arrays into a single list sorted by `created_at`. */
-export function mergeSortedByCreatedAt(a: UsageRecord[], b: UsageRecord[]): UsageRecord[] {
-  return [...a, ...b].sort((x, y) => x.created_at.localeCompare(y.created_at));
+/** Merge usage ledgers into a single chronology for balance-baseline reconstruction. */
+export function mergeSortedByCreatedAt(...records: UsageRecord[][]): UsageRecord[] {
+  return records.flat().sort((x, y) => x.created_at.localeCompare(y.created_at));
 }

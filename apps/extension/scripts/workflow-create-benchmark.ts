@@ -11,8 +11,9 @@
  * - The Kilo CLI token lives only inside the throwaway browser profile, which
  *   is removed and verified after each attempt. It is never printed or
  *   persisted in an artifact.
- * - Chat-completions traffic must target `https://app.kilo.ai`; the first
- *   non-production URL aborts the batch as a blocker.
+ * - Chat-completions traffic must have the exact `https://app.kilo.ai`
+ *   origin (parsed, not prefix-matched); the first URL with any other
+ *   origin aborts the batch as a blocker.
  * - Artifacts are allowlist-redacted: no user/assistant text, no tool
  *   arguments or results beyond pinned metadata and byte counts, no raw
  *   storage values.
@@ -349,7 +350,7 @@ Options:
   --timeout-ms <ms>  per-attempt agent-phase deadline (default 900000)
   --date <YYYY-MM-DD> follow-up date (default: today + 45 days)
   --append           extend an existing batch in --out; refuses a different
-                     gitHead or follow-up date`;
+                     gitHead, follow-up date, or org hash`;
 
 const parseArgs = (argv: readonly string[]): ParsedArgs => {
   let attempts = 3;
@@ -537,6 +538,17 @@ const makeBlockerRecord = (input: {
   startedAtIso: new Date(input.batchStartedAtMs).toISOString(),
   wallClockSeconds: Math.round((Date.now() - input.batchStartedAtMs) / 1000),
 });
+
+const writeBlockerArtifact = async (outDir: string, blocker: BlockerRecord): Promise<void> => {
+  const blockerPath = join(outDir, 'blocker.json');
+  try {
+    await writeFile(blockerPath, `${JSON.stringify(blocker, null, 2)}\n`);
+  } catch (error) {
+    console.error(
+      `blocker artifact could not be written to ${blockerPath}: ${errorToReason(error)}`
+    );
+  }
+};
 
 // ── Extension storage helpers (raw chrome.storage.local; WXT strips "local:") ─
 
@@ -864,11 +876,12 @@ const selectModel = async (sidePanel: Page): Promise<void> => {
   await expect(modelTrigger).toHaveAttribute('data-model-id', modelId, { timeout: 15_000 });
 };
 
-const sendMessage = async (sidePanel: Page, text: string): Promise<void> => {
+const sendMessage = async (sidePanel: Page, text: string): Promise<number> => {
   const composer = sidePanel.getByLabel('Message agent');
   await expect(composer).toBeEnabled({ timeout: 15_000 });
   await composer.fill(text);
   await composer.press('Enter');
+  return Date.now();
 };
 
 // ── Gateway traffic capture ─────────────────────────────────────────────────
@@ -889,11 +902,18 @@ const startGatewayCapture = (
   const byRequest = new Map<Request, CapturedGatewayRequest>();
 
   const onRequest = (request: Request): void => {
-    if (!request.url().includes(gatewayChatCompletionsPath)) {
+    const url = request.url();
+    if (!url.includes(gatewayChatCompletionsPath)) {
       return;
     }
-    if (!request.url().startsWith(gatewayBase)) {
-      gatewayBlockerReason ??= `non-production gateway URL observed: ${request.url()}`;
+    let origin: string | null = null;
+    try {
+      origin = new URL(url).origin;
+    } catch {
+      origin = null;
+    }
+    if (origin !== gatewayBase) {
+      gatewayBlockerReason ??= `non-production gateway URL observed: ${url}`;
       return;
     }
     let postData: string | null = null;
@@ -1708,8 +1728,18 @@ const runAttempt = async (input: {
   followUpDate: string;
   timeoutMs: number;
   batchStartedAtMs: number;
+  batchOrgIdHash: string | null;
 }): Promise<AttemptRunResult> => {
-  const { attempt, gitHead, token, userEmail, followUpDate, timeoutMs, batchStartedAtMs } = input;
+  const {
+    attempt,
+    gitHead,
+    token,
+    userEmail,
+    followUpDate,
+    timeoutMs,
+    batchStartedAtMs,
+    batchOrgIdHash,
+  } = input;
   const attemptStartMs = Date.now();
   const startedAtIso = new Date(attemptStartMs).toISOString();
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-workflow-create-bench-'));
@@ -1722,6 +1752,7 @@ const runAttempt = async (input: {
   let requests: readonly CapturedGatewayRequest[] = [];
   let savedAtOffsetMs: number | null = null;
   let createSentOffsetMs = 0;
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
 
   const nowOffset = (): number => Date.now() - attemptStartMs;
 
@@ -1753,12 +1784,11 @@ const runAttempt = async (input: {
     // ── Agent phase (the only phase governed by --timeout-ms) ──
     setupDone.value = true;
     const preTurnCount = (await snapshotTurn(sidePanel)).eventCount;
-    createSentOffsetMs = nowOffset();
-    await sendMessage(sidePanel, createMessage);
-
     const abortController = new AbortController();
-    const deadlineMs = Date.now() + timeoutMs;
-    const deadlineTimer = setTimeout(() => {
+    const submitAtMs = await sendMessage(sidePanel, createMessage);
+    createSentOffsetMs = submitAtMs - attemptStartMs;
+    const deadlineMs = submitAtMs + timeoutMs;
+    deadlineTimer = setTimeout(() => {
       abortController.abort();
     }, timeoutMs);
 
@@ -1801,7 +1831,6 @@ const runAttempt = async (input: {
       });
       finalSnapshot = verifyPhase.finalSnapshot;
     }
-    clearTimeout(deadlineTimer);
 
     const finalInternalEvents = validateEvents(finalSnapshot.events);
     const finalBenchEvents = finalInternalEvents.map(toBenchEvent);
@@ -1831,7 +1860,10 @@ const runAttempt = async (input: {
     }
 
     const distinctOrgIdHashes = new Set(requests.map(request => request.orgIdHash));
-    if (distinctOrgIdHashes.size > 1) {
+    const orgIdMismatched =
+      distinctOrgIdHashes.size > 1 ||
+      (batchOrgIdHash !== null && !distinctOrgIdHashes.has(batchOrgIdHash));
+    if (orgIdMismatched) {
       if (attempt === 1) {
         return {
           kind: 'blocker',
@@ -1951,6 +1983,9 @@ const runAttempt = async (input: {
       }),
     };
   } finally {
+    if (deadlineTimer !== undefined) {
+      clearTimeout(deadlineTimer);
+    }
     try {
       await cleanupAttempt(context, userDataDir);
     } catch (error) {
@@ -1985,12 +2020,15 @@ const main = async (): Promise<number> => {
   let outDir: string;
   try {
     outDir = parsed.out ?? (await mkdtemp(join(tmpdir(), 'kilo-workflow-create-bench-')));
+    await mkdir(outDir, { recursive: true });
   } catch (error) {
     throw new BatchBlockerError(
       'build',
       `could not create the output directory: ${errorToReason(error)}`
     );
   }
+
+  let batchOrgIdHash: string | null = null;
 
   try {
     let followUpDate = parsed.date;
@@ -2033,6 +2071,35 @@ const main = async (): Promise<number> => {
       }
       const existingFiles = await listAttemptFiles(outDir);
       firstAttempt = existingFiles.length === 0 ? 1 : Math.max(...existingFiles) + 1;
+      const existingOrgIdHashes = new Set<string>();
+      for (const index of existingFiles) {
+        let existing: { orgIdHash?: unknown };
+        try {
+          existing = JSON.parse(await readFile(join(outDir, `attempt-${index}.json`), 'utf8')) as {
+            orgIdHash?: unknown;
+          };
+        } catch {
+          throw new BatchBlockerError(
+            'build',
+            `--append refused: could not read attempt-${index}.json in ${outDir}`
+          );
+        }
+        if (typeof existing.orgIdHash === 'string') {
+          existingOrgIdHashes.add(existing.orgIdHash);
+        }
+      }
+      if (existingOrgIdHashes.size > 1) {
+        throw new BatchBlockerError(
+          'build',
+          '--append refused: existing attempt files carry differing orgIdHash values'
+        );
+      }
+      if (existingOrgIdHashes.size === 1) {
+        const existingHash = existingOrgIdHashes.values().next().value;
+        if (existingHash !== undefined) {
+          batchOrgIdHash = existingHash;
+        }
+      }
     } else {
       if (parsed.date === null) {
         followUpDate = formatDatePlusDays(45);
@@ -2048,7 +2115,6 @@ const main = async (): Promise<number> => {
     if (followUpDate === null) {
       throw new BatchBlockerError('build', 'internal: no follow-up date resolved');
     }
-    await mkdir(outDir, { recursive: true });
 
     if (!parsed.noBuild) {
       await runBuild();
@@ -2076,14 +2142,13 @@ const main = async (): Promise<number> => {
         followUpDate,
         timeoutMs: parsed.timeoutMs,
         batchStartedAtMs,
+        batchOrgIdHash,
       });
       if (result.kind === 'blocker') {
-        await writeFile(
-          join(outDir, 'blocker.json'),
-          `${JSON.stringify(result.blocker, null, 2)}\n`
-        );
+        await writeBlockerArtifact(outDir, result.blocker);
         return 2;
       }
+      batchOrgIdHash ??= result.record.orgIdHash;
       await writeFile(
         join(outDir, `attempt-${attemptNumber}.json`),
         `${JSON.stringify(result.record, null, 2)}\n`
@@ -2151,7 +2216,7 @@ const main = async (): Promise<number> => {
         gitHead,
         batchStartedAtMs,
       });
-      await writeFile(join(outDir, 'blocker.json'), `${JSON.stringify(blocker, null, 2)}\n`);
+      await writeBlockerArtifact(outDir, blocker);
       return 2;
     }
     throw error;

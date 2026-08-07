@@ -40,7 +40,7 @@ Options:
 | `--no-build` | Skip the self-build. The caller then owns build freshness. |
 | `--timeout-ms <ms>` | Per-attempt agent-phase deadline. Default `900000`. |
 | `--date <YYYY-MM-DD>` | Follow-up date. Default: today + 45 days. |
-| `--append` | Extend an existing batch in `--out`. Refuses a different `gitHead` or follow-up date. |
+| `--append` | Extend an existing batch in `--out`. Refuses a different `gitHead`, follow-up date, or org hash. |
 
 Examples:
 
@@ -84,15 +84,22 @@ Compare batches only when they share every variable except the one lever:
 
 - Same `N` and the same `--date` (the baseline's follow-up date).
 - Same scenario: page, message, model, mode, and settings.
+- Same attempt-by-attempt rendering-mode sequence: the ordered headed/headless
+  flags of both batches must match position by position, not just in
+  aggregate. A batch whose attempts mix modes (`mixedModes: true` in its
+  summary) is invalid for comparison and is rerun.
 - One product variable per step.
 - Compare against the latest accepted head's batch, never the original
   baseline after later changes landed.
 - Judge by medians, and only keep a win: median `createToSavedSeconds`
   improves ≥ 10% over the comparison batch, every attempt passes the full
-  correctness check, neither batch is mixed-mode, and the after-median lies
-  outside the overlap of both batches' min–max ranges.
-- An inconclusive step (median moved but the ranges overlap) extends each
-  batch once with `--attempts 2 --append --out <same dir>` before deciding.
+  correctness check, neither batch is mixed-mode and the mode sequences
+  match attempt by attempt, and the after-median lies outside the overlap of
+  both batches' min–max ranges.
+- An inconclusive step — the after-median improves ≥ 10% but still lies
+  inside the overlap of both batches' min–max ranges — extends each batch
+  once with `--attempts 2 --append --out <same dir>` before deciding. A
+  median improvement below 10% is not a win and gets no extension.
 
 ## Honesty rules
 

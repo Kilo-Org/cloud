@@ -5,7 +5,7 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
 
-import { beforeAll, beforeEach, describe, test, expect } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, test, expect } from '@jest/globals';
 import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
@@ -20,6 +20,7 @@ import {
   getUserFromAuth,
 } from './server';
 import { db } from '@/lib/drizzle';
+import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import { kilocode_users, organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -574,6 +575,82 @@ describe('getUserFromAuth', () => {
     const afterGrant = await getUserFromAuth({ adminOnly: true });
     expect(afterGrant.authFailedResponse).not.toBeNull();
     expect(afterGrant.user).toBeNull();
+  });
+});
+
+describe('getUserFromAuth admin_access telemetry (REST)', () => {
+  let events: AdminAccessEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+  });
+
+  test('emits one rest/token event for an authorized admin via API token', async () => {
+    const admin = await insertTestUser({
+      google_user_email: `rest-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      is_super_admin: true,
+      api_token_pepper: 'rest-admin-pepper',
+    });
+    const token = generateApiToken(admin);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        'x-pathname': '/admin/api/safety-identifiers',
+        'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      event: 'admin_access',
+      surface: 'rest',
+      authVia: 'token',
+      adminTier: 'super_admin',
+      kiloUserId: admin.id,
+      email: admin.google_user_email,
+      route: '/admin/api/safety-identifiers',
+      method: null,
+      ip: '203.0.113.7',
+      tokenSource: null,
+    });
+  });
+
+  test('does not emit when a non-admin token hits an admin-only check', async () => {
+    const nonAdmin = await insertTestUser({
+      is_admin: false,
+      api_token_pepper: 'rest-nonadmin-pepper',
+    });
+    const token = generateApiToken(nonAdmin);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.authFailedResponse).not.toBeNull();
+    expect(events).toHaveLength(0);
+  });
+
+  test('does not emit for adminOnly:false calls even for an admin', async () => {
+    const admin = await insertTestUser({
+      is_admin: true,
+      api_token_pepper: 'rest-admin-noemit-pepper',
+    });
+    const token = generateApiToken(admin);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events).toHaveLength(0);
   });
 });
 

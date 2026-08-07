@@ -50,16 +50,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 3,
+          weight: 9,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
     : []),
-  {
-    model: 'inclusionai/ling-3.0-flash:free',
-    weight: 3,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
   {
     model: 'poolside/laguna-s-2.1:free',
     weight: 1,

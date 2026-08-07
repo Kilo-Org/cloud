@@ -139,13 +139,6 @@ export const toAgentConversationItems = (messages: StoredMessage[]): GroupedConv
  * while they stream. `undefined` when no assistant message is live.
  */
 export const getStreamingTextPartId = (messages: StoredMessage[]): string | undefined => {
-  for (const message of messages.toReversed()) {
-    if (isMessageStreaming(message)) {
-      const textPart = message.parts
-        .toReversed()
-        .find(part => part.type === 'text' && !isSnapshotProgressPart(part));
-      return textPart?.id;
-    }
-  }
-  return undefined;
+  const message = messages.findLast(candidate => isMessageStreaming(candidate));
+  return message?.parts.findLast(part => part.type === 'text' && !isSnapshotProgressPart(part))?.id;
 };

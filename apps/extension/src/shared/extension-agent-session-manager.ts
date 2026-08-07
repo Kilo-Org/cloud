@@ -262,32 +262,29 @@ async function readActiveHistoryWithLivenessGrace(
     queryPage: () => Promise<SessionMessagesPageResult>;
   }
 ): Promise<SessionMessagesPageResult> {
-  const result = initialResult;
   for (let attempt = 0; attempt < ACTIVE_HISTORY_LIVENESS_GRACE_READS; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
     await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
-    let current: ActiveSessionsResult | null = null;
-    try {
-      // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
-      current = await fetchActiveSessions();
-    } catch {
-      /*
-       * A rejected grace liveness read leaves the session's working state
-       * unknown. Resolve the original empty page without the probe, matching
-       * the rejected initial probe behavior, instead of letting the probe
-       * rejection block the transcript.
-       */
-      return result;
+    /*
+     * A rejected grace liveness read leaves the session's working state
+     * unknown. Resolve the original empty page without the probe, matching
+     * the rejected initial probe behavior, instead of letting the probe
+     * rejection block the transcript.
+     */
+    // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
+    const current = await fetchActiveSessions().catch(() => null);
+    if (current === null) {
+      return initialResult;
     }
-    if (current !== null && isSessionWorking(current)) {
-      return readActiveHistoryWithRetry(result, {
+    if (isSessionWorking(current)) {
+      return readActiveHistoryWithRetry(initialResult, {
         fetchActiveSessions,
         isSessionWorking,
         queryPage,
       });
     }
   }
-  return result;
+  return initialResult;
 }
 
 /**

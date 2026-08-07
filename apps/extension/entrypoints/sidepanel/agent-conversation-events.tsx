@@ -171,7 +171,7 @@ const ToolExchangePanel = ({
   /** Rendered under "Code". Omit to hide the block. */
   codeText?: string | undefined;
   imageDataUrl?: string | undefined;
-  imageAlt?: string | undefined;
+  imageAlt: string;
   /** Rendered under "Result" or "Error". Omit while the tool still runs. */
   resultText?: string | undefined;
   status: 'completed' | 'failed' | 'running';
@@ -230,7 +230,7 @@ const ToolExchangePanel = ({
               <pre className={resultBlockClassName}>{resultText}</pre>
             ) : (
               <img
-                alt={imageAlt ?? 'Viewport screenshot captured by get_viewport_screenshot'}
+                alt={imageAlt}
                 className="mt-1 max-h-40 max-w-full rounded-md border border-border object-contain"
                 src={imageDataUrl}
               />

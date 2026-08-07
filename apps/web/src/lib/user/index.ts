@@ -978,6 +978,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   authorizations created by the user are removed, including organization grants)
  * - Organization GitLab PAT credentials authorized by the user (parent integration suspended;
  *   project access-token credentials preserved)
+ * - slack_oauth_credentials (encrypted Slack bot tokens; removed via the
+ *   platform_integrations cascade below. Organization-owned Slack credentials are
+ *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,

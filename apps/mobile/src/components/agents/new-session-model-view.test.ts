@@ -207,16 +207,20 @@ describe('resolveNewSessionModelView', () => {
     expect(view.spawnSelection).toBeUndefined();
   });
 
-  it('selects the first catalog option when the catalog has no defaultModel', () => {
+  it('selects the first catalog option and its first offered variant when the catalog has no defaultModel', () => {
     const catalog = createCatalog([
       { id: 'kilo', models: [{ id: 'kilo-model-a' }] },
       { id: 'anthropic', models: [{ id: 'claude-x' }] },
-      { id: 'opencode', models: [{ id: 'opencode-model' }] },
+      { id: 'opencode', models: [{ id: 'opencode-model', variants: ['fast', 'balanced'] }] },
     ]);
     const view = resolveNewSessionModelView({ ...baseInput, catalog });
 
     expect(view.selectedValue).toBe(view.options[0]?.id);
-    expect(view.spawnSelection).toEqual({ model: view.options[0]?.modelRef });
+    expect(view.selectedVariant).toBe('fast');
+    expect(view.spawnSelection).toEqual({
+      model: { providerID: 'opencode', modelID: 'opencode-model' },
+      variant: 'fast',
+    });
   });
 
   it('drops a CLI override when the catalog is gone and falls back to the gateway', () => {

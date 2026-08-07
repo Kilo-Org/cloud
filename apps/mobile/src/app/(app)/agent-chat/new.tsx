@@ -253,7 +253,7 @@ function NewSessionScreenBody() {
         attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
         isCreating={isCreating}
         isModelsError={isModelsError}
-        isLoadingModels={isLoadingModels || instanceCatalog.isLoading}
+        isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
         mode={mode}
         model={modelView.selectedValue}
         variant={modelView.selectedVariant}

@@ -3,6 +3,7 @@ import {
   REMOTE_MODEL_CATALOG_MAX_SERIALIZED_BYTES,
   REMOTE_MODEL_IDENTITY_MAX_LENGTH,
   REMOTE_MODEL_MAX_MODELS_PER_PROVIDER,
+  remoteModelCatalogV1Schema,
 } from './schemas';
 import { CommandDeliveredError, UserWebCommandError } from './user-web-connection';
 
@@ -287,6 +288,22 @@ describe('listInstanceModels', () => {
       ok: false,
       reason: 'invalid',
     });
+  });
+
+  it('classifies an unexpected strict-parse throw as transport and never rejects', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({ any: 'payload' });
+    const parseSpy = jest.spyOn(remoteModelCatalogV1Schema, 'safeParse').mockImplementation(() => {
+      throw new Error('strict parse exploded');
+    });
+    try {
+      await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
+        ok: false,
+        reason: 'transport',
+      });
+    } finally {
+      parseSpy.mockRestore();
+    }
   });
 
   it('classifies a resolved payload over the serialized byte limit as invalid', async () => {

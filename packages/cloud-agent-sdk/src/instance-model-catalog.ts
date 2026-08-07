@@ -53,6 +53,8 @@ export type InstanceModelCatalogResult =
  * - Resolved and schema-valid → `{ ok: true, catalog }` with the transformed
  *   catalog shape.
  * - Resolved but outside the strict schema → `{ ok: false, reason: 'invalid' }`.
+ * - Resolved but the strict parse throws unexpectedly → `{ ok: false,
+ *   reason: 'transport' }`; the parse never escapes the helper.
  * - Rejected with the old-CLI `invalid list_models command` string or a
  *   non-retryable relay code → `{ ok: false, reason: 'unsupported' }`.
  * - Rejected with a retryable relay code or a transport-level failure →
@@ -85,7 +87,11 @@ export async function listInstanceModels(
     return { ok: false, reason: 'transport' };
   }
 
-  const parsed = remoteModelCatalogV1Schema.safeParse(raw);
-  if (!parsed.success) return { ok: false, reason: 'invalid' };
-  return { ok: true, catalog: parsed.data };
+  try {
+    const parsed = remoteModelCatalogV1Schema.safeParse(raw);
+    if (!parsed.success) return { ok: false, reason: 'invalid' };
+    return { ok: true, catalog: parsed.data };
+  } catch {
+    return { ok: false, reason: 'transport' };
+  }
 }

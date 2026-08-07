@@ -174,14 +174,20 @@ export function resolveNewSessionModelView(
   });
 
   let selectedValue = delegate.selectedValue;
+  let selectedVariant = delegate.selectedVariant;
   if (delegate.source === 'remote-cli-catalog' && selectedValue === '') {
     const firstOption = delegate.options[0];
     if (firstOption) {
       // A valid catalog can carry no `defaultModel`. The first option comes
-      // from the catalog, so it is always valid on that instance. Do not apply
-      // this to the legacy fallback: "no selection" there means "let the CLI
-      // use its own default", which is today's behavior.
+      // from the catalog, so it is always valid on that instance. Derive its
+      // variant with the picker rule: keep the current variant when the first
+      // option offers it, otherwise use its first offered variant. Do not
+      // apply this to the legacy fallback: "no selection" there means "let the
+      // CLI use its own default", which is today's behavior.
       selectedValue = firstOption.id;
+      selectedVariant = firstOption.variants.includes(selectedVariant)
+        ? selectedVariant
+        : (firstOption.variants[0] ?? '');
     }
   }
 
@@ -191,14 +197,14 @@ export function resolveNewSessionModelView(
     selected?.modelRef && !isSelectionUnavailable
       ? {
           model: selected.modelRef,
-          ...(delegate.selectedVariant ? { variant: delegate.selectedVariant } : {}),
+          ...(selectedVariant ? { variant: selectedVariant } : {}),
         }
       : undefined;
 
   return {
     options: delegate.options,
     selectedValue,
-    selectedVariant: delegate.selectedVariant,
+    selectedVariant,
     spawnSelection,
     isSelectionUnavailable,
   };

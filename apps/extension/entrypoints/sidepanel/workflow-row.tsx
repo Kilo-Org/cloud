@@ -18,11 +18,13 @@ const confirmDeleteButtonClass =
 /**
  * One saved workflow: name, description, scope, and the run and delete
  * controls. The row owns its own delete confirmation and, when the workflow
- * declares params, the form that collects their values before a run.
+ * declares params, the form that collects their values before a run. When
+ * autoApproveChanges is set, the delete control acts on the first click.
  */
 export const WorkflowRow = ({
   activeConversationRunning,
   allowWorkflowsInSafeMode,
+  autoApproveChanges,
   isDangerousMode,
   item,
   onDelete,
@@ -30,6 +32,7 @@ export const WorkflowRow = ({
 }: {
   activeConversationRunning: boolean;
   allowWorkflowsInSafeMode: boolean;
+  autoApproveChanges: boolean;
   isDangerousMode: boolean;
   item: WorkflowSettingsListItem;
   onDelete: (id: string) => void;
@@ -91,7 +94,7 @@ export const WorkflowRow = ({
             setConfirmingDelete(false);
           }}
           onClick={() => {
-            if (confirmingDelete) {
+            if (autoApproveChanges || confirmingDelete) {
               onDelete(item.id);
               return;
             }

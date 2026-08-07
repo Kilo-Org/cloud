@@ -18,12 +18,13 @@ export const deriveWorkflowSaveCardState = ({
   saveError: string | undefined;
   loadError: string | undefined;
 }): WorkflowSaveCardView => {
-  if (pendingDraft === undefined) {
-    return { kind: 'hidden' };
-  }
-
+  // A load failure is visible even when no draft was read (reload-path rejection).
   if (loadError !== undefined) {
     return { kind: 'loadError', message: loadError };
+  }
+
+  if (pendingDraft === undefined) {
+    return { kind: 'hidden' };
   }
 
   if (isSaving) {

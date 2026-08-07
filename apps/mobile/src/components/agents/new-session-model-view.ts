@@ -21,7 +21,7 @@ export type NewSessionModelView = {
   isSelectionUnavailable: boolean;
 };
 
-export type ResolveNewSessionRemoteOverrideInput = {
+type ResolveNewSessionRemoteOverrideInput = {
   catalog: RemoteModelCatalogV1 | null;
   gatewayModel: string;
   gatewayVariant: string;
@@ -43,7 +43,7 @@ export type ResolveNewSessionRemoteOverrideInput = {
  * real catalog that later drops the model must keep the override, because the
  * visible unavailable row plus the blocked Start is the intended signal.
  */
-export function resolveNewSessionRemoteOverride(
+function resolveNewSessionRemoteOverride(
   input: ResolveNewSessionRemoteOverrideInput
 ): RemoteModelOverride | null {
   if (input.remoteOverride) {

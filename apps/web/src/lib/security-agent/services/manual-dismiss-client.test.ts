@@ -61,6 +61,35 @@ describe('submitManualFindingDismissal', () => {
     expect(JSON.parse(String(request.body)).actor).toEqual({ id: 'user-123' });
   });
 
+  it('passes the stable operation key to the Worker when present', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          messageId: 'dismiss-message-123',
+        }),
+    });
+
+    await submitManualFindingDismissal({
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      installationId: 'installation-123',
+      reason: 'not_used',
+      operationKey: 'retry-safe-key-123',
+    });
+
+    const request = mockFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      operationKey: 'retry-safe-key-123',
+    });
+  });
+
   it('throws a TRPCError (not a raw Error) when fetch rejects with a transport error', async () => {
     mockFetch.mockRejectedValue(new Error('network down'));
 

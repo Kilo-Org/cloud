@@ -19,6 +19,12 @@ type SubmitManualFindingDismissalParams = {
   installationId: string;
   reason: DismissReason;
   comment?: string;
+  /**
+   * Stable client-generated per-intent operation key (P1-A-08e). The Worker
+   * uses it to reuse the original accepted command on a same-key retry
+   * instead of enqueueing a duplicate.
+   */
+  operationKey?: string;
 };
 
 type AcceptedManualFindingDismissal = {
@@ -78,6 +84,7 @@ export async function submitManualFindingDismissal(
         installationId: params.installationId,
         reason: params.reason,
         comment: params.comment,
+        ...(params.operationKey !== undefined ? { operationKey: params.operationKey } : {}),
       }),
     });
     try {

@@ -12,7 +12,12 @@ import {
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { agent_configs, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
-import { settleOperation } from '@kilocode/db/operation-ledger';
+import {
+  recordOperationAcceptance,
+  recordOperationProgress,
+  settleOperation,
+  type LedgerTransaction,
+} from '@kilocode/db/operation-ledger';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -69,6 +74,8 @@ const ManualSecuritySyncCommandSchema = z.object({
   actor: SecuritySyncActorSchema,
   origin: z.enum(['manual', 'dashboard_refresh', 'enable_initial_sync']).default('manual'),
   repoFullName: z.string().min(1).optional(),
+  /** Stable web operation key (P1-A-08e); same-key retries reuse the original command. */
+  operationKey: z.string().min(1).max(128).optional(),
 });
 
 const DependabotDismissReasonSchema = z.enum([
@@ -87,6 +94,8 @@ const ManualFindingDismissalCommandSchema = z.object({
   installationId: z.string().min(1),
   reason: DependabotDismissReasonSchema,
   comment: z.string().optional(),
+  /** Stable web operation key (P1-A-08e); same-key retries reuse the original command. */
+  operationKey: z.string().min(1).max(128).optional(),
 });
 
 const SecurityDismissMessageSchema = ManualFindingDismissalCommandSchema.extend({
@@ -203,14 +212,363 @@ async function timingSafeEqual(left: string, right: string): Promise<boolean> {
   return nodeTimingSafeEqual(new Uint8Array(leftDigest), new Uint8Array(rightDigest));
 }
 
+// ----- security operation ledger dedupe (P1-A-08e) ---------------------------
+//
+// Manual sync and dismissal commands carry the web's stable `operationKey`.
+// The web admits a `security`-domain ledger row BEFORE calling the Worker, so
+// at enqueue time a keyed request locks the matching row with `FOR UPDATE` and
+// either reuses the already-recorded acceptance (no second command, run,
+// message, or queued effect) or creates the command and records `provider_ref`
+// plus `canonical_result` in the SAME transaction. A missing ledger row or a
+// failed acceptance update fails the request before any command or queue
+// effect. The queue batch is sent only after that transaction commits, so
+// acceptance always precedes queue send. Every post-acceptance ledger write is
+// fenced on the `queueSendClaimId` recorded at acceptance: a stale sender whose
+// claim was superseded cannot clear or confirm a newer claim. A queue-send
+// failure releases the sender's claim (keeping `queueAdmitted: false`) so a
+// same-key retry re-claims and re-sends the original command and message
+// instead of creating a second one, and the queue error is reported only after
+// that release commits. Scheduled syncs and keyless commands never touch this
+// path.
+
+const SECURITY_LEDGER_DOMAIN = 'security';
+const QUEUE_SEND_LEASE_MS = 60_000;
+
+type SecurityLedgerLookupRow = {
+  id: string;
+  intent: string;
+  status: string;
+  provider_ref: string | null;
+  canonical_result: Record<string, unknown> | null;
+};
+
+type SecurityLedgerAcceptance = {
+  commandId: string;
+  runId: string;
+  messageId: string;
+  queueAdmitted: boolean;
+  queueSendClaimedUntil?: string;
+  queueSendClaimId?: string;
+};
+
+/**
+ * Locks the security ledger row admitted for a stable operation key inside the
+ * caller's transaction. The `FOR UPDATE` lock serializes concurrent same-key
+ * requests: the first enqueuer commits its acceptance, then a blocked requester
+ * re-reads the row and reuses that acceptance instead of creating a second
+ * command, run, message, or queued effect.
+ */
+async function lockSecurityLedgerRow(
+  tx: LedgerTransaction,
+  params: { operationKey: string; userId: string }
+): Promise<SecurityLedgerLookupRow | null> {
+  const rows = await tx
+    .select({
+      id: operation_ledgers.id,
+      intent: operation_ledgers.intent,
+      status: operation_ledgers.status,
+      provider_ref: operation_ledgers.provider_ref,
+      canonical_result: operation_ledgers.canonical_result,
+    })
+    .from(operation_ledgers)
+    .where(
+      and(
+        eq(operation_ledgers.domain, SECURITY_LEDGER_DOMAIN),
+        eq(operation_ledgers.operation_key, params.operationKey),
+        eq(operation_ledgers.kilo_user_id, params.userId)
+      )
+    )
+    .for('update')
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Extracts the recorded Worker acceptance from a ledger row when the matching
+ * intent already accepted a command. The `provider_ref` plus the replay-safe
+ * `canonical_result` carry the original command identifiers.
+ */
+function securityLedgerAcceptanceFromRow(
+  row: SecurityLedgerLookupRow,
+  intent: 'manual_sync' | 'dismiss_finding'
+): SecurityLedgerAcceptance | null {
+  if (row.intent !== intent || !row.provider_ref || !row.canonical_result) {
+    return null;
+  }
+  const canonical = row.canonical_result;
+  if (
+    typeof canonical.commandId === 'string' &&
+    typeof canonical.runId === 'string' &&
+    typeof canonical.messageId === 'string'
+  ) {
+    return {
+      commandId: canonical.commandId,
+      runId: canonical.runId,
+      messageId: canonical.messageId,
+      queueAdmitted:
+        canonical.queueAdmitted === true ||
+        ['completed', 'failed', 'no_op', 'interrupted', 'superseded'].includes(row.status),
+      queueSendClaimedUntil:
+        typeof canonical.queueSendClaimedUntil === 'string'
+          ? canonical.queueSendClaimedUntil
+          : undefined,
+      queueSendClaimId:
+        typeof canonical.queueSendClaimId === 'string' ? canonical.queueSendClaimId : undefined,
+    };
+  }
+  return null;
+}
+
+type KeyedEnqueueIds = { commandId: string; runId: string; messageId: string };
+
+type KeyedLedgerAdmission =
+  | { reused: true; ids: KeyedEnqueueIds }
+  | { reused: false; ids: KeyedEnqueueIds; rowId: string; queueSendClaimId: string };
+
+function buildManualSyncQueueMessage(
+  command: z.infer<typeof ManualSecuritySyncCommandSchema>,
+  ids: KeyedEnqueueIds,
+  ownerKey: string
+): MessageSendRequest<SecuritySyncQueueMessage> {
+  return {
+    body: {
+      schemaVersion: 1,
+      commandId: ids.commandId,
+      runId: ids.runId,
+      messageId: ids.messageId,
+      trigger: 'manual',
+      owner: command.owner,
+      ownerKey,
+      chunkIndex: 0,
+      chunkCount: 1,
+      dispatchedAt: new Date().toISOString(),
+      actor: command.actor,
+      repoFullName: command.repoFullName,
+    },
+    contentType: 'json',
+  };
+}
+
+function buildDismissQueueMessage(
+  command: z.infer<typeof ManualFindingDismissalCommandSchema>,
+  ids: KeyedEnqueueIds
+): MessageSendRequest<SecuritySyncQueueMessage> {
+  return {
+    body: {
+      ...command,
+      kind: 'dismiss',
+      commandId: ids.commandId,
+      runId: ids.runId,
+      messageId: ids.messageId,
+      dispatchedAt: new Date().toISOString(),
+    },
+    contentType: 'json',
+  };
+}
+
+/**
+ * Transaction-safe enqueue for a keyed command (P1-A-08e). A keyed request
+ * requires the ledger row the web admitted before calling the Worker: a
+ * missing row or a failed acceptance update fails the request without creating
+ * a command, sending a queue message, or returning 202. The matching ledger row
+ * is locked with `FOR UPDATE`; a row that already carries a complete acceptance
+ * reuses the original identifiers, and otherwise the command is created and the
+ * acceptance (`provider_ref` + `canonical_result`) is recorded in the SAME
+ * transaction. The queue send claim is committed before the queue send. A
+ * retry reuses the command and message identity until queue admission is
+ * confirmed, then command processing deduplicates any crash-window replay.
+ */
+async function enqueueKeyedSecurityCommand(
+  db: WorkerDb,
+  queue: Queue<SecuritySyncQueueMessage>,
+  params: {
+    operationKey: string;
+    userId: string;
+    intent: 'manual_sync' | 'dismiss_finding';
+    runId: string;
+    messageId: string;
+    description: string;
+    createCommand: (tx: LedgerTransaction) => Promise<{ id: string }>;
+    buildMessage: (ids: KeyedEnqueueIds) => MessageSendRequest<SecuritySyncQueueMessage>;
+  }
+): Promise<KeyedEnqueueIds> {
+  const admission: KeyedLedgerAdmission = await db.transaction(async tx => {
+    const row = await lockSecurityLedgerRow(tx, {
+      operationKey: params.operationKey,
+      userId: params.userId,
+    });
+    if (!row) {
+      throw new Error(
+        `Security operation ledger row not found for operation key ${params.operationKey}`
+      );
+    }
+    if (row.intent !== params.intent) {
+      throw new Error(
+        `Security operation ledger intent mismatch for operation key ${params.operationKey}`
+      );
+    }
+    const reused = securityLedgerAcceptanceFromRow(row, params.intent);
+    const queueSendClaimedUntil = reused?.queueSendClaimedUntil
+      ? Date.parse(reused.queueSendClaimedUntil)
+      : Number.NaN;
+    if (
+      reused?.queueAdmitted ||
+      (Number.isFinite(queueSendClaimedUntil) && queueSendClaimedUntil > Date.now())
+    ) {
+      if (!reused) throw new Error('Security operation ledger acceptance is missing');
+      return {
+        reused: true,
+        ids: {
+          commandId: reused.commandId,
+          runId: reused.runId,
+          messageId: reused.messageId,
+        },
+      };
+    }
+    const nextQueueSendClaimedUntil = new Date(Date.now() + QUEUE_SEND_LEASE_MS).toISOString();
+    const queueSendClaimId = crypto.randomUUID();
+    const ids = reused ?? {
+      commandId: (await params.createCommand(tx)).id,
+      runId: params.runId,
+      messageId: params.messageId,
+    };
+    if (!reused) {
+      const updated = await recordOperationAcceptance(tx, {
+        rowId: row.id,
+        providerRef: ids.messageId,
+        canonicalResult: {
+          commandId: ids.commandId,
+          runId: ids.runId,
+          messageId: ids.messageId,
+          queueAdmitted: false,
+          queueSendClaimedUntil: nextQueueSendClaimedUntil,
+          queueSendClaimId,
+        },
+      });
+      if (!updated) {
+        throw new Error(
+          `Security operation ledger acceptance was not recorded for operation key ${params.operationKey}`
+        );
+      }
+    } else {
+      const claimed = await recordOperationProgress(
+        tx,
+        row.id,
+        {
+          queueAdmitted: false,
+          queueSendClaimedUntil: nextQueueSendClaimedUntil,
+          queueSendClaimId,
+        },
+        { expectedQueueSendClaimId: reused.queueSendClaimId }
+      );
+      if (!claimed) {
+        throw new Error(
+          `Security operation ledger queue claim was not recorded for operation key ${params.operationKey}`
+        );
+      }
+    }
+    return {
+      reused: false,
+      ids: {
+        commandId: ids.commandId,
+        runId: ids.runId,
+        messageId: ids.messageId,
+      },
+      rowId: row.id,
+      queueSendClaimId,
+    };
+  });
+
+  if (admission.reused) {
+    console.info(`${params.description} reused from operation ledger acceptance`, {
+      operation_key: params.operationKey,
+      command_id: admission.ids.commandId,
+      run_id: admission.ids.runId,
+      message_id: admission.ids.messageId,
+    });
+    return admission.ids;
+  }
+
+  try {
+    await queue.sendBatch([params.buildMessage(admission.ids)]);
+  } catch (error) {
+    try {
+      const released = await recordOperationProgress(
+        db,
+        admission.rowId,
+        {
+          queueAdmitted: false,
+          queueSendClaimedUntil: new Date(0).toISOString(),
+          queueSendClaimId: null,
+        },
+        { expectedQueueSendClaimId: admission.queueSendClaimId }
+      );
+      if (!released) {
+        console.info('Security queue-send claim was replaced after queue failure', {
+          operation_key: params.operationKey,
+          row_id: admission.rowId,
+        });
+      }
+    } catch (releaseError) {
+      console.error('Failed to release security queue-send claim', {
+        operation_key: params.operationKey,
+        row_id: admission.rowId,
+        error_type: releaseError instanceof Error ? releaseError.name : 'UnknownError',
+      });
+      throw new Error(
+        'Security operation ledger queue claim could not be released after queue failure'
+      );
+    }
+    throw error;
+  }
+
+  const queued = await recordOperationProgress(
+    db,
+    admission.rowId,
+    {
+      queueAdmitted: true,
+      queueSendClaimedUntil: new Date(0).toISOString(),
+      queueSendClaimId: null,
+    },
+    { expectedQueueSendClaimId: admission.queueSendClaimId }
+  );
+  if (!queued) {
+    console.info('Security queue-send claim was replaced after queue success', {
+      operation_key: params.operationKey,
+      row_id: admission.rowId,
+    });
+  }
+  return admission.ids;
+}
+
 async function enqueueManualSyncCommand(
   db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   command: z.infer<typeof ManualSecuritySyncCommandSchema>
-): Promise<{ commandId: string; runId: string; messageId: string }> {
+): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
   const ownerKey = createOwnerKey(command.owner);
   const messageId = `${runId}:${ownerKey}:manual`;
+
+  if (command.operationKey !== undefined) {
+    return enqueueKeyedSecurityCommand(db, queue, {
+      operationKey: command.operationKey,
+      userId: command.actor.id,
+      intent: 'manual_sync',
+      runId,
+      messageId,
+      description: 'Manual sync command',
+      createCommand: tx =>
+        createSecurityAgentCommand(tx, {
+          commandType: 'sync',
+          origin: command.origin,
+          owner: toCommandOwner(command.owner),
+          repoFullName: command.repoFullName,
+        }),
+      buildMessage: ids => buildManualSyncQueueMessage(command, ids, ownerKey),
+    });
+  }
+
   const ledgerCommand = await createSecurityAgentCommand(db, {
     commandType: 'sync',
     origin: command.origin,
@@ -220,23 +578,11 @@ async function enqueueManualSyncCommand(
 
   try {
     await queue.sendBatch([
-      {
-        body: {
-          schemaVersion: 1,
-          commandId: ledgerCommand.id,
-          runId,
-          messageId,
-          trigger: 'manual',
-          owner: command.owner,
-          ownerKey,
-          chunkIndex: 0,
-          chunkCount: 1,
-          dispatchedAt: new Date().toISOString(),
-          actor: command.actor,
-          repoFullName: command.repoFullName,
-        },
-        contentType: 'json',
-      },
+      buildManualSyncQueueMessage(
+        command,
+        { commandId: ledgerCommand.id, runId, messageId },
+        ownerKey
+      ),
     ]);
   } catch (error) {
     await markSecurityAgentCommandQueueAdmissionFailed(
@@ -254,9 +600,29 @@ async function enqueueDismissFindingCommand(
   db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   command: z.infer<typeof ManualFindingDismissalCommandSchema>
-): Promise<{ commandId: string; runId: string; messageId: string }> {
+): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
   const messageId = `${runId}:${command.findingId}:dismiss`;
+
+  if (command.operationKey !== undefined) {
+    return enqueueKeyedSecurityCommand(db, queue, {
+      operationKey: command.operationKey,
+      userId: command.actor.id,
+      intent: 'dismiss_finding',
+      runId,
+      messageId,
+      description: 'Finding dismissal command',
+      createCommand: tx =>
+        createSecurityAgentCommand(tx, {
+          commandType: 'dismiss_finding',
+          origin: 'manual',
+          owner: toCommandOwner(command.owner),
+          findingId: command.findingId,
+        }),
+      buildMessage: ids => buildDismissQueueMessage(command, ids),
+    });
+  }
+
   const ledgerCommand = await createSecurityAgentCommand(db, {
     commandType: 'dismiss_finding',
     origin: 'manual',
@@ -266,17 +632,7 @@ async function enqueueDismissFindingCommand(
 
   try {
     await queue.sendBatch([
-      {
-        body: {
-          ...command,
-          kind: 'dismiss',
-          commandId: ledgerCommand.id,
-          runId,
-          messageId,
-          dispatchedAt: new Date().toISOString(),
-        },
-        contentType: 'json',
-      },
+      buildDismissQueueMessage(command, { commandId: ledgerCommand.id, runId, messageId }),
     ]);
   } catch (error) {
     await markSecurityAgentCommandQueueAdmissionFailed(

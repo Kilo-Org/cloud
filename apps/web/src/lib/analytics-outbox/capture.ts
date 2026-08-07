@@ -49,11 +49,10 @@ export async function runAfterResponse(work: () => Promise<void>): Promise<void>
     return;
   }
   try {
-    // The scheduled promise must never reject unhandled; `work` already
-    // reports its own capture failures, this catch is the safety net.
-    after(() => {
-      void work().catch(reportCaptureError);
-    });
+    // Return the rejection-handled promise so the runtime awaits the bounded
+    // capture work. `work` already reports its own capture failures; this
+    // catch is the safety net.
+    after(() => work().catch(reportCaptureError));
   } catch (error) {
     reportCaptureError(error);
   }

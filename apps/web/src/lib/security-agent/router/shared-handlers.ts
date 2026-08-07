@@ -350,12 +350,23 @@ export function securitySyncLedgerResourceKey(
   return `security:manual_sync:${securityOwnerScopeKey(owner)}:${repoFullName ?? '*'}`;
 }
 
+/**
+ * Normalizes a dismissal comment for intent identity: trimmed with internal
+ * whitespace collapsed, so cosmetic spacing differences do not create a
+ * spurious key-reuse mismatch.
+ */
+function normalizeDismissComment(comment?: string): string {
+  return (comment ?? '').trim().replace(/\s+/g, ' ');
+}
+
 /** Security ledger resource identity for a finding dismissal. */
 export function securityDismissLedgerResourceKey(
   owner: SecurityReviewOwner,
-  findingId: string
+  findingId: string,
+  reason: string,
+  comment?: string
 ): string {
-  return `security:dismiss_finding:${securityOwnerScopeKey(owner)}:${findingId}`;
+  return `security:dismiss_finding:${securityOwnerScopeKey(owner)}:${findingId}:${reason}:${normalizeDismissComment(comment)}`;
 }
 
 /**
@@ -1437,6 +1448,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           },
           origin: 'dashboard_refresh' as const,
           repoFullName: input.repoFullName,
+          operationKey: input.operationKey,
         };
 
         // With an `operationKey`, admit a `security`-domain ledger row before
@@ -1593,6 +1605,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           installationId,
           reason: input.reason,
           comment: input.comment,
+          operationKey: input.operationKey,
         };
 
         // With an `operationKey`, admit a `security`-domain ledger row before
@@ -1604,7 +1617,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             owner: securityOwner,
             intent: 'dismiss_finding',
             operationKey: input.operationKey,
-            resourceKey: securityDismissLedgerResourceKey(securityOwner, input.findingId),
+            resourceKey: securityDismissLedgerResourceKey(
+              securityOwner,
+              input.findingId,
+              input.reason,
+              input.comment
+            ),
             submit: () => submitManualFindingDismissal(submitParams),
           });
           if (result.kind === 'replayed') {

@@ -147,17 +147,44 @@ describe('runAfterResponse outside automated tests', () => {
     expect((error as Error).message).toBe('after unavailable outside request scope');
   });
 
-  it('reports a rejected scheduled work promise without propagating or leaking it', async () => {
+  it('returns a promise to after() that settles only after the capture work completes', async () => {
+    let scheduledTask: (() => Promise<unknown>) | undefined;
     jest.mocked(after).mockImplementation(task => {
-      // next/server owns the callback promise; invoke it like the runtime.
+      // next/server owns the callback promise; capture it like the runtime.
       if (typeof task === 'function') {
-        void Promise.resolve(task()).catch(() => undefined);
+        scheduledTask = task as () => Promise<unknown>;
+      }
+    });
+
+    let workSettled = false;
+    await runAfterResponse(async () => {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      workSettled = true;
+    });
+
+    expect(scheduledTask).toBeDefined();
+    const taskPromise = scheduledTask!();
+    expect(workSettled).toBe(false);
+
+    await taskPromise;
+    expect(workSettled).toBe(true);
+  });
+
+  it('reports a rejected scheduled work promise without rejecting the callback promise', async () => {
+    let scheduledTask: (() => Promise<unknown>) | undefined;
+    jest.mocked(after).mockImplementation(task => {
+      // next/server owns the callback promise; capture it like the runtime.
+      if (typeof task === 'function') {
+        scheduledTask = task as () => Promise<unknown>;
       }
     });
 
     await expect(
       runAfterResponse(() => Promise.reject(new Error('scheduled work rejected')))
     ).resolves.toBeUndefined();
+
+    expect(scheduledTask).toBeDefined();
+    await expect(scheduledTask!()).resolves.toBeUndefined();
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     expect(jest.mocked(captureException)).toHaveBeenCalledTimes(1);

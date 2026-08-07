@@ -26,6 +26,11 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
+import {
+  isSecurityConfigurationError,
+  isSecuritySyncRetryable,
+  SECURITY_CONFIGURATION_COPY,
+} from '@/lib/hooks/use-security-agent-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -85,6 +90,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // stays disabled instead of silently offering a shrunken "All repositories
   // only" option list.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
+
+  // A non-retryable sync outcome (missing-configuration rejection, persistence
+  // failure, replay-failed, or a typed rejection) ended the intent: the hook
+  // already rotated the operation key, so a resubmit would be a fresh intent.
+  // Both sync controls disable and the inline copy below explains the state.
+  const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
+  const syncDisabled = triggerSync.isPending || syncBlocked;
 
   const openRepoFilter = () => {
     if (repoFilterUnavailable) {
@@ -165,11 +177,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 }
               );
             }}
-            disabled={triggerSync.isPending}
+            disabled={syncDisabled}
             accessibilityRole="button"
             accessibilityLabel="Sync now"
-            accessibilityState={{ disabled: triggerSync.isPending, busy: triggerSync.isPending }}
-            className="size-11 items-center justify-center active:opacity-70"
+            accessibilityState={{ disabled: syncDisabled, busy: triggerSync.isPending }}
+            className={cn(
+              'size-11 items-center justify-center active:opacity-70',
+              syncBlocked && 'opacity-50'
+            )}
           >
             <SpinningIcon
               icon={RefreshCw}
@@ -182,6 +197,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {refreshFailed ? (
           <Text className="text-xs text-warn">Could not refresh — showing last synced data.</Text>
+        ) : null}
+
+        {triggerSync.isError ? (
+          <Text className="text-xs text-destructive">
+            {isSecurityConfigurationError(triggerSync.error)
+              ? SECURITY_CONFIGURATION_COPY
+              : triggerSync.error.message}
+          </Text>
         ) : null}
 
         {dashboardStats.isLoading ? (
@@ -224,11 +247,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                   }
                 );
               }}
-              disabled={triggerSync.isPending}
+              disabled={syncDisabled}
               accessibilityRole="button"
               accessibilityLabel="Sync findings"
-              accessibilityState={{ disabled: triggerSync.isPending, busy: triggerSync.isPending }}
-              className="min-h-11 flex-row items-center gap-1.5 active:opacity-70"
+              accessibilityState={{
+                disabled: syncDisabled,
+                busy: triggerSync.isPending,
+              }}
+              className={cn(
+                'min-h-11 flex-row items-center gap-1.5 active:opacity-70',
+                syncBlocked && 'opacity-50'
+              )}
             >
               {triggerSync.isPending && (
                 <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />

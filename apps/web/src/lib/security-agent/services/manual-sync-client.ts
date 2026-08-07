@@ -17,6 +17,12 @@ type SubmitManualSecuritySyncParams = {
   actor: ManualSecuritySyncActor;
   repoFullName?: string;
   origin?: 'manual' | 'dashboard_refresh' | 'enable_initial_sync';
+  /**
+   * Stable client-generated per-intent operation key (P1-A-08e). The Worker
+   * uses it to reuse the original accepted command on a same-key retry
+   * instead of enqueueing a duplicate.
+   */
+  operationKey?: string;
 };
 
 type AcceptedManualSecuritySync = {
@@ -74,6 +80,7 @@ export async function submitManualSecuritySync(
         actor: params.actor,
         origin: params.origin,
         repoFullName: params.repoFullName,
+        ...(params.operationKey !== undefined ? { operationKey: params.operationKey } : {}),
       }),
     });
     try {

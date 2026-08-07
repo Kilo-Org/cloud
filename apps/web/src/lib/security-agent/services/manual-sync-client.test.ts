@@ -59,6 +59,59 @@ describe('submitManualSecuritySync', () => {
     });
   });
 
+  it('passes the stable operation key to the Worker when present', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          messageId: 'message-123',
+        }),
+    });
+
+    await submitManualSecuritySync({
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+      origin: 'dashboard_refresh',
+      operationKey: 'retry-safe-key-123',
+    });
+
+    expect(JSON.parse(mockFetch.mock.calls[0]?.[1]?.body as string)).toEqual({
+      schemaVersion: 1,
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+      origin: 'dashboard_refresh',
+      operationKey: 'retry-safe-key-123',
+    });
+  });
+
+  it('omits the operation key from the request body when absent', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          messageId: 'message-123',
+        }),
+    });
+
+    await submitManualSecuritySync({
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body as string);
+    expect(body).not.toHaveProperty('operationKey');
+  });
+
   it('throws a TRPCError (not a raw Error) when fetch rejects with a transport error', async () => {
     mockFetch.mockRejectedValue(new Error('network down'));
 

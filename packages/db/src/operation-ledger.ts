@@ -367,7 +367,8 @@ async function evaluateExistingRow(
 export async function recordOperationProgress(
   database: LedgerDatabase,
   rowId: string,
-  partialResult: Record<string, unknown>
+  partialResult: Record<string, unknown>,
+  options?: { expectedQueueSendClaimId?: string }
 ): Promise<OperationLedgerRow | null> {
   return runInTransaction(database, async tx => {
     const [row] = await tx
@@ -387,13 +388,17 @@ export async function recordOperationProgress(
       throw new CanonicalResultTooLargeError(bytes);
     }
 
+    const claimCondition = options?.expectedQueueSendClaimId
+      ? sql`${operation_ledgers.canonical_result}->>'queueSendClaimId' = ${options.expectedQueueSendClaimId}`
+      : undefined;
     const [updated] = await tx
       .update(operation_ledgers)
       .set({ canonical_result: merged })
       .where(
         and(
           eq(operation_ledgers.id, row.id),
-          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES)
+          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES),
+          ...(claimCondition ? [claimCondition] : [])
         )
       )
       .returning();

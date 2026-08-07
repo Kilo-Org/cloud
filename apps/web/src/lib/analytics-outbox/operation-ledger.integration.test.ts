@@ -448,6 +448,71 @@ describe('operation ledger (integration)', () => {
     expect(await recordOperationProgress(db, rowId, { late: true })).toBeNull();
   });
 
+  it('fences progress on the current queue-send claim id', async () => {
+    const admitted = await admitSession('claim-fence-user');
+    if (admitted.admission !== 'admitted') return;
+    const rowId = admitted.row.id;
+
+    // The first sender records its queue-send claim.
+    const firstClaim = await recordOperationProgress(db, rowId, {
+      queueAdmitted: false,
+      queueSendClaimedUntil: new Date(Date.now() + 60_000).toISOString(),
+      queueSendClaimId: 'claim-a',
+    });
+    expect(firstClaim?.canonical_result).toMatchObject({
+      queueAdmitted: false,
+      queueSendClaimId: 'claim-a',
+    });
+
+    // The queue-send lease lapses and a newer sender replaces the claim.
+    const newerClaim = await recordOperationProgress(db, rowId, {
+      queueAdmitted: false,
+      queueSendClaimedUntil: new Date(Date.now() + 60_000).toISOString(),
+      queueSendClaimId: 'claim-b',
+    });
+    expect(newerClaim?.canonical_result).toMatchObject({ queueSendClaimId: 'claim-b' });
+
+    // A stale sender naming the superseded claim must not confirm or clear
+    // the newer claim: the CAS returns null and the row keeps claim-b.
+    const stale = await recordOperationProgress(
+      db,
+      rowId,
+      {
+        queueAdmitted: true,
+        queueSendClaimedUntil: new Date(0).toISOString(),
+        queueSendClaimId: null,
+      },
+      { expectedQueueSendClaimId: 'claim-a' }
+    );
+    expect(stale).toBeNull();
+
+    const [fenced] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, rowId));
+    expect(fenced?.canonical_result).toMatchObject({
+      queueAdmitted: false,
+      queueSendClaimId: 'claim-b',
+    });
+    const newerLease = fenced?.canonical_result?.queueSendClaimedUntil as string | undefined;
+    expect(newerLease).toBeDefined();
+    expect(Date.parse(newerLease!)).toBeGreaterThan(Date.now());
+
+    // The current claim holder can still update the row with its own id.
+    const current = await recordOperationProgress(
+      db,
+      rowId,
+      {
+        queueAdmitted: true,
+        queueSendClaimedUntil: new Date(0).toISOString(),
+        queueSendClaimId: null,
+      },
+      { expectedQueueSendClaimId: 'claim-b' }
+    );
+    expect(current?.canonical_result).toMatchObject({ queueAdmitted: true });
+    expect(current?.canonical_result?.queueSendClaimId).toBeNull();
+  });
+
   it('overwrites the provider ref', async () => {
     const admitted = await admitSession('provider-ref-user');
     if (admitted.admission !== 'admitted') return;

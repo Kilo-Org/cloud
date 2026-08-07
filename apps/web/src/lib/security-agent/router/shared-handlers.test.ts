@@ -700,6 +700,9 @@ describe('security operation ledger (P1-A-08e)', () => {
       canonicalResult: { commandId, runId, messageId },
     });
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey })
+    );
   });
 
   it('replays a settled manual sync without re-submitting or re-tracking', async () => {
@@ -1011,7 +1014,7 @@ describe('security operation ledger (P1-A-08e)', () => {
       admission: 'admitted',
       row: ledgerRow({
         intent: 'dismiss_finding',
-        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}`,
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:`,
       }),
     });
     mockSubmitManualFindingDismissal.mockResolvedValue({
@@ -1035,7 +1038,7 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockAdmitOperation.mock.calls[0]?.[1]).toMatchObject({
       intent: 'dismiss_finding',
       operationKey,
-      resourceKey: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}`,
+      resourceKey: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:`,
     });
     expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
@@ -1043,6 +1046,9 @@ describe('security operation ledger (P1-A-08e)', () => {
       canonicalResult: { commandId, runId, messageId: 'dismiss-message-123' },
     });
     expect(mockSubmitManualFindingDismissal).toHaveBeenCalledTimes(1);
+    expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey })
+    );
   });
 
   it('replays a settled dismissal without re-triggering the GitHub call', async () => {
@@ -1055,7 +1061,7 @@ describe('security operation ledger (P1-A-08e)', () => {
       admission: 'duplicate_settled',
       row: ledgerRow({
         intent: 'dismiss_finding',
-        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}`,
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:`,
         status: 'completed',
         canonical_result: { commandId, runId, messageId: 'dismiss-message-123' },
       }),
@@ -1067,6 +1073,100 @@ describe('security operation ledger (P1-A-08e)', () => {
         input: { findingId, reason: 'not_used', operationKey },
       })
     ).resolves.toEqual({
+      success: true,
+      accepted: true,
+      commandId,
+      runId,
+      messageId: 'dismiss-message-123',
+      replayed: true,
+    });
+    expect(mockSubmitManualFindingDismissal).not.toHaveBeenCalled();
+  });
+
+  it('rejects a same-key dismissal when the reason differs', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    // The row was admitted for the same key with a DIFFERENT reason, so the
+    // dismissal intent identity does not match the stored resource key.
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        intent: 'dismiss_finding',
+        status: 'completed',
+        canonical_result: { commandId, runId, messageId: 'dismiss-message-123' },
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:`,
+      }),
+    });
+
+    await expect(
+      createHandlers().dismissFinding.handler({
+        ctx: context,
+        input: { findingId, reason: 'fix_started', operationKey },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+    expect(mockSubmitManualFindingDismissal).not.toHaveBeenCalled();
+  });
+
+  it('rejects a same-key dismissal when the comment differs', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        intent: 'dismiss_finding',
+        status: 'completed',
+        canonical_result: { commandId, runId, messageId: 'dismiss-message-123' },
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:No production usage`,
+      }),
+    });
+
+    await expect(
+      createHandlers().dismissFinding.handler({
+        ctx: context,
+        input: {
+          findingId,
+          reason: 'not_used',
+          comment: 'Actually used in production',
+          operationKey,
+        },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+    expect(mockSubmitManualFindingDismissal).not.toHaveBeenCalled();
+  });
+
+  it('treats same-key dismissal comments as equal after whitespace normalization', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        intent: 'dismiss_finding',
+        status: 'completed',
+        canonical_result: { commandId, runId, messageId: 'dismiss-message-123' },
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:No production usage`,
+      }),
+    });
+
+    await expect(
+      createHandlers().dismissFinding.handler({
+        ctx: context,
+        input: {
+          findingId,
+          reason: 'not_used',
+          comment: '  No  production   usage  ',
+          operationKey,
+        },
+      })
+    ).resolves.toMatchObject({
       success: true,
       accepted: true,
       commandId,

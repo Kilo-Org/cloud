@@ -171,7 +171,7 @@ export const SignedInView = ({
   return (
     <Shell
       auth={auth}
-      headerBeforeSettings={headerBeforeSettings}
+      headerBeforeSettings={mode === 'browser' ? headerBeforeSettings : undefined}
       onOrganizationChange={selectOrganization}
       onSignOut={onSignOut}
       organizationOptions={organizationOptions}
@@ -182,13 +182,15 @@ export const SignedInView = ({
         <>
           <PendingMemorySaveCard />
           <PendingWorkflowSaveCard />
-          <AgentChatPanel
-            auth={auth}
-            onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
-            organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
-          />
         </>
-      ) : (
+      ) : null}
+      <AgentChatPanel
+        auth={auth}
+        isVisible={mode === 'browser'}
+        onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
+        organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
+      />
+      {mode === 'browser' ? null : (
         <ExtensionAgentsProvider
           auth={auth}
           key={`${auth.token}:${selectedOrganizationId}`}

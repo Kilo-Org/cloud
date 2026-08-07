@@ -192,6 +192,22 @@ describe('POST /api/edit/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it.each(['mercury-edit-2', 'inception/mercury-edit-2:free', 'inception/mercury-edit-latest'])(
+    'rejects unknown edit model or alias %s',
+    async model => {
+      setOrganizationAuth();
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest({ ...makeValidRequestBody(), model }) as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        error_type: ProxyErrorType.unsupported_edit_model,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
   it('rejects requests with non-positive max_tokens', async () => {
     setOrganizationAuth();
 

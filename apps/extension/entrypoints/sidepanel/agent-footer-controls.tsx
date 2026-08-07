@@ -225,7 +225,7 @@ export const AgentFooterControls = ({
         />
         <ModelPicker
           auth={auth}
-          disabled={isConversationControlDisabled || isModelSelectDisabled}
+          disabled={isConversationControlDisabled || isModelSelectDisabled || isRunning}
           model={model}
           modelOptions={modelOptions}
           onModelChange={onModelChange}
@@ -234,7 +234,7 @@ export const AgentFooterControls = ({
         <CompactSelectControl
           ariaLabel="Thinking effort"
           className="w-24 pl-2 pr-6"
-          disabled={isConversationControlDisabled || isThinkingSelectDisabled}
+          disabled={isConversationControlDisabled || isThinkingSelectDisabled || isRunning}
           onChange={onThinkingEffortChange}
           value={thinkingEffort}
         >

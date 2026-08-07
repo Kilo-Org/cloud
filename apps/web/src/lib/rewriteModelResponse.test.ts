@@ -116,8 +116,15 @@ function dataObjects(sse: string): unknown[] {
     .map(payload => JSON.parse(payload));
 }
 
+const rewriteChatCompletionsWithoutTransforms: typeof rewriteModelResponse_Messages = (
+  response,
+  removeCost,
+  capture,
+  vercelRequestId
+) => rewriteModelResponse_ChatCompletions(response, removeCost, capture, vercelRequestId, null);
+
 const rewriters = [
-  ['Chat Completions', rewriteModelResponse_ChatCompletions],
+  ['Chat Completions', rewriteChatCompletionsWithoutTransforms],
   ['Messages', rewriteModelResponse_Messages],
   ['Responses', rewriteModelResponse_Responses],
 ] as const;
@@ -206,7 +213,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const json = await result.json();
 
       expect(json.model).toBe('upstream-model');
@@ -229,7 +236,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const json = await result.json();
 
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
@@ -242,7 +249,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'application/json' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
 
       expect(result.status).toBe(502);
       expect(await result.text()).toBe('not-json{');
@@ -270,7 +277,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       );
 
       try {
-        const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+        const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
         await reader?.read();
@@ -295,7 +302,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
       const events = dataObjects(sse) as Array<{ error?: { code: number; type: string } }>;
 
@@ -311,7 +318,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -352,7 +359,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
 
       expect(sse).toContain('still streaming');
@@ -371,7 +378,8 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         upstream,
         true,
         capture,
-        'iad1::terminal-request'
+        'iad1::terminal-request',
+        null
       );
       const sse = await readOutputStream(result);
 
@@ -396,7 +404,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"model":"upstream-model","usage":{"cost":1,"is_byok":true,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{}}}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -420,7 +428,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         ': openrouter heartbeat\n\n' + 'data: {"model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
 
       expect(sse).toContain(': KILO PROCESSING');
@@ -432,7 +440,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'text/event-stream' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
 
       expect(await readOutputStream(result)).toBe('');
     });
@@ -720,7 +728,7 @@ describe.each([
   [
     'Chat Completions',
     'chat_completions',
-    rewriteModelResponse_ChatCompletions,
+    rewriteChatCompletionsWithoutTransforms,
     'data: {"id":"gen-chat","choices":[]}\n\n',
     'data: {"error":{"code":429,"message":"rate limited"}}\n\n',
     'gen-chat',
@@ -997,7 +1005,7 @@ describe('request log capture', () => {
       headers: { 'content-type': 'text/event-stream' },
     });
 
-    const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+    const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null, null);
     const reader = result.body?.getReader();
     await reader?.cancel();
 

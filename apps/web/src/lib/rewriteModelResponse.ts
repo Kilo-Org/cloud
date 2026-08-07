@@ -384,7 +384,7 @@ export async function rewriteModelResponse_ChatCompletions(
   removeCost: boolean,
   capture: RequestLogCapture | null,
   vercelRequestId: string | null,
-  responseTransforms: ProviderResponseTransforms | null = null
+  responseTransforms: ProviderResponseTransforms | null
 ) {
   const headers = getOutputHeaders(response);
 

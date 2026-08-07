@@ -43,8 +43,7 @@ export function buildRoutingTable(params: {
   // one row for the model (one effort per model), bind that row even if the
   // summary omitted variant. Multiple snapshot rows without an exact match is
   // corrupt — throw so buildRoutingTable fails and the caller keeps the
-  // previous published table. Emit reasoningEffort only — never variant — so
-  // the published PLATFORM artifact shape stays unchanged for rolling deploys.
+  // previous published table.
   const snapshotVariant = (m: BenchmarkDeciderModel): string | null =>
     m.variant !== undefined ? (m.variant ?? null) : (m.reasoningEffort ?? null);
 
@@ -70,16 +69,15 @@ export function buildRoutingTable(params: {
         .filter(s => s.routeKey === routeKey && s.cases > 0 && s.avgCostUsd !== null)
         .map(s => {
           const cfg = findSnapshot(s.model, s.variant);
-          // Platform artifact: emit reasoningEffort from the run snapshot's
-          // effort key, NOT variant (custom sparse tables are a later slice).
-          const effort =
-            cfg?.reasoningEffort !== undefined && cfg.reasoningEffort !== null
-              ? cfg.reasoningEffort
-              : null;
+          const effort = cfg.reasoningEffort ?? null;
+          // Legacy enum efforts keep the exact current shape. A snapshot that only
+          // has a non-enum variant emits `variant` instead — never both.
+          const variant = effort === null ? (cfg.variant ?? null) : null;
           return {
             model: s.model,
             accuracy: s.accuracy,
             avgCostUsd: s.avgCostUsd ?? 0,
+            ...(variant !== null ? { variant } : {}),
             reasoningEffort: effort,
           };
         }),

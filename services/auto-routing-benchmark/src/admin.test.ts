@@ -54,6 +54,7 @@ const TEST_CONFIG_ROWS = {
   classifierModels: TEST_CONFIG.classifierModels,
   deciderModels: TEST_CONFIG.deciderModels.map(m => ({
     model: m.id,
+    variant: null,
     reasoning_effort: m.reasoningEffort ?? null,
   })),
   autoDeciderModels: [],
@@ -235,6 +236,7 @@ describe('GET /admin/config', () => {
     const classifierModels = ['some/model'];
     const deciderModels = TEST_CONFIG.deciderModels.map(m => ({
       model: m.id,
+      variant: null,
       reasoning_effort: null,
     }));
     vi.mocked(getConfigRows).mockResolvedValueOnce({
@@ -349,7 +351,9 @@ describe('PUT /admin/config', () => {
     expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
-    expect(deciderModelRows).toEqual([{ model: 'manual/model', reasoning_effort: 'low' }]);
+    expect(deciderModelRows).toEqual([
+      { model: 'manual/model', variant: null, reasoning_effort: 'low' },
+    ]);
     expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
   });
 });

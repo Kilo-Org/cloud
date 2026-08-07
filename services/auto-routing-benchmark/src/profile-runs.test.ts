@@ -84,12 +84,14 @@ import {
 import {
   NoEntriesClaimedError,
   drainQueue,
+  platformRegistryEntries,
   drainQueues,
   failRunAndDrain,
   processJob,
   startRun,
   sweepStaleRunsAndDrain,
 } from './run';
+import { getBenchmarkConfig } from './config';
 
 const queueSendBatch = vi.fn();
 const kvDelete = vi.fn();
@@ -127,8 +129,8 @@ function mockConfig(overrides: Partial<typeof configRow> = {}) {
     // mapConfigRows requires non-empty classifier + decider lists.
     classifierModels: ['classifier/a'],
     deciderModels: [
-      { model: 'platform/a', reasoning_effort: null },
-      { model: 'platform/b', reasoning_effort: 'high' },
+      { model: 'platform/a', variant: null, reasoning_effort: null },
+      { model: 'platform/b', variant: null, reasoning_effort: 'high' },
     ],
     autoDeciderModels: [],
     excludedAutoDeciderModels: [],
@@ -262,6 +264,40 @@ describe('startRun — registry-backed decider runs', () => {
     await expect(startRun(env, 'decider', { entries: [] })).rejects.toThrow(
       /non-empty registry entry snapshot/
     );
+  });
+
+  it('maps a saved canonical variant from the decider list into the registry entry', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: configRow,
+      classifierModels: ['classifier/a'],
+      deciderModels: [{ model: 'platform/a', variant: 'max', reasoning_effort: null }],
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
+    });
+
+    const config = await getBenchmarkConfig(env.BENCH_DB);
+    expect(platformRegistryEntries(config!)).toEqual([{ model: 'platform/a', variant: 'max' }]);
+  });
+
+  it("keeps a legacy enum effort as today's exact pair", async () => {
+    // mockConfig() default: platform/b holds reasoning_effort 'high' (legacy shape).
+    const config = await getBenchmarkConfig(env.BENCH_DB);
+    expect(platformRegistryEntries(config!)).toEqual([
+      { model: 'platform/a', variant: null },
+      { model: 'platform/b', variant: 'high' },
+    ]);
+  });
+
+  it('carries the entry variant into the run_models row', async () => {
+    const result = await startRun(env, 'decider', {
+      purpose: 'platform',
+      entries: [{ model: 'platform/a', variant: 'max' }],
+    });
+    expect(result.runId).toMatch(/^decider-/);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toEqual([
+      expect.objectContaining({ model: 'platform/a', variant: 'max', enqueued: true }),
+    ]);
   });
 
   it('writes no run at all when the registry claim rejects', async () => {

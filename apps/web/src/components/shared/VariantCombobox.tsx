@@ -21,6 +21,8 @@ type VariantComboboxProps = {
   variant?: 'compact';
   /** Optional className for the trigger button */
   className?: string;
+  /** Optional aria-label for the trigger button, overriding the default accessible name */
+  triggerAriaLabel?: string;
 };
 
 export function VariantCombobox({
@@ -29,6 +31,7 @@ export function VariantCombobox({
   onValueChange,
   disabled = false,
   className,
+  triggerAriaLabel,
 }: VariantComboboxProps) {
   const [open, setOpen] = useState(false);
 
@@ -44,6 +47,7 @@ export function VariantCombobox({
           variant="outline"
           size="sm"
           role="combobox"
+          aria-label={triggerAriaLabel}
           aria-expanded={open}
           disabled={disabled}
           className={cn('h-9 justify-between gap-1.5', className)}

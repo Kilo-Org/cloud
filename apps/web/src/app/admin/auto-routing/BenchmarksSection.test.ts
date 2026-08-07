@@ -10,9 +10,11 @@ import {
   formatAccuracy,
   formatUsd,
   formStateToConfig,
+  pinnedModelFor,
   runFilterQuery,
   runTypeLabel,
   RoutingTableView,
+  variantOptionsForModel,
 } from './BenchmarksSection';
 
 describe('formatAccuracy', () => {
@@ -78,6 +80,36 @@ describe('costPerAccuracy', () => {
   });
 });
 
+describe('pinnedModelFor', () => {
+  it('pins a saved id as a selectable option', () => {
+    expect(pinnedModelFor('anthropic/claude-sonnet-4.5')).toEqual({
+      id: 'anthropic/claude-sonnet-4.5',
+      name: 'anthropic/claude-sonnet-4.5',
+    });
+  });
+});
+
+describe('variantOptionsForModel', () => {
+  it('offers the selected model catalog variant keys', () => {
+    const option = { id: 'openai/gpt-5', name: 'GPT-5', variants: ['none', 'low', 'high'] };
+    expect(variantOptionsForModel(option, null)).toEqual(['none', 'low', 'high']);
+  });
+
+  it('appends a saved variant key omitted from the catalog', () => {
+    const option = { id: 'openai/gpt-5', name: 'GPT-5', variants: ['low', 'high'] };
+    expect(variantOptionsForModel(option, 'max')).toEqual(['low', 'high', 'max']);
+  });
+
+  it('does not duplicate a saved variant key that is still in the catalog', () => {
+    const option = { id: 'openai/gpt-5', name: 'GPT-5', variants: ['low', 'high'] };
+    expect(variantOptionsForModel(option, 'high')).toEqual(['low', 'high']);
+  });
+
+  it('hides when neither catalog nor saved variant key exists', () => {
+    expect(variantOptionsForModel({ id: 'model', name: 'Model' }, null)).toEqual([]);
+  });
+});
+
 describe('RoutingTableView', () => {
   it('renders candidates in the published serving rank order', () => {
     const html = renderToStaticMarkup(
@@ -117,7 +149,7 @@ describe('RoutingTableView', () => {
     expect(html.indexOf('threshold-meeting')).toBeLessThan(html.indexOf('below-threshold-cheaper'));
   });
 
-  it('renders reasoning effort next to the model name', () => {
+  it('renders canonical variant before effort/default', () => {
     const html = renderToStaticMarkup(
       React.createElement(RoutingTableView, {
         data: {
@@ -136,6 +168,40 @@ describe('RoutingTableView', () => {
                   accuracy: 0.8,
                   avgCostUsd: 0.006,
                   meetsThreshold: true,
+                  variant: 'xhigh',
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
+
+    expect(html.indexOf('Model')).toBeLessThan(html.indexOf('Variant'));
+    expect(html.indexOf('Variant')).toBeLessThan(html.indexOf('Accuracy'));
+    expect(html.indexOf('openai/gpt-5')).toBeLessThan(html.indexOf('xhigh'));
+    expect(html.indexOf('xhigh')).toBeLessThan(html.indexOf('80.0%'));
+  });
+
+  it('renders legacy reasoning effort as the variant label when variant is absent', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(RoutingTableView, {
+        data: {
+          publishedAt: '2026-06-17T00:00:00.000Z',
+          table: {
+            version: 'run-1',
+            generatedAt: '2026-06-17T00:00:00.000Z',
+            minAccuracy: 0.7,
+            switchCostFactor: 3,
+            bestAccuracySwitchThreshold: 0.05,
+            source: 'benchmark',
+            routes: {
+              'implementation/code_generation': [
+                {
+                  model: 'anthropic/claude-sonnet-4.5',
+                  accuracy: 0.8,
+                  avgCostUsd: 0.006,
+                  meetsThreshold: true,
                   reasoningEffort: 'high',
                 },
               ],
@@ -145,10 +211,38 @@ describe('RoutingTableView', () => {
       })
     );
 
-    expect(html.indexOf('Model')).toBeLessThan(html.indexOf('Reasoning effort'));
-    expect(html.indexOf('Reasoning effort')).toBeLessThan(html.indexOf('Accuracy'));
-    expect(html.indexOf('openai/gpt-5')).toBeLessThan(html.indexOf('high'));
+    expect(html.indexOf('anthropic/claude-sonnet-4.5')).toBeLessThan(html.indexOf('high'));
     expect(html.indexOf('high')).toBeLessThan(html.indexOf('80.0%'));
+  });
+
+  it('renders default when neither variant nor effort exists', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(RoutingTableView, {
+        data: {
+          publishedAt: '2026-06-17T00:00:00.000Z',
+          table: {
+            version: 'run-1',
+            generatedAt: '2026-06-17T00:00:00.000Z',
+            minAccuracy: 0.7,
+            switchCostFactor: 3,
+            bestAccuracySwitchThreshold: 0.05,
+            source: 'benchmark',
+            routes: {
+              'implementation/code_generation': [
+                {
+                  model: 'openai/gpt-4o-mini',
+                  accuracy: 0.8,
+                  avgCostUsd: 0.006,
+                  meetsThreshold: true,
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
+
+    expect(html.indexOf('openai/gpt-4o-mini')).toBeLessThan(html.indexOf('default'));
   });
 });
 
@@ -160,7 +254,7 @@ describe('configToFormState', () => {
     expect(state.classifierMaxP95LatencyMs).toBe('1000');
     expect(state.autoDeciderMinCostUsd).toBe(15);
     expect(state.autoDeciderMaxCostUsd).toBe(25);
-    expect(state.classifierModels).toBe('');
+    expect(state.classifierModels).toEqual([]);
     expect(state.deciderModels).toEqual([]);
     expect(state.autoDeciderModels).toEqual([]);
     expect(state.excludedAutoDeciderModels).toBe('');
@@ -204,7 +298,7 @@ describe('formStateToConfig round-trip', () => {
     expect(state.autoDeciderMinCostUsd).toBe(12);
     expect(state.autoDeciderMaxCostUsd).toBe(24);
     expect(state.benchmarkOrgId).toBe('org-123');
-    expect(state.deciderModels).toEqual([{ id: 'manual-model', reasoningEffort: 'low' }]);
+    expect(state.deciderModels).toEqual([{ id: 'manual-model', variant: 'low' }]);
     expect(state.autoDeciderModels).toEqual(baseConfig.autoDeciderModels);
     expect(state.excludedAutoDeciderModels).toBe('excluded-auto-model');
 
@@ -215,11 +309,64 @@ describe('formStateToConfig round-trip', () => {
     expect(result.autoDeciderMinCostUsd).toBe(12);
     expect(result.autoDeciderMaxCostUsd).toBe(24);
     expect(result.benchmarkOrgId).toBe('org-123');
-    expect(result.manualDeciderModels).toEqual([{ id: 'manual-model', reasoningEffort: 'low' }]);
+    expect(result.manualDeciderModels).toEqual([
+      { id: 'manual-model', variant: 'low', reasoningEffort: null },
+    ]);
     expect(result.excludedAutoDeciderModels).toEqual(['excluded-auto-model']);
     expect(result.deciderModels).toEqual([
-      { id: 'manual-model', reasoningEffort: 'low' },
+      { id: 'manual-model', variant: 'low', reasoningEffort: null },
+      // Auto rows stay effort-only in the effective list.
       { id: 'auto-model', reasoningEffort: null },
+    ]);
+  });
+
+  it('round-trips classifierModels as a string array and drops blank rows', () => {
+    const state = configToFormState(baseConfig);
+    expect(state.classifierModels).toEqual(['model-a', 'model-b']);
+    const result = formStateToConfig(
+      { ...state, classifierModels: ['model-a', '  ', 'model-c'] },
+      baseConfig
+    );
+    expect(result.classifierModels).toEqual(['model-a', 'model-c']);
+  });
+
+  it('round-trips canonical variant rows and loads legacy effort rows as variant', () => {
+    const variantConfig: BenchmarkConfig = {
+      ...baseConfig,
+      manualDeciderModels: [
+        { id: 'manual-v2', variant: 'high', reasoningEffort: null },
+        { id: 'legacy', reasoningEffort: 'low' },
+      ],
+    };
+    const state = configToFormState(variantConfig);
+    expect(state.deciderModels).toEqual([
+      { id: 'manual-v2', variant: 'high' },
+      { id: 'legacy', variant: 'low' },
+    ]);
+
+    const result = formStateToConfig(state, variantConfig);
+    expect(result.manualDeciderModels).toEqual([
+      { id: 'manual-v2', variant: 'high', reasoningEffort: null },
+      { id: 'legacy', variant: 'low', reasoningEffort: null },
+    ]);
+    // Manual rows save variant-only; the legacy effort field stays null.
+    expect(result.manualDeciderModels?.every(model => model.reasoningEffort === null)).toBe(true);
+  });
+
+  it('drops blank decider rows on save', () => {
+    const state = configToFormState(baseConfig);
+    const result = formStateToConfig(
+      {
+        ...state,
+        deciderModels: [
+          { id: '   ', variant: null },
+          { id: 'manual-model', variant: 'low' },
+        ],
+      },
+      baseConfig
+    );
+    expect(result.manualDeciderModels).toEqual([
+      { id: 'manual-model', variant: 'low', reasoningEffort: null },
     ]);
   });
 
@@ -242,24 +389,35 @@ describe('formStateToConfig round-trip', () => {
 });
 
 describe('effectiveDeciderModels', () => {
-  it('combines manual models with non-excluded auto models and lets manual override an auto duplicate', () => {
+  it('keeps manual rows variant-only and auto rows effort-only, drops excluded auto, and lets manual override an auto duplicate', () => {
     expect(
       effectiveDeciderModels({
         manualDeciderModels: [
-          { id: 'manual/model', reasoningEffort: null },
-          { id: 'auto/duplicate', reasoningEffort: 'high' },
+          { id: 'manual/model', variant: null },
+          { id: 'auto/duplicate', variant: 'high' },
         ],
         autoDeciderModels: [
           { id: 'auto/duplicate', reasoningEffort: null, avgAttemptCostUsd: 20 },
           { id: 'auto/included', reasoningEffort: 'low', avgAttemptCostUsd: 22 },
           { id: 'auto/excluded', reasoningEffort: null, avgAttemptCostUsd: 23 },
+          {
+            id: 'auto/variant-carrying',
+            variant: 'xhigh',
+            reasoningEffort: null,
+            avgAttemptCostUsd: 24,
+          },
         ],
         excludedAutoDeciderModels: ['auto/excluded'],
       })
-    ).toEqual([
-      { id: 'manual/model', reasoningEffort: null },
-      { id: 'auto/duplicate', reasoningEffort: 'high' },
+    ).toStrictEqual([
+      // Manual rows are canonical variant-only with the legacy effort null.
+      { id: 'manual/model', variant: null, reasoningEffort: null },
+      // A manual row with the same id overrides the synced auto row.
+      { id: 'auto/duplicate', variant: 'high', reasoningEffort: null },
+      // Auto rows stay effort-only and never emit the variant key, even when
+      // the synced row carries a variant.
       { id: 'auto/included', reasoningEffort: 'low' },
+      { id: 'auto/variant-carrying', reasoningEffort: null },
     ]);
   });
 });

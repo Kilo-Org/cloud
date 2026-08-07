@@ -1275,14 +1275,17 @@ export function rowsToRoutingTable(
   });
   for (const row of sorted) {
     routeMap[row.route_key] ??= [];
-    // Platform artifact compatibility: keep reading reasoning_effort exactly
-    // as today so published JSON shape stays effort-based during rolling deploys.
+    // Platform artifact compatibility: a row with a reasoning_effort keeps the
+    // exact current read shape. A variant-only row (non-enum key) returns variant.
+    const effort = parsePersistedReasoningEffort(row.reasoning_effort);
+    const variant = effort === null ? variantFromStorage(row.variant) : null;
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      reasoningEffort: parsePersistedReasoningEffort(row.reasoning_effort),
+      ...(variant !== null ? { variant } : {}),
+      reasoningEffort: effort,
     });
   }
   return {

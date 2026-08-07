@@ -395,12 +395,17 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     ...new Set(readyEntries.map(r => r.runId)),
   ]);
   const generatedAt = new Date().toISOString();
-  // Platform artifact keeps emitting reasoningEffort (not variant) so the shape
-  // stays unchanged for auto-routing workers deployed before exact pairs.
-  const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => ({
-    id: entry.model,
-    reasoningEffort: parsePersistedReasoningEffort(entry.variant),
-  }));
+  // Platform artifact keeps emitting reasoningEffort for enum efforts (not
+  // variant) so the shape stays unchanged for auto-routing workers deployed
+  // before exact pairs. A non-enum catalog variant can only ride as `variant`;
+  // emitting effort would drop it.
+  const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => {
+    const effort = parsePersistedReasoningEffort(entry.variant);
+    if (effort === null && entry.variant !== null) {
+      return { id: entry.model, variant: entry.variant, reasoningEffort: null };
+    }
+    return { id: entry.model, reasoningEffort: effort };
+  });
   const table = buildRoutingTable({
     version: computeRegistryRoutingTableVersion(
       readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant }))

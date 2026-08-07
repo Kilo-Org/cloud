@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "71e8de8c-6976-494d-8532-109016ea7f84",
-  "prevId": "c0afe0b5-ea9a-4206-a099-34099ac02ee9",
+  "id": "d7af8623-377e-4c10-99fe-89ac6e94f3b8",
+  "prevId": "71e8de8c-6976-494d-8532-109016ea7f84",
   "tables": {
     "benchmark_config": {
       "name": "benchmark_config",
@@ -42,6 +42,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "user_max_concurrency": {
+          "name": "user_max_concurrency",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 100
         },
         "benchmark_user_id": {
           "name": "benchmark_user_id",
@@ -190,6 +198,22 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "platform_requested": {
+          "name": "platform_requested",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "user_requested": {
+          "name": "user_requested",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         }
       },
       "indexes": {},
@@ -329,10 +353,11 @@
         }
       },
       "indexes": {
-        "UQ_benchmark_runs_one_running_per_kind": {
-          "name": "UQ_benchmark_runs_one_running_per_kind",
+        "UQ_benchmark_runs_one_running_per_kind_purpose": {
+          "name": "UQ_benchmark_runs_one_running_per_kind_purpose",
           "columns": [
-            "kind"
+            "kind",
+            "purpose"
           ],
           "isUnique": true,
           "where": "\"benchmark_runs\".\"status\" = 'running'"

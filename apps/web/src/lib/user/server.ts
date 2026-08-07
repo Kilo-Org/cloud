@@ -994,6 +994,19 @@ export const authOptions: NextAuthOptions = {
         token.authenticatedAt = token.iat;
         delete token.ssoSourceOrganizationId;
 
+        if (existingUser.is_admin) {
+          // Admin audit trail: identify which Kilocode admin authenticated.
+          logExceptInTest(
+            JSON.stringify({
+              event: 'admin_login_succeeded',
+              kiloUserId: existingUser.id,
+              email: existingUser.google_user_email,
+              provider: accountInfo.provider,
+              adminTier: existingUser.is_super_admin ? 'super_admin' : 'platform_admin',
+            })
+          );
+        }
+
         if (accountInfo.provider === 'workos') {
           const domain = getLowerDomainFromEmail(existingUser.google_user_email);
           assert(domain, 'WorkOS user must have a valid primary email domain');

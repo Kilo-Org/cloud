@@ -648,6 +648,9 @@ describe('generateReviewPrompt (incremental review)', () => {
       expect(prompt).toContain('Position rules');
       expect(prompt).toContain('old_path');
       expect(prompt).toContain('line_code');
+      // hardConstraints is appended without replacePlaceholders (see
+      // generateReviewPrompt), so an {MR_IID} there would render literally.
+      expect(prompt).not.toContain('{MR_IID}');
     }
   });
 

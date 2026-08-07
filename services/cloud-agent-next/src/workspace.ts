@@ -133,29 +133,85 @@ export {
   GIT_COMMAND_TIMEOUT_MS,
 } from './sandbox-timeout-logging.js';
 
+const FORBIDDEN_PATH_SEGMENTS = new Set(['.', '..']);
+
+/** Ids we generate ourselves: UUIDs and `agent_<uuid>` session ids. */
+const GENERATED_ID_SEGMENT = /^[A-Za-z0-9._-]+$/;
+
+function invalidSegment(label: string): Error {
+  return new Error(`Refusing to build a workspace path from an invalid ${label}`);
+}
+
+export function isGeneratedIdPathSegment(value: string): boolean {
+  return GENERATED_ID_SEGMENT.test(value) && !FORBIDDEN_PATH_SEGMENTS.has(value);
+}
+
+/**
+ * Build one path segment from a user id.
+ *
+ * A blank segment does not fail loudly, it collapses: an empty `userId` turns
+ * `/workspace/<orgId>//sessions/<sessionId>` into
+ * `/workspace/<orgId>/sessions/<sessionId>`, which looks plausible, does not
+ * exist on disk, and falls outside the `external_directory` allowlist we derive
+ * from the same workspace path. Reject the input instead of handing a silently
+ * wrong root to the sandbox.
+ *
+ * User ids legitimately contain `/` and `:` (e.g. `oauth/google:1234`), so they
+ * are rewritten rather than rejected.
+ */
+function requireUserIdPathSegment(userId: string | undefined): string {
+  const sanitized = sanitizeIdForPath(userId?.trim() ?? '');
+  if (!sanitized || FORBIDDEN_PATH_SEGMENTS.has(sanitized)) {
+    throw invalidSegment('userId');
+  }
+  return sanitized;
+}
+
+/**
+ * Build one path segment from an id we generate.
+ *
+ * Reject rather than rewrite, so the same id renders identically everywhere it
+ * is used. Rewriting would let `getSessionWorkspacePath` and
+ * `getSessionHomePath` disagree about one session: a session id of `x/y` would
+ * yield the segment `x-y` in the workspace path and the directory `/home/x/y`
+ * for the session home.
+ */
+function requireGeneratedIdPathSegment(value: string | undefined, label: string): string {
+  if (value === undefined || !isGeneratedIdPathSegment(value)) {
+    throw invalidSegment(label);
+  }
+  return value;
+}
+
 export function getBaseWorkspacePath(
-  kilocodeOrganizationId: string | undefined,
+  kilocodeOrganizationId: string | null | undefined,
   userId: string
 ): string {
-  const safeUserId = sanitizeIdForPath(userId);
-  // Personal accounts (no orgId) get simpler path without orgId segment
-  if (!kilocodeOrganizationId) {
+  const safeUserId = requireUserIdPathSegment(userId);
+  // Only an absent org id means "personal". A supplied-but-unusable value is
+  // upstream corruption, and routing it here would silently place an org
+  // session's workspace, allowlist, and cleanup root in the personal namespace.
+  // `null` is accepted alongside `undefined` because absence is what it encodes:
+  // the metadata schemas use `z.string().optional()`, which rejects `null` today,
+  // but a future `nullish()` must not turn every personal session into a throw.
+  if (kilocodeOrganizationId === null || kilocodeOrganizationId === undefined) {
     return `/workspace/${safeUserId}`;
   }
   // Org accounts maintain orgId/userId structure
-  return `/workspace/${kilocodeOrganizationId}/${safeUserId}`;
+  return `/workspace/${requireGeneratedIdPathSegment(kilocodeOrganizationId, 'organization id')}/${safeUserId}`;
 }
 
 export function getSessionWorkspacePath(
-  kilocodeOrganizationId: string | undefined,
+  kilocodeOrganizationId: string | null | undefined,
   userId: string,
   sessionId: string
 ): string {
-  return `${getBaseWorkspacePath(kilocodeOrganizationId, userId)}/sessions/${sessionId}`;
+  const safeSessionId = requireGeneratedIdPathSegment(sessionId, 'session id');
+  return `${getBaseWorkspacePath(kilocodeOrganizationId, userId)}/sessions/${safeSessionId}`;
 }
 
 export function getSessionHomePath(sessionId: string): string {
-  return `${SESSION_HOME_ROOT}/${sessionId}`;
+  return `${SESSION_HOME_ROOT}/${requireGeneratedIdPathSegment(sessionId, 'session id')}`;
 }
 
 export function getKilocodeCliDir(sessionHome: string): string {
@@ -497,6 +553,18 @@ export async function cleanupStaleWorkspaces(
 
   for (const candidateSessionId of sessionDirs) {
     if (candidateSessionId === currentSessionId) {
+      skipped++;
+      continue;
+    }
+
+    // Candidate names come from the sandbox filesystem and are interpolated into
+    // `rm -rf '<path>'` below. Session ids we generate always satisfy this, so a
+    // name that does not is either not ours or is malformed; skip it visibly
+    // rather than shelling out with it.
+    if (!isGeneratedIdPathSegment(candidateSessionId)) {
+      logger
+        .withFields({ candidateSessionId })
+        .warn('Skipping session: directory name is not a valid session id');
       skipped++;
       continue;
     }

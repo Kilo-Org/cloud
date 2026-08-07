@@ -48,10 +48,14 @@ import {
 } from './cli-runner';
 import {
   countCaseResultsByLane,
+  getCaseResults,
   getExistingCaseResultIds,
   getRunWithModels,
+  getSummaries,
   listLaneFailures,
+  markRunCompleted,
   recordLaneFailure,
+  saveRoutingTable,
   upsertCaseResult,
 } from './db';
 import { processJob } from './run';
@@ -433,5 +437,115 @@ describe('processJob — decider chunk chaining', () => {
     );
     expect(countCaseResultsByLane).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('processJob — saved canonical variant reaches the CLI and publish', () => {
+  it('passes a saved canonical variant to the CLI as variant', async () => {
+    mockRunSnapshot([{ model, variant: 'max', enqueued: true, reasoning_effort: null }]);
+
+    await processJob(env, deciderMessage({ variant: 'max' }));
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        model,
+        variant: 'max',
+        instanceName: `${runId}:${model}:max:0:0`,
+      })
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, variant: 'max' })
+    );
+  });
+
+  // Publish-fidelity harness: a completed platform run whose snapshot row is
+  // variant-only publishes variant; an enum effort row keeps the effort shape.
+  function mockPublishHarness(variant: string, reasoningEffort: string | null) {
+    mockRunSnapshot([{ model, variant, enqueued: true, reasoning_effort: reasoningEffort }]);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model, variant, rep: 0, n: DECIDER_CASES.length },
+    ]);
+    vi.mocked(getCaseResults).mockResolvedValue(
+      DECIDER_CASES.map(c => ({
+        run_id: runId,
+        model,
+        variant,
+        case_id: c.id,
+        route_key: 'implementation/code_generation',
+        score: 1,
+        latency_ms: 10,
+        cost_usd: 0.001,
+        error: null,
+        fallback_reason: null,
+        retried: null,
+        exit_code: 0,
+        output_prefix: 'ok',
+        event_count: 1,
+        last_event_types: 'x',
+        rep: 0,
+        timed_out: 0,
+      }))
+    );
+    vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));
+  }
+
+  it('publishes a routing table carrying variant for a non-enum snapshot key', async () => {
+    const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
+    mockPublishHarness('max', null);
+    vi.mocked(getSummaries).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model,
+        variant: 'max',
+        routeKey,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgLatencyMs: 100,
+        p50LatencyMs: 90,
+        p95LatencyMs: 120,
+        cases: 5,
+        errors: 0,
+        timeouts: 0,
+      }))
+    );
+
+    await processJob(env, { ...deciderMessage({ variant: 'max' }), chunk: 9999 });
+
+    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
+    expect(table).toBeDefined();
+    const firstRoute = Object.values(table.routes)[0];
+    expect(firstRoute[0]).toMatchObject({ model, variant: 'max', reasoningEffort: null });
+  });
+
+  it('publishes a routing table with the legacy effort shape for an enum key', async () => {
+    const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
+    mockPublishHarness('high', 'high');
+    vi.mocked(getSummaries).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model,
+        variant: 'high',
+        routeKey,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgLatencyMs: 100,
+        p50LatencyMs: 90,
+        p95LatencyMs: 120,
+        cases: 5,
+        errors: 0,
+        timeouts: 0,
+      }))
+    );
+
+    await processJob(env, { ...deciderMessage({ variant: 'high' }), chunk: 9999 });
+
+    const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
+    expect(table).toBeDefined();
+    const firstRoute = Object.values(table.routes)[0];
+    expect(firstRoute[0]).toMatchObject({ model, reasoningEffort: 'high' });
+    expect(
+      firstRoute[0] && 'variant' in firstRoute[0] ? firstRoute[0].variant : undefined
+    ).toBeUndefined();
   });
 });

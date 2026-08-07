@@ -10,13 +10,15 @@ import { OpenInCliButton } from '@/app/share/[shareId]/open-in-cli-button';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
 export default async function SharedSessionPage({
   params,
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
+  notFound();
+
   const { sessionId } = await params;
 
   // Validate sessionId is a valid UUID before querying the database

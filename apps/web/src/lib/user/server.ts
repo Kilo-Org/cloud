@@ -86,6 +86,11 @@ import {
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
@@ -1004,6 +1009,20 @@ export const authOptions: NextAuthOptions = {
           );
           token.ssoSourceOrganizationId = ssoAuthority.sourceOrganizationId;
         }
+
+        if (existingUser.is_admin) {
+          // Admin audit trail: identify which Kilocode admin authenticated.
+          // Emitted only after JWT creation is guaranteed to succeed.
+          logExceptInTest(
+            JSON.stringify({
+              event: 'admin_login_succeeded',
+              kiloUserId: existingUser.id,
+              email: existingUser.google_user_email,
+              provider: accountInfo.provider,
+              adminTier: existingUser.is_super_admin ? 'super_admin' : 'platform_admin',
+            })
+          );
+        }
       } catch (error) {
         captureException(error, {
           tags: {
@@ -1067,7 +1086,31 @@ type GetAuthResponse =
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = await headers();
+  const result = await resolveUserFromAuth(opts, headersList);
 
+  // Admin audit trail: emit exactly one identity-attributed event per authorized
+  // admin request. Guarded strictly on adminOnly so the millions of
+  // adminOnly:false calls never log.
+  if (opts.adminOnly === true && result.user) {
+    emitAdminAccessEvent({
+      surface: 'rest',
+      user: result.user,
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      route: headersList.get('x-pathname') ?? headersList.get('x-matched-path') ?? null,
+      // No reliable HTTP method header is available here; do not fabricate one.
+      method: null,
+      ip: clientIpFromHeaders(headersList),
+    });
+  }
+
+  return result;
+}
+
+async function resolveUserFromAuth(
+  opts: RequiredPermissions,
+  headersList: Awaited<ReturnType<typeof headers>>
+): Promise<GetAuthResponse> {
   // This path is executed for non-next-auth requests
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path

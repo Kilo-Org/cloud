@@ -224,11 +224,13 @@ export async function sweepStaleRuns(env: Env): Promise<string[]> {
   // Rows a terminal run left claimed (its transition threw) are unreachable by
   // the drain, by requeue and by the stale sweep. Settle them so a pool entry
   // can never sit `running` forever.
-  await failOrphanedRunningProfiles(db, PROFILE_ORPHANED_CLAIM_FAILURE_REASON).catch(error => {
-    console.warn(
-      JSON.stringify({ event: 'benchmark_profile_orphan_release_error', ...formatError(error) })
-    );
-  });
+  await failOrphanedRunningProfiles(db, PROFILE_ORPHANED_CLAIM_FAILURE_REASON, olderThanIso).catch(
+    error => {
+      console.warn(
+        JSON.stringify({ event: 'benchmark_profile_orphan_release_error', ...formatError(error) })
+      );
+    }
+  );
   for (const run of stale) {
     // No-ops for a salvaged run: its rows are already ready/failed.
     await markProfilesFailedForRun(db, run.id, 'timed out').catch(() => {});
@@ -706,10 +708,26 @@ export async function startRun(
   // paying to benchmark it a second time and then discarding the result.
   let claimedEntries: RunModelEntry[] = modelEntries;
   if (kind === 'decider') {
-    claimedEntries = await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
-      engineIdentity,
-      repetitions,
-    });
+    try {
+      claimedEntries = await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
+        engineIdentity,
+        repetitions,
+      });
+    } catch (error) {
+      // The claim walks entries one statement at a time, so a failure part-way
+      // leaves earlier rows claimed by a run that will never be written. Give
+      // them straight back rather than leaving them for the orphan sweep.
+      await releaseProfileClaims(env.BENCH_DB, runId).catch(releaseError => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_profile_claim_release_error',
+            runId,
+            ...formatError(releaseError),
+          })
+        );
+      });
+      throw error;
+    }
     if (claimedEntries.length === 0) {
       throw new NoEntriesClaimedError(runId);
     }
@@ -760,7 +778,7 @@ export async function startRun(
     // they sit `running` under a run that was never written and nothing can
     // reach them.
     if (kind === 'decider') {
-      await releaseProfileClaims(env.BENCH_DB, runId).catch(releaseError => {
+      await releaseProfileClaims(env.BENCH_DB, runId).catch((releaseError: unknown) => {
         console.warn(
           JSON.stringify({
             event: 'benchmark_profile_claim_release_error',
@@ -1531,33 +1549,30 @@ async function finalizeRunIfComplete(
     const failedEntries = enqueuedModels
       .filter(m => failedEntryKeys.has(JSON.stringify([m.model, m.variant])))
       .map(m => ({ model: m.model, variant: m.variant }));
-    // Separate try blocks on purpose: if the per-entry failure throws, the ready
-    // sweep must still run, or every entry of a completed run stays `running`.
-    if (failedEntries.length > 0) {
-      await markProfilesFailedForEntries(
-        env.BENCH_DB,
-        runId,
-        failedEntries,
-        PROFILE_LANE_DEAD_FAILURE_REASON
-      ).catch(error => {
-        console.warn(
-          JSON.stringify({
-            event: 'benchmark_profile_failed_transition_error',
-            runId,
-            ...formatError(error),
-          })
+    // One try block, fail-first. `markProfilesReadyForRun` has no entry filter —
+    // it readies every row still `running` under this run — so it must not run
+    // when the per-entry failure did not complete, or a dead lane's partial
+    // measurements would be published as a real result. If this throws, the
+    // rows stay `running` and the orphan sweep settles them.
+    try {
+      if (failedEntries.length > 0) {
+        await markProfilesFailedForEntries(
+          env.BENCH_DB,
+          runId,
+          failedEntries,
+          PROFILE_LANE_DEAD_FAILURE_REASON
         );
-      });
-    }
-    await markProfilesReadyForRun(env.BENCH_DB, runId).catch(error => {
+      }
+      await markProfilesReadyForRun(env.BENCH_DB, runId);
+    } catch (error) {
       console.warn(
         JSON.stringify({
-          event: 'benchmark_profile_ready_transition_error',
+          event: 'benchmark_profile_transition_error',
           runId,
           ...formatError(error),
         })
       );
-    });
+    }
     console.log(
       JSON.stringify({
         event: 'benchmark_decider_run_completed',

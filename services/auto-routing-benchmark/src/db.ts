@@ -12,7 +12,20 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  notInArray,
+  or,
+} from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -1040,21 +1053,26 @@ export async function getSummariesForRuns(
  * after the bulk stale sweep).
  */
 /**
- * Fail registry rows left `running` by a run that already reached a terminal
- * state. Their transition threw (a D1 blip, a bound-variable failure) and
- * nothing else can reach them: the drain wants `pending`, requeue wants
- * `failed`, and the stale sweep only looks at runs that are still `running`.
- * Without this they stay claimed forever and the owner's pool never resolves.
- * Rows whose run has not been written yet (claimed moments before insert) are
- * untouched, because the run id has no terminal row to match.
+ * Fail registry rows stuck `running` with no live run behind them. Two ways in:
+ * a run reached a terminal state without settling its rows (its transition
+ * threw), or the claim landed and the run row was never written at all. Neither
+ * is reachable otherwise — the drain wants `pending`, requeue wants `failed`,
+ * and the stale sweep only looks at runs that are still `running`. Left alone
+ * they stay claimed forever, and because a claimed platform row keeps the queue
+ * unsettled, the platform routing table would never publish again.
+ *
+ * The age guard is what makes this safe to run from every sweep: a run marks
+ * itself completed just before settling its rows, so without it this would fail
+ * fully-measured entries mid-finalization and send them back to be re-measured
+ * at full cost.
  */
-export async function failOrphanedRunningProfiles(
-  db: D1Database,
+export function failOrphanedRunningProfilesStatement(
+  orm: ReturnType<typeof drizzle>,
   failureReason: string,
-  nowIso: string = new Date().toISOString()
-): Promise<number> {
-  const orm = drizzle(db);
-  const result = await orm
+  olderThanIso: string,
+  nowIso: string
+) {
+  return orm
     .update(benchmarkProfiles)
     .set({
       status: 'failed',
@@ -1065,15 +1083,33 @@ export async function failOrphanedRunningProfiles(
     .where(
       and(
         eq(benchmarkProfiles.status, 'running'),
-        inArray(
-          benchmarkProfiles.run_id,
-          orm
-            .select({ id: benchmarkRuns.id })
-            .from(benchmarkRuns)
-            .where(inArray(benchmarkRuns.status, ['completed', 'failed']))
+        lt(benchmarkProfiles.updated_at, olderThanIso),
+        or(
+          isNull(benchmarkProfiles.run_id),
+          notInArray(
+            benchmarkProfiles.run_id,
+            orm
+              .select({ id: benchmarkRuns.id })
+              .from(benchmarkRuns)
+              .where(eq(benchmarkRuns.status, 'running'))
+          )
         )
       )
     );
+}
+
+export async function failOrphanedRunningProfiles(
+  db: D1Database,
+  failureReason: string,
+  olderThanIso: string,
+  nowIso: string = new Date().toISOString()
+): Promise<number> {
+  const result = await failOrphanedRunningProfilesStatement(
+    drizzle(db),
+    failureReason,
+    olderThanIso,
+    nowIso
+  );
   return result.meta.changes ?? 0;
 }
 

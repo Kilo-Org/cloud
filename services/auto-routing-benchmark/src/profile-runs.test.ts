@@ -69,6 +69,7 @@ import {
   listStaleRunningDeciderRuns,
   failOrphanedRunningProfiles,
   recordLaneFailure,
+  releaseProfileClaims,
   markProfilesFailedForEntries,
   markProfilesFailedForRun,
   markProfilesReadyForRun,
@@ -165,6 +166,7 @@ beforeEach(() => {
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
   vi.mocked(failOrphanedRunningProfiles).mockResolvedValue(0);
+  vi.mocked(releaseProfileClaims).mockResolvedValue(undefined);
   vi.mocked(getSummaries).mockResolvedValue([]);
   vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
   queueSendBatch.mockResolvedValue(undefined);
@@ -270,9 +272,14 @@ describe('startRun — registry-backed decider runs', () => {
       'claim failed'
     );
 
-    // The claim precedes the run row, so a failed claim leaves nothing behind.
+    // The claim precedes the run row, so a failed claim leaves nothing behind —
+    // and any rows it did claim are handed straight back to the queue.
     expect(insertRun).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(releaseProfileClaims).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.stringMatching(/^user-/)
+    );
   });
 
   it('drops entries another queue already claimed instead of measuring them twice', async () => {

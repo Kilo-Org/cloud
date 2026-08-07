@@ -266,6 +266,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CLIENT_ID` - Slack OAuth app client ID. [PUBLIC]
 - `SLACK_CLIENT_SECRET` - Slack OAuth app client secret. `[SECRET]`
 - `SLACK_SIGNING_SECRET` - Slack request signing secret for webhooks. `[SECRET]`
+- `SLACK_ENCRYPTION_KEY` - Encrypts the Slack bot token at rest (AES-256-GCM) in the Chat SDK state store. Generate with `openssl rand -base64 32`; must decode to exactly 32 bytes or `apps/web` fails at startup. `[SECRET]`
 - `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
 - `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]

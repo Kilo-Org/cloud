@@ -53,6 +53,7 @@ jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -369,6 +370,27 @@ describe('organizations settings trpc router', () => {
       });
 
       expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
+    });
+
+    it('keeps latest aliases available despite model deny lists and missing snapshot routes', async () => {
+      const organization = await createTestOrganization(
+        'Latest Alias Enterprise',
+        owner.id,
+        0,
+        { model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS] },
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+        data: [makeOpenRouterModel(CLAUDE_SONNET_LATEST_MODEL_ALIAS)],
+      } satisfies OpenRouterModelsResponse);
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: organization.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual([CLAUDE_SONNET_LATEST_MODEL_ALIAS]);
     });
 
     it('should exclude models in model_deny_list for enterprise orgs', async () => {

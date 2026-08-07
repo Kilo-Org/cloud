@@ -6,6 +6,7 @@ import {
 } from '@/lib/ai-gateway/model-utils';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { isLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
 
@@ -45,6 +46,11 @@ export function createAllowPredicateFromProviderAllowList(
     const normalizedModelId = normalizeModelId(modelId);
     if (!requireModelInCurrentSnapshot && !providerAllowSet && modelDenySet.size === 0) return true;
     if (await isModelRestrictionExempt(modelId)) return true;
+    // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
+    if (isLatestModelAlias(normalizedModelId)) {
+      // Provider compatibility is enforced at inference through provider routing options.
+      return !providerAllowSet || providerAllowSet.size > 0;
+    }
     if (modelDenySet.has(normalizedModelId)) {
       return false;
     }

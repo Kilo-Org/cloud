@@ -4,6 +4,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from './effective-model-access.server';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -90,6 +91,49 @@ describe('effective organization model access', () => {
     await expect(
       getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)
     ).resolves.toEqual({ allowed: true });
+  });
+
+  it('excludes latest aliases from model restrictions while enforcing provider routes', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: {
+            model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+            provider_allow_list: ['anthropic'],
+          },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => {
+        throw new Error('latest aliases must not use snapshot provider metadata');
+      })
+    ).resolves.toEqual({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['anthropic']),
+    });
+  });
+
+  it('denies latest aliases when the organization allows no providers', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: {
+            model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+            provider_allow_list: [],
+          },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
   it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(

@@ -4,6 +4,7 @@ import {
   createAllowPredicateFromRestrictions,
   type ProviderLookup,
 } from '@/lib/model-allow.server';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
@@ -87,6 +88,28 @@ describe('model access predicates', () => {
 
     await expect(isAllowed('grok-4.5')).resolves.toBe(false);
     await expect(isAllowed('x-ai/grok-4.6')).resolves.toBe(true);
+  });
+
+  test('latest aliases bypass model restrictions but retain provider availability', async () => {
+    const withProviders = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: ['anthropic'],
+        modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+      },
+      lookup({})
+    );
+    const withoutProviders = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: [],
+        modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+      },
+      lookup({})
+    );
+
+    await expect(withProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(true);
+    await expect(withoutProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
   test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(

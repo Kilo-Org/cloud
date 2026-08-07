@@ -16,18 +16,30 @@ import {
 } from '@/lib/ai-gateway/providers/openai';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
+import {
+  CLAUDE_FABLE_LATEST_MODEL_ALIAS,
+  CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
+  CLAUDE_OPUS_LATEST_MODEL_ALIAS,
+  CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+  GEMINI_FLASH_LATEST_MODEL_ALIAS,
+  GEMINI_PRO_LATEST_MODEL_ALIAS,
+  GPT_LATEST_MODEL_ALIAS,
+  GPT_MINI_LATEST_MODEL_ALIAS,
+  GROK_LATEST_MODEL_ALIAS,
+  KIMI_LATEST_MODEL_ALIAS,
+} from '@/lib/ai-gateway/latest-model-aliases';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
-  '~anthropic/claude-fable-latest': CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
-  '~anthropic/claude-opus-latest': CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
-  '~anthropic/claude-sonnet-latest': CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
-  '~anthropic/claude-haiku-latest': CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
-  '~openai/gpt-latest': GPT_CURRENT_VERCEL_MODEL_ID,
-  '~openai/gpt-mini-latest': GPT_MINI_CURRENT_VERCEL_MODEL_ID,
-  '~moonshotai/kimi-latest': KIMI_CURRENT_VERCEL_MODEL_ID,
-  '~google/gemini-pro-latest': GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
-  '~google/gemini-flash-latest': GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
-  '~x-ai/grok-latest': GROK_CURRENT_VERCEL_MODEL_ID,
+  [CLAUDE_FABLE_LATEST_MODEL_ALIAS]: CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
+  [CLAUDE_OPUS_LATEST_MODEL_ALIAS]: CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
+  [CLAUDE_SONNET_LATEST_MODEL_ALIAS]: CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
+  [CLAUDE_HAIKU_LATEST_MODEL_ALIAS]: CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
+  [GPT_LATEST_MODEL_ALIAS]: GPT_CURRENT_VERCEL_MODEL_ID,
+  [GPT_MINI_LATEST_MODEL_ALIAS]: GPT_MINI_CURRENT_VERCEL_MODEL_ID,
+  [KIMI_LATEST_MODEL_ALIAS]: KIMI_CURRENT_VERCEL_MODEL_ID,
+  [GEMINI_PRO_LATEST_MODEL_ALIAS]: GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
+  [GEMINI_FLASH_LATEST_MODEL_ALIAS]: GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
+  [GROK_LATEST_MODEL_ALIAS]: GROK_CURRENT_VERCEL_MODEL_ID,
   'deepseek/deepseek-v4-flash-latest': 'deepseek/deepseek-v4-flash-0731',
   'inclusionai/ling-3.0-flash:free': 'inclusionai/ling-3.0-flash-free',
   'mistralai/codestral-2508': 'mistral/codestral',

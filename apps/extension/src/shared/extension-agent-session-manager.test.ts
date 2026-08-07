@@ -686,11 +686,11 @@ describe('createExtensionAgentSessionManager', () => {
       expect(trpc.activeSessions.list.query).not.toHaveBeenCalled();
     });
 
-    it('retries an empty page while the session is active', async () => {
+    it('retries an empty page while the session is running', async () => {
       vi.useFakeTimers();
       try {
         const trpc = makeTrpcMock();
-        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID }] });
+        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
         trpc.activeSessions.list.query = listQuery;
         const pageQuery = vi
           .fn()
@@ -730,6 +730,163 @@ describe('createExtensionAgentSessionManager', () => {
           includeCloudAgentSessions: true,
           organizationId: null,
         });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps retrying a running session until a late-persisted page arrives', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        trpc.activeSessions.list.query = mockQuery({
+          sessions: [{ id: SESSION_ID, status: 'busy' }],
+        });
+        const pageQuery = vi.fn();
+        /*
+         * The persisted page can lag the whole running turn: only the
+         * eleventh read carries messages while the first ten stay empty.
+         */
+        for (let index = 0; index < 10; index += 1) {
+          pageQuery.mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID });
+        }
+        pageQuery.mockResolvedValueOnce({
+          history: {
+            messages: [
+              {
+                info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                parts: [],
+              },
+            ],
+            nextCursor: null,
+            omittedItemCount: 0,
+          },
+          kiloSessionId: SESSION_ID,
+        });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        expect(pageQuery).toHaveBeenCalledTimes(11);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps retrying an empty message page (not just null history) while the session is running', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        trpc.activeSessions.list.query = mockQuery({
+          sessions: [{ id: SESSION_ID, status: 'busy' }],
+        });
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({
+            history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+            kiloSessionId: SESSION_ID,
+          })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        expect(pageQuery).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not retry a listed but idle session (a fresh session start is not delayed)', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        trpc.activeSessions.list.query = mockQuery({
+          sessions: [{ id: SESSION_ID, status: 'idle' }],
+        });
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Advance the timers so the removed idle-gate loop can settle.
+        // The assertion below then distinguishes the two.
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await resultPromise;
+
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+        /*
+         * No delayed-history retry runs for an idle session. The page
+         * resolves on the first read, so the session's own first send is
+         * never blocked.
+         */
+        expect(pageQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops retrying a short time after the session stops running', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'busy' }] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'idle' }] });
+        trpc.activeSessions.list.query = listQuery;
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({ kind: 'success', messages: [] });
+        /*
+         * The retry stops once the session is no longer running. The expected
+         * page count is the initial read, five retry reads, and five grace
+         * reads; the idle re-check is an active-sessions call.
+         */
+        expect(pageQuery).toHaveBeenCalledTimes(11);
+        expect(listQuery).toHaveBeenCalledTimes(2);
       } finally {
         vi.useRealTimers();
       }

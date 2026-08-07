@@ -23,12 +23,33 @@ import { getCloudAgentWsUrl } from './cloud-agent-config';
 const FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS = 1000;
 /** Match the mobile `SPAWNED_NOT_FOUND_MAX_ATTEMPTS` for NOT_FOUND retry parity. */
 const SPAWNED_NOT_FOUND_MAX_ATTEMPTS = 8;
-/** Session-ingest persistence can lag while an active CLI turn is running. */
-const ACTIVE_HISTORY_MAX_RETRIES = 8;
+/**
+ * Safety cap for the running-session history retry. The retry normally ends
+ * when the persisted page carries messages or the session stops running (see
+ * `ACTIVE_HISTORY_RECHECK_INTERVAL`); this bound only limits how long a
+ * genuinely long-running turn can hold the initial history read open.
+ */
+const ACTIVE_HISTORY_MAX_RETRIES = 120;
+/** Re-verify the session is still running every N retry reads. */
+const ACTIVE_HISTORY_RECHECK_INTERVAL = 5;
+/**
+ * Extra reads after the session stops running. The CLI batches session-ingest
+ * until the turn completes, and the ingest can land a moment after the
+ * busy→idle status change, so keep polling briefly before applying the empty
+ * page.
+ */
+const ACTIVE_HISTORY_END_GRACE_READS = 5;
 
 const skipBatchOptions = { context: { skipBatch: true } } as const;
 
 type TrpcClient = ReturnType<typeof createTRPCClient<MobileRouter>>;
+
+/** Shape of the paged `getSessionMessagesPage` query result. */
+type SessionMessagesPageResult = Awaited<
+  ReturnType<TrpcClient['cliSessionsV2']['getSessionMessagesPage']['query']>
+>;
+/** Shape of the `activeSessions.list` query result used for liveness rechecks. */
+type ActiveSessionsResult = Awaited<ReturnType<TrpcClient['activeSessions']['list']['query']>>;
 
 // ---------------------------------------------------------------------------
 // Error code extraction — extension-owned copy of the mobile classifier
@@ -121,6 +142,91 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
 }
 
 /**
+ * True when the page carries no persisted SDK messages yet.
+ *
+ * Both a `null` history (the ingest DO has no session or message rows) and a
+ * page with zero messages (a session row exists but no message has been
+ * materialized) mean session-ingest persistence is still catching up while a
+ * live CLI turn runs. Typed failure variants are not "empty" — they pass
+ * through so the caller can surface retry semantics.
+ */
+function isPageWithoutPersistedMessages(history: KiloSdkMessageHistory | null): boolean {
+  if (history === null) {
+    return true;
+  }
+  return isHistoryPage(history) && history.messages.length === 0;
+}
+
+/**
+ * Read the paged query's history in its server-validated shape. The tRPC
+ * result carries typed failure variants alongside the page, so the shape is
+ * narrowed at the transport boundary.
+ */
+function pageHistory(result: SessionMessagesPageResult): KiloSdkMessageHistory | null {
+  // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
+  return result.history as KiloSdkMessageHistory | null;
+}
+
+/**
+ * Keep reading a running session's history page until it carries persisted
+ * messages, the session stops running, or the safety bound is reached.
+ */
+async function readActiveHistoryWithRetry(
+  initialResult: SessionMessagesPageResult,
+  {
+    fetchActiveSessions,
+    isSessionWorking,
+    queryPage,
+  }: {
+    queryPage: () => Promise<SessionMessagesPageResult>;
+    fetchActiveSessions: () => Promise<ActiveSessionsResult>;
+    isSessionWorking: (active: ActiveSessionsResult) => boolean;
+  }
+): Promise<SessionMessagesPageResult> {
+  let result = initialResult;
+  for (let attempt = 0; attempt < ACTIVE_HISTORY_MAX_RETRIES; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- retry persistence after a fixed delay
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- retries must observe ordered history
+    result = await queryPage();
+    if (!isPageWithoutPersistedMessages(pageHistory(result))) {
+      return result;
+    }
+    if ((attempt + 1) % ACTIVE_HISTORY_RECHECK_INTERVAL === 0) {
+      // eslint-disable-next-line no-await-in-loop -- ordered liveness recheck between retries
+      const current = await fetchActiveSessions();
+      if (!isSessionWorking(current)) {
+        return readPageInEndGraceWindow(result, queryPage);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Extra reads after the session stops running. The CLI batches session-ingest
+ * until the turn completes, and the ingest can land a moment after the
+ * busy→idle status change, so keep polling briefly before applying the empty
+ * page.
+ */
+async function readPageInEndGraceWindow(
+  initialResult: SessionMessagesPageResult,
+  queryPage: () => Promise<SessionMessagesPageResult>
+): Promise<SessionMessagesPageResult> {
+  let result = initialResult;
+  for (let grace = 0; grace < ACTIVE_HISTORY_END_GRACE_READS; grace += 1) {
+    // eslint-disable-next-line no-await-in-loop -- bounded grace reads after turn end
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- bounded grace reads after turn end
+    result = await queryPage();
+    if (!isPageWithoutPersistedMessages(pageHistory(result))) {
+      break;
+    }
+  }
+  return result;
+}
+
+/**
  * Pin a replayed page to the active kilo session.
  *
  * The manager renders the root transcript only for messages whose
@@ -154,42 +260,53 @@ function pinPageToSession(
  * `fetchMobileSessionSnapshotPage` adapter and pins the replayed page to the
  * requested `kiloSessionId` so the manager's root transcript filter keeps the
  * loaded history on screen.
+ *
+ * A running CLI session can read empty for a long stretch: the CLI batches
+ * session-ingest until the turn completes, so the persisted page lags the
+ * live turn. For such a session the bounded retry keeps reading until the
+ * page carries messages or the session stops running, instead of latching an
+ * empty transcript that later persistence can never fill.
  */
 async function fetchExtensionSessionSnapshotPage(
   trpcClient: TrpcClient,
   kiloSessionId: KiloSessionId,
   options: { cursor?: string; organizationId: string | null }
 ): Promise<SessionSnapshotPageOutcome | null> {
-  const queryPage = (): Promise<
-    Awaited<ReturnType<TrpcClient['cliSessionsV2']['getSessionMessagesPage']['query']>>
-  > =>
+  const queryPage = (): Promise<SessionMessagesPageResult> =>
     trpcClient.cliSessionsV2.getSessionMessagesPage.query({
       session_id: kiloSessionId,
       ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
     });
-
-  let result = await queryPage();
-  if (result.history === null && options.cursor === undefined) {
-    const active = await trpcClient.activeSessions.list.query({
+  const fetchActiveSessions = (): Promise<ActiveSessionsResult> =>
+    trpcClient.activeSessions.list.query({
       includeCloudAgentSessions: true,
       organizationId: options.organizationId,
     });
-    const isActive = active.sessions.some(session => session.id === kiloSessionId);
-    if (isActive) {
-      for (let attempt = 0; attempt < ACTIVE_HISTORY_MAX_RETRIES; attempt += 1) {
-        // eslint-disable-next-line no-await-in-loop -- retry persistence after a fixed delay
-        await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
-        // eslint-disable-next-line no-await-in-loop -- retries must observe ordered history
-        result = await queryPage();
-        if (result.history !== null) {
-          break;
-        }
-      }
+  const isSessionWorking = (active: ActiveSessionsResult): boolean =>
+    active.sessions.some(session => session.id === kiloSessionId && session.status !== 'idle');
+
+  let result = await queryPage();
+  if (options.cursor === undefined && isPageWithoutPersistedMessages(pageHistory(result))) {
+    /*
+     * Only a non-idle session gets the delayed-history retry. A freshly
+     * created session is idle on its first read: its history is empty by
+     * definition, and its own first prompt is sent immediately after this
+     * page resolves and rendered via the live CLI echo — blocking there
+     * would delay the very send that starts the turn. A reopened running
+     * session has a persisted user message that only this page can replay,
+     * so keep reading until session-ingest persistence catches up.
+     */
+    const active = await fetchActiveSessions();
+    if (isSessionWorking(active)) {
+      result = await readActiveHistoryWithRetry(result, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
-  const history = result.history as KiloSdkMessageHistory | null;
+  const history = pageHistory(result);
   if (history === null) {
     return pinPageToSession(
       {

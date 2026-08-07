@@ -4,6 +4,7 @@ import {
   getEffectiveModelDecision,
   resolveOrganizationDefaultModelPolicy,
 } from '@/lib/organizations/effective-model-access.server';
+import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 /**
  * Get a default model that is allowed for an organization.
@@ -19,16 +20,17 @@ export async function getDefaultAllowedModel(
   }
 
   // Resolve the organization's default policy once. When it imposes no
-  // restriction (non-Enterprise, or an unrestricted grant with no deny list and
-  // no provider ceiling), return `globalDefault` exactly as the pre-policy code
-  // did. The organization's own `default_model` is only consulted on the
-  // restricted path below, after `isAllowed` accepts it, because it may hold a
-  // non-routable virtual id such as `organization-auto`.
+  // restriction (non-Enterprise with an unrestricted grant), return
+  // `globalDefault` exactly as the pre-policy code did. The organization's own
+  // `default_model` is only consulted on the restricted path below, after
+  // `isAllowed` accepts it, because it may hold a non-routable virtual id such
+  // as `organization-auto`.
   const policy = await resolveOrganizationDefaultModelPolicy({ organizationId });
   const isUnrestricted =
     policy.memberGrant.mode === 'unrestricted' &&
     policy.organizationModelDenyList.length === 0 &&
-    !policy.organizationProviderCeiling;
+    !policy.organizationProviderCeiling &&
+    !policy.requireModelInCurrentSnapshot;
   if (isUnrestricted) {
     return globalDefault;
   }
@@ -53,7 +55,12 @@ export async function getDefaultAllowedModel(
     }
   }
 
-  // All models were blocked; fall back to global default
-  console.warn('[SlackBot] No allowed model found; org policy blocks all preferred models');
-  return globalDefault;
+  const providerIndex = await getModelIdToProviderSlugsIndex();
+  for (const modelId of providerIndex.keys()) {
+    if (await isAllowed(modelId)) {
+      return modelId;
+    }
+  }
+
+  throw new Error('No allowed default model is available for this organization');
 }

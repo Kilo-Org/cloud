@@ -3,7 +3,7 @@ import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -351,11 +351,40 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getPropertyPath(target: unknown, path: string): unknown {
+  let current = target;
+  for (const segment of path.split('.')) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+function rewriteThoughtContent(delta: unknown, path: string) {
+  if (
+    !isRecord(delta) ||
+    typeof delta.content !== 'string' ||
+    getPropertyPath(delta, path) !== true
+  ) {
+    return;
+  }
+
+  delta.reasoning_content = delta.content;
+  delete delta.content;
+}
+
 export async function rewriteModelResponse_ChatCompletions(
   response: Response,
   removeCost: boolean,
   capture: RequestLogCapture | null,
-  vercelRequestId: string | null
+  vercelRequestId: string | null,
+  responseTransforms: ProviderResponseTransforms | null
 ) {
   const headers = getOutputHeaders(response);
 
@@ -430,11 +459,17 @@ export async function rewriteModelResponse_ChatCompletions(
             });
           }
 
-          const delta = json.choices?.[0]?.delta;
-          if (delta) {
+          for (const choice of json.choices ?? []) {
+            const delta = choice.delta;
+            if (!delta) {
+              continue;
+            }
             // Some APIs set null here, which is not accepted by OpenCode
-            if (delta?.role === null) {
+            if (delta.role === null) {
               delete delta.role;
+            }
+            if (responseTransforms?.thoughtContentMapping) {
+              rewriteThoughtContent(delta, responseTransforms.thoughtContentMapping);
             }
           }
 
@@ -836,7 +871,8 @@ export async function rewriteModelResponse(
   model: string,
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
-  logging: RequestLoggingParams
+  logging: RequestLoggingParams,
+  responseTransforms: ProviderResponseTransforms | null
 ): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const requiresCostRemoval =
@@ -850,7 +886,8 @@ export async function rewriteModelResponse(
       response,
       requiresCostRemoval,
       capture,
-      vercelRequestId
+      vercelRequestId,
+      responseTransforms
     );
   }
   if (kind === 'responses') {

@@ -50,7 +50,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 3,
+          weight: 9,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -151,7 +151,7 @@ export function shouldRedactModelNameInMicrodollarUsage(
 }
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+  return provider === 'experiment' || isKiloStealthModel(model);
 }
 
 export function isDeadFreeModel(model: string): boolean {

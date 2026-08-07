@@ -35,10 +35,15 @@ export type TransformRequestContext = {
 
 export type GatewayChatApiKind = GatewayRequest['kind'];
 
+export type ProviderResponseTransforms = {
+  thoughtContentMapping: string | null;
+};
+
 export type Provider = {
   id: ProviderId;
   apiUrl: string;
   apiKey: string;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
+  responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;
 };

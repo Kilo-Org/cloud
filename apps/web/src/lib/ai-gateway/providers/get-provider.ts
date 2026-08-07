@@ -80,6 +80,7 @@ async function checkDirectBYOK(
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
       supportedChatApis: directByok.supported_chat_apis,
+      responseTransforms: null,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);

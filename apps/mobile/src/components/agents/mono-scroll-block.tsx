@@ -41,6 +41,11 @@ type MonoScrollSheetContextValue = {
 const MonoScrollSheetContext = createContext<MonoScrollSheetContextValue | null>(null);
 export const MonoScrollSheetProvider = MonoScrollSheetContext.Provider;
 
+/** Sheet mono mode/presence for any block that joins the mono contract. */
+export function useMonoScrollSheet(): MonoScrollSheetContextValue | null {
+  return useContext(MonoScrollSheetContext);
+}
+
 /**
  * Monospace block for tool-card / preparation output.
  *
@@ -81,7 +86,7 @@ export function MonoScrollBlock({
   inTranscript = false,
 }: Readonly<MonoScrollBlockProps>) {
   const textSelectable = useTranscriptTextSelectable();
-  const sheet = useContext(MonoScrollSheetContext);
+  const sheet = useMonoScrollSheet();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
   const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);

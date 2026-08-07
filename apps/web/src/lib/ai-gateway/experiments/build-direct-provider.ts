@@ -88,6 +88,61 @@ function mapThoughtSignatures(context: TransformRequestContext, path: string) {
   }
 }
 
+function renameJsonRefProperties(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.reduce<boolean>(
+      (changed, item) => renameJsonRefProperties(item) || changed,
+      false
+    );
+  }
+
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  let changed = false;
+  for (const [key, nestedValue] of Object.entries(value)) {
+    changed = renameJsonRefProperties(nestedValue) || changed;
+    if (key === '$ref') {
+      delete value.$ref;
+      value._ref = nestedValue;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function sanitizeJsonRefContent(content: string): string {
+  try {
+    const result: unknown = JSON.parse(content);
+    return renameJsonRefProperties(result) ? JSON.stringify(result) : content;
+  } catch {
+    return content;
+  }
+}
+
+function sanitizeJsonRefToolResults(context: TransformRequestContext) {
+  if (context.request.kind !== 'chat_completions') {
+    return;
+  }
+
+  for (const message of context.request.body.messages) {
+    if (message.role !== 'tool') {
+      continue;
+    }
+
+    if (typeof message.content === 'string') {
+      message.content = sanitizeJsonRefContent(message.content);
+    } else {
+      for (const part of message.content) {
+        if (part.type === 'text') {
+          part.text = sanitizeJsonRefContent(part.text);
+        }
+      }
+    }
+  }
+}
+
 async function compressWithHeadroom(
   context: TransformRequestContext,
   compression: CustomLlmCompression
@@ -147,6 +202,9 @@ export function buildDirectProvider(
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
     supportedChatApis,
+    responseTransforms: upstream.thought_content_mapping
+      ? { thoughtContentMapping: upstream.thought_content_mapping }
+      : null,
     async transformRequest(context) {
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;
@@ -180,6 +238,9 @@ export function buildDirectProvider(
       }
       if (upstream.thought_signature_mapping) {
         mapThoughtSignatures(context, upstream.thought_signature_mapping);
+      }
+      if (upstream.sanitize_ref_fields) {
+        sanitizeJsonRefToolResults(context);
       }
     },
   };

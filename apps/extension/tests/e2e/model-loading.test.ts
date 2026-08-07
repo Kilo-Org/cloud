@@ -7,6 +7,7 @@ import {
   startFixtureServer,
 } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
+import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
 const orgOneId = 'org-1';
 const orgTwoId = 'org-2';
@@ -126,7 +127,7 @@ test('model catalog failures can be retried', async () => {
   }
 });
 
-test('switching credit accounts clears the model while the next catalog loads', async () => {
+test('switching credit accounts keeps the conversation model and blocks sending until the next catalog loads', async () => {
   const fixture = await startFixtureServer();
   const { promise: pendingOrgTwoModels, resolve: releaseOrgTwoModels } =
     Promise.withResolvers<void>();
@@ -164,7 +165,7 @@ test('switching credit accounts clears the model while the next catalog loads', 
     await sidePanel.getByLabel('Close settings').click();
 
     await expect(sidePanel.getByLabel('Model')).toBeDisabled();
-    await expect(sidePanel.getByLabel('Model')).toContainText('Loading models...');
+    await expect(sidePanel.getByLabel('Model')).toContainText('anthropic/claude-sonnet-4');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeDisabled();
 
     releaseOrgTwoModels();
@@ -227,6 +228,38 @@ test('stale organization model loads cannot overwrite the current catalog', asyn
     await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
   } finally {
     releaseOrgOneModels();
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('each conversation tab shows its own stored model', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      models: [
+        { id: 'model/alpha', name: 'Alpha', preferredIndex: 0, variants: { medium: {} } },
+        { id: 'model/beta', name: 'Beta', variants: { medium: {} } },
+      ],
+    });
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await expectSelectedModelId(sidePanel, 'model/alpha');
+
+    await sidePanel.getByLabel('New conversation').click();
+    await selectModelById(sidePanel, 'model/beta');
+
+    await sidePanel.getByRole('tab', { name: /Conversation 1/u }).click();
+    await expectSelectedModelId(sidePanel, 'model/alpha');
+
+    await sidePanel.getByRole('tab', { name: /Conversation 2/u }).click();
+    await expectSelectedModelId(sidePanel, 'model/beta');
+  } finally {
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });
   }

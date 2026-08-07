@@ -24,6 +24,7 @@ import {
   modelSummaries,
   routingTableCandidates,
   routingTables,
+  runLaneFailures,
   runModels,
 } from './db-schema';
 import { pickClassifierWinner } from './winner';
@@ -49,6 +50,12 @@ const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 // INSERT comfortably under D1's 100-variable ceiling; publishing is infrequent,
 // so smaller statements are preferable to risking a skipped routing-table update.
 const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
+
+// Run model rows bind 5 values per row. Keep each INSERT comfortably under D1's
+// 100-variable ceiling; the profile drain claims batches of up to 33 entries,
+// and an unchunked 33-row insert fails with "too many SQL variables", which
+// stranded every pending Benchmark profile in production.
+const RUN_MODEL_INSERT_BATCH_SIZE = 18;
 
 // ---------------------------------------------------------------------------
 // Row mapping helpers
@@ -243,7 +250,9 @@ export async function insertRun(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [insertRunStmt];
 
   if (models.length > 0) {
-    stmts.push(orm.insert(runModels).values(models));
+    for (let i = 0; i < models.length; i += RUN_MODEL_INSERT_BATCH_SIZE) {
+      stmts.push(orm.insert(runModels).values(models.slice(i, i + RUN_MODEL_INSERT_BATCH_SIZE)));
+    }
   }
 
   for (let i = 0; i < carriedSummaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {
@@ -319,13 +328,23 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
     });
 }
 
-export async function countCaseResults(db: D1Database, runId: string): Promise<number> {
-  const row = await drizzle(db)
-    .select({ n: count() })
+export type LaneCaseCount = { model: string; variant: string; rep: number; n: number };
+
+/** Per-lane case counts for run-completion accounting. Variant is storage form. */
+export async function countCaseResultsByLane(
+  db: D1Database,
+  runId: string
+): Promise<LaneCaseCount[]> {
+  return drizzle(db)
+    .select({
+      model: caseResults.model,
+      variant: caseResults.variant,
+      rep: caseResults.rep,
+      n: count(),
+    })
     .from(caseResults)
     .where(eq(caseResults.run_id, runId))
-    .get();
-  return row?.n ?? 0;
+    .groupBy(caseResults.model, caseResults.variant, caseResults.rep);
 }
 
 export async function getCaseResults(db: D1Database, runId: string): Promise<CaseResultRow[]> {
@@ -618,6 +637,124 @@ export async function markProfilesFailedForRun(
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   await markProfilesFailedForRunStatement(drizzle(db), runId, failureReason, nowIso);
+}
+
+/**
+ * Production UPDATE for the per-entry failed transition at profile-run
+ * completion. Same run_id + status='running' no-clobber guard as the
+ * whole-run variants. Exported for honest SQLite tests.
+ */
+export function markProfilesFailedForEntriesStatement(
+  orm: ReturnType<typeof drizzle>,
+  runId: string,
+  /** Storage-form variant keys ('' = default variant). */
+  entries: readonly { model: string; variant: string }[],
+  failureReason: string,
+  nowIso: string
+) {
+  // or(...[]) evaluates to undefined and the WHERE would degrade to run_id +
+  // status='running', failing every running entry of the run. Refuse the
+  // destructive form at the boundary instead of relying on caller guards.
+  if (entries.length === 0) {
+    throw new Error('markProfilesFailedForEntriesStatement requires at least one entry');
+  }
+  return orm
+    .update(benchmarkProfiles)
+    .set({
+      status: 'failed',
+      failure_reason: boundProfileFailureReason(failureReason),
+      updated_at: nowIso,
+      completed_at: nowIso,
+    })
+    .where(
+      and(
+        eq(benchmarkProfiles.run_id, runId),
+        eq(benchmarkProfiles.status, 'running'),
+        or(
+          ...entries.map(e =>
+            and(eq(benchmarkProfiles.model, e.model), eq(benchmarkProfiles.variant, e.variant))
+          )
+        )
+      )
+    );
+}
+
+/**
+ * Transition the given entries claimed by this run to failed. Only rows still
+ * pointing at this run_id and still running are updated.
+ */
+export async function markProfilesFailedForEntries(
+  db: D1Database,
+  runId: string,
+  entries: readonly { model: string; variant: string }[],
+  failureReason: string,
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  if (entries.length === 0) return;
+  await markProfilesFailedForEntriesStatement(drizzle(db), runId, entries, failureReason, nowIso);
+}
+
+// ---------------------------------------------------------------------------
+// Lane failures (dead-lettered queue messages)
+// ---------------------------------------------------------------------------
+
+export type RunLaneFailureRow = typeof runLaneFailures.$inferSelect;
+
+/**
+ * Production INSERT for lane-death records. ON CONFLICT DO NOTHING so DLQ
+ * redelivery or several dead chunks of one lane never throw. Exported for
+ * honest SQLite tests.
+ */
+export function recordLaneFailureStatement(
+  orm: ReturnType<typeof drizzle>,
+  row: {
+    runId: string;
+    model: string;
+    /** Storage form ('' = default variant). */
+    variant: string;
+    rep: number;
+    chunk: number;
+    shard: number;
+    failedAtIso: string;
+  }
+) {
+  return orm
+    .insert(runLaneFailures)
+    .values({
+      run_id: row.runId,
+      model: row.model,
+      variant: row.variant,
+      rep: row.rep,
+      chunk: row.chunk,
+      shard: row.shard,
+      failed_at: row.failedAtIso,
+    })
+    .onConflictDoNothing();
+}
+
+/** Record that a run's lane chunk dead-lettered. Variant in storage form. */
+export async function recordLaneFailure(
+  db: D1Database,
+  row: {
+    runId: string;
+    model: string;
+    /** Storage form ('' = default variant). */
+    variant: string;
+    rep: number;
+    chunk: number;
+    shard: number;
+  },
+  failedAtIso: string = new Date().toISOString()
+): Promise<void> {
+  await recordLaneFailureStatement(drizzle(db), { ...row, failedAtIso });
+}
+
+/** Lane-death records of a run, at (model, variant, rep, chunk, shard) granularity. */
+export async function listLaneFailures(
+  db: D1Database,
+  runId: string
+): Promise<RunLaneFailureRow[]> {
+  return drizzle(db).select().from(runLaneFailures).where(eq(runLaneFailures.run_id, runId));
 }
 
 /**

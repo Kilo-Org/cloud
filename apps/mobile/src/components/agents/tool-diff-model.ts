@@ -16,10 +16,13 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 import { languageForPath } from '@/lib/pr-review/diff/highlight';
 
-const EDIT_CHARACTER_CAP = 1000;
-const EDIT_LINE_CAP = 100;
-const WRITE_CHARACTER_CAP = 2000;
-const WRITE_LINE_CAP = 200;
+// Sized for the scrolling detail sheet: an order of magnitude above the old
+// transcript-preview caps (1000/2000) because the sheet scrolls and only one
+// body renders at a time.
+const EDIT_CHARACTER_CAP = 10_000;
+const EDIT_LINE_CAP = 500;
+const WRITE_CHARACTER_CAP = 20_000;
+const WRITE_LINE_CAP = 1000;
 
 export type ToolDiffModel = {
   lines: readonly ParsedDiffLine[];

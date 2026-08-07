@@ -84,9 +84,10 @@ pending → running → ready
 - **running**: set when a profile run claims the entries at `startRun`.
 - **ready**: set when that profile run completes successfully (`run_id`
   provenance points at the measuring run).
-- **failed**: set when the run fails (enqueue, timeout sweep, etc.). Only rows
-  still pointing at that `run_id` transition — a newer pending/ready row is
-  never clobbered.
+- **failed**: set when the run fails (enqueue, timeout sweep, etc.) — or, at
+  profile-run completion, per entry whose lane dead-lettered while the run's
+  other entries become `ready`. Only rows still pointing at that `run_id`
+  transition — a newer pending/ready row is never clobbered.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
 exact variant match the live decider engine. Stale rows are never returned as
@@ -204,24 +205,37 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   unless the dev runner pins the arm64 manifest digest
   (`MINIFLARE_CONTAINER_EGRESS_IMAGE`) — already handled by the dev runner.
 
-## Debugging the DLQ
+## Dead-letter handling (lane failure)
 
 Failed queue messages land in `auto-routing-benchmark-dlq` after `max_retries`
 (6) on `auto-routing-benchmark-jobs`. A decider message is one
-(model, repetition, shard, chunk) job, so a DLQ'd message means that chunk never
-produced results; its model's summaries for the affected route(s) will be
-missing or incomplete and `finalizeRunIfComplete` will mark the run accordingly.
+(model, repetition, shard, chunk) job, and later chunks are chained from it —
+so a DLQ'd message kills its lane's remaining cases.
 
-To inspect / handle:
+The worker consumes the DLQ itself: each dead message is recorded in
+`run_lane_failures`, and run finalization is lane-aware. A run completes once
+every (model, variant, rep) lane has either all its case rows or a recorded
+lane death — a single dead model can no longer wedge the whole run.
 
-- **Prod**: read the DLQ from the Cloudflare dashboard (Workers → Queues →
-  `auto-routing-benchmark-dlq`) or `wrangler queues` tooling; the message body is
-  the JSON job (`runId`, `model`, `rep`, `shard`, `shardCount`, `chunk`, case ids).
-- **Replay**: re-run the affected model with the admin `force` toggle once the
-  underlying cause (OpenRouter outage, container image, bad case) is fixed —
-  carried summaries mean only the re-triggered model is re-benchmarked.
-- **Declare failed**: a run with a wedged/dead `running` row is swept to `failed`
-  on the next `GET /admin/runs`, freeing the one-active-run-per-kind slot.
+- **Profile runs** complete per-entry: entries whose lanes all finished go
+  `ready`; entries with a dead lane go `failed` ("Benchmark lane
+  dead-lettered…"; the owner's Retry re-admits them, quota-charged).
+- **Platform runs** fail fast with the dead lane named in the run error —
+  publishing a partial routing table would silently drop a candidate from
+  routing decisions, so the previous table stays live.
+- **Backstop**: the 6h stale sweep still fails wedged `running` rows on the
+  next `GET /admin/runs` / run start / scheduled sync, for failures that never
+  reach the DLQ (e.g. a throwing consumer).
+
+To inspect:
+
+- **Prod**: Cloudflare dashboard (Workers → Queues →
+  `auto-routing-benchmark-dlq`); the message body is the JSON job (`runId`,
+  `model`, `rep`, `shard`, `chunk`, case ids). Recorded lane deaths are
+  queryable: `SELECT * FROM run_lane_failures WHERE run_id = '…'`.
+- **Replay**: failed profile entries re-admit via the owner's Retry; platform
+  candidates re-measure on the next run (carried summaries mean only models
+  without current results re-run).
 
 ## Commands
 

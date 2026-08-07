@@ -116,8 +116,15 @@ function dataObjects(sse: string): unknown[] {
     .map(payload => JSON.parse(payload));
 }
 
+const rewriteChatCompletionsWithoutTransforms: typeof rewriteModelResponse_Messages = (
+  response,
+  removeCost,
+  capture,
+  vercelRequestId
+) => rewriteModelResponse_ChatCompletions(response, removeCost, capture, vercelRequestId, null);
+
 const rewriters = [
-  ['Chat Completions', rewriteModelResponse_ChatCompletions],
+  ['Chat Completions', rewriteChatCompletionsWithoutTransforms],
   ['Messages', rewriteModelResponse_Messages],
   ['Responses', rewriteModelResponse_Responses],
 ] as const;
@@ -206,7 +213,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const json = await result.json();
 
       expect(json.model).toBe('upstream-model');
@@ -229,7 +236,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const json = await result.json();
 
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
@@ -242,7 +249,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'application/json' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
 
       expect(result.status).toBe(502);
       expect(await result.text()).toBe('not-json{');
@@ -270,7 +277,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       );
 
       try {
-        const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+        const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
         await reader?.read();
@@ -295,7 +302,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
       const events = dataObjects(sse) as Array<{ error?: { code: number; type: string } }>;
 
@@ -311,7 +318,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -324,6 +331,27 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(dataPayloads(sse)).toContain('[DONE]');
     });
 
+    test('moves marked delta content to reasoning content', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"flags":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"flags":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, {
+        thoughtContentMapping: 'extra_content.flags.thought',
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_content: 'first thought',
+        extra_content: { flags: { thought: true } },
+      });
+      expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
+      expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });
+    });
+
     test('does not treat a null error field as terminal', async () => {
       const upstream = sseResponse(
         'data: {"id":"gen-chat","error":null,"choices":[]}\n\n' +
@@ -331,7 +359,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
 
       expect(sse).toContain('still streaming');
@@ -350,7 +378,8 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         upstream,
         true,
         capture,
-        'iad1::terminal-request'
+        'iad1::terminal-request',
+        null
       );
       const sse = await readOutputStream(result);
 
@@ -375,7 +404,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"model":"upstream-model","usage":{"cost":1,"is_byok":true,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{}}}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -399,7 +428,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         ': openrouter heartbeat\n\n' + 'data: {"model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
       const sse = await readOutputStream(result);
 
       expect(sse).toContain(': KILO PROCESSING');
@@ -411,7 +440,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'text/event-stream' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, null);
 
       expect(await readOutputStream(result)).toBe('');
     });
@@ -699,7 +728,7 @@ describe.each([
   [
     'Chat Completions',
     'chat_completions',
-    rewriteModelResponse_ChatCompletions,
+    rewriteChatCompletionsWithoutTransforms,
     'data: {"id":"gen-chat","choices":[]}\n\n',
     'data: {"error":{"code":429,"message":"rate limited"}}\n\n',
     'gen-chat',
@@ -774,7 +803,8 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      makeLogging({ organization_id: KILO_ORGANIZATION_ID })
+      makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
+      null
     );
 
     expect(result).not.toBeNull();
@@ -800,7 +830,8 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
+      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      null
     );
 
     expect(await result.json()).toMatchObject({
@@ -821,7 +852,8 @@ describe('rewriteModelResponse', () => {
       'google/gemma-4-26b-a4b-it:free',
       'openrouter',
       'chat_completions',
-      makeLogging()
+      makeLogging(),
+      null
     );
 
     expect(result).not.toBeNull();
@@ -840,7 +872,8 @@ describe('rewriteModelResponse', () => {
       QWEN37_PLUS_MODEL_ID,
       'openrouter',
       'chat_completions',
-      makeLogging()
+      makeLogging(),
+      null
     );
 
     // The upstream-reported cost does not reflect the custom pricing, so it
@@ -858,7 +891,8 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
+      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      null
     );
 
     expect(result).not.toBeNull();
@@ -976,7 +1010,7 @@ describe('request log capture', () => {
       headers: { 'content-type': 'text/event-stream' },
     });
 
-    const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null);
+    const result = await rewriteModelResponse_ChatCompletions(upstream, true, capture, null, null);
     const reader = result.body?.getReader();
     await reader?.cancel();
 

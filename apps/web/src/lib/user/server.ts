@@ -1004,6 +1004,20 @@ export const authOptions: NextAuthOptions = {
           );
           token.ssoSourceOrganizationId = ssoAuthority.sourceOrganizationId;
         }
+
+        if (existingUser.is_admin) {
+          // Admin audit trail: identify which Kilocode admin authenticated.
+          // Emitted only after JWT creation is guaranteed to succeed.
+          logExceptInTest(
+            JSON.stringify({
+              event: 'admin_login_succeeded',
+              kiloUserId: existingUser.id,
+              email: existingUser.google_user_email,
+              provider: accountInfo.provider,
+              adminTier: existingUser.is_super_admin ? 'super_admin' : 'platform_admin',
+            })
+          );
+        }
       } catch (error) {
         captureException(error, {
           tags: {

@@ -5,6 +5,8 @@ import { clearToolImages, rememberToolImage } from '@/src/shared/agent-tool-imag
 import {
   getStreamingTextPartId,
   isMessageStreaming,
+  isSnapshotOnlyMessage,
+  shouldShowWorkingIndicator,
   toAgentConversationItems,
 } from './agents-conversation-adapter';
 
@@ -499,5 +501,146 @@ describe('streaming text part id', () => {
     ];
     expect(getStreamingTextPartId(messages)).toBeUndefined();
     expect(isMessageStreaming(messages[0]!)).toBe(false);
+  });
+});
+
+describe('working indicator', () => {
+  it('shows while streaming a message with only synthetic snapshot progress', () => {
+    const messages: StoredMessage[] = [
+      {
+        info: assistantInfo('msg-snap-live'),
+        parts: [
+          {
+            id: 'p-snap-live',
+            messageID: 'msg-snap-live',
+            sessionID: 'ses-1',
+            synthetic: true,
+            text: '⠋ Initializing snapshot…',
+            type: 'text' as const,
+          },
+        ],
+      },
+    ];
+    expect(shouldShowWorkingIndicator(true, messages)).toBe(true);
+  });
+
+  it('hides while streaming a message with live assistant output', () => {
+    const messages: StoredMessage[] = [
+      {
+        info: assistantInfo('msg-live'),
+        parts: [
+          {
+            id: 'p-snap',
+            messageID: 'msg-live',
+            sessionID: 'ses-1',
+            synthetic: true,
+            text: '⠋ Initializing snapshot…',
+            type: 'text' as const,
+          },
+          {
+            id: 'p-live',
+            messageID: 'msg-live',
+            sessionID: 'ses-1',
+            text: 'real output',
+            type: 'text' as const,
+          },
+        ],
+      },
+    ];
+    expect(shouldShowWorkingIndicator(true, messages)).toBe(false);
+  });
+
+  it('hides when the session is not streaming', () => {
+    const messages: StoredMessage[] = [
+      {
+        info: assistantInfo('msg-idle'),
+        parts: [
+          {
+            id: 'p-idle',
+            messageID: 'msg-idle',
+            sessionID: 'ses-1',
+            synthetic: true,
+            text: '⠋ Initializing snapshot…',
+            type: 'text' as const,
+          },
+        ],
+      },
+    ];
+    expect(shouldShowWorkingIndicator(false, messages)).toBe(false);
+  });
+
+  it('shows while streaming before any message exists', () => {
+    expect(shouldShowWorkingIndicator(true, [])).toBe(true);
+  });
+
+  it('shows when the newest message is a completed assistant message', () => {
+    const messages: StoredMessage[] = [
+      {
+        info: assistantInfo('msg-done', {
+          time: { completed: 2100, created: 2000 },
+        }),
+        parts: [
+          {
+            id: 'p-done',
+            messageID: 'msg-done',
+            sessionID: 'ses-1',
+            text: 'done',
+            type: 'text' as const,
+          },
+        ],
+      },
+    ];
+    expect(shouldShowWorkingIndicator(true, messages)).toBe(true);
+  });
+});
+
+describe('snapshot-only message detection', () => {
+  it('is true for a message made only of snapshot progress parts', () => {
+    const message: StoredMessage = {
+      info: assistantInfo('msg-snap'),
+      parts: [
+        {
+          id: 'p-snap-1',
+          messageID: 'msg-snap',
+          sessionID: 'ses-1',
+          synthetic: true,
+          text: '⠋ Initializing snapshot…',
+          type: 'text' as const,
+        },
+      ],
+    };
+    expect(isSnapshotOnlyMessage(message)).toBe(true);
+  });
+
+  it('is false when a message also carries live text', () => {
+    const message: StoredMessage = {
+      info: assistantInfo('msg-mixed'),
+      parts: [
+        {
+          id: 'p-snap-2',
+          messageID: 'msg-mixed',
+          sessionID: 'ses-1',
+          synthetic: true,
+          text: '⠋ Initializing snapshot…',
+          type: 'text' as const,
+        },
+        {
+          id: 'p-mixed',
+          messageID: 'msg-mixed',
+          sessionID: 'ses-1',
+          text: 'result',
+          type: 'text' as const,
+        },
+      ],
+    };
+    expect(isSnapshotOnlyMessage(message)).toBe(false);
+  });
+
+  it('is false for a message with no parts', () => {
+    const message: StoredMessage = {
+      info: assistantInfo('msg-empty'),
+      parts: [],
+    };
+    expect(isSnapshotOnlyMessage(message)).toBe(false);
   });
 });

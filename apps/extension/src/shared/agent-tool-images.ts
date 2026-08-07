@@ -18,7 +18,7 @@ export const rememberToolImage = (
   if (!attachment.mime.startsWith('image/')) {
     return;
   }
-  if (attachment.dataUrl === '') {
+  if (!attachment.dataUrl.startsWith('data:image/')) {
     return;
   }
   toolImages.delete(partId);

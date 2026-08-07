@@ -22,6 +22,14 @@ describe('agent tool images', () => {
     expect(getToolImage('part-2')).toBeUndefined();
   });
 
+  it('drops an external image URL', () => {
+    rememberToolImage('part-ext', {
+      dataUrl: 'https://example.com/screenshot.png',
+      mime: 'image/png',
+    });
+    expect(getToolImage('part-ext')).toBeUndefined();
+  });
+
   it('reads back a stored image', () => {
     rememberToolImage('part-3', { dataUrl: 'data:image/png;base64,AAA=', mime: 'image/png' });
     expect(getToolImage('part-3')).toBe('data:image/png;base64,AAA=');

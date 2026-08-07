@@ -3,29 +3,10 @@ import type { JSX } from 'react';
 import type { StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
   getStreamingTextPartId,
-  isMessageStreaming,
+  shouldShowWorkingIndicator,
   toAgentConversationItems,
 } from './agents-conversation-adapter';
 import { ConversationList } from './conversation-list';
-
-/**
- * True when the agent is running but the newest message shows no live
- * assistant output — the gap between sending a prompt and the first
- * assistant token. The indicator fills that gap.
- */
-export const shouldShowWorkingIndicator = (
-  isStreaming: boolean,
-  messages: StoredMessage[]
-): boolean => {
-  if (!isStreaming) {
-    return false;
-  }
-  const last = messages.at(-1);
-  if (last === undefined) {
-    return true;
-  }
-  return !isMessageStreaming(last);
-};
 
 const WorkingIndicatorRow = (): JSX.Element => (
   <div className="flex justify-start">

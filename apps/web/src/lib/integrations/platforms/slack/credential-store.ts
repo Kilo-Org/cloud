@@ -44,6 +44,10 @@ export type WriteSlackCredentialInput = {
   refreshToken?: string | null;
 };
 
+export type SlackCredentialWriteOutcome =
+  | { status: 'written'; credential: SlackOAuthCredential }
+  | { status: 'skipped_existing' };
+
 /**
  * Creates or replaces the credential row for an integration.
  *
@@ -56,6 +60,34 @@ export type WriteSlackCredentialInput = {
 export async function writeSlackCredential(
   input: WriteSlackCredentialInput
 ): Promise<SlackOAuthCredential> {
+  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false });
+  if (outcome.status === 'skipped_existing') {
+    // Unreachable: only `onlyIfAbsent` can skip. Asserted rather than cast so a future
+    // change to the skip conditions cannot silently drop a credential write.
+    throw new Error('Slack credential write was skipped unexpectedly');
+  }
+  return outcome.credential;
+}
+
+/**
+ * Creates the credential row only when the integration does not have one yet.
+ *
+ * For callers whose token comes from a snapshot rather than from a live Slack
+ * response — the Step 2 backfill reads `platform_integrations.metadata` up front — a
+ * reinstall part-way through the run writes a fresh credential that a blind replace
+ * would overwrite with the by-then-revoked snapshot token. Existence is therefore
+ * re-checked inside the same locked transaction as the write.
+ */
+export async function createSlackCredentialIfAbsent(
+  input: WriteSlackCredentialInput
+): Promise<SlackCredentialWriteOutcome> {
+  return upsertSlackCredential(input, { onlyIfAbsent: true });
+}
+
+async function upsertSlackCredential(
+  input: WriteSlackCredentialInput,
+  { onlyIfAbsent }: { onlyIfAbsent: boolean }
+): Promise<SlackCredentialWriteOutcome> {
   return db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildSlackCredentialLockKey(input.integrationId)}, 0))`
@@ -67,6 +99,8 @@ export async function writeSlackCredential(
       .where(eq(slack_oauth_credentials.platform_integration_id, input.integrationId))
       .limit(1)
       .for('update');
+
+    if (existing && onlyIfAbsent) return { status: 'skipped_existing' };
 
     const credentialId = existing?.id ?? randomUUID();
     const credentialVersion = (existing?.credential_version ?? 0) + 1;
@@ -114,14 +148,14 @@ export async function writeSlackCredential(
       if (!updated) {
         throw new Error('Slack credential was modified concurrently');
       }
-      return updated;
+      return { status: 'written', credential: updated };
     }
 
     const [created] = await tx
       .insert(slack_oauth_credentials)
       .values({ id: credentialId, platform_integration_id: input.integrationId, ...values })
       .returning();
-    return created;
+    return { status: 'written', credential: created };
   });
 }
 

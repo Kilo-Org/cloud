@@ -10,7 +10,9 @@
  *
  * Idempotent by design: integrations that already have a credential row are skipped
  * rather than re-encrypted, so re-running does not churn `credential_version` (each
- * bump invalidates the previous ciphertext, since the version is inside the AAD).
+ * bump invalidates the previous ciphertext, since the version is inside the AAD). The
+ * skip is enforced by the write itself, so a reinstall that lands mid-run keeps its
+ * fresh token instead of being overwritten by this run's older metadata snapshot.
  *
  * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints token material.
  *
@@ -26,7 +28,7 @@ import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { platform_integrations, slack_oauth_credentials } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
-import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
+import { createSlackCredentialIfAbsent } from '@/lib/integrations/platforms/slack/credential-store';
 import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack/credential-keyset';
 
 type SkipReason =
@@ -105,6 +107,9 @@ async function main(): Promise<void> {
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
     const batch = integrations.slice(offset, offset + batchSize);
 
+    // Cheap pre-filter only: it avoids opening a transaction per already-migrated
+    // integration. `createSlackCredentialIfAbsent` is what actually guarantees we never
+    // replace a row, since this snapshot can go stale before the write.
     const existingRows = await db
       .select({ integrationId: slack_oauth_credentials.platform_integration_id })
       .from(slack_oauth_credentials)
@@ -147,14 +152,18 @@ async function main(): Promise<void> {
       if (!execute) continue;
 
       try {
-        await writeSlackCredential({
+        const outcome = await createSlackCredentialIfAbsent({
           integrationId: integration.id,
           slackTeamId: teamId,
           owner,
           botToken,
           botUserId: readBotUserId(integration.metadata),
         });
-        migrated += 1;
+        if (outcome.status === 'skipped_existing') {
+          skipped.already_migrated += 1;
+        } else {
+          migrated += 1;
+        }
       } catch (error) {
         skipped.write_failed += 1;
         // Message only: the stack of an encryption failure can carry key material.

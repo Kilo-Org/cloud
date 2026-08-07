@@ -30,6 +30,7 @@ import {
 } from '@kilocode/db/schema';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
 import {
+  createSlackCredentialIfAbsent,
   decryptSlackBotToken,
   getSlackCredentialByIntegrationId,
   writeSlackCredential,
@@ -183,6 +184,44 @@ describe('writeSlackCredential', () => {
     expect(written.refresh_token_encrypted).not.toBeNull();
     expect(written.refresh_token_encrypted).not.toContain('xoxe-refresh-token');
     expect(written.access_token_expires_at).not.toBeNull();
+  });
+});
+
+describe('createSlackCredentialIfAbsent', () => {
+  it('creates the credential when the integration has none', async () => {
+    const outcome = await createSlackCredentialIfAbsent({
+      integrationId,
+      slackTeamId: teamId,
+      owner,
+      botToken: 'xoxb-backfilled-token',
+    });
+
+    if (outcome.status !== 'written') throw new Error('Expected the credential to be written');
+    expect(outcome.credential.credential_version).toBe(1);
+    expect(decryptSlackBotToken(outcome.credential, owner)).toBe('xoxb-backfilled-token');
+  });
+
+  it('leaves an existing credential untouched instead of replacing it', async () => {
+    await writeSlackCredential({
+      integrationId,
+      slackTeamId: teamId,
+      owner,
+      botToken: 'xoxb-reinstalled-token',
+    });
+
+    const outcome = await createSlackCredentialIfAbsent({
+      integrationId,
+      slackTeamId: teamId,
+      owner,
+      botToken: 'xoxb-stale-snapshot-token',
+    });
+
+    expect(outcome.status).toBe('skipped_existing');
+
+    const stored = await getSlackCredentialByIntegrationId(integrationId);
+    if (!stored) throw new Error('Expected a stored credential');
+    expect(stored.credential_version).toBe(1);
+    expect(decryptSlackBotToken(stored, owner)).toBe('xoxb-reinstalled-token');
   });
 });
 

@@ -6,6 +6,7 @@ import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
+import { OfflineBanner } from '@/components/offline-banner';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { OrganizationProvider } from '@/lib/organization-context';
@@ -26,6 +27,7 @@ export function AppRootProviders({ children }: { readonly children: ReactNode })
               <ActionSheetProvider>
                 <>
                   {children}
+                  <OfflineBanner />
                   <PortalHost />
                   {/*
                     Toaster mounts last so it renders above PortalHost overlays (sheets/dropdowns

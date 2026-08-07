@@ -15,7 +15,8 @@ import {
 
 function resetTimestamp(value: number | undefined): string | null {
   if (value === undefined || !Number.isFinite(value) || value <= 0) return null;
-  const date = new Date(value);
+  // BytePlus reports reset milestones as Unix timestamps in seconds.
+  const date = new Date(value * 1_000);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 

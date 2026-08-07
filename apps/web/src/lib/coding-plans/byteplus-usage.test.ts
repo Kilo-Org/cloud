@@ -16,6 +16,9 @@ jest.mock('@/lib/coding-plans/byteplus-control-plane', () => ({
 
 const mockedGetBytePlusSeatUsage = jest.mocked(getBytePlusSeatUsage);
 const fetchedAt = '2026-08-06T12:00:00.000Z';
+const shortTermResetMilestone = 1_781_280_000;
+const weeklyResetMilestone = 1_781_884_800;
+const monthlyResetMilestone = 1_783_000_000;
 
 beforeEach(() => {
   mockedGetBytePlusSeatUsage.mockReset();
@@ -29,9 +32,9 @@ describe('BytePlus usage normalization', () => {
           shortTermUsage: 12.5,
           weeklyUsage: 55,
           monthlyUsage: 99.25,
-          shortTermResetMilestone: 1_781_280_000_000,
-          weeklyResetMilestone: 1_781_884_800_000,
-          monthlyResetMilestone: 1_783_000_000_000,
+          shortTermResetMilestone,
+          weeklyResetMilestone,
+          monthlyResetMilestone,
         },
         fetchedAt
       )
@@ -41,19 +44,19 @@ describe('BytePlus usage normalization', () => {
         {
           id: 'short_term',
           remainingPercent: 87.5,
-          resetsAt: new Date(1_781_280_000_000).toISOString(),
+          resetsAt: new Date(shortTermResetMilestone * 1_000).toISOString(),
           period: { unit: 'hour', value: 5 },
         },
         {
           id: 'weekly',
           remainingPercent: 45,
-          resetsAt: new Date(1_781_884_800_000).toISOString(),
+          resetsAt: new Date(weeklyResetMilestone * 1_000).toISOString(),
           period: { unit: 'week', value: 1 },
         },
         {
           id: 'monthly',
           remainingPercent: 0.75,
-          resetsAt: new Date(1_783_000_000_000).toISOString(),
+          resetsAt: new Date(monthlyResetMilestone * 1_000).toISOString(),
           period: { unit: 'month', value: 1 },
         },
       ],
@@ -67,9 +70,9 @@ describe('BytePlus usage normalization', () => {
           shortTermUsage: 0,
           weeklyUsage: 100,
           monthlyUsage: 140,
-          shortTermResetMilestone: 1_781_280_000_000,
-          weeklyResetMilestone: 1_781_884_800_000,
-          monthlyResetMilestone: 1_783_000_000_000,
+          shortTermResetMilestone,
+          weeklyResetMilestone,
+          monthlyResetMilestone,
         },
         fetchedAt
       ).windows.map(window => window.remainingPercent)
@@ -81,11 +84,11 @@ describe('BytePlus usage normalization', () => {
       normalizeBytePlusUsage(
         {
           shortTermUsage: -1,
-          shortTermResetMilestone: 1_781_280_000_000,
+          shortTermResetMilestone,
           weeklyUsage: 50,
           weeklyResetMilestone: 0,
           monthlyUsage: 25,
-          monthlyResetMilestone: 1_783_000_000_000,
+          monthlyResetMilestone,
         },
         fetchedAt
       ).windows
@@ -93,7 +96,7 @@ describe('BytePlus usage normalization', () => {
       {
         id: 'monthly',
         remainingPercent: 75,
-        resetsAt: new Date(1_783_000_000_000).toISOString(),
+        resetsAt: new Date(monthlyResetMilestone * 1_000).toISOString(),
         period: { unit: 'month', value: 1 },
       },
     ]);
@@ -102,7 +105,7 @@ describe('BytePlus usage normalization', () => {
       normalizeBytePlusUsage(
         {
           shortTermUsage: Number.NaN,
-          shortTermResetMilestone: 1_781_280_000_000,
+          shortTermResetMilestone,
           weeklyUsage: 25,
           weeklyResetMilestone: Number.NaN,
           monthlyUsage: 1,
@@ -116,11 +119,11 @@ describe('BytePlus usage normalization', () => {
   it('calls the control-plane client and returns only the normalized snapshot', async () => {
     mockedGetBytePlusSeatUsage.mockResolvedValue({
       shortTermUsage: 10,
-      shortTermResetMilestone: 1_781_280_000_000,
+      shortTermResetMilestone,
       weeklyUsage: 20,
-      weeklyResetMilestone: 1_781_884_800_000,
+      weeklyResetMilestone,
       monthlyUsage: 30,
-      monthlyResetMilestone: 1_783_000_000_000,
+      monthlyResetMilestone,
     });
 
     const result = await getBytePlusUsage('seat-123');

@@ -355,6 +355,18 @@ export function filterActiveSessionsByOrganization<T extends { organizationId?: 
 }
 
 /**
+ * Ids of every row in the active-sessions cache, WITHOUT the org-context
+ * filter. Used to exclude active sessions from stored history the moment the
+ * live state exists in the cache — including WS-written rows not yet
+ * org-attributed — so a live session never renders as a stored-history twin
+ * while it waits for enrichment. The pinned tray itself stays org-filtered,
+ * so the pinned set is always a subset of this exclusion set.
+ */
+export function selectActiveExclusionIds(sessions: readonly { id: string }[]): Set<string> {
+  return new Set(sessions.map(s => s.id));
+}
+
+/**
  * Drop rows for a disconnected CLI connection. No cloud-sentinel special
  * case needed: CLI disconnect ids never equal `CLOUD_AGENT_CONNECTION_ID`.
  */

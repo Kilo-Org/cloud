@@ -1,8 +1,8 @@
-import { AppState, type AppStateStatus } from 'react-native';
-import { addEventListener, type NetInfoState } from '@react-native-community/netinfo';
 import { type ConnectionLifecycleHooks } from '@kilocode/cloud-agent-sdk';
+import { addEventListener } from '@react-native-community/netinfo';
+import { AppState, type AppStateStatus } from 'react-native';
 
-type ConnectivityState = Pick<NetInfoState, 'isConnected' | 'isInternetReachable'>;
+import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
 
 type NativeLifecycleSources = {
   getAppState: () => AppStateStatus;
@@ -20,10 +20,6 @@ const nativeLifecycleSources: NativeLifecycleSources = {
   },
   onConnectivityChange: listener => addEventListener(listener),
 };
-
-function isOnline(state: ConnectivityState): boolean {
-  return state.isInternetReachable ?? state.isConnected ?? true;
-}
 
 export function createNativeUserWebConnectionLifecycleHooks(
   sources: NativeLifecycleSources = nativeLifecycleSources

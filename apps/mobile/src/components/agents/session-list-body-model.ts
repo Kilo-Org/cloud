@@ -24,16 +24,27 @@
  *         "Clear filters"), while a no-query error shows only Retry.
  *      2. No query, error → retry-capable error empty state.
  *      3. No query, no error → compact "No past sessions" + New coding
- *         task CTA. When stored rows ARE loaded but the active set
+ *         task CTA. When stored rows ARE loaded but the live active set
  *         excludes every one, the honest "All sessions are active" body
  *         (`all-active`, no CTA) replaces the false "No past sessions";
- *         while more history pages remain the body stays `render-list` so
- *         it never claims the history is exhausted (the bounded backfill
- *         is in flight or its bound is reached).
+ *         while more history pages remain and the tray is populated the
+ *         body stays `render-list` so it never claims the history is
+ *         exhausted (the bounded backfill is in flight or its bound is
+ *         reached). An empty section list with stored rows loaded can
+ *         only arise from active-set exclusion, which in the full view
+ *         also covers live rows awaiting org attribution — so `all-active`
+ *         can render while the tray is momentarily empty, and never the
+ *         false "No past sessions".
  *  - `showInlineError` mirrors the prior inline header ("Couldn't refresh.
  *    Pull down to try again.") and is ADDITIONALLY driven by the
  *    active-only failure flag (`activeIsError`) so the tray's non-blocking
- *    staleness surface is rendered whenever there is visible content.
+ *    staleness surface is rendered whenever there is visible content —
+ *    including the all-excluded window (stored rows loaded, nothing
+ *    rendered, tray empty), where the widened term treats the `all-active`
+ *    body as visible content. That widened stored-rows term is gated on
+ *    there being no active query: an empty search or filter state keeps
+ *    only its own body-level error surface and never gains a second
+ *    inline error from stored rows alone.
  */
 
 export type SessionListBodyModel =
@@ -121,7 +132,14 @@ export function selectSessionListBodyModel(
     activeIsError,
   } = inputs;
 
-  const showInlineError = (isError || activeIsError) && (hasHistoryContent || hasPinnedActive);
+  // The stored-rows term only widens inline-error visibility in the
+  // no-query full-view all-excluded window (the `all-active` body below).
+  // Search and filter states already surface their own body-level error
+  // (`query-error-empty`) or filtered-empty body, so they never get a
+  // second inline error from stored rows alone.
+  const showInlineError =
+    (isError || activeIsError) &&
+    (hasHistoryContent || hasPinnedActive || (!hasActiveQuery && hasStoredSessions));
 
   // History has rows — nothing to decide at the body level.
   if (hasHistoryContent) {
@@ -177,10 +195,13 @@ export function selectSessionListBodyModel(
     return { kind: 'render-list', primaryAction: 'none', showInlineError };
   }
 
-  // Honest all-pinned body, distinct from "No past sessions": sessions DO
-  // exist — every one is pinned above. No creation CTA: the screen already
-  // offers creation through the tray, the FAB, and the header action.
-  if (hasPinnedActive && hasStoredSessions) {
+  // Honest all-active body, distinct from "No past sessions": sessions DO
+  // exist — every loaded stored row is excluded by the live active set. In
+  // the full view that set covers WS-written rows awaiting org attribution,
+  // so this branch can render while the tray is momentarily empty. No
+  // creation CTA: the screen already offers creation through the tray, the
+  // FAB, and the header action.
+  if (hasStoredSessions) {
     return { kind: 'all-active', primaryAction: 'none', showInlineError };
   }
 

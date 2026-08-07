@@ -39,6 +39,7 @@ export function useAgentSessionListData(options: {
     dateGroups,
     activeSessions,
     activeSessionIds,
+    activeExclusionIds,
     activeIsError,
     isLoading,
     storedIsError,
@@ -136,24 +137,48 @@ export function useAgentSessionListData(options: {
       }),
     [activeSessions, effectiveSearchQuery, platformFilter, projectFilter]
   );
+  // History/active exclusivity. The full history view excludes by the
+  // UNFILTERED active cache id set: a session leaves history the moment its
+  // live state arrives (WS write or poll), before the org-attributed row can
+  // pin it in the tray — the direct move. A narrowed view keeps the
+  // org-filtered set instead: an unenriched live row cannot yet prove it
+  // matches the narrowing, so hiding its stored twin would flash a false
+  // "No sessions match" — the transition there stays atomic via the
+  // animation-free tray. `isSearching` (committed query non-empty), NOT
+  // `effectiveSearchQuery`, drives the search half: once a search is
+  // committed the pre-existing exclusion semantics stay in force for the
+  // stored groups that remain rendered until results land. Pinned ⊆ exclusion holds
+  // at every commit in both modes, so a session never renders in both places.
   const sections = useMemo<SessionSection[]>(() => {
     const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
-    return excludeActiveFromGroups(storedGroups, activeSessionIds).map(group => ({
+    const narrowed = isSearching || platformFilter.length > 0 || projectFilter.length > 0;
+    const exclusionIds = narrowed ? activeSessionIds : activeExclusionIds;
+    return excludeActiveFromGroups(storedGroups, exclusionIds).map(group => ({
       title: group.label,
       data: group.sessions,
     }));
-  }, [activeSessionIds, dateGroups, effectiveSearchQuery, search.dateGroups]);
+  }, [
+    activeExclusionIds,
+    activeSessionIds,
+    dateGroups,
+    effectiveSearchQuery,
+    isSearching,
+    platformFilter,
+    projectFilter,
+    search.dateGroups,
+  ]);
   // Bounded automatic backfill: when active-set exclusion empties every
   // rendered stored page and no gate (search, loading, error, in-flight
-  // stored fetch, page bound) blocks, fetch the next stored page so history
-  // still surfaces below a viewport-filling tray. `paging` selects the search
-  // vs stored pagination; the `isSearching` gate keeps the stored fetch from
-  // ever firing during committed search mode.
+  // stored fetch, page bound, empty tray) blocks, fetch the next stored page
+  // so history still surfaces below a viewport-filling tray. `paging` selects
+  // the search vs stored pagination; the `isSearching` gate keeps the stored
+  // fetch from ever firing during committed search mode.
   const shouldBackfill = useMemo(
     () =>
       shouldBackfillHistoryAfterActiveExclusion({
         hasHistoryContent: sections.length > 0,
         hasStoredSessions: storedSessions.length > 0,
+        hasPinnedActive: pinnedActive.length > 0,
         hasMoreHistory: paging.hasNextPage,
         isFetchingNextPage: paging.isFetchingNextPage,
         isFetching: storedIsFetching,
@@ -168,6 +193,7 @@ export function useAgentSessionListData(options: {
       isSearching,
       paging.hasNextPage,
       paging.isFetchingNextPage,
+      pinnedActive,
       sections,
       storedIsFetching,
       storedLoadedPageCount,

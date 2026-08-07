@@ -18,6 +18,7 @@ function greenInputs(overrides: Partial<SelectorInputs> = {}): SelectorInputs {
   return {
     hasHistoryContent: false,
     hasStoredSessions: true,
+    hasPinnedActive: true,
     hasMoreHistory: true,
     isFetchingNextPage: false,
     isFetching: false,
@@ -131,6 +132,19 @@ describe('useHistoryBackfill mounted', () => {
       greenInputs({ loadedPageCount: MAX_HISTORY_AUTOLOAD_PAGES })
     );
     expect(fetchNextPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not backfill while the tray is empty and opens exactly once when it populates', async () => {
+    const fetchNextPage = vi.fn();
+
+    // Empty tray (the unenriched window, covered by the `all-active` body):
+    // no automatic fetch even with every other gate green.
+    const renderer = await mountProbe(fetchNextPage, greenInputs({ hasPinnedActive: false }));
+    expect(fetchNextPage).not.toHaveBeenCalled();
+
+    // The tray populates: the false-to-true transition fetches exactly once.
+    await updateProbe(renderer, fetchNextPage, greenInputs());
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
   it('does not backfill while a stored fetch is in flight', async () => {

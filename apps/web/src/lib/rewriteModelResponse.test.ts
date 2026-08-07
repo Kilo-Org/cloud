@@ -803,7 +803,8 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      makeLogging({ organization_id: KILO_ORGANIZATION_ID })
+      makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
+      null
     );
 
     expect(result).not.toBeNull();
@@ -829,7 +830,8 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
+      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      null
     );
 
     expect(await result.json()).toMatchObject({
@@ -850,7 +852,8 @@ describe('rewriteModelResponse', () => {
       'google/gemma-4-26b-a4b-it:free',
       'openrouter',
       'chat_completions',
-      makeLogging()
+      makeLogging(),
+      null
     );
 
     expect(result).not.toBeNull();
@@ -869,7 +872,8 @@ describe('rewriteModelResponse', () => {
       QWEN37_PLUS_MODEL_ID,
       'openrouter',
       'chat_completions',
-      makeLogging()
+      makeLogging(),
+      null
     );
 
     // The upstream-reported cost does not reflect the custom pricing, so it
@@ -887,7 +891,8 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
+      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
+      null
     );
 
     expect(result).not.toBeNull();

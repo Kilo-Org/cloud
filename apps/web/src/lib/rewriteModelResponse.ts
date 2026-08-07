@@ -872,7 +872,7 @@ export async function rewriteModelResponse(
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
   logging: RequestLoggingParams,
-  responseTransforms: ProviderResponseTransforms | null = null
+  responseTransforms: ProviderResponseTransforms | null
 ): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const requiresCostRemoval =

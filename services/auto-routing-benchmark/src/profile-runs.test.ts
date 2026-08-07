@@ -424,6 +424,12 @@ describe('decider run completion', () => {
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
     expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
+    // Settle the registry rows first. The orphan reaper spares rows whose run
+    // is still running, so completing the run first would open a window where a
+    // concurrent sweep fails entries that are fully measured.
+    expect(vi.mocked(markProfilesReadyForRun).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(markRunCompleted).mock.invocationCallOrder[0]
+    );
     // A user-queue run still triggers a platform republish: the registry is
     // shared, so a pair it measured may complete the platform model list.
     // Nothing is ready here, so publishing is honestly skipped.

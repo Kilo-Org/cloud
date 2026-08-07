@@ -291,7 +291,11 @@ export type StartedQueueRun = { runId: string; purpose: BenchmarkRunPurpose; ent
  */
 export async function drainQueues(
   env: Env,
-  selector: 'platform' | 'user' | 'both'
+  selector: 'platform' | 'user' | 'both',
+  // Filled with whatever each queue threw. The scheduled callers ignore it; an
+  // admin who pressed a button needs to be told the queue is wedged instead of
+  // being shown "nothing to run".
+  errors?: unknown[]
 ): Promise<StartedQueueRun[]> {
   const queues: BenchmarkRunPurpose[] =
     selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
@@ -301,6 +305,7 @@ export async function drainQueues(
       const drained = await drainQueue(env, queue);
       if (drained) started.push({ ...drained, purpose: queue });
     } catch (error) {
+      errors?.push(error);
       console.warn(
         JSON.stringify({
           event: 'benchmark_queue_drain_error',
@@ -408,7 +413,12 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
   });
   const table = buildRoutingTable({
     version: computeRegistryRoutingTableVersion(
-      readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant }))
+      readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
+      {
+        minAccuracy: config.minAccuracy,
+        switchCostFactor: config.switchCostFactor,
+        bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+      }
     ),
     generatedAt,
     minAccuracy: config.minAccuracy,
@@ -418,8 +428,8 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     summaries: filterSummariesByProvenance(readyEntries, summaries),
   });
 
-  // The version is a hash of the contributing registry rows, so an unchanged
-  // registry republishes an identical table. Skip the write and the cache flush.
+  // The version hashes the contributing registry rows and the config knobs, so
+  // an identical version means an identical table. Skip the write and the flush.
   const published = await getLatestRoutingTable(env.BENCH_DB).catch(() => null);
   if (published?.table.version === table.version) {
     return { version: table.version };
@@ -914,11 +924,13 @@ export async function drainQueue(
         event: 'benchmark_queue_drain_started',
         queue,
         runId: result.runId,
-        entryCount: entries.length,
+        entryCount: result.enqueuedModels,
         models: entries.map(e => e.model),
       })
     );
-    return { runId: result.runId, entryCount: entries.length };
+    // The claimed count, not the requested one — the other queue may have taken
+    // part of this batch between the read and the claim.
+    return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
     if (error instanceof RunAlreadyActiveError) {
       console.log(
@@ -1542,7 +1554,6 @@ async function finalizeRunIfComplete(
   // model_summaries with carried=true and are included via getSummaries below.
   const freshSummaries = summarize(rows, kind);
   await replaceModelSummaries(env.BENCH_DB, runId, freshSummaries);
-  await markRunCompleted(env.BENCH_DB, runId);
 
   // Every decider run feeds the one global registry — the platform routing table
   // and every owner's custom table are assembled from it, so no decider run
@@ -1561,6 +1572,12 @@ async function finalizeRunIfComplete(
     // when the per-entry failure did not complete, or a dead lane's partial
     // measurements would be published as a real result. If this throws, the
     // rows stay `running` and the orphan sweep settles them.
+    //
+    // This runs BEFORE `markRunCompleted`. The orphan reaper spares rows whose
+    // run is still in the running set, so settling first leaves it no window:
+    // completing first would expose a run older than the stale age — its rows
+    // carry claim-time `updated_at`, so the age guard does not cover them — and
+    // a sweep landing in between would fail entries that are fully measured.
     try {
       if (failedEntries.length > 0) {
         await markProfilesFailedForEntries(
@@ -1580,6 +1597,7 @@ async function finalizeRunIfComplete(
         })
       );
     }
+    await markRunCompleted(env.BENCH_DB, runId);
     console.log(
       JSON.stringify({
         event: 'benchmark_decider_run_completed',
@@ -1604,6 +1622,9 @@ async function finalizeRunIfComplete(
     await drainQueues(env, 'both');
     return;
   }
+
+  // Classifier runs own no registry rows, so there is nothing to settle first.
+  await markRunCompleted(env.BENCH_DB, runId);
 
   // Read back all summaries (fresh + carried) for publishing.
   const allSummaries = await getSummaries(env.BENCH_DB, runId);

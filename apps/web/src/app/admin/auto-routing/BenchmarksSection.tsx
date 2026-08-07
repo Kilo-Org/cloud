@@ -1321,16 +1321,27 @@ export function BenchmarksSection() {
     queryFn: fetchBenchmarkRoutingTable,
   });
 
+  // Run activity drives polling and cache invalidation, so it must not depend
+  // on what the list is filtered to — a platform run finishing while the admin
+  // reads the classifier list is still a completion. On the 'all' filter this
+  // shares its key with runsQuery, so it costs no extra request.
+  const allRunsQuery = useQuery({
+    queryKey: ['auto-routing', 'benchmark-runs', 'all'],
+    queryFn: () => fetchBenchmarkRuns('all'),
+  });
+
   // Poll runs every 30s while any run is 'running'
-  const hasRunningRun = runsQuery.data?.runs.some(r => r.status === 'running') ?? false;
+  const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
   const refetchRuns = runsQuery.refetch;
+  const refetchAllRuns = allRunsQuery.refetch;
   useEffect(() => {
     if (!hasRunningRun) return;
     const id = setInterval(() => {
       void refetchRuns();
+      void refetchAllRuns();
     }, 30_000);
     return () => clearInterval(id);
-  }, [hasRunningRun, refetchRuns]);
+  }, [hasRunningRun, refetchRuns, refetchAllRuns]);
 
   // When the last running run finishes, its completion publishes a routing
   // table / classifier winner. Those live in their own query caches, so

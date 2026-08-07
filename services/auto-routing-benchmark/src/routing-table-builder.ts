@@ -120,10 +120,24 @@ function fnv1aHex(input: string): string {
  * each owner's sparse custom table.
  */
 export function computeRegistryRoutingTableVersion(
-  contributors: readonly { runId: string; model: string; variant: string | null }[]
+  contributors: readonly { runId: string; model: string; variant: string | null }[],
+  // The knobs are part of the table's identity, not just its metadata:
+  // `rankCandidates` drops candidates below `minAccuracy`, and the other two
+  // steer the router at serve time. Leaving them out lets a threshold-only
+  // config save rebuild an identically versioned table, which the publisher
+  // then skips — the live table would keep the old thresholds until some new
+  // measurement happened to change the ready set.
+  knobs: { minAccuracy: number; switchCostFactor: number; bestAccuracySwitchThreshold: number }
 ): string {
   const parts = [...contributors].map(c => `${c.runId}\0${c.model}\0${c.variant ?? ''}`).sort();
-  return `registry-${fnv1aHex(JSON.stringify(parts))}`;
+  // Read the knobs positionally: hashing the object would make the version
+  // depend on the caller's key order.
+  return `registry-${fnv1aHex(
+    JSON.stringify({
+      parts,
+      knobs: [knobs.minAccuracy, knobs.switchCostFactor, knobs.bestAccuracySwitchThreshold],
+    })
+  )}`;
 }
 
 /**
@@ -207,7 +221,8 @@ export function buildCustomRoutingTable(params: {
       runId: r.runId,
       model: r.entry.model,
       variant: r.entry.variant,
-    }))
+    })),
+    { minAccuracy, switchCostFactor, bestAccuracySwitchThreshold }
   );
 
   const table: CustomRoutingTable = {

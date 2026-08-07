@@ -181,8 +181,10 @@ vi.mock('drizzle-orm/d1', () => {
             return builder;
           },
           where(clause: unknown) {
-            // The claim's WHERE is an or() of exact pairs; the operator mock
-            // reduces it to a 'models' descriptor carrying those model ids.
+            // The claim's WHERE is an and() tree that this mock does not walk,
+            // so `entries` stays empty and these tests only prove the statement
+            // is issued. What it actually updates is covered for real against
+            // SQLite in profiles-sql.test.ts.
             const models = (clause as { models?: string[] } | null)?.models;
             if (models) stmt.entries = models;
             return builder;

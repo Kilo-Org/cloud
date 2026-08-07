@@ -64,6 +64,22 @@ const RUN_MODEL_INSERT_BATCH_SIZE = 18;
 // ceiling — the same ceiling that once stranded every pending profile in prod.
 const PROFILE_ENTRY_FILTER_BATCH_SIZE = 30;
 
+/**
+ * Rows per config INSERT. D1 allows 100 bound variables per statement and the
+ * widest of these tables is 4 columns, so 20 rows always fits. The decider
+ * lists are catalog-sized and grow on their own — the auto list is refilled by
+ * a nightly sync — so they cannot go in one statement.
+ */
+const CONFIG_INSERT_BATCH_SIZE = 20;
+
+function batchRows<T>(rows: readonly T[]): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < rows.length; i += CONFIG_INSERT_BATCH_SIZE) {
+    batches.push(rows.slice(i, i + CONFIG_INSERT_BATCH_SIZE));
+  }
+  return batches;
+}
+
 // ---------------------------------------------------------------------------
 // Row mapping helpers
 // ---------------------------------------------------------------------------
@@ -174,20 +190,14 @@ export async function replaceConfig(
     orm.delete(configDeciderModels),
     orm.delete(configAutoDeciderExclusions),
   ];
-  if (classifierModels.length > 0) {
-    stmts.push(
-      orm.insert(configClassifierModels).values(classifierModels.map(m => ({ model: m })))
-    );
+  for (const batch of batchRows(classifierModels)) {
+    stmts.push(orm.insert(configClassifierModels).values(batch.map(m => ({ model: m }))));
   }
-  if (deciderModels.length > 0) {
-    stmts.push(orm.insert(configDeciderModels).values(deciderModels));
+  for (const batch of batchRows(deciderModels)) {
+    stmts.push(orm.insert(configDeciderModels).values(batch));
   }
-  if (excludedAutoDeciderModels.length > 0) {
-    stmts.push(
-      orm
-        .insert(configAutoDeciderExclusions)
-        .values(excludedAutoDeciderModels.map(model => ({ model })))
-    );
+  for (const batch of batchRows(excludedAutoDeciderModels)) {
+    stmts.push(orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model }))));
   }
   await orm.batch(stmts);
 }
@@ -200,8 +210,8 @@ export async function replaceAutoDeciderModels(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm.delete(configAutoDeciderModels),
   ];
-  if (autoDeciderModels.length > 0) {
-    stmts.push(orm.insert(configAutoDeciderModels).values(autoDeciderModels));
+  for (const batch of batchRows(autoDeciderModels)) {
+    stmts.push(orm.insert(configAutoDeciderModels).values(batch));
   }
   await orm.batch(stmts);
 }
@@ -1028,11 +1038,21 @@ export async function getSummariesForRuns(
   runIds: readonly string[]
 ): Promise<BenchmarkModelSummaryWithRun[]> {
   if (runIds.length === 0) return [];
-  const rows = await drizzle(db)
-    .select()
-    .from(modelSummaries)
-    .where(inArray(modelSummaries.run_id, [...runIds]));
-  return rows.map(mapSummaryRowWithRun);
+  const orm = drizzle(db);
+  // One bound variable per run id. Each ready registry row carries its own
+  // measuring run, so this set grows with the decider list and with every
+  // requeue — chunk it rather than let it trip D1's ceiling and freeze the
+  // published table behind a swallowed error.
+  const ids = [...runIds];
+  const summaries: BenchmarkModelSummaryWithRun[] = [];
+  for (let i = 0; i < ids.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    const rows = await orm
+      .select()
+      .from(modelSummaries)
+      .where(inArray(modelSummaries.run_id, ids.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE)));
+    summaries.push(...rows.map(mapSummaryRowWithRun));
+  }
+  return summaries;
 }
 
 /**

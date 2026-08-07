@@ -566,6 +566,31 @@ describe('POST /admin/runs', () => {
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows.map(m => m.model)).toEqual(['m/1', 'm/2']);
   });
+
+  it('reports a queue that cannot start instead of claiming there is nothing to run', async () => {
+    // One repetition per live container is the floor. Below it no batch fits,
+    // and drains swallow their own errors — so without this the panel would
+    // answer 200 "nothing pending" for a queue full of pending work.
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        user_max_concurrency: 4,
+        decider_repetitions: 5,
+      },
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('requires at least one live container lane'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

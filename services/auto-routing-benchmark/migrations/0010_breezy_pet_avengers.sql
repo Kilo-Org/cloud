@@ -8,11 +8,20 @@ ALTER TABLE `benchmark_profiles` ADD `user_requested` integer DEFAULT true NOT N
 -- 1. Runs that drained owner-pool work were tagged 'profile'; the purpose column
 --    now names the queue, and that queue is 'user'.
 UPDATE `benchmark_runs` SET `purpose` = 'user' WHERE `purpose` = 'profile';--> statement-breakpoint
--- 2. Adopt every measurement a completed platform run already paid for into the
---    registry, so the platform routing table keeps its candidates instead of
---    re-benchmarking models that were measured with real money. Provenance
---    points at the run whose model_summaries hold the numbers; ORDER BY
---    started_at DESC keeps the newest run per exact pair.
+-- 2. Adopt every measurement an earlier decider run already paid for into the
+--    registry, so no model that was measured with real money is benchmarked
+--    again. Provenance points at the run whose model_summaries hold the
+--    numbers; ORDER BY started_at DESC plus the status guard on the upsert
+--    keeps the newest run per exact pair.
+--
+--    Failed runs are read too, and that is the point. Until this migration one
+--    dead lane failed the whole run, so a run that graded every case for 32 of
+--    its 33 models left all 33 rows `failed` with the results unused.
+--
+--    A pair is adopted only when it is whole: no dead lane of its own, and
+--    `repetitions` x 180 graded cases. 180 is the decider dataset size that
+--    `engine_identity` pins, so a partly measured pair — the real hazard in a
+--    run that timed out — can never be published as a finished candidate.
 --
 --    An owner pool may already hold a row for the same pair. A `pending` or
 --    `failed` row there means the measurement was going to be paid for again,
@@ -25,8 +34,8 @@ INSERT INTO `benchmark_profiles` (
   `platform_requested`, `user_requested`
 )
 SELECT
-  `rm`.`model`,
-  `rm`.`variant`,
+  `ms`.`model`,
+  `ms`.`variant`,
   `r`.`engine_identity`,
   `r`.`repetitions`,
   'ready',
@@ -35,19 +44,20 @@ SELECT
   `r`.`started_at`,
   COALESCE(`r`.`completed_at`, `r`.`started_at`),
   COALESCE(`r`.`completed_at`, `r`.`started_at`),
-  true,
-  false
+  `r`.`purpose` = 'platform',
+  `r`.`purpose` <> 'platform'
 FROM `benchmark_runs` `r`
-JOIN `run_models` `rm` ON `rm`.`run_id` = `r`.`id`
+JOIN `model_summaries` `ms` ON `ms`.`run_id` = `r`.`id`
 WHERE `r`.`kind` = 'decider'
-  AND `r`.`purpose` = 'platform'
-  AND `r`.`status` = 'completed'
-  AND EXISTS (
-    SELECT 1 FROM `model_summaries` `ms`
-    WHERE `ms`.`run_id` = `r`.`id`
-      AND `ms`.`model` = `rm`.`model`
-      AND `ms`.`variant` = `rm`.`variant`
+  AND `r`.`status` IN ('completed', 'failed')
+  AND NOT EXISTS (
+    SELECT 1 FROM `run_lane_failures` `lf`
+    WHERE `lf`.`run_id` = `r`.`id`
+      AND `lf`.`model` = `ms`.`model`
+      AND `lf`.`variant` = `ms`.`variant`
   )
+GROUP BY `r`.`id`, `ms`.`model`, `ms`.`variant`
+HAVING SUM(`ms`.`cases`) = `r`.`repetitions` * 180
 ORDER BY `r`.`started_at` DESC
 ON CONFLICT (`model`, `variant`, `engine_identity`, `repetitions`) DO UPDATE SET
   `status` = 'ready',
@@ -55,5 +65,5 @@ ON CONFLICT (`model`, `variant`, `engine_identity`, `repetitions`) DO UPDATE SET
   `failure_reason` = NULL,
   `updated_at` = excluded.`updated_at`,
   `completed_at` = excluded.`completed_at`,
-  `platform_requested` = 1
+  `platform_requested` = `benchmark_profiles`.`platform_requested` OR excluded.`platform_requested`
 WHERE `benchmark_profiles`.`status` IN ('pending', 'failed');

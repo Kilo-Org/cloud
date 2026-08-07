@@ -136,10 +136,13 @@ describe('buildCustomRoutingTable', () => {
     // Deterministic version shape unchanged
     expect(table!.version).toMatch(/^registry-[0-9a-f]{8}$/);
     expect(table!.version).toBe(
-      computeRegistryRoutingTableVersion([
-        { runId: 'run-r1', model: 'vendor/a', variant: 'high' },
-        { runId: 'run-r2', model: 'vendor/b', variant: 'max' },
-      ])
+      computeRegistryRoutingTableVersion(
+        [
+          { runId: 'run-r1', model: 'vendor/a', variant: 'high' },
+          { runId: 'run-r2', model: 'vendor/b', variant: 'max' },
+        ],
+        base
+      )
     );
   });
 
@@ -181,8 +184,14 @@ describe('buildCustomRoutingTable', () => {
       { runId: 'r1', model: 'm', variant: 'x' as string | null },
       { runId: 'r2', model: 'n', variant: null },
     ];
-    expect(computeRegistryRoutingTableVersion(a)).toBe(
-      computeRegistryRoutingTableVersion([...a].reverse())
+    const knobs = { minAccuracy: 0.7, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    expect(computeRegistryRoutingTableVersion(a, knobs)).toBe(
+      computeRegistryRoutingTableVersion([...a].reverse(), knobs)
+    );
+    // A threshold-only change must produce a different version, or the
+    // publisher would skip writing the retuned table.
+    expect(computeRegistryRoutingTableVersion(a, { ...knobs, minAccuracy: 0.8 })).not.toBe(
+      computeRegistryRoutingTableVersion(a, knobs)
     );
   });
 });

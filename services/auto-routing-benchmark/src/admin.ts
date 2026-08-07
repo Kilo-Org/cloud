@@ -107,7 +107,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       // the selected queues — the same path the timer takes.
       if (kind === 'decider') {
         if (queue !== 'user') await syncPlatformRegistry(c.env);
-        const started = await drainQueues(c.env, queue);
+        const drainErrors: unknown[] = [];
+        const started = await drainQueues(c.env, queue, drainErrors);
+        // Drains never throw, so a wedged queue would otherwise return 200 and
+        // the panel would report "nothing pending" for work that is stuck.
+        if (started.length === 0 && drainErrors.length > 0) {
+          const [first] = drainErrors;
+          if (first instanceof BenchmarkRunConfigError)
+            return c.json({ error: first.message }, 400);
+          throw first;
+        }
         return c.json({
           runId: started[0]?.runId ?? null,
           enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),

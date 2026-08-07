@@ -32,7 +32,7 @@ vi.mock('./db', async importOriginal => {
     saveRoutingTable: vi.fn(),
     upsertCaseResult: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
-    listStaleRunningDeciderRunIds: vi.fn(),
+    listStaleRunningDeciderRuns: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
@@ -69,6 +69,7 @@ import {
   getSummariesForRuns,
   listReadyCurrentProfilesForEntries,
   listLaneFailures,
+  listStaleRunningDeciderRuns,
   markRunCompleted,
   recordLaneFailure,
   saveRoutingTable,
@@ -168,6 +169,7 @@ beforeEach(() => {
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
+  vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   tokenGet.mockResolvedValue('internal-secret');
   queueSendBatch.mockResolvedValue(undefined);
   vi.stubGlobal(

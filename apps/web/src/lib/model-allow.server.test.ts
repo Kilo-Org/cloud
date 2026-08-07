@@ -66,7 +66,21 @@ describe('model access predicates', () => {
   test('enterprise deny lists require models to exist in the current snapshot', async () => {
     const isAllowed = createAllowPredicateFromRestrictions(
       {
+        requireModelInCurrentSnapshot: true,
         modelDenyList: ['x-ai/grok-4.5'],
+      },
+      lookup({ 'x-ai/grok-4.6': ['x-ai'] })
+    );
+
+    await expect(isAllowed('grok-4.5')).resolves.toBe(false);
+    await expect(isAllowed('x-ai/grok-4.6')).resolves.toBe(true);
+  });
+
+  test('Enterprise requires snapshot membership without configured restrictions', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        modelDenyList: [],
       },
       lookup({ 'x-ai/grok-4.6': ['x-ai'] })
     );
@@ -80,6 +94,7 @@ describe('model access predicates', () => {
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(
         {
+          requireModelInCurrentSnapshot: true,
           providerAllowList: [],
           modelDenyList: [modelId],
         },
@@ -103,6 +118,7 @@ describe('model access predicates', () => {
   test('createAllowPredicateFromRestrictions uses provider allow and model deny lists', async () => {
     const isAllowed = createAllowPredicateFromRestrictions(
       {
+        requireModelInCurrentSnapshot: true,
         providerAllowList: ['openai'],
         modelDenyList: ['openai/gpt-4o'],
       },

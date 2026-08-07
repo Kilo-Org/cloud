@@ -350,6 +350,27 @@ describe('organizations settings trpc router', () => {
       };
     }
 
+    it('excludes models outside the snapshot without configured restrictions', async () => {
+      const organization = await createTestOrganization(
+        'Snapshot-only Enterprise',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+        data: [makeOpenRouterModel('openai/gpt-4o'), makeOpenRouterModel('openrouter/free')],
+      } satisfies OpenRouterModelsResponse);
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: organization.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
+    });
+
     it('should exclude models in model_deny_list for enterprise orgs', async () => {
       const openRouterModelsResponse = {
         data: [
@@ -576,19 +597,21 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it('should allow any model when no access policy is configured', async () => {
+    it('rejects models outside the snapshot when no access policy is configured', async () => {
       const caller = await createCallerForUser(owner.id);
 
       await updateOrganizationSettings(testOrganization.id, {
         data_collection: 'allow',
       });
 
-      const result = await caller.organizations.settings.updateDefaultModel({
-        organizationId: testOrganization.id,
-        default_model: 'any-model',
-      });
-
-      expect(result.settings.default_model).toBe('any-model');
+      await expect(
+        caller.organizations.settings.updateDefaultModel({
+          organizationId: testOrganization.id,
+          default_model: 'openrouter/free',
+        })
+      ).rejects.toThrow(
+        "Default model 'openrouter/free' is not in the organization's allowed models list"
+      );
     });
 
     it.each(['kilo-auto/balanced', 'kilo-internal/private-model'])(
@@ -775,10 +798,10 @@ describe('organizations settings trpc router', () => {
       const result = await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: specificOrg.id,
         behavior: 'specific',
-        specific_model: 'any-model',
+        specific_model: 'openai/gpt-4o',
       });
 
-      expect(result.settings.default_model).toBe('any-model');
+      expect(result.settings.default_model).toBe('openai/gpt-4o');
     });
 
     it('sets and clears Organization Auto routes', async () => {

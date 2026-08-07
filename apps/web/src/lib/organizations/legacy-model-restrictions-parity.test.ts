@@ -153,6 +153,21 @@ describe('legacy organization restrictions with no groups or policies', () => {
     expect(legacy['blocked-provider/model']).toBe(false);
   });
 
+  it('requires snapshot membership for Enterprise without configured restrictions', async () => {
+    const { owner, organization } = await seedLegacyOrganization(
+      'Legacy Enterprise Snapshot Only',
+      {}
+    );
+
+    const { legacy } = await expectParityWithLegacyPredicate(organization, owner.id);
+    expect(legacy).toEqual({
+      'denied/model': true,
+      'allowed/model': true,
+      'blocked-provider/model': true,
+      'unknown-routes/model': false,
+    });
+  });
+
   it('keeps stored restrictions unenforced on Teams, as before', async () => {
     const { owner, organization } = await seedLegacyOrganization(
       'Legacy Teams',

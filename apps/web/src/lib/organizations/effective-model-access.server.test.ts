@@ -76,6 +76,22 @@ describe('effective organization model access', () => {
     expect(decision).toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
+  it('requires snapshot membership for Enterprise without configured restrictions', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: { ...context().organization, settings: {} },
+        defaultPolicies: [],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'grok-4.5', async () => new Set())
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+    await expect(
+      getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)
+    ).resolves.toEqual({ allowed: true });
+  });
+
   it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
@@ -87,7 +103,7 @@ describe('effective organization model access', () => {
     }
   );
 
-  it('preserves organization access when no model access policy is configured', async () => {
+  it('allows known snapshot models when no model access policy is configured', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({ defaultPolicies: [], groupPolicies: [] })
     );

@@ -16,6 +16,7 @@ import {
 } from '@/lib/organizations/organization-group-policy-context.server';
 
 export type EffectiveOrganizationModelPolicy = {
+  requireModelInCurrentSnapshot: boolean;
   organizationModelDenyList: string[];
   organizationProviderCeiling?: string[];
   memberGrant:
@@ -50,6 +51,7 @@ export function evaluateEffectiveModelAccessPolicy(
     : undefined;
   if (!organizationRestrictionsEnabled) {
     return {
+      requireModelInCurrentSnapshot: false,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -63,6 +65,7 @@ export function evaluateEffectiveModelAccessPolicy(
     .filter(policy => policy.type === 'model_access');
   if (policies.length === 0 || policies.some(policy => policy.data.mode === 'all')) {
     return {
+      requireModelInCurrentSnapshot: true,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -73,6 +76,7 @@ export function evaluateEffectiveModelAccessPolicy(
 
   const selectedPolicies = policies.filter(policy => policy.data.mode === 'selected');
   return {
+    requireModelInCurrentSnapshot: true,
     organizationModelDenyList,
     organizationProviderCeiling,
     memberGrant: {
@@ -111,9 +115,7 @@ export async function getEffectiveModelDecision(
   if (policy.organizationModelDenyList.includes(normalizedModelId)) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const hasOrganizationRestrictions =
-    policy.organizationModelDenyList.length > 0 || policy.organizationProviderCeiling !== undefined;
-  const currentModelProviders = hasOrganizationRestrictions
+  const currentModelProviders = policy.requireModelInCurrentSnapshot
     ? await providerLookup(normalizedModelId)
     : undefined;
   if (currentModelProviders?.size === 0) {

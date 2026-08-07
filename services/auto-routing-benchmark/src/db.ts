@@ -937,16 +937,7 @@ export async function syncPlatformRegistryRows(
   // blow D1's bound-variable ceiling once the decider list passes ~47 entries.
   // Both statements run in one batch, so no drain sees a half-cleared queue.
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
-    orm
-      .update(benchmarkProfiles)
-      .set({ platform_requested: false, updated_at: nowIso })
-      .where(
-        and(
-          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
-          eq(benchmarkProfiles.repetitions, current.repetitions),
-          eq(benchmarkProfiles.platform_requested, true)
-        )
-      ),
+    clearPlatformRequestedStatement(orm, current),
   ];
 
   for (const entry of desired) {
@@ -977,12 +968,40 @@ export async function syncPlatformRegistryRows(
             benchmarkProfiles.engine_identity,
             benchmarkProfiles.repetitions,
           ],
-          set: { platform_requested: true, updated_at: nowIso },
+          // updated_at is deliberately NOT bumped here. It times the row's
+          // measurement lifecycle — claim, settle — and the orphaned-claim
+          // reaper only touches rows untouched for hours. This reconcile runs
+          // every 15 minutes, so bumping it would hold every platform row
+          // permanently below the reaper's age guard and an orphaned claim
+          // would keep the queue unsettled forever.
+          set: { platform_requested: true },
         }) as BatchItem<'sqlite'>
     );
   }
 
   await orm.batch(stmts);
+}
+
+/**
+ * Drop `platform_requested` across the current-engine registry, so a reconcile
+ * can re-set it per desired pair. Exported for the reconcile-vs-reaper test.
+ *
+ * Leaves `updated_at` alone for the reason given on the claim above.
+ */
+export function clearPlatformRequestedStatement(
+  orm: ReturnType<typeof drizzle>,
+  current: { engineIdentity: string; repetitions: number }
+) {
+  return orm
+    .update(benchmarkProfiles)
+    .set({ platform_requested: false })
+    .where(
+      and(
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        eq(benchmarkProfiles.platform_requested, true)
+      )
+    );
 }
 
 /**

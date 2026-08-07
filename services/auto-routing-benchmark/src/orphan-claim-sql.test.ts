@@ -10,7 +10,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
-import { failOrphanedRunningProfilesStatement } from './db';
+import { clearPlatformRequestedStatement, failOrphanedRunningProfilesStatement } from './db';
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_profiles (
@@ -73,12 +73,18 @@ function seedRun(id: string, status: 'running' | 'completed' | 'failed'): void {
   );
 }
 
-function seedClaim(model: string, runId: string | null, updatedAt: string): void {
+function seedClaim(
+  model: string,
+  runId: string | null,
+  updatedAt: string,
+  platformRequested: 0 | 1 = 0
+): void {
   exec(
     `INSERT INTO benchmark_profiles
-      (model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at)
-     VALUES (?, '', 'v-test:engine', 1, 'running', ?, ?, ?)`,
-    [model, runId, LONG_AGO, updatedAt]
+      (model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at,
+       platform_requested)
+     VALUES (?, '', 'v-test:engine', 1, 'running', ?, ?, ?, ?)`,
+    [model, runId, LONG_AGO, updatedAt, platformRequested]
   );
 }
 
@@ -147,6 +153,24 @@ describe('failOrphanedRunningProfilesStatement (real SQLite)', () => {
     reap();
 
     expect(statusOf('m/being-settled')).toBe('running');
+  });
+
+  it('still reaps after a platform reconcile has run', () => {
+    // The reconcile runs every 15 minutes and touches every platform row. If it
+    // bumped updated_at, no platform row could ever reach the reaper's age
+    // guard, and an orphaned claim would keep the platform queue unsettled —
+    // and the routing table unpublishable — forever.
+    seedClaim('m/orphan-platform', 'run-that-does-not-exist', LONG_AGO, 1);
+
+    const reconcile = clearPlatformRequestedStatement(drizzle({} as D1Database), {
+      engineIdentity: 'v-test:engine',
+      repetitions: 1,
+    }).toSQL();
+    exec(reconcile.sql, reconcile.params);
+
+    reap();
+
+    expect(statusOf('m/orphan-platform')).toBe('failed');
   });
 
   it('leaves rows that are not claimed at all', () => {

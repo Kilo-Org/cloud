@@ -9,11 +9,17 @@ import {
   contextUsageAtomFamily,
   draftAtomFamily,
   evictConversationAtoms,
+  queuedMessageAtomFamily,
   remoteMcpStoreAtom,
   runningConversationIdsAtom,
   sessionCostAtomFamily,
   streamingMessageIdAtomFamily,
 } from './agent-chat-atoms';
+import {
+  appendQueuedMessage,
+  resolveSendAction,
+  shouldSendQueuedMessage,
+} from './agent-message-queue';
 import {
   createAssistantMessage,
   createToolResult,
@@ -153,13 +159,15 @@ export const formatSelectedTabSystemEnvironment = ({
 
 export const AgentChatPanel = ({
   auth,
+  isVisible = true,
   onHeaderBeforeSettingsChange,
   organizationId,
 }: {
   auth: StoredAuth;
+  readonly isVisible?: boolean;
   onHeaderBeforeSettingsChange?: (node?: ReactNode) => void;
   organizationId: string | undefined;
-}): JSX.Element => {
+}): JSX.Element | null => {
   const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(emptyDefaultConversationEvents);
@@ -193,7 +201,7 @@ export const AgentChatPanel = ({
     selectedTabId: activeConversation.selectedTabId,
   });
   inspectableTabsRef.current = inspectableTabs;
-  const model = activeConversation.model ?? modelOptions[0]?.id ?? '';
+  const model = activeConversation.model ?? '';
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
@@ -245,9 +253,9 @@ export const AgentChatPanel = ({
       const conversation = conversationStoreRef.current.conversations.find(
         item => item.id === conversationId
       );
-      const runModel = conversation?.model ?? modelOptions[0]?.id ?? '';
+      const runModel = conversation?.model ?? '';
 
-      if (conversation === undefined || runModel === '') {
+      if (conversation === undefined || !isModelInCatalog(runModel)) {
         return;
       }
 
@@ -276,6 +284,7 @@ export const AgentChatPanel = ({
       }
     },
     // Compaction is a single short gateway call; no abort wiring until it proves slow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps — isModelInCatalog is a component-scope helper reading modelOptions from the render closure; modelOptions is listed so the callback re-captures it when the catalog changes.
     [
       auth.token,
       isConversationStoreLoaded,
@@ -326,10 +335,15 @@ export const AgentChatPanel = ({
 
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
-  const modelControlValue = modelOptions.length === 0 ? '' : model;
+
+  // The conversation's stored model is the only model a run may use, so every gateway path
+  // Waits until the loaded catalog actually contains it. Never fall back to modelOptions[0].
+  const isModelInCatalog = (modelId: string): boolean =>
+    modelOptions.some(option => option.id === modelId);
+
   const canSend =
     isConversationStoreLoaded &&
-    modelControlValue !== '' &&
+    selectedModel !== undefined &&
     selectedTabId !== undefined &&
     !isCompacting;
 
@@ -447,7 +461,9 @@ export const AgentChatPanel = ({
   ]);
 
   useEffect(() => {
-    if (modelOptions.length === 0) {
+    // A running turn snapshotted its model at startTurn; repairing the stored model now
+    // Would make the locked control disagree with the in-flight request. Repair after.
+    if (modelOptions.length === 0 || isRunning) {
       return;
     }
 
@@ -458,10 +474,10 @@ export const AgentChatPanel = ({
         })
       );
     }
-  }, [activeConversationId, model, modelOptions, setConversationStore]);
+  }, [activeConversationId, isRunning, model, modelOptions, setConversationStore]);
 
   useEffect(() => {
-    if (thinkingOptions.length === 0) {
+    if (thinkingOptions.length === 0 || isRunning) {
       return;
     }
 
@@ -472,7 +488,7 @@ export const AgentChatPanel = ({
         })
       );
     }
-  }, [activeConversationId, setConversationStore, thinkingEffort, thinkingOptions]);
+  }, [activeConversationId, isRunning, setConversationStore, thinkingEffort, thinkingOptions]);
 
   const appendEvents = (conversationId: string, nextEvents: AgentConversationEvent[]): void => {
     setConversationStore(currentStore =>
@@ -614,7 +630,7 @@ export const AgentChatPanel = ({
     }
 
     const runMode = conversation.mode ?? defaultMode;
-    const runModel = conversation.model ?? modelOptions[0]?.id ?? '';
+    const runModel = conversation.model ?? '';
     const runSelectedModel = modelOptions.find(option => option.id === runModel);
     const runThinkingOptions = runSelectedModel?.variants ?? [];
     const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
@@ -706,6 +722,17 @@ export const AgentChatPanel = ({
         // Clean up the run state first so compactConversation's running-conversation check passes.
         cleanupRun();
 
+        // A stopped or aborted run drops its pending message. A clean end leaves it for the
+        // Drain effect, which runs after this run's last events are committed to the store.
+        if (
+          !shouldSendQueuedMessage({
+            aborted: runState.abort.signal.aborted,
+            queued: store.get(queuedMessageAtomFamily(conversationId)),
+          })
+        ) {
+          store.set(queuedMessageAtomFamily(conversationId), undefined);
+        }
+
         if (runState.currentRunHasUsage() && ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
           void compactConversation(conversationId);
         }
@@ -713,9 +740,15 @@ export const AgentChatPanel = ({
     }
   };
 
-  const submitMessage = (text: string): void => {
-    const conversation = getActiveStoredConversation(conversationStoreRef.current);
-    const conversationId = conversation.id;
+  const submitMessage = (conversationId: string, text: string): void => {
+    const conversation = conversationStoreRef.current.conversations.find(
+      candidate => candidate.id === conversationId
+    );
+
+    if (conversation === undefined) {
+      return;
+    }
+
     const conversationEvents = conversation.events;
     const runSelectedTabId = getSelectedInspectableTabId({
       activeTabId,
@@ -751,30 +784,35 @@ export const AgentChatPanel = ({
   const submitDraft = (): void => {
     const text = store.get(draftAtomFamily(activeConversationId)).trim();
     const conversation = getActiveStoredConversation(conversationStoreRef.current);
-    const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
-    const conversationSelectedTabId = getSelectedInspectableTabId({
-      activeTabId,
-      inspectableTabs,
-      selectedTabId: conversation.selectedTabId,
+    const action = resolveSendAction({
+      hasModel: isModelInCatalog(conversation.model ?? ''),
+      hasTargetTab:
+        getSelectedInspectableTabId({
+          activeTabId,
+          inspectableTabs,
+          selectedTabId: conversation.selectedTabId,
+        }) !== undefined,
+      isCompacting: store.get(compactingConversationIdsAtom).includes(conversation.id),
+      isRunning: store.get(runningConversationIdsAtom).includes(conversation.id),
+      isStoreLoaded: isConversationStoreLoaded,
+      text,
     });
-    const isConversationRunning = store.get(runningConversationIdsAtom).includes(conversation.id);
-    const isConversationCompacting = store
-      .get(compactingConversationIdsAtom)
-      .includes(conversation.id);
 
-    if (
-      !isConversationStoreLoaded ||
-      text === '' ||
-      isConversationRunning ||
-      isConversationCompacting ||
-      conversationModel === '' ||
-      conversationSelectedTabId === undefined
-    ) {
+    if (action === 'ignore') {
       return;
     }
 
     store.set(draftAtomFamily(activeConversationId), '');
-    submitMessage(text);
+
+    // A send during a run queues one pending message for the next turn.
+    if (action === 'queue') {
+      store.set(queuedMessageAtomFamily(conversation.id), current =>
+        appendQueuedMessage(current, text)
+      );
+      return;
+    }
+
+    submitMessage(conversation.id, text);
   };
 
   const stopRun = (): void => {
@@ -800,7 +838,7 @@ export const AgentChatPanel = ({
         return;
       }
       const conversationId = conversation.id;
-      const runModel = conversation.model ?? modelOptions[0]?.id ?? '';
+      const runModel = conversation.model ?? '';
       const runSelectedTabId = getSelectedInspectableTabId({
         activeTabId,
         inspectableTabs,
@@ -811,7 +849,12 @@ export const AgentChatPanel = ({
       const isCompactingNow = store.get(compactingConversationIdsAtom).includes(conversationId);
       const isRunningNow = store.get(runningConversationIdsAtom).includes(conversationId);
 
-      if (!isConversationStoreLoaded || runModel === '' || isCompactingNow || isRunningNow) {
+      if (
+        !isConversationStoreLoaded ||
+        !isModelInCatalog(runModel) ||
+        isCompactingNow ||
+        isRunningNow
+      ) {
         return;
       }
 
@@ -833,6 +876,16 @@ export const AgentChatPanel = ({
           currentIds.filter(currentId => currentId !== conversationId)
         );
         store.set(streamingMessageIdAtomFamily(conversationId), undefined);
+
+        // Same rule as startTurn's finally: an aborted run drops its pending message.
+        if (
+          !shouldSendQueuedMessage({
+            aborted: runState.abort.signal.aborted,
+            queued: store.get(queuedMessageAtomFamily(conversationId)),
+          })
+        ) {
+          store.set(queuedMessageAtomFamily(conversationId), undefined);
+        }
       };
 
       // Build user message with system environment including workflows index.
@@ -938,6 +991,46 @@ export const AgentChatPanel = ({
     workflows,
   ]);
 
+  /*
+   * Drain a queued message once its conversation is idle. This must be an effect, not part
+   * of startTurn's finally: React batches the run's last setConversationStore calls, so
+   * conversationStoreRef.current is only current after the commit, and a drain inside the
+   * finally would build the next request without the turn it is answering. A conversation
+   * whose stored model is not in the loaded catalog keeps waiting; the model-repair effect
+   * repairs the model and re-runs this one through the modelOptions dependency.
+   */
+  useEffect(() => {
+    if (!isConversationStoreLoaded) {
+      return;
+    }
+
+    const runningIds = store.get(runningConversationIdsAtom);
+    const compactingIds = store.get(compactingConversationIdsAtom);
+
+    for (const conversation of conversationStoreRef.current.conversations) {
+      const queued = store.get(queuedMessageAtomFamily(conversation.id));
+
+      if (
+        queued !== undefined &&
+        !runningIds.includes(conversation.id) &&
+        !compactingIds.includes(conversation.id) &&
+        isModelInCatalog(conversation.model ?? '')
+      ) {
+        // Clear before sending so a failing send cannot re-queue itself.
+        store.set(queuedMessageAtomFamily(conversation.id), undefined);
+        submitMessage(conversation.id, queued);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- submitMessage and isModelInCatalog are component-scope helpers reading refs for latest values; listing them would loop every render. The listed deps are the only triggers: a run or compaction ending, a catalog change, or a stored conversation update such as the model repair.
+  }, [
+    compactingConversationIds,
+    conversationStore,
+    isConversationStoreLoaded,
+    modelOptions,
+    runningConversationIds,
+    store,
+  ]);
+
   const createConversation = (): void => {
     if (!isConversationStoreLoaded || isCreateDefaultInFlightRef.current) {
       return;
@@ -1011,6 +1104,8 @@ export const AgentChatPanel = ({
       // Required: deleting run-state makes the run's later finally see isCurrentRun() === false
       // And skip cleanup; without this, close/delete mid-stream leaks a stale streaming id.
       store.set(streamingMessageIdAtomFamily(conversationId), undefined);
+      // A closed, deleted or signed-out conversation can never drain its pending message.
+      store.set(queuedMessageAtomFamily(conversationId), undefined);
       setRunningConversationIds(currentIds =>
         currentIds.filter(currentId => currentId !== conversationId)
       );
@@ -1110,7 +1205,7 @@ export const AgentChatPanel = ({
   );
 
   useEffect(() => {
-    if (!isConversationStoreLoaded) {
+    if (!isConversationStoreLoaded || !isVisible) {
       onHeaderBeforeSettingsChange?.();
 
       return () => {
@@ -1137,9 +1232,16 @@ export const AgentChatPanel = ({
     deleteConversation,
     historyConversations,
     isConversationStoreLoaded,
+    isVisible,
     onHeaderBeforeSettingsChange,
     openConversationFromHistory,
   ]);
+
+  // Hidden means DOM-free, not unmounted: the run state, abort controllers and conversation
+  // Store live in this component, so a panel-mode change must not unmount it.
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1179,7 +1281,7 @@ export const AgentChatPanel = ({
           isRunning={isRunning}
           isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
-          model={modelControlValue}
+          model={model}
           modelLoadError={modelLoadError}
           modelOptions={modelOptions}
           onModeChange={nextMode => {

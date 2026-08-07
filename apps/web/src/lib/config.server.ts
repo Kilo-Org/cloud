@@ -188,8 +188,6 @@ export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PR
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
-// Encrypts the Slack bot token at rest in the Chat SDK state store (AES-256-GCM).
-// Must decode to exactly 32 bytes (64-char hex or 44-char base64).
 export const SLACK_ENCRYPTION_KEY = getEnvVariable('SLACK_ENCRYPTION_KEY');
 // Posts notifications from server-side Admin UI code to a fixed Slack channel.
 // Expected to be a Slack Incoming Webhook URL. Keep this server-only.

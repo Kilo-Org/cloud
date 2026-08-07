@@ -827,11 +827,15 @@ describe('createExtensionAgentSessionManager', () => {
       expect(trpc.activeSessions.list.query).not.toHaveBeenCalled();
     });
 
-    it('returns the empty snapshot promptly for a running session without blocking on the retry loop', async () => {
+    it('returns the empty snapshot promptly for a running session with a watermark without blocking on the retry loop', async () => {
       const trpc = makeTrpcMock();
       const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
       trpc.activeSessions.list.query = listQuery;
-      const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+      const pageQuery = mockQuery({
+        history: null,
+        kiloSessionId: SESSION_ID,
+        watermarkEventId: 42,
+      });
       trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
       const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
       createExtensionAgentSessionManager(opts);
@@ -841,9 +845,10 @@ describe('createExtensionAgentSessionManager', () => {
        * Round-14 regression state: a reopened running CLI session's initial
        * page is empty and the session is confirmed working. The old code ran
        * the bounded 120-second history retry, blocking the session switch and
-       * the WebSocket transport that would replay the persisted events. The
-       * empty page must resolve immediately so the transport can connect and
-       * replay from the page watermark.
+       * the WebSocket transport that would replay the persisted events. When
+       * the page carries a usable event-log watermark, the empty page must
+       * resolve immediately so the transport can connect and replay every
+       * stored event from that watermark.
        */
       const result = await resultPromise;
       expect(result).toStrictEqual({
@@ -852,10 +857,70 @@ describe('createExtensionAgentSessionManager', () => {
         messages: [],
         nextCursor: null,
         omittedItemCount: 0,
+        watermarkEventId: 42,
       });
-      // The confirmed-running session must not start the delayed-page retry.
+      // The confirmed-running session with a watermark must not start the delayed-page retry.
       expect(pageQuery).toHaveBeenCalledTimes(1);
       expect(listQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a confirmed-running empty page without a watermark until persisted messages appear', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * Cumulative-review regression state: the reopened running CLI session
+         * lists busy on the gate read and its initial page is empty, but the
+         * tRPC result carries no `watermarkEventId` (remote CLI transport has
+         * no watermark replay path, and Cloud Agent can omit the watermark
+         * when its optional lookup fails). With no watermark there is nothing
+         * for the transport to replay, so resolving the empty page immediately
+         * would hide the already-persisted messages. The bounded history
+         * recovery must keep reading until the page carries them.
+         */
+        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        /*
+         * The persisted page lags the running turn: the initial read and the
+         * first retry read are empty, then the persisted user message arrives.
+         */
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // The initial read resolves immediately; two retry sleeps then elapse.
+        await vi.advanceTimersByTimeAsync(2000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        // Initial read plus the two retry reads; the message page ends the retry.
+        expect(pageQuery).toHaveBeenCalledTimes(3);
+        // Only the gate read confirms the session; the retry rechecks liveness later.
+        expect(listQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('keeps retrying through the liveness probe until a late-persisted page arrives', async () => {
@@ -916,18 +981,20 @@ describe('createExtensionAgentSessionManager', () => {
       }
     });
 
-    it('returns the empty snapshot promptly when the running session page carries zero messages', async () => {
+    it('returns the empty snapshot promptly when the running session page carries zero messages and a watermark', async () => {
       const trpc = makeTrpcMock();
       const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
       trpc.activeSessions.list.query = listQuery;
       /*
        * A page with zero messages (a session row exists but no message has
        * been materialized) is empty just like a null history, so a
-       * confirmed-running session must resolve it immediately too.
+       * confirmed-running session with a usable watermark must resolve it
+       * immediately too and let the transport replay from the watermark.
        */
       const pageQuery = mockQuery({
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         kiloSessionId: SESSION_ID,
+        watermarkEventId: 9,
       });
       trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
       const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
@@ -940,6 +1007,7 @@ describe('createExtensionAgentSessionManager', () => {
         messages: [],
         nextCursor: null,
         omittedItemCount: 0,
+        watermarkEventId: 9,
       });
       expect(pageQuery).toHaveBeenCalledTimes(1);
       expect(listQuery).toHaveBeenCalledTimes(1);

@@ -328,11 +328,15 @@ function pinPageToSession(
  * A running CLI session can read empty for a long stretch: the CLI batches
  * session-ingest until the turn completes, so the persisted page lags the
  * live turn. A confirmed-running session resolves that empty page
- * immediately — the bounded history retry would hold the snapshot (and the
- * session switch) for up to `ACTIVE_HISTORY_MAX_RETRIES` seconds while the
- * page stays empty for the whole turn. The bounded recovery still runs for a
- * session that is not yet confirmed working and turns busy within the
- * liveness window, where persistence typically catches up quickly.
+ * immediately only when the page carries a usable event-log watermark: the
+ * transport replays every stored event from that watermark, so the snapshot
+ * (and the session switch) is not held for up to `ACTIVE_HISTORY_MAX_RETRIES`
+ * seconds while the page stays empty for the whole turn. Without a watermark
+ * there is no transport replay path, so the bounded history recovery keeps
+ * reading until the page carries the persisted messages or the session stops
+ * running. The liveness-grace recovery still runs for a session that is not
+ * yet confirmed working and turns busy within the liveness window, where
+ * persistence typically catches up quickly.
  *
  * Both page outcomes forward the tRPC result's `watermarkEventId` (when the
  * server returned one) so the transport seeds its first WebSocket connect
@@ -370,15 +374,16 @@ async function fetchExtensionSessionSnapshotPage(
      * single idle or missing liveness read must not latch the empty
      * transcript.
      *
-     * A confirmed-working session resolves its empty page immediately: the
-     * persisted page can stay empty for the whole turn, so the bounded
-     * history retry would hold the snapshot (and the session switch) for up
-     * to `ACTIVE_HISTORY_MAX_RETRIES` seconds while the transport never
-     * connects. Resolving promptly lets the transport connect and replay
-     * every stored event from the page watermark, so the persisted transcript
-     * still renders for a reopened running session without the page retry.
+     * A confirmed-working session resolves its empty page immediately only
+     * when the page carries a usable event-log watermark: the transport
+     * seeds its first WebSocket connect from that watermark, so every stored
+     * event replays and the persisted transcript renders without the page
+     * retry. Without a watermark there is no replay path — the already
+     * persisted messages would stay invisible — so the bounded history
+     * recovery keeps reading until the page carries them or the session stops
+     * running.
      *
-     * Only a session that is not confirmed working gets the bounded liveness
+     * A session that is not confirmed working gets the bounded liveness
      * probe: it re-checks `activeSessions.list` for a fixed number of reads
      * and runs the bounded history recovery when the session becomes busy; a
      * stably idle or absent session resolves the empty page when the window
@@ -400,6 +405,16 @@ async function fetchExtensionSessionSnapshotPage(
     }
     if (active !== null && !isSessionWorking(active)) {
       result = await readActiveHistoryWithLivenessGrace(result, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
+    } else if (
+      active !== null &&
+      isSessionWorking(active) &&
+      (result.watermarkEventId === null || result.watermarkEventId === undefined)
+    ) {
+      result = await readActiveHistoryWithRetry(result, {
         fetchActiveSessions,
         isSessionWorking,
         queryPage,

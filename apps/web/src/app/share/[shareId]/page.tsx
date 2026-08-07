@@ -27,7 +27,7 @@ import { cookies } from 'next/headers';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { validate as isValidUUID } from 'uuid';
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
 /**
  * Extracts text content from a blob message based on its type.
@@ -85,6 +85,8 @@ export default async function SharePage({
   params: Promise<{ shareId: string }>;
   searchParams: Promise<NextAppSearchParams>;
 }) {
+  notFound();
+
   const { shareId } = await params;
   const resolvedSearchParams = await searchParams;
   const cookieStore = await cookies();

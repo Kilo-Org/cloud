@@ -4,7 +4,10 @@ import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import { syncAutoDeciderModels } from './auto-decider-sync';
 import type { HonoEnv } from './hono-env';
-import { processJob, type BenchmarkJobMessage } from './run';
+import { processDeadLetter, processJob, type BenchmarkJobMessage } from './run';
+
+// Queue name of the dead-letter queue, matched against batch.queue.
+const DLQ_NAME = 'auto-routing-benchmark-dlq';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
 export { BenchRunnerContainer } from './bench-runner-container';
@@ -31,6 +34,19 @@ export default {
     );
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
+    // Dead-lettered messages: record the lane death and try to finalize the
+    // run. Same retry contract as the jobs branch: a throw (transient D1
+    // failure after the death was recorded) skips the ack so the message
+    // retries and finalization is re-attempted. A message still failing after
+    // max_retries is dropped (the DLQ has no DLQ); the stale sweep remains
+    // the backstop for runs that never finalize.
+    if (batch.queue === DLQ_NAME) {
+      for (const message of batch.messages) {
+        await processDeadLetter(env, message.body);
+        message.ack();
+      }
+      return;
+    }
     for (const message of batch.messages) {
       // Deliberately no try/catch: a throw from processJob (transient token,
       // D1 or container failures) must skip the ack so the queue retries the

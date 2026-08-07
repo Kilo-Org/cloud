@@ -28,6 +28,7 @@ import {
 import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
+import { formatZodError } from '@/lib/zod/format-zod-error';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
@@ -92,8 +93,17 @@ export function CustomLlmsContent() {
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!editor.publicId.trim()) {
+    const trimmedPublicId = editor.publicId.trim();
+    if (!trimmedPublicId) {
       setEditor(prev => ({ ...prev, validationError: 'public_id is required' }));
+      return;
+    }
+
+    if (!trimmedPublicId.startsWith(CUSTOM_LLM_PREFIX)) {
+      setEditor(prev => ({
+        ...prev,
+        validationError: `public_id must start with "${CUSTOM_LLM_PREFIX}"`,
+      }));
       return;
     }
 
@@ -107,22 +117,19 @@ export function CustomLlmsContent() {
 
     const result = StrictCustomLlmDefinitionSchema.safeParse(parsed);
     if (!result.success) {
-      const messages = result.error.issues
-        .map(issue => `${issue.path.join('.')}: ${issue.message}`)
-        .join('\n');
-      setEditor(prev => ({ ...prev, validationError: messages }));
+      setEditor(prev => ({ ...prev, validationError: formatZodError(result.error) }));
       return;
     }
 
     try {
       await upsertMutation.mutateAsync({
-        public_id: editor.publicId,
+        public_id: trimmedPublicId,
         definition: result.data,
       });
       toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
       closeEditor();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save');
+      toast.error(formatZodError(error));
     }
   }, [editor, upsertMutation, closeEditor]);
 
@@ -132,7 +139,7 @@ export function CustomLlmsContent() {
         await deleteMutation.mutateAsync({ public_id: publicId });
         toast.success('Custom LLM deleted');
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to delete');
+        toast.error(formatZodError(error));
       }
     },
     [deleteMutation]

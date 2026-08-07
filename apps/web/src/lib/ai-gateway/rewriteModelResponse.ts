@@ -3,7 +3,7 @@ import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -35,6 +35,33 @@ export type RequestLoggingParams = {
   session_id: string | null;
   vercel_request_id: string | null;
   request: GatewayRequest;
+};
+
+export type LogUnrewrittenResponseParams = {
+  response: Response;
+  model: string;
+  providerId: ProviderId;
+  logging: RequestLoggingParams;
+};
+
+export type RewriteResponseParams = {
+  response: Response;
+  removeCost: boolean;
+  capture: RequestLogCapture | null;
+  vercelRequestId: string | null;
+};
+
+export type RewriteChatCompletionsResponseParams = RewriteResponseParams & {
+  responseTransforms: ProviderResponseTransforms | null;
+};
+
+export type RewriteModelResponseParams = {
+  response: Response;
+  model: string;
+  providerId: ProviderId;
+  kind: GatewayRequest['kind'];
+  logging: RequestLoggingParams;
+  responseTransforms: ProviderResponseTransforms | null;
 };
 
 type CapturedResponseBody =
@@ -139,12 +166,12 @@ async function createRequestLogCapture(
 }
 
 /** For paths where the upstream response is not passed through rewriteModelResponse. */
-export async function logUnrewrittenResponse(
-  response: Response,
-  model: string,
-  providerId: ProviderId,
-  logging: RequestLoggingParams
-): Promise<void> {
+export async function logUnrewrittenResponse({
+  response,
+  model,
+  providerId,
+  logging,
+}: LogUnrewrittenResponseParams): Promise<void> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   if (!capture) {
     return;
@@ -351,12 +378,41 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
   }
 }
 
-export async function rewriteModelResponse_ChatCompletions(
-  response: Response,
-  removeCost: boolean,
-  capture: RequestLogCapture | null,
-  vercelRequestId: string | null
-) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getPropertyPath(target: unknown, path: string): unknown {
+  let current = target;
+  for (const segment of path.split('.')) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+function rewriteThoughtContent(delta: unknown, path: string) {
+  if (
+    !isRecord(delta) ||
+    typeof delta.content !== 'string' ||
+    getPropertyPath(delta, path) !== true
+  ) {
+    return;
+  }
+
+  delta.reasoning_content = delta.content;
+  delete delta.content;
+}
+
+export async function rewriteModelResponse_ChatCompletions({
+  response,
+  removeCost,
+  capture,
+  vercelRequestId,
+  responseTransforms,
+}: RewriteChatCompletionsResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -430,11 +486,17 @@ export async function rewriteModelResponse_ChatCompletions(
             });
           }
 
-          const delta = json.choices?.[0]?.delta;
-          if (delta) {
+          for (const choice of json.choices ?? []) {
+            const delta = choice.delta;
+            if (!delta) {
+              continue;
+            }
             // Some APIs set null here, which is not accepted by OpenCode
-            if (delta?.role === null) {
+            if (delta.role === null) {
               delete delta.role;
+            }
+            if (responseTransforms?.thoughtContentMapping) {
+              rewriteThoughtContent(delta, responseTransforms.thoughtContentMapping);
             }
           }
 
@@ -530,12 +592,12 @@ function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
   }
 }
 
-export async function rewriteModelResponse_Messages(
-  response: Response,
-  removeCost: boolean,
-  capture: RequestLogCapture | null,
-  vercelRequestId: string | null
-) {
+export async function rewriteModelResponse_Messages({
+  response,
+  removeCost,
+  capture,
+  vercelRequestId,
+}: RewriteResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -686,12 +748,12 @@ type ResponsesApiEvent = {
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
-export async function rewriteModelResponse_Responses(
-  response: Response,
-  removeCost: boolean,
-  capture: RequestLogCapture | null,
-  vercelRequestId: string | null
-) {
+export async function rewriteModelResponse_Responses({
+  response,
+  removeCost,
+  capture,
+  vercelRequestId,
+}: RewriteResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -831,13 +893,14 @@ export async function rewriteModelResponse_Responses(
   });
 }
 
-export async function rewriteModelResponse(
-  response: Response,
-  model: string,
-  providerId: ProviderId,
-  kind: GatewayRequest['kind'],
-  logging: RequestLoggingParams
-): Promise<NextResponse> {
+export async function rewriteModelResponse({
+  response,
+  model,
+  providerId,
+  kind,
+  logging,
+  responseTransforms,
+}: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const requiresCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') &&
@@ -846,18 +909,29 @@ export async function rewriteModelResponse(
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
   if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(
+    return rewriteModelResponse_ChatCompletions({
       response,
-      requiresCostRemoval,
+      removeCost: requiresCostRemoval,
       capture,
-      vercelRequestId
-    );
+      vercelRequestId,
+      responseTransforms,
+    });
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, requiresCostRemoval, capture, vercelRequestId);
+    return rewriteModelResponse_Responses({
+      response,
+      removeCost: requiresCostRemoval,
+      capture,
+      vercelRequestId,
+    });
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, requiresCostRemoval, capture, vercelRequestId);
+    return rewriteModelResponse_Messages({
+      response,
+      removeCost: requiresCostRemoval,
+      capture,
+      vercelRequestId,
+    });
   }
 
   const error = new Error(`implementation error: unrecognized API kind ${kind}`);

@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { OFFLINE_BANNER_SHOW_DELAY_MS } from '@/lib/offline-banner-state';
 
 type ConnectivityState = { isConnected: boolean | null; isInternetReachable: boolean | null };
 
@@ -71,7 +72,7 @@ describe('useOfflineBannerState mounted', () => {
     vi.useRealTimers();
   });
 
-  it('subscribes once, flips after the debounce in both directions, and cleans up on unmount', async () => {
+  it('subscribes once, shows after the delay, hides at once, and cleans up on unmount', async () => {
     vi.useFakeTimers();
 
     const renderer = await renderProbe();
@@ -85,17 +86,12 @@ describe('useOfflineBannerState mounted', () => {
     expect(textChildren(renderer)).toEqual(['false']);
 
     act(() => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(OFFLINE_BANNER_SHOW_DELAY_MS);
     });
     expect(textChildren(renderer)).toEqual(['true']);
 
     act(() => {
       netinfo.emit({ isConnected: true, isInternetReachable: true });
-    });
-    expect(textChildren(renderer)).toEqual(['true']);
-
-    act(() => {
-      vi.advanceTimersByTime(1000);
     });
     expect(textChildren(renderer)).toEqual(['false']);
 
@@ -109,7 +105,7 @@ describe('useOfflineBannerState mounted', () => {
 
       act(() => {
         netinfo.emit({ isConnected: false, isInternetReachable: false });
-        vi.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(OFFLINE_BANNER_SHOW_DELAY_MS);
       });
 
       expect(renderer.toJSON()).toBeNull();

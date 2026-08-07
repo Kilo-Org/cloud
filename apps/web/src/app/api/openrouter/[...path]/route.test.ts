@@ -14,7 +14,7 @@ import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decisi
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse } from '@/lib/ai-gateway/rewriteModelResponse';
 import { readDb } from '@/lib/drizzle';
 import {
   checkFreeModelRateLimit,
@@ -74,14 +74,16 @@ jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   getToolsAvailable: jest.fn(() => false),
   getToolsUsed: jest.fn(() => false),
 }));
-jest.mock('@/lib/rewriteModelResponse', () => {
-  const actual = jest.requireActual('@/lib/rewriteModelResponse');
+jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
+  const actual = jest.requireActual('@/lib/ai-gateway/rewriteModelResponse');
   const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
   return {
     ...actual,
     // Mirror the production passthrough; these tests exercise the route, not
     // the response rewrite.
-    rewriteModelResponse: jest.fn(async (response: Response) => wrapInSafeNextResponse(response)),
+    rewriteModelResponse: jest.fn(async ({ response }: { response: Response }) =>
+      wrapInSafeNextResponse(response)
+    ),
   };
 });
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
@@ -134,6 +136,7 @@ const provider = {
   apiUrl: 'https://openrouter.ai/api/v1',
   apiKey: 'test-key',
   supportedChatApis: ['chat_completions', 'responses', 'messages'],
+  responseTransforms: null,
   transformRequest: jest.fn(),
 } satisfies Provider;
 
@@ -287,11 +290,28 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
+      expect.objectContaining({
+        logging: expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
+        responseTransforms: null,
+      })
+    );
+  });
+
+  it('passes provider response transforms to the response rewriter', async () => {
+    const responseTransforms = { thoughtContentMapping: 'extra_content.flags.thought' };
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, responseTransforms },
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    const { POST } = await import('./route');
+
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ responseTransforms })
     );
   });
 

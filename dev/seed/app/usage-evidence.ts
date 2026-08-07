@@ -2,7 +2,7 @@ import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/sche
 import { and, desc, eq, gt } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
-import { isValidEmail, resolveUserId } from '../lib/resolve-user';
+import { isValidEmail, resolveSeedUserId } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email> [--since <ISO-8601>]';
@@ -83,7 +83,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const { email, since } = parseArgs(args);
-  const userId = await resolveUserId(email);
+  const userId = await resolveSeedUserId(email);
   const db = getSeedDb();
 
   // Filter first, then cap: a --since window never discards an in-window row.

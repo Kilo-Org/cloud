@@ -54,7 +54,10 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
+import {
+  rewriteModelResponse,
+  logUnrewrittenResponse,
+} from '@/lib/ai-gateway/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -1024,21 +1027,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
-      await logUnrewrittenResponse(
+      await logUnrewrittenResponse({
         response,
-        effectiveModelIdLowerCased,
-        effectiveProviderContext.provider.id,
-        requestLogging
-      );
+        model: effectiveModelIdLowerCased,
+        providerId: effectiveProviderContext.provider.id,
+        logging: requestLogging,
+      });
       return errorResponse;
     }
   }
 
-  return await rewriteModelResponse(
+  return await rewriteModelResponse({
     response,
-    effectiveModelIdLowerCased,
-    effectiveProviderContext.provider.id,
-    requestBodyParsed.kind,
-    requestLogging
-  );
+    model: effectiveModelIdLowerCased,
+    providerId: effectiveProviderContext.provider.id,
+    kind: requestBodyParsed.kind,
+    logging: requestLogging,
+    responseTransforms: effectiveProviderContext.provider.responseTransforms,
+  });
 }

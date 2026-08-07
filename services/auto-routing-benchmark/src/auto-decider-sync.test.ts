@@ -79,7 +79,7 @@ describe('syncAutoDeciderModels', () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       config,
       classifierModels: ['classifier/model'],
-      deciderModels: [{ model: 'manual/model', reasoning_effort: null }],
+      deciderModels: [{ model: 'manual/model', variant: null, reasoning_effort: null }],
       autoDeciderModels: [
         {
           model: 'auto/existing',
@@ -167,7 +167,7 @@ describe('syncAutoDeciderModels', () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       config,
       classifierModels: ['classifier/model'],
-      deciderModels: [{ model: 'manual/model', reasoning_effort: null }],
+      deciderModels: [{ model: 'manual/model', variant: null, reasoning_effort: null }],
       autoDeciderModels: [
         {
           model: 'auto/existing',

@@ -12,8 +12,8 @@ type ModelBadgeOption = ModelDataDisclosure & {
 /**
  * Badge predicates for the model selector pill and picker rows.
  * Input contract: a post-normalization SessionModelOption (both call sites
- * pass one: ModelSelector maps options through toSessionModelOption at
- * model-selector.tsx:140, and the picker bridge carries SessionModelOption).
+ * pass one: ModelSelector maps options through toSessionModelOption in
+ * model-selector.tsx, and the picker bridge carries SessionModelOption).
  * BYOK is per-user account state, not gateway metadata: the CLI passes the
  * backend's hasUserByokAvailable through the v1 wire catalog, so the badge
  * must render for CLI-catalog options too. Free/data-collection stay gated

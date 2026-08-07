@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { encryptCredential, requireEncryptionKey } from '../lib/byok';
 import { getSeedDb } from '../lib/db';
-import { isValidEmail, resolveUserId } from '../lib/resolve-user';
+import { isValidEmail, resolveSeedUserId } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email> <provider> <model-id>';
@@ -61,7 +61,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Unknown arguments: ${rest.join(' ')}`);
   }
 
-  const userId = await resolveUserId(email);
+  const userId = await resolveSeedUserId(email);
   const db = getSeedDb();
 
   // Reset and replace this topic's own data in one transaction: key deletion, key

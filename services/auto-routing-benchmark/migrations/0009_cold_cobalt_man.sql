@@ -1,0 +1,1 @@
+ALTER TABLE `config_decider_models` ADD `variant` text;

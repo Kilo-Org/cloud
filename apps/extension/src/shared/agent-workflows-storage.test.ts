@@ -1,9 +1,14 @@
 /* eslint-disable max-lines -- Contract review repairs added tests for pathPrefix/startUrl clearing; splitting would obscure coverage. */
 import { describe, expect, it } from 'vitest';
-import { MAX_WORKFLOW_COUNT, MAX_WORKFLOW_SCRIPT_LENGTH } from './agent-workflows';
+import {
+  DEFAULT_WORKFLOW_SETTINGS,
+  MAX_WORKFLOW_COUNT,
+  MAX_WORKFLOW_SCRIPT_LENGTH,
+} from './agent-workflows';
 import type {
   AgentWorkflow,
   AgentWorkflowInput,
+  AgentWorkflowSettings,
   PendingAgentWorkflowDraft,
 } from './agent-workflows';
 import {
@@ -373,28 +378,45 @@ describe('agent workflows storage', () => {
     expect(storage.values.has(PENDING_WORKFLOW_SAVE_STORAGE_KEY)).toBe(false);
   });
 
-  it('loads workflow settings with default false', async () => {
+  it('loads the default settings record when nothing is stored', async () => {
     const storage = createStorage();
     const settings = await loadWorkflowSettings(storage);
-    expect(settings).toStrictEqual({ allowWorkflowsInSafeMode: false });
+    expect(settings).toStrictEqual(DEFAULT_WORKFLOW_SETTINGS);
   });
 
-  it('returns default for corrupt settings', async () => {
+  it('upgrades an old record with new fields defaulted to false', async () => {
     const storage = createStorage();
-    storage.values.set(WORKFLOW_SETTINGS_STORAGE_KEY, { bad: true });
+    storage.values.set(WORKFLOW_SETTINGS_STORAGE_KEY, { allowWorkflowsInSafeMode: true });
     const settings = await loadWorkflowSettings(storage);
-    expect(settings).toStrictEqual({ allowWorkflowsInSafeMode: false });
+    expect(settings).toStrictEqual({
+      allowWorkflowsInSafeMode: true,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: false,
+    });
   });
 
-  it('round-trips workflow settings', async () => {
+  it('returns the default record for malformed settings', async () => {
     const storage = createStorage();
-    await saveWorkflowSettings(storage, { allowWorkflowsInSafeMode: true });
-    const settings = await loadWorkflowSettings(storage);
-    expect(settings).toStrictEqual({ allowWorkflowsInSafeMode: true });
+    storage.values.set(WORKFLOW_SETTINGS_STORAGE_KEY, 'not-an-object');
+    await expect(loadWorkflowSettings(storage)).resolves.toStrictEqual(DEFAULT_WORKFLOW_SETTINGS);
 
-    await saveWorkflowSettings(storage, { allowWorkflowsInSafeMode: false });
+    storage.values.set(WORKFLOW_SETTINGS_STORAGE_KEY, { allowWorkflowsInSafeMode: 'yes' });
+    await expect(loadWorkflowSettings(storage)).resolves.toStrictEqual(DEFAULT_WORKFLOW_SETTINGS);
+  });
+
+  it('round-trips all three settings flags', async () => {
+    const storage = createStorage();
+    const settings: AgentWorkflowSettings = {
+      allowWorkflowsInSafeMode: true,
+      autoApproveWorkflowChanges: true,
+      autoApproveWorkflowRuns: true,
+    };
+    await saveWorkflowSettings(storage, settings);
+    await expect(loadWorkflowSettings(storage)).resolves.toStrictEqual(settings);
+
+    await saveWorkflowSettings(storage, { ...DEFAULT_WORKFLOW_SETTINGS });
     const reverted = await loadWorkflowSettings(storage);
-    expect(reverted).toStrictEqual({ allowWorkflowsInSafeMode: false });
+    expect(reverted).toStrictEqual(DEFAULT_WORKFLOW_SETTINGS);
   });
 });
 

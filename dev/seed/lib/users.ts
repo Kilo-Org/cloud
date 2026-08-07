@@ -9,7 +9,7 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-export async function resolveUserId(email: string): Promise<string> {
+export async function resolveSeedUserId(email: string): Promise<string> {
   const normalizedEmail = normalizeSeedEmail(email);
   const db = getSeedDb();
   const matches = await db

@@ -189,6 +189,16 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 export const SLACK_ENCRYPTION_KEY = getEnvVariable('SLACK_ENCRYPTION_KEY');
+/**
+ * RSA keyset for encrypting Slack bot credentials at rest, as JSON or base64-encoded
+ * JSON: `{ "active": { "keyId": "...", "publicKeyPem": "..." },
+ * "decrypt": [{ "keyId": "...", "privateKeyPem": "..." }] }`.
+ *
+ * Unlike the GitLab/Bitbucket platform-credential keys, web holds the private half
+ * because the Slack webhook path decrypts in-process. See
+ * `@/lib/integrations/platforms/slack/credential-keyset`.
+ */
+export const SLACK_CREDENTIAL_KEYSET_JSON = getEnvVariable('SLACK_CREDENTIAL_KEYSET_JSON');
 // Posts notifications from server-side Admin UI code to a fixed Slack channel.
 // Expected to be a Slack Incoming Webhook URL. Keep this server-only.
 export const SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(

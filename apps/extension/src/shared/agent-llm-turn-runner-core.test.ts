@@ -163,7 +163,7 @@ describe('agent LLM turn runner core', () => {
     ]);
   });
 
-  it('allows twenty tool rounds before asking the user to continue', async () => {
+  it('allows the shared maxAgentToolRounds tool rounds before asking the user to continue', async () => {
     const appendedEvents: AgentConversationEvent[] = [];
     const responses = createToolOnlyGatewayResponses(maxAgentToolRounds);
     const fetch: FetchLike = () => responses.next().value;
@@ -196,7 +196,9 @@ describe('agent LLM turn runner core', () => {
       updateThinkingBlock: () => {},
     });
 
-    expect(appendedEvents.filter(event => event.type === 'tool-result')).toHaveLength(20);
+    expect(appendedEvents.filter(event => event.type === 'tool-result')).toHaveLength(
+      maxAgentToolRounds
+    );
     expect(appendedEvents.at(-1)).toMatchObject({
       role: 'assistant',
       text: 'Too many tool rounds.',

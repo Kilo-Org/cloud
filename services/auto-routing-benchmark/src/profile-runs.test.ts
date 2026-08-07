@@ -23,12 +23,14 @@ vi.mock('./db', async importOriginal => {
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRunIds: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    markProfilesFailedForEntries: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markRunCompleted: vi.fn(),
     markRunFailed: vi.fn(),
-    countCaseResults: vi.fn(),
+    countCaseResultsByLane: vi.fn(),
+    listLaneFailures: vi.fn(),
     getCaseResults: vi.fn(),
     getExistingCaseResultIds: vi.fn(),
     getSummaries: vi.fn(),
@@ -40,7 +42,7 @@ vi.mock('./db', async importOriginal => {
 });
 
 import {
-  countCaseResults,
+  countCaseResultsByLane,
   existsNewerCompletedRun,
   getCaseResults,
   getConfigRows,
@@ -50,8 +52,10 @@ import {
   getRunWithModels,
   getSummaries,
   insertRun,
+  listLaneFailures,
   listPendingCurrentProfiles,
   listStaleRunningDeciderRunIds,
+  markProfilesFailedForEntries,
   markProfilesFailedForRun,
   markProfilesReadyForRun,
   markProfilesRunningForRun,
@@ -104,8 +108,8 @@ function mockConfig(overrides: Partial<typeof configRow> = {}) {
     // mapConfigRows requires non-empty classifier + decider lists.
     classifierModels: ['classifier/a'],
     deciderModels: [
-      { model: 'platform/a', reasoning_effort: null },
-      { model: 'platform/b', reasoning_effort: 'high' },
+      { model: 'platform/a', variant: null, reasoning_effort: null },
+      { model: 'platform/b', variant: null, reasoning_effort: 'high' },
     ],
     autoDeciderModels: [],
     excludedAutoDeciderModels: [],
@@ -123,10 +127,12 @@ beforeEach(() => {
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
   vi.mocked(markProfilesRunningForRun).mockResolvedValue(undefined);
   vi.mocked(markProfilesReadyForRun).mockResolvedValue(undefined);
+  vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
   vi.mocked(markProfilesFailedForRun).mockResolvedValue(undefined);
   vi.mocked(markRunCompleted).mockResolvedValue(undefined);
   vi.mocked(markRunFailed).mockResolvedValue(undefined);
-  vi.mocked(countCaseResults).mockResolvedValue(0);
+  vi.mocked(countCaseResultsByLane).mockResolvedValue([]);
+  vi.mocked(listLaneFailures).mockResolvedValue([]);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(replaceModelSummaries).mockResolvedValue(undefined);
   vi.mocked(saveRoutingTable).mockResolvedValue(undefined);
@@ -183,6 +189,41 @@ describe('startRun — profile purpose', () => {
     expect(runArg.purpose).toBe('platform');
     expect(modelRows.map(m => m.model).sort()).toEqual(['platform/a', 'platform/b']);
     expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+  });
+
+  it('platform startRun maps a saved canonical variant into the run_models row', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: configRow,
+      classifierModels: ['classifier/a'],
+      deciderModels: [{ model: 'platform/a', variant: 'max', reasoning_effort: null }],
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
+    });
+
+    const result = await startRun(env, 'decider');
+    expect(result.runId).toMatch(/^decider-/);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toEqual([
+      expect.objectContaining({
+        model: 'platform/a',
+        variant: 'max',
+        enqueued: true,
+      }),
+    ]);
+  });
+
+  it("platform startRun keeps a legacy enum effort as today's exact row shape", async () => {
+    // mockConfig() default: platform/b holds reasoning_effort 'high' (legacy shape).
+    const result = await startRun(env, 'decider');
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    const row = modelRows.find(m => m.model === 'platform/b');
+    expect(row).toMatchObject({
+      model: 'platform/b',
+      variant: 'high',
+      enqueued: true,
+      reasoning_effort: 'high',
+    });
+    expect(result.enqueuedModels).toBe(2);
   });
 
   it('rejects profile runs that are not decider or lack entries', async () => {
@@ -250,7 +291,9 @@ describe('profile completion transitions', () => {
     const runId = 'profile-complete-1';
     mockProfileRunState(runId);
     const { DECIDER_CASES } = await import('./datasets/decider-cases');
-    vi.mocked(countCaseResults).mockResolvedValue(DECIDER_CASES.length);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model: 'vendor/m', variant: 'xhigh', rep: 0, n: DECIDER_CASES.length },
+    ]);
     vi.mocked(getCaseResults).mockResolvedValue(
       DECIDER_CASES.map(c => ({
         run_id: runId,
@@ -464,7 +507,9 @@ describe('platform run completion still publishes', () => {
         },
       ],
     });
-    vi.mocked(countCaseResults).mockResolvedValue(DECIDER_CASES.length);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model: 'platform/a', variant: '', rep: 0, n: DECIDER_CASES.length },
+    ]);
     vi.mocked(getCaseResults).mockResolvedValue(
       DECIDER_CASES.map(c => ({
         run_id: runId,

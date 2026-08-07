@@ -73,21 +73,6 @@ const tokenForMatch = (match: RegExpMatchArray): ScriptToken => {
   return 'keyword';
 };
 
-/**
- * Merge adjacent plain spans so the renderer emits few nodes. With the current
- * pattern plain runs are already separated by token matches, but keeping the
- * merge here protects the one-span-per-run contract if the pattern ever grows
- * a zero-width alternative.
- */
-const pushSpan = (spans: ScriptSpan[], span: ScriptSpan): void => {
-  const previous = spans.at(-1);
-  if (previous !== undefined && previous.token === 'plain' && span.token === 'plain') {
-    previous.text += span.text;
-    return;
-  }
-  spans.push(span);
-};
-
 export const highlightScriptLine = (line: string): ScriptSpan[] => {
   const spans: ScriptSpan[] = [];
   let cursor = 0;
@@ -95,13 +80,13 @@ export const highlightScriptLine = (line: string): ScriptSpan[] => {
     const index = match.index ?? 0;
     const text = match[0] ?? '';
     if (index > cursor) {
-      pushSpan(spans, { text: line.slice(cursor, index), token: 'plain' });
+      spans.push({ text: line.slice(cursor, index), token: 'plain' });
     }
-    pushSpan(spans, { text, token: tokenForMatch(match) });
+    spans.push({ text, token: tokenForMatch(match) });
     cursor = index + text.length;
   }
   if (cursor < line.length) {
-    pushSpan(spans, { text: line.slice(cursor), token: 'plain' });
+    spans.push({ text: line.slice(cursor), token: 'plain' });
   }
   return spans;
 };

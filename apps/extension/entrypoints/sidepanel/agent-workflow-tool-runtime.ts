@@ -394,8 +394,8 @@ const executeSaveWorkflow = async (
   };
 
   // The runs toggle is a permission the model reads through the save result's nextStep.
-  // Read the setting before requesting approval. A failed settings read still permits
-  // The save and falls back to the cautious ask-the-user guidance.
+  // Read the setting before requesting approval.
+  // A failed settings read still permits the save and falls back to the cautious ask-the-user guidance.
   let runsAutoApproved = false;
   try {
     const settings = await loadWorkflowSettings(ctx.storage);

@@ -236,10 +236,6 @@ export const requestApproval = async (
   }
   atomStore.set(pendingLockAtom, true);
 
-  // Auto-approve workflow changes when the setting is enabled.
-  // The settings read happens before draft persistence.
-  // An auto-approved save never leaves a pending card or draft.
-  // The lock releases on every exit.
   if (kind === 'workflow') {
     let autoApproveWorkflowChanges = false;
     try {

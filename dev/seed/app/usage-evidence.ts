@@ -1,8 +1,8 @@
-import { kilocode_users, microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
-import { and, desc, eq, gt, or } from 'drizzle-orm';
+import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
+import { and, desc, eq, gt } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
-import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail, resolveUserId } from '../lib/resolve-user';
 import type { SeedResult } from '../index';
 
 export const usage = '<email> [--since <ISO-8601>]';
@@ -24,42 +24,6 @@ function printUsage(): void {
   console.log(
     '  pnpm -s dev:seed app:usage-evidence ada@example.com --since 2026-08-07T12:00:00Z --json'
   );
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-async function resolveUserId(email: string): Promise<string> {
-  const normalizedEmail = normalizeSeedEmail(email);
-  const db = getSeedDb();
-  const matches = await db
-    .select({
-      userId: kilocode_users.id,
-      email: kilocode_users.google_user_email,
-    })
-    .from(kilocode_users)
-    .where(
-      or(
-        eq(kilocode_users.google_user_email, email),
-        eq(kilocode_users.normalized_email, normalizedEmail)
-      )
-    );
-
-  if (matches.length === 0) {
-    throw new Error(`No user found for email ${email}`);
-  }
-
-  const exactMatches = matches.filter(match => match.email === email);
-  const resolvedMatches = exactMatches.length > 0 ? exactMatches : matches;
-  if (resolvedMatches.length > 1) {
-    const matchList = resolvedMatches.map(match => `${match.email} (${match.userId})`).join(', ');
-    throw new Error(`Multiple users matched ${email}: ${matchList}`);
-  }
-
-  const [user] = resolvedMatches;
-  return user.userId;
 }
 
 type UsageEvidenceOptions = {
@@ -128,7 +92,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     conditions.push(gt(microdollar_usage.created_at, since));
   }
 
-  // Plan section 317: select every plan-required per-row field. The metadata half can be
+  // Select every plan-required per-row field. The metadata half can be
   // null for a row without it, so all metadata fields stay nullable-safe in the row type.
   const rows = await db
     .select({

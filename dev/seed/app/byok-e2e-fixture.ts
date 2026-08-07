@@ -1,11 +1,11 @@
-import { byok_api_keys, kilocode_users, modelsByProvider } from '@kilocode/db/schema';
+import { byok_api_keys, modelsByProvider } from '@kilocode/db/schema';
 import { StoredModelSchema } from '@kilocode/db/schema-types';
-import { and, desc, eq, or, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { encryptCredential, requireEncryptionKey } from '../lib/byok';
 import { getSeedDb } from '../lib/db';
-import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail, resolveUserId } from '../lib/resolve-user';
 import type { SeedResult } from '../index';
 
 export const usage = '<email> <provider> <model-id>';
@@ -27,42 +27,6 @@ function printUsage(): void {
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:byok-e2e-fixture ada@example.com minimax minimax/minimax-m2.5');
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-async function resolveUserId(email: string): Promise<string> {
-  const normalizedEmail = normalizeSeedEmail(email);
-  const db = getSeedDb();
-  const matches = await db
-    .select({
-      userId: kilocode_users.id,
-      email: kilocode_users.google_user_email,
-    })
-    .from(kilocode_users)
-    .where(
-      or(
-        eq(kilocode_users.google_user_email, email),
-        eq(kilocode_users.normalized_email, normalizedEmail)
-      )
-    );
-
-  if (matches.length === 0) {
-    throw new Error(`No user found for email ${email}`);
-  }
-
-  const exactMatches = matches.filter(match => match.email === email);
-  const resolvedMatches = exactMatches.length > 0 ? exactMatches : matches;
-  if (resolvedMatches.length > 1) {
-    const matchList = resolvedMatches.map(match => `${match.email} (${match.userId})`).join(', ');
-    throw new Error(`Multiple users matched ${email}: ${matchList}`);
-  }
-
-  const [user] = resolvedMatches;
-  return user.userId;
 }
 
 export async function run(...args: string[]): Promise<SeedResult | void> {

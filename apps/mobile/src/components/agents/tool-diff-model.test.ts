@@ -160,19 +160,19 @@ describe('buildToolDiffModel — edit tool', () => {
   });
 
   it('truncates oldString and newString at the character cap', () => {
-    const longOld = 'a'.repeat(EDIT_CHAR_CAP + 50);
-    const longNew = 'b'.repeat(EDIT_CHAR_CAP + 10);
+    const longOld = 'a'.repeat(EDIT_CHARACTER_CAP + 50);
+    const longNew = 'b'.repeat(EDIT_CHARACTER_CAP + 10);
     const part = makeEditToolPart({ oldString: longOld, newString: longNew });
     const model = mustBe(buildToolDiffModel(part), 'model');
     expect(model.truncated).toBe(true);
 
-    // Each side capped: no line exceeds EDIT_CHAR_CAP combined.
+    // Each side capped: no line exceeds EDIT_CHARACTER_CAP combined.
     const oldLines = model.lines.filter(l => l.type === 'del');
     const newLines = model.lines.filter(l => l.type === 'add');
     const oldChars = oldLines.reduce((sum, l) => sum + l.text.length, 0);
     const newChars = newLines.reduce((sum, l) => sum + l.text.length, 0);
-    expect(oldChars).toBeLessThanOrEqual(EDIT_CHAR_CAP);
-    expect(newChars).toBeLessThanOrEqual(EDIT_CHAR_CAP);
+    expect(oldChars).toBeLessThanOrEqual(EDIT_CHARACTER_CAP);
+    expect(newChars).toBeLessThanOrEqual(EDIT_CHARACTER_CAP);
   });
 
   it('truncates at the line cap', () => {
@@ -269,13 +269,13 @@ describe('buildToolDiffModel — write tool', () => {
   });
 
   it('truncates content at the character cap', () => {
-    const longContent = 'x'.repeat(WRITE_CHAR_CAP + 100);
+    const longContent = 'x'.repeat(WRITE_CHARACTER_CAP + 100);
     const part = makeWriteToolPart({ content: longContent });
     const model = mustBe(buildToolDiffModel(part), 'model');
     expect(model.truncated).toBe(true);
     const totalChars =
       model.lines.reduce((sum, l) => sum + l.text.length, 0) + (model.lines.length - 1);
-    expect(totalChars).toBeLessThanOrEqual(WRITE_CHAR_CAP);
+    expect(totalChars).toBeLessThanOrEqual(WRITE_CHARACTER_CAP);
   });
 
   it('truncates at the line cap', () => {
@@ -352,7 +352,7 @@ describe('buildToolDiffModel — non-diff tools', () => {
 });
 
 // Constants from the model, duplicated here for focused assertion.
-const EDIT_CHAR_CAP = 1000;
-const EDIT_LINE_CAP = 100;
-const WRITE_CHAR_CAP = 2000;
-const WRITE_LINE_CAP = 200;
+const EDIT_CHARACTER_CAP = 10_000;
+const EDIT_LINE_CAP = 500;
+const WRITE_CHARACTER_CAP = 20_000;
+const WRITE_LINE_CAP = 1000;

@@ -199,6 +199,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'sambanova',
   'stepfun',
   'streamlake',
+  'tencent',
   'togetherai',
   'vertex',
   'vertexAnthropic',

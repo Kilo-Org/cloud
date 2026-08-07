@@ -15,7 +15,7 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
-import { tencent_hy3_free_model } from './providers/tencent';
+import { isTencentFreeModel, tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -78,10 +78,14 @@ describe('isFreeModel', () => {
     test('registers Tencent Hy3 as free without adding it to Auto Free', () => {
       expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
       expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
+      expect(tencent_hy3_free_model.flags).toContain('vercel-routing');
       expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
       expect(autoFreeModels.map(({ model }) => model)).not.toContain(
         tencent_hy3_free_model.public_id
       );
+      expect(isTencentFreeModel('tencent/hy3:free')).toBe(true);
+      expect(isTencentFreeModel('tencent/hy3')).toBe(true);
+      expect(isTencentFreeModel('stepfun/step-3.7-flash:free')).toBe(false);
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {

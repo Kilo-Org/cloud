@@ -110,6 +110,7 @@ describe('mapModelIdToVercel', () => {
       expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).toBe(
         'google/gemma-4-26b-a4b-it'
       );
+      expect(mapModelIdToVercel('tencent/hy3:free')).toBe('tencent/hy3');
     });
 
     it('does not use internal_id for exclusives that are not vercel-routed', () => {

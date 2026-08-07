@@ -181,6 +181,109 @@ describe('applyVercelSettings BYOK pinning', () => {
   });
 });
 
+describe('applyVercelSettings Tencent free model API key', () => {
+  const originalTencentFreeApiKey = process.env.TENCENT_FREE_API_KEY;
+
+  afterEach(() => {
+    if (originalTencentFreeApiKey !== undefined) {
+      process.env.TENCENT_FREE_API_KEY = originalTencentFreeApiKey;
+    } else {
+      delete process.env.TENCENT_FREE_API_KEY;
+    }
+  });
+
+  it('uses TENCENT_FREE_API_KEY for the free Tencent model in the non-user-byok case', async () => {
+    process.env.TENCENT_FREE_API_KEY = 'test-tencent-free-key';
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'tencent/hy3:free',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('tencent/hy3:free', request, null);
+
+    expect(request.body.model).toBe('tencent/hy3');
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      tencent: [{ apiKey: 'test-tencent-free-key' }],
+    });
+  });
+
+  it('uses TENCENT_FREE_API_KEY when referenced by internal id in the non-user-byok case', async () => {
+    process.env.TENCENT_FREE_API_KEY = 'test-tencent-free-key';
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'tencent/hy3',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('tencent/hy3', request, null);
+
+    expect(request.body.model).toBe('tencent/hy3');
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      tencent: [{ apiKey: 'test-tencent-free-key' }],
+    });
+  });
+
+  it('does not set byok when TENCENT_FREE_API_KEY is not set', async () => {
+    delete process.env.TENCENT_FREE_API_KEY;
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'tencent/hy3:free',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('tencent/hy3:free', request, null);
+
+    expect(request.body.model).toBe('tencent/hy3');
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
+
+  it('does not set Tencent byok for non-Tencent models even when TENCENT_FREE_API_KEY is set', async () => {
+    process.env.TENCENT_FREE_API_KEY = 'test-tencent-free-key';
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
+
+  it('does not override userByok with TENCENT_FREE_API_KEY when userByok is provided', async () => {
+    process.env.TENCENT_FREE_API_KEY = 'test-tencent-free-key';
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'user-anthropic-key', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      anthropic: [{ apiKey: 'user-anthropic-key' }],
+    });
+  });
+});
+
 describe('passesVercelRoutingPercentage', () => {
   it('never passes at 0% and always passes at 100%', () => {
     for (let seed = 0; seed < 1_000; seed++) {

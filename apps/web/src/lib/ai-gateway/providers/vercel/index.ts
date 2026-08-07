@@ -22,6 +22,7 @@ import {
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isTencentFreeModel } from '@/lib/ai-gateway/providers/tencent';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromRedis,
@@ -295,6 +296,14 @@ export async function applyVercelSettings(
       requestToMutate,
       vercelInferenceProviders
     );
+
+    if (isTencentFreeModel(requestedModel) && process.env.TENCENT_FREE_API_KEY) {
+      requestToMutate.body.providerOptions ??= {};
+      requestToMutate.body.providerOptions.gateway ??= {};
+      requestToMutate.body.providerOptions.gateway.byok = {
+        tencent: [{ apiKey: process.env.TENCENT_FREE_API_KEY }],
+      };
+    }
   }
 
   if (requestToMutate.body.providerOptions) {

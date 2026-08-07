@@ -138,6 +138,7 @@ function NewSessionScreenBody() {
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
     organizationId,
+    mode,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,

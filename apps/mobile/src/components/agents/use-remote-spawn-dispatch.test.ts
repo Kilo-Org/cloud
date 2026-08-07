@@ -10,10 +10,7 @@ import {
 } from '@/lib/share-payload';
 import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
 
-import {
-  RemoteSpawnInheritanceProvider,
-  useRemoteSpawnDispatch,
-} from './use-remote-spawn-dispatch';
+import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(async () => {
@@ -67,7 +64,6 @@ type ReactInternals = {
 
 type HookDispatcher = {
   useCallback: <T>(callback: T, _deps?: unknown) => T;
-  useContext: <T>(context: React.Context<T>) => T;
   useEffect: (effect: React.EffectCallback, _deps?: unknown) => void;
   useMemo: <T>(factory: () => T, _deps?: unknown) => T;
   useRef: <T>(initial: T) => { current: T };
@@ -108,13 +104,10 @@ async function runStartAndWaitForReplace(onStart: () => void) {
  * `use-interaction-handlers.test.ts` so we can exercise
  * `useRemoteSpawnDispatch` without pulling react-native into vitest.
  */
-function runHookWithProvider(args: {
+function runHook(args: {
   organizationId: string | undefined;
   mode?: string;
   selection?: ModelSelection;
-  /** When false, omit the Provider — inheritance must not leak fields. */
-  withProvider?: boolean;
-  providerMode?: string;
   getSubmitPayload?: () => SharePayload | null;
 }) {
   const reactInternals = React as typeof React & ReactInternals;
@@ -122,17 +115,11 @@ function runHookWithProvider(args: {
   const refs: { current: unknown }[] = [];
   let hookIndex = 0;
   let refIndex = 0;
-  let contextValue: { mode?: string } = {};
 
   const dispatcher: HookDispatcher = {
     useCallback: hookCallback => {
       hookIndex += 1;
       return hookCallback;
-    },
-    useContext: context => {
-      hookIndex += 1;
-      void context;
-      return contextValue as never;
     },
     useEffect: effect => {
       hookIndex += 1;
@@ -165,10 +152,6 @@ function runHookWithProvider(args: {
       return [hookState[stateIndex] as typeof initialValue, setState];
     },
   };
-
-  if (args.withProvider !== false) {
-    contextValue = { mode: args.providerMode };
-  }
 
   const previousDispatcher =
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
@@ -203,10 +186,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     __resetSharePayloadStoreForTests();
   });
 
-  it('onStart builds agent from inherited mode and wire model from selection', async () => {
-    const { onStart } = runHookWithProvider({
+  it('onStart builds agent from explicit mode and wire model from selection', async () => {
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      providerMode: 'plan',
+      mode: 'plan',
       selection: { model: { providerID: 'anthropic', modelID: 'claude-x' }, variant: 'high' },
     });
 
@@ -220,19 +203,17 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     ]);
   });
 
-  it('onStart without inheritance yields org-only input — empty context regression', async () => {
-    const { onStart } = runHookWithProvider({
+  it('onStart without mode yields org-only input', async () => {
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
     });
 
     expect(await captureSpawnCall(onStart)).toEqual(['conn-abc', { orgId: 'org-xyz' }]);
   });
 
-  it('explicit mode and selection args win over empty context', async () => {
-    const { onStart } = runHookWithProvider({
+  it('explicit mode and selection reach the spawn input', async () => {
+    const { onStart } = runHook({
       organizationId: undefined,
-      withProvider: false,
       mode: 'code',
       selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
     });
@@ -244,19 +225,18 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('org route passes the route org into useRemoteInstanceSpawn (not inherit)', () => {
-    runHookWithProvider({ organizationId: 'org-route-1', withProvider: false });
+    runHook({ organizationId: 'org-route-1' });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith('org-route-1');
   });
 
   it('personal route (no param) passes null so context org cannot win', () => {
-    runHookWithProvider({ organizationId: undefined, withProvider: false });
+    runHook({ organizationId: undefined });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith(null);
   });
 
   it('personal-route onStart omits orgId when only mode and selection are set', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: undefined,
-      withProvider: false,
       mode: 'code',
       selection: { model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' } },
     });
@@ -271,9 +251,8 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('a non-kilo selection reaches spawn as the provider own model with its variant', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       mode: 'code',
       selection: { model: { providerID: 'opencode', modelID: 'opencode-model' }, variant: 'xhigh' },
     });
@@ -289,9 +268,8 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('an omitted selection reaches spawn with no model key at all', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       mode: 'code',
     });
 
@@ -302,9 +280,8 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('ready path stages the press-time payload and navigates with shareId + autoSend', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       getSubmitPayload: () => samplePayload,
     });
 
@@ -323,9 +300,8 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('ready path navigates without share params when press-time payload is null', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       getSubmitPayload: () => null,
     });
 
@@ -340,9 +316,8 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('ready path navigates without share params when getSubmitPayload is omitted', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
     });
 
     await runStartAndWaitForReplace(onStart);
@@ -352,12 +327,5 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
-  });
-});
-
-// Smoke: Provider is a real React context provider (not a no-op export).
-describe('RemoteSpawnInheritanceProvider', () => {
-  it('exposes a Provider component', () => {
-    expect(typeof RemoteSpawnInheritanceProvider).toBe('function');
   });
 });

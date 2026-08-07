@@ -1,14 +1,4 @@
-import {
-  createContext,
-  createElement,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
@@ -42,32 +32,11 @@ type InstancesRefetch = () => Promise<{
   data: { instances: InstancePickerInstance[] } | undefined;
 }>;
 
-type RemoteSpawnInheritance = {
-  mode?: string;
-};
-
-const RemoteSpawnInheritanceContext = createContext<RemoteSpawnInheritance>({});
-
-/**
- * Supplies the new-session screen's current mode to `useRemoteSpawnDispatch`
- * without requiring the sibling-owned `use-new-session-share-remote` wrapper
- * to forward that field. The model half no longer rides inheritance: the
- * route passes the validated `selection` explicitly.
- */
-export function RemoteSpawnInheritanceProvider({
-  mode,
-  children,
-}: RemoteSpawnInheritance & { children: ReactNode }) {
-  const value = useMemo(() => ({ mode }), [mode]);
-  return createElement(RemoteSpawnInheritanceContext.Provider, { value }, children);
-}
-
 type UseRemoteSpawnDispatchArgs = {
   organizationId: string | undefined;
   /**
-   * Optional override for the inherited mode. When omitted, the value comes
-   * from the nearest `RemoteSpawnInheritanceProvider` (the new-session
-   * screen).
+   * The current new-session agent mode for the spawn target. Omitted for
+   * callers without a mode (share-gate); the CLI then uses its default.
    */
   mode?: string;
   /**
@@ -145,7 +114,7 @@ type UseRemoteSpawnDispatchResult = {
  */
 export function useRemoteSpawnDispatch({
   organizationId,
-  mode: modeArg,
+  mode,
   selection,
   runOnInstance,
   setRunOnInstance,
@@ -154,8 +123,6 @@ export function useRemoteSpawnDispatch({
   getSubmitPayload,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
-  const inheritance = useContext(RemoteSpawnInheritanceContext);
-  const mode = modeArg ?? inheritance.mode;
   // Route param is frozen at navigation: missing param means personal, not
   // "inherit live context". `?? null` so undefined does not fall through to
   // `useOrganization()` after a later org switch (share-gate keeps zero-arg

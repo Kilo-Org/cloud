@@ -1,6 +1,7 @@
 import { type RefObject, useCallback, useRef } from 'react';
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
+import { type AgentMode } from '@/components/agents/mode-selector';
 import { useRemoteSpawnDispatch } from '@/components/agents/use-remote-spawn-dispatch';
 import { type AgentAttachment } from '@/lib/agent-attachments/agent-attachment-types';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -12,6 +13,8 @@ type InstancesRefetch = () => Promise<{
 
 type UseNewSessionShareRemoteArgs = {
   organizationId: string | undefined;
+  /** Current new-session agent mode, passed through to the spawn dispatch. */
+  mode: AgentMode;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   refetchInstances: InstancesRefetch;
@@ -35,6 +38,7 @@ type UseNewSessionShareRemoteArgs = {
  */
 export function useNewSessionShareRemote({
   organizationId,
+  mode,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
@@ -60,6 +64,7 @@ export function useNewSessionShareRemote({
 
   const remoteSpawn = useRemoteSpawnDispatch({
     organizationId,
+    mode,
     selection,
     runOnInstance,
     setRunOnInstance,

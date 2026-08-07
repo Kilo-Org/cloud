@@ -5,6 +5,7 @@ import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
 import { WASTELAND_URL } from '@/lib/constants';
 import { generateApiToken } from '@/lib/tokens';
 import { getUserOrgMemberships } from '@/lib/organizations/organizations';
+import { recordKiloAdminElevationForRequest, serviceTarget } from '@/lib/admin/admin-access-log';
 import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
 
 /**
@@ -27,6 +28,15 @@ export async function resolveWastelandUpstreamForUser(
   if (!WASTELAND_URL) return null;
 
   try {
+    if (user.is_admin) {
+      // Same elevation as POST /api/wasteland/token: the minted token carries
+      // `isAdmin` into the worker, which emits nothing back here.
+      await recordKiloAdminElevationForRequest({
+        user,
+        reason: 'service_token_mint',
+        target: serviceTarget('wasteland'),
+      });
+    }
     const orgMemberships = await getUserOrgMemberships(user.id);
     const token = generateApiToken(
       user,

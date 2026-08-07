@@ -1944,6 +1944,7 @@ export const CustomLlmApiConfigSchema = z.object({
   add_cache_breakpoints: z.boolean().optional(),
   remove_cache_breakpoints: z.boolean().optional(),
   inject_reasoning_into_content: z.boolean().optional(),
+  sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),

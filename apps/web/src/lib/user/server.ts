@@ -90,6 +90,7 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
+  routeFromHeaders,
 } from '@/lib/admin/admin-access-log';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@/lib/utils';
@@ -1094,10 +1095,11 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
       surface: 'rest',
+      kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
       tokenSource: result.tokenSource ?? null,
-      route: headersList.get('x-pathname') ?? headersList.get('x-matched-path') ?? null,
+      route: routeFromHeaders(headersList),
       // No reliable HTTP method header is available here; do not fabricate one.
       method: null,
       ip: clientIpFromHeaders(headersList),

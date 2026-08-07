@@ -394,7 +394,10 @@ describe('agent LLM harness', () => {
 
   it('gives a safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'When the user asks you to create a workflow in safe mode, read the page once with get_page_snapshot, use find_in_page for targeted follow-ups instead of re-snapshotting unchanged state, declare values that vary between runs as params, and save the workflow scoped to the current page origin and path.'
+      'When the user asks you to create a workflow in safe mode, read the page once with get_page_snapshot, use find_in_page for targeted follow-ups instead of re-snapshotting unchanged state, declare values that vary between runs as params, and save the workflow scoped to the current page by setting scopeOrigin to the current origin and pathPrefix to the current path.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'For a workflow you save in safe mode, write the script using only the page helpers listed in the save_workflow tool description (page.click, page.fill, page.text, page.textAll, page.attr, page.exists, page.waitFor). page.goto and other page methods do not exist; move to another page by returning { navigate: "<url>", state } from the script.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain('Google Flights');
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(

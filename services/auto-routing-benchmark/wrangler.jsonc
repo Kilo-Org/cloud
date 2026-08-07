@@ -60,10 +60,12 @@
         "dead_letter_queue": "auto-routing-benchmark-dlq",
       },
       {
-        // Lane-death signal: a message here exhausted its retries. The handler
-        // records the lane failure and finalizes the run (profile runs complete
-        // per-entry; platform runs fail fast). Handler never throws, so retries
-        // only cover transient D1 reads; the stale sweep is the backstop.
+        // Lane-death signal: a message here exhausted its job retries. The
+        // handler records the lane failure and finalizes the run (profile runs
+        // complete per-entry; platform runs fail fast). A throw retries the
+        // message so a transient failure after recording still finalizes; a
+        // message still failing after max_retries is dropped (the DLQ has no
+        // DLQ) and the stale sweep is the backstop.
         "queue": "auto-routing-benchmark-dlq",
         "max_batch_size": 1,
         "max_retries": 2,

@@ -799,9 +799,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
 
 /**
  * Handle a dead-lettered benchmark job: record the lane death, then attempt
- * finalization so a single dead lane cannot wedge its run. The queue handler
- * must not let this throw — a poison DLQ message retrying forever would wedge
- * the run again; the stale sweep remains the backstop.
+ * finalization so a single dead lane cannot wedge its run. Malformed messages
+ * and terminal runs are settled cases and return normally; transient failures
+ * (e.g. D1) throw so the DLQ consumer retries — a death recorded without a
+ * completed finalization must be re-attempted, not acked away.
  */
 export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<void> {
   const parsed = BenchmarkJobMessageSchema.safeParse(rawMessage);

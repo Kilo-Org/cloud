@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { createErrorHandler, createNotFoundHandler, formatError } from '@kilocode/worker-utils';
+import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import { syncAutoDeciderModels } from './auto-decider-sync';
@@ -35,18 +35,14 @@ export default {
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
     // Dead-lettered messages: record the lane death and try to finalize the
-    // run. Never throw — a poison DLQ message retrying forever would wedge the
-    // run again; the stale sweep remains the backstop.
+    // run. Same retry contract as the jobs branch: a throw (transient D1
+    // failure after the death was recorded) skips the ack so the message
+    // retries and finalization is re-attempted. A message still failing after
+    // max_retries is dropped (the DLQ has no DLQ); the stale sweep remains
+    // the backstop for runs that never finalize.
     if (batch.queue === DLQ_NAME) {
       for (const message of batch.messages) {
-        await processDeadLetter(env, message.body).catch(error => {
-          console.warn(
-            JSON.stringify({
-              event: 'benchmark_deadletter_handler_error',
-              ...formatError(error),
-            })
-          );
-        });
+        await processDeadLetter(env, message.body);
         message.ack();
       }
       return;

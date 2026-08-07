@@ -8,7 +8,10 @@ import {
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
+import { checkRateLimit } from '@vercel/firewall';
 import * as z from 'zod';
+
+const STREAM_TICKET_IP_RATE_LIMIT_ID = 'stream-ticket-ip';
 
 const streamTicketSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
@@ -51,6 +54,14 @@ function handleTRPCError(error: unknown): NextResponse {
  */
 export async function POST(request: Request) {
   try {
+    const { rateLimited } = await checkRateLimit(STREAM_TICKET_IP_RATE_LIMIT_ID, { request });
+    if (rateLimited) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
 
     if (authFailedResponse) {

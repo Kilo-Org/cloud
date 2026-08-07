@@ -54,7 +54,6 @@ describe('modelSelectorBadges', () => {
     const badges = modelSelectorBadges({
       id: 'remote-unavailable-model',
       showGatewayMetadata: false,
-      unavailable: true,
     });
     expect(badges.byok).toBe(false);
     expect(badges.free).toBe(false);

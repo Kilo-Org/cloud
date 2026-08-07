@@ -210,12 +210,6 @@ export async function upsertDiscordInstallation(
     owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
-  if (!defaultModel) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'No model is available under the organization provider policy.',
-    });
-  }
 
   const metadata = {
     guild_icon: oauthResponse.guild.icon,

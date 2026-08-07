@@ -211,30 +211,24 @@ export async function upsertSlackInstallation({
     throw new SlackWorkspaceAlreadyConnectedError(teamName);
   }
 
-  const existingModelSlug =
-    existing?.metadata &&
-    typeof existing.metadata === 'object' &&
-    'model_slug' in existing.metadata &&
-    typeof existing.metadata.model_slug === 'string'
-      ? existing.metadata.model_slug
-      : null;
+  // For org integrations, get a model that respects org access policy.
+  // For user integrations, use the shared bot default model.
   const defaultModel =
-    existingModelSlug ??
-    (owner.type === 'org'
+    owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL);
-  if (!defaultModel) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'No model is available under the organization provider policy.',
-    });
-  }
+      : DEFAULT_BOT_MODEL;
 
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
     access_token: installation.botToken,
     bot_user_id: installation.botUserId,
-    model_slug: defaultModel,
+    model_slug:
+      existing?.metadata &&
+      typeof existing.metadata === 'object' &&
+      'model_slug' in existing.metadata &&
+      typeof existing.metadata.model_slug === 'string'
+        ? existing.metadata.model_slug
+        : defaultModel,
   };
 
   if (existing) {

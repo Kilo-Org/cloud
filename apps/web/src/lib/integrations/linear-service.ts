@@ -366,6 +366,11 @@ export async function upsertLinearInstallation(
     await options.deleteChatSdkIdentityCache?.(previousOrganizationId);
   }
 
+  const defaultModel =
+    owner.type === 'org'
+      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
+
   const existingMetadata =
     existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
 
@@ -374,23 +379,11 @@ export async function upsertLinearInstallation(
       ? existingMetadata.model_slug
       : null;
 
-  const defaultModel =
-    existingModelSlug ??
-    (owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL);
-  if (!defaultModel) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'No model is available under the organization provider policy.',
-    });
-  }
-
   const metadata = {
     ...existingMetadata,
     bot_enabled: true,
     bot_user_id: botUserId,
-    model_slug: defaultModel,
+    model_slug: existingModelSlug ?? defaultModel,
   };
 
   if (existing) {

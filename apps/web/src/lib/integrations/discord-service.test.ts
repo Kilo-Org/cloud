@@ -58,10 +58,6 @@ import {
   upsertDiscordInstallation,
 } from './discord-service';
 
-const mockedGetDefaultAllowedModel = jest.mocked(
-  jest.requireMock('@/lib/slack-bot/model-allow-list').getDefaultAllowedModel
-);
-
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
 
 function buildDiscordIntegration(overrides: Record<string, unknown> = {}) {
@@ -151,7 +147,6 @@ describe('discord-service persisted guild ID validation', () => {
     mockUpdateReturning.mockReset();
     mockInsertValues.mockReset();
     mockInsertReturning.mockReset();
-    mockedGetDefaultAllowedModel.mockResolvedValue('gpt-test');
   });
 
   it('does not test a connection when the stored guild ID is malformed', async () => {
@@ -178,30 +173,6 @@ describe('discord-service persisted guild ID validation', () => {
         guild: { id: 'guild/1', name: 'Test Guild', icon: null },
       })
     ).rejects.toThrow('Invalid Discord guild ID');
-
-    expect(mockInsertValues).not.toHaveBeenCalled();
-  });
-
-  it('returns an actionable error when organization policy allows no model', async () => {
-    mockLimit.mockResolvedValue([]);
-    mockedGetDefaultAllowedModel.mockResolvedValue(null);
-
-    await expect(
-      upsertDiscordInstallation(
-        { type: 'org', id: 'organization-id' },
-        {
-          access_token: 'access-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          refresh_token: 'refresh-token',
-          scope: 'bot guilds',
-          guild: { id: '123456789012345678', name: 'Test Guild', icon: null },
-        }
-      )
-    ).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'No model is available under the organization provider policy.',
-    });
 
     expect(mockInsertValues).not.toHaveBeenCalled();
   });

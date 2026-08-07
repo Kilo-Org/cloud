@@ -4,7 +4,6 @@ import {
   getEffectiveModelDecision,
   resolveOrganizationDefaultModelPolicy,
 } from '@/lib/organizations/effective-model-access.server';
-import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 /**
  * Get a default model that is allowed for an organization.
@@ -13,24 +12,23 @@ import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openr
 export async function getDefaultAllowedModel(
   organizationId: string,
   globalDefault = PRIMARY_DEFAULT_MODEL
-): Promise<string | null> {
+): Promise<string> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
     return globalDefault;
   }
 
   // Resolve the organization's default policy once. When it imposes no
-  // restriction (non-Enterprise with an unrestricted grant), return
-  // `globalDefault` exactly as the pre-policy code did. The organization's own
-  // `default_model` is only consulted on the restricted path below, after
-  // `isAllowed` accepts it, because it may hold a non-routable virtual id such
-  // as `organization-auto`.
+  // restriction (non-Enterprise, or an unrestricted grant with no deny list and
+  // no provider ceiling), return `globalDefault` exactly as the pre-policy code
+  // did. The organization's own `default_model` is only consulted on the
+  // restricted path below, after `isAllowed` accepts it, because it may hold a
+  // non-routable virtual id such as `organization-auto`.
   const policy = await resolveOrganizationDefaultModelPolicy({ organizationId });
   const isUnrestricted =
     policy.memberGrant.mode === 'unrestricted' &&
     policy.organizationModelDenyList.length === 0 &&
-    !policy.organizationProviderCeiling &&
-    !policy.requireModelInCurrentSnapshot;
+    !policy.organizationProviderCeiling;
   if (isUnrestricted) {
     return globalDefault;
   }
@@ -55,12 +53,7 @@ export async function getDefaultAllowedModel(
     }
   }
 
-  const providerIndex = await getModelIdToProviderSlugsIndex();
-  for (const modelId of providerIndex.keys()) {
-    if (await isAllowed(modelId)) {
-      return modelId;
-    }
-  }
-
-  return null;
+  // All models were blocked; fall back to global default
+  console.warn('[SlackBot] No allowed model found; org policy blocks all preferred models');
+  return globalDefault;
 }

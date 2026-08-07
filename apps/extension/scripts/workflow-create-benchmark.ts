@@ -258,6 +258,13 @@ class CleanupBlockerError extends BatchBlockerError {
   }
 }
 
+class CleanupCapError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CleanupCapError';
+  }
+}
+
 // ── Small helpers ───────────────────────────────────────────────────────────
 
 const isRecord = (value: unknown): value is RawRecord =>
@@ -623,36 +630,153 @@ const writeLocal = (page: Page, items: Record<string, unknown>): Promise<void> =
 const readConversationStore = (sidePanel: Page): Promise<unknown> =>
   readLocal(sidePanel, 'kiloAgentConversations');
 
+// ── Conversation event contract (zod-loose; unknown keys dropped) ───────────
+
+const benchEventSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      id: z.string(),
+      role: z.enum(['assistant', 'user']).optional(),
+      text: z.string().optional(),
+      type: z.literal('message'),
+    })
+    .strip(),
+  z
+    .object({
+      id: z.string(),
+      text: z.string().optional(),
+      type: z.literal('thinking'),
+    })
+    .strip(),
+  z
+    .object({
+      arguments: z.record(z.string(), z.unknown()).optional(),
+      code: z.string().optional(),
+      id: z.string(),
+      name: z.string(),
+      type: z.literal('tool-call'),
+    })
+    .strip(),
+  z
+    .object({
+      error: z.string().optional(),
+      id: z.string(),
+      ok: z.boolean(),
+      toolCallId: z.string(),
+      type: z.literal('tool-result'),
+      value: z.unknown().optional(),
+    })
+    .strip(),
+]);
+
 const snapshotTurn = async (sidePanel: Page): Promise<TurnSnapshot> => {
   const store = await readConversationStore(sidePanel);
-  let events: readonly RawRecord[] = [];
-  let updatedAt = '';
-  if (isRecord(store)) {
-    const activeConversationId = store['activeConversationId'];
-    const conversations = store['conversations'];
-    if (typeof activeConversationId === 'string' && Array.isArray(conversations)) {
-      const conversation = conversations.find(
-        (candidate): candidate is ConversationShape =>
-          isRecord(candidate) &&
-          candidate['id'] === activeConversationId &&
-          Array.isArray(candidate['events']) &&
-          (candidate['updatedAt'] === undefined || typeof candidate['updatedAt'] === 'string')
-      );
-      if (conversation !== undefined) {
-        const rawEvents = conversation['events'];
-        if (Array.isArray(rawEvents)) {
-          events = rawEvents.filter(isRecord);
-        }
-        if (typeof conversation['updatedAt'] === 'string') {
-          updatedAt = conversation['updatedAt'];
-        }
-      }
+  if (!isRecord(store)) {
+    throw new StorageParseError('conversation storage is not an object');
+  }
+  const activeConversationId = store['activeConversationId'];
+  const conversations = store['conversations'];
+  if (typeof activeConversationId !== 'string' || !Array.isArray(conversations)) {
+    throw new StorageParseError('conversation storage has an invalid envelope');
+  }
+  const conversation = conversations.find(
+    (candidate): candidate is ConversationShape =>
+      isRecord(candidate) &&
+      candidate['id'] === activeConversationId &&
+      Array.isArray(candidate['events']) &&
+      (candidate['updatedAt'] === undefined || typeof candidate['updatedAt'] === 'string')
+  );
+  if (conversation === undefined) {
+    throw new StorageParseError('the active conversation is missing from storage');
+  }
+  const rawEvents = conversation['events'];
+  if (!rawEvents.every(isRecord)) {
+    throw new StorageParseError('conversation storage contains a malformed event');
+  }
+  // Validate every event against the benchmark event contract at the
+  // storage-read boundary, before any poll ingests it. A malformed record
+  // becomes a storage-parse failure instead of poisoning the collector.
+  for (const raw of rawEvents) {
+    if (!benchEventSchema.safeParse(raw).success) {
+      throw new StorageParseError('conversation storage contains an event that failed validation');
     }
+  }
+  const events = rawEvents;
+  let updatedAt = '';
+  if (typeof conversation['updatedAt'] === 'string') {
+    updatedAt = conversation['updatedAt'];
   }
   const lastEvent = events[events.length - 1];
   const stopVisible = (await sidePanel.getByRole('button', { name: 'Stop' }).count()) > 0;
   const dialogOpen = (await sidePanel.locator('[role="dialog"]:visible').count()) > 0;
   return { eventCount: events.length, events, lastEvent, stopVisible, dialogOpen, updatedAt };
+};
+
+// ── Setup stage budget ──────────────────────────────────────────────────────
+//
+// The whole setup stage (panel, page, target-tab, credit-account, model, and
+// safe-mode readiness) shares one enforced 30-second budget. Every internal
+// Playwright wait derives its timeout from the remaining budget so the stage
+// stops itself when the budget is exhausted; no sub-step starts after it.
+
+interface SetupBudget {
+  readonly budgetMs: number;
+  readonly startedAtMs: number;
+  remainingMs(): number;
+  isExhausted(): boolean;
+  waitTimeoutFor(nominalMs: number): number;
+}
+
+const makeSetupBudget = (budgetMs: number): SetupBudget => {
+  const startedAtMs = Date.now();
+  return {
+    budgetMs,
+    startedAtMs,
+    remainingMs: () => Math.max(0, budgetMs - (Date.now() - startedAtMs)),
+    isExhausted: () => Date.now() - startedAtMs >= budgetMs,
+    waitTimeoutFor: (nominalMs: number) =>
+      Math.max(1, Math.min(nominalMs, Math.max(0, budgetMs - (Date.now() - startedAtMs)))),
+  };
+};
+
+// Runs one setup sub-step inside the shared stage budget. A sub-step never
+// starts once the budget is exhausted, and its Playwright operations are
+// bounded by the remaining budget, so the stage stops itself before cleanup
+// starts. When the budget fires first, the started operation is still awaited
+// to settlement before the stage returns, so no late Playwright work outlives
+// the stage result.
+const runSetupStep = async <Value>(
+  budget: SetupBudget,
+  label: string,
+  op: () => Promise<Value>
+): Promise<Value> => {
+  if (budget.isExhausted()) {
+    throw new Error(`${label} timed out: the 30-second setup stage budget was exhausted`);
+  }
+  const operation = op();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${label} timed out: the 30-second setup stage budget was exhausted`));
+        }, budget.remainingMs());
+      }),
+    ]);
+  } catch (error) {
+    try {
+      await operation;
+    } catch {
+      // The operation's own rejection is secondary; the error above is the
+      // outcome that made the race return.
+    }
+    throw error;
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
 };
 
 // ── Browser setup (probe pattern) ───────────────────────────────────────────
@@ -665,13 +789,43 @@ const launchContext = async (
   };
   let context: BrowserContext;
   let headless = false;
+  let pendingHeadedLaunch: Promise<BrowserContext> | undefined;
   try {
-    context = await withTimeout(
-      chromium.launchPersistentContext(userDataDir, { ...launchOptions, headless: false }),
-      60_000,
-      'browser launch timed out after 60s'
-    );
+    pendingHeadedLaunch = chromium.launchPersistentContext(userDataDir, {
+      ...launchOptions,
+      headless: false,
+    });
+    context = await withTimeout(pendingHeadedLaunch, 60_000, 'browser launch timed out after 60s');
   } catch {
+    // The primary timeout fired, but the headed launch promise is still live
+    // on the same profile dir. The headless fallback must not touch the
+    // profile until the headed promise has settled and its context is closed,
+    // so no untracked browser process or authentication profile is left
+    // behind. The settle wait is bounded: if the headed launch does not
+    // settle within it, the attempt fails instead of starting headless on the
+    // same profile.
+    const headedSettleWaitMs = 30_000;
+    const headedSettleTimeoutMessage = 'the headed browser launch did not settle within 30s';
+    if (pendingHeadedLaunch !== undefined) {
+      try {
+        await withTimeout(
+          (async (): Promise<void> => {
+            const headedContext = await pendingHeadedLaunch;
+            await headedContext.close();
+          })(),
+          headedSettleWaitMs,
+          headedSettleTimeoutMessage
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === headedSettleTimeoutMessage) {
+          throw new Error(
+            'the headed browser launch did not settle; the attempt fails instead of falling back headless on the same profile',
+            { cause: error }
+          );
+        }
+        // The headed launch rejected; there is no context to close.
+      }
+    }
     headless = true;
     context = await withTimeout(
       chromium.launchPersistentContext(userDataDir, { ...launchOptions, headless: true }),
@@ -695,10 +849,13 @@ const ensureSignedInPanel = async (
   sidePanel: Page,
   token: string,
   userEmail: string | undefined,
-  timeoutMs: number
+  budget: SetupBudget
 ): Promise<void> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (budget.isExhausted()) {
+      break;
+    }
     if (attempt > 0) {
       try {
         await writeLocal(sidePanel, { kiloAuth: { token, userEmail } });
@@ -709,7 +866,9 @@ const ensureSignedInPanel = async (
       }
     }
     try {
-      await sidePanel.getByLabel('Settings').waitFor({ state: 'visible', timeout: timeoutMs });
+      await sidePanel
+        .getByLabel('Settings')
+        .waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(60_000) });
       return;
     } catch (error) {
       lastError = error;
@@ -723,13 +882,14 @@ const openAuthenticatedSidePanel = async (
   context: BrowserContext,
   extensionId: string,
   token: string,
-  userEmail: string | undefined
+  userEmail: string | undefined,
+  budget: SetupBudget
 ): Promise<Page> => {
   const sidePanel = await context.newPage();
   await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
   await writeLocal(sidePanel, { kiloAuth: { token, userEmail } });
   await sidePanel.reload();
-  await ensureSignedInPanel(sidePanel, token, userEmail, 60_000);
+  await ensureSignedInPanel(sidePanel, token, userEmail, budget);
   return sidePanel;
 };
 
@@ -759,9 +919,12 @@ const dismissConsent = async (page: Page): Promise<void> => {
   }
 };
 
-const openFlightsTab = async (context: BrowserContext): Promise<Page> => {
+const openFlightsTab = async (context: BrowserContext, budget: SetupBudget): Promise<Page> => {
   const flightsPage = await context.newPage();
-  await flightsPage.goto(targetUrl, { timeout: 60_000, waitUntil: 'domcontentloaded' });
+  await flightsPage.goto(targetUrl, {
+    timeout: budget.waitTimeoutFor(60_000),
+    waitUntil: 'domcontentloaded',
+  });
   await dismissConsent(flightsPage);
   await flightsPage.waitForTimeout(2000);
   if (!flightsPage.url().includes('/travel/flights')) {
@@ -799,9 +962,9 @@ const readTabLabels = async (select: ReturnType<Page['locator']>): Promise<strin
   return value.filter((entry): entry is string => typeof entry === 'string');
 };
 
-const selectTargetTab = async (sidePanel: Page): Promise<void> => {
+const selectTargetTab = async (sidePanel: Page, budget: SetupBudget): Promise<void> => {
   const targetTab = sidePanel.locator('select[aria-label="Target tab"]');
-  await targetTab.waitFor({ state: 'visible', timeout: 30_000 });
+  await targetTab.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
 
   const findFlightsValue = async (): Promise<string | undefined> => {
     const labels = await readTabLabels(targetTab);
@@ -813,7 +976,7 @@ const selectTargetTab = async (sidePanel: Page): Promise<void> => {
     return values[index];
   };
 
-  await expect.poll(findFlightsValue, { timeout: 30_000 }).toBeDefined();
+  await expect.poll(findFlightsValue, { timeout: budget.waitTimeoutFor(30_000) }).toBeDefined();
 
   const flightsValue = await findFlightsValue();
   if (flightsValue === undefined) {
@@ -832,16 +995,20 @@ const selectTargetTab = async (sidePanel: Page): Promise<void> => {
   }
 };
 
-const selectCreditAccount = async (sidePanel: Page): Promise<string> => {
+const selectCreditAccount = async (sidePanel: Page, budget: SetupBudget): Promise<string> => {
   const settingsButton = sidePanel.getByLabel('Settings');
-  await settingsButton.waitFor({ state: 'visible', timeout: 30_000 });
+  await settingsButton.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
   await settingsButton.click();
-  await sidePanel.getByLabel('Settings panel').waitFor({ state: 'visible', timeout: 30_000 });
+  await sidePanel
+    .getByLabel('Settings panel')
+    .waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
 
   const creditAccount = sidePanel.getByLabel('Credit account');
-  await creditAccount.waitFor({ state: 'visible', timeout: 30_000 });
+  await creditAccount.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
   await expect
-    .poll(async () => (await creditAccount.locator('option').count()) > 0, { timeout: 30_000 })
+    .poll(async () => (await creditAccount.locator('option').count()) > 0, {
+      timeout: budget.waitTimeoutFor(30_000),
+    })
     .toBe(true);
 
   await creditAccount.selectOption({ label: creditAccountLabel });
@@ -856,24 +1023,28 @@ const selectCreditAccount = async (sidePanel: Page): Promise<string> => {
   }
 
   await sidePanel.getByLabel('Close settings').click();
-  await sidePanel.getByLabel('Settings panel').waitFor({ state: 'detached', timeout: 15_000 });
+  await sidePanel
+    .getByLabel('Settings panel')
+    .waitFor({ state: 'detached', timeout: budget.waitTimeoutFor(15_000) });
   return selectedLabel;
 };
 
-const selectModel = async (sidePanel: Page): Promise<void> => {
+const selectModel = async (sidePanel: Page, budget: SetupBudget): Promise<void> => {
   const modelTrigger = sidePanel.getByLabel('Model');
-  await expect(modelTrigger).toBeEnabled({ timeout: 30_000 });
+  await expect(modelTrigger).toBeEnabled({ timeout: budget.waitTimeoutFor(30_000) });
   await modelTrigger.click();
   const dialog = sidePanel.locator('[role="dialog"][aria-label="Select model"]');
-  await dialog.waitFor({ state: 'visible', timeout: 30_000 });
+  await dialog.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
 
   await dialog.getByLabel('Search models').fill(modelId);
   const option = dialog.locator(`button[data-model-id="${modelId}"]`);
-  await option.waitFor({ state: 'visible', timeout: 30_000 });
+  await option.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
   await option.click();
-  await dialog.waitFor({ state: 'detached', timeout: 15_000 });
+  await dialog.waitFor({ state: 'detached', timeout: budget.waitTimeoutFor(15_000) });
 
-  await expect(modelTrigger).toHaveAttribute('data-model-id', modelId, { timeout: 15_000 });
+  await expect(modelTrigger).toHaveAttribute('data-model-id', modelId, {
+    timeout: budget.waitTimeoutFor(15_000),
+  });
 };
 
 const sendMessage = async (sidePanel: Page, text: string): Promise<number> => {
@@ -896,7 +1067,8 @@ const checkGatewayBlocker = (): void => {
 
 const startGatewayCapture = (
   context: BrowserContext,
-  nowOffset: () => number
+  nowOffset: () => number,
+  onBlocker: () => void
 ): { requests: CapturedGatewayRequest[]; detach: () => void } => {
   const requests: CapturedGatewayRequest[] = [];
   const byRequest = new Map<Request, CapturedGatewayRequest>();
@@ -913,7 +1085,10 @@ const startGatewayCapture = (
       origin = null;
     }
     if (origin !== gatewayBase) {
-      gatewayBlockerReason ??= `non-production gateway URL observed: ${url}`;
+      if (gatewayBlockerReason === null) {
+        gatewayBlockerReason = `non-production gateway URL observed: ${url}`;
+        onBlocker();
+      }
       return;
     }
     let postData: string | null = null;
@@ -996,9 +1171,10 @@ const computeSavedAtOffsetMs = (
   if (saveSeenAtMs === null) {
     return null;
   }
-  // The persisted store can lag the in-memory stream, so the save boundary is
-  // the min of the first-seen poll stamp and the first post-save request
-  // offset: a new request can only start after the save result existed.
+  // The persisted store can lag the in-memory stream, so the save upper bound
+  // is the first request that starts after the save was observed: a new
+  // request can only start after the save result existed. Without a post-save
+  // request the first-seen poll stamp is the bound.
   let firstPostSaveOffsetMs: number | null = null;
   for (const request of requests) {
     if (
@@ -1008,7 +1184,7 @@ const computeSavedAtOffsetMs = (
       firstPostSaveOffsetMs = request.offsetMs;
     }
   }
-  return Math.min(saveSeenAtMs, firstPostSaveOffsetMs ?? Number.POSITIVE_INFINITY);
+  return firstPostSaveOffsetMs ?? saveSeenAtMs;
 };
 
 // ── Conversation polling (abortable) ────────────────────────────────────────
@@ -1100,6 +1276,14 @@ const pollAgentPhase = async (options: {
     finalSnapshot = snapshot;
     collector.ingest(snapshot.events, nowOffset());
 
+    // The deadline is authoritative for this poll: it is checked after the
+    // current poll is ingested and before terminal completion is accepted, so
+    // a deadline-crossing poll can never be recorded as a completed turn.
+    if (aborted || Date.now() >= deadlineMs) {
+      timedOut = true;
+      break;
+    }
+
     if (snapshot.eventCount > startEventCount) {
       const changed =
         previous === undefined ||
@@ -1136,10 +1320,6 @@ const pollAgentPhase = async (options: {
     if (mode === 'verify' && turnEnded) {
       break;
     }
-    if (aborted || Date.now() >= deadlineMs) {
-      timedOut = true;
-      break;
-    }
 
     previous = snapshot;
     try {
@@ -1159,44 +1339,7 @@ const pollAgentPhase = async (options: {
   };
 };
 
-// ── Validation layer (zod-loose; unknown keys dropped) ──────────────────────
-
-const benchEventSchema = z.discriminatedUnion('type', [
-  z
-    .object({
-      id: z.string(),
-      role: z.enum(['assistant', 'user']).optional(),
-      text: z.string().optional(),
-      type: z.literal('message'),
-    })
-    .strip(),
-  z
-    .object({
-      id: z.string(),
-      text: z.string().optional(),
-      type: z.literal('thinking'),
-    })
-    .strip(),
-  z
-    .object({
-      arguments: z.record(z.string(), z.unknown()).optional(),
-      code: z.string().optional(),
-      id: z.string(),
-      name: z.string(),
-      type: z.literal('tool-call'),
-    })
-    .strip(),
-  z
-    .object({
-      error: z.string().optional(),
-      id: z.string(),
-      ok: z.boolean(),
-      toolCallId: z.string(),
-      type: z.literal('tool-result'),
-      value: z.unknown().optional(),
-    })
-    .strip(),
-]);
+// ── Event conversion and validation helpers ─────────────────────────────────
 
 const toInternalEvent = (event: z.infer<typeof benchEventSchema>): InternalEvent => {
   switch (event.type) {
@@ -1588,30 +1731,94 @@ const cleanupAttempt = async (
   context: BrowserContext | undefined,
   userDataDir: string
 ): Promise<void> => {
-  if (context !== undefined) {
+  // One bounded 15-second lifecycle: every step observes the same deadline, no
+  // step starts after it, and every started operation is awaited to settlement
+  // before this function returns, so no cleanup work outlives the cleanup
+  // result. Crossing the cap still emits the cleanup blocker.
+  const cleanupController = new AbortController();
+  const cleanupCapMs = 15_000;
+  const startedAtMs = Date.now();
+  const remainingMs = (): number => Math.max(0, cleanupCapMs - (Date.now() - startedAtMs));
+  const exceeded = (): boolean => Date.now() - startedAtMs >= cleanupCapMs;
+
+  // Runs one cleanup step under the shared deadline. When the cap fires first,
+  // the started operation is still awaited to settlement so the lifecycle owns
+  // no detached work after return; the attempt then fails as a blocker.
+  const runStep = async <Value>(label: string, op: Promise<Value>): Promise<Value> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await withTimeout(context.close(), 15_000, 'closing the browser context timed out');
-    } catch {
-      // Best-effort close; the profile-dir absence check is the real gate.
+      return await Promise.race([
+        op,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            reject(new CleanupCapError(`${label} exceeded the 15-second cleanup cap`));
+          }, remainingMs());
+        }),
+      ]);
+    } catch (error) {
+      if (!(error instanceof CleanupCapError)) {
+        throw new CleanupBlockerError(errorToReason(error));
+      }
+      cleanupController.abort();
+      try {
+        await op;
+      } catch {
+        // The operation failed after the cap; the cap breach is the failure.
+      }
+      throw new CleanupBlockerError(`${label} exceeded the 15-second cleanup cap`);
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
     }
-  }
-  await rm(userDataDir, { force: true, recursive: true });
-  let gone = false;
-  for (let retry = 0; retry < 2 && !gone; retry += 1) {
-    try {
-      await access(userDataDir);
-    } catch {
-      gone = true;
+  };
+
+  try {
+    if (context !== undefined) {
+      try {
+        await runStep('context close', context.close());
+      } catch {
+        // Best-effort close; the profile-dir absence check is the real gate.
+      }
     }
-    if (!gone && retry === 0) {
-      await new Promise(resolve => {
-        setTimeout(resolve, 2000);
-      });
-      await rm(userDataDir, { force: true, recursive: true });
+    if (exceeded()) {
+      throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
     }
-  }
-  if (!gone) {
-    throw new CleanupBlockerError(`profile directory survived cleanup: ${userDataDir}`);
+    await runStep('profile removal', rm(userDataDir, { force: true, recursive: true }));
+    let gone = false;
+    for (let retry = 0; retry < 2 && !gone; retry += 1) {
+      if (exceeded()) {
+        throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
+      }
+      let exists = true;
+      try {
+        await runStep('profile absence check', access(userDataDir));
+      } catch {
+        // A missing directory is the success case for the absence check; only
+        // the shared deadline can fail it.
+        if (exceeded()) {
+          throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
+        }
+        exists = false;
+      }
+      gone = !exists;
+      if (!gone && retry === 0) {
+        await runStep('cleanup wait', sleep(2000, cleanupController.signal));
+        if (exceeded()) {
+          throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
+        }
+        await runStep('profile removal retry', rm(userDataDir, { force: true, recursive: true }));
+      }
+    }
+    if (!gone) {
+      throw new CleanupBlockerError(`profile directory survived cleanup: ${userDataDir}`);
+    }
+  } catch (error) {
+    cleanupController.abort();
+    if (error instanceof CleanupBlockerError) {
+      throw error;
+    }
+    throw new CleanupBlockerError(errorToReason(error));
   }
 };
 
@@ -1651,6 +1858,7 @@ const buildFailedAttemptRecord = (input: {
   attemptStartMs: number;
   failureReason: string;
   collector: EventCollector;
+  followUpSent: boolean;
 }): AttemptRecord => {
   classifyRequestPhases(input.requests, input.savedAtOffsetMs);
   let transcript: readonly RedactedEvent[] = [];
@@ -1661,6 +1869,7 @@ const buildFailedAttemptRecord = (input: {
   let snapshotResultBytes: readonly number[] = [];
   let readCallsBeforeFirstSave = 0;
   let saveWorkflowCallCount = 0;
+  let autoRunObserved = false;
   try {
     const internal = validateEvents(input.collector.events);
     const bench = internal.map(toBenchEvent);
@@ -1673,6 +1882,7 @@ const buildFailedAttemptRecord = (input: {
     snapshotResultBytes = metrics.snapshotResultBytes;
     readCallsBeforeFirstSave = metrics.readCallsBeforeFirstSave;
     saveWorkflowCallCount = metrics.saveWorkflowCallCount;
+    autoRunObserved = hasOkRealRun(bench);
     transcript = redactTranscript(internal, input.collector.offsetByEventId, correlation);
   } catch {
     // Partial or inconsistent store on a failed attempt; keep defaults.
@@ -1687,7 +1897,7 @@ const buildFailedAttemptRecord = (input: {
     settings: { ...benchSettings },
     followUpDate: input.followUpDate,
     creditAccountLabel: input.creditAccount === '' ? null : input.creditAccount,
-    orgIdHash: null,
+    orgIdHash: input.requests[0]?.orgIdHash ?? null,
     createToSavedSeconds:
       input.savedAtOffsetMs === null
         ? null
@@ -1705,8 +1915,8 @@ const buildFailedAttemptRecord = (input: {
     snapshotResultBytes,
     readCallsBeforeFirstSave,
     saveWorkflowCallCount,
-    autoRunObserved: false,
-    followUpSent: false,
+    autoRunObserved,
+    followUpSent: input.followUpSent,
     correctness: null,
     success: false,
     failureReason: input.failureReason,
@@ -1752,39 +1962,60 @@ const runAttempt = async (input: {
   let requests: readonly CapturedGatewayRequest[] = [];
   let savedAtOffsetMs: number | null = null;
   let createSentOffsetMs = 0;
+  let followUpSent = false;
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const abortController = new AbortController();
 
   const nowOffset = (): number => Date.now() - attemptStartMs;
 
   try {
     const launched = await launchContext(userDataDir);
-    context = launched.context;
+    const attemptContext = launched.context;
+    context = attemptContext;
     headless = launched.headless;
     extensionId = launched.extensionId;
 
-    const capture = startGatewayCapture(context, nowOffset);
+    const capture = startGatewayCapture(attemptContext, nowOffset, () => {
+      abortController.abort();
+    });
     requests = capture.requests;
 
-    const sidePanel = await openAuthenticatedSidePanel(context, extensionId, token, userEmail);
+    // The whole setup stage shares one enforced 30-second budget. Each
+    // sub-step runs inside it; internal Playwright waits derive from the
+    // remaining budget, so the stage stops itself before cleanup starts.
+    const setupBudget = makeSetupBudget(30_000);
+    const sidePanel = await runSetupStep(setupBudget, 'side panel setup', () =>
+      openAuthenticatedSidePanel(attemptContext, extensionId, token, userEmail, setupBudget)
+    );
     checkGatewayBlocker();
-    await seedWorkflowSettings(sidePanel, benchSettings);
-    await openFlightsTab(context);
+    await runSetupStep(setupBudget, 'workflow settings setup', () =>
+      seedWorkflowSettings(sidePanel, benchSettings)
+    );
     checkGatewayBlocker();
-    await selectTargetTab(sidePanel);
+    await runSetupStep(setupBudget, 'flights tab setup', () =>
+      openFlightsTab(attemptContext, setupBudget)
+    );
     checkGatewayBlocker();
-    creditAccount = await selectCreditAccount(sidePanel);
+    await runSetupStep(setupBudget, 'target-tab setup', () =>
+      selectTargetTab(sidePanel, setupBudget)
+    );
     checkGatewayBlocker();
-    await selectModel(sidePanel);
+    creditAccount = await runSetupStep(setupBudget, 'credit-account setup', () =>
+      selectCreditAccount(sidePanel, setupBudget)
+    );
     checkGatewayBlocker();
-    await sidePanel
-      .getByRole('button', { name: /Safe mode/ })
-      .waitFor({ state: 'visible', timeout: 30_000 });
+    await runSetupStep(setupBudget, 'model setup', () => selectModel(sidePanel, setupBudget));
+    checkGatewayBlocker();
+    await runSetupStep(setupBudget, 'safe-mode readiness', () =>
+      sidePanel
+        .getByRole('button', { name: /Safe mode/ })
+        .waitFor({ state: 'visible', timeout: setupBudget.waitTimeoutFor(30_000) })
+    );
     checkGatewayBlocker();
 
     // ── Agent phase (the only phase governed by --timeout-ms) ──
     setupDone.value = true;
     const preTurnCount = (await snapshotTurn(sidePanel)).eventCount;
-    const abortController = new AbortController();
     const submitAtMs = await sendMessage(sidePanel, createMessage);
     createSentOffsetMs = submitAtMs - attemptStartMs;
     const deadlineMs = submitAtMs + timeoutMs;
@@ -1801,6 +2032,7 @@ const runAttempt = async (input: {
       mode: 'create',
       nowOffset,
     });
+    checkGatewayBlocker();
 
     savedAtOffsetMs = computeSavedAtOffsetMs(collector, requests);
     const createToSavedSeconds =
@@ -1814,9 +2046,9 @@ const runAttempt = async (input: {
     const createInternalEvents = validateEvents(collector.events);
     const autoRunObserved = hasOkRealRun(createInternalEvents.map(toBenchEvent));
 
-    let followUpSent = false;
+    let verifyTimedOut = false;
     let finalSnapshot = createPhase.finalSnapshot;
-    if (!autoRunObserved && Date.now() < deadlineMs) {
+    if (!createPhase.timedOut && !autoRunObserved && Date.now() < deadlineMs) {
       const verifyStartCount = (await snapshotTurn(sidePanel)).eventCount;
       await sendMessage(sidePanel, `Run it for ${followUpDestination} on ${followUpDate}`);
       followUpSent = true;
@@ -1829,7 +2061,30 @@ const runAttempt = async (input: {
         mode: 'verify',
         nowOffset,
       });
+      verifyTimedOut = verifyPhase.timedOut;
+      checkGatewayBlocker();
       finalSnapshot = verifyPhase.finalSnapshot;
+    }
+    checkGatewayBlocker();
+    if (createPhase.timedOut || verifyTimedOut) {
+      return {
+        kind: 'record',
+        record: buildFailedAttemptRecord({
+          attempt,
+          headless,
+          startedAtIso,
+          gitHead,
+          followUpDate,
+          creditAccount,
+          requests,
+          savedAtOffsetMs,
+          createSentOffsetMs,
+          attemptStartMs,
+          failureReason: 'deadline',
+          collector,
+          followUpSent,
+        }),
+      };
     }
 
     const finalInternalEvents = validateEvents(finalSnapshot.events);
@@ -1838,6 +2093,7 @@ const runAttempt = async (input: {
     const workflows = validateWorkflows(rawWorkflows);
 
     classifyRequestPhases(requests, savedAtOffsetMs);
+    checkGatewayBlocker();
 
     if (requests.length === 0) {
       return {
@@ -1855,6 +2111,7 @@ const runAttempt = async (input: {
           attemptStartMs,
           failureReason: 'no-gateway-requests',
           collector,
+          followUpSent,
         }),
       };
     }
@@ -1892,6 +2149,7 @@ const runAttempt = async (input: {
           attemptStartMs,
           failureReason: 'org-id-mismatch',
           collector,
+          followUpSent,
         }),
       };
     }
@@ -1980,6 +2238,7 @@ const runAttempt = async (input: {
         attemptStartMs,
         failureReason: reason,
         collector,
+        followUpSent,
       }),
     };
   } finally {

@@ -584,6 +584,73 @@ describe('createExtensionAgentSessionManager', () => {
       }
     });
 
+    it('forwards the event-log watermark on an empty page so a reopened running session replays persisted events', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * Round-8 regression state: the reopened CLI session's initial page
+         * read is still empty (session-ingest batches until the turn ends),
+         * but the ingest DO already carries the nonce-bearing user message —
+         * the tRPC result reports that high-water mark as `watermarkEventId`.
+         * The transport seeds its first WebSocket connect from this page
+         * watermark (`fromId=0`), so every persisted event replays and the
+         * user message reaches the renderer even though the page is empty.
+         * Dropping the watermark would connect with `replay=false` and lose
+         * the already-persisted message.
+         */
+        trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+          history: null,
+          kiloSessionId: SESSION_ID,
+          watermarkEventId: 42,
+        });
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await resultPromise;
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          watermarkEventId: 42,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('forwards the event-log watermark on a message page', async () => {
+      const trpc = makeTrpcMock();
+      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+        history: {
+          messages: [
+            {
+              info: { role: 'user', sessionID: SESSION_ID, time: {} },
+              parts: [],
+            },
+          ],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
+        kiloSessionId: SESSION_ID,
+        watermarkEventId: 7,
+      });
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [{ info: { role: 'user', sessionID: SESSION_ID, time: {} }, parts: [] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: 7,
+      });
+    });
+
     it('returns success page when history has messages array', async () => {
       const trpc = makeTrpcMock();
       trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({

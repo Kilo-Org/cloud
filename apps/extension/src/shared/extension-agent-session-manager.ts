@@ -321,6 +321,12 @@ function pinPageToSession(
  * live turn. For such a session the bounded retry keeps reading until the
  * page carries messages or the session stops running, instead of latching an
  * empty transcript that later persistence can never fill.
+ *
+ * Both page outcomes forward the tRPC result's `watermarkEventId` (when the
+ * server returned one) so the transport seeds its first WebSocket connect
+ * with `fromId=0` and the ingest DO replays every stored event. That replay
+ * is the safety net when a still-running session's empty page is latched:
+ * the already-persisted user message still reaches the renderer.
  */
 async function fetchExtensionSessionSnapshotPage(
   trpcClient: TrpcClient,
@@ -376,6 +382,21 @@ async function fetchExtensionSessionSnapshotPage(
   }
 
   const history = pageHistory(result);
+  /*
+   * Forward the event-log watermark from the tRPC result. The transport
+   * seeds its first WebSocket connect's `fromId` from the page watermark: a
+   * present watermark makes the DO replay every stored event, closing the
+   * gap between the page snapshot and the live stream when session-ingest
+   * materialization lags a running turn. Dropping it here connects with
+   * `replay=false`, and a reopened running session's already-persisted user
+   * message never reaches the renderer even though the message API carries
+   * it. Absent or null watermarks (fresh sessions, failed watermark read)
+   * stay absent to keep `replay=false` for sessions with nothing to replay.
+   */
+  const watermark =
+    result.watermarkEventId === null || result.watermarkEventId === undefined
+      ? {}
+      : { watermarkEventId: result.watermarkEventId };
   if (history === null) {
     return pinPageToSession(
       {
@@ -384,6 +405,7 @@ async function fetchExtensionSessionSnapshotPage(
         messages: [],
         nextCursor: null,
         omittedItemCount: 0,
+        ...watermark,
       },
       kiloSessionId
     );
@@ -398,6 +420,7 @@ async function fetchExtensionSessionSnapshotPage(
         messages: history.messages as SessionSnapshotPage['messages'],
         nextCursor: history.nextCursor,
         omittedItemCount: history.omittedItemCount,
+        ...watermark,
       },
       kiloSessionId
     );

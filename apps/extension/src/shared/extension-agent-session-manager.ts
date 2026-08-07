@@ -286,6 +286,12 @@ async function fetchExtensionSessionSnapshotPage(
     active.sessions.some(session => session.id === kiloSessionId && session.status !== 'idle');
 
   let result = await queryPage();
+  const initialHistory = pageHistory(result);
+  console.info('[agents-debug] initial history page', {
+    historyType: initialHistory === null ? 'null' : 'value',
+    messageCount: initialHistory !== null && isHistoryPage(initialHistory) ? initialHistory.messages.length : -1,
+    sessionId: kiloSessionId,
+  });
   if (options.cursor === undefined && isPageWithoutPersistedMessages(pageHistory(result))) {
     /*
      * Only a non-idle session gets the delayed-history retry. A freshly
@@ -297,6 +303,10 @@ async function fetchExtensionSessionSnapshotPage(
      * so keep reading until session-ingest persistence catches up.
      */
     const active = await fetchActiveSessions();
+    console.info('[agents-debug] history liveness', {
+      sessionId: kiloSessionId,
+      sessions: active.sessions.map(session => ({ id: session.id, status: session.status })),
+    });
     if (isSessionWorking(active)) {
       result = await readActiveHistoryWithRetry(result, {
         fetchActiveSessions,

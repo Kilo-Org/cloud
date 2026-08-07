@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { generateApiToken } from '@/lib/tokens';
 import { getUserOrgMemberships } from '@/lib/organizations/organizations';
+import { recordKiloAdminElevationForRequest, serviceTarget } from '@/lib/admin/admin-access-log';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
@@ -20,9 +21,21 @@ const ONE_HOUR_SECONDS = 60 * 60;
  * worker can enforce access and check org membership without DB round-trips.
  */
 export async function POST() {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const { user, authFailedResponse, tokenSource } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (user.is_admin) {
+    // The minted token carries `isAdmin`, so the elevation is exercised inside
+    // the Wasteland worker where this app emits nothing. Correlate on
+    // `kiloUserId` within the token's lifetime below.
+    await recordKiloAdminElevationForRequest({
+      user,
+      tokenSource,
+      reason: 'service_token_mint',
+      target: serviceTarget('wasteland'),
+    });
+  }
 
   const orgMemberships = await getUserOrgMemberships(user.id);
 

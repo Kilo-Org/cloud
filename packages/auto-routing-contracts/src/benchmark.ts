@@ -279,6 +279,9 @@ export const StartBenchmarkRunResponseSchema = z.object({
   skippedModels: z.array(z.string()).default([]),
   // One entry per run actually started. 'both' can start two.
   startedRuns: z.array(StartedBenchmarkRunSchema).default([]),
+  // One entry per queue that could not start. Reported even when another queue
+  // did start, or a wedged queue would read as "nothing pending".
+  drainErrors: z.array(z.string()).default([]),
 });
 
 /** Registry row counts for one queue, under the live engine identity. */

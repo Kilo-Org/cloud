@@ -150,7 +150,13 @@ describe('auto routing benchmark admin client', () => {
 
     await expect(startBenchmarkRun('classifier', false, 'platform')).resolves.toEqual({
       status: 200,
-      body: { runId: 'run-2', enqueuedModels: 3, skippedModels: [], startedRuns: [] },
+      body: {
+        runId: 'run-2',
+        enqueuedModels: 3,
+        skippedModels: [],
+        startedRuns: [],
+        drainErrors: [],
+      },
     });
 
     expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {

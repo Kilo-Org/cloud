@@ -1377,6 +1377,11 @@ export function BenchmarksSection() {
           data.startedRuns.map(run => `${run.purpose} queue: ${run.entryCount} entries`).join(' · ')
         );
       }
+      // One queue can start while the other is wedged. Say so, or its pending
+      // work looks the same as an empty queue.
+      for (const message of data.drainErrors) {
+        toast.error(`A queue could not start: ${message}`);
+      }
       void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs'] });
       void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
     },

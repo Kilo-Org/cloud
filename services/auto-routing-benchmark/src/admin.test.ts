@@ -591,6 +591,35 @@ describe('POST /admin/runs', () => {
     });
     expect(insertRun).not.toHaveBeenCalled();
   });
+
+  it('reports a wedged queue alongside the queue that did start', async () => {
+    // The platform budget fits one entry per repetition; the user budget does
+    // not. Hiding the user queue's failure behind the platform run would leave
+    // its pending work looking like an empty queue.
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        max_concurrency: 100,
+        user_max_concurrency: 4,
+        decider_repetitions: 5,
+      },
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      startedRuns: { purpose: string }[];
+      drainErrors: string[];
+    };
+    expect(body.startedRuns.map(r => r.purpose)).toEqual(['platform']);
+    expect(body.drainErrors).toHaveLength(1);
+    expect(body.drainErrors[0]).toContain('requires at least one live container lane');
+  });
 });
 
 // ---------------------------------------------------------------------------

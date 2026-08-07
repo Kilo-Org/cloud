@@ -111,6 +111,8 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         const started = await drainQueues(c.env, queue, drainErrors);
         // Drains never throw, so a wedged queue would otherwise return 200 and
         // the panel would report "nothing pending" for work that is stuck.
+        // Nothing started at all is a failed request; a queue that failed while
+        // another started is reported alongside the run that did start.
         if (started.length === 0 && drainErrors.length > 0) {
           const [first] = drainErrors;
           if (first instanceof BenchmarkRunConfigError)
@@ -122,6 +124,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
           skippedModels: [],
           startedRuns: started,
+          drainErrors: drainErrors.map(error =>
+            error instanceof Error ? error.message : String(error)
+          ),
         });
       }
       try {

@@ -136,26 +136,57 @@ export function useNewSessionCreator({
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
 
       // The intent settled (the ledger now owns the create); the next submit
-      // is a fresh intent with a fresh key.
+      // is a fresh intent with a fresh key. Rotate before the post-success
+      // work so a UI failure cannot keep the successful key for a retry.
       rotateKey();
 
-      captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-      await invalidateAgentSessionQueries(queryClient, trpc);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const path = organizationId
-        ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
-        : `/(app)/agent-chat/${result.kiloSessionId}`;
-      router.push(path as Href);
-      requestAnimationFrame(() => {
-        navigation.dispatch(state => {
-          const routes = state.routes.filter((r: { name: string }) => r.name !== 'agent-chat/new');
-          return {
-            type: 'RESET' as const,
-            payload: { ...state, routes, index: routes.length - 1 },
-          };
+      // Post-success UI work is outside the server failure boundary: the
+      // cloud operation is already successful here, so a cache-invalidation,
+      // haptics, navigation, or stack-cleanup failure must not report the
+      // create as failed or invite a duplicate retry. Failures are
+      // intentionally swallowed so they never reach the create-failure path
+      // below.
+      try {
+        captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
+        await invalidateAgentSessionQueries(queryClient, trpc);
+        // Haptics is fire-and-forget outcome feedback. Await it inside its
+        // own boundary so a rejected call is contained: no unhandled
+        // rejection, no create-failure toast, and the navigation below still
+        // runs.
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {
+          // A failed haptics call is cosmetic; stay silent and navigate.
+        }
+        const path = organizationId
+          ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
+          : `/(app)/agent-chat/${result.kiloSessionId}`;
+        router.push(path as Href);
+        requestAnimationFrame(() => {
+          // This callback runs after the surrounding try block has returned,
+          // so a failure here would escape as an uncaught exception. The
+          // stack cleanup is cosmetic; contain it.
+          try {
+            navigation.dispatch(state => {
+              const routes = state.routes.filter(
+                (r: { name: string }) => r.name !== 'agent-chat/new'
+              );
+              return {
+                type: 'RESET' as const,
+                payload: { ...state, routes, index: routes.length - 1 },
+              };
+            });
+          } catch {
+            // The session already exists; stay silent.
+          }
         });
-      });
+      } catch {
+        // The cloud session already exists. Stay silent: no create-failure
+        // toast, no duplicate-create retry.
+      }
     } catch (error) {
+      // Only `prepareSession` errors can reach here; post-success UI
+      // failures are swallowed above.
       const message = error instanceof Error ? error.message : 'Failed to create session';
       toast.error(message);
       // A typed terminal rejection ends the intent; retryable failures

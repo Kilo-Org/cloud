@@ -20,7 +20,11 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
 
-import type { AcceptedPhaseEventName, AnalyticsEventMap } from '@kilocode/app-shared/analytics';
+import {
+  redactProhibitedProperties,
+  type AcceptedPhaseEventName,
+  type AnalyticsEventMap,
+} from '@kilocode/app-shared/analytics';
 
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import PostHogClient from '@/lib/posthog';
@@ -99,7 +103,10 @@ function sendToPostHog<K extends AcceptedPhaseEventName>(
   PostHogClient().capture({
     distinctId: params.distinctId,
     event: params.event,
-    properties: params.properties,
+    // Runtime redaction removes DEC-05 prohibited keys from record-shaped
+    // payloads (`app_startup`); it is a no-op for typed strict payloads,
+    // whose keys are deny-list safe by schema.
+    properties: redactProhibitedProperties(params.properties),
   });
 }
 

@@ -54,11 +54,19 @@ describe('captureCatalogEvent', () => {
     });
   });
 
-  it('passes the record-shaped app_startup payload through unchanged', async () => {
+  it('redacts prohibited keys from the record-shaped app_startup payload', async () => {
     captureCatalogEvent({
       distinctId: 'user@example.com',
       event: 'app_startup',
-      properties: { outcome: 'app', auth_ready: 0, consent_ready: 60 },
+      properties: {
+        outcome: 'app',
+        auth_ready: 0,
+        consent_ready: 60,
+        email: 'user@example.com',
+        prompt: 'list my open pull requests',
+        repo_name: 'kilo-cloud',
+        session_id: 'sess_abc',
+      },
     });
     await Promise.resolve();
     await Promise.resolve();

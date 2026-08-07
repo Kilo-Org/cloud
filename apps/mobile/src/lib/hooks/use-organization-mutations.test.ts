@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the P1-A-08e org mutation wiring suite pins both operation families' key isolation and rotation policy in one file. */
 // P1-A-08e wiring tests for `useOrganizationMutations`.
 //
 // The org surfaces (member-row action sheet, member-limit sheet) own their
@@ -8,7 +9,10 @@
 // limit-only update carries no key), and the key rotation policy (real
 // `isOrganizationMutationRetryable` + `mapOrganizationOperationError`) runs
 // inside `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React
-// ref state that needs a mounted renderer).
+// ref state that needs a mounted renderer). The hook mounts one key-state pair
+// per operation family (role change first, member removal second), so the mock
+// returns a DISTINCT pair per call to prove the families never share or rotate
+// each other's key.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,10 +25,19 @@ import {
   useOrganizationMutations,
 } from './use-organization-mutations';
 
-const hoistedKeys = vi.hoisted(() => ({
-  getKey: vi.fn(() => 'hoisted-op-key'),
+// The hook body mounts two `useHoistedOperationKey` calls in a fixed order:
+// the role-change pair first, then the member-removal pair. A counter routes
+// call 1 to `roleKeys` and call 2 to `removeKeys`, so each family exercises
+// its own getKey/rotateKey and the tests can prove cross-family isolation.
+const roleKeys = vi.hoisted(() => ({
+  getKey: vi.fn(() => 'role-op-key'),
   rotateKey: vi.fn(),
 }));
+const removeKeys = vi.hoisted(() => ({
+  getKey: vi.fn(() => 'remove-op-key'),
+  rotateKey: vi.fn(),
+}));
+const hoistedKeyCalls = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
@@ -32,7 +45,13 @@ vi.mock('expo-crypto', () => ({
 
 vi.mock('@/lib/pr-review/merge/pr-operation-ledger', async importOriginal => {
   const actual = await importOriginal<typeof PrOperationLedgerModule>();
-  return { ...actual, useHoistedOperationKey: () => hoistedKeys };
+  return {
+    ...actual,
+    useHoistedOperationKey: () => {
+      hoistedKeyCalls.count += 1;
+      return hoistedKeyCalls.count % 2 === 1 ? roleKeys : removeKeys;
+    },
+  };
 });
 
 type MutationOptions = {
@@ -127,8 +146,11 @@ beforeEach(() => {
   membersRemoveMutateMock.mockReset();
   invalidateQueriesMock.mockReset();
   toastErrorMock.mockReset();
-  hoistedKeys.getKey.mockClear();
-  hoistedKeys.rotateKey.mockClear();
+  hoistedKeyCalls.count = 0;
+  roleKeys.getKey.mockClear();
+  roleKeys.rotateKey.mockClear();
+  removeKeys.getKey.mockClear();
+  removeKeys.rotateKey.mockClear();
 });
 
 afterEach(() => {
@@ -164,13 +186,13 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
 
     await updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'billing_manager' });
 
-    expect(hoistedKeys.getKey).toHaveBeenCalled();
+    expect(roleKeys.getKey).toHaveBeenCalled();
     expect(membersUpdateMutateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ operationKey: 'hoisted-op-key' })
+      expect.objectContaining({ operationKey: 'role-op-key' })
     );
   });
 
-  it('does not attach an operation key or rotate the hoisted key on a limit-only update (success or failure)', async () => {
+  it('does not attach an operation key or rotate any hoisted key on a limit-only update (success or failure)', async () => {
     const badRequest = new Error('limit update rejected');
     Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
     membersUpdateMutateMock
@@ -183,11 +205,13 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
       updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', dailyUsageLimitUsd: 30 })
     ).rejects.toMatchObject({ message: 'limit update rejected' });
 
-    // A limit-only update never runs a keyed role mutation: it must not read
-    // or rotate the hoisted key, even when it fails, so a pending role-change
-    // key survives for another intent.
-    expect(hoistedKeys.getKey).not.toHaveBeenCalled();
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    // A limit-only update never runs a keyed mutation: it must not read or
+    // rotate either family's hoisted key, even when it fails, so a pending
+    // role-change or removal key survives for another intent.
+    expect(roleKeys.getKey).not.toHaveBeenCalled();
+    expect(roleKeys.rotateKey).not.toHaveBeenCalled();
+    expect(removeKeys.getKey).not.toHaveBeenCalled();
+    expect(removeKeys.rotateKey).not.toHaveBeenCalled();
     expect(membersUpdateMutateMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: expect.any(String) })
     );
@@ -199,7 +223,7 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
 
     await updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' });
 
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(roleKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the key on retryable failures (in-progress, network, settle-failed)', async () => {
@@ -223,7 +247,7 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
         ).rejects.toMatchObject({ message: expected });
       })
     );
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    expect(roleKeys.rotateKey).not.toHaveBeenCalled();
   });
 
   it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
@@ -235,7 +259,24 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
     await expect(
       updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
     ).rejects.toMatchObject({ message: 'This action did not complete. Please try again.' });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(roleKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('a removal does not rotate a role-change key held open by a retryable failure', async () => {
+    membersUpdateMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    membersRemoveMutateMock.mockResolvedValueOnce({ success: true, updated: 'member-2' });
+    useOrganizationMutations(ORG_ID);
+
+    await expect(
+      updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
+    ).rejects.toMatchObject({ message: 'This change is still being processed. Please try again.' });
+    await removeMemberOptions()?.mutationFn?.({ memberId: 'member-2' });
+
+    // The removal rotates only its own key; the role-change key survives so
+    // the same-key role retry still dedupes/reconciles on the server.
+    expect(removeKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(roleKeys.rotateKey).not.toHaveBeenCalled();
+    expect(roleKeys.getKey).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -248,12 +289,12 @@ describe('useOrganizationMutations removeMember (P1-A-08e)', () => {
       success: true,
       updated: 'member-1',
     });
-    expect(hoistedKeys.getKey).toHaveBeenCalled();
+    expect(removeKeys.getKey).toHaveBeenCalled();
     expect(membersRemoveMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: ORG_ID,
         memberId: 'member-1',
-        operationKey: 'hoisted-op-key',
+        operationKey: 'remove-op-key',
       })
     );
   });
@@ -264,7 +305,7 @@ describe('useOrganizationMutations removeMember (P1-A-08e)', () => {
 
     await removeMemberOptions()?.mutationFn?.({ memberId: 'member-1' });
 
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(removeKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the key on an in-progress CONFLICT (retryable) and maps the marker', async () => {
@@ -276,7 +317,7 @@ describe('useOrganizationMutations removeMember (P1-A-08e)', () => {
     ).rejects.toMatchObject({
       message: 'This change is still being processed. Please try again.',
     });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    expect(removeKeys.rotateKey).not.toHaveBeenCalled();
   });
 
   it('regenerates the key on a non-retryable rejection', async () => {
@@ -288,7 +329,7 @@ describe('useOrganizationMutations removeMember (P1-A-08e)', () => {
     await expect(
       removeMemberOptions()?.mutationFn?.({ memberId: 'member-1' })
     ).rejects.toMatchObject({ message: 'no permission' });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(removeKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
   it('onError still surfaces the mapped message through the existing toast path', () => {
@@ -298,6 +339,23 @@ describe('useOrganizationMutations removeMember (P1-A-08e)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith(
       'This change is still being processed. Please try again.'
     );
+  });
+
+  it('a role change does not rotate a removal key held open by a retryable failure', async () => {
+    membersRemoveMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    membersUpdateMutateMock.mockResolvedValueOnce({ success: true, updated: 'role' });
+    useOrganizationMutations(ORG_ID);
+
+    await expect(
+      removeMemberOptions()?.mutationFn?.({ memberId: 'member-1' })
+    ).rejects.toMatchObject({ message: 'This change is still being processed. Please try again.' });
+    await updateMemberOptions()?.mutationFn?.({ memberId: 'member-2', role: 'owner' });
+
+    // The role change rotates only its own key; the removal key survives so
+    // the same-key removal retry still dedupes/reconciles on the server.
+    expect(roleKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(removeKeys.rotateKey).not.toHaveBeenCalled();
+    expect(removeKeys.getKey).toHaveBeenCalledTimes(1);
   });
 });
 

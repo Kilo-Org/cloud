@@ -99,7 +99,12 @@ export function useOrganizationMutations(
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { getKey, rotateKey } = useHoistedOperationKey();
+  // One hoisted key state per operation family: a retryable role change must
+  // keep its key even when a removal runs, and a removal must not rotate or
+  // clear the role-change key. Two `useHoistedOperationKey` calls give each
+  // family its own getKey/rotateKey pair instead of a shared single key state.
+  const { getKey: getRoleKey, rotateKey: rotateRoleKey } = useHoistedOperationKey();
+  const { getKey: getRemoveKey, rotateKey: rotateRemoveKey } = useHoistedOperationKey();
 
   const withMembersKey = trpc.organizations.withMembers.queryKey({ organizationId });
   const listKey = trpc.organizations.list.queryKey();
@@ -217,18 +222,18 @@ export function useOrganizationMutations(
             organizationId,
             ...input,
             ...(input.role !== undefined && {
-              operationKey: getKey(
+              operationKey: getRoleKey(
                 organizationRoleChangeIntentFingerprint(organizationId, input.memberId, input.role)
               ),
             }),
           });
           if (isKeyedRoleMutation) {
-            rotateKey();
+            rotateRoleKey();
           }
           return result;
         } catch (error) {
           if (isKeyedRoleMutation && !isOrganizationMutationRetryable(error)) {
-            rotateKey();
+            rotateRoleKey();
           }
           throw mapOrganizationOperationError(error);
         }
@@ -258,15 +263,15 @@ export function useOrganizationMutations(
           const result = await trpcClient.organizations.members.remove.mutate({
             organizationId,
             ...input,
-            operationKey: getKey(
+            operationKey: getRemoveKey(
               organizationRemoveMemberIntentFingerprint(organizationId, input.memberId)
             ),
           });
-          rotateKey();
+          rotateRemoveKey();
           return result;
         } catch (error) {
           if (!isOrganizationMutationRetryable(error)) {
-            rotateKey();
+            rotateRemoveKey();
           }
           throw mapOrganizationOperationError(error);
         }

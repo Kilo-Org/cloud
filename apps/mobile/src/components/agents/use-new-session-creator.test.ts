@@ -1,4 +1,5 @@
 /* eslint-disable import/first -- mocks must be defined before the module under test is imported */
+/* eslint-disable max-lines -- cohesive hook suite pinning the post-success containment regressions in one file */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +13,14 @@ const prepareSessionMutate = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
 const navigationDispatch = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
+const invalidateAgentSessionQueries = vi.hoisted(() => vi.fn());
+// Not a `vi.fn()`: vitest attaches its own rejection handler to any promise a
+// mock returns, which would mask a leaked haptics rejection. A plain module
+// export returning a real promise keeps `unhandledRejection` detection honest.
+const hapticsMock = vi.hoisted(() => ({
+  calls: 0,
+  rejectWith: undefined as Error | undefined,
+}));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -28,7 +37,13 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({}),
 }));
 vi.mock('expo-haptics', () => ({
-  notificationAsync: vi.fn(),
+  notificationAsync: async (): Promise<void> => {
+    hapticsMock.calls += 1;
+    await Promise.resolve();
+    if (hapticsMock.rejectWith !== undefined) {
+      throw hapticsMock.rejectWith;
+    }
+  },
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('sonner-native', () => ({
@@ -42,7 +57,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_CREATED_EVENT: 'session_created',
 }));
 vi.mock('@/lib/agent-session-cache', () => ({
-  invalidateAgentSessionQueries: vi.fn(),
+  invalidateAgentSessionQueries,
 }));
 // The real classifier lives in mobile-session-manager (covered by its own
 // suite); this test mirrors its decision so hook-level retries are exercised
@@ -173,12 +188,19 @@ function usedOperationKeys(): (string | undefined)[] {
   );
 }
 
+function sessionResult(): { kiloSessionId: string; cloudAgentSessionId: string } {
+  return { kiloSessionId: 'ses_12345678901234567890123456', cloudAgentSessionId: 'c-1' };
+}
+
 describe('useNewSessionCreator operationKey', () => {
   beforeEach(() => {
     prepareSessionMutate.mockReset();
     routerPush.mockClear();
     navigationDispatch.mockClear();
     toastError.mockClear();
+    invalidateAgentSessionQueries.mockReset();
+    hapticsMock.calls = 0;
+    hapticsMock.rejectWith = undefined;
     attachmentsWire = null;
   });
 
@@ -325,5 +347,126 @@ describe('useNewSessionCreator operationKey', () => {
 
     const keys = usedOperationKeys();
     expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it('does not treat a post-success cache failure as a create failure and rotates the key', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    invalidateAgentSessionQueries.mockRejectedValueOnce(new Error('cache invalidation failed'));
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    // The create-failure toast path must not run for a post-success failure.
+    expect(toastError).not.toHaveBeenCalled();
+
+    // The next submit is a fresh intent with a fresh key, not a retry of the
+    // successful operation key.
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const keys = usedOperationKeys();
+    expect(keys[1]).toBeDefined();
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it('does not treat a post-success navigation failure as a create failure and rotates the key', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    routerPush.mockImplementationOnce(() => {
+      throw new Error('navigation failed');
+    });
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    // The create-failure toast path must not run for a post-success failure.
+    expect(toastError).not.toHaveBeenCalled();
+
+    // The next submit is a fresh intent with a fresh key, not a retry of the
+    // successful operation key.
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const keys = usedOperationKeys();
+    expect(keys[1]).toBeDefined();
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it('does not treat a rejected haptics call as a create failure and rotates the key', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    hapticsMock.rejectWith = new Error('haptics failed');
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    try {
+      const creator = runCreator({});
+      creator.promptRef.current = 'hello';
+      await creator.createSessionFromDraft();
+      // Give the runtime a turn to flag an unhandled rejection if the hook
+      // ever leaks the haptics promise's rejection.
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(hapticsMock.calls).toBe(1);
+      // A rejected haptics call must be contained: no unhandled rejection and
+      // no create-failure toast.
+      expect(unhandledRejections).toEqual([]);
+      expect(toastError).not.toHaveBeenCalled();
+
+      // The next submit is a fresh intent with a fresh key, not a retry of the
+      // successful operation key.
+      creator.promptRef.current = 'hello';
+      await creator.createSessionFromDraft();
+
+      const keys = usedOperationKeys();
+      expect(keys[1]).toBeDefined();
+      expect(keys[1]).not.toBe(keys[0]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+    }
+  });
+
+  it('contains a deferred stack-cleanup failure after a success and rotates the key', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    navigationDispatch.mockImplementationOnce(() => {
+      throw new Error('stack cleanup failed');
+    });
+    // The test environment has no requestAnimationFrame; capture the deferred
+    // callback so it can be run after the submit settles, like the real frame
+    // boundary does.
+    const scheduledFrames: (() => void)[] = [];
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the arrow is a global stub, not an async callback
+    vi.stubGlobal('requestAnimationFrame', (callback: () => void) => {
+      scheduledFrames.push(callback);
+      return 1;
+    });
+
+    try {
+      const creator = runCreator({});
+      creator.promptRef.current = 'hello';
+      await creator.createSessionFromDraft();
+      expect(toastError).not.toHaveBeenCalled();
+
+      // The deferred stack cleanup runs after the submit returned; a failure
+      // there must be contained instead of surfacing as an uncaught exception.
+      expect(scheduledFrames).toHaveLength(1);
+      expect(() => {
+        scheduledFrames[0]?.();
+      }).not.toThrow();
+      expect(toastError).not.toHaveBeenCalled();
+
+      // The next submit is a fresh intent with a fresh key, not a retry of the
+      // successful operation key.
+      creator.promptRef.current = 'hello';
+      await creator.createSessionFromDraft();
+
+      const keys = usedOperationKeys();
+      expect(keys[1]).toBeDefined();
+      expect(keys[1]).not.toBe(keys[0]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

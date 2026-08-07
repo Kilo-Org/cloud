@@ -7,7 +7,9 @@ vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
-    countCaseResults: vi.fn(),
+    countCaseResultsByLane: vi.fn(),
+    listLaneFailures: vi.fn(),
+    recordLaneFailure: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
     getCaseResults: vi.fn(),
     getExistingCaseResultIds: vi.fn(),
@@ -45,9 +47,11 @@ import {
   type CliRunResult,
 } from './cli-runner';
 import {
-  countCaseResults,
+  countCaseResultsByLane,
   getExistingCaseResultIds,
   getRunWithModels,
+  listLaneFailures,
+  recordLaneFailure,
   upsertCaseResult,
 } from './db';
 import { processJob } from './run';
@@ -129,7 +133,9 @@ beforeEach(() => {
     )
   );
   mockRunSnapshot();
-  vi.mocked(countCaseResults).mockResolvedValue(0);
+  vi.mocked(countCaseResultsByLane).mockResolvedValue([]);
+  vi.mocked(listLaneFailures).mockResolvedValue([]);
+  vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
   vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
   vi.mocked(destroyDeciderCliContainer).mockResolvedValue(undefined);
   vi.mocked(warmUpCliContainer).mockResolvedValue(undefined);
@@ -243,7 +249,7 @@ describe('processJob — decider container availability failures', () => {
     await expect(processJob(env, deciderMessage())).rejects.toThrow(message);
 
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(countCaseResults).not.toHaveBeenCalled();
+    expect(countCaseResultsByLane).not.toHaveBeenCalled();
   });
 
   it('lets the queue retry warmup capacity failures before running cases', async () => {
@@ -255,7 +261,7 @@ describe('processJob — decider container availability failures', () => {
 
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(countCaseResults).not.toHaveBeenCalled();
+    expect(countCaseResultsByLane).not.toHaveBeenCalled();
   });
 });
 
@@ -301,7 +307,7 @@ describe('processJob — decider chunk chaining', () => {
         },
       },
     ]);
-    expect(countCaseResults).not.toHaveBeenCalled();
+    expect(countCaseResultsByLane).not.toHaveBeenCalled();
   });
 
   it('enqueues the next chunk assigned to the same shard lane', async () => {
@@ -339,7 +345,7 @@ describe('processJob — decider chunk chaining', () => {
         },
       },
     ]);
-    expect(countCaseResults).not.toHaveBeenCalled();
+    expect(countCaseResultsByLane).not.toHaveBeenCalled();
   });
 
   it('does not rerun completed chunk cases or enqueue a fully completed next chunk', async () => {
@@ -402,7 +408,7 @@ describe('processJob — decider chunk chaining', () => {
     expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
       instanceName: `${runId}:${model}::0:3`,
     });
-    expect(countCaseResults).toHaveBeenCalled();
+    expect(countCaseResultsByLane).toHaveBeenCalled();
   });
 
   it('finalizes terminal chunks even when best-effort container destroy fails', async () => {
@@ -425,7 +431,7 @@ describe('processJob — decider chunk chaining', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('benchmark_container_destroy_failed')
     );
-    expect(countCaseResults).toHaveBeenCalled();
+    expect(countCaseResultsByLane).toHaveBeenCalled();
     warn.mockRestore();
   });
 });

@@ -249,3 +249,28 @@ export const profileRequestEvents = sqliteTable(
     ),
   ]
 );
+
+/**
+ * Lane-death ledger: one row per benchmark queue message that exhausted its
+ * retries and dead-lettered. Written by the DLQ consumer; read by run
+ * finalization so a dead lane no longer wedges its run — profile runs complete
+ * per-entry, platform runs fail fast instead of waiting for the stale sweep.
+ */
+export const runLaneFailures = sqliteTable(
+  'run_lane_failures',
+  {
+    run_id: text('run_id').notNull(),
+    model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
+    rep: integer('rep').notNull().default(0),
+    chunk: integer('chunk').notNull().default(0),
+    shard: integer('shard').notNull().default(0),
+    failed_at: text('failed_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.run_id, table.model, table.variant, table.rep, table.chunk, table.shard],
+    }),
+  ]
+);

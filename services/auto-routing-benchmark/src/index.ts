@@ -1,10 +1,13 @@
 import { Hono } from 'hono';
-import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
+import { createErrorHandler, createNotFoundHandler, formatError } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import { syncAutoDeciderModels } from './auto-decider-sync';
 import type { HonoEnv } from './hono-env';
-import { processJob, type BenchmarkJobMessage } from './run';
+import { processDeadLetter, processJob, type BenchmarkJobMessage } from './run';
+
+// Queue name of the dead-letter queue, matched against batch.queue.
+const DLQ_NAME = 'auto-routing-benchmark-dlq';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
 export { BenchRunnerContainer } from './bench-runner-container';
@@ -31,6 +34,23 @@ export default {
     );
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
+    // Dead-lettered messages: record the lane death and try to finalize the
+    // run. Never throw — a poison DLQ message retrying forever would wedge the
+    // run again; the stale sweep remains the backstop.
+    if (batch.queue === DLQ_NAME) {
+      for (const message of batch.messages) {
+        await processDeadLetter(env, message.body).catch(error => {
+          console.warn(
+            JSON.stringify({
+              event: 'benchmark_deadletter_handler_error',
+              ...formatError(error),
+            })
+          );
+        });
+        message.ack();
+      }
+      return;
+    }
     for (const message of batch.messages) {
       // Deliberately no try/catch: a throw from processJob (transient token,
       // D1 or container failures) must skip the ack so the queue retries the

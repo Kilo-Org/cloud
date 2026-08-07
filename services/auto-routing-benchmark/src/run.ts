@@ -13,9 +13,9 @@ import * as z from 'zod';
 import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import type { RunModelRow } from './db';
+import type { RunModelRow, RunRow } from './db';
 import {
-  countCaseResults,
+  countCaseResultsByLane,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
@@ -25,14 +25,17 @@ import {
   getRunWithModels,
   getSummaries,
   insertRun,
+  listLaneFailures,
   listPendingCurrentProfiles,
   listStaleRunningDeciderRunIds,
+  markProfilesFailedForEntries,
   markProfilesFailedForRun,
   markProfilesReadyForRun,
   markProfilesRunningForRun,
   markRunCompleted,
   markRunFailed,
   markStaleRunsFailed,
+  recordLaneFailure,
   replaceModelSummaries,
   saveRoutingTable,
   upsertCaseResult,
@@ -582,6 +585,7 @@ export async function startRun(
     // take effect without re-running any model. The state mirrors the rows
     // insertRun just wrote, so no re-read is needed.
     await finalizeRunIfComplete(env, runId, kind, {
+      status: 'running',
       maxConcurrency: config.maxConcurrency,
       minAccuracy: config.minAccuracy,
       switchCostFactor: config.switchCostFactor,
@@ -793,7 +797,69 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
   }
 }
 
+/**
+ * Handle a dead-lettered benchmark job: record the lane death, then attempt
+ * finalization so a single dead lane cannot wedge its run. The queue handler
+ * must not let this throw — a poison DLQ message retrying forever would wedge
+ * the run again; the stale sweep remains the backstop.
+ */
+export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<void> {
+  const parsed = BenchmarkJobMessageSchema.safeParse(rawMessage);
+  if (!parsed.success) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_deadletter_invalid_message',
+        error: parsed.error.message,
+        raw: JSON.stringify(rawMessage).slice(0, 200),
+      })
+    );
+    return;
+  }
+
+  const message = parsed.data;
+  const state = await getRunState(env, message.runId).catch(() => undefined);
+  if (!state || state.status !== 'running') {
+    // Run already completed/failed/swept — its lane accounting is settled.
+    console.warn(
+      JSON.stringify({ event: 'benchmark_deadletter_run_not_running', runId: message.runId })
+    );
+    return;
+  }
+
+  // Resolve the exact-pair variant like processDeciderJob does: an explicit
+  // message variant wins; a legacy variant-less message maps to the model's
+  // sole snapshot row.
+  const rowsForModel = state.models.filter(m => m.model === message.model);
+  const soleVariant = rowsForModel.length === 1 ? rowsForModel[0]?.variant : undefined;
+  const storedVariant =
+    message.variant !== undefined
+      ? variantToStorage(message.variant)
+      : (soleVariant ?? variantToStorage(null));
+
+  await recordLaneFailure(env.BENCH_DB, {
+    runId: message.runId,
+    model: message.model,
+    variant: storedVariant,
+    rep: message.rep ?? 0,
+    chunk: message.chunk ?? 0,
+    shard: message.shard ?? 0,
+  });
+  console.warn(
+    JSON.stringify({
+      event: 'benchmark_lane_dead',
+      runId: message.runId,
+      kind: message.kind,
+      model: message.model,
+      variant: variantFromStorage(storedVariant),
+      rep: message.rep ?? 0,
+      chunk: message.chunk ?? 0,
+    })
+  );
+  await finalizeRunIfComplete(env, message.runId, message.kind, state);
+}
+
 type RunState = {
+  status: RunRow['status'];
   maxConcurrency: number;
   minAccuracy: number;
   switchCostFactor: number;
@@ -813,6 +879,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
   if (!result) throw new Error(`unknown run ${runId}`);
   const { run, models } = result;
   return {
+    status: run.status,
     maxConcurrency: run.max_concurrency,
     minAccuracy: run.min_accuracy,
     switchCostFactor: run.switch_cost_factor,
@@ -1149,23 +1216,68 @@ export async function runCasesWithConcurrency<T>(
   await Promise.all(workers);
 }
 
+// Lane identity for completion accounting: one (model, variant, rep) chain of
+// chunk messages. All keys use storage-form variant ('' = default).
+function laneKey(model: string, variant: string, rep: number): string {
+  return `${model} ${variant} ${rep}`;
+}
+
+/** Failure reason written to profile entries whose lane dead-lettered. */
+export const PROFILE_LANE_DEAD_FAILURE_REASON =
+  'Benchmark lane dead-lettered (queue retries exhausted); retry to re-measure.';
+
 async function finalizeRunIfComplete(
   env: Env,
   runId: string,
   kind: BenchmarkKind,
-  // Run snapshot already loaded by the caller (startRun / processJob).
+  // Run snapshot already loaded by the caller (startRun / processJob / processDeadLetter).
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
   const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
-  const expected = enqueuedModels.length * caseCount * state.repetitions;
-  const actual = await countCaseResults(env.BENCH_DB, runId);
 
-  if (actual < expected) return;
+  // Lane accounting: a lane is done when all its case rows exist, dead when
+  // one of its chunk messages dead-lettered (rows win — a message can die
+  // after its writes landed). The run finalizes once every lane is accounted
+  // for, so one dead lane no longer wedges the run until the stale sweep.
+  const [laneCounts, laneFailures] = await Promise.all([
+    countCaseResultsByLane(env.BENCH_DB, runId),
+    listLaneFailures(env.BENCH_DB, runId),
+  ]);
+  const countByLane = new Map(laneCounts.map(r => [laneKey(r.model, r.variant, r.rep), r.n]));
+  const deadLaneKeys = new Set(laneFailures.map(f => laneKey(f.model, f.variant, f.rep)));
+  const lanes = enqueuedModels.flatMap(m =>
+    Array.from({ length: state.repetitions }, (_, rep) => ({
+      model: m.model,
+      variant: m.variant,
+      rep,
+    }))
+  );
+  const isDone = (lane: { model: string; variant: string; rep: number }) =>
+    (countByLane.get(laneKey(lane.model, lane.variant, lane.rep)) ?? 0) >= caseCount;
+  const deadLanes = lanes.filter(lane => !isDone(lane));
+  if (deadLanes.some(lane => !deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep)))) {
+    return;
+  }
+
+  // A platform run publishes one comparable artifact; a missing candidate
+  // would silently drop it from routing. Fail fast instead of publishing
+  // partial results or wedging until the 6h stale sweep.
+  if (deadLanes.length > 0 && state.purpose !== 'profile') {
+    const [first, ...rest] = deadLanes;
+    await failRunAndDrain(
+      env,
+      runId,
+      `lane dead-lettered: ${first.model} variant ${variantFromStorage(first.variant) ?? 'default'} rep ${first.rep}` +
+        (rest.length > 0 ? ` (+${rest.length} more)` : '')
+    );
+    return;
+  }
 
   // Two consumers may both see completion and both aggregate — harmless:
   // identical deterministic inputs → identical summaries; replaceModelSummaries
-  // is a batched delete+insert; markRunCompleted guards on status='running'.
+  // is a batched delete+insert; markRunCompleted and the per-entry profile
+  // transitions guard on status='running'.
   const rows = await getCaseResults(env.BENCH_DB, runId);
   // Fresh results (enqueued models). Carried summaries (skipped models) stay in
   // model_summaries with carried=true and are included via getSummaries below.
@@ -1176,7 +1288,23 @@ async function finalizeRunIfComplete(
   // Profile runs update the registry only — never publish platform artifacts,
   // never touch the classifier winner, never clear platform KV keys.
   if (state.purpose === 'profile') {
+    // Entries whose lanes all completed become ready; entries with a dead lane
+    // fail (retry re-admits them) without taking down the whole run. Fail
+    // first so the ready sweep only catches survivors; both statements keep
+    // the run_id + status='running' no-clobber guard.
+    const failedEntryKeys = new Set(deadLanes.map(l => `${l.model} ${l.variant}`));
+    const failedEntries = enqueuedModels
+      .filter(m => failedEntryKeys.has(`${m.model} ${m.variant}`))
+      .map(m => ({ model: m.model, variant: m.variant }));
     try {
+      if (failedEntries.length > 0) {
+        await markProfilesFailedForEntries(
+          env.BENCH_DB,
+          runId,
+          failedEntries,
+          PROFILE_LANE_DEAD_FAILURE_REASON
+        );
+      }
       await markProfilesReadyForRun(env.BENCH_DB, runId);
     } catch (error) {
       console.warn(
@@ -1193,6 +1321,7 @@ async function finalizeRunIfComplete(
         runId,
         kind,
         purpose: state.purpose,
+        failedEntries: failedEntries.length,
       })
     );
     try {

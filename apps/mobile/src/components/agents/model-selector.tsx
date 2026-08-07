@@ -12,9 +12,6 @@ import {
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
-  hasUserByokAvailable,
-  isFreeModelOption,
-  mayTrainOnYourPrompts,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -26,6 +23,8 @@ import {
   setModelPickerBridge,
 } from '@/lib/picker-bridge';
 import { cn } from '@/lib/utils';
+
+import { modelSelectorBadges } from './model-selector-badges';
 
 type ModelSelectorProps = {
   value: string;
@@ -143,10 +142,8 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const showGatewayMetadata = selectedModel?.showGatewayMetadata ?? false;
   const label = selectedModel?.name ?? (!providerAware && value ? value : 'Model');
-  const byok = showGatewayMetadata && hasUserByokAvailable(selectedModel);
-  const collectsData = showGatewayMetadata && mayTrainOnYourPrompts(selectedModel);
+  const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
   const compactVariantLabel = variant ? compactThinkingEffortLabel(variant) : '';
@@ -227,9 +224,7 @@ export function ModelPickerOptionRow({
   onToggleFavorite: (option: SessionModelOption) => void;
 }>) {
   const colors = useThemeColors();
-  const free = option.showGatewayMetadata && isFreeModelOption(option);
-  const byok = option.showGatewayMetadata && hasUserByokAvailable(option);
-  const collectsData = option.showGatewayMetadata && mayTrainOnYourPrompts(option);
+  const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
   const accessibilityLabel = [
     option.provider?.name,

@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { type Href, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
+import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -43,36 +44,38 @@ type InstancesRefetch = () => Promise<{
 
 type RemoteSpawnInheritance = {
   mode?: string;
-  model?: string;
-  variant?: string;
 };
 
 const RemoteSpawnInheritanceContext = createContext<RemoteSpawnInheritance>({});
 
 /**
- * Supplies the new-session screen's current mode/model/variant to
- * `useRemoteSpawnDispatch` without requiring the sibling-owned
- * `use-new-session-share-remote` wrapper to forward those fields.
+ * Supplies the new-session screen's current mode to `useRemoteSpawnDispatch`
+ * without requiring the sibling-owned `use-new-session-share-remote` wrapper
+ * to forward that field. The model half no longer rides inheritance: the
+ * route passes the validated `selection` explicitly.
  */
 export function RemoteSpawnInheritanceProvider({
   mode,
-  model,
-  variant,
   children,
 }: RemoteSpawnInheritance & { children: ReactNode }) {
-  const value = useMemo(() => ({ mode, model, variant }), [mode, model, variant]);
+  const value = useMemo(() => ({ mode }), [mode]);
   return createElement(RemoteSpawnInheritanceContext.Provider, { value }, children);
 }
 
 type UseRemoteSpawnDispatchArgs = {
   organizationId: string | undefined;
   /**
-   * Optional override for inheritance fields. When omitted, values come from
-   * the nearest `RemoteSpawnInheritanceProvider` (the new-session screen).
+   * Optional override for the inherited mode. When omitted, the value comes
+   * from the nearest `RemoteSpawnInheritanceProvider` (the new-session
+   * screen).
    */
   mode?: string;
-  model?: string;
-  variant?: string;
+  /**
+   * The validated wire model selection for the active target. Never inherited:
+   * the caller owns it because it depends on the target instance's catalog.
+   * Undefined means "let the CLI use its default".
+   */
+  selection?: ModelSelection;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   /**
@@ -143,8 +146,7 @@ type UseRemoteSpawnDispatchResult = {
 export function useRemoteSpawnDispatch({
   organizationId,
   mode: modeArg,
-  model: modelArg,
-  variant: variantArg,
+  selection,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
@@ -154,8 +156,6 @@ export function useRemoteSpawnDispatch({
   const router = useRouter();
   const inheritance = useContext(RemoteSpawnInheritanceContext);
   const mode = modeArg ?? inheritance.mode;
-  const model = modelArg ?? inheritance.model;
-  const variant = variantArg ?? inheritance.variant;
   // Route param is frozen at navigation: missing param means personal, not
   // "inherit live context". `?? null` so undefined does not fall through to
   // `useOrganization()` after a later org switch (share-gate keeps zero-arg
@@ -181,11 +181,11 @@ export function useRemoteSpawnDispatch({
   }, [runOnInstance]);
 
   const getSubmitPayloadRef = useRef(getSubmitPayload);
-  const spawnFieldsRef = useRef({ mode, model, variant, organizationId });
+  const spawnFieldsRef = useRef({ mode, selection, organizationId });
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
-    spawnFieldsRef.current = { mode, model, variant, organizationId };
-  }, [getSubmitPayload, mode, model, variant, organizationId]);
+    spawnFieldsRef.current = { mode, selection, organizationId };
+  }, [getSubmitPayload, mode, selection, organizationId]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -205,8 +205,7 @@ export function useRemoteSpawnDispatch({
     }
     const createInput = buildCreateRemoteSessionInput({
       mode: fields.mode,
-      model: fields.model,
-      variant: fields.variant,
+      selection: fields.selection,
       organizationId: fields.organizationId,
     });
     void (async () => {

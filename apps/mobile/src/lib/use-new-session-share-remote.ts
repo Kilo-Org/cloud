@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useRef } from 'react';
+import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { useRemoteSpawnDispatch } from '@/components/agents/use-remote-spawn-dispatch';
 import { type AgentAttachment } from '@/lib/agent-attachments/agent-attachment-types';
@@ -19,6 +20,12 @@ type UseNewSessionShareRemoteArgs = {
   promptRef: RefObject<string>;
   /** Live attachment list owned by `useAgentAttachmentUpload`. */
   attachments: AgentAttachment[];
+  /**
+   * The validated wire model selection for the active target, derived by the
+   * route from the new-session model view. Undefined means "let the CLI use
+   * its default".
+   */
+  selection?: ModelSelection;
 };
 
 /**
@@ -34,6 +41,7 @@ export function useNewSessionShareRemote({
   instanceList,
   promptRef,
   attachments,
+  selection,
 }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
@@ -52,6 +60,7 @@ export function useNewSessionShareRemote({
 
   const remoteSpawn = useRemoteSpawnDispatch({
     organizationId,
+    selection,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,

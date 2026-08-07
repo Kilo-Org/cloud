@@ -63,7 +63,7 @@ export function NewSessionModelProvider({
   );
 
   return (
-    <RemoteSpawnInheritanceProvider mode={mode} model={model} variant={variant}>
+    <RemoteSpawnInheritanceProvider mode={mode}>
       <NewSessionModelContext.Provider value={state}>{children}</NewSessionModelContext.Provider>
     </RemoteSpawnInheritanceProvider>
   );

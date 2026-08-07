@@ -50,7 +50,7 @@ export async function ensureOrganizationAccess(
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
   if (ctx.user.is_admin) {
-    return elevateViaKiloAdmin(ctx, {
+    return await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access',
       target: organizationTarget(organizationId),
       grant: 'owner',
@@ -115,7 +115,7 @@ export async function getOrganizationsAccessRoles(
     return result;
   }
   if (ctx.user.is_admin) {
-    const grant = elevateViaKiloAdmin(ctx, {
+    const grant = await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access_batch',
       target: organizationsTarget(uniqueIds),
       grant: 'owner',
@@ -196,7 +196,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
   if (ctx.user.is_admin) {
     // Recorded before the fetch so an admin probing a non-existent organization
     // is still attributed, rather than vanishing into the NOT_FOUND below.
-    recordKiloAdminElevation(ctx, {
+    await recordKiloAdminElevation(ctx, {
       reason: 'organization_fetch',
       target: organizationTarget(organizationId),
     });

@@ -167,7 +167,8 @@ export function emitAdminAccessEvent(params: {
  * `trpcPath`/`trpcType` are populated for every `baseProcedure` descendant by a
  * middleware in `@/lib/trpc/init`; the remaining fields come from
  * `createTRPCContext`. All are optional because the many hand-rolled `{ user }`
- * contexts in tests and scripts do not set them.
+ * contexts in REST route handlers, tests, and scripts do not set them, which is
+ * also what {@link recordKiloAdminElevation} uses to pick its attribution source.
  */
 export type AdminAuditContext = {
   user: AdminAccessUser;
@@ -186,18 +187,43 @@ export type AdminAuditContext = {
  * Call this from inside the `is_admin` branch, before returning the elevated
  * result, so the access is recorded even if the caller later throws. Prefer
  * {@link elevateViaKiloAdmin} where the branch produces a value.
+ *
+ * Surface-agnostic on purpose. Several elevation sites live in helpers that are
+ * shared between tRPC procedures and REST route handlers — `ensureOrganizationAccess`
+ * is called both from `organizationMemberProcedure` and from route handlers such
+ * as `/api/cloud-agent/sessions/stream-ticket`, which hand-roll a `{ user }`
+ * context. A context carrying `trpcPath` is attributed from the context; anything
+ * else is attributed from the request headers, so a REST caller is not mislabeled
+ * as a tRPC session request. That distinction matters most for `authVia`: guessing
+ * `"session"` for a bearer-token request would silently break the compromise
+ * discriminator this whole event exists to provide.
  */
-export function recordKiloAdminElevation(
+export async function recordKiloAdminElevation(
   ctx: AdminAuditContext,
   params: { reason: KiloAdminElevationReason; target: string | null }
-): void {
+): Promise<void> {
+  if (ctx.trpcPath === undefined) {
+    // `tokenSource` can only be preserved when the caller put it on the context,
+    // and today's REST handlers pass a bare `{ user }`. That is a deliberate
+    // limit, not an oversight: `authVia` — the discriminator that separates a
+    // stolen bearer token from a web-console session — is derived from the
+    // headers below and is always correct. `tokenSource` only adds granularity
+    // *within* the token case, and null is already one of its documented values.
+    await recordKiloAdminElevationForRequest({
+      user: ctx.user,
+      tokenSource: ctx.tokenSource,
+      reason: params.reason,
+      target: params.target,
+    });
+    return;
+  }
   emitAdminAccessEvent({
     surface: 'trpc',
     kind: 'kilo_admin_elevation',
     user: ctx.user,
     authViaToken: ctx.authViaToken ?? false,
     tokenSource: ctx.tokenSource ?? null,
-    route: ctx.trpcPath ?? null,
+    route: ctx.trpcPath,
     method: ctx.trpcType ?? null,
     ip: ctx.ip ?? null,
     reason: params.reason,
@@ -211,28 +237,30 @@ export function recordKiloAdminElevation(
  * elevation and its audit record are a single expression.
  *
  *     if (ctx.user.is_admin) {
- *       return elevateViaKiloAdmin(ctx, {
+ *       return await elevateViaKiloAdmin(ctx, {
  *         reason: 'organization_access',
  *         target: organizationTarget(organizationId),
  *         grant: 'owner',
  *       });
  *     }
  */
-export function elevateViaKiloAdmin<const TGrant>(
+export async function elevateViaKiloAdmin<const TGrant>(
   ctx: AdminAuditContext,
   params: {
     reason: KiloAdminElevationReason;
     target: string | null;
     grant: TGrant;
   }
-): TGrant {
-  recordKiloAdminElevation(ctx, { reason: params.reason, target: params.target });
+): Promise<TGrant> {
+  await recordKiloAdminElevation(ctx, { reason: params.reason, target: params.target });
   return params.grant;
 }
 
 /**
  * {@link recordKiloAdminElevation} for route handlers and server components,
- * which have request headers instead of a tRPC context.
+ * which have request headers instead of a tRPC context. Call it directly from
+ * REST-only sites; `recordKiloAdminElevation` also delegates here for the
+ * transport-agnostic helpers that REST handlers share with tRPC procedures.
  *
  * Resolves the header store itself so callers cannot forget to. If the store is
  * unavailable — a unit test invoking the surrounding function directly, or a

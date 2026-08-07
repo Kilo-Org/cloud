@@ -459,7 +459,7 @@ async function addOrganizationCondition(
       // No membership predicate is added at all, so the query spans every
       // organization's sessions. This is the broadest read in the file and it
       // never touches `adminProcedure`, so it must be recorded here.
-      recordKiloAdminElevation(ctx, {
+      await recordKiloAdminElevation(ctx, {
         reason: 'cli_session_cross_org_query',
         target: UNSCOPED_TARGET,
       });

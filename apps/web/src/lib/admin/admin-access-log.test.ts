@@ -126,10 +126,10 @@ describe('kilo admin elevation telemetry', () => {
     };
   }
 
-  test('recordKiloAdminElevation attributes the event to the exact procedure', () => {
+  test('recordKiloAdminElevation attributes the event to the exact procedure', async () => {
     const ctx = ctxFor();
 
-    recordKiloAdminElevation(ctx, {
+    await recordKiloAdminElevation(ctx, {
       reason: 'organization_access',
       target: organizationTarget('org-1'),
     });
@@ -152,8 +152,8 @@ describe('kilo admin elevation telemetry', () => {
     });
   });
 
-  test('carries the token discriminator so a stolen admin token is separable', () => {
-    recordKiloAdminElevation(ctxFor({ authViaToken: true, tokenSource: 'cloud-agent' }), {
+  test('carries the token discriminator so a stolen admin token is separable', async () => {
+    await recordKiloAdminElevation(ctxFor({ authViaToken: true, tokenSource: 'cloud-agent' }), {
       reason: 'cli_session_cross_org_query',
       target: UNSCOPED_TARGET,
     });
@@ -161,19 +161,35 @@ describe('kilo admin elevation telemetry', () => {
     expect(events[0]).toMatchObject({ authVia: 'token', tokenSource: 'cloud-agent' });
   });
 
-  test('degrades to null route/method for contexts without the tRPC middleware', () => {
-    // Hand-rolled `{ user }` contexts (scripts, older tests) never see
-    // baseProcedure, so attribution falls back to identity alone.
-    recordKiloAdminElevation(
+  test('attributes a context without the tRPC middleware to the request surface', async () => {
+    // `ensureOrganizationAccess` and friends are shared with REST route handlers
+    // that hand-roll `{ user }`. Those elevations must not be labelled `trpc`,
+    // and must derive `authVia` from the request rather than assuming a session.
+    await recordKiloAdminElevation(
       { user: defineTestUser({ is_admin: true }) },
       { reason: 'organization_fetch', target: null }
     );
 
-    expect(events[0]).toMatchObject({ route: null, method: null, ip: null, target: null });
+    expect(events[0]).toMatchObject({
+      surface: 'rest',
+      route: null,
+      method: null,
+      ip: null,
+      target: null,
+    });
   });
 
-  test('elevateViaKiloAdmin returns the grant and emits exactly one event', () => {
-    const granted = elevateViaKiloAdmin(ctxFor(), {
+  test('a tokenSource on a non-tRPC context survives the REST fallback', async () => {
+    await recordKiloAdminElevation(
+      { user: defineTestUser({ is_admin: true }), tokenSource: 'cloud-agent' },
+      { reason: 'organization_access', target: organizationTarget('org-1') }
+    );
+
+    expect(events[0]).toMatchObject({ surface: 'rest', tokenSource: 'cloud-agent' });
+  });
+
+  test('elevateViaKiloAdmin returns the grant and emits exactly one event', async () => {
+    const granted = await elevateViaKiloAdmin(ctxFor(), {
       reason: 'organization_access',
       target: organizationTarget('org-1'),
       grant: 'owner',
@@ -187,18 +203,18 @@ describe('kilo admin elevation telemetry', () => {
     });
   });
 
-  test('a throwing sink never propagates into the admin action', () => {
+  test('a throwing sink never propagates into the admin action', async () => {
     setAdminAccessSinkForTest(() => {
       throw new Error('drain unavailable');
     });
 
-    expect(() =>
+    await expect(
       elevateViaKiloAdmin(ctxFor(), {
         reason: 'organization_access',
         target: organizationTarget('org-1'),
         grant: 'owner',
       })
-    ).not.toThrow();
+    ).resolves.toBe('owner');
   });
 
   test('recordKiloAdminElevationForRequest still emits when no header store exists', async () => {

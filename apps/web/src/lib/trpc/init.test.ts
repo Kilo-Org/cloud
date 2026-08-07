@@ -18,8 +18,8 @@ const testRouter = createTRPCRouter({
   ping: adminProcedure.query(() => 'ok'),
   // Stands in for the `is_admin` bypasses on regular procedures, which can only
   // name their procedure if `baseProcedure` publishes it onto the context.
-  bypass: baseProcedure.mutation(({ ctx }) => {
-    recordKiloAdminElevation(ctx, {
+  bypass: baseProcedure.mutation(async ({ ctx }) => {
+    await recordKiloAdminElevation(ctx, {
       reason: 'cli_session_cross_org_query',
       target: UNSCOPED_TARGET,
     });

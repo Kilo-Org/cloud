@@ -4,10 +4,7 @@ import {
   ensureOrganizationAccessAndFetchOrg,
   getOrganizationsAccessRoles,
 } from './utils';
-import {
-  setAdminAccessSinkForTest,
-  type AdminAccessEvent,
-} from '@/lib/admin/admin-access-log';
+import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import type { TRPCContext } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -75,6 +72,28 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   });
 
+  test('ensureOrganizationAccess does not label a REST caller as a tRPC request', async () => {
+    // Route handlers such as `/api/cloud-agent/sessions/stream-ticket` and
+    // `/api/auto-routing/settings` call this helper with a hand-rolled
+    // `{ user }`. Labelling those `surface:"trpc"`/`authVia:"session"` would
+    // hide a token-authenticated admin read behind a web-console-looking event.
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+
+    await expect(ensureOrganizationAccess({ user: admin }, organization.id)).resolves.toBe('owner');
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      surface: 'rest',
+      kind: 'kilo_admin_elevation',
+      kiloUserId: admin.id,
+      route: null,
+      method: null,
+      reason: 'organization_access',
+      target: `organization:${organization.id}`,
+    });
+  });
+
   test('ensureOrganizationAccess stays silent for a member resolving their own org', async () => {
     const member = await insertTestUser({ is_admin: false });
     const organization = await createTestOrganization(
@@ -128,9 +147,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     const admin = await insertTestUser({ is_admin: true });
     const missingId = crypto.randomUUID();
 
-    await expect(
-      ensureOrganizationAccessAndFetchOrg(ctxFor(admin), missingId)
-    ).rejects.toThrow(/Organization not found/);
+    await expect(ensureOrganizationAccessAndFetchOrg(ctxFor(admin), missingId)).rejects.toThrow(
+      /Organization not found/
+    );
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({

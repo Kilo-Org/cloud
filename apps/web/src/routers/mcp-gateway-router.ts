@@ -122,7 +122,7 @@ async function requireOrganizationManager(params: { organizationId: string; ctx:
     // The owner-membership check below is skipped entirely, so a Kilo admin can
     // manage any customer organization's gateway connections (including their
     // static headers and provider credentials) from a `baseProcedure`.
-    recordKiloAdminElevation(params.ctx, {
+    await recordKiloAdminElevation(params.ctx, {
       reason: 'mcp_gateway_organization_manage',
       target: organizationTarget(params.organizationId),
     });

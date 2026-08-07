@@ -160,7 +160,7 @@ async function resolveOrganizationIdWithOverride(
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidRegex.test(input.overrideUser)) {
       // It's an organization ID
-      return elevateViaKiloAdmin(ctx, {
+      return await elevateViaKiloAdmin(ctx, {
         reason: 'code_index_user_override',
         target: organizationTarget(input.overrideUser),
         grant: input.overrideUser,
@@ -175,7 +175,7 @@ async function resolveOrganizationIdWithOverride(
         });
       }
       // Format the user ID using getUserUUID
-      return elevateViaKiloAdmin(ctx, {
+      return await elevateViaKiloAdmin(ctx, {
         reason: 'code_index_user_override',
         target: userTarget(user.id),
         grant: getUserUUID(user),

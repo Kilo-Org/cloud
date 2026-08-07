@@ -235,7 +235,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     // actors that a customer would see as "Kilo Admin"/"Masked user". Recorded
     // before the query so an over-budget or failed report still attributes the
     // attempt; the DB-backed security audit log is written on success only.
-    recordKiloAdminElevation(params.ctx, {
+    await recordKiloAdminElevation(params.ctx, {
       reason: 'security_agent_audit_report',
       target: owner.type === 'organization' ? organizationTarget(owner.id) : userTarget(owner.id),
     });

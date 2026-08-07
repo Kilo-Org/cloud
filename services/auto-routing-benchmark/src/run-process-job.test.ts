@@ -2,6 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CliRunnerModule from './cli-runner';
 import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import type * as ConfigModule from './config';
+
+// Publishing reads live config to learn which pairs the platform table wants.
+vi.mock('./config', async importOriginal => {
+  const actual = await importOriginal<typeof ConfigModule>();
+  return { ...actual, getBenchmarkConfig: vi.fn() };
+});
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
@@ -15,12 +22,17 @@ vi.mock('./db', async importOriginal => {
     getExistingCaseResultIds: vi.fn(),
     getRunWithModels: vi.fn(),
     getSummaries: vi.fn(),
+    syncPlatformRegistryRows: vi.fn(),
+    getLatestRoutingTable: vi.fn(),
+    countCurrentProfilesByStatus: vi.fn(),
+    getSummariesForRuns: vi.fn(),
+    listReadyCurrentProfilesForEntries: vi.fn(),
     markRunCompleted: vi.fn(),
     replaceModelSummaries: vi.fn(),
     saveRoutingTable: vi.fn(),
     upsertCaseResult: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
-    listStaleRunningDeciderRunIds: vi.fn(),
+    listStaleRunningDeciderRuns: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
@@ -51,13 +63,19 @@ import {
   getCaseResults,
   getExistingCaseResultIds,
   getRunWithModels,
-  getSummaries,
+  syncPlatformRegistryRows,
+  getLatestRoutingTable,
+  countCurrentProfilesByStatus,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
   listLaneFailures,
+  listStaleRunningDeciderRuns,
   markRunCompleted,
   recordLaneFailure,
   saveRoutingTable,
   upsertCaseResult,
 } from './db';
+import { getBenchmarkConfig } from './config';
 import { processJob } from './run';
 
 const tokenGet = vi.fn<() => Promise<string>>();
@@ -128,6 +146,30 @@ function deciderMessage(overrides: { variant?: string | null } = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getBenchmarkConfig).mockResolvedValue({
+    classifierModels: ['classifier/a'],
+    deciderModels: [{ id: model, reasoningEffort: null }],
+    minAccuracy: 0.7,
+    maxConcurrency: 100,
+    userMaxConcurrency: 100,
+    benchmarkUserId: 'user-1',
+    benchmarkOrgId: null,
+    switchCostFactor: 3,
+    bestAccuracySwitchThreshold: 0.05,
+    classifierRepetitions: 1,
+    deciderRepetitions: 1,
+    classifierMaxP95LatencyMs: 1000,
+    autoDeciderMinCostUsd: 15,
+    autoDeciderMaxCostUsd: 25,
+    updatedAt: null,
+    updatedBy: null,
+  });
+  vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+  vi.mocked(getSummariesForRuns).mockResolvedValue([]);
+  vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
+  vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
+  vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
+  vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   tokenGet.mockResolvedValue('internal-secret');
   queueSendBatch.mockResolvedValue(undefined);
   vi.stubGlobal(
@@ -489,15 +531,22 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
       }))
     );
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));
+    // Publishing reads the registry, not this run's own summaries: the entry is
+    // ready with this run as its provenance, and the platform queue is settled.
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model, variant, run_id: runId },
+    ]);
+    vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([{ status: 'ready', count: 1 }]);
+    vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   }
 
-  it('publishes a routing table carrying variant for a non-enum snapshot key', async () => {
+  async function seedRegistrySummaries(variant: string) {
     const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
-    mockPublishHarness('max', null);
-    vi.mocked(getSummaries).mockResolvedValue(
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
       TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        runId,
         model,
-        variant: 'max',
+        variant,
         routeKey,
         accuracy: 0.9,
         avgCostUsd: 0.001,
@@ -509,6 +558,11 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
         timeouts: 0,
       }))
     );
+  }
+
+  it('publishes a routing table carrying variant for a non-enum snapshot key', async () => {
+    mockPublishHarness('max', null);
+    await seedRegistrySummaries('max');
 
     await processJob(env, { ...deciderMessage({ variant: 'max' }), chunk: 9999 });
 
@@ -520,23 +574,8 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
   });
 
   it('publishes a routing table with the legacy effort shape for an enum key', async () => {
-    const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
     mockPublishHarness('high', 'high');
-    vi.mocked(getSummaries).mockResolvedValue(
-      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
-        model,
-        variant: 'high',
-        routeKey,
-        accuracy: 0.9,
-        avgCostUsd: 0.001,
-        avgLatencyMs: 100,
-        p50LatencyMs: 90,
-        p95LatencyMs: 120,
-        cases: 5,
-        errors: 0,
-        timeouts: 0,
-      }))
-    );
+    await seedRegistrySummaries('high');
 
     await processJob(env, { ...deciderMessage({ variant: 'high' }), chunk: 9999 });
 

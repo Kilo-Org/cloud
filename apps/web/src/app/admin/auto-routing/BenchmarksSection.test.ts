@@ -11,6 +11,8 @@ import {
   formatUsd,
   formStateToConfig,
   pinnedModelFor,
+  runFilterQuery,
+  runTypeLabel,
   RoutingTableView,
   variantOptionsForModel,
 } from './BenchmarksSection';
@@ -276,6 +278,7 @@ describe('formStateToConfig round-trip', () => {
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
     maxConcurrency: 4,
+    userMaxConcurrency: 100,
     benchmarkUserId: 'user-123',
     benchmarkOrgId: 'org-123',
     classifierRepetitions: 3,
@@ -416,5 +419,22 @@ describe('effectiveDeciderModels', () => {
       { id: 'auto/included', reasoningEffort: 'low' },
       { id: 'auto/variant-carrying', reasoningEffort: null },
     ]);
+  });
+});
+
+describe('run type naming', () => {
+  it('names classifier, platform-queue and user-queue runs distinctly', () => {
+    // The three kinds of run share one table; the label is what tells an admin
+    // which one they are looking at.
+    expect(runTypeLabel({ kind: 'classifier', purpose: 'platform' })).toBe('Classifier');
+    expect(runTypeLabel({ kind: 'decider', purpose: 'platform' })).toBe('Platform queue');
+    expect(runTypeLabel({ kind: 'decider', purpose: 'user' })).toBe('User queue');
+  });
+
+  it('filters server-side by kind and purpose', () => {
+    expect(runFilterQuery('all')).toBe('');
+    expect(runFilterQuery('classifier')).toBe('?kind=classifier');
+    expect(runFilterQuery('platform')).toBe('?kind=decider&purpose=platform');
+    expect(runFilterQuery('user')).toBe('?kind=decider&purpose=user');
   });
 });

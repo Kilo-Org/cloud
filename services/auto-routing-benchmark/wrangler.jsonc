@@ -15,7 +15,9 @@
       "custom_domain": true,
     },
   ],
-  "triggers": { "crons": ["0 5 * * *"] },
+  // 05:00 daily: platform auto-decider sync (may start a platform run).
+  // Every 15 min: drain pending Benchmark-profile work into the profile slot.
+  "triggers": { "crons": ["0 5 * * *", "*/15 * * * *"] },
   "dev": { "port": 8814, "local_protocol": "http", "ip": "0.0.0.0" },
   "observability": { "enabled": true },
   "vars": {
@@ -33,7 +35,7 @@
       "class_name": "BenchRunnerContainer",
       "image": "./container/Dockerfile",
       "instance_type": "standard-2",
-      "max_instances": 100,
+      "max_instances": 200,
     },
   ],
   "durable_objects": {
@@ -56,7 +58,7 @@
         "max_batch_size": 1,
         "max_retries": 6,
         "retry_delay": 180,
-        "max_concurrency": 100,
+        "max_concurrency": 200,
         "dead_letter_queue": "auto-routing-benchmark-dlq",
       },
       {

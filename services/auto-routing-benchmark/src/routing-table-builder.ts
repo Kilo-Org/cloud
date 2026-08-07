@@ -13,15 +13,15 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkModelSummaryWithRun } from './db';
 
-// Builds the routing table from per-(model, taxonomy-route) decider summaries. Models
-// with zero graded cases in a route are excluded from that route, as are
-// models with no cost signal at all (avgCostUsd null means every case failed
-// to report cost; ranking such a model as cheapest would hand it the route).
-// Throws when any route ends up empty so the caller keeps the previous
-// published table. The routing knobs come from the run's snapshot, not live
-// config.
+// Builds the full platform routing table from per-(model, taxonomy-route)
+// decider summaries. Models with zero graded cases in a route are excluded from
+// that route, as are models with no cost signal at all (avgCostUsd null means
+// every case failed to report cost; ranking such a model as cheapest would hand
+// it the route). Throws when any route ends up empty so the caller keeps the
+// previous published table.
 export function buildRoutingTable(params: {
-  runId: string;
+  /** Table identity. Derived from the contributing registry rows, not one run. */
+  version: string;
   generatedAt: string;
   minAccuracy: number;
   switchCostFactor: number;
@@ -30,7 +30,7 @@ export function buildRoutingTable(params: {
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
   const {
-    runId,
+    version,
     generatedAt,
     minAccuracy,
     switchCostFactor,
@@ -89,7 +89,7 @@ export function buildRoutingTable(params: {
   );
 
   const table: RoutingTable = {
-    version: runId,
+    version,
     generatedAt,
     minAccuracy,
     switchCostFactor,
@@ -114,14 +114,49 @@ function fnv1aHex(input: string): string {
 }
 
 /**
- * Deterministic version id for a sparse custom table: hash of contributing
- * (runId, model, variant) triples so identical assembly inputs cache-hit.
+ * Deterministic version id for a table assembled from the registry: a hash of
+ * the contributing (runId, model, variant) triples, so identical assembly
+ * inputs produce the same id and cache-hit. Used by both the platform table and
+ * each owner's sparse custom table.
  */
-export function computeCustomRoutingTableVersion(
-  contributors: readonly { runId: string; model: string; variant: string | null }[]
+export function computeRegistryRoutingTableVersion(
+  contributors: readonly { runId: string; model: string; variant: string | null }[],
+  // The knobs are part of the table's identity, not just its metadata:
+  // `rankCandidates` drops candidates below `minAccuracy`, and the other two
+  // steer the router at serve time. Leaving them out lets a threshold-only
+  // config save rebuild an identically versioned table, which the publisher
+  // then skips — the live table would keep the old thresholds until some new
+  // measurement happened to change the ready set.
+  knobs: { minAccuracy: number; switchCostFactor: number; bestAccuracySwitchThreshold: number }
 ): string {
   const parts = [...contributors].map(c => `${c.runId}\0${c.model}\0${c.variant ?? ''}`).sort();
-  return `custom-${fnv1aHex(JSON.stringify(parts))}`;
+  // Read the knobs positionally: hashing the object would make the version
+  // depend on the caller's key order.
+  return `registry-${fnv1aHex(
+    JSON.stringify({
+      parts,
+      knobs: [knobs.minAccuracy, knobs.switchCostFactor, knobs.bestAccuracySwitchThreshold],
+    })
+  )}`;
+}
+
+/**
+ * Keep only summaries that belong to a ready entry's own measuring run: exact
+ * (model, variant) AND run_id must match, so measurements never leak across
+ * runs. Shared by the platform table and every owner's sparse custom table —
+ * both read the same registry.
+ */
+export function filterSummariesByProvenance(
+  readyEntries: readonly { entry: PoolEntry; runId: string }[],
+  summaries: readonly BenchmarkModelSummaryWithRun[]
+): BenchmarkModelSummaryWithRun[] {
+  const provenanceByPair = new Map(
+    readyEntries.map(r => [poolEntryKey(r.entry), r.runId] as const)
+  );
+  return summaries.filter(summary => {
+    const pairKey = poolEntryKey({ model: summary.model, variant: summary.variant ?? null });
+    return provenanceByPair.get(pairKey) === summary.runId;
+  });
 }
 
 /**
@@ -158,16 +193,7 @@ export function buildCustomRoutingTable(params: {
 
   if (readyEntries.length === 0) return null;
 
-  // Per ready entry: only summaries from that entry's provenance run + exact pair.
-  const provenanceByPair = new Map(
-    readyEntries.map(r => [poolEntryKey(r.entry), r.runId] as const)
-  );
-
-  const filtered = summaries.filter(s => {
-    const pairKey = poolEntryKey({ model: s.model, variant: s.variant ?? null });
-    const provenanceRunId = provenanceByPair.get(pairKey);
-    return provenanceRunId !== undefined && s.runId === provenanceRunId;
-  });
+  const filtered = filterSummariesByProvenance(readyEntries, summaries);
 
   const routes: CustomRoutingTable['routes'] = {};
   for (const routeKey of TAXONOMY_ROUTE_KEYS) {
@@ -190,12 +216,13 @@ export function buildCustomRoutingTable(params: {
 
   if (Object.keys(routes).length === 0) return null;
 
-  const version = computeCustomRoutingTableVersion(
+  const version = computeRegistryRoutingTableVersion(
     readyEntries.map(r => ({
       runId: r.runId,
       model: r.entry.model,
       variant: r.entry.variant,
-    }))
+    })),
+    { minAccuracy, switchCostFactor, bestAccuracySwitchThreshold }
   );
 
   const table: CustomRoutingTable = {

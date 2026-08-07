@@ -151,7 +151,7 @@ export function shouldRedactModelNameInMicrodollarUsage(
 }
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+  return provider === 'experiment' || isKiloStealthModel(model);
 }
 
 export function isDeadFreeModel(model: string): boolean {

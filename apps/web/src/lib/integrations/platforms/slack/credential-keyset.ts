@@ -85,6 +85,26 @@ function assertRsaPrivateKey(pem: string): void {
   }
 }
 
+/**
+ * A matching key ID is not proof of a matching key pair. If the active private slot
+ * holds an unrelated RSA key, encryption still succeeds against the active public key
+ * and every later decryption fails, so the mismatch would only surface once something
+ * tried to read a credential we had already written. Compare the SPKI of the declared
+ * public key with the public half derived from the private key instead.
+ */
+function assertActiveKeyPairMatches(publicKeyPem: string, privateKeyPem: string): void {
+  const declared = createPublicKey(publicKeyPem).export({ type: 'spki', format: 'der' });
+  const derived = createPublicKey(createPrivateKey(privateKeyPem)).export({
+    type: 'spki',
+    format: 'der',
+  });
+  if (!declared.equals(derived)) {
+    throw new SlackCredentialKeysetError(
+      'SLACK_CREDENTIAL_KEYSET_JSON active public key does not match its private key'
+    );
+  }
+}
+
 function buildKeyset(raw: string): SlackCredentialKeyset {
   const parsed = KeysetSchema.safeParse(parseJsonOrBase64Json(raw));
   if (!parsed.success) {
@@ -92,23 +112,28 @@ function buildKeyset(raw: string): SlackCredentialKeyset {
   }
 
   const { active, decrypt } = parsed.data;
+
+  // `decryptKeyedEnvelope` resolves the private half for `active.keyId` from the
+  // `decrypt` slots when `active` carries no private key, so the active key must
+  // appear in `decrypt` for web to be able to read what it just wrote.
+  const activePrivateKeyPem = decrypt.find(
+    slot => slot.keyId === active.keyId && slot.privateKeyPem
+  )?.privateKeyPem;
+  if (!activePrivateKeyPem) {
+    throw new SlackCredentialKeysetError(
+      'SLACK_CREDENTIAL_KEYSET_JSON must include a private key for the active key ID'
+    );
+  }
+
   try {
     assertRsaPublicKey(active.publicKeyPem);
     for (const slot of decrypt) {
       if (slot.privateKeyPem) assertRsaPrivateKey(slot.privateKeyPem);
     }
+    assertActiveKeyPairMatches(active.publicKeyPem, activePrivateKeyPem);
   } catch (error) {
     if (error instanceof SlackCredentialKeysetError) throw error;
     throw new SlackCredentialKeysetError('SLACK_CREDENTIAL_KEYSET_JSON contains an unusable key');
-  }
-
-  // `decryptKeyedEnvelope` resolves the private half for `active.keyId` from the
-  // `decrypt` slots when `active` carries no private key, so the active key must
-  // appear in `decrypt` for web to be able to read what it just wrote.
-  if (!decrypt.some(slot => slot.keyId === active.keyId && slot.privateKeyPem)) {
-    throw new SlackCredentialKeysetError(
-      'SLACK_CREDENTIAL_KEYSET_JSON must include a private key for the active key ID'
-    );
   }
 
   return {

@@ -6,6 +6,11 @@ const rsa = generateKeyPairSync('rsa', {
   publicKeyEncoding: { type: 'spki', format: 'pem' },
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
 });
+const otherRsa = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+});
 const ec = generateKeyPairSync('ec', {
   namedCurve: 'P-256',
   publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -96,6 +101,15 @@ describe('Slack credential keyset', () => {
     mockConfig.keyset = JSON.stringify({
       active: { keyId: KEY_ID, publicKeyPem: rsa.publicKey },
       decrypt: [{ keyId: 'some-older-key', privateKeyPem: rsa.privateKey }],
+    });
+
+    expect(() => requireSlackCredentialKeyset()).toThrow(SlackCredentialKeysetError);
+  });
+
+  it('rejects an active private key that does not match the active public key', () => {
+    mockConfig.keyset = JSON.stringify({
+      active: { keyId: KEY_ID, publicKeyPem: rsa.publicKey },
+      decrypt: [{ keyId: KEY_ID, privateKeyPem: otherRsa.privateKey }],
     });
 
     expect(() => requireSlackCredentialKeyset()).toThrow(SlackCredentialKeysetError);

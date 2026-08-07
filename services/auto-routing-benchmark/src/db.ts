@@ -941,7 +941,7 @@ export async function syncPlatformRegistryRows(
   ];
 
   for (const entry of desired) {
-    stmts.push(claimPlatformRequestedStatement(orm, entry, current, nowIso) as BatchItem<'sqlite'>);
+    stmts.push(claimPlatformRequestedStatement(orm, entry, current, nowIso));
   }
 
   await orm.batch(stmts);

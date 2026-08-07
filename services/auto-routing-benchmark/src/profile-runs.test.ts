@@ -23,12 +23,14 @@ vi.mock('./db', async importOriginal => {
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRunIds: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    markProfilesFailedForEntries: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markRunCompleted: vi.fn(),
     markRunFailed: vi.fn(),
-    countCaseResults: vi.fn(),
+    countCaseResultsByLane: vi.fn(),
+    listLaneFailures: vi.fn(),
     getCaseResults: vi.fn(),
     getExistingCaseResultIds: vi.fn(),
     getSummaries: vi.fn(),
@@ -40,7 +42,7 @@ vi.mock('./db', async importOriginal => {
 });
 
 import {
-  countCaseResults,
+  countCaseResultsByLane,
   existsNewerCompletedRun,
   getCaseResults,
   getConfigRows,
@@ -50,8 +52,10 @@ import {
   getRunWithModels,
   getSummaries,
   insertRun,
+  listLaneFailures,
   listPendingCurrentProfiles,
   listStaleRunningDeciderRunIds,
+  markProfilesFailedForEntries,
   markProfilesFailedForRun,
   markProfilesReadyForRun,
   markProfilesRunningForRun,
@@ -123,10 +127,12 @@ beforeEach(() => {
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
   vi.mocked(markProfilesRunningForRun).mockResolvedValue(undefined);
   vi.mocked(markProfilesReadyForRun).mockResolvedValue(undefined);
+  vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
   vi.mocked(markProfilesFailedForRun).mockResolvedValue(undefined);
   vi.mocked(markRunCompleted).mockResolvedValue(undefined);
   vi.mocked(markRunFailed).mockResolvedValue(undefined);
-  vi.mocked(countCaseResults).mockResolvedValue(0);
+  vi.mocked(countCaseResultsByLane).mockResolvedValue([]);
+  vi.mocked(listLaneFailures).mockResolvedValue([]);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(replaceModelSummaries).mockResolvedValue(undefined);
   vi.mocked(saveRoutingTable).mockResolvedValue(undefined);
@@ -250,7 +256,9 @@ describe('profile completion transitions', () => {
     const runId = 'profile-complete-1';
     mockProfileRunState(runId);
     const { DECIDER_CASES } = await import('./datasets/decider-cases');
-    vi.mocked(countCaseResults).mockResolvedValue(DECIDER_CASES.length);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model: 'vendor/m', variant: 'xhigh', rep: 0, n: DECIDER_CASES.length },
+    ]);
     vi.mocked(getCaseResults).mockResolvedValue(
       DECIDER_CASES.map(c => ({
         run_id: runId,
@@ -464,7 +472,9 @@ describe('platform run completion still publishes', () => {
         },
       ],
     });
-    vi.mocked(countCaseResults).mockResolvedValue(DECIDER_CASES.length);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model: 'platform/a', variant: '', rep: 0, n: DECIDER_CASES.length },
+    ]);
     vi.mocked(getCaseResults).mockResolvedValue(
       DECIDER_CASES.map(c => ({
         run_id: runId,

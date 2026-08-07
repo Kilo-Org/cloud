@@ -2148,9 +2148,7 @@ const runAttempt = async (input: {
       savedAtOffsetMs === null ? null : Math.round((savedAtOffsetMs - createSentOffsetMs) / 1000);
     const createTurnEndedAtMs = createPhase.turnEnded ? createPhase.endedAtMs : null;
     const turnTotalSeconds =
-      createTurnEndedAtMs === null
-        ? null
-        : Math.round((createTurnEndedAtMs - createSentOffsetMs) / 1000);
+      createTurnEndedAtMs === null ? null : Math.round((createTurnEndedAtMs - submitAtMs) / 1000);
 
     const createInternalEvents = validateEvents(collector.events);
     const autoRunObserved = hasOkRealRun(createInternalEvents.map(toBenchEvent));

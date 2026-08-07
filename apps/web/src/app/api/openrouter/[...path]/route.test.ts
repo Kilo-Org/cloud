@@ -291,7 +291,31 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       expect.anything(),
       expect.anything(),
       expect.anything(),
-      expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
+      expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
+      undefined
+    );
+  });
+
+  it('passes provider response transforms to the response rewriter', async () => {
+    const responseTransforms = { thoughtContentMapping: 'extra_content.flags.thought' };
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, responseTransforms },
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    const { POST } = await import('./route');
+
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      responseTransforms
     );
   });
 

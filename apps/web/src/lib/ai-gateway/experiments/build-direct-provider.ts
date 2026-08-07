@@ -147,6 +147,9 @@ export function buildDirectProvider(
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
     supportedChatApis,
+    responseTransforms: upstream.thought_content_mapping
+      ? { thoughtContentMapping: upstream.thought_content_mapping }
+      : undefined,
     async transformRequest(context) {
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;

@@ -1949,6 +1949,7 @@ export const CustomLlmApiConfigSchema = z.object({
   remove_from_body: z.array(z.string()).optional(),
   compression: CustomLlmCompressionSchema.optional(),
   thought_signature_mapping: CustomLlmPropertyPathSchema.optional(),
+  thought_content_mapping: CustomLlmPropertyPathSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;

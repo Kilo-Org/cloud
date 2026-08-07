@@ -324,6 +324,27 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(dataPayloads(sse)).toContain('[DONE]');
     });
 
+    test('moves marked delta content to reasoning content', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"flags":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"flags":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, true, null, null, {
+        thoughtContentMapping: 'extra_content.flags.thought',
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_content: 'first thought',
+        extra_content: { flags: { thought: true } },
+      });
+      expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
+      expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });
+    });
+
     test('does not treat a null error field as terminal', async () => {
       const upstream = sseResponse(
         'data: {"id":"gen-chat","error":null,"choices":[]}\n\n' +

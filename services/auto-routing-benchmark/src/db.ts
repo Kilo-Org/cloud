@@ -50,6 +50,12 @@ const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 // so smaller statements are preferable to risking a skipped routing-table update.
 const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 
+// Run model rows bind 5 values per row. Keep each INSERT comfortably under D1's
+// 100-variable ceiling; the profile drain claims batches of up to 33 entries,
+// and an unchunked 33-row insert fails with "too many SQL variables", which
+// stranded every pending Benchmark profile in production.
+const RUN_MODEL_INSERT_BATCH_SIZE = 18;
+
 // ---------------------------------------------------------------------------
 // Row mapping helpers
 // ---------------------------------------------------------------------------
@@ -243,7 +249,9 @@ export async function insertRun(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [insertRunStmt];
 
   if (models.length > 0) {
-    stmts.push(orm.insert(runModels).values(models));
+    for (let i = 0; i < models.length; i += RUN_MODEL_INSERT_BATCH_SIZE) {
+      stmts.push(orm.insert(runModels).values(models.slice(i, i + RUN_MODEL_INSERT_BATCH_SIZE)));
+    }
   }
 
   for (let i = 0; i < carriedSummaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {

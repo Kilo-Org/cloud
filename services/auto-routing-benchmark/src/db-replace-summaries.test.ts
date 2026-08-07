@@ -101,4 +101,46 @@ describe('insertRun', () => {
     expect(mocks.batch).toHaveBeenCalledTimes(1);
     expect(mocks.batch.mock.calls[0]?.[0]).toHaveLength(3);
   });
+
+  it('chunks run_models inserts to stay below D1 SQL variable limits', async () => {
+    // 33 entries is the profile-drain batch size that failed in production:
+    // unchunked it binds 165 variables and D1 rejects the whole run insert.
+    const models = Array.from({ length: 33 }, (_, i) => ({
+      run_id: 'run-1',
+      model: `model/${i}`,
+      variant: '',
+      enqueued: true,
+      reasoning_effort: null,
+    }));
+
+    await insertRun(
+      {} as D1Database,
+      {
+        id: 'run-1',
+        kind: 'decider',
+        startedAt: '2026-06-17T00:00:00.000Z',
+        min_accuracy: 0.7,
+        switch_cost_factor: 3,
+        best_accuracy_switch_threshold: 0.05,
+        max_concurrency: 100,
+        benchmark_user_id: 'user-123',
+        benchmark_org_id: null,
+        repetitions: 1,
+        classifier_max_p95_latency_ms: null,
+        engine_identity: 'v1:test',
+      },
+      models,
+      []
+    );
+
+    // 5 bind values per row × 18 rows = 90 < 100 D1 variable ceiling.
+    const modelInsertSizes = mocks.insertValues.mock.calls
+      .map(([rows]) => rows)
+      .filter(Array.isArray)
+      .map(rows => rows.length);
+    expect(modelInsertSizes).toEqual([18, 15]);
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
+    // run insert + two run_models chunks.
+    expect(mocks.batch.mock.calls[0]?.[0]).toHaveLength(3);
+  });
 });

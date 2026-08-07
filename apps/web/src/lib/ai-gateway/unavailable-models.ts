@@ -21,6 +21,7 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'google/gemma-3n-e4b-it:free',
   'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
   'google/gemma-4-31b-it:free',
+  'inclusionai/ling-3.0-flash:free',
   'kilo/auto-free', // discontinued variant of kilo-auto/free
   'kwaipilot/kat-coder-pro-v2.5:free',
   'liquid/lfm-2.5-1.2b-instruct:free',

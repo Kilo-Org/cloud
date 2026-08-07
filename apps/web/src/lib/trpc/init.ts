@@ -3,7 +3,11 @@ import { headers } from 'next/headers';
 import { getUserFromAuth } from '@/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
-import { clientIpFromHeaders, emitAdminAccessEvent } from '@/lib/admin/admin-access-log';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
@@ -44,8 +48,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
   setTag('userId', user.id);
   return {
     user,
-    // The token path is selected iff an Authorization header is present.
-    authViaToken: headersList.get('Authorization') != null,
+    authViaToken: authViaTokenFromHeaders(headersList),
     tokenSource: tokenSource ?? null,
     ip: clientIpFromHeaders(headersList),
   };

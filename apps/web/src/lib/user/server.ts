@@ -86,7 +86,11 @@ import {
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
-import { clientIpFromHeaders, emitAdminAccessEvent } from '@/lib/admin/admin-access-log';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
@@ -1091,8 +1095,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     emitAdminAccessEvent({
       surface: 'rest',
       user: result.user,
-      // The token path is selected iff an Authorization header is present.
-      authViaToken: headersList.get('Authorization') != null,
+      authViaToken: authViaTokenFromHeaders(headersList),
       tokenSource: result.tokenSource ?? null,
       route: headersList.get('x-pathname') ?? headersList.get('x-matched-path') ?? null,
       // No reliable HTTP method header is available here; do not fabricate one.

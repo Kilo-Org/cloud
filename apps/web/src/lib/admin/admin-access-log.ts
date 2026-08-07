@@ -1,5 +1,6 @@
 import 'server-only';
 import type { User } from '@kilocode/db/schema';
+import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
 
 /**
@@ -35,6 +36,12 @@ export type AdminAccessEvent = {
   authVia: 'token' | 'session';
   /** Set only for tokens that carry a source (e.g. `cloud-agent`); else null. */
   tokenSource: string | null;
+  /**
+   * Best-effort route identifier. For tRPC this is the exact procedure path;
+   * for REST it is the concrete pathname (`x-pathname`) when available, falling
+   * back to Vercel's matched route pattern (`x-matched-path`), which may be
+   * templated (e.g. `/admin/api/users/[id]/...`).
+   */
   route: string | null;
   method: string | null;
   ip: string | null;
@@ -67,18 +74,34 @@ export function emitAdminAccessEvent(params: {
   method: string | null;
   ip: string | null;
 }): void {
-  currentSink({
-    event: 'admin_access',
-    surface: params.surface,
-    kiloUserId: params.user.id,
-    email: params.user.google_user_email,
-    adminTier: params.user.is_super_admin ? 'super_admin' : 'platform_admin',
-    authVia: params.authViaToken ? 'token' : 'session',
-    tokenSource: params.tokenSource,
-    route: params.route,
-    method: params.method,
-    ip: params.ip,
-  });
+  // Audit logging is a side effect that must never deny a legitimate admin
+  // action: swallow (and report) any sink failure rather than propagate it.
+  try {
+    currentSink({
+      event: 'admin_access',
+      surface: params.surface,
+      kiloUserId: params.user.id,
+      email: params.user.google_user_email,
+      adminTier: params.user.is_super_admin ? 'super_admin' : 'platform_admin',
+      authVia: params.authViaToken ? 'token' : 'session',
+      tokenSource: params.tokenSource,
+      route: params.route,
+      method: params.method,
+      ip: params.ip,
+    });
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_access_log' } });
+  }
+}
+
+/**
+ * Whether a request authenticated via an API bearer token. Mirrors the exact
+ * branch condition in `getUserFromAuth` (truthiness of the `Authorization`
+ * header), so the emitted `authVia` label can never diverge from the auth path
+ * that was actually taken. This is the compromise discriminator.
+ */
+export function authViaTokenFromHeaders(headersList: Headers): boolean {
+  return Boolean(headersList.get('Authorization'));
 }
 
 /**

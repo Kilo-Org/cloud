@@ -9,6 +9,12 @@ import {
 } from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@/lib/trpc/init';
 import type { TRPCContext } from '@/lib/trpc/init';
+import {
+  elevateViaKiloAdmin,
+  organizationTarget,
+  organizationsTarget,
+  recordKiloAdminElevation,
+} from '@/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray } from 'drizzle-orm';
 import * as z from 'zod';
@@ -44,7 +50,11 @@ export async function ensureOrganizationAccess(
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
   if (ctx.user.is_admin) {
-    return 'owner';
+    return elevateViaKiloAdmin(ctx, {
+      reason: 'organization_access',
+      target: organizationTarget(organizationId),
+      grant: 'owner',
+    });
   }
   const directRows = await db
     .select({ role: organization_memberships.role })
@@ -105,7 +115,12 @@ export async function getOrganizationsAccessRoles(
     return result;
   }
   if (ctx.user.is_admin) {
-    for (const id of uniqueIds) result.set(id, 'owner');
+    const grant = elevateViaKiloAdmin(ctx, {
+      reason: 'organization_access_batch',
+      target: organizationsTarget(uniqueIds),
+      grant: 'owner',
+    });
+    for (const id of uniqueIds) result.set(id, grant);
     return result;
   }
 
@@ -179,6 +194,12 @@ export async function ensureOrganizationAccessAndFetchOrg(
   roles?: OrganizationRole[]
 ): Promise<Organization> {
   if (ctx.user.is_admin) {
+    // Recorded before the fetch so an admin probing a non-existent organization
+    // is still attributed, rather than vanishing into the NOT_FOUND below.
+    recordKiloAdminElevation(ctx, {
+      reason: 'organization_fetch',
+      target: organizationTarget(organizationId),
+    });
     const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
 
     if (!org) {

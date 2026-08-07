@@ -1,10 +1,30 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { adminProcedure, createCallerFactory, createTRPCRouter, type TRPCContext } from './init';
-import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
+import {
+  adminProcedure,
+  baseProcedure,
+  createCallerFactory,
+  createTRPCRouter,
+  type TRPCContext,
+} from './init';
+import {
+  recordKiloAdminElevation,
+  setAdminAccessSinkForTest,
+  UNSCOPED_TARGET,
+  type AdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
 const testRouter = createTRPCRouter({
   ping: adminProcedure.query(() => 'ok'),
+  // Stands in for the `is_admin` bypasses on regular procedures, which can only
+  // name their procedure if `baseProcedure` publishes it onto the context.
+  bypass: baseProcedure.mutation(({ ctx }) => {
+    recordKiloAdminElevation(ctx, {
+      reason: 'cli_session_cross_org_query',
+      target: UNSCOPED_TARGET,
+    });
+    return 'ok';
+  }),
 });
 const createCaller = createCallerFactory(testRouter);
 
@@ -35,6 +55,7 @@ describe('adminProcedure admin_access telemetry', () => {
     expect(events[0]).toMatchObject({
       event: 'admin_access',
       surface: 'trpc',
+      kind: 'admin_guard',
       authVia: 'session',
       adminTier: 'super_admin',
       route: 'ping',
@@ -58,6 +79,7 @@ describe('adminProcedure admin_access telemetry', () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       surface: 'trpc',
+      kind: 'admin_guard',
       authVia: 'token',
       adminTier: 'platform_admin',
       tokenSource: 'cloud-agent',
@@ -70,5 +92,26 @@ describe('adminProcedure admin_access telemetry', () => {
     await expect(caller.ping()).rejects.toThrow();
 
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('baseProcedure audit context', () => {
+  test('publishes the procedure path and type so elevations inside a resolver are attributable', async () => {
+    const caller = createCaller(
+      ctxFor({ user: defineTestUser({ is_admin: true }), ip: '203.0.113.7' })
+    );
+
+    await expect(caller.bypass()).resolves.toBe('ok');
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      surface: 'trpc',
+      kind: 'kilo_admin_elevation',
+      route: 'bypass',
+      method: 'mutation',
+      ip: '203.0.113.7',
+      reason: 'cli_session_cross_org_query',
+      target: '*',
+    });
   });
 });

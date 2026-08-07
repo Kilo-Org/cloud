@@ -3,6 +3,10 @@ import { getUserFromAuth } from '@/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
+import {
+  organizationTarget,
+  recordKiloAdminElevationForRequest,
+} from '@/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { db } from '@/lib/drizzle';
 import { eq, inArray, and, isNull } from 'drizzle-orm';
@@ -56,7 +60,7 @@ export async function getAuthorizedOrgContext(
       ? getUserFromAuthOverride
       : getUserFromAuth;
 
-  const { authFailedResponse, user } = await getUserFromAuthFn({ adminOnly: false });
+  const { authFailedResponse, user, tokenSource } = await getUserFromAuthFn({ adminOnly: false });
   if (authFailedResponse) {
     return { success: false, nextResponse: authFailedResponse };
   }
@@ -71,6 +75,14 @@ export async function getAuthorizedOrgContext(
 
   // admin user allowed to edit everything
   if (user.is_admin) {
+    // Recorded before the lookup so an admin probing a non-existent organization
+    // is still attributed, rather than vanishing into the 404 below.
+    await recordKiloAdminElevationForRequest({
+      user,
+      tokenSource,
+      reason: 'organization_access_rest',
+      target: organizationTarget(organizationId),
+    });
     const organization = await getOrganizationById(organizationId);
     if (!organization) {
       const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });

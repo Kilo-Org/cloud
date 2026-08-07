@@ -17,7 +17,8 @@ import {
   GatewayError,
   parseStaticHeaders,
 } from '@kilocode/mcp-gateway';
-import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import { organizationTarget, recordKiloAdminElevation } from '@/lib/admin/admin-access-log';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { db } from '@/lib/drizzle';
 import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
@@ -116,14 +117,19 @@ async function withGatewayErrorMapping<T>(operation: () => Promise<T>): Promise<
   }
 }
 
-async function requireOrganizationManager(params: {
-  organizationId: string;
-  userId: string;
-  isGlobalAdmin: boolean;
-}) {
-  if (params.isGlobalAdmin) return;
+async function requireOrganizationManager(params: { organizationId: string; ctx: TRPCContext }) {
+  if (params.ctx.user.is_admin) {
+    // The owner-membership check below is skipped entirely, so a Kilo admin can
+    // manage any customer organization's gateway connections (including their
+    // static headers and provider credentials) from a `baseProcedure`.
+    recordKiloAdminElevation(params.ctx, {
+      reason: 'mcp_gateway_organization_manage',
+      target: organizationTarget(params.organizationId),
+    });
+    return;
+  }
   const repository = createGatewayRepository(db);
-  const membership = await repository.findMembership(params.userId, params.organizationId);
+  const membership = await repository.findMembership(params.ctx.user.id, params.organizationId);
   if (!membership || membership.role !== 'owner') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Organization owner access required' });
   }
@@ -360,8 +366,7 @@ async function getConfigDetail(params: {
 async function resolveScopedConfig(params: {
   configId: string;
   organizationId?: string;
-  userId: string;
-  isGlobalAdmin: boolean;
+  ctx: TRPCContext;
 }) {
   const repository = createGatewayRepository(db);
   const resolved = await repository.findDashboardRouteByConfigId(params.configId);
@@ -370,11 +375,14 @@ async function resolveScopedConfig(params: {
     ? resolved.config.owner_scope === GatewayOwnerScope.Organization &&
       resolved.config.owner_id === params.organizationId
     : resolved.config.owner_scope === GatewayOwnerScope.Personal &&
-      resolved.config.owner_id === params.userId;
+      resolved.config.owner_id === params.ctx.user.id;
   if (!belongsToScope) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
   }
-  if (!params.organizationId && !params.isGlobalAdmin) {
+  // Deliberately not an admin elevation: the personal branch above already
+  // requires `owner_id === ctx.user.id`, so `is_admin` only gates a staff-only
+  // feature on the caller's *own* config — no customer data is reached.
+  if (!params.organizationId && !params.ctx.user.is_admin) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
   }
   return resolved;
@@ -383,15 +391,13 @@ async function resolveScopedConfig(params: {
 async function requireManagedConfig(params: {
   configId: string;
   organizationId?: string;
-  userId: string;
-  isGlobalAdmin: boolean;
+  ctx: TRPCContext;
 }) {
   const resolved = await resolveScopedConfig(params);
   if (params.organizationId) {
     await requireOrganizationManager({
       organizationId: params.organizationId,
-      userId: params.userId,
-      isGlobalAdmin: params.isGlobalAdmin,
+      ctx: params.ctx,
     });
   }
   return resolved;
@@ -425,8 +431,7 @@ export const mcpGatewayRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await requireOrganizationManager({
         organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
+        ctx,
       });
       return listConfigs({
         ownerScope: GatewayOwnerScope.Organization,
@@ -447,8 +452,7 @@ export const mcpGatewayRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await requireOrganizationManager({
         organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
+        ctx,
       });
       return getConfigDetail({
         configId: input.configId,
@@ -509,8 +513,7 @@ export const mcpGatewayRouter = createTRPCRouter({
       withGatewayErrorMapping(async () => {
         await requireOrganizationManager({
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         const services = createGatewayServices();
         const created = await services.configService.createOrganizationConfig({
@@ -538,8 +541,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         const resolved = await resolveScopedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         const services = createGatewayServices();
         const route = services.routeService.parseResource(resolved.route.canonical_url);
@@ -560,8 +562,7 @@ export const mcpGatewayRouter = createTRPCRouter({
       await requireManagedConfig({
         configId: input.configId,
         organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
+        ctx,
       });
       const services = createGatewayServices();
       const route = await services.configService.rotateRoute({ configId: input.configId });
@@ -573,8 +574,7 @@ export const mcpGatewayRouter = createTRPCRouter({
       await requireManagedConfig({
         configId: input.configId,
         organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
+        ctx,
       });
       const services = createGatewayServices();
       const config = await services.configService.disableConfig(input.configId);
@@ -587,8 +587,7 @@ export const mcpGatewayRouter = createTRPCRouter({
       await requireManagedConfig({
         configId: input.configId,
         organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
+        ctx,
       });
       const services = createGatewayServices();
       const config = await services.configService.deleteConfig(input.configId);
@@ -603,8 +602,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         const resolved = await requireManagedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         if (resolved.config.auth_mode !== GatewayAuthMode.StaticHeaders) {
           throw new TRPCError({
@@ -628,8 +626,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         await requireManagedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         const services = createGatewayServices();
         const config = await services.configService.updateProviderScopes({
@@ -655,8 +652,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         const resolved = await requireManagedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         if (resolved.config.auth_mode !== GatewayAuthMode.OAuthStatic) {
           throw new TRPCError({
@@ -680,8 +676,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         await requireManagedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         const services = createGatewayServices();
         const assignment = await services.configService.assignUser({
@@ -701,8 +696,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         await requireManagedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
+          ctx,
         });
         const services = createGatewayServices();
         const assignment = await services.configService.revokeAssignment({

@@ -27,6 +27,12 @@ export type TRPCContext = {
   authViaToken?: boolean;
   tokenSource?: string | null;
   ip?: string | null;
+  // Procedure path and type, injected into the context by `baseProcedure` so
+  // that `is_admin` elevation sites *inside* a resolver (which only receive
+  // `ctx`, not the middleware's `path`/`type`) can attribute their audit event
+  // to the exact procedure. Optional for the same reason as the fields above.
+  trpcPath?: string;
+  trpcType?: string;
 };
 
 /**
@@ -100,10 +106,20 @@ const timingMiddleware = t.middleware(async ({ path, type, ctx, next }) => {
   return result;
 });
 
+// Publishes the procedure path/type onto the context so audit emitters reachable
+// only from a resolver (see `recordKiloAdminElevation`) can name the procedure.
+// `next({ ctx })` merges into the existing context, so nothing is dropped.
+const auditContextMiddleware = t.middleware(({ path, type, next }) =>
+  next({ ctx: { trpcPath: path, trpcType: type } })
+);
+
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
-export const baseProcedure = t.procedure.use(timingMiddleware).use(sentryMiddleware);
+export const baseProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(sentryMiddleware)
+  .use(auditContextMiddleware);
 
 // Admin-only procedure. creditManager/superadmin/sessionViewer chain on this,
 // so emitting here covers the whole admin.* tRPC surface with a single event.
@@ -118,6 +134,7 @@ export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }
   // (or a chained sub-check) later throws.
   emitAdminAccessEvent({
     surface: 'trpc',
+    kind: 'admin_guard',
     user: ctx.user,
     authViaToken: ctx.authViaToken ?? false,
     tokenSource: ctx.tokenSource ?? null,

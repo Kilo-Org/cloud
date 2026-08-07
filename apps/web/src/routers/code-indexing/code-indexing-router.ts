@@ -8,6 +8,7 @@ import {
   ensureOrganizationAccessAndFetchOrg,
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
+import { elevateViaKiloAdmin, organizationTarget, userTarget } from '@/lib/admin/admin-access-log';
 import { sentryLogger } from '@/lib/utils.server';
 import { codeIndexingAdminRouter } from './code-indexing-admin-router';
 import { getOrganizationById } from '@/lib/organizations/organizations';
@@ -159,7 +160,11 @@ async function resolveOrganizationIdWithOverride(
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidRegex.test(input.overrideUser)) {
       // It's an organization ID
-      return input.overrideUser;
+      return elevateViaKiloAdmin(ctx, {
+        reason: 'code_index_user_override',
+        target: organizationTarget(input.overrideUser),
+        grant: input.overrideUser,
+      });
     } else {
       // It's an email - look up the user
       const user = await findUserByEmail(input.overrideUser);
@@ -170,7 +175,11 @@ async function resolveOrganizationIdWithOverride(
         });
       }
       // Format the user ID using getUserUUID
-      return getUserUUID(user);
+      return elevateViaKiloAdmin(ctx, {
+        reason: 'code_index_user_override',
+        target: userTarget(user.id),
+        grant: getUserUUID(user),
+      });
     }
   }
 

@@ -5,6 +5,8 @@ import {
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   selectAutoFreeCandidate,
+  shouldRedactErrorResponse,
+  shouldRedactModelNameInMicrodollarUsage,
 } from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
@@ -165,7 +167,6 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
-        'inclusionai/ling-3.0-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
       });
     });
@@ -176,7 +177,7 @@ describe('isFreeModel', () => {
 
       for (const candidate of autoFreeModels) {
         if (!candidate.model.includes('laguna')) {
-          expect(candidate.weight).toBe(3);
+          expect(candidate.weight).toBe(9);
         }
       }
     });
@@ -293,5 +294,47 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('anthropic/claude-sonnet-4')).toBe(
       false
     );
+  });
+});
+
+describe('shouldRedactErrorResponse', () => {
+  test('does not redact errors for custom models', () => {
+    expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
+  });
+
+  test('redacts errors for experiment provider', () => {
+    expect(shouldRedactErrorResponse('experiment', 'some-experiment-model')).toBe(true);
+  });
+
+  test('redacts errors for stealth models regardless of provider', () => {
+    expect(shouldRedactErrorResponse('openrouter', claude_opus_4_7_stealth_model.public_id)).toBe(
+      true
+    );
+    expect(shouldRedactErrorResponse('martian', gpt_5_6_sol_stealth_model.public_id)).toBe(true);
+  });
+
+  test('does not redact errors for regular models and providers', () => {
+    expect(shouldRedactErrorResponse('openrouter', 'anthropic/claude-3.5-sonnet')).toBe(false);
+    expect(shouldRedactErrorResponse('vercel', 'openai/gpt-4o')).toBe(false);
+  });
+});
+
+describe('shouldRedactModelNameInMicrodollarUsage', () => {
+  test('redacts model name for custom provider', () => {
+    expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
+      true
+    );
+  });
+
+  test('redacts model name for experiment provider', () => {
+    expect(shouldRedactModelNameInMicrodollarUsage('experiment', 'some-experiment-model')).toBe(
+      true
+    );
+  });
+
+  test('redacts model name for stealth models', () => {
+    expect(
+      shouldRedactModelNameInMicrodollarUsage('openrouter', claude_opus_4_7_stealth_model.public_id)
+    ).toBe(true);
   });
 });

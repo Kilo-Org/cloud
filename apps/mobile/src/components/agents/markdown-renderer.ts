@@ -14,6 +14,8 @@ import { Renderer } from 'react-native-marked';
 
 import { openExternalUrl } from '@/lib/external-link';
 
+import { CodeBlock } from './code-block';
+import { normalizeFenceLanguage } from './code-block-model';
 import { isSupportedScheme, parseHtmlImages } from './markdown-html-image';
 import { MarkdownImage } from './markdown-image';
 import {
@@ -28,6 +30,11 @@ import { MarkdownTable } from './markdown-table';
 export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
 
 export type MarkdownLinkPressHandler = (href: string) => boolean;
+
+// Fenced code blocks are highlighted by the shared CodeBlock; a huge pasted
+// fence must not threaten the transcript's scroll performance, so the code
+// payload is capped and the hit shows the shared Truncated marker.
+export const MARKDOWN_CODE_CHARACTER_CAP = 50_000;
 
 /** Recursively checks whether any node in the tree is a MarkdownImage. */
 function containsMarkdownImage(nodes: ReactNode[]): boolean {
@@ -115,23 +122,20 @@ export class MarkdownRenderer extends Renderer {
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
   override code(
     text: string,
-    _language: string | undefined,
+    language: string | undefined,
     containerStyle: ViewStyle | undefined,
     _textStyle: TextStyle | undefined
   ): ReactNode {
     return createElement(
       View,
       { key: this.getKey(), style: containerStyle },
-      createElement(
-        Text,
-        {
-          selectable: this.selectable,
-          className: 'font-mono text-sm leading-5',
-          // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color
-          style: { color: this.palette.textColor },
-        },
-        text
-      )
+      createElement(CodeBlock, {
+        code: text,
+        language: normalizeFenceLanguage(language),
+        selectable: this.selectable,
+        baseColor: this.palette.textColor,
+        maxLength: MARKDOWN_CODE_CHARACTER_CAP,
+      })
     );
   }
 

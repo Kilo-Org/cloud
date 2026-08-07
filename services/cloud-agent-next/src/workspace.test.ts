@@ -40,6 +40,10 @@ import {
   cleanupStaleWorkspaces,
   createSandboxUsageEvent,
   setupWorkspace,
+  getBaseWorkspacePath,
+  getSessionWorkspacePath,
+  getSessionHomePath,
+  sanitizeIdForPath,
   LOW_DISK_THRESHOLD_MB,
   STALE_DIR_MIN_AGE_SECONDS,
 } from './workspace';
@@ -1474,5 +1478,89 @@ describe('disk space checking', () => {
         })
       ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
     });
+  });
+});
+
+describe('workspace path construction', () => {
+  const ORG_ID = '33c8c114-791f-463c-9f7f-fe74b284cfcf';
+  const BOT_USER_ID = `bot-code-review-${ORG_ID}`;
+  const SESSION_ID = 'agent_420ae020-e3c4-4e67-878b-66672c3d997e';
+
+  it('keeps the userId segment between the org and the sessions directory', () => {
+    // Dropping this segment would yield `/workspace/<orgId>/sessions/<sessionId>`,
+    // which is indistinguishable in shape from a legitimate personal-account
+    // workspace and so reads as valid, but for an org session points at a
+    // directory that does not exist and is outside the external_directory
+    // allowlist. No caller has been observed passing an empty userId; this is a
+    // guard, not a repair.
+    expect(getSessionWorkspacePath(ORG_ID, BOT_USER_ID, SESSION_ID)).toBe(
+      `/workspace/${ORG_ID}/${BOT_USER_ID}/sessions/${SESSION_ID}`
+    );
+  });
+
+  it('omits the org segment for personal accounts', () => {
+    expect(getSessionWorkspacePath(undefined, 'user-1', SESSION_ID)).toBe(
+      `/workspace/user-1/sessions/${SESSION_ID}`
+    );
+  });
+
+  it.each([
+    ['undefined', undefined],
+    // Absence may arrive as null if the metadata schemas ever move to nullish();
+    // that must stay a personal account, not a hard failure on every resume.
+    ['null', null],
+  ])('omits the org segment when the org id is %s', (_label, orgId) => {
+    expect(getBaseWorkspacePath(orgId, 'user-1')).toBe('/workspace/user-1');
+  });
+
+  it.each([
+    ['a blank org id', '   '],
+    ['an empty org id', ''],
+    ['a relative org id', '..'],
+  ])('throws on %s instead of falling back to the personal namespace', (_label, orgId) => {
+    // A supplied-but-unusable org id is corruption, not a personal account.
+    // Falling back would put an org session's workspace, allowlist, and cleanup
+    // root under /workspace/<userId> and still look like it worked.
+    expect(() => getBaseWorkspacePath(orgId, 'user-1')).toThrow(/invalid organization id/);
+  });
+
+  it('replaces path separators in federated user ids', () => {
+    expect(sanitizeIdForPath('oauth/google:1234')).toBe('oauth-google-1234');
+    expect(getBaseWorkspacePath(ORG_ID, 'oauth/google:1234')).toBe(
+      `/workspace/${ORG_ID}/oauth-google-1234`
+    );
+  });
+
+  it.each([
+    ['an empty userId', ''],
+    ['a whitespace userId', '   '],
+    ['a relative userId', '..'],
+  ])('throws on %s instead of collapsing the path', (_label, userId) => {
+    expect(() => getSessionWorkspacePath(ORG_ID, userId, SESSION_ID)).toThrow(/invalid userId/);
+  });
+
+  it.each([
+    ['a blank session id', ''],
+    ['a session id containing a separator', 'agent_x/y'],
+    ['a padded session id', ` ${SESSION_ID} `],
+  ])('throws on %s', (_label, sessionId) => {
+    expect(() => getSessionWorkspacePath(ORG_ID, BOT_USER_ID, sessionId)).toThrow(
+      /invalid session id/
+    );
+  });
+
+  it('renders a session id identically in the workspace path and the session home', () => {
+    // These two are independent entry points that feed the same permission
+    // allowlist, so a session id must never render one way in one and another
+    // way in the other.
+    expect(getSessionHomePath(SESSION_ID)).toBe(`/home/${SESSION_ID}`);
+    expect(getSessionWorkspacePath(ORG_ID, BOT_USER_ID, SESSION_ID)).toContain(`/${SESSION_ID}`);
+  });
+
+  it.each([
+    ['a blank session id', ''],
+    ['a session id containing a separator', 'x/y'],
+  ])('rejects %s for the session home path too', (_label, sessionId) => {
+    expect(() => getSessionHomePath(sessionId)).toThrow(/invalid session id/);
   });
 });

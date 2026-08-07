@@ -42,6 +42,7 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { recordKiloAdminElevation, UNSCOPED_TARGET } from '@/lib/admin/admin-access-log';
 import {
   fetchPullRequestForBranch,
   fetchPullRequestReviewDecision,
@@ -454,7 +455,15 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
-    if (!ctx.user.is_admin) {
+    if (ctx.user.is_admin) {
+      // No membership predicate is added at all, so the query spans every
+      // organization's sessions. This is the broadest read in the file and it
+      // never touches `adminProcedure`, so it must be recorded here.
+      await recordKiloAdminElevation(ctx, {
+        reason: 'cli_session_cross_org_query',
+        target: UNSCOPED_TARGET,
+      });
+    } else {
       whereConditions.push(sql`(
         ${cli_sessions_v2.organization_id} IS NULL
         OR EXISTS (

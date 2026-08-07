@@ -30,6 +30,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
@@ -802,6 +803,10 @@ export function SessionDetailContent({
               }
             : {})}
         />
+        <SessionConnectionIndicator
+          activeSessionType={activeSessionType}
+          agentStatusType={agentStatus.type}
+        />
         {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
         {keyboardContainerKind === 'app-aware-padding' ? (
@@ -1066,19 +1071,19 @@ function ActiveSessionKeepAwake({ sessionId }: Readonly<{ sessionId: KiloSession
   return null;
 }
 
-// Mirrors MessageBubble's bubble geometry (px-4 py-1/py-2 wrapper,
+// Mirrors MessageBubble's bubble geometry (px-4 py-1 wrapper,
 // rounded-2xl with an asymmetric "tail" corner, self-start/self-end
 // alignment) so the loading state reads as a message list, not a spinner.
 export function SessionSkeletonMessages() {
   return (
     <View className="flex-1 pt-2">
-      <View className="items-start px-4 py-2">
+      <View className="items-start px-4 py-1">
         <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
       </View>
       <View className="items-end px-4 py-1">
         <Skeleton className="h-10 w-1/2 rounded-2xl rounded-tr-sm" />
       </View>
-      <View className="items-start px-4 py-2">
+      <View className="items-start px-4 py-1">
         <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tl-sm" />
       </View>
     </View>

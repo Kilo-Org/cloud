@@ -47,6 +47,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
+import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -332,6 +333,8 @@ async function syncProviders(
       providerData.models.splice(0, 0, extraModel.model);
     }
   }
+
+  injectSupportedFimModels(providerModelData);
 
   applyFreeEndpointDataPolicy({
     providerModelData,

@@ -1,6 +1,7 @@
 import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import { useAtom } from 'jotai';
-import { draftAtomFamily } from './agent-chat-atoms';
+import { X } from 'lucide-react';
+import { draftAtomFamily, queuedMessageAtomFamily } from './agent-chat-atoms';
 
 export const MessageComposer = ({
   activeConversationId,
@@ -16,6 +17,7 @@ export const MessageComposer = ({
   onSubmit: () => void;
 }): JSX.Element => {
   const [draft, setDraft] = useAtom(draftAtomFamily(activeConversationId));
+  const [queuedMessage, setQueuedMessage] = useAtom(queuedMessageAtomFamily(activeConversationId));
   const isSendDisabled = !canSend || draft.trim() === '';
 
   return (
@@ -26,6 +28,23 @@ export const MessageComposer = ({
         onSubmit();
       }}
     >
+      {queuedMessage === undefined ? null : (
+        <div className="mb-2 flex items-center gap-2 rounded-md border border-border bg-surface-raised px-3 py-2">
+          <span className="type-label min-w-0 flex-1 truncate text-foreground-muted">
+            Queued: {queuedMessage}
+          </span>
+          <button
+            aria-label="Cancel queued message"
+            className="flex size-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted outline-none transition hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+            onClick={() => {
+              setQueuedMessage(undefined);
+            }}
+            type="button"
+          >
+            <X aria-hidden="true" className="size-3.5" />
+          </button>
+        </div>
+      )}
       <label className="sr-only" htmlFor="agent-message">
         Message agent
       </label>
@@ -41,7 +60,9 @@ export const MessageComposer = ({
             onSubmit();
           }
         }}
-        placeholder="Ask Kilo to inspect this tab..."
+        placeholder={
+          isRunning ? 'Queue a message for the next turn...' : 'Ask Kilo to inspect this tab...'
+        }
         value={draft}
       />
       <div className="mt-2 grid gap-2">

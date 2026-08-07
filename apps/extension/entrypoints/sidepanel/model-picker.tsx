@@ -38,8 +38,9 @@ export const ModelPicker = ({
   });
 
   const selectedOption = modelOptions.find(option => option.id === model);
-  const triggerLabel =
-    modelOptions.length === 0 ? 'Loading models...' : (selectedOption?.name ?? model);
+  // Always show the conversation's own model: its name when the catalog has it, its raw id
+  // While the catalog is missing or stale. 'Loading models...' means no model is stored yet.
+  const triggerLabel = selectedOption?.name ?? (model === '' ? 'Loading models...' : model);
 
   const rows = useMemo(
     () =>
@@ -75,7 +76,7 @@ export const ModelPicker = ({
       <button
         aria-label="Model"
         className={triggerClassName}
-        data-model-id={modelOptions.length === 0 || model === '' ? undefined : model}
+        data-model-id={model === '' ? undefined : model}
         disabled={disabled}
         onClick={() => {
           if (disabled) {

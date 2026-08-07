@@ -14,6 +14,15 @@ export const remoteMcpStoreAtom = atom<RemoteMcpStore>({ servers: [] });
 // Keys for closed-but-not-deleted conversations are kept so their drafts survive reopen; evicted on delete and on sign-out.
 export const draftAtomFamily = atomFamily((_conversationId: string) => atom(''));
 
+// Per-conversation pending message, sent as the next turn when the current run ends.
+// One message per conversation; a send during a run appends to it.
+// In-memory only, so a reload drops it.
+// Cleared when its run aborts, when its conversation closes, and on delete or sign-out.
+// Nothing would ever drain it after that.
+export const queuedMessageAtomFamily = atomFamily((_conversationId: string) =>
+  atom<string | undefined>()
+);
+
 // Per-conversation context usage from the latest gateway turn (in-memory only).
 // Same lifecycle as drafts: kept across close, evicted on delete and on sign-out.
 export const contextUsageAtomFamily = atomFamily((_conversationId: string) =>
@@ -34,12 +43,13 @@ export const streamingMessageIdAtomFamily = atomFamily((_conversationId: string)
 export const runningConversationIdsAtom = atom<readonly string[]>([]);
 export const compactingConversationIdsAtom = atom<readonly string[]>([]);
 
-// Evict a single conversation's in-memory atoms (draft + context usage + session cost + streaming id).
+// Evict a single conversation's in-memory atoms (draft + context usage + session cost + streaming id + queued message).
 export const evictConversationAtoms = (conversationId: string): void => {
   draftAtomFamily.remove(conversationId);
   contextUsageAtomFamily.remove(conversationId);
   sessionCostAtomFamily.remove(conversationId);
   streamingMessageIdAtomFamily.remove(conversationId);
+  queuedMessageAtomFamily.remove(conversationId);
 };
 
 /*
@@ -54,6 +64,7 @@ export const clearPerConversationAtoms = (): void => {
     ...contextUsageAtomFamily.getParams(),
     ...sessionCostAtomFamily.getParams(),
     ...streamingMessageIdAtomFamily.getParams(),
+    ...queuedMessageAtomFamily.getParams(),
   ]);
   for (const id of ids) {
     evictConversationAtoms(id);

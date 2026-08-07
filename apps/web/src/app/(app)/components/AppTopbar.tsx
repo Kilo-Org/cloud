@@ -8,6 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from '@/components/ui/breadcrumb';
+import { SystemMessageBanner } from '@/components/shared/SystemMessageBanner';
 
 export function AppTopbar() {
   const { title, icon, extras, hideTopbar } = usePageTitle();
@@ -30,6 +31,7 @@ export function AppTopbar() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+          <SystemMessageBanner />
           {extras && <div className="shrink-0">{extras}</div>}
         </div>
       )}

@@ -9,7 +9,7 @@ import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isModelRestrictionExempt } from '@/lib/model-allow.server';
-import { resolveLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
+import { isLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
 import { db } from '@/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
@@ -114,15 +114,15 @@ export async function getEffectiveModelDecision(
     return { allowed: true };
   }
   // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
-  const latestAliasTarget = resolveLatestModelAlias(normalizedModelId);
-  const latestAlias = latestAliasTarget !== undefined;
+  const latestAlias = isLatestModelAlias(normalizedModelId);
   if (!latestAlias && policy.organizationModelDenyList.includes(normalizedModelId)) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const currentModelProviders = policy.requireModelInCurrentSnapshot
-    ? await providerLookup(latestAliasTarget ?? normalizedModelId)
-    : undefined;
-  if (!latestAlias && currentModelProviders?.size === 0) {
+  const currentModelProviders =
+    policy.requireModelInCurrentSnapshot && !latestAlias
+      ? await providerLookup(normalizedModelId)
+      : undefined;
+  if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
   }
   const organizationRoutes = policy.organizationProviderCeiling
@@ -131,7 +131,7 @@ export async function getEffectiveModelDecision(
 
   async function decisionWithinOrganizationCeiling(): Promise<EffectiveModelDecision> {
     if (!organizationRoutes) return { allowed: true };
-    if (latestAlias && currentModelProviders?.size === 0) {
+    if (latestAlias) {
       // Aliases have no snapshot endpoints, so pass the ceiling through to provider.only.
       return organizationRoutes.size > 0
         ? { allowed: true, eligibleProviderRoutes: organizationRoutes }
@@ -158,10 +158,9 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.providerAllowList.length === 0) {
     return { allowed: false, denialSource: 'no_grant' };
   }
-  const modelProviders =
-    latestAlias && currentModelProviders?.size === 0
-      ? new Set(policy.memberGrant.providerAllowList)
-      : (currentModelProviders ?? (await providerLookup(latestAliasTarget ?? normalizedModelId)));
+  const modelProviders = latestAlias
+    ? new Set(policy.memberGrant.providerAllowList)
+    : (currentModelProviders ?? (await providerLookup(normalizedModelId)));
   if (modelProviders.size === 0) {
     return { allowed: false, denialSource: 'group_provider' };
   }

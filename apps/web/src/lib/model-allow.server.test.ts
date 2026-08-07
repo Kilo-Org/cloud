@@ -5,7 +5,6 @@ import {
   type ProviderLookup,
 } from '@/lib/model-allow.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
-import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
@@ -98,15 +97,7 @@ describe('model access predicates', () => {
         providerAllowList: ['anthropic'],
         modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
       },
-      lookup({ [CLAUDE_SONNET_CURRENT_MODEL_ID]: ['anthropic'] })
-    );
-    const withIncompatibleProviders = createAllowPredicateFromRestrictions(
-      {
-        requireModelInCurrentSnapshot: true,
-        providerAllowList: ['openai'],
-        modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
-      },
-      lookup({ [CLAUDE_SONNET_CURRENT_MODEL_ID]: ['anthropic'] })
+      lookup({})
     );
     const withoutProviders = createAllowPredicateFromRestrictions(
       {
@@ -118,7 +109,6 @@ describe('model access predicates', () => {
     );
 
     await expect(withProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(true);
-    await expect(withIncompatibleProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
     await expect(withoutProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 

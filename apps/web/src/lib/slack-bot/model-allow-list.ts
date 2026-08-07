@@ -13,7 +13,7 @@ import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openr
 export async function getDefaultAllowedModel(
   organizationId: string,
   globalDefault = PRIMARY_DEFAULT_MODEL
-): Promise<string> {
+): Promise<string | null> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
     return globalDefault;
@@ -62,5 +62,5 @@ export async function getDefaultAllowedModel(
     }
   }
 
-  throw new Error('No allowed default model is available for this organization');
+  return null;
 }

@@ -5,7 +5,6 @@ import {
   getEffectiveModelDecision,
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
-import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -109,9 +108,8 @@ describe('effective organization model access', () => {
     );
 
     await expect(
-      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async modelId => {
-        expect(modelId).toBe(CLAUDE_SONNET_CURRENT_MODEL_ID);
-        return new Set(['anthropic']);
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => {
+        throw new Error('latest aliases must not use snapshot provider metadata');
       })
     ).resolves.toEqual({
       allowed: true,

@@ -3,7 +3,6 @@ import {
   CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
@@ -29,7 +28,6 @@ import {
   GROK_LATEST_MODEL_ALIAS,
   KIMI_LATEST_MODEL_ALIAS,
   LATEST_MODEL_ALIASES,
-  resolveLatestModelAlias,
 } from '@/lib/ai-gateway/latest-model-aliases';
 
 describe('mapModelIdToVercel', () => {
@@ -62,12 +60,6 @@ describe('mapModelIdToVercel', () => {
         GEMINI_FLASH_LATEST_MODEL_ALIAS,
         GROK_LATEST_MODEL_ALIAS,
       ]);
-    });
-
-    it('resolves aliases to their provider-catalog model ids', () => {
-      expect(resolveLatestModelAlias(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).toBe(
-        CLAUDE_SONNET_CURRENT_MODEL_ID
-      );
     });
 
     it('does not map a latest alias that is missing the leading tilde', () => {

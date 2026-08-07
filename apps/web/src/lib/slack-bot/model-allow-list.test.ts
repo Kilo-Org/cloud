@@ -43,4 +43,18 @@ describe('getDefaultAllowedModel', () => {
 
     await expect(getDefaultAllowedModel('organization-id')).resolves.toBe('snapshot/fallback');
   });
+
+  test('returns null when Enterprise has no allowed snapshot model', async () => {
+    mockedGetOrganizationById.mockResolvedValue({ settings: {} } as never);
+    mockedResolveOrganizationDefaultModelPolicy.mockResolvedValue({
+      requireModelInCurrentSnapshot: true,
+      organizationModelDenyList: [],
+      memberGrant: { mode: 'unrestricted' },
+      policyRevision: 0,
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: false });
+    mockedGetModelIdToProviderSlugsIndex.mockResolvedValue(new Map());
+
+    await expect(getDefaultAllowedModel('organization-id')).resolves.toBeNull();
+  });
 });

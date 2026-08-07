@@ -23,7 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, Save, Trash2 } from 'lucide-react';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
-import { isEligiblePoolModel } from '@/components/auto-routing/AutoRoutingModeCard';
+import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { Badge } from '@/components/ui/badge';
@@ -74,36 +74,6 @@ export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy
 // ---------------------------------------------------------------------------
 // Model picker helpers (exported for unit tests)
 // ---------------------------------------------------------------------------
-
-/** Catalog shape consumed by the pickers; structurally satisfied by the OpenRouter selector list. */
-export type CatalogModelShape = {
-  id: string;
-  name: string;
-  isFree?: boolean;
-  mayTrainOnYourPrompts?: boolean;
-  hasUserByokAvailable?: boolean;
-  pricing?: { prompt?: string } | null;
-  opencode?: { variants?: Record<string, unknown> } | null;
-};
-
-export function modelOptionFromCatalog(model: CatalogModelShape): ModelOption {
-  const variantKeys = model.opencode?.variants
-    ? Object.keys(model.opencode.variants).filter(key => key.trim().length > 0)
-    : [];
-  return {
-    id: model.id,
-    name: model.name,
-    isFree: model.isFree,
-    mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
-    hasUserByokAvailable: model.hasUserByokAvailable,
-    variants: variantKeys.length > 0 ? variantKeys : undefined,
-  };
-}
-
-/** Eligible model options for the classifier and decider pickers. */
-export function toBenchmarkModelOptions(models: CatalogModelShape[]): ModelOption[] {
-  return models.filter(isEligiblePoolModel).map(modelOptionFromCatalog);
-}
 
 /** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
 export function pinnedModelFor(id: string): ModelOption {
@@ -1167,7 +1137,7 @@ export function BenchmarksSection() {
 
   const modelsQuery = useModelSelectorList(undefined);
   const modelOptions = useMemo(
-    () => toBenchmarkModelOptions(modelsQuery.data?.data ?? []),
+    () => toEligibleModelOptions(modelsQuery.data?.data ?? [], []),
     [modelsQuery.data?.data]
   );
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;

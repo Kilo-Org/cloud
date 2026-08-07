@@ -10,10 +10,8 @@ import {
   formatAccuracy,
   formatUsd,
   formStateToConfig,
-  modelOptionFromCatalog,
   pinnedModelFor,
   RoutingTableView,
-  toBenchmarkModelOptions,
   variantOptionsForModel,
 } from './BenchmarksSection';
 
@@ -77,43 +75,6 @@ describe('costPerAccuracy', () => {
 
   it('uses an em dash when accuracy is zero', () => {
     expect(formatCostPerAccuracy({ avgCostUsd: 0.001, accuracy: 0 })).toBe('—');
-  });
-});
-
-describe('modelOptionFromCatalog', () => {
-  it('derives variant keys from catalog opencode metadata', () => {
-    const option = modelOptionFromCatalog({
-      id: 'openai/gpt-5',
-      name: 'GPT-5',
-      opencode: { variants: { none: {}, low: {}, high: {}, ' ': {} } },
-    });
-    expect(option.id).toBe('openai/gpt-5');
-    expect(option.name).toBe('GPT-5');
-    expect(option.variants).toEqual(['none', 'low', 'high']);
-  });
-
-  it('omits variants when the catalog exposes none', () => {
-    const option = modelOptionFromCatalog({
-      id: 'anthropic/claude-sonnet-4.5',
-      name: 'Claude Sonnet 4.5',
-    });
-    expect(option.variants).toBeUndefined();
-  });
-});
-
-describe('toBenchmarkModelOptions', () => {
-  it('keeps eligible models and drops ineligible pool models', () => {
-    const options = toBenchmarkModelOptions([
-      { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
-      { id: 'kilo-auto/efficient', name: 'Efficient' },
-      { id: 'kilo-internal/openai/custom', name: 'Custom' },
-      { id: 'chutes-byok/m1', name: 'Chutes BYOK', hasUserByokAvailable: true },
-      { id: 'openai/gpt-5', name: 'GPT-5', pricing: { prompt: '0' }, isFree: true },
-    ]);
-    expect(options.map(option => option.id)).toEqual([
-      'anthropic/claude-sonnet-4.5',
-      'openai/gpt-5',
-    ]);
   });
 });
 

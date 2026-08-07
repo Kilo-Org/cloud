@@ -43,8 +43,7 @@ export function buildRoutingTable(params: {
   // one row for the model (one effort per model), bind that row even if the
   // summary omitted variant. Multiple snapshot rows without an exact match is
   // corrupt — throw so buildRoutingTable fails and the caller keeps the
-  // previous published table. Emit reasoningEffort only — never variant — so
-  // the published PLATFORM artifact shape stays unchanged for rolling deploys.
+  // previous published table.
   const snapshotVariant = (m: BenchmarkDeciderModel): string | null =>
     m.variant !== undefined ? (m.variant ?? null) : (m.reasoningEffort ?? null);
 

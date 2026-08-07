@@ -1386,8 +1386,6 @@ async function finalizeRunIfComplete(
       const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => {
         const key = m.reasoning_effort ?? variantFromStorage(m.variant);
         const effort = parsePersistedReasoningEffort(key);
-        // A catalog variant outside the legacy four-value effort enum (e.g. 'max')
-        // can only be carried as `variant`; emitting effort would drop it.
         if (effort === null && key !== null) {
           return { id: m.model, variant: key, reasoningEffort: null };
         }

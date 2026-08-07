@@ -697,10 +697,12 @@ export async function startRun(
 
   const startedAt = new Date().toISOString();
   // Distinguish user-queue run ids so ops logs and D1 rows are easy to filter.
+  // The nonce matters: two drains of one queue can reach here in the same
+  // millisecond, and a shared id makes each one's claim match the other's rows —
+  // the loser's release would then hand back rows the winner is measuring.
   const runId =
-    purpose === 'user'
-      ? `user-${startedAt.replace(/[:.]/g, '-')}`
-      : `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
+    (purpose === 'user' ? 'user' : kind) +
+    `-${startedAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}`;
 
   // Claim the registry rows BEFORE writing the run. Both queues drain from the
   // same registry and their drains can overlap (cron, admin, run completion), so

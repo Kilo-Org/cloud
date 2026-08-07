@@ -29,7 +29,10 @@ const SCHEMA_SQL = `
     PRIMARY KEY (model, variant, engine_identity, repetitions)
   );
   CREATE TABLE benchmark_runs (
-    id TEXT PRIMARY KEY,
+    -- NOT NULL matches production. Without it SQLite allows a NULL id, and a
+    -- NULL in the subquery makes NOT IN match nothing — the reaper would stop
+    -- reaping and the fixture would hide it.
+    id TEXT PRIMARY KEY NOT NULL,
     kind TEXT NOT NULL,
     status TEXT NOT NULL,
     started_at TEXT NOT NULL,

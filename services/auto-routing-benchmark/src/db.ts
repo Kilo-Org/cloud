@@ -12,20 +12,7 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gt,
-  inArray,
-  isNull,
-  lt,
-  ne,
-  notInArray,
-  or,
-} from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -1084,15 +1071,12 @@ export function failOrphanedRunningProfilesStatement(
       and(
         eq(benchmarkProfiles.status, 'running'),
         lt(benchmarkProfiles.updated_at, olderThanIso),
-        or(
-          isNull(benchmarkProfiles.run_id),
-          notInArray(
-            benchmarkProfiles.run_id,
-            orm
-              .select({ id: benchmarkRuns.id })
-              .from(benchmarkRuns)
-              .where(eq(benchmarkRuns.status, 'running'))
-          )
+        notInArray(
+          benchmarkProfiles.run_id,
+          orm
+            .select({ id: benchmarkRuns.id })
+            .from(benchmarkRuns)
+            .where(eq(benchmarkRuns.status, 'running'))
         )
       )
     );

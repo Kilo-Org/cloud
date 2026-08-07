@@ -224,6 +224,39 @@ describe('processDeadLetter', () => {
     expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
   });
 
+  it('keeps entries distinct when delimiter-joined keys would collide', async () => {
+    // Space-join would collapse these two entries to the same key ('a b c');
+    // only the dead one may fail.
+    mockRunState([
+      { model: 'a b', variant: 'c' },
+      { model: 'a', variant: 'b c' },
+    ]);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model: 'a', variant: 'b c', rep: 0, n: DECIDER_CASES.length },
+    ]);
+    vi.mocked(listLaneFailures).mockResolvedValue([
+      {
+        run_id: runId,
+        model: 'a b',
+        variant: 'c',
+        rep: 0,
+        chunk: 27,
+        shard: 0,
+        failed_at: '2026-08-07T12:00:00.000Z',
+      },
+    ]);
+
+    await processDeadLetter(env, deadLetterMessage({ model: 'a b', variant: 'c' }));
+
+    expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      runId,
+      [{ model: 'a b', variant: 'c' }],
+      PROFILE_LANE_DEAD_FAILURE_REASON
+    );
+    expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
+  });
+
   it('lets written rows win over a failure record (message died after writes)', async () => {
     mockRunState([{ model: 'b/dead', variant: 'high' }]);
     vi.mocked(countCaseResultsByLane).mockResolvedValue([

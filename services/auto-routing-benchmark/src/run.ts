@@ -1218,9 +1218,10 @@ export async function runCasesWithConcurrency<T>(
 }
 
 // Lane identity for completion accounting: one (model, variant, rep) chain of
-// chunk messages. All keys use storage-form variant ('' = default).
+// chunk messages. JSON tuple keys (storage-form variant) so model/variant
+// values can never collide across concatenation.
 function laneKey(model: string, variant: string, rep: number): string {
-  return `${model} ${variant} ${rep}`;
+  return JSON.stringify([model, variant, rep]);
 }
 
 /** Failure reason written to profile entries whose lane dead-lettered. */
@@ -1293,9 +1294,9 @@ async function finalizeRunIfComplete(
     // fail (retry re-admits them) without taking down the whole run. Fail
     // first so the ready sweep only catches survivors; both statements keep
     // the run_id + status='running' no-clobber guard.
-    const failedEntryKeys = new Set(deadLanes.map(l => `${l.model} ${l.variant}`));
+    const failedEntryKeys = new Set(deadLanes.map(l => JSON.stringify([l.model, l.variant])));
     const failedEntries = enqueuedModels
-      .filter(m => failedEntryKeys.has(`${m.model} ${m.variant}`))
+      .filter(m => failedEntryKeys.has(JSON.stringify([m.model, m.variant])))
       .map(m => ({ model: m.model, variant: m.variant }));
     try {
       if (failedEntries.length > 0) {

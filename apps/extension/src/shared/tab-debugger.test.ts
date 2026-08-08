@@ -1,6 +1,8 @@
-/* eslint-disable max-lines */
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+/* eslint-disable max-lines, jest/max-expects -- the selector tests assert the full node list and round-trip each selector */
+import { describe, expect, it, vi } from 'vitest';
 import {
+  MAX_SELECTOR_LENGTH,
   evalInTab,
   evalInTabWithScripting,
   getPageSnapshotInTabWithScripting,
@@ -13,6 +15,7 @@ import type {
   BrowserTabsApi,
   ChromeDebuggerApi,
   ChromeDebuggerTargetInfo,
+  PageSnapshot,
 } from './tab-debugger';
 
 const createDebuggerApi = ({
@@ -196,7 +199,7 @@ describe('tab debugger helpers', () => {
     const scriptingApi: BrowserScriptingApi = {
       executeScript: async details => {
         calls.push(details);
-        return [{ result: await Promise.resolve(details.func(details.args.join(''))) }];
+        return [{ result: await Promise.resolve(details.func(...details.args)) }];
       },
     };
 
@@ -316,7 +319,7 @@ describe('tab debugger helpers', () => {
       calls.map(call => ({ args: call.args, target: call.target, world: call.world }))
     ).toStrictEqual([
       {
-        args: ['123'],
+        args: ['123', String(MAX_SELECTOR_LENGTH)],
         target: { tabId: 7 },
         world: 'MAIN',
       },
@@ -460,5 +463,261 @@ describe('tab debugger helpers', () => {
       'capture:B',
       'update:B:1',
     ]);
+  });
+});
+
+const captureFixtureSnapshot = async (): Promise<PageSnapshot> => {
+  // JSDOM reports zero rects, which the injected visibility check treats as hidden. Report a
+  // 10x10 rect so captured fixtures participate in the snapshot.
+  const rectSpy = vi
+    .spyOn(Element.prototype, 'getBoundingClientRect')
+    .mockReturnValue(new DOMRect(0, 0, 10, 10));
+  const scriptingApi: BrowserScriptingApi = {
+    executeScript: async details => [
+      { result: await Promise.resolve(details.func(...details.args)) },
+    ],
+  };
+
+  try {
+    const result = await getPageSnapshotInTabWithScripting({ scriptingApi, tabId: 7 });
+
+    if (!result.ok) {
+      throw new Error('Expected a page snapshot result.');
+    }
+
+    // The mocked scripting API always runs the injected snapshot function.
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- result.value is the injected function's PageSnapshot.
+    return result.value as PageSnapshot;
+  } finally {
+    rectSpy.mockRestore();
+  }
+};
+
+describe('injected page snapshot selector evidence', () => {
+  it('gives every captured node a unique usable CSS selector', async () => {
+    document.body.innerHTML = [
+      '<button id="search" class="btn primary">Search flights</button>',
+      '<button class="btn">Sort by best</button>',
+      '<button class="btn">Sort by cheapest</button>',
+      '<input aria-label="Where to?" placeholder="Where to?">',
+      '<a href="https://example.com/flights">Flights</a>',
+    ].join('');
+
+    const snapshot = await captureFixtureSnapshot();
+    const selectors = snapshot.nodes.map(node => node.selector);
+
+    expect(selectors).toStrictEqual([
+      'button#search',
+      'button.btn:nth-of-type(2)',
+      'button.btn:nth-of-type(3)',
+      'input[aria-label="Where to?"]',
+      'a',
+    ]);
+
+    for (const node of snapshot.nodes) {
+      const matched = document.querySelector(node.selector);
+
+      expect(matched).not.toBeNull();
+    }
+    for (const node of snapshot.nodes.filter(candidate => candidate.text !== undefined)) {
+      const matched = document.querySelector(node.selector);
+
+      expect(matched?.textContent?.trim()).toBe(node.text);
+    }
+  });
+
+  it('escapes selector identifiers and attribute values into valid CSS', async () => {
+    document.body.innerHTML = [
+      '<button id="123 start">Odd id</button>',
+      '<button class="a:b">Colon class</button>',
+      '<input aria-label="say &quot;hi&quot;" placeholder="ignored">',
+    ].join('');
+
+    const snapshot = await captureFixtureSnapshot();
+    const selectors = snapshot.nodes.map(node => node.selector);
+
+    expect(selectors).toStrictEqual([
+      String.raw`button#\31 23\ start`,
+      String.raw`button.a\:b`,
+      String.raw`input[aria-label="say \"hi\""]`,
+    ]);
+
+    for (const node of snapshot.nodes) {
+      const matched = document.querySelector(node.selector);
+
+      expect(matched).not.toBeNull();
+    }
+  });
+
+  it('uniquely matches duplicate nested controls despite omitted duplicates', async () => {
+    document.body.innerHTML = [
+      '<div class="card"><button class="buy">Buy now</button></div>',
+      '<div class="card"><button class="buy">Buy now</button></div>',
+      '<div class="card"><button class="buy" style="display: none">Hidden duplicate</button></div>',
+      '<main id="app"><button class="buy">Buy later</button></main>',
+    ].join('');
+
+    const snapshot = await captureFixtureSnapshot();
+    const buttons = snapshot.nodes.filter(node => node.tag === 'button');
+    const selectors = buttons.map(node => node.selector);
+
+    expect(selectors).toStrictEqual([
+      'div.card:nth-of-type(1) > button.buy:nth-of-type(1)',
+      'div.card:nth-of-type(2) > button.buy:nth-of-type(1)',
+      'main#app:nth-of-type(1) > button.buy:nth-of-type(1)',
+    ]);
+
+    for (const node of buttons) {
+      const matched = document.querySelectorAll(node.selector);
+
+      expect(matched).toHaveLength(1);
+      expect(matched[0]?.textContent?.trim()).toBe(node.text);
+    }
+  });
+
+  it('keeps selector inputs complete above the former truncation bounds', async () => {
+    const longClass = `c${'x'.repeat(80)}`;
+    const longLabel = `l${'y'.repeat(140)}`;
+    const longName = `n${'z'.repeat(140)}`;
+    document.body.innerHTML = [
+      `<button class="${longClass}">Classed button</button>`,
+      `<input aria-label="${longLabel}" placeholder="p">`,
+      `<input name="${longName}" placeholder="q">`,
+    ].join('');
+
+    const snapshot = await captureFixtureSnapshot();
+    const classed = snapshot.nodes.find(node => node.text === 'Classed button');
+
+    expect(classed?.selector).toBe(`button.${longClass}`);
+
+    const labelled = snapshot.nodes.find(node => node.selector.includes('aria-label'));
+
+    expect(labelled?.selector).toBe(`input[aria-label="${longLabel}"]`);
+
+    const named = snapshot.nodes.find(node => node.selector.includes('name'));
+
+    expect(named?.selector).toBe(`input[name="${longName}"]`);
+
+    for (const node of snapshot.nodes) {
+      const matched = document.querySelector(node.selector);
+
+      expect(matched).not.toBeNull();
+    }
+  });
+
+  it('drops unbounded selector inputs that would exceed the maximum selector size', async () => {
+    const hugeId = `i${'x'.repeat(600)}`;
+    document.body.innerHTML = `<button id="${hugeId}">Huge id</button>`;
+
+    const snapshot = await captureFixtureSnapshot();
+    const [node] = snapshot.nodes;
+
+    expect(node?.selector).toBe('button');
+    expect(node?.selector.length).toBeLessThanOrEqual(MAX_SELECTOR_LENGTH);
+    expect(node?.selector.length).toBeGreaterThan(0);
+
+    for (const capturedNode of snapshot.nodes) {
+      const matched = document.querySelector(capturedNode.selector);
+
+      expect(matched).not.toBeNull();
+    }
+  });
+
+  it('falls back to a shorter selector when an attribute value cannot fit', async () => {
+    document.body.innerHTML = `<input aria-label="${'a'.repeat(600)}" placeholder="Search">`;
+
+    const snapshot = await captureFixtureSnapshot();
+    const [node] = snapshot.nodes;
+
+    expect(node?.selector).toBe('input[placeholder="Search"]');
+    expect(node?.selector.length).toBeLessThanOrEqual(MAX_SELECTOR_LENGTH);
+
+    for (const capturedNode of snapshot.nodes) {
+      const matched = document.querySelector(capturedNode.selector);
+
+      expect(matched).not.toBeNull();
+    }
+  });
+
+  it('escapes control characters into valid CSS and preserves exact attribute values', async () => {
+    document.body.innerHTML = [
+      '<button id="line\nbreak">Newline id</button>',
+      '<button aria-label="tab\there">Tab label</button>',
+      '<input name="  spaced  " placeholder="p">',
+    ].join('');
+
+    const snapshot = await captureFixtureSnapshot();
+    const selectors = snapshot.nodes.map(node => node.selector);
+
+    expect(selectors).toStrictEqual([
+      String.raw`button#line\a break`,
+      String.raw`button[aria-label="tab\9 here"]`,
+      String.raw`input[name="  spaced  "]`,
+    ]);
+
+    for (const node of snapshot.nodes) {
+      const matched = document.querySelector(node.selector);
+
+      expect(matched).not.toBeNull();
+    }
+  });
+
+  it('drops an over-long custom tag name and keeps a bounded verified selector', async () => {
+    const longTag = `x-${'y'.repeat(520)}`;
+    document.body.innerHTML = [
+      `<${longTag} id="keep" role="button">Long tag</${longTag}>`,
+      '<button id="other">Other</button>',
+    ].join('');
+
+    const snapshot = await captureFixtureSnapshot();
+    const longTagNode = snapshot.nodes.find(node => node.selector === '#keep');
+
+    expect(longTagNode?.selector).toBe('#keep');
+    expect(longTagNode?.selector.length).toBeLessThanOrEqual(MAX_SELECTOR_LENGTH);
+    expect(longTagNode?.tag.length).toBeGreaterThan(MAX_SELECTOR_LENGTH);
+
+    for (const node of snapshot.nodes) {
+      const matched = document.querySelectorAll(node.selector);
+
+      expect(matched).toHaveLength(1);
+    }
+  });
+
+  it('omits nodes that have no bounded unique selector', async () => {
+    const openWraps = '<div class="wrap">'.repeat(30);
+    const closeWraps = '</div>'.repeat(30);
+    const nested = `${openWraps}<button class="go">Go</button>${closeWraps}`;
+    document.body.innerHTML = `${nested}${nested}`;
+
+    const snapshot = await captureFixtureSnapshot();
+
+    // The two buttons are symmetric for every chain that fits within the bound, so no verified
+    // Selector exists. Both nodes are omitted instead of exposing an ambiguous selector.
+    expect(snapshot.nodes).toStrictEqual([]);
+  });
+
+  it('skips NUL-containing identifiers and attribute values with a verified fallback', async () => {
+    document.body.innerHTML = [
+      '<button class="nul">Nul id</button>',
+      '<button id="normal" class="nul">Normal id</button>',
+      '<input placeholder="Search">',
+    ].join('');
+    document.body.querySelector('button.nul')?.setAttribute('id', 'a\u0000b');
+    document.body.querySelector('input')?.setAttribute('aria-label', 'l\u0000abel');
+
+    const snapshot = await captureFixtureSnapshot();
+    const selectors = snapshot.nodes.map(node => node.selector);
+
+    expect(selectors).toStrictEqual([
+      'button.nul:nth-of-type(1)',
+      'button#normal',
+      'input[placeholder="Search"]',
+    ]);
+
+    for (const node of snapshot.nodes) {
+      const matched = document.querySelectorAll(node.selector);
+
+      expect(matched).toHaveLength(1);
+    }
   });
 });

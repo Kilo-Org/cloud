@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- memory-tool cases live with the existing runtime suite */
 import { describe, expect, it, vi } from 'vitest';
-import { PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
+import { MAX_SELECTOR_LENGTH, PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
 import { createSafeToolCall } from './agent-conversation';
 import type { AgentMemory } from './agent-memories';
 
@@ -51,6 +51,7 @@ describe('safe tool runtime', () => {
             {
               id: 'node-1',
               role: 'button',
+              selector: 'button.original',
               tag: 'button',
               text: 'Original button',
             },
@@ -83,6 +84,7 @@ describe('safe tool runtime', () => {
           {
             id: 'node-1',
             role: 'button',
+            selector: 'button.original',
             tag: 'button',
             text: 'Original button',
           },
@@ -110,6 +112,7 @@ describe('safe tool runtime', () => {
       value: {
         id: 'node-1',
         role: 'button',
+        selector: 'button.original',
         tag: 'button',
         text: 'Original button',
       },
@@ -181,12 +184,14 @@ describe('safe tool runtime', () => {
               id: 'node-1',
               label: 'Keyword action',
               role: 'button',
+              selector: 'button#keyword-action',
               tag: 'button',
             },
             {
               href: 'https://example.com/docs/keyword',
               id: 'node-2',
               role: 'link',
+              selector: 'a.docs',
               tag: 'a',
               text: 'Documentation',
             },
@@ -219,6 +224,7 @@ describe('safe tool runtime', () => {
             label: 'Keyword action',
             matchedField: 'label',
             role: 'button',
+            selector: 'button#keyword-action',
             tag: 'button',
           },
           {
@@ -232,6 +238,7 @@ describe('safe tool runtime', () => {
             id: 'node-2',
             matchedField: 'href',
             role: 'link',
+            selector: 'a.docs',
             tag: 'a',
             text: 'Documentation',
           },
@@ -239,6 +246,131 @@ describe('safe tool runtime', () => {
         snapshotId: 'snapshot-3',
         totalMatches: 3,
         truncated: false,
+      },
+    });
+  });
+
+  it('rejects a page snapshot whose nodes carry no selector', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        ok: true,
+        value: {
+          nodes: [{ id: 'node-1', role: 'button', tag: 'button' }],
+          snapshotId: 'snapshot-invalid',
+          text: 'No selectors',
+          title: 'Invalid',
+          url: 'https://example.com/',
+        },
+      },
+      type: PAGE_SNAPSHOT_MESSAGE,
+    });
+
+    await expect(
+      executeSafeToolCall(
+        createSafeToolCall({
+          name: 'get_page_snapshot',
+          tabId: 7,
+        })
+      )
+    ).resolves.toStrictEqual({
+      error: 'Page snapshot was invalid.',
+      ok: false,
+    });
+  });
+
+  it('rejects a page snapshot node whose selector exceeds the maximum size', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        ok: true,
+        value: {
+          nodes: [
+            {
+              id: 'node-1',
+              role: 'button',
+              selector: `b${'x'.repeat(MAX_SELECTOR_LENGTH)}`,
+              tag: 'button',
+            },
+          ],
+          snapshotId: 'snapshot-invalid',
+          text: 'Too long',
+          title: 'Invalid',
+          url: 'https://example.com/',
+        },
+      },
+      type: PAGE_SNAPSHOT_MESSAGE,
+    });
+
+    await expect(
+      executeSafeToolCall(
+        createSafeToolCall({
+          name: 'get_page_snapshot',
+          tabId: 7,
+        })
+      )
+    ).resolves.toStrictEqual({
+      error: 'Page snapshot was invalid.',
+      ok: false,
+    });
+  });
+
+  it('accepts a page snapshot node whose selector is exactly at the maximum size', async () => {
+    const selectorAtBound = `b${'x'.repeat(MAX_SELECTOR_LENGTH - 1)}`;
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        ok: true,
+        value: {
+          nodes: [
+            {
+              id: 'node-1',
+              role: 'button',
+              selector: selectorAtBound,
+              tag: 'button',
+            },
+          ],
+          snapshotId: 'snapshot-at-bound',
+          text: 'At bound',
+          title: 'Boundary',
+          url: 'https://example.com/',
+        },
+      },
+      type: PAGE_SNAPSHOT_MESSAGE,
+    });
+
+    await expect(
+      executeSafeToolCall(
+        createSafeToolCall({
+          name: 'get_page_snapshot',
+          tabId: 7,
+        })
+      )
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: {
+        limits: {
+          maxNodeCount: 80,
+          maxNodeTextLength: 500,
+          maxTextLength: 8000,
+        },
+        nodes: [
+          {
+            id: 'node-1',
+            role: 'button',
+            selector: selectorAtBound,
+            tag: 'button',
+          },
+        ],
+        nodesTruncated: false,
+        snapshotId: 'snapshot-at-bound',
+        text: 'At bound',
+        textTruncated: false,
+        title: 'Boundary',
+        url: 'https://example.com/',
       },
     });
   });

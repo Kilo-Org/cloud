@@ -621,7 +621,12 @@ const benchEventSchema = z.discriminatedUnion('type', [
 ]);
 
 const snapshotTurn = async (sidePanel: Page): Promise<TurnSnapshot> => {
-  const store = await readConversationStore(sidePanel);
+  // A wedged panel must fail the attempt, not hang the poll loop forever.
+  const store = await withTimeout(
+    readConversationStore(sidePanel),
+    20_000,
+    'reading the conversation store timed out'
+  );
   if (!isRecord(store)) {
     throw new StorageParseError('conversation storage is not an object');
   }
@@ -1150,10 +1155,17 @@ const selectModel = async (sidePanel: Page, budget: SetupBudget): Promise<void> 
 };
 
 const sendMessage = async (sidePanel: Page, text: string): Promise<number> => {
-  const composer = sidePanel.getByLabel('Message agent');
-  await expect(composer).toBeEnabled({ timeout: 15_000 });
-  await composer.fill(text);
-  await composer.press('Enter');
+  // A wedged panel must fail the attempt, not hang the batch past cleanup.
+  await withTimeout(
+    (async (): Promise<void> => {
+      const composer = sidePanel.getByLabel('Message agent');
+      await expect(composer).toBeEnabled({ timeout: 15_000 });
+      await composer.fill(text);
+      await composer.press('Enter');
+    })(),
+    30_000,
+    'sending the message to the panel timed out'
+  );
   return Date.now();
 };
 
@@ -2135,7 +2147,10 @@ const runAttempt = async (input: {
 
     const createEvents = validateEvents(collector.events);
     const createCorrelation = correlateToolExchanges(createEvents);
-    const autoRunObserved = selectLastValidRealRun(createCorrelation.exchanges) !== undefined;
+    const autoRunObserved =
+      selectLastValidRealRun(createCorrelation.exchanges, {
+        requireInput: Object.keys(scenario.followUpValues).length > 0,
+      }) !== undefined;
 
     if (!createPhase.timedOut && !collector.hasSaveSuccess()) {
       return {

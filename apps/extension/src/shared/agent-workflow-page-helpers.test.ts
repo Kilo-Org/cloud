@@ -337,3 +337,37 @@ describe('navigation and sleep guards', () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe('script shape classification by compilation', () => {
+  it('runs a body script that begins with a helper function declaration', async () => {
+    const result = await runPageCode(
+      'function pick(v) { return v + "!"; } return { done: true, result: pick(input.topic) };',
+      { input: { topic: 'go' } }
+    );
+
+    expect(result.ok).toBe(true);
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- test-only shape
+    expect((result.value as { result: string }).result).toBe('go!');
+  });
+
+  it('runs a body script that begins with an async helper function declaration', async () => {
+    const result = await runPageCode(
+      'async function pick(v) { return v; } return { done: true, result: await pick(input.topic) };',
+      { input: { topic: 'zig' } }
+    );
+
+    expect(result.ok).toBe(true);
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- test-only shape
+    expect((result.value as { result: string }).result).toBe('zig');
+  });
+
+  it('runs a plain (non-async) arrow function expression script', async () => {
+    const result = await runPageCode('({ input }) => ({ done: true, result: input.topic })', {
+      input: { topic: 'c' },
+    });
+
+    expect(result.ok).toBe(true);
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- test-only shape
+    expect((result.value as { result: string }).result).toBe('c');
+  });
+});

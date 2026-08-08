@@ -71,9 +71,8 @@ describe('buildWorkflowPageCode function', () => {
     const code = buildWorkflowPageCode(script, { input: { key: 1 } }, false);
 
     expect(code).toContain('const dryRun = false');
-    expect(code).toContain(
-      'const workflow = async ({ page, state, input }) => { return { done: true, result: 1 }; }'
-    );
+    expect(code).toContain(`const scriptText = ${JSON.stringify(script)};`);
+    expect(code).toContain("new AsyncFunctionCtor('{ page, state, input }', scriptText)");
     expect(code).toContain('"input":{"key":1}');
   });
 

@@ -238,19 +238,18 @@ const page = {
  * body would define a function and return undefined, so expression-shaped
  * scripts are used directly instead.
  */
-const isFunctionExpressionScript = (script: string): boolean =>
-  /^\s*(?:async\s*)?\([^)]*\)\s*=>/u.test(script) || /^\s*async\s+function\b/u.test(script);
-
 /**
  * Build the injected page code for a single workflow page eval.
- * The dynamic values (`script`, `state`, `dryRun`, `input`) are embedded with
- * plain string CONCATENATION and `JSON.stringify`, never a template literal —
- * a workflow script containing a backtick or `${` would otherwise break or
- * corrupt the composed code. `input` is re-injected on every page so scripts
- * never lose run inputs across navigations; `state` carries only what the
- * script returns.
+ * The script is embedded with `JSON.stringify` and compiled at run time:
+ * first as a function EXPRESSION (models pass `async ({ page }) => { … }`
+ * despite the body contract), and when that does not compile to a function,
+ * as the documented async function body. Compiling instead of pattern
+ * matching classifies every shape correctly — a body that starts with a
+ * helper function declaration is not an expression, and vice versa.
+ * `input` is re-injected on every page so scripts never lose run inputs
+ * across navigations; `state` carries only what the script returns.
  */
-/* eslint-disable prefer-template, max-params -- Concatenation avoids template-literal injection from untrusted workflow scripts; the page code needs all four values. */
+/* eslint-disable prefer-template, max-params -- Concatenation with JSON.stringify avoids template-literal injection from untrusted workflow scripts; the page code needs all four values. */
 export const buildWorkflowPageCode = (
   script: string,
   state: unknown,
@@ -261,10 +260,20 @@ export const buildWorkflowPageCode = (
   JSON.stringify(dryRun) +
   ';\n' +
   PAGE_HELPERS_CODE +
-  (isFunctionExpressionScript(script)
-    ? 'const workflow = (' + script + ');\n'
-    : 'const workflow = async ({ page, state, input }) => { ' + script + ' };\n') +
-  'if (typeof workflow !== "function") { throw new Error("Workflow script must be a function body or a function expression."); }\n' +
+  'const scriptText = ' +
+  JSON.stringify(script) +
+  ';\n' +
+  'const AsyncFunctionCtor = Object.getPrototypeOf(async () => {}).constructor;\n' +
+  'let workflow;\n' +
+  'try {\n' +
+  "  const candidate = new Function('return (' + scriptText + '\\n);')();\n" +
+  "  if (typeof candidate === 'function') { workflow = candidate; }\n" +
+  '} catch {\n' +
+  '  // Not an expression: fall through to the body form.\n' +
+  '}\n' +
+  'if (workflow === undefined) {\n' +
+  "  workflow = new AsyncFunctionCtor('{ page, state, input }', scriptText);\n" +
+  '}\n' +
   'try {\n' +
   '  const value = await workflow({ page, state: ' +
   JSON.stringify(state) +

@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 type SyncResult = {
   id: number;
   generated_at: string;
+  completed_at?: string;
   total_providers: number;
   total_models: number;
   direct_byok_model_counts: Record<string, number>;
@@ -54,13 +55,31 @@ export function SyncProvidersContent() {
       </p>
 
       {lastSync && (
-        <p className="text-muted-foreground text-sm">
-          Last successful sync{' '}
-          <span title={new Date(lastSync.generated_at).toLocaleString()}>
-            {formatDistanceToNow(new Date(lastSync.generated_at), { addSuffix: true })}
-          </span>{' '}
-          — {lastSync.total_providers} providers, {lastSync.total_models} models.
-        </p>
+        <div className="text-muted-foreground flex flex-col gap-1 text-sm">
+          {lastSync.completed_at ? (
+            <p>
+              Last full sync completed{' '}
+              <span
+                className="font-medium text-foreground"
+                title={new Date(lastSync.completed_at).toLocaleString()}
+              >
+                {formatDistanceToNow(new Date(lastSync.completed_at), { addSuffix: true })}
+              </span>{' '}
+              ({new Date(lastSync.completed_at).toLocaleString()})
+            </p>
+          ) : (
+            <p className="text-amber-500">No completed full run timestamp recorded in Redis yet.</p>
+          )}
+          {lastSync.generated_at && (
+            <p>
+              Database snapshot generated{' '}
+              <span title={new Date(lastSync.generated_at).toLocaleString()}>
+                {formatDistanceToNow(new Date(lastSync.generated_at), { addSuffix: true })}
+              </span>{' '}
+              — {lastSync.total_providers} providers, {lastSync.total_models} models.
+            </p>
+          )}
+        </div>
       )}
 
       <Card>
@@ -89,7 +108,15 @@ export function SyncProvidersContent() {
               <p className="font-medium">Last sync result</p>
               <ul className="text-muted-foreground mt-2 space-y-1">
                 <li>Row ID: {lastResult.id}</li>
-                <li>Generated at: {new Date(lastResult.generated_at).toLocaleString()}</li>
+                <li>
+                  Database snapshot generated at:{' '}
+                  {new Date(lastResult.generated_at).toLocaleString()}
+                </li>
+                {lastResult.completed_at && (
+                  <li>
+                    Full sync completed at: {new Date(lastResult.completed_at).toLocaleString()}
+                  </li>
+                )}
                 <li>Providers: {lastResult.total_providers}</li>
                 <li>Models: {lastResult.total_models}</li>
                 {Object.entries(lastResult.direct_byok_model_counts).map(([provider, count]) => (

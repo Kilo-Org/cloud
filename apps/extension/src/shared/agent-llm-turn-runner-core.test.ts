@@ -659,6 +659,64 @@ describe('continue nudge', () => {
     expect(calls).toBe(1);
   });
 
+  it("nudges on a first-person progressive announcement (I'm creating…)", async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"I\'m saving it as a reusable flow now."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(3);
+  });
+
+  it('does not nudge a completed-work statement (I am done)', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"I am done. Nothing else is needed."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+
   it('does not nudge when the model asks the user a question', async () => {
     let calls = 0;
     const fetch: FetchLike = () => {

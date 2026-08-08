@@ -165,8 +165,14 @@ const isFirefoxWebDriver = (driver: WebDriver): driver is FirefoxWebDriver => {
   return isRecord(candidate) && typeof candidate['installAddon'] === 'function';
 };
 
-const chatCompletionStreamResponse = (events: unknown[]): string =>
-  `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+// The real gateway always reports a finish_reason; append the terminal chunk
+// unless the fixture pins its own, or the turn runner retries the "truncated" stream.
+const chatCompletionStreamResponse = (events: unknown[]): string => {
+  const terminal = events.some(event => JSON.stringify(event).includes('"finish_reason"'))
+    ? []
+    : [{ choices: [{ delta: {}, finish_reason: 'stop' }] }];
+  return `${[...events, ...terminal].map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+};
 
 const defaultEvalCode = 'return document.documentElement.outerHTML.length;';
 const dangerousToolNames = [

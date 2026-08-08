@@ -259,7 +259,9 @@ export function NewSessionPrompt({
           editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
-          autoFocus
+          // A shared payload prefills this input, so raising the keyboard on
+          // arrival hides the attachment strip and the Start button.
+          autoFocus={shareId === undefined || shareId === ''}
         />
         <View className="flex-row items-center justify-between pb-2">
           <View className="flex-row items-center gap-1">

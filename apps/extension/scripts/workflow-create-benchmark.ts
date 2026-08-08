@@ -2,8 +2,8 @@
 /**
  * Workflow-create benchmark driver.
  *
- * Runs N identical safe-mode workflow-creation attempts against one pinned
- * golden-star scenario (see `agent-workflow-bench-scenarios.ts`) with
+ * Runs N identical safe-mode workflow-creation attempts against one of the
+ * pinned golden-star scenarios (see `agent-workflow-bench-scenarios.ts`) with
  * `kilo-auto/efficient` on the production gateway, records redacted
  * per-attempt JSON plus a summary, and returns exit 0/1/2. See
  * `workflow-create-benchmark.md` in this directory.
@@ -44,7 +44,9 @@ import type {
   BenchAttemptStats,
   BenchCorrectnessResult,
   BenchEvent,
+  BenchToolCallEvent,
   BenchToolCorrelation,
+  BenchToolResultEvent,
   BenchWorkflow,
 } from '../src/shared/agent-workflow-bench-scoring';
 
@@ -121,30 +123,6 @@ interface CapturedGatewayRequest {
   readonly orgIdHash: string;
   phase: 'create' | 'verify' | null;
 }
-
-type InternalMessage = {
-  id: string;
-  role?: string;
-  text?: string;
-  type: 'message';
-};
-type InternalThinking = { id: string; text?: string; type: 'thinking' };
-type InternalToolCall = {
-  arguments?: Record<string, unknown>;
-  code?: string;
-  id: string;
-  name: string;
-  type: 'tool-call';
-};
-type InternalToolResult = {
-  error?: string;
-  id: string;
-  ok: boolean;
-  toolCallId: string;
-  type: 'tool-result';
-  value?: unknown;
-};
-type InternalEvent = InternalMessage | InternalThinking | InternalToolCall | InternalToolResult;
 
 interface ToolErrorRecord {
   readonly name: string;
@@ -1414,7 +1392,10 @@ const pollAgentPhase = async (options: {
       lastChangedAt = Date.now();
     }
 
-    if (mode === 'create' && collector.hasSaveSuccess() && turnEnded) {
+    // A finished create turn is terminal either way: with a save the verify
+    // phase follows; without one no later poll can produce a save, so
+    // waiting for the deadline only burns the batch's time.
+    if (mode === 'create' && turnEnded) {
       break;
     }
     if (mode === 'verify' && turnEnded) {
@@ -1441,50 +1422,7 @@ const pollAgentPhase = async (options: {
 
 // ── Event conversion and validation helpers ─────────────────────────────────
 
-const toInternalEvent = (event: z.infer<typeof benchEventSchema>): InternalEvent => {
-  switch (event.type) {
-    case 'message':
-      return {
-        id: event.id,
-        type: 'message',
-        ...(event.role === undefined ? {} : { role: event.role }),
-        ...(event.text === undefined ? {} : { text: event.text }),
-      };
-    case 'thinking':
-      return {
-        id: event.id,
-        type: 'thinking',
-        ...(event.text === undefined ? {} : { text: event.text }),
-      };
-    case 'tool-call':
-      return {
-        id: event.id,
-        name: event.name,
-        type: 'tool-call',
-        ...(event.arguments === undefined ? {} : { arguments: event.arguments }),
-        ...(event.code === undefined ? {} : { code: event.code }),
-      };
-    case 'tool-result':
-      return {
-        id: event.id,
-        ok: event.ok,
-        toolCallId: event.toolCallId,
-        type: 'tool-result',
-        ...(event.error === undefined ? {} : { error: event.error }),
-        ...(event.value === undefined ? {} : { value: event.value }),
-      };
-  }
-};
-
-const validateEvents = (value: readonly RawRecord[]): InternalEvent[] => {
-  const parsed = benchEventSchema.array().safeParse(value);
-  if (!parsed.success) {
-    throw new StorageParseError('conversation storage failed validation');
-  }
-  return parsed.data.map(toInternalEvent);
-};
-
-const toBenchEvent = (event: InternalEvent): BenchEvent => {
+const toBenchEventFromParsed = (event: z.infer<typeof benchEventSchema>): BenchEvent => {
   switch (event.type) {
     case 'message':
       return {
@@ -1505,6 +1443,7 @@ const toBenchEvent = (event: InternalEvent): BenchEvent => {
         id: event.id,
         name: event.name,
         type: 'tool-call',
+        ...(event.code === undefined ? {} : { code: event.code }),
       };
     case 'tool-result':
       return {
@@ -1516,6 +1455,14 @@ const toBenchEvent = (event: InternalEvent): BenchEvent => {
         ...(event.value === undefined ? {} : { value: event.value }),
       };
   }
+};
+
+const validateEvents = (value: readonly RawRecord[]): BenchEvent[] => {
+  const parsed = benchEventSchema.array().safeParse(value);
+  if (!parsed.success) {
+    throw new StorageParseError('conversation storage failed validation');
+  }
+  return parsed.data.map(toBenchEventFromParsed);
 };
 
 const validateWorkflows = (value: unknown): BenchWorkflow[] => {
@@ -1550,7 +1497,7 @@ const joinNameById = (correlation: BenchToolCorrelation): ReadonlyMap<string, st
 };
 
 const computeMetrics = (
-  events: readonly InternalEvent[],
+  events: readonly BenchEvent[],
   offsetByEventId: ReadonlyMap<string, number>,
   correlation: BenchToolCorrelation
 ): {
@@ -1562,7 +1509,9 @@ const computeMetrics = (
   readCallsBeforeFirstSave: number;
   saveWorkflowCallCount: number;
 } => {
-  const toolCalls = events.filter((event): event is InternalToolCall => event.type === 'tool-call');
+  const toolCalls = events.filter(
+    (event): event is BenchToolCallEvent => event.type === 'tool-call'
+  );
   const toolCallsByName: Record<string, number> = {};
   for (const call of toolCalls) {
     toolCallsByName[call.name] = (toolCallsByName[call.name] ?? 0) + 1;
@@ -1710,7 +1659,7 @@ const workflowMemoryResultMetadataKeys = new Set([
 ]);
 
 const redactToolResult = (
-  event: InternalToolResult,
+  event: BenchToolResultEvent,
   joinedName: string,
   offsetSeconds: number | null
 ): RedactedEvent => {
@@ -1767,7 +1716,7 @@ const redactToolResult = (
 };
 
 const redactTranscript = (
-  events: readonly InternalEvent[],
+  events: readonly BenchEvent[],
   offsetByEventId: ReadonlyMap<string, number>,
   correlation: BenchToolCorrelation
 ): RedactedEvent[] => {
@@ -1982,10 +1931,9 @@ const buildFailedAttemptRecord = (input: {
   let autoRunObserved = false;
   let failureReason = input.failureReason;
   try {
-    const internal = validateEvents(input.collector.events);
-    const bench = internal.map(toBenchEvent);
+    const bench = validateEvents(input.collector.events);
     const correlation = correlateToolExchanges(bench);
-    const metrics = computeMetrics(internal, input.collector.offsetByEventId, correlation);
+    const metrics = computeMetrics(bench, input.collector.offsetByEventId, correlation);
     toolCallCount = metrics.toolCallCount;
     toolErrorCount = metrics.toolErrorCount;
     toolErrors = metrics.toolErrors;
@@ -1994,7 +1942,7 @@ const buildFailedAttemptRecord = (input: {
     readCallsBeforeFirstSave = metrics.readCallsBeforeFirstSave;
     saveWorkflowCallCount = metrics.saveWorkflowCallCount;
     autoRunObserved = selectLastValidRealRun(correlation.exchanges) !== undefined;
-    transcript = redactTranscript(internal, input.collector.offsetByEventId, correlation);
+    transcript = redactTranscript(bench, input.collector.offsetByEventId, correlation);
   } catch (error) {
     // A storage validation failure must surface as `storage-parse`, not as a
     // silent default artifact. The sanitized defaults above stay: no raw
@@ -2173,9 +2121,32 @@ const runAttempt = async (input: {
     const turnTotalSeconds =
       createTurnEndedAtMs === null ? null : Math.round((createTurnEndedAtMs - submitAtMs) / 1000);
 
-    const createInternalEvents = validateEvents(collector.events);
-    const createCorrelation = correlateToolExchanges(createInternalEvents.map(toBenchEvent));
+    const createEvents = validateEvents(collector.events);
+    const createCorrelation = correlateToolExchanges(createEvents);
     const autoRunObserved = selectLastValidRealRun(createCorrelation.exchanges) !== undefined;
+
+    if (!createPhase.timedOut && !collector.hasSaveSuccess()) {
+      return {
+        kind: 'record',
+        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
+        record: buildFailedAttemptRecord({
+          attempt,
+          scenarioId: scenario.id,
+          headless,
+          startedAtIso,
+          gitHead,
+          followUpDate,
+          creditAccount,
+          requests,
+          savedAtOffsetMs,
+          createSentOffsetMs,
+          attemptStartMs,
+          failureReason: 'no-save',
+          collector,
+          followUpSent,
+        }),
+      };
+    }
 
     let verifyTimedOut = false;
     let finalSnapshot = createPhase.finalSnapshot;
@@ -2222,8 +2193,7 @@ const runAttempt = async (input: {
       };
     }
 
-    const finalInternalEvents = validateEvents(finalSnapshot.events);
-    const finalBenchEvents = finalInternalEvents.map(toBenchEvent);
+    const finalBenchEvents = validateEvents(finalSnapshot.events);
     const rawWorkflows = await readExtensionLocalStorage(sidePanel, 'kiloAgentWorkflows');
     const workflows = validateWorkflows(rawWorkflows);
 
@@ -2294,7 +2264,7 @@ const runAttempt = async (input: {
     }
 
     const correlation = correlateToolExchanges(finalBenchEvents);
-    const metrics = computeMetrics(finalInternalEvents, collector.offsetByEventId, correlation);
+    const metrics = computeMetrics(finalBenchEvents, collector.offsetByEventId, correlation);
     const correctness = scoreWorkflowCorrectness({
       workflows,
       events: finalBenchEvents,
@@ -2333,12 +2303,12 @@ const runAttempt = async (input: {
       correctness,
       success: correctness.passed,
       failureReason: correctness.passed ? null : 'correctness-failed',
-      transcript: redactTranscript(finalInternalEvents, collector.offsetByEventId, correlation),
+      transcript: redactTranscript(finalBenchEvents, collector.offsetByEventId, correlation),
     };
     return {
       kind: 'record',
       record,
-      ...(writeRawArtifacts ? { raw: { events: finalInternalEvents, workflows } } : {}),
+      ...(writeRawArtifacts ? { raw: { events: finalBenchEvents, workflows } } : {}),
     };
   } catch (error) {
     if (error instanceof BatchBlockerError) {

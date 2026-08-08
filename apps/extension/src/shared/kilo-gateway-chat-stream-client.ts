@@ -129,12 +129,15 @@ const usageSchema = z.object({
 const streamDataSchema = z.object({
   choices: z.array(
     z.object({
-      delta: z.object({
-        content: z.string().nullable().optional(),
-        reasoning: z.string().nullable().optional(),
-        reasoning_details: z.array(z.unknown()).nullable().optional(),
-        tool_calls: z.array(z.unknown()).optional(),
-      }),
+      // Providers may send a finish-only chunk with no delta at all.
+      delta: z
+        .object({
+          content: z.string().nullable().optional(),
+          reasoning: z.string().nullable().optional(),
+          reasoning_details: z.array(z.unknown()).nullable().optional(),
+          tool_calls: z.array(z.unknown()).optional(),
+        })
+        .optional(),
       finish_reason: z.string().nullable().optional(),
     })
   ),
@@ -315,6 +318,9 @@ const applyStreamingData = (
   }
 
   const { delta } = choice;
+  if (delta === undefined) {
+    return;
+  }
   const { content, reasoning, reasoning_details: reasoningDetails, tool_calls: toolCalls } = delta;
 
   if (typeof content === 'string' && content.length > 0) {

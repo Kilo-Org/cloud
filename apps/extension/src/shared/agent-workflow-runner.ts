@@ -122,7 +122,7 @@ const fillElement = (el, value) => {
   } else if (el.isContentEditable) {
     el.textContent = value;
   } else {
-    el.value = value;
+    throw new Error('The matched element is not a fillable input. Target the inner input element, or use page.clickText to open it first.');
   }
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -238,7 +238,7 @@ const page = {
  * body would define a function and return undefined, so expression-shaped
  * scripts are used directly instead.
  */
-export const isFunctionExpressionScript = (script: string): boolean =>
+const isFunctionExpressionScript = (script: string): boolean =>
   /^\s*(?:async\s*)?\([^)]*\)\s*=>/u.test(script) || /^\s*async\s+function\b/u.test(script);
 
 /**

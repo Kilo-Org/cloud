@@ -29,12 +29,16 @@ export interface BenchWorkflow {
 
 export interface BenchToolCallEvent {
   readonly arguments: Record<string, unknown>;
+  /** Eval tool calls carry code instead of arguments; redaction reports only its length. */
+  readonly code?: string;
   readonly id: string;
   readonly name: string;
   readonly type: 'tool-call';
 }
 
 export interface BenchToolResultEvent {
+  /** The tool failure text; used by the driver's metrics and redaction. */
+  readonly error?: string;
   readonly id: string;
   readonly ok: boolean;
   readonly toolCallId: string;

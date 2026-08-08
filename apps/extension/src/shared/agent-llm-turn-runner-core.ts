@@ -67,6 +67,9 @@ const withReasoningDetails = <ToolCall extends ToolCallEvent>(
 const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
+const isHighEffort = (thinkingEffort: string | undefined): boolean =>
+  thinkingEffort === 'high' || thinkingEffort === 'xhigh' || thinkingEffort === 'max';
+
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
 // One transparent retry tier for failures the user cannot act on: a stalled stream, a transient network failure, or a retriable gateway status.
@@ -111,7 +114,7 @@ const CONTINUE_NUDGE_TEXT =
 const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
 // First-person intent or a progressive verb: the model said what it is about to do rather than what it did.
 const ANNOUNCEMENT_RE =
-  /\b(?:i'?ll|i will|i am going to|let me|now i|next i)\b|\b\w+ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
+  /\b(?:i'?ll|i will|i am going to|let me|now i|next i)\b|^\s*\w+ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
 
 const deservesContinueNudge = (lastAssistantText: string): boolean =>
   lastAssistantText.length > 0 &&
@@ -166,6 +169,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   ) =>
     fetchKiloGatewayChatCompletionStream({
       apiBaseUrl,
+      // A high-effort model legitimately streams for minutes; anything else past two minutes is a pathological trickle worth cutting and retrying.
+      completionTimeoutMs: isHighEffort(thinkingEffort) ? 300_000 : 120_000,
       fetch,
       messages: buildGatewayMessagesFromEvents(nextEvents, { supportsImages }),
       model,
@@ -190,12 +195,19 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     let streamedThinkingText = '';
     let streamedThinkingEventId: string | undefined = undefined;
     let didStartAssistantStreaming = false;
+    // A retry replaces the streamed text only when its own first delta arrives; a retry that fails outright leaves the previous text in place instead of a permanently empty bubble.
+    let resetStreamedTextOnNextDelta = false;
+    let resetThinkingTextOnNextDelta = false;
 
     try {
       const streamOnce = (): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> =>
         getGatewayChatCompletion(
           nextEvents,
           delta => {
+            if (resetStreamedTextOnNextDelta) {
+              resetStreamedTextOnNextDelta = false;
+              streamedText = '';
+            }
             streamedText += delta;
 
             if (streamedAssistantEventId === undefined) {
@@ -212,6 +224,10 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
             updateAssistantMessage(streamedAssistantEventId, streamedText);
           },
           delta => {
+            if (resetThinkingTextOnNextDelta) {
+              resetThinkingTextOnNextDelta = false;
+              streamedThinkingText = '';
+            }
             streamedThinkingText += delta;
 
             if (streamedThinkingEventId === undefined) {
@@ -261,14 +277,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
             }
             throw error;
           }
-          streamedText = '';
-          streamedThinkingText = '';
-          if (streamedAssistantEventId !== undefined) {
-            updateAssistantMessage(streamedAssistantEventId, '');
-          }
-          if (streamedThinkingEventId !== undefined) {
-            updateThinkingBlock(streamedThinkingEventId, '');
-          }
+          resetStreamedTextOnNextDelta = true;
+          resetThinkingTextOnNextDelta = true;
           await abortableDelay(STREAM_RETRY_DELAYS_MS[streamAttempt - 1] ?? 4000, signal);
           if (isSignalAborted(signal)) {
             const abortError = new Error('The user aborted a request.');

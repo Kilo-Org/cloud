@@ -125,10 +125,13 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
         fn();
       };
 
-      // The landed URL satisfies the navigation when it is the requested URL or any URL other than the page we navigated away from (a redirect).
+      // The landed URL satisfies the navigation when it is the requested URL or, once our tabs.update has been applied, any URL other than the page we navigated away from (a server-side redirect). Before the update lands, a completing earlier navigation must not resolve this one.
+      let updateApplied = false;
       const isAcceptableLandingUrl = (landedUrl: string): boolean =>
         urlMatches(landedUrl, url) ||
-        (preNavigationUrl !== undefined && !urlMatches(landedUrl, preNavigationUrl));
+        (updateApplied &&
+          preNavigationUrl !== undefined &&
+          !urlMatches(landedUrl, preNavigationUrl));
 
       const checkIsCompleteAndMatching = (
         tabInfo:
@@ -181,6 +184,7 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
       // Without waiting for a later onUpdated event.
       void browser.tabs.update(tabId, { url }).then(
         async () => {
+          updateApplied = true;
           try {
             const freshTab = await browser.tabs.get(tabId);
             if (checkIsCompleteAndMatching(freshTab)) {

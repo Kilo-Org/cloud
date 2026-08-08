@@ -174,8 +174,7 @@ const NPM_SCENARIO: BenchScenario = {
   usesDate: false,
 };
 
-// MDN was probed and rejected: its search results never render in an
-// automated browser, so no workflow can succeed there.
+// MDN was probed and rejected: its search results never render in an automated browser, so no workflow can succeed there.
 const TMDB_SCENARIO: BenchScenario = {
   createMessage: 'Create a workflow to look up a movie on TMDB',
   expectedParams: [{ key: 'movie', re: /movie|film|title|query|search/iu }],

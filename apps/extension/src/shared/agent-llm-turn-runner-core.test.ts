@@ -446,9 +446,9 @@ describe('stream retry', () => {
     await runLlmTurn(options);
 
     expect(calls).toBe(2);
-    // The retry cleared the half-streamed text, then re-streamed into the same event.
+    // The retry replaces the half-streamed text in place when its own first delta arrives; the text is never cleared to an empty bubble.
     const firstAppendedMessage = appended.find(event => event.type === 'message');
-    expect(updates.some(update => update.text === '')).toBe(true);
+    expect(updates.some(update => update.text === '')).toBe(false);
     expect(updates.at(-1)?.text).toBe('Full answer.');
     expect(updates.every(update => update.id === firstAppendedMessage?.id)).toBe(true);
   });

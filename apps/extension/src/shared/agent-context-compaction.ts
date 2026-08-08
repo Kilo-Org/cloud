@@ -172,6 +172,8 @@ export const compactConversationEvents = async ({
 
   const completion = await fetchKiloGatewayChatCompletionStream({
     apiBaseUrl,
+    // A long conversation legitimately takes long to summarize.
+    completionTimeoutMs: 300_000,
     fetch,
     messages: buildSummarizationMessages(toSummarize),
     model,

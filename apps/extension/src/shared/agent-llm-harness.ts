@@ -3,6 +3,7 @@ import type { KiloGatewayChatMessage, KiloGatewayToolDefinition } from './kilo-a
 import type { AgentConversationEvent, AgentMode } from './agent-conversation';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type ExtensionToolCall = Exclude<ToolCallEvent, { readonly source: 'agent' }>;
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 export const EXTENSION_AGENT_SYSTEM_PROMPT = [
@@ -369,7 +370,7 @@ export const createWorkflowToolDefinitions = ({
 };
 
 const getProviderToolCallId = (toolCall: ToolCallEvent): string =>
-  toolCall.providerToolCallId ?? toolCall.id;
+  'source' in toolCall ? toolCall.id : (toolCall.providerToolCallId ?? toolCall.id);
 
 const screenshotValueSchema = {
   safeParse(
@@ -493,6 +494,10 @@ const getGatewayMessageText = (event: MessageEvent): string =>
     : event.text;
 
 const getToolCallArguments = (toolCall: ToolCallEvent): string => {
+  if ('source' in toolCall) {
+    return JSON.stringify(toolCall.arguments);
+  }
+
   if (toolCall.name === 'eval') {
     return JSON.stringify({ code: toolCall.code });
   }
@@ -531,28 +536,37 @@ export const buildGatewayMessagesFromEvents = (
           break;
         }
         case 'tool-call': {
-          const toolCalls = getConsecutiveToolCalls(events, index);
+          const consecutiveToolCalls = getConsecutiveToolCalls(events, index);
+          // Agent-source tool calls carry arbitrary agent names, not gateway tool names.
+          // Keep them out of the gateway replay without changing extension tool behaviour.
+          const toolCalls = consecutiveToolCalls.filter(
+            (toolCall): toolCall is ExtensionToolCall => !('source' in toolCall)
+          );
+
           for (const toolCall of toolCalls) {
             toolCallsById.set(toolCall.id, toolCall);
           }
 
-          index += toolCalls.length - 1;
+          index += consecutiveToolCalls.length - 1;
           const reasoningDetails = toolCalls.find(
             toolCall => toolCall.reasoningDetails !== undefined
           )?.reasoningDetails;
-          messages.push({
-            content: null,
-            ...(reasoningDetails === undefined ? {} : { reasoning_details: reasoningDetails }),
-            role: 'assistant',
-            tool_calls: toolCalls.map(toolCall => ({
-              function: {
-                arguments: getToolCallArguments(toolCall),
-                name: toolCall.name,
-              },
-              id: getProviderToolCallId(toolCall),
-              type: 'function',
-            })),
-          });
+
+          if (toolCalls.length > 0) {
+            messages.push({
+              content: null,
+              ...(reasoningDetails === undefined ? {} : { reasoning_details: reasoningDetails }),
+              role: 'assistant',
+              tool_calls: toolCalls.map(toolCall => ({
+                function: {
+                  arguments: getToolCallArguments(toolCall),
+                  name: toolCall.name,
+                },
+                id: getProviderToolCallId(toolCall),
+                type: 'function',
+              })),
+            });
+          }
           break;
         }
         case 'tool-result': {

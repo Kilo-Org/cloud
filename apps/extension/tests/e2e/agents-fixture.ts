@@ -454,11 +454,61 @@ export const mockAgentsApi = async (
       }
 
       if (proc === 'cliSessionsV2.getSessionMessagesPage') {
+        const inputRecord = isRecordObject(input) ? input : {};
+        const requestedId =
+          hasStringOptional(inputRecord, 'session_id') ?? 'ses_cloudsession00000000001';
+        const cloudSession = activeSessions.find(
+          (session): session is CloudAgentSessionSeed =>
+            isCloudAgentSessionSeed(session) && session.kiloSessionId === requestedId
+        );
+        if (cloudSession !== undefined) {
+          /**
+           * A running cloud session's persisted page must carry its first
+           * user message. The session manager retries an empty first page
+           * while the session is still listed as running, and an
+           * always-empty fixture page would keep the default cloud session
+           * on its loading skeleton. The message and part ids match the
+           * default stream's own user message, so the SDK upserts merge the
+           * page and the live stream without duplicating transcript rows.
+           */
+          return {
+            result: {
+              data: {
+                history: {
+                  messages: [
+                    {
+                      info: {
+                        agent: 'build',
+                        id: 'msg-u-1',
+                        model: { modelID: 'claude-sonnet-4', providerID: 'anthropic' },
+                        role: 'user',
+                        sessionID: requestedId,
+                        time: { created: Date.now() },
+                      },
+                      parts: [
+                        {
+                          id: 'p-u-1',
+                          messageID: 'msg-u-1',
+                          sessionID: requestedId,
+                          text: 'Fix the login bug',
+                          type: 'text',
+                        },
+                      ],
+                    },
+                  ],
+                  nextCursor: null,
+                  omittedItemCount: 0,
+                },
+                kiloSessionId: requestedId,
+              },
+            },
+          };
+        }
         return {
           result: {
             data: {
               history: { messages: [], nextCursor: null, omittedItemCount: 0 },
-              kiloSessionId: 'ses_cloudsession00000000001',
+              kiloSessionId: requestedId,
             },
           },
         };
@@ -675,6 +725,16 @@ export const mockAgentsApi = async (
 
 let _eventCounter = 0;
 
+/**
+ * A fenced code block of exactly 20 lines: more than COLLAPSE_LINE_THRESHOLD
+ * (15), matching the "Show more (20 lines)" label the shared code block
+ * already asserts.
+ */
+const longCodeBlock = (): string => {
+  const lines = Array.from({ length: 20 }, (_unused, index) => `line ${index + 1}`);
+  return `\`\`\`ts\n${lines.join('\n')}\n\`\`\``;
+};
+
 const buildDefaultCloudAgentStream = (): Record<string, unknown>[] => {
   _eventCounter = 0;
   const sessionId = 'ses_cloudsession00000000001';
@@ -690,6 +750,8 @@ const buildDefaultCloudAgentStream = (): Record<string, unknown>[] => {
 
   const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
     ev('kilocode', { properties, type });
+
+  const assistantText = `I found the issue.\n\n${longCodeBlock()}`;
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
@@ -730,26 +792,115 @@ const buildDefaultCloudAgentStream = (): Record<string, unknown>[] => {
       },
     }),
     kilocode('message.part.delta', {
-      delta: 'I found',
+      delta: 'I found the issue.',
       field: 'text',
       messageID: 'msg-a-1',
       partID: 'p-a-1',
       sessionID: sessionId,
     }),
     kilocode('message.part.delta', {
-      delta: ' the issue.',
+      delta: `\n\n${longCodeBlock()}`,
       field: 'text',
       messageID: 'msg-a-1',
       partID: 'p-a-1',
       sessionID: sessionId,
+    }),
+    // Synthetic snapshot progress — the adapter must never render this.
+    kilocode('message.part.updated', {
+      part: {
+        id: 'p-a-snap',
+        messageID: 'msg-a-1',
+        sessionID: sessionId,
+        synthetic: true,
+        text: '⠋ Initializing snapshot…',
+        type: 'text',
+      },
+    }),
+    kilocode('message.part.updated', {
+      part: {
+        id: 'p-a-think',
+        messageID: 'msg-a-1',
+        sessionID: sessionId,
+        text: 'Checking the auth guard first.',
+        time: { start: Date.now() },
+        type: 'reasoning',
+      },
+    }),
+    kilocode('message.part.updated', {
+      part: {
+        callID: 'call-1',
+        id: 'p-a-tool',
+        messageID: 'msg-a-1',
+        sessionID: sessionId,
+        state: {
+          input: { filePath: 'src/auth.ts' },
+          metadata: {},
+          output: 'export const guard = () => true;',
+          status: 'completed',
+          time: { end: Date.now(), start: Date.now() },
+          title: 'src/auth.ts',
+        },
+        tool: 'read',
+        type: 'tool',
+      },
+    }),
+    // A screenshot tool carrying a real PNG attachment exercises the whole
+    // Image chain: the SDK onToolAttachment sink, the bounded store, the
+    // Adapter lookup, and the shared renderer <img> branch.
+    kilocode('message.part.updated', {
+      part: {
+        callID: 'call-2',
+        id: 'p-a-shot',
+        messageID: 'msg-a-1',
+        sessionID: sessionId,
+        state: {
+          attachments: [
+            {
+              id: 'att-1',
+              messageID: 'msg-a-1',
+              mime: 'image/png',
+              sessionID: sessionId,
+              type: 'file',
+              url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            },
+          ],
+          input: { fullPage: false },
+          metadata: {},
+          output: 'captured',
+          status: 'completed',
+          time: { end: Date.now(), start: Date.now() },
+          title: 'viewport',
+        },
+        tool: 'browser_screenshot',
+        type: 'tool',
+      },
     }),
     kilocode('message.part.updated', {
       part: {
         id: 'p-a-1',
         messageID: 'msg-a-1',
         sessionID: sessionId,
-        text: 'I found the issue.',
+        text: assistantText,
         type: 'text',
+      },
+    }),
+    // Finalize the assistant message. Without time.completed the adapter keeps
+    // Treating it as streaming, force-expands the code block, and the shared
+    // Component never renders its "Show more" control.
+    kilocode('message.updated', {
+      info: {
+        agent: 'build',
+        cost: 0,
+        id: 'msg-a-1',
+        mode: 'code',
+        modelID: 'claude-sonnet-4',
+        parentID: 'msg-u-1',
+        path: { cwd: '/', root: '/' },
+        providerID: 'anthropic',
+        role: 'assistant',
+        sessionID: sessionId,
+        time: { completed: Date.now(), created: Date.now() },
+        tokens: { cache: { read: 0, write: 0 }, input: 0, output: 0, reasoning: 0 },
       },
     }),
     ev('complete', { currentBranch: 'main' }),

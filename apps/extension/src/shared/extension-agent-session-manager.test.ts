@@ -559,13 +559,42 @@ describe('createExtensionAgentSessionManager', () => {
 
   describe('fetchSnapshotPage', () => {
     it('returns empty success when history is null', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Let the bounded liveness grace probe expire without a page retry.
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await resultPromise;
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+        // An inactive session must not trigger the delayed-page retry.
+        expect(pageQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the empty first page usable when the liveness probe rejects', async () => {
       const trpc = makeTrpcMock();
-      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
-        history: null,
-        kiloSessionId: SESSION_ID,
+      const probeError = new Error('active sessions unavailable');
+      vi.spyOn(trpc.activeSessions.list, 'query').mockImplementation(async () => {
+        throw probeError;
       });
+      const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+      trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
       const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
       createExtensionAgentSessionManager(opts);
+
       const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
       expect(result).toStrictEqual({
         info: { id: SESSION_ID },
@@ -574,13 +603,138 @@ describe('createExtensionAgentSessionManager', () => {
         nextCursor: null,
         omittedItemCount: 0,
       });
+      // The rejected probe must not trigger a page retry.
+      expect(pageQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the original empty snapshot when the grace liveness probe rejects after a missing active row', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * Regression state: the gate's first active-sessions read misses the
+         * running session's row (registration or read-model refresh race), so
+         * the grace liveness probe runs — and that probe rejects. The old
+         * code propagated the probe rejection and rejected the snapshot,
+         * blocking the WebSocket replay. The rejected grace probe must
+         * resolve the original empty page instead.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [] })
+          .mockRejectedValueOnce(new Error('active sessions unavailable'));
+        trpc.activeSessions.list.query = listQuery;
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // The single grace probe sleep elapses; the probe then rejects.
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const result = await resultPromise;
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+        // The rejected grace probe must not trigger a page retry.
+        expect(pageQuery).toHaveBeenCalledTimes(1);
+        // Gate read plus the one rejected grace probe read.
+        expect(listQuery).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('forwards the event-log watermark on an empty page so a reopened running session replays persisted events', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * Round-8 regression state: the reopened CLI session's initial page
+         * read is still empty (session-ingest batches until the turn ends),
+         * but the ingest DO already carries the nonce-bearing user message —
+         * the tRPC result reports that high-water mark as `watermarkEventId`.
+         * The transport seeds its first WebSocket connect from this page
+         * watermark (`fromId=0`), so every persisted event replays and the
+         * user message reaches the renderer even though the page is empty.
+         * Dropping the watermark would connect with `replay=false` and lose
+         * the already-persisted message.
+         */
+        trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+          history: null,
+          kiloSessionId: SESSION_ID,
+          watermarkEventId: 42,
+        });
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await resultPromise;
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          watermarkEventId: 42,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('forwards the event-log watermark on a message page', async () => {
+      const trpc = makeTrpcMock();
+      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+        history: {
+          messages: [
+            {
+              info: { role: 'user', sessionID: SESSION_ID, time: {} },
+              parts: [],
+            },
+          ],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
+        kiloSessionId: SESSION_ID,
+        watermarkEventId: 7,
+      });
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [{ info: { role: 'user', sessionID: SESSION_ID, time: {} }, parts: [] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: 7,
+      });
     });
 
     it('returns success page when history has messages array', async () => {
       const trpc = makeTrpcMock();
       trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
         history: {
-          messages: [{ info: { role: 'user', time: {} }, parts: [] }],
+          messages: [
+            {
+              info: { role: 'user', sessionID: SESSION_ID, time: {} },
+              parts: [
+                {
+                  id: 'part-1',
+                  messageID: 'msg-1',
+                  sessionID: SESSION_ID,
+                  text: 'hello',
+                  type: 'text',
+                },
+              ],
+            },
+          ],
           nextCursor: 'cursor-1',
           omittedItemCount: 5,
         },
@@ -592,13 +746,75 @@ describe('createExtensionAgentSessionManager', () => {
       expect(result).toStrictEqual({
         info: { id: SESSION_ID },
         kind: 'success',
-        messages: [{ info: { role: 'user', time: {} }, parts: [] }],
+        messages: [
+          {
+            info: { role: 'user', sessionID: SESSION_ID, time: {} },
+            parts: [
+              {
+                id: 'part-1',
+                messageID: 'msg-1',
+                sessionID: SESSION_ID,
+                text: 'hello',
+                type: 'text',
+              },
+            ],
+          },
+        ],
         nextCursor: 'cursor-1',
         omittedItemCount: 5,
       });
     });
 
-    it('passes cursor to query', async () => {
+    it('normalizes a mismatched server session id to the requested id', async () => {
+      const trpc = makeTrpcMock();
+      const serverSessionId = 'ses_server_mismatched_0000000001' as KiloSessionId;
+      trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+        history: {
+          messages: [
+            {
+              info: { role: 'user', sessionID: serverSessionId, time: {} },
+              parts: [
+                {
+                  id: 'part-1',
+                  messageID: 'msg-1',
+                  sessionID: serverSessionId,
+                  text: 'hello',
+                  type: 'text',
+                },
+              ],
+            },
+          ],
+          nextCursor: 'cursor-1',
+          omittedItemCount: 2,
+        },
+        kiloSessionId: serverSessionId,
+      });
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [
+          {
+            info: { role: 'user', sessionID: SESSION_ID, time: {} },
+            parts: [
+              {
+                id: 'part-1',
+                messageID: 'msg-1',
+                sessionID: SESSION_ID,
+                text: 'hello',
+                type: 'text',
+              },
+            ],
+          },
+        ],
+        nextCursor: 'cursor-1',
+        omittedItemCount: 2,
+      });
+    });
+
+    it('passes cursor to query without retrying', async () => {
       const trpc = makeTrpcMock();
       const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
       trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
@@ -606,6 +822,412 @@ describe('createExtensionAgentSessionManager', () => {
       createExtensionAgentSessionManager(opts);
       await capturedConfig!.fetchSnapshotPage!(SESSION_ID, { cursor: 'my-cursor' });
       expect(pageQuery).toHaveBeenCalledWith({ cursor: 'my-cursor', session_id: SESSION_ID });
+      // Cursor pages must not be retried or checked against active sessions.
+      expect(pageQuery).toHaveBeenCalledTimes(1);
+      expect(trpc.activeSessions.list.query).not.toHaveBeenCalled();
+    });
+
+    it('returns the empty snapshot promptly for a running session with a watermark without blocking on the retry loop', async () => {
+      const trpc = makeTrpcMock();
+      const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+      trpc.activeSessions.list.query = listQuery;
+      const pageQuery = mockQuery({
+        history: null,
+        kiloSessionId: SESSION_ID,
+        watermarkEventId: 42,
+      });
+      trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+
+      const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      /*
+       * Round-14 regression state: a reopened running CLI session's initial
+       * page is empty and the session is confirmed working. The old code ran
+       * the bounded 120-second history retry, blocking the session switch and
+       * the WebSocket transport that would replay the persisted events. When
+       * the page carries a usable event-log watermark, the empty page must
+       * resolve immediately so the transport can connect and replay every
+       * stored event from that watermark.
+       */
+      const result = await resultPromise;
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: 42,
+      });
+      // The confirmed-running session with a watermark must not start the delayed-page retry.
+      expect(pageQuery).toHaveBeenCalledTimes(1);
+      expect(listQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a confirmed-running empty page without a watermark until persisted messages appear', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * Cumulative-review regression state: the reopened running CLI session
+         * lists busy on the gate read and its initial page is empty, but the
+         * tRPC result carries no `watermarkEventId` (remote CLI transport has
+         * no watermark replay path, and Cloud Agent can omit the watermark
+         * when its optional lookup fails). With no watermark there is nothing
+         * for the transport to replay, so resolving the empty page immediately
+         * would hide the already-persisted messages. The bounded history
+         * recovery must keep reading until the page carries them.
+         */
+        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        /*
+         * The persisted page lags the running turn: the initial read and the
+         * first retry read are empty, then the persisted user message arrives.
+         */
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // The initial read resolves immediately; two retry sleeps then elapse.
+        await vi.advanceTimersByTimeAsync(2000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        // Initial read plus the two retry reads; the message page ends the retry.
+        expect(pageQuery).toHaveBeenCalledTimes(3);
+        // Only the gate read confirms the session; the retry rechecks liveness later.
+        expect(listQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps retrying through the liveness probe until a late-persisted page arrives', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * The session is not confirmed working on the gate's first read (a
+         * starting session can miss its active row while registration or the
+         * read model refreshes), then turns busy on the liveness probe read,
+         * which is the only path that runs the bounded history recovery.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [] })
+          .mockResolvedValue({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        const pageQuery = vi.fn();
+        /*
+         * The persisted page can lag the whole running turn: only the
+         * eleventh read carries messages while the first ten stay empty.
+         */
+        for (let index = 0; index < 10; index += 1) {
+          pageQuery.mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID });
+        }
+        pageQuery.mockResolvedValueOnce({
+          history: {
+            messages: [
+              {
+                info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                parts: [],
+              },
+            ],
+            nextCursor: null,
+            omittedItemCount: 0,
+          },
+          kiloSessionId: SESSION_ID,
+        });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Liveness probe sleep plus the ten retry sleeps.
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        // Initial read plus ten retry reads.
+        expect(pageQuery).toHaveBeenCalledTimes(11);
+        // Gate read, probe read, and one retry liveness recheck.
+        expect(listQuery).toHaveBeenCalledTimes(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('returns the empty snapshot promptly when the running session page carries zero messages and a watermark', async () => {
+      const trpc = makeTrpcMock();
+      const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+      trpc.activeSessions.list.query = listQuery;
+      /*
+       * A page with zero messages (a session row exists but no message has
+       * been materialized) is empty just like a null history, so a
+       * confirmed-running session with a usable watermark must resolve it
+       * immediately too and let the transport replay from the watermark.
+       */
+      const pageQuery = mockQuery({
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        kiloSessionId: SESSION_ID,
+        watermarkEventId: 9,
+      });
+      trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+      createExtensionAgentSessionManager(opts);
+
+      const result = await capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+      expect(result).toStrictEqual({
+        info: { id: SESSION_ID },
+        kind: 'success',
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: 9,
+      });
+      expect(pageQuery).toHaveBeenCalledTimes(1);
+      expect(listQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps checking liveness when the first lookup misses the active row', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * The active row is missing on the gate's first read (registration
+         * or refresh race), then appears as busy on the liveness grace read.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        /*
+         * The initial page is empty and stays empty through the first retry
+         * read, then the persisted messages arrive on the third read.
+         */
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Liveness grace sleep + the first retry sleep + the second retry sleep.
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        expect(pageQuery).toHaveBeenCalledTimes(3);
+        expect(listQuery).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('probes a listed-idle session that becomes busy and returns the persisted user message', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * Round-9 regression state: the reopened CLI session lists idle on
+         * the gate's first read (session-ingest persistence has not caught up
+         * yet), then turns busy on the bounded liveness probe read. The old
+         * code latched the empty page after that single idle read, so the
+         * batched nonce-bearing user message never reached the reopened UI.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'idle' }] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'busy' }] });
+        trpc.activeSessions.list.query = listQuery;
+        /*
+         * The persisted page lags the turn: the initial read and the first
+         * retry read are empty, then the persisted user message arrives.
+         */
+        const pageQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({ history: null, kiloSessionId: SESSION_ID })
+          .mockResolvedValueOnce({
+            history: {
+              messages: [
+                {
+                  info: { role: 'user', sessionID: SESSION_ID, time: {} },
+                  parts: [],
+                },
+              ],
+              nextCursor: null,
+              omittedItemCount: 0,
+            },
+            kiloSessionId: SESSION_ID,
+          });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Liveness probe sleep + the two retry sleeps.
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({
+          kind: 'success',
+          messages: [{ info: { sessionID: SESSION_ID } }],
+        });
+        expect(pageQuery).toHaveBeenCalledTimes(3);
+        expect(listQuery).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('returns the empty page within the bound when the session stays stably idle', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const listQuery = mockQuery({ sessions: [{ id: SESSION_ID, status: 'idle' }] });
+        trpc.activeSessions.list.query = listQuery;
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // The bounded liveness probe: one gate read plus three probe reads.
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        const result = await resultPromise;
+        expect(result).toStrictEqual({
+          info: { id: SESSION_ID },
+          kind: 'success',
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+        /*
+         * No page retry runs for a stably idle session: the page resolves on
+         * the first read, so the fresh session's own first send is not held
+         * beyond the liveness bound.
+         */
+        expect(pageQuery).toHaveBeenCalledTimes(1);
+        /*
+         * The bounded probe rechecks activeSessions.list for the whole window
+         * before latching the empty page.
+         */
+        expect(listQuery).toHaveBeenCalledTimes(4);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops retrying a short time after the session stops running', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        /*
+         * The session misses the gate's first read, turns busy on the
+         * liveness probe read (starting the bounded history recovery), then
+         * turns idle on the retry's liveness recheck, which ends the retry.
+         */
+        const listQuery = vi
+          .fn()
+          .mockResolvedValueOnce({ sessions: [] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'busy' }] })
+          .mockResolvedValueOnce({ sessions: [{ id: SESSION_ID, status: 'idle' }] });
+        trpc.activeSessions.list.query = listQuery;
+        const pageQuery = mockQuery({ history: null, kiloSessionId: SESSION_ID });
+        trpc.cliSessionsV2.getSessionMessagesPage.query = pageQuery;
+        const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
+        createExtensionAgentSessionManager(opts);
+
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        // Liveness probe sleep, five retry sleeps, and five grace-window sleeps.
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        const result = await resultPromise;
+        expect(result).toMatchObject({ kind: 'success', messages: [] });
+        /*
+         * The retry stops once the session is no longer running. The expected
+         * page count is the initial read, five retry reads, and five grace
+         * reads; the idle re-check is an active-sessions call.
+         */
+        expect(pageQuery).toHaveBeenCalledTimes(11);
+        // Gate read, probe read, and the retry liveness recheck.
+        expect(listQuery).toHaveBeenCalledTimes(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('passes organizationId and includeCloudAgentSessions in the retry active lookup when org is set', async () => {
+      vi.useFakeTimers();
+      try {
+        const trpc = makeTrpcMock();
+        const listQuery = mockQuery({ sessions: [] });
+        trpc.activeSessions.list.query = listQuery;
+        trpc.cliSessionsV2.getSessionMessagesPage.query = mockQuery({
+          history: null,
+          kiloSessionId: SESSION_ID,
+        });
+        const opts = {
+          ...makeDefaultOptions(),
+          organizationId: '550e8400-e29b-41d4-a716-446655440000',
+          trpcClient: trpc as never,
+        };
+        createExtensionAgentSessionManager(opts);
+        const resultPromise = capturedConfig!.fetchSnapshotPage!(SESSION_ID, {});
+        await vi.advanceTimersByTimeAsync(10_000);
+        await resultPromise;
+        expect(listQuery).toHaveBeenCalledWith({
+          includeCloudAgentSessions: true,
+          organizationId: '550e8400-e29b-41d4-a716-446655440000',
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

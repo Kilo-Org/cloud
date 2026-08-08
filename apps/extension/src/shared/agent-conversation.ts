@@ -71,8 +71,21 @@ export type AgentConversationEvent =
       readonly type: 'tool-call';
     }
   | {
+      readonly arguments: Record<string, unknown>;
+      readonly id: string;
+      /** The agent's own tool name (`read`, `bash`, …), not an extension tool. */
+      readonly name: string;
+      /** Marks the agent-tool member so the renderer can branch on it. */
+      readonly source: 'agent';
+      /** The tool's own one-line summary of the call. */
+      readonly title?: string;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly error?: string;
       readonly id: string;
+      /** Image bytes for an agent tool result, from `agent-tool-images`. */
+      readonly imageDataUrl?: string;
       readonly ok: boolean;
       readonly toolCallId: string;
       readonly type: 'tool-result';
@@ -98,7 +111,7 @@ export type GroupedConversationItem =
       readonly type: 'event';
     }
   | {
-      readonly result: Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+      readonly result?: Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
       readonly toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
       readonly type: 'tool-exchange';
     };
@@ -290,7 +303,7 @@ export const getConversationScrollKey = (items: GroupedConversationItem[]): stri
   items
     .map(item => {
       if (item.type === 'tool-exchange') {
-        return `${item.toolCall.id}:${item.result.id}`;
+        return `${item.toolCall.id}:${item.result?.id ?? 'running'}`;
       }
 
       const { event } = item;

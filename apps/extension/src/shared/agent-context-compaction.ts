@@ -77,6 +77,10 @@ const stringifyToolValue = (value: unknown): string => {
 const getToolCallDetail = (
   event: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>
 ): string | undefined => {
+  if ('source' in event) {
+    return stringifyToolValue(event.arguments);
+  }
+
   if (event.name === 'eval') {
     return event.code;
   }

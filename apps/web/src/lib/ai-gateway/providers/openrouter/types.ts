@@ -65,7 +65,12 @@ export type SharedGatewayRequestProperties = {
 };
 
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &
-  OpenAI.Responses.ResponseCreateParams;
+  OpenAI.Responses.ResponseCreateParams & {
+    prompt_cache_options?: {
+      mode?: 'implicit' | 'explicit';
+      ttl?: string;
+    };
+  };
 
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {

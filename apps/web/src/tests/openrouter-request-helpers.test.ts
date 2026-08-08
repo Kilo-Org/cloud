@@ -73,6 +73,95 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
+  test('adds a cache breakpoint before environment_details and at the end of the last user message in chat completions', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          { role: 'assistant', content: 'First response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Main task instruction' },
+              { type: 'text', text: '<environment_details>\nOS: Linux\n</environment_details>' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    const userContent = request.body.messages.at(2)?.content;
+    expect(Array.isArray(userContent)).toBe(true);
+    if (!Array.isArray(userContent)) return;
+    expect(userContent).toEqual([
+      {
+        type: 'text',
+        text: 'Main task instruction',
+        cache_control: { type: 'ephemeral' },
+      },
+      {
+        type: 'text',
+        text: '<environment_details>\nOS: Linux\n</environment_details>',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+  });
+
+  test('adds a cache breakpoint before environment_details on the last user message with environment_details across multi-turn chat completions', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Turn 1 prompt' },
+              { type: 'text', text: '<environment_details>\nTurn 1 env\n</environment_details>' },
+            ],
+          },
+          { role: 'assistant', content: 'Turn 1 response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Turn 2 prompt part 1' },
+              { type: 'text', text: 'Turn 2 prompt part 2' },
+              { type: 'text', text: '<environment_details>\nTurn 2 env\n</environment_details>' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    const turn1Content = request.body.messages.at(1)?.content;
+    expect(turn1Content).toEqual([
+      { type: 'text', text: 'Turn 1 prompt' },
+      { type: 'text', text: '<environment_details>\nTurn 1 env\n</environment_details>' },
+    ]);
+
+    const turn2Content = request.body.messages.at(3)?.content;
+    expect(turn2Content).toEqual([
+      { type: 'text', text: 'Turn 2 prompt part 1' },
+      {
+        type: 'text',
+        text: 'Turn 2 prompt part 2',
+        cache_control: { type: 'ephemeral' },
+      },
+      {
+        type: 'text',
+        text: '<environment_details>\nTurn 2 env\n</environment_details>',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+  });
+
   test('does nothing for chat completions requests when any cache_control is already present', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -112,7 +201,7 @@ describe('addCacheBreakpoints', () => {
     ]);
   });
 
-  test('adds a cache breakpoint to the system message and the last eligible responses message when none exist', () => {
+  test('adds a prompt_cache_breakpoint to the system message and the last eligible responses message with mode implicit', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
@@ -143,6 +232,8 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    expect(request.body.prompt_cache_options).toEqual({ mode: 'implicit' });
+
     const systemMessage = request.body.input.at(0);
     expect(systemMessage).toMatchObject({ type: 'message', role: 'system' });
     if (!systemMessage || systemMessage.type !== 'message') return;
@@ -152,7 +243,7 @@ describe('addCacheBreakpoints', () => {
     expect(systemContent.at(-1)).toMatchObject({
       type: 'input_text',
       text: 'You are helpful.',
-      cache_control: { type: 'ephemeral' },
+      prompt_cache_breakpoint: { mode: 'explicit' },
     });
 
     const lastItem = request.body.input.at(-1);
@@ -160,12 +251,60 @@ describe('addCacheBreakpoints', () => {
       type: 'function_call_output',
       output: [
         { type: 'input_text', text: 'Tool output' },
-        { type: 'input_text', text: 'Tool detail', cache_control: { type: 'ephemeral' } },
+        { type: 'input_text', text: 'Tool detail', prompt_cache_breakpoint: { mode: 'explicit' } },
       ],
     });
   });
 
-  test('does nothing for responses requests when any cache_control is already present', () => {
+  test('adds a prompt_cache_breakpoint before environment_details and at the end of the last user message in responses', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          {
+            type: 'message',
+            role: 'system',
+            content: 'You are helpful.',
+          },
+          {
+            type: 'message',
+            role: 'user',
+            content: [
+              { type: 'input_text', text: 'Main user instructions' },
+              {
+                type: 'input_text',
+                text: '<environment_details>\nCurrent time: 2026-08-08\n</environment_details>',
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    expect(request.body.prompt_cache_options).toEqual({ mode: 'implicit' });
+
+    const userMessage = request.body.input.at(1);
+    expect(userMessage).toMatchObject({ type: 'message', role: 'user' });
+    if (!userMessage || userMessage.type !== 'message') return;
+    expect(userMessage.content).toEqual([
+      {
+        type: 'input_text',
+        text: 'Main user instructions',
+        prompt_cache_breakpoint: { mode: 'explicit' },
+      },
+      {
+        type: 'input_text',
+        text: '<environment_details>\nCurrent time: 2026-08-08\n</environment_details>',
+        prompt_cache_breakpoint: { mode: 'explicit' },
+      },
+    ]);
+  });
+
+  test('does nothing for responses requests when any prompt_cache_breakpoint or cache_control is already present', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
@@ -178,8 +317,7 @@ describe('addCacheBreakpoints', () => {
               {
                 type: 'input_text',
                 text: 'First prompt',
-                // @ts-expect-error non-standard cache_control extension
-                cache_control: { type: 'ephemeral' },
+                prompt_cache_breakpoint: { mode: 'explicit' },
               },
             ],
           },
@@ -197,6 +335,7 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
+    expect(request.body.prompt_cache_options).toBeUndefined();
     const lastItem = request.kind === 'responses' && request.body.input?.at(-1);
     expect(lastItem).toMatchObject({
       type: 'function_call_output',
@@ -226,6 +365,46 @@ describe('addCacheBreakpoints', () => {
     expect(request.body.cache_control).toBeUndefined();
     expect(request.body.messages.at(-1)?.content).toEqual([
       { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+    ]);
+  });
+
+  test('adds a cache breakpoint before environment_details in messages requests', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest instructions' },
+              {
+                type: 'text',
+                text: '<environment_details>\nWorking directory: /workspace\n</environment_details>',
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.cache_control).toBeUndefined();
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      {
+        type: 'text',
+        text: 'Latest instructions',
+        cache_control: { type: 'ephemeral' },
+      },
+      {
+        type: 'text',
+        text: '<environment_details>\nWorking directory: /workspace\n</environment_details>',
+        cache_control: { type: 'ephemeral' },
+      },
     ]);
   });
 
@@ -348,7 +527,7 @@ describe('removeCacheBreakpoints', () => {
     expect(containsCacheControlDeep(request.body.messages)).toBe(false);
   });
 
-  test('removes all cache breakpoints added to a responses request', () => {
+  test('removes all cache breakpoints and prompt_cache_options added to a responses request', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
@@ -374,11 +553,12 @@ describe('removeCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
     if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
-    expect(containsCacheControlDeep(request.body.input)).toBe(true);
+    expect(containsCacheControlDeep(request.body)).toBe(true);
 
     removeCacheBreakpoints(request);
 
-    expect(containsCacheControlDeep(request.body.input)).toBe(false);
+    expect(containsCacheControlDeep(request.body)).toBe(false);
+    expect(request.body.prompt_cache_options).toBeUndefined();
   });
 
   test('removes top-level and nested cache_control from a messages request', () => {
@@ -419,7 +599,11 @@ function containsCacheControlDeep(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  if (Object.hasOwn(value, 'cache_control')) {
+  if (
+    Object.hasOwn(value, 'cache_control') ||
+    Object.hasOwn(value, 'prompt_cache_breakpoint') ||
+    Object.hasOwn(value, 'prompt_cache_options')
+  ) {
     return true;
   }
   return Object.values(value).some(containsCacheControlDeep);

@@ -181,6 +181,9 @@ const page = {
   navigate() {
     throw new Error('page.navigate does not exist. To open another page, return { navigate: "<url>", state: { … } } from the script; the runner navigates and re-runs the script on the new page.');
   },
+  goto() {
+    throw new Error('page.goto does not exist. To open another page, return { navigate: "<url>", state: { … } } from the script; the runner navigates and re-runs the script on the new page.');
+  },
   async waitFor(selector, timeoutMs) {
     if (typeof selector === 'number') { return page.sleep(selector); }
     if (!pageIsReal()) { dryRunActions.push({ action: 'waitFor', selector }); return; }

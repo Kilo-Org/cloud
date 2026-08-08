@@ -749,3 +749,40 @@ describe('stall watchdog', () => {
     expect(failure instanceof KiloGatewayStreamStalledError).toBe(false);
   });
 });
+
+describe('completion total cap', () => {
+  it('cuts off a stream that keeps trickling past the completion timeout', async () => {
+    const encoder = new TextEncoder();
+    const fetch: FetchLike = () =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            async start(controller) {
+              // Trickle forever: never [DONE], never quiet long enough to stall.
+              for (let index = 0; index < 1000; index += 1) {
+                controller.enqueue(
+                  encoder.encode('data: {"choices":[{"delta":{"content":"x"}}]}\n\n')
+                );
+                await new Promise(resolve => setTimeout(resolve, 20));
+              }
+            },
+          }),
+          { headers: { 'Content-Type': 'text/event-stream' }, status: 200 }
+        )
+      );
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://gateway.test',
+        completionTimeoutMs: 150,
+        fetch,
+        messages: [],
+        model: 'test-model',
+        onContentDelta: () => {},
+        stallTimeoutMs: 5000,
+        token: 'token',
+        tools: [],
+      })
+    ).rejects.toThrow('exceeded 150 ms');
+  });
+});

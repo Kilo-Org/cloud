@@ -18,6 +18,8 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly onReasoningDelta?: ((delta: string) => void) | undefined;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
+  /** Abort and throw KiloGatewayStreamStalledError when the whole completion exceeds this. */
+  readonly completionTimeoutMs?: number | undefined;
   /** Abort and throw KiloGatewayStreamStalledError when no bytes arrive for this long. */
   readonly stallTimeoutMs?: number | undefined;
   readonly thinkingEffort?: string | undefined;
@@ -25,10 +27,10 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly tools: KiloGatewayToolDefinition[];
 }
 
-/** A streaming request that stopped delivering bytes. Callers may retry. */
+/** A streaming request that stopped delivering bytes or ran far too long. Callers may retry. */
 export class KiloGatewayStreamStalledError extends Error {
-  constructor(stallTimeoutMs: number) {
-    super(`Gateway stream stalled: no data for ${String(stallTimeoutMs)} ms.`);
+  constructor(message: string) {
+    super(message);
     this.name = 'KiloGatewayStreamStalledError';
   }
 }
@@ -44,6 +46,7 @@ export class KiloGatewayHttpError extends Error {
 }
 
 const DEFAULT_STALL_TIMEOUT_MS = 45_000;
+const DEFAULT_COMPLETION_TIMEOUT_MS = 90_000;
 
 interface StreamingToolCallBuffer {
   arguments: string;
@@ -448,6 +451,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   onReasoningDelta = () => {},
   organizationId,
   signal,
+  completionTimeoutMs = DEFAULT_COMPLETION_TIMEOUT_MS,
   stallTimeoutMs = DEFAULT_STALL_TIMEOUT_MS,
   thinkingEffort,
   token,
@@ -467,9 +471,11 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   // Watchdog: a stalled response — before the first byte or mid-stream — surfaces as a typed, retriable error instead of hanging the turn forever. Each read races against the stall timer, so the guarantee holds even when the underlying fetch ignores its abort signal.
   const stallController = new AbortController();
   const stall: {
+    error?: Error;
     reject?: (error: Error) => void;
     stalled: boolean;
     timer?: ReturnType<typeof setTimeout>;
+    totalTimer?: ReturnType<typeof setTimeout>;
   } = { stalled: false };
   // eslint-disable-next-line promise/avoid-new -- A deferred rejection has no promise-returning primitive to defer to.
   const stallPromise = new Promise<never>((_resolve, reject) => {
@@ -478,14 +484,22 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   // The race consumes this rejection; this guard keeps it from surfacing as an unhandled rejection when the stream completes first.
   // eslint-disable-next-line promise/prefer-await-to-then -- Marking the rejection handled must not block this function.
   stallPromise.catch(() => {});
+  const failStalled = (message: string): void => {
+    stall.stalled = true;
+    stall.error = new KiloGatewayStreamStalledError(message);
+    stallController.abort();
+    stall.reject?.(stall.error);
+  };
   const armWatchdog = (): void => {
     clearTimeout(stall.timer);
     stall.timer = setTimeout(() => {
-      stall.stalled = true;
-      stallController.abort();
-      stall.reject?.(new KiloGatewayStreamStalledError(stallTimeoutMs));
+      failStalled(`Gateway stream stalled: no data for ${String(stallTimeoutMs)} ms.`);
     }, stallTimeoutMs);
   };
+  // The total cap catches a provider that keeps trickling bytes forever; a retry lets the router pick a faster route.
+  stall.totalTimer = setTimeout(() => {
+    failStalled(`Gateway completion exceeded ${String(completionTimeoutMs)} ms and was cut off.`);
+  }, completionTimeoutMs);
   const onCallerAbort = (): void => {
     stallController.abort();
     const abortError = new Error('The user aborted a request.');
@@ -545,11 +559,12 @@ export const fetchKiloGatewayChatCompletionStream = async ({
     );
   } catch (error) {
     if (stall.stalled && signal?.aborted !== true) {
-      throw new KiloGatewayStreamStalledError(stallTimeoutMs);
+      throw stall.error ?? new KiloGatewayStreamStalledError('Gateway stream stalled.');
     }
     throw error;
   } finally {
     clearTimeout(stall.timer);
+    clearTimeout(stall.totalTimer);
     signal?.removeEventListener('abort', onCallerAbort);
   }
 };

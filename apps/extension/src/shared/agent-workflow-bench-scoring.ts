@@ -134,13 +134,11 @@ export interface BenchToolExchange {
 
 /**
  * Correlation of every tool-result to its tool-call by `toolCallId`. A
- * tool-result that matches no tool-call is preserved as an explicit
- * `unknown-tool` classification in `unknownToolResults`; it never becomes a
- * named exchange, so it can never be read as a workflow run result.
+ * A tool-result that matches no tool-call is omitted from named exchanges, so
+ * it can never be read as a workflow run result.
  */
 export interface BenchToolCorrelation {
   readonly exchanges: readonly BenchToolExchange[];
-  readonly unknownToolResults: readonly BenchToolResultEvent[];
 }
 
 interface DryRunAction {
@@ -189,13 +187,11 @@ const findStringValues = (value: unknown, output: string[] = []): string[] => {
 /**
  * Correlate every tool-result with its tool-call by `toolCallId`
  * (`agent-conversation.ts` tool-result events carry no tool name). A
- * tool-result that matches no tool-call is preserved as an explicit
- * `unknown-tool` classification: it never becomes a named exchange, so it
- * can never be read as a workflow run result.
+ * A tool-result that matches no tool-call is omitted from named exchanges, so
+ * it can never be read as a workflow run result.
  */
 export const correlateToolExchanges = (events: readonly BenchEvent[]): BenchToolCorrelation => {
   const exchanges: BenchToolExchange[] = [];
-  const unknownToolResults: BenchToolResultEvent[] = [];
 
   for (const event of events) {
     if (event.type === 'tool-result') {
@@ -204,21 +200,19 @@ export const correlateToolExchanges = (events: readonly BenchEvent[]): BenchTool
           candidate.type === 'tool-call' && candidate.id === event.toolCallId
       );
 
-      if (call === undefined) {
-        unknownToolResults.push(event);
-      } else {
+      if (call !== undefined) {
         exchanges.push({ call, result: event });
       }
     }
   }
 
-  return { exchanges, unknownToolResults };
+  return { exchanges };
 };
 
 const hasNonEmptyInput = (input: unknown): boolean =>
   isRecord(input) && Object.keys(input).length > 0;
 
-const selectLastValidRealRun = (
+export const selectLastValidRealRun = (
   exchanges: readonly BenchToolExchange[]
 ): BenchToolExchange | undefined => {
   const candidates = exchanges.filter(exchange => {

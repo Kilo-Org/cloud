@@ -27,12 +27,18 @@ import { homedir, tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { z } from 'zod';
 import {
+  readExtensionLocalStorage,
+  setExtensionStorage,
+} from '../tests/e2e/extension-context-fixture';
+import {
   correlateToolExchanges,
   computeBatchSummary,
+  selectLastValidRealRun,
   scoreWorkflowCorrectness,
   TARGET_PATH_PREFIX,
   TARGET_SCOPE_ORIGIN,
 } from '../src/shared/agent-workflow-bench-scoring';
+import { agentWorkflowSchema } from '../src/shared/agent-workflows';
 import type {
   BenchAttemptStats,
   BenchCorrectnessResult,
@@ -557,78 +563,8 @@ const writeBlockerArtifact = async (outDir: string, blocker: BlockerRecord): Pro
   }
 };
 
-// ── Extension storage helpers (raw chrome.storage.local; WXT strips "local:") ─
-
-const readLocal = (page: Page, key: string): Promise<unknown> =>
-  page.evaluate(
-    storageKey =>
-      new Promise<unknown>((resolve, reject) => {
-        const chromeApi = (
-          globalThis as typeof globalThis & {
-            chrome?: {
-              runtime?: { lastError?: { message?: string } };
-              storage?: {
-                local?: {
-                  get: (keys: string[], callback: (items: Record<string, unknown>) => void) => void;
-                };
-              };
-            };
-          }
-        ).chrome;
-        const runtime = chromeApi?.runtime;
-        const storage = chromeApi?.storage?.local;
-        if (runtime === undefined || storage === undefined) {
-          reject(new Error('Extension runtime storage is unavailable.'));
-          return;
-        }
-        storage.get([storageKey], items => {
-          const message = runtime.lastError?.message;
-          if (message !== undefined && message !== '') {
-            reject(new Error(message));
-            return;
-          }
-          resolve(items[storageKey]);
-        });
-      }),
-    key
-  );
-
-const writeLocal = (page: Page, items: Record<string, unknown>): Promise<void> =>
-  page.evaluate(
-    storageItems =>
-      new Promise<void>((resolve, reject) => {
-        const chromeApi = (
-          globalThis as typeof globalThis & {
-            chrome?: {
-              runtime?: { lastError?: { message?: string } };
-              storage?: {
-                local?: {
-                  set: (items: Record<string, unknown>, callback: () => void) => void;
-                };
-              };
-            };
-          }
-        ).chrome;
-        const runtime = chromeApi?.runtime;
-        const storage = chromeApi?.storage?.local;
-        if (runtime === undefined || storage === undefined) {
-          reject(new Error('Extension runtime storage is unavailable.'));
-          return;
-        }
-        storage.set(storageItems, () => {
-          const message = runtime.lastError?.message;
-          if (message !== undefined && message !== '') {
-            reject(new Error(message));
-            return;
-          }
-          resolve();
-        });
-      }),
-    items
-  );
-
 const readConversationStore = (sidePanel: Page): Promise<unknown> =>
-  readLocal(sidePanel, 'kiloAgentConversations');
+  readExtensionLocalStorage(sidePanel, 'kiloAgentConversations');
 
 // ── Conversation event contract (zod-loose; unknown keys dropped) ───────────
 
@@ -904,7 +840,7 @@ const ensureSignedInPanel = async (
     }
     if (attempt > 0) {
       try {
-        await writeLocal(sidePanel, { kiloAuth: { token, userEmail } });
+        await setExtensionStorage(sidePanel, { kiloAuth: { token, userEmail } });
         await sidePanel.reload();
       } catch (error) {
         lastError = error;
@@ -933,7 +869,7 @@ const openAuthenticatedSidePanel = async (
 ): Promise<Page> => {
   const sidePanel = await context.newPage();
   await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  await writeLocal(sidePanel, { kiloAuth: { token, userEmail } });
+  await setExtensionStorage(sidePanel, { kiloAuth: { token, userEmail } });
   await sidePanel.reload();
   await ensureSignedInPanel(sidePanel, token, userEmail, budget);
   return sidePanel;
@@ -947,7 +883,7 @@ const seedWorkflowSettings = async (
     autoApproveWorkflowRuns: boolean;
   }
 ): Promise<void> => {
-  await writeLocal(sidePanel, { kiloWorkflowSettings: settings });
+  await setExtensionStorage(sidePanel, { kiloWorkflowSettings: settings });
 };
 
 const dismissConsent = async (page: Page): Promise<void> => {
@@ -1304,35 +1240,6 @@ const classifyRequestPhases = (
   }
 };
 
-const computeSavedAtOffsetMs = (
-  collector: EventCollector,
-  requests: readonly CapturedGatewayRequest[]
-): number | null => {
-  const saveSeenAtMs = collector.saveSeenAtMs;
-  if (saveSeenAtMs === null) {
-    return null;
-  }
-  // The pinned boundary is the minimum of the first save observation and the
-  // first gateway request that starts after it. A request that starts after
-  // the observation definitely ran after the save existed, but the
-  // observation itself is the earliest proven save bound: taking the minimum
-  // never inflates `createToSavedSeconds` with a later request's offset, and
-  // a request between the two stays in the create phase. Without a post-save
-  // request the first-seen poll stamp is the bound.
-  let firstPostSaveOffsetMs: number | null = null;
-  for (const request of requests) {
-    if (
-      request.offsetMs > saveSeenAtMs &&
-      (firstPostSaveOffsetMs === null || request.offsetMs < firstPostSaveOffsetMs)
-    ) {
-      firstPostSaveOffsetMs = request.offsetMs;
-    }
-  }
-  return firstPostSaveOffsetMs === null
-    ? saveSeenAtMs
-    : Math.min(saveSeenAtMs, firstPostSaveOffsetMs);
-};
-
 // ── Conversation polling (abortable) ────────────────────────────────────────
 
 const isSaveSuccess = (
@@ -1564,28 +1471,8 @@ const toBenchEvent = (event: InternalEvent): BenchEvent => {
   }
 };
 
-const workflowParamSchema = z
-  .object({
-    description: z.string().optional(),
-    name: z.string(),
-  })
-  .strip();
-
-const workflowSchema = z
-  .object({
-    approvedScriptHash: z.string().optional(),
-    description: z.string(),
-    id: z.string(),
-    name: z.string(),
-    params: z.array(workflowParamSchema).optional(),
-    pathPrefix: z.string().optional(),
-    scopeOrigin: z.string(),
-    script: z.string(),
-  })
-  .strip();
-
 const validateWorkflows = (value: unknown): BenchWorkflow[] => {
-  const parsed = z.array(workflowSchema).safeParse(value);
+  const parsed = z.array(agentWorkflowSchema).safeParse(value);
   if (!parsed.success) {
     throw new StorageParseError('workflow storage failed validation');
   }
@@ -1604,18 +1491,6 @@ const validateWorkflows = (value: unknown): BenchWorkflow[] => {
   }
   return workflows;
 };
-
-const hasOkRealRun = (events: readonly BenchEvent[]): boolean =>
-  correlateToolExchanges(events).exchanges.some(exchange => {
-    const argumentsValue = exchange.call.arguments;
-    return (
-      exchange.call.name === 'run_workflow' &&
-      argumentsValue['dryRun'] !== true &&
-      isRecord(argumentsValue['input']) &&
-      Object.keys(argumentsValue['input']).length > 0 &&
-      exchange.result.ok
-    );
-  });
 
 // ── Metrics and redaction ───────────────────────────────────────────────────
 
@@ -2067,7 +1942,7 @@ const buildFailedAttemptRecord = (input: {
     snapshotResultBytes = metrics.snapshotResultBytes;
     readCallsBeforeFirstSave = metrics.readCallsBeforeFirstSave;
     saveWorkflowCallCount = metrics.saveWorkflowCallCount;
-    autoRunObserved = hasOkRealRun(bench);
+    autoRunObserved = selectLastValidRealRun(correlation.exchanges) !== undefined;
     transcript = redactTranscript(internal, input.collector.offsetByEventId, correlation);
   } catch (error) {
     // A storage validation failure must surface as `storage-parse`, not as a
@@ -2236,7 +2111,7 @@ const runAttempt = async (input: {
     });
     checkGatewayBlocker();
 
-    savedAtOffsetMs = computeSavedAtOffsetMs(collector, requests);
+    savedAtOffsetMs = collector.saveSeenAtMs;
     const createToSavedSeconds =
       savedAtOffsetMs === null ? null : Math.round((savedAtOffsetMs - createSentOffsetMs) / 1000);
     const createTurnEndedAtMs = createPhase.turnEnded ? createPhase.endedAtMs : null;
@@ -2244,7 +2119,8 @@ const runAttempt = async (input: {
       createTurnEndedAtMs === null ? null : Math.round((createTurnEndedAtMs - submitAtMs) / 1000);
 
     const createInternalEvents = validateEvents(collector.events);
-    const autoRunObserved = hasOkRealRun(createInternalEvents.map(toBenchEvent));
+    const createCorrelation = correlateToolExchanges(createInternalEvents.map(toBenchEvent));
+    const autoRunObserved = selectLastValidRealRun(createCorrelation.exchanges) !== undefined;
 
     let verifyTimedOut = false;
     let finalSnapshot = createPhase.finalSnapshot;
@@ -2289,7 +2165,7 @@ const runAttempt = async (input: {
 
     const finalInternalEvents = validateEvents(finalSnapshot.events);
     const finalBenchEvents = finalInternalEvents.map(toBenchEvent);
-    const rawWorkflows = await readLocal(sidePanel, 'kiloAgentWorkflows');
+    const rawWorkflows = await readExtensionLocalStorage(sidePanel, 'kiloAgentWorkflows');
     const workflows = validateWorkflows(rawWorkflows);
 
     classifyRequestPhases(requests, savedAtOffsetMs);

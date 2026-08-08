@@ -512,7 +512,6 @@ describe('scoreWorkflowCorrectness toolCallId correlation', () => {
 
     const correlation = correlateToolExchanges(events);
     expect(correlation.exchanges).toHaveLength(2);
-    expect(correlation.unknownToolResults).toHaveLength(1);
 
     const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
 
@@ -526,7 +525,6 @@ describe('scoreWorkflowCorrectness toolCallId correlation', () => {
 
     const correlation = correlateToolExchanges(events);
     expect(correlation.exchanges).toHaveLength(0);
-    expect(correlation.unknownToolResults).toHaveLength(1);
 
     const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
 

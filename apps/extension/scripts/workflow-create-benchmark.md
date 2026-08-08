@@ -113,11 +113,14 @@ The driver writes into `--out`:
 Exit codes: `0` every attempt passed the correctness check; `1` at least one
 attempt failed; `2` usage error or blocker.
 
-The transcript is allowlist-redacted: user/assistant/thinking text becomes
-`<text: N chars>`, tool arguments keep only pinned metadata and byte counts,
-page-content tool results keep only byte counts, and `run_workflow` results
-keep only `ok`, `pagesVisited`, and `resultChars`. No token, no raw storage
-value, and no user content is persisted.
+The transcript is redacted: user/assistant/thinking text becomes
+`<text: N chars>`, `save_workflow` arguments keep pinned metadata with the
+script reduced to its length, other tool arguments keep scalar values capped
+at 120 characters (the benchmark's own pinned queries and ids — never page
+content), page-content tool results keep only byte counts, `run_workflow`
+results keep only `ok`, `pagesVisited`, and `resultChars`, and workflow or
+memory tool results keep an allowlist of metadata keys plus content lengths.
+No token and no raw storage value is persisted.
 
 ### Raw debugging artifacts
 

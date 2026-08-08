@@ -1601,11 +1601,11 @@ const redactSaveWorkflowArguments = (args: Record<string, unknown>): Record<stri
   }
   const scopeOrigin = args['scopeOrigin'];
   if (typeof scopeOrigin === 'string') {
-    out['scopeOrigin'] = scopeOrigin;
+    out['scopeOrigin'] = capString(scopeOrigin, 120);
   }
   const pathPrefix = args['pathPrefix'];
   if (typeof pathPrefix === 'string') {
-    out['pathPrefix'] = pathPrefix;
+    out['pathPrefix'] = capString(pathPrefix, 120);
   }
   const params = args['params'];
   if (Array.isArray(params)) {
@@ -1847,11 +1847,15 @@ const cleanupAttempt = async (
       let exists = true;
       try {
         await runStep('profile absence check', access(userDataDir));
-      } catch {
-        // A missing directory is the success case for the absence check; only
-        // the shared deadline can fail it.
+      } catch (error) {
         if (exceeded()) {
           throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
+        }
+        // Only a confirmed missing directory counts as gone; a permission or
+        // I/O error must not pass the absence verification.
+        const code = (error as NodeJS.ErrnoException | undefined)?.code;
+        if (code !== 'ENOENT') {
+          throw new CleanupBlockerError(`profile absence check failed: ${errorToReason(error)}`);
         }
         exists = false;
       }
@@ -1997,6 +2001,8 @@ type AttemptRunResult =
 
 const runAttempt = async (input: {
   attempt: number;
+  /** True for the first attempt this invocation runs, including in --append mode. */
+  isFirstAttemptOfBatch: boolean;
   scenario: BenchScenario;
   gitHead: string;
   token: string;
@@ -2008,6 +2014,7 @@ const runAttempt = async (input: {
 }): Promise<AttemptRunResult> => {
   const {
     attempt,
+    isFirstAttemptOfBatch,
     scenario,
     gitHead,
     token,
@@ -2228,7 +2235,7 @@ const runAttempt = async (input: {
       distinctOrgIdHashes.size > 1 ||
       (batchOrgIdHash !== null && !distinctOrgIdHashes.has(batchOrgIdHash));
     if (orgIdMismatched) {
-      if (attempt === 1) {
+      if (isFirstAttemptOfBatch) {
         return {
           kind: 'blocker',
           blocker: makeBlockerRecord({
@@ -2325,7 +2332,7 @@ const runAttempt = async (input: {
       };
     }
     const reason = error instanceof StorageParseError ? 'storage-parse' : errorToReason(error);
-    if (attempt === 1 && !setupDone.value) {
+    if (isFirstAttemptOfBatch && !setupDone.value) {
       return {
         kind: 'blocker',
         blocker: makeBlockerRecord({
@@ -2532,6 +2539,7 @@ const main = async (): Promise<number> => {
       const attemptNumber = firstAttempt + offset;
       const result = await runAttempt({
         attempt: attemptNumber,
+        isFirstAttemptOfBatch: offset === 0,
         scenario: parsed.scenario,
         gitHead,
         token,

@@ -111,8 +111,8 @@ const fillElement = (el, value) => {
       (opt) => normText(opt.value) === normText(value) || normText(opt.textContent) === normText(value)
     );
     if (!option) {
-      const labels = [...el.options].map((opt) => (opt.textContent ?? '').trim()).filter(Boolean);
-      throw new Error('No option matches "' + value + '". Options: ' + labels.join(', '));
+      const labels = [...el.options].slice(0, 20).map((opt) => (opt.textContent ?? '').trim()).filter(Boolean);
+      throw new Error('No option matches "' + value + '". Options: ' + labels.join(', ').slice(0, 300));
     }
     el.value = option.value;
   } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
@@ -172,7 +172,7 @@ const page = {
       if (el === null) {
         const label = findByText(document.querySelectorAll('label'), labelText);
         if (label !== null) {
-          el = label.control ?? (label.htmlFor ? document.getElementById(label.htmlFor) : label.querySelector(FILLABLE));
+          el = label.control ?? (label.htmlFor ? document.getElementById(label.htmlFor) : null) ?? label.querySelector(FILLABLE);
         }
       }
       return el;

@@ -122,9 +122,9 @@ export interface BenchToolExchange {
 }
 
 /**
- * Correlation of every tool-result to its tool-call by `toolCallId`. A
- * tool-result that matches no tool-call is omitted from named exchanges, so
- * it can never be read as a workflow run result.
+ * Correlation of every tool-result to its tool-call by `toolCallId`.
+ * A tool-result that matches no tool-call is omitted from named exchanges,
+ * so it can never be read as a workflow run result.
  */
 export interface BenchToolCorrelation {
   readonly exchanges: readonly BenchToolExchange[];

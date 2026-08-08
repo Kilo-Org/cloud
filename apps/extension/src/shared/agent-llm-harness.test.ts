@@ -394,7 +394,7 @@ describe('agent LLM harness', () => {
 
   it('gives a concise safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot, use targeted reads only when a required selector is missing, then call save_workflow as the next tool action with scopeOrigin set to the current origin and pathPrefix set to the current path, declare values that vary between runs as params, and do not end with text.'
+      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot, use targeted reads only when a required selector is missing, then call save_workflow as the next tool action with scopeOrigin set to the current origin and pathPrefix set to the current path, declare values that vary between runs as params, and do not end with text. The script must use only the documented page.* helpers and never document, querySelector, or page.goto.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
       'For a workflow you save in safe mode, write the script using only the page helpers listed in the save_workflow tool description'

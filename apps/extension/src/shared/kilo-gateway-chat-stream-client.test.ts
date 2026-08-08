@@ -763,6 +763,7 @@ describe('completion total cap', () => {
                 controller.enqueue(
                   encoder.encode('data: {"choices":[{"delta":{"content":"x"}}]}\n\n')
                 );
+                // eslint-disable-next-line no-await-in-loop -- The fixture must pace its trickle.
                 await new Promise(resolve => setTimeout(resolve, 20));
               }
             },

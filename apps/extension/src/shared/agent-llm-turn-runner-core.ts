@@ -114,7 +114,7 @@ const CONTINUE_NUDGE_TEXT =
 const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
 // First-person intent or a progressive verb: the model said what it is about to do rather than what it did.
 const ANNOUNCEMENT_RE =
-  /\b(?:i'?ll|i will|i am going to|let me|now i|next i)\b|^\s*\w+ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
+  /\b(?:i'?ll|i will|i am going to|let me|now i|next i)\b|^\s*\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
 
 const deservesContinueNudge = (lastAssistantText: string): boolean =>
   lastAssistantText.length > 0 &&

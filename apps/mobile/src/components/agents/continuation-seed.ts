@@ -1,4 +1,13 @@
-import { type Part, type StoredMessage, type TextPart } from '@kilocode/cloud-agent-sdk';
+import {
+  type ModelSelection,
+  type Part,
+  type StoredMessage,
+  type TextPart,
+} from '@kilocode/cloud-agent-sdk';
+import {
+  type InstanceModelCatalogResult,
+  type RemoteModelCatalogV1,
+} from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
   buildContinuePrefillParams,
@@ -6,6 +15,11 @@ import {
   resolvePrefillModel,
   resolvePrefillRepo,
 } from '@/components/agents/new-session-prefill';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import {
+  buildCreateRemoteSessionInput,
+  type CreateRemoteSessionInput,
+} from '@/lib/hooks/remote-instance-spawn-classifier';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
 export const CONTINUATION_SEED_MAX_CHARS = 3800;
@@ -111,26 +125,88 @@ export type ContinuationDestination =
   | { kind: 'remote'; instance: InstancePickerInstance };
 
 /**
- * Validate a stored model against the current gateway catalog.
+ * Resolve the stored model + variant of a continued session against the
+ * target instance's model catalog.
  *
- * Returns the original model + variant when present and valid. Returns empty
- * strings when the model is absent or the variant is not in its variant list,
- * so the caller can omit the model override and let the remote CLI use its
- * default.
+ * Returns a `ModelSelection` only when the selection is valid on the target:
+ *
+ * - The stored model must exist in `options`, the source session's picker
+ *   options. A plain gateway option has no `modelRef`; its `id` is the
+ *   gateway model id, so the selection defaults to the `kilo` provider.
+ * - A non-empty variant must be offered by the source option; otherwise the
+ *   whole selection is dropped, keeping today's "never silently change a
+ *   variant" behavior.
+ * - With a catalog, the provider and model must exist in it, and a set
+ *   variant must be offered by that catalog model.
+ * - Without a catalog (an old CLI, or a CLI whose catalog could not be
+ *   read), only a `kilo` selection is sent; an unvalidated non-Kilo provider
+ *   is omitted rather than guessed.
+ *
+ * Returns `undefined` when the selection must be omitted so the CLI uses its
+ * own default model.
  */
-export function resolveContinueRemoteModel(
-  model: string,
-  variant: string,
-  catalog: { id: string; variants: string[] }[]
-): { model: string; variant: string } {
-  const found = catalog.find(m => m.id === model);
-  if (!found) {
-    return { model: '', variant: '' };
+export function resolveContinueRemoteSelection(input: {
+  model: string;
+  variant: string;
+  options: SessionModelOption[];
+  catalog: RemoteModelCatalogV1 | null;
+}): ModelSelection | undefined {
+  const { model, variant, options, catalog } = input;
+  const option = options.find(o => o.id === model);
+  if (!option) {
+    return undefined;
   }
-  if (variant && !found.variants.includes(variant)) {
-    return { model: '', variant: '' };
+  if (variant && !option.variants.includes(variant)) {
+    return undefined;
   }
-  return { model, variant };
+  const ref = option.modelRef ?? { providerID: 'kilo', modelID: option.id };
+  if (catalog !== null) {
+    const catalogModel = catalog.providers
+      .find(provider => provider.id === ref.providerID)
+      ?.models.find(m => m.id === ref.modelID);
+    if (!catalogModel || (variant && !catalogModel.variants.includes(variant))) {
+      return undefined;
+    }
+  } else if (ref.providerID !== 'kilo') {
+    return undefined;
+  }
+  return { model: ref, ...(variant ? { variant } : {}) };
+}
+
+/**
+ * Assemble the `create_session` wire input for a continued remote session.
+ *
+ * Normalizes the catalog result with the same model-count rule as the
+ * new-session hook: a parsed catalog counts only when it carries at least one
+ * model; a catalog with no models is treated as "no catalog". Then resolves
+ * the stored selection against it and delegates to
+ * `buildCreateRemoteSessionInput`. Pure so the continue hook keeps no
+ * catalog logic and the behavior is testable without mounting the hook.
+ */
+export function buildContinueRemoteSpawnInput(input: {
+  mode: string;
+  model: string;
+  variant: string;
+  options: SessionModelOption[];
+  catalogResult: InstanceModelCatalogResult;
+  organizationId: string | undefined;
+}): CreateRemoteSessionInput | undefined {
+  const catalog =
+    input.catalogResult.ok &&
+    input.catalogResult.catalog.providers.some(provider => provider.models.length > 0)
+      ? input.catalogResult.catalog
+      : null;
+  const selection = resolveContinueRemoteSelection({
+    model: input.model,
+    variant: input.variant,
+    options: input.options,
+    catalog,
+  });
+  return buildCreateRemoteSessionInput({
+    mode: input.mode,
+    selection,
+    organizationId: input.organizationId,
+  });
 }
 
 export function resolveContinuationDestinations(args: {

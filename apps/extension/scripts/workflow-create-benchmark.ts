@@ -1844,20 +1844,25 @@ const cleanupAttempt = async (
       if (exceeded()) {
         throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
       }
-      let exists = true;
-      try {
-        await runStep('profile absence check', access(userDataDir));
-      } catch (error) {
-        if (exceeded()) {
-          throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
-        }
-        // Only a confirmed missing directory counts as gone; a permission or
-        // I/O error must not pass the absence verification.
-        const code = (error as NodeJS.ErrnoException | undefined)?.code;
-        if (code !== 'ENOENT') {
-          throw new CleanupBlockerError(`profile absence check failed: ${errorToReason(error)}`);
-        }
-        exists = false;
+      // Only a confirmed missing directory counts as gone; a permission or
+      // I/O error rejects here and runStep raises it as a cleanup blocker.
+      // The ENOENT mapping happens before runStep's wrapping so the code is
+      // still readable on the raw error.
+      const exists = await runStep(
+        'profile absence check',
+        access(userDataDir).then(
+          () => true,
+          (error: unknown) => {
+            const code = (error as NodeJS.ErrnoException | undefined)?.code;
+            if (code !== 'ENOENT') {
+              throw error;
+            }
+            return false;
+          }
+        )
+      );
+      if (exceeded()) {
+        throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
       }
       gone = !exists;
       if (!gone && retry === 0) {

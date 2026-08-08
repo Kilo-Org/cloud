@@ -394,7 +394,7 @@ describe('agent LLM harness', () => {
 
   it('gives a concise safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot and write the script directly from it. Each snapshot node carries a CSS selector for its element; prefer copying those selectors into the script unchanged. get_element_details only repeats a snapshot node and find_in_page only searches snapshot text, so do not call them to hunt for selectors. Then call save_workflow as the next tool action with scopeOrigin set to the current origin and pathPrefix set to the current path, declare values that vary between runs as params, and do not end with text. The script must use only the documented page.* helpers and never document, querySelector, or page.goto.'
+      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot and write the script directly from it. Safe reads never reveal CSS selectors — get_element_details only repeats a snapshot node and find_in_page only searches snapshot text — so do not call them to hunt for selectors; derive each script selector from the visible text, placeholders, or labels in the snapshot. Then call save_workflow as the next tool action with scopeOrigin set to the current origin and pathPrefix set to the current path, declare values that vary between runs as params, and do not end with text. The script must use only the documented page.* helpers and never document, querySelector, or page.goto.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
       'For a workflow you save in safe mode, write the script using only the page helpers listed in the save_workflow tool description'
@@ -410,22 +410,18 @@ describe('agent LLM harness', () => {
     );
   });
 
-  it('tells the model that snapshot nodes carry a CSS selector', () => {
+  it('tells the model that get_element_details never returns a CSS selector', () => {
     const definitions = createSafeToolDefinitions({ supportsImages: false });
     const elementDetails = definitions.find(tool => tool.function.name === 'get_element_details');
-    const pageSnapshot = definitions.find(tool => tool.function.name === 'get_page_snapshot');
 
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain('Safe reads never reveal CSS selectors');
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'Each snapshot node carries a CSS selector for its element'
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
+      'use targeted reads only when a required selector is missing'
     );
-    expect(pageSnapshot?.function.description).toContain(
-      'CSS selectors for writing workflow scripts'
-    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Safe reads never reveal CSS selectors');
     expect(elementDetails?.function.description).toContain(
-      "The record repeats that node's snapshot fields (role, tag, label, text, href, state, and the CSS selector for its element); it never contains HTML or page source."
+      "The record repeats that node's snapshot fields (role, tag, label, text, href, state)"
     );
-    expect(elementDetails?.function.description).not.toContain('never contains a CSS selector');
+    expect(elementDetails?.function.description).toContain('never contains a CSS selector');
   });
 
   it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {

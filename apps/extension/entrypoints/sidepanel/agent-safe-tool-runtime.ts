@@ -4,7 +4,6 @@ import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-co
 import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
 import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
 import {
-  MAX_SELECTOR_LENGTH,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   isTabDebuggerResponse,
@@ -17,7 +16,6 @@ const pageSnapshotNodeSchema = z.object({
   id: z.string(),
   label: z.string().optional(),
   role: z.string(),
-  selector: z.string().min(1).max(MAX_SELECTOR_LENGTH),
   state: z.record(z.string(), z.boolean()).optional(),
   tag: z.string(),
   text: z.string().optional(),
@@ -43,7 +41,6 @@ const toPageSnapshotNode = (node: z.infer<typeof pageSnapshotNodeSchema>): PageS
   id: node.id,
   ...(node.label === undefined ? {} : { label: node.label }),
   role: node.role,
-  selector: node.selector,
   ...(node.state === undefined ? {} : { state: node.state }),
   tag: node.tag,
   ...(node.text === undefined ? {} : { text: node.text }),

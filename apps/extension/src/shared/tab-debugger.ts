@@ -2,9 +2,6 @@
 import { z } from 'zod';
 
 export const DEBUGGER_PROTOCOL_VERSION = '1.3';
-// Maximum length of a snapshot node's CSS selector. Enforced when the selector is produced (inside
-// The injected snapshot scan) and again when the side panel accepts a snapshot from the background.
-export const MAX_SELECTOR_LENGTH = 512;
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
@@ -83,13 +80,6 @@ export interface PageSnapshotNode {
   readonly id: string;
   readonly label?: string;
   readonly role: string;
-  // Best-effort CSS selector for the element: valid CSS, at most MAX_SELECTOR_LENGTH characters,
-  // And uniquely matching this element in the current document when the page allows it. Derived
-  // From the element's own safe attributes (tag, id, classes, name, aria-label, role, or
-  // Placeholder) plus structural disambiguation. It is a read-only hint for building workflow
-  // Scripts; it never contains page source, href URLs, or values the snapshot does not already
-  // Expose.
-  readonly selector: string;
   readonly state?: Record<string, boolean>;
   readonly tag: string;
   readonly text?: string;
@@ -448,14 +438,10 @@ const runInjectedEval = (code: string): unknown =>
   new Function(`return (async () => { ${code} })()`)();
 
 /* eslint-disable unicorn/consistent-function-scoping */
-const runInjectedPageSnapshot = (
-  timeoutMsText: string,
-  maxSelectorLengthText: string
-): PageSnapshot => {
+const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
   const maxTextLength = 8000;
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
-  const maxSelectorLength = Number(maxSelectorLengthText);
   const timeoutMs = Number(timeoutMsText);
   const deadline =
     Number.isFinite(timeoutMs) && timeoutMs > 0
@@ -597,7 +583,7 @@ const runInjectedPageSnapshot = (
 
     return rect.width > 0 && rect.height > 0;
   };
-  const getPriority = (node: { readonly role: string }): number => {
+  const getPriority = (node: PageSnapshotNode): number => {
     if (node.role === 'button' || node.role === 'field') {
       return 0;
     }
@@ -608,276 +594,6 @@ const runInjectedPageSnapshot = (
 
     return 2;
   };
-  const escapeCssIdentifier = (value: string): string => {
-    let result = '';
-
-    for (const character of value) {
-      const codePoint = character.codePointAt(0) ?? 0;
-
-      if (/[0-9a-zA-Z_-]/u.test(character)) {
-        result += character;
-      } else if (
-        codePoint === 0 ||
-        codePoint === 10 ||
-        codePoint === 12 ||
-        codePoint === 13 ||
-        (codePoint >= 1 && codePoint <= 31) ||
-        codePoint === 127
-      ) {
-        // Control code points have no single-character escape; use a hex escape.
-        result += `\\${codePoint.toString(16)} `;
-      } else {
-        result += `\\${character}`;
-      }
-    }
-
-    if (/^[0-9]/.test(result)) {
-      return `\\3${result[0] ?? ''} ${result.slice(1)}`;
-    }
-
-    if (/^-[0-9]/.test(result) || result.startsWith('--')) {
-      return `\\-${result.slice(1)}`;
-    }
-
-    return result;
-  };
-  const escapeCssAttributeValue = (value: string): string => {
-    let result = '';
-
-    for (const character of value) {
-      const codePoint = character.codePointAt(0) ?? 0;
-
-      if (character === '"') {
-        result += `\\"`;
-      } else if (character === '\\') {
-        result += `\\\\`;
-      } else if (
-        codePoint === 0 ||
-        codePoint === 10 ||
-        codePoint === 12 ||
-        codePoint === 13 ||
-        (codePoint >= 1 && codePoint <= 31) ||
-        codePoint === 127
-      ) {
-        // Control code points cannot appear raw inside a quoted string; use a hex escape.
-        result += `\\${codePoint.toString(16)} `;
-      } else {
-        result += character;
-      }
-    }
-
-    return result;
-  };
-  const getTagImpliedRole = (tag: string): string | undefined => {
-    if (/^h[1-6]$/u.test(tag)) {
-      return 'heading';
-    }
-
-    if (tag === 'a') {
-      return 'link';
-    }
-
-    if (tag === 'button') {
-      return 'button';
-    }
-
-    if (tag === 'input' || tag === 'select' || tag === 'textarea') {
-      return 'field';
-    }
-
-    return undefined;
-  };
-  // NUL (U+0000) cannot round-trip through CSS: a browser replaces the escaped code point with
-  // U+FFFD when parsing, so a NUL-derived part can never match the captured element. Skip such
-  // Values and let the structural fallback carry the selector instead.
-  const isCssSafe = (value: string): boolean => !value.includes('\0');
-  // Derived from attributes the snapshot already surfaces (plus structural id/class). Never
-  // Includes href URLs, values, or data-* attributes, so it cannot leak page source. Values are
-  // Kept complete or skipped entirely; they are never truncated, and the result always fits within
-  // The maxSelectorLength bound.
-  const getElementBaseSelector = (element: Element): string => {
-    const tag = element.tagName.toLowerCase();
-    const parts: string[] = [];
-    const canAdd = (part: string): boolean =>
-      parts.join('').length + part.length <= maxSelectorLength;
-
-    // The tag name is page-controlled (custom elements can name themselves) and can exceed the
-    // Bound on its own. A selector is valid without a type selector; drop an over-long tag and
-    // Keep the remaining parts.
-    if (canAdd(tag)) {
-      parts.push(tag);
-    }
-
-    const { id } = element;
-
-    if (id !== '' && isCssSafe(id)) {
-      const escapedId = escapeCssIdentifier(id);
-
-      if (canAdd(`#${escapedId}`)) {
-        parts.push(`#${escapedId}`);
-
-        return parts.join('');
-      }
-    }
-
-    let classCount = 0;
-
-    for (const className of element.classList) {
-      if (classCount >= 2) {
-        break;
-      }
-
-      if (isCssSafe(className)) {
-        const escapedClass = escapeCssIdentifier(className);
-
-        if (canAdd(`.${escapedClass}`)) {
-          parts.push(`.${escapedClass}`);
-          classCount += 1;
-        }
-      }
-    }
-
-    const isFormField =
-      element instanceof HTMLInputElement ||
-      element instanceof HTMLTextAreaElement ||
-      element instanceof HTMLSelectElement;
-    const name = isFormField ? element.getAttribute('name') : null;
-
-    if (name !== null && name.trim() !== '' && isCssSafe(name)) {
-      const escapedName = escapeCssAttributeValue(name);
-
-      if (canAdd(`[name="${escapedName}"]`)) {
-        parts.push(`[name="${escapedName}"]`);
-
-        return parts.join('');
-      }
-    }
-
-    const ariaLabel = element.getAttribute('aria-label');
-
-    if (ariaLabel !== null && ariaLabel.trim() !== '' && isCssSafe(ariaLabel)) {
-      const escapedLabel = escapeCssAttributeValue(ariaLabel);
-
-      if (canAdd(`[aria-label="${escapedLabel}"]`)) {
-        parts.push(`[aria-label="${escapedLabel}"]`);
-
-        return parts.join('');
-      }
-    }
-
-    const explicitRole = element.getAttribute('role');
-
-    if (
-      explicitRole !== null &&
-      explicitRole.trim() !== '' &&
-      isCssSafe(explicitRole) &&
-      explicitRole.trim() !== getTagImpliedRole(tag)
-    ) {
-      const escapedRole = escapeCssAttributeValue(explicitRole);
-
-      if (canAdd(`[role="${escapedRole}"]`)) {
-        parts.push(`[role="${escapedRole}"]`);
-
-        return parts.join('');
-      }
-    }
-
-    const placeholder = isFormField ? element.getAttribute('placeholder') : null;
-
-    if (placeholder !== null && placeholder.trim() !== '' && isCssSafe(placeholder)) {
-      const escapedPlaceholder = escapeCssAttributeValue(placeholder);
-
-      if (canAdd(`[placeholder="${escapedPlaceholder}"]`)) {
-        parts.push(`[placeholder="${escapedPlaceholder}"]`);
-
-        return parts.join('');
-      }
-    }
-
-    return parts.join('');
-  };
-  const getNthOfTypeIndex = (element: Element): number => {
-    const { tagName } = element;
-    let index = 1;
-
-    for (
-      let sibling = element.previousElementSibling;
-      sibling !== null;
-      sibling = sibling.previousElementSibling
-    ) {
-      if (sibling.tagName === tagName) {
-        index += 1;
-      }
-    }
-
-    return index;
-  };
-  // `:nth-of-type` only disambiguates among siblings, so duplicate controls in different parents can
-  // Still collide, and so can selectors of nodes omitted from the snapshot. Verify each selector
-  // Against the live document and disambiguate with an ancestor chain until it uniquely matches the
-  // Captured element. Every emitted selector is verified to match exactly the captured element and
-  // Fits within maxSelectorLength; when no bounded chain uniquely matches, return undefined and the
-  // Caller omits the node rather than expose an ambiguous selector.
-  const getUniqueSelector = (element: Element): string | undefined => {
-    const matchesExactly = (candidateSelector: string): boolean => {
-      try {
-        const matched = document.querySelectorAll(candidateSelector);
-
-        return matched.length === 1 && matched[0] === element;
-      } catch {
-        return false;
-      }
-    };
-    const tag = element.tagName.toLowerCase();
-    const base = getElementBaseSelector(element);
-
-    if (matchesExactly(base)) {
-      return base;
-    }
-
-    const nthOfTypeIndex = getNthOfTypeIndex(element);
-    const niceNth = `${base}:nth-of-type(${nthOfTypeIndex})`;
-
-    if (niceNth.length <= maxSelectorLength && matchesExactly(niceNth)) {
-      return niceNth;
-    }
-
-    // The attribute-based selector is not unique (or too long); keep the readable leaf when it
-    // Fits and climb the ancestors until the chain uniquely matches. A selector is valid without a
-    // Type selector, so an over-long custom tag falls back to the positional leaf.
-    const structuralNth = `${tag}:nth-of-type(${nthOfTypeIndex})`;
-    const positionalNth = `:nth-of-type(${nthOfTypeIndex})`;
-    let leaf = niceNth;
-
-    if (niceNth.length > maxSelectorLength) {
-      leaf = structuralNth.length <= maxSelectorLength ? structuralNth : positionalNth;
-    }
-
-    const parts = [leaf];
-
-    for (
-      let ancestor = element.parentElement;
-      ancestor !== null && ancestor !== document.documentElement;
-      ancestor = ancestor.parentElement
-    ) {
-      checkDeadline();
-
-      const ancestorCompound = `${getElementBaseSelector(ancestor)}:nth-of-type(${getNthOfTypeIndex(ancestor)})`;
-      const candidate = `${ancestorCompound} > ${parts.join(' > ')}`;
-
-      if (candidate.length > maxSelectorLength) {
-        break;
-      }
-
-      parts.unshift(ancestorCompound);
-
-      if (matchesExactly(candidate)) {
-        return candidate;
-      }
-    }
-
-    return undefined;
-  };
   const root = document.body ?? document.documentElement;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
     acceptNode: node =>
@@ -885,19 +601,7 @@ const runInjectedPageSnapshot = (
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_SKIP,
   });
-  const candidates: {
-    element: Element;
-    node: {
-      href?: string;
-      id: string;
-      label?: string;
-      role: string;
-      selector: string;
-      state?: Record<string, boolean>;
-      tag: string;
-      text?: string;
-    };
-  }[] = [];
+  const candidates: PageSnapshotNode[] = [];
   let elementNode = walker.nextNode();
 
   while (elementNode !== null && candidates.length < maxNodeCount * 3) {
@@ -928,15 +632,12 @@ const runInjectedPageSnapshot = (
         id: string;
         label?: string;
         role: string;
-        selector: string;
         state?: Record<string, boolean>;
         tag: string;
         text?: string;
       } = {
         id: `node-${candidates.length + 1}`,
         role: getRole(element),
-        // Filled with a document-unique selector after the ≤ maxNodeCount final candidates are chosen.
-        selector: '',
         tag,
       };
 
@@ -956,26 +657,14 @@ const runInjectedPageSnapshot = (
         node.text = text;
       }
 
-      candidates.push({ element, node });
+      candidates.push(node);
     }
 
     elementNode = walker.nextNode();
   }
-  const finalCandidates = candidates
-    .toSorted((left, right) => getPriority(left.node) - getPriority(right.node))
+  const nodes = candidates
+    .toSorted((left, right) => getPriority(left) - getPriority(right))
     .slice(0, maxNodeCount);
-  const nodes: PageSnapshotNode[] = [];
-
-  for (const candidate of finalCandidates) {
-    const uniqueSelector = getUniqueSelector(candidate.element);
-
-    // Omit the node when no bounded selector uniquely matches it; an ambiguous selector would
-    // Misdirect workflow scripts.
-    if (uniqueSelector !== undefined) {
-      candidate.node.selector = uniqueSelector;
-      nodes.push(candidate.node);
-    }
-  }
   const pageText = getPageText();
 
   return {
@@ -1140,7 +829,7 @@ export const getPageSnapshotInTabWithScripting = async ({
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
-          args: [String(timeoutMs), String(MAX_SELECTOR_LENGTH)],
+          args: [String(timeoutMs)],
           func: runInjectedPageSnapshot,
           target: { tabId },
           world: 'MAIN',

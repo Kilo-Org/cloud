@@ -80,9 +80,7 @@ const isRetriableStreamError = (error: unknown): boolean => {
   return error instanceof TypeError;
 };
 
-// Mirrors the gateway's own error-class finish reasons. A completion cut
-// short mid-thought (no tool calls to act on) is a provider fault the user
-// cannot fix, so the turn retries it transparently.
+// Mirrors the gateway's own error-class finish reasons. A completion cut short mid-thought (no tool calls to act on) is a provider fault the user cannot fix, so the turn retries it transparently.
 const TRUNCATED_FINISH_REASONS = new Set([
   'length',
   'max_tokens',

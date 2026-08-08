@@ -781,68 +781,114 @@ const runSetupStep = async <Value>(
 
 // ── Browser setup (probe pattern) ───────────────────────────────────────────
 
-const launchContext = async (
-  userDataDir: string
-): Promise<{ context: BrowserContext; extensionId: string; headless: boolean }> => {
+type LaunchContextResult =
+  | {
+      readonly kind: 'ready';
+      readonly context: BrowserContext;
+      readonly extensionId: string;
+      readonly headless: boolean;
+    }
+  | {
+      readonly error: unknown;
+      readonly headless: boolean;
+      readonly kind: 'pending-cleanup';
+      readonly pendingCleanup: Promise<void>;
+    }
+  | {
+      readonly context: BrowserContext;
+      readonly cleanupFailure?: string;
+      readonly error: unknown;
+      readonly headless: boolean;
+      readonly kind: 'failed';
+    };
+
+const launchContext = async (userDataDir: string): Promise<LaunchContextResult> => {
   const launchOptions: { args: string[] } = {
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
   };
+  const closeWhenReady = (launch: Promise<BrowserContext>): Promise<void> =>
+    launch.then(context => context.close());
+  const headedLaunch = chromium.launchPersistentContext(userDataDir, {
+    ...launchOptions,
+    headless: false,
+  });
   let context: BrowserContext;
   let headless = false;
-  let pendingHeadedLaunch: Promise<BrowserContext> | undefined;
   try {
-    pendingHeadedLaunch = chromium.launchPersistentContext(userDataDir, {
-      ...launchOptions,
-      headless: false,
-    });
-    context = await withTimeout(pendingHeadedLaunch, 60_000, 'browser launch timed out after 60s');
-  } catch {
-    // The primary timeout fired, but the headed launch promise is still live
-    // on the same profile dir. The headless fallback must not touch the
-    // profile until the headed promise has settled and its context is closed,
-    // so no untracked browser process or authentication profile is left
-    // behind. The settle wait is bounded: if the headed launch does not
-    // settle within it, the attempt fails instead of starting headless on the
-    // same profile.
-    const headedSettleWaitMs = 30_000;
-    const headedSettleTimeoutMessage = 'the headed browser launch did not settle within 30s';
-    if (pendingHeadedLaunch !== undefined) {
-      try {
-        await withTimeout(
-          (async (): Promise<void> => {
-            const headedContext = await pendingHeadedLaunch;
-            await headedContext.close();
-          })(),
-          headedSettleWaitMs,
-          headedSettleTimeoutMessage
-        );
-      } catch (error) {
-        if (error instanceof Error && error.message === headedSettleTimeoutMessage) {
-          throw new Error(
-            'the headed browser launch did not settle; the attempt fails instead of falling back headless on the same profile',
-            { cause: error }
-          );
-        }
-        // The headed launch rejected; there is no context to close.
+    context = await withTimeout(headedLaunch, 60_000, 'browser launch timed out after 60s');
+  } catch (headedError) {
+    let headedContext: BrowserContext | undefined;
+    try {
+      headedContext = await withTimeout(
+        headedLaunch,
+        30_000,
+        'the headed browser launch did not settle within 30s'
+      );
+    } catch (settleError) {
+      if (settleError instanceof Error && settleError.message.includes('did not settle')) {
+        return {
+          error: headedError,
+          headless: false,
+          kind: 'pending-cleanup',
+          pendingCleanup: closeWhenReady(headedLaunch),
+        };
       }
     }
-    headless = true;
-    context = await withTimeout(
-      chromium.launchPersistentContext(userDataDir, { ...launchOptions, headless: true }),
-      60_000,
-      'browser launch timed out after 60s'
-    );
+    if (headedContext !== undefined) {
+      const closePromise = headedContext.close();
+      try {
+        await withTimeout(closePromise, 30_000, 'headed browser close timed out');
+      } catch (closeError) {
+        if (closeError instanceof Error && closeError.message.includes('timed out')) {
+          return {
+            error: closeError,
+            headless: false,
+            kind: 'pending-cleanup',
+            pendingCleanup: closePromise,
+          };
+        }
+        return {
+          cleanupFailure: errorToReason(closeError),
+          context: headedContext,
+          error: closeError,
+          headless: false,
+          kind: 'failed',
+        };
+      }
+    }
+
+    const headlessLaunch = chromium.launchPersistentContext(userDataDir, {
+      ...launchOptions,
+      headless: true,
+    });
+    try {
+      headless = true;
+      context = await withTimeout(headlessLaunch, 60_000, 'browser launch timed out after 60s');
+    } catch (headlessError) {
+      return {
+        error: headlessError,
+        headless: true,
+        kind: 'pending-cleanup',
+        pendingCleanup: closeWhenReady(headlessLaunch),
+      };
+    }
   }
-  const [existingServiceWorker] = context.serviceWorkers();
-  const serviceWorker =
-    existingServiceWorker ??
-    (await withTimeout(
-      context.waitForEvent('serviceworker', { timeout: 30_000 }),
-      30_000,
-      'service worker discovery timed out after 30s'
-    ));
-  const extensionId = new URL(serviceWorker.url()).host;
-  return { context, extensionId, headless };
+  try {
+    const [existingServiceWorker] = context.serviceWorkers();
+    const serviceWorker =
+      existingServiceWorker ??
+      (await withTimeout(
+        context.waitForEvent('serviceworker', { timeout: 30_000 }),
+        30_000,
+        'service worker discovery timed out after 30s'
+      ));
+    const extensionId = new URL(serviceWorker.url()).host;
+    return { kind: 'ready', context, extensionId, headless };
+  } catch (error) {
+    // Return the live context to the attempt owner. Cleanup must close it
+    // before removing the throwaway profile.
+    return { context, error, headless, kind: 'failed' };
+  }
 };
 
 const ensureSignedInPanel = async (
@@ -1266,9 +1312,12 @@ const computeSavedAtOffsetMs = (
   if (saveSeenAtMs === null) {
     return null;
   }
-  // The persisted store can lag the in-memory stream, so the save upper bound
-  // is the first request that starts after the save was observed: a new
-  // request can only start after the save result existed. Without a post-save
+  // The pinned boundary is the minimum of the first save observation and the
+  // first gateway request that starts after it. A request that starts after
+  // the observation definitely ran after the save existed, but the
+  // observation itself is the earliest proven save bound: taking the minimum
+  // never inflates `createToSavedSeconds` with a later request's offset, and
+  // a request between the two stays in the create phase. Without a post-save
   // request the first-seen poll stamp is the bound.
   let firstPostSaveOffsetMs: number | null = null;
   for (const request of requests) {
@@ -1279,7 +1328,9 @@ const computeSavedAtOffsetMs = (
       firstPostSaveOffsetMs = request.offsetMs;
     }
   }
-  return firstPostSaveOffsetMs ?? saveSeenAtMs;
+  return firstPostSaveOffsetMs === null
+    ? saveSeenAtMs
+    : Math.min(saveSeenAtMs, firstPostSaveOffsetMs);
 };
 
 // ── Conversation polling (abortable) ────────────────────────────────────────
@@ -1722,6 +1773,20 @@ const redactOtherToolArguments = (args: Record<string, unknown>): Record<string,
   return out;
 };
 
+// Approved metadata keys for workflow and memory tool results. Only these
+// keys may enter the artifact; every other field is dropped so raw workflow
+// code, memory text, and arbitrary scalar content never persist.
+const workflowMemoryResultMetadataKeys = new Set([
+  'approvedScriptHash',
+  'createdAt',
+  'id',
+  'inScope',
+  'memoryId',
+  'saved',
+  'truncated',
+  'workflowId',
+]);
+
 const redactToolResult = (
   event: InternalToolResult,
   joinedName: string,
@@ -1751,14 +1816,29 @@ const redactToolResult = (
       ...(pagesVisited === undefined ? {} : { pagesVisited }),
     };
   }
+  // Workflow and memory tool results: allowlist metadata only. Raw content
+  // fields (`script`, `text`) are replaced with their lengths; all other
+  // fields are dropped, so no arbitrary scalar string or token-like field
+  // enters the artifact.
   const scalars: Record<string, unknown> = {};
   if (isRecord(event.value)) {
     for (const [key, value] of Object.entries(event.value)) {
+      if (!workflowMemoryResultMetadataKeys.has(key)) {
+        continue;
+      }
       const capped = capScalar(value);
       if (capped === undefined) {
         continue;
       }
       scalars[key] = capped;
+    }
+    const script = event.value['script'];
+    if (typeof script === 'string') {
+      scalars['scriptChars'] = script.length;
+    }
+    const text = event.value['text'];
+    if (typeof text === 'string') {
+      scalars['textChars'] = text.length;
     }
   }
   return { ...base, ...(Object.keys(scalars).length === 0 ? {} : { scalars }) };
@@ -1824,12 +1904,14 @@ const redactTranscript = (
 
 const cleanupAttempt = async (
   context: BrowserContext | undefined,
-  userDataDir: string
+  userDataDir: string,
+  pendingCleanup: Promise<void> | undefined,
+  initialContextCloseFailure: string | null
 ): Promise<void> => {
   // One bounded 15-second lifecycle: every step observes the same deadline, no
-  // step starts after it, and every started operation is awaited to settlement
-  // before this function returns, so no cleanup work outlives the cleanup
-  // result. Crossing the cap still emits the cleanup blocker.
+  // step starts after it. Crossing the cap emits a cleanup blocker and skips
+  // profile removal, so an unresolved browser operation cannot reopen the
+  // token profile after cleanup.
   const cleanupController = new AbortController();
   const cleanupCapMs = 15_000;
   const startedAtMs = Date.now();
@@ -1837,8 +1919,7 @@ const cleanupAttempt = async (
   const exceeded = (): boolean => Date.now() - startedAtMs >= cleanupCapMs;
 
   // Runs one cleanup step under the shared deadline. When the cap fires first,
-  // the started operation is still awaited to settlement so the lifecycle owns
-  // no detached work after return; the attempt then fails as a blocker.
+  // attach a rejection handler and stop before profile removal.
   const runStep = async <Value>(label: string, op: Promise<Value>): Promise<Value> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -1855,11 +1936,7 @@ const cleanupAttempt = async (
         throw new CleanupBlockerError(errorToReason(error));
       }
       cleanupController.abort();
-      try {
-        await op;
-      } catch {
-        // The operation failed after the cap; the cap breach is the failure.
-      }
+      void op.catch(() => undefined);
       throw new CleanupBlockerError(`${label} exceeded the 15-second cleanup cap`);
     } finally {
       if (timer !== undefined) {
@@ -1872,7 +1949,7 @@ const cleanupAttempt = async (
   // profile, so it is never silently accepted: the failure is recorded, the
   // profile removal and absence verification still run (cleanup guarantees are
   // not weakened), and the attempt then fails as a cleanup blocker.
-  let contextCloseFailure: string | null = null;
+  let contextCloseFailure: string | null = initialContextCloseFailure;
   try {
     if (context !== undefined) {
       try {
@@ -1880,6 +1957,13 @@ const cleanupAttempt = async (
       } catch (error) {
         contextCloseFailure = error instanceof Error ? error.message : String(error);
       }
+      if (contextCloseFailure !== null) {
+        throw new CleanupBlockerError(`context close failed: ${contextCloseFailure}`);
+      }
+    } else if (pendingCleanup !== undefined) {
+      // The browser launch or close did not settle during setup. Cleanup owns
+      // the operation and skips profile removal when the shared cap expires.
+      await runStep('browser launch settlement', pendingCleanup);
     }
     if (exceeded()) {
       throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
@@ -1912,9 +1996,6 @@ const cleanupAttempt = async (
     }
     if (!gone) {
       throw new CleanupBlockerError(`profile directory survived cleanup: ${userDataDir}`);
-    }
-    if (contextCloseFailure !== null) {
-      throw new CleanupBlockerError(`context close failed: ${contextCloseFailure}`);
     }
   } catch (error) {
     cleanupController.abort();
@@ -2066,6 +2147,8 @@ const runAttempt = async (input: {
   const setupDone = { value: false };
   let context: BrowserContext | undefined;
   let headless: boolean | null = null;
+  let pendingCleanup: Promise<void> | undefined;
+  let initialContextCloseFailure: string | null = null;
   let extensionId = '';
   let creditAccount = '';
   let requests: readonly CapturedGatewayRequest[] = [];
@@ -2079,6 +2162,16 @@ const runAttempt = async (input: {
 
   try {
     const launched = await launchContext(userDataDir);
+    if (launched.kind !== 'ready') {
+      if (launched.kind === 'pending-cleanup') {
+        pendingCleanup = launched.pendingCleanup;
+        throw launched.error;
+      }
+      context = launched.context;
+      headless = launched.headless;
+      initialContextCloseFailure = launched.cleanupFailure ?? null;
+      throw launched.error;
+    }
     const attemptContext = launched.context;
     context = attemptContext;
     headless = launched.headless;
@@ -2353,7 +2446,7 @@ const runAttempt = async (input: {
       clearTimeout(deadlineTimer);
     }
     try {
-      await cleanupAttempt(context, userDataDir);
+      await cleanupAttempt(context, userDataDir, pendingCleanup, initialContextCloseFailure);
     } catch (error) {
       if (error instanceof CleanupBlockerError) {
         throw error;

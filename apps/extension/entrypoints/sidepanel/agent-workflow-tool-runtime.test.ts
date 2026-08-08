@@ -1,5 +1,6 @@
 /* eslint-disable max-lines, consistent-type-imports, no-unsafe-type-assertion, no-unsafe-assignment, no-useless-undefined, jest/no-untyped-mock-factory, jest/no-conditional-in-test, prefer-destructuring, import/first -- test mock factories and fixture coverage */
 import { describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { getDefaultStore } from 'jotai';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
 import {
@@ -13,6 +14,7 @@ import {
   pendingLockAtom,
   requestApproval as realRequestApproval,
 } from './pending-approval';
+import type { ApprovalOutcome } from './pending-approval';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
 import {
   executeWorkflowToolCall,
@@ -60,6 +62,23 @@ const createToolCall = (name: string, args: Record<string, unknown> = {}): Workf
     tabId: 1,
     type: 'tool-call',
   }) as unknown as WorkflowToolCallEvent;
+
+// A requestApproval mock that stays pending until the test settles it.
+// The runtime must read the runs setting only after this resolves.
+// A change during the pending card must be reflected in the nextStep.
+const deferredApproval = (): {
+  requestApproval: Mock<WorkflowToolContext['requestApproval']>;
+  settle: (outcome: ApprovalOutcome) => void;
+} => {
+  const { promise, resolve } = Promise.withResolvers<ApprovalOutcome>();
+  const requestApproval = vi.fn<WorkflowToolContext['requestApproval']>(() => promise);
+  return {
+    requestApproval,
+    settle: (outcome: ApprovalOutcome) => {
+      resolve(outcome);
+    },
+  };
+};
 
 // ---------- search_workflows ----------
 
@@ -529,6 +548,99 @@ describe('save_workflow', () => {
         autoApproved: false,
         nextStep:
           'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('reports the runs toggle at the completed save, not when the card opened', async () => {
+    // The setting starts ON when the card opens.
+    // The user flips it OFF while the approval is pending.
+    // The nextStep must report the OFF state, never the stale ON.
+    const { requestApproval, settle } = deferredApproval();
+    const ctx = createBaseCtx({ requestApproval });
+    const settingsValue: Record<string, unknown> = {
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: true,
+    };
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue(settingsValue);
+
+    const resultPromise = executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    // Wait for the approval request to be in flight before changing the setting.
+    await vi.waitFor(() => {
+      if (requestApproval.mock.calls.length === 0) {
+        throw new Error('approval not requested yet');
+      }
+    });
+
+    // Flip the toggle while the approval card is pending, then approve.
+    settingsValue['autoApproveWorkflowRuns'] = false;
+    settle({ autoApproved: false, savedId: 'new-wf-id', status: 'approved' });
+
+    const result = await resultPromise;
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('reports a run toggle flipped on while approval is pending', async () => {
+    // The setting starts OFF when the card opens.
+    // The user flips it ON while the approval is pending.
+    // The completed save reports the ON state.
+    const { requestApproval, settle } = deferredApproval();
+    const ctx = createBaseCtx({ requestApproval });
+    const settingsValue: Record<string, unknown> = {
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: false,
+    };
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue(settingsValue);
+
+    const resultPromise = executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    // Wait for the approval request to be in flight before changing the setting.
+    await vi.waitFor(() => {
+      if (requestApproval.mock.calls.length === 0) {
+        throw new Error('approval not requested yet');
+      }
+    });
+
+    settingsValue['autoApproveWorkflowRuns'] = true;
+    settle({ autoApproved: false, savedId: 'new-wf-id', status: 'approved' });
+
+    const result = await resultPromise;
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.',
         saved: true,
         workflowId: 'new-wf-id',
       },

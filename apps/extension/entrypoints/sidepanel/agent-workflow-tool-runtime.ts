@@ -82,6 +82,7 @@ const saveMemoryArgsSchema = z.object({
 // ---------- run guidance ----------
 
 // The runs toggle is a permission the model reads through the save result's nextStep.
+// The setting is read when the save completes, so a change during a pending card is reflected.
 // It is never a runtime refusal. The exact strings are pinned by the runtime tests.
 const NEXT_STEP_RUNS_AUTO_APPROVED =
   'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.';
@@ -394,17 +395,21 @@ const executeSaveWorkflow = async (
   };
 
   // The runs toggle is a permission the model reads through the save result's nextStep.
-  // Read the setting before requesting approval.
+  // Request approval first, then read the setting when the save completes.
+  // A change made while the card was pending is reflected in the guidance.
+  const outcome = await ctx.requestApproval('workflow', draft);
+
   // A failed settings read still permits the save and falls back to the cautious ask-the-user guidance.
   let runsAutoApproved = false;
-  try {
-    const settings = await loadWorkflowSettings(ctx.storage);
-    runsAutoApproved = settings.autoApproveWorkflowRuns;
-  } catch {
-    // The nextStep is guidance only. An unreadable setting falls back to the cautious text.
+  if (outcome.status === 'approved') {
+    try {
+      const settings = await loadWorkflowSettings(ctx.storage);
+      runsAutoApproved = settings.autoApproveWorkflowRuns;
+    } catch {
+      // The nextStep is guidance only. An unreadable setting falls back to the cautious text.
+    }
   }
 
-  const outcome = await ctx.requestApproval('workflow', draft);
   const extra: Record<string, unknown> =
     outcome.status === 'approved'
       ? {

@@ -424,7 +424,7 @@ describe('batch summary', () => {
 });
 
 describe('zero-param scenarios', () => {
-  const npr = BENCH_SCENARIOS['npr'];
+  const { npr } = BENCH_SCENARIOS;
   if (npr === undefined) {
     throw new Error('scenario registry is missing npr');
   }

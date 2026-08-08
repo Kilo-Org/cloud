@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One flat registry of twenty pinned scenario specs; splitting it would only scatter the pins. */
 /**
  * Golden-star scenario registry for the workflow-create benchmark.
  *
@@ -6,11 +7,11 @@
  * which params the agent must declare, what the stored script must mention,
  * and what a verifying run's result must contain.
  *
- * The five scenarios cover five task shapes: a JS-heavy SPA search (flights),
- * a query-parameter search (hn), a path-encoded lookup (wikipedia), a
- * filtered list on a code host (github), and a classic GET-form site
- * (weather). Scoring reads only these specs — nothing in the product is
- * allowed to special-case a benchmark site by name.
+ * The scenarios cover the common task shapes: JS-heavy SPA searches,
+ * query-parameter searches, path-encoded lookups, filtered lists, classic
+ * GET-form sites, price and status lookups, and a zero-param workflow.
+ * Scoring reads only these specs — nothing in the product is allowed to
+ * special-case a benchmark site by name.
  */
 
 export interface BenchRegexCheck {

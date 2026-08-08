@@ -197,7 +197,8 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     !containsCacheControl(request.body.messages)
   ) {
     const systemMessage = request.body.messages.find(
-      msg => msg.role === 'system' || msg.role === 'developer'
+      (msg): msg is Extract<OpenAI.ChatCompletionMessageParam, { role: 'system' | 'developer' }> =>
+        msg.role === 'system' || msg.role === 'developer'
     );
     if (systemMessage) {
       console.debug(
@@ -207,7 +208,8 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     }
 
     const lastMessage = request.body.messages.findLast(
-      msg => msg.role === 'user' || msg.role === 'tool'
+      (msg): msg is Extract<OpenAI.ChatCompletionMessageParam, { role: 'user' | 'tool' }> =>
+        msg.role === 'user' || msg.role === 'tool'
     );
     if (lastMessage) {
       if (
@@ -246,7 +248,8 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     };
 
     const systemMessage = request.body.input.find(
-      msg => msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
+      (msg): msg is Extract<OpenAI.Responses.ResponseInputItem, { type: 'message' }> =>
+        msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
     );
     if (systemMessage) {
       console.debug(
@@ -256,7 +259,12 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     }
 
     const lastMessage = request.body.input.findLast(
-      msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
+      (
+        msg
+      ): msg is
+        | Extract<OpenAI.Responses.ResponseInputItem, { type: 'message' }>
+        | Extract<OpenAI.Responses.ResponseInputItem, { type: 'function_call_output' }> =>
+        (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
     );
     if (lastMessage) {
       if (

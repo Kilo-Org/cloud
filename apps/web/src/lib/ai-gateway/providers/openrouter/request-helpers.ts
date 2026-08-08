@@ -24,7 +24,14 @@ export function hasMiddleOutTransform(request: GatewayRequest) {
   );
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
+  if (!isObjectRecord(message)) {
+    return;
+  }
   if (typeof message.content === 'string') {
     message.content = [
       {
@@ -36,7 +43,7 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
     ];
   } else if (Array.isArray(message.content)) {
     const lastItem = message.content.at(-1);
-    if (lastItem) {
+    if (isObjectRecord(lastItem)) {
       // @ts-expect-error non-standard extension
       lastItem.cache_control = { type: 'ephemeral' };
     }
@@ -44,6 +51,9 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
 }
 
 function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
+  if (!isObjectRecord(message)) {
+    return;
+  }
   if ('content' in message) {
     if (typeof message.content === 'string') {
       message.content = [
@@ -55,7 +65,7 @@ function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Response
       ];
     } else if (Array.isArray(message.content)) {
       const lastItem = message.content.at(-1);
-      if (lastItem && 'type' in lastItem && lastItem.type === 'input_text') {
+      if (isObjectRecord(lastItem) && lastItem.type === 'input_text') {
         lastItem.prompt_cache_breakpoint = { mode: 'explicit' };
       }
     }
@@ -70,7 +80,7 @@ function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Response
       ];
     } else if (Array.isArray(message.output)) {
       const lastItem = message.output.at(-1);
-      if (lastItem && 'type' in lastItem && lastItem.type === 'input_text') {
+      if (isObjectRecord(lastItem) && lastItem.type === 'input_text') {
         lastItem.prompt_cache_breakpoint = { mode: 'explicit' };
       }
     }
@@ -78,25 +88,41 @@ function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Response
 }
 
 function isEnvironmentDetailsChatCompletionsPart(part: OpenAI.ChatCompletionContentPart): boolean {
-  return part.type === 'text' && part.text.startsWith('<environment_details>');
+  return (
+    isObjectRecord(part) &&
+    part.type === 'text' &&
+    typeof part.text === 'string' &&
+    part.text.startsWith('<environment_details>')
+  );
 }
 
 function isEnvironmentDetailsResponsesPart(
   part: OpenAI.Responses.ResponseInputContent | OpenAI.Responses.ResponseContent
 ): boolean {
   return (
-    'type' in part && part.type === 'input_text' && part.text.startsWith('<environment_details>')
+    isObjectRecord(part) &&
+    part.type === 'input_text' &&
+    typeof part.text === 'string' &&
+    part.text.startsWith('<environment_details>')
   );
 }
 
 function isEnvironmentDetailsMessagesPart(part: Anthropic.ContentBlockParam): boolean {
-  return part.type === 'text' && part.text.startsWith('<environment_details>');
+  return (
+    isObjectRecord(part) &&
+    part.type === 'text' &&
+    typeof part.text === 'string' &&
+    part.text.startsWith('<environment_details>')
+  );
 }
 
 function setCacheControlOnMessagesMessage(
   message: Anthropic.MessageParam,
   cacheControl: Anthropic.CacheControlEphemeral
 ) {
+  if (!isObjectRecord(message)) {
+    return;
+  }
   if (typeof message.content === 'string') {
     message.content = [
       {
@@ -105,7 +131,7 @@ function setCacheControlOnMessagesMessage(
         cache_control: cacheControl,
       },
     ];
-  } else {
+  } else if (Array.isArray(message.content)) {
     const lastItem = message.content.findLast(isCacheableMessagesContentBlock);
     if (lastItem) {
       lastItem.cache_control = cacheControl;
@@ -139,17 +165,16 @@ function isCacheableMessagesContentBlock(
   Anthropic.ContentBlockParam,
   Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
 > {
-  return item.type !== 'thinking' && item.type !== 'redacted_thinking';
+  return isObjectRecord(item) && item.type !== 'thinking' && item.type !== 'redacted_thinking';
 }
 
 function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
+  if (!isObjectRecord(message)) {
+    return false;
+  }
   return typeof message.content === 'string'
     ? message.content.length > 0
-    : message.content.some(isCacheableMessagesContentBlock);
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+    : Array.isArray(message.content) && message.content.some(isCacheableMessagesContentBlock);
 }
 
 function containsCacheControl(value: unknown): boolean {
@@ -202,7 +227,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   ) {
     const systemMessage = request.body.messages.find(
       (msg): msg is Extract<OpenAI.ChatCompletionMessageParam, { role: 'system' | 'developer' }> =>
-        msg.role === 'system' || msg.role === 'developer'
+        isObjectRecord(msg) && (msg.role === 'system' || msg.role === 'developer')
     );
     if (systemMessage) {
       console.debug(
@@ -213,7 +238,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
 
     const lastMessage = request.body.messages.findLast(
       (msg): msg is Extract<OpenAI.ChatCompletionMessageParam, { role: 'user' | 'tool' }> =>
-        msg.role === 'user' || msg.role === 'tool'
+        isObjectRecord(msg) && (msg.role === 'user' || msg.role === 'tool')
     );
     if (lastMessage) {
       if (
@@ -224,7 +249,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
         const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsChatCompletionsPart);
         if (envIndex > 0) {
           const targetElement = lastMessage.content[envIndex - 1];
-          if (targetElement) {
+          if (isObjectRecord(targetElement)) {
             console.debug(
               '[addCacheBreakpoints] setting cache breakpoint before environment details in chat completions'
             );
@@ -252,7 +277,8 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     };
 
     const systemMessage = request.body.input.find(
-      msg => 'role' in msg && (msg.role === 'system' || msg.role === 'developer')
+      msg =>
+        isObjectRecord(msg) && 'role' in msg && (msg.role === 'system' || msg.role === 'developer')
     );
     if (systemMessage) {
       console.debug(
@@ -263,8 +289,9 @@ export function addCacheBreakpoints(request: GatewayRequest) {
 
     const lastMessage = request.body.input.findLast(
       msg =>
-        ('role' in msg && msg.role === 'user') ||
-        ('type' in msg && msg.type === 'function_call_output')
+        isObjectRecord(msg) &&
+        (('role' in msg && msg.role === 'user') ||
+          ('type' in msg && msg.type === 'function_call_output'))
     );
     if (lastMessage) {
       if (
@@ -277,7 +304,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
         const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsResponsesPart);
         if (envIndex > 0) {
           const targetElement = lastMessage.content[envIndex - 1];
-          if (targetElement && 'type' in targetElement && targetElement.type === 'input_text') {
+          if (isObjectRecord(targetElement) && targetElement.type === 'input_text') {
             console.debug(
               '[addCacheBreakpoints] setting cache breakpoint before environment details in responses'
             );
@@ -309,6 +336,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
       if (
+        isObjectRecord(lastMessage) &&
         lastMessage.role === 'user' &&
         Array.isArray(lastMessage.content) &&
         lastMessage.content.length > 1
@@ -316,7 +344,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
         const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsMessagesPart);
         if (envIndex > 0) {
           const targetElement = lastMessage.content[envIndex - 1];
-          if (targetElement && isCacheableMessagesContentBlock(targetElement)) {
+          if (isObjectRecord(targetElement) && isCacheableMessagesContentBlock(targetElement)) {
             console.debug(
               '[addCacheBreakpoints] setting cache breakpoint before environment details in messages'
             );

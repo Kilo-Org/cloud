@@ -392,17 +392,19 @@ describe('agent LLM harness', () => {
     );
   });
 
-  it('gives a safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
+  it('gives a concise safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'When the user asks you to create a workflow in safe mode, read the page once with get_page_snapshot, use find_in_page for targeted follow-ups instead of re-snapshotting unchanged state, declare values that vary between runs as params, and save the workflow scoped to the current page by setting scopeOrigin to the current origin and pathPrefix to the current path.'
-    );
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'Once you have inspected enough, call save_workflow instead of ending with a text response.'
+      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot, use targeted reads only when a required selector is missing, then call save_workflow with scopeOrigin set to the current origin and pathPrefix set to the current path, without ending with an explanation.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'For a workflow you save in safe mode, write the script using only the page helpers listed in the save_workflow tool description (page.click, page.fill, page.text, page.textAll, page.attr, page.exists, page.waitFor). page.goto and other page methods do not exist; move to another page by returning { navigate: "<url>", state } from the script.'
     );
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain('Google Flights');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'When a workflow task has values that vary between runs (a destination, a search term, a date), declare them as params in save_workflow and read them from input in the script.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toMatch(
+      /Once you have inspected enough|Google Flights/
+    );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'When the user asks you to create a workflow: in dangerous mode, first perform the task once with the page tools to verify the steps, then save the workflow, then verify it with run_workflow dryRun: true and report the planned actions. Follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user. Never start a real run of a workflow whose actions buy, send, delete, or otherwise change data without asking the user first.'
     );

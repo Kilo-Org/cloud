@@ -175,13 +175,14 @@ describe('addCacheBreakpoints', () => {
             ],
           },
           { role: 'assistant', content: 'Calling tool' },
-          { role: 'tool', content: 'Tool output' },
+          { role: 'tool', content: 'Tool output', tool_call_id: 'call_123' },
         ],
       },
     };
 
     addCacheBreakpoints(request);
 
+    if (request.kind !== 'chat_completions') return;
     const userContent = request.body.messages.at(1)?.content;
     expect(userContent).toEqual([
       { type: 'text', text: 'User prompt' },
@@ -191,6 +192,31 @@ describe('addCacheBreakpoints', () => {
     const toolContent = request.body.messages.at(3)?.content;
     expect(toolContent).toEqual([
       { type: 'text', text: 'Tool output', cache_control: { type: 'ephemeral' } },
+    ]);
+  });
+
+  test('adds a cache breakpoint to developer message in chat completions', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'developer', content: 'Developer guidelines.' },
+          { role: 'user', content: 'Hello' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'chat_completions') return;
+    const devContent = request.body.messages.at(0)?.content;
+    expect(devContent).toEqual([
+      {
+        type: 'text',
+        text: 'Developer guidelines.',
+        cache_control: { type: 'ephemeral' },
+      },
     ]);
   });
 
@@ -335,6 +361,32 @@ describe('addCacheBreakpoints', () => {
     ]);
   });
 
+  test('adds a prompt_cache_breakpoint to developer message in responses', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          { type: 'message', role: 'developer', content: 'Developer instructions.' },
+          { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hello' }] },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    const devMessage = request.body.input.at(0);
+    if (!devMessage || typeof devMessage !== 'object' || devMessage.type !== 'message') return;
+    expect(devMessage.content).toEqual([
+      {
+        type: 'input_text',
+        text: 'Developer instructions.',
+        prompt_cache_breakpoint: { mode: 'explicit' },
+      },
+    ]);
+  });
+
   test('does nothing for responses requests when prompt_cache_options is already present', () => {
     const request: GatewayRequest = {
       kind: 'responses',
@@ -359,8 +411,14 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     expect(request.body.prompt_cache_options).toEqual({ mode: 'explicit' });
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
     const userMessage = request.body.input.at(0);
-    if (userMessage && userMessage.type === 'message' && Array.isArray(userMessage.content)) {
+    if (
+      userMessage &&
+      typeof userMessage === 'object' &&
+      userMessage.type === 'message' &&
+      Array.isArray(userMessage.content)
+    ) {
       expect(userMessage.content[0]).toEqual({ type: 'input_text', text: 'First prompt' });
     }
   });
@@ -405,6 +463,35 @@ describe('addCacheBreakpoints', () => {
         { type: 'input_text', text: 'Tool detail' },
       ],
     });
+  });
+
+  test('adds cache_control to system prompt and last message in messages requests', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: 'System instructions',
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.system).toEqual([
+      {
+        type: 'text',
+        text: 'System instructions',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+    ]);
   });
 
   test('adds cache_control to the last content block of a messages request', () => {

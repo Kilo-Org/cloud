@@ -109,6 +109,26 @@ function setCacheControlOnMessagesMessage(
   }
 }
 
+function setCacheControlOnMessagesSystem(
+  system: string | Anthropic.TextBlockParam[],
+  cacheControl: Anthropic.CacheControlEphemeral
+): Anthropic.TextBlockParam[] {
+  if (typeof system === 'string') {
+    return [
+      {
+        type: 'text',
+        text: system,
+        cache_control: cacheControl,
+      },
+    ];
+  }
+  const lastBlock = system.at(-1);
+  if (lastBlock) {
+    lastBlock.cache_control = cacheControl;
+  }
+  return system;
+}
+
 function isCacheableMessagesContentBlock(
   item: Anthropic.ContentBlockParam
 ): item is Exclude<
@@ -176,10 +196,12 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     request.body.messages.length > 1 &&
     !containsCacheControl(request.body.messages)
   ) {
-    const systemMessage = request.body.messages.find(msg => msg.role === 'system');
+    const systemMessage = request.body.messages.find(
+      msg => msg.role === 'system' || msg.role === 'developer'
+    );
     if (systemMessage) {
       console.debug(
-        '[addCacheBreakpoints] setting cache breakpoint on system chat completions message'
+        `[addCacheBreakpoints] setting cache breakpoint on ${systemMessage.role} chat completions message`
       );
       setCacheControlOnChatCompletionsMessage(systemMessage);
     }
@@ -224,10 +246,12 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     };
 
     const systemMessage = request.body.input.find(
-      msg => msg.type === 'message' && msg.role === 'system'
+      msg => msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
     );
     if (systemMessage) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
+      console.debug(
+        `[addCacheBreakpoints] setting cache breakpoint on ${systemMessage.role} responses message`
+      );
       setCacheBreakpointOnResponsesMessage(systemMessage);
     }
 
@@ -262,10 +286,16 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'messages' &&
     request.body.messages.length > 1 &&
-    !containsCacheControl(request.body.messages)
+    !containsCacheControl(request.body.messages) &&
+    !containsCacheControl(request.body.system)
   ) {
     const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
     delete request.body.cache_control;
+
+    if (request.body.system) {
+      console.debug('[addCacheBreakpoints] setting cache breakpoint on system messages prompt');
+      request.body.system = setCacheControlOnMessagesSystem(request.body.system, cacheControl);
+    }
 
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
@@ -305,6 +335,9 @@ export function removeCacheBreakpoints(request: GatewayRequest) {
   } else if (request.kind === 'messages') {
     console.debug('[removeCacheBreakpoints] removing cache breakpoints from messages request');
     delete request.body.cache_control;
+    if (request.body.system) {
+      deleteCacheControl(request.body.system);
+    }
     deleteCacheControl(request.body.messages);
   }
 }

@@ -91,7 +91,8 @@ const WIKIPEDIA_SCENARIO: BenchScenario = {
   followUpMessage: 'Run it for {topic}',
   followUpValues: { topic: 'Nikola Tesla' },
   id: 'wikipedia',
-  minResultChars: 300,
+  // A genuine REST summary can be short (Tesla's is ~200 chars).
+  minResultChars: 100,
   resultContentChecks: [],
   resultMustContainValues: ['topic'],
   scopeOrigin: 'https://en.wikipedia.org',

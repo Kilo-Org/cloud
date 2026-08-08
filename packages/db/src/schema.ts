@@ -3919,6 +3919,84 @@ export type PlatformAccessTokenCredential = typeof platform_access_token_credent
 export type NewPlatformAccessTokenCredential =
   typeof platform_access_token_credentials.$inferInsert;
 
+/**
+ * Encrypted Slack bot credentials, one row per Slack `platform_integrations` row.
+ *
+ * Deliberately a separate table rather than extra columns on `platform_oauth_credentials`:
+ * `GitLabOAuthCredentialRowSchema` in `packages/worker-utils/src/gitlab-credential.ts` is
+ * `.strict()` and `git-token-service` selects that whole row, so any column added to
+ * `platform_oauth_credentials` fails GitLab refresh closed to `reconnect_required`.
+ *
+ * Also deliberately not more `platform_integrations.metadata` jsonb: that column is
+ * spread-merged in several places, is read wholesale for unrelated queries, and cannot
+ * carry typed expiry or refresh bookkeeping.
+ *
+ * The refresh-bookkeeping columns (`refresh_token_encrypted`, `access_token_expires_at`,
+ * `refresh_claimed_at`, `refresh_attempt_count`, `next_refresh_attempt_at`,
+ * `last_refreshed_at`) are inert until Slack token rotation is enabled on the app.
+ * They exist now so enabling rotation needs no further migration.
+ *
+ * PII: there is no direct user FK. User-owned rows are removed by the
+ * `platform_integrations` cascade, which `softDeleteUser` already triggers by deleting
+ * that user's `platform_integrations`. Org-owned rows correctly survive user deletion.
+ */
+export const slack_oauth_credentials = pgTable(
+  'slack_oauth_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    // Slack workspace ID (`T...`). Mirrors platform_integrations.platform_installation_id
+    // and is part of the encryption AAD, so it must not be updated in place.
+    slack_team_id: text().notNull(),
+    slack_enterprise_id: text(),
+    is_enterprise_install: boolean().notNull().default(false),
+    bot_user_id: text(),
+    access_token_encrypted: text().notNull(),
+    // Null while tokens are long-lived; populated from `expires_in` once rotation is on.
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // Null until rotation is enabled on the Slack app.
+    refresh_token_encrypted: text(),
+    // Scopes Slack actually granted, as opposed to the scopes we asked for. Null until
+    // the install path can observe the real OAuth response; see getMissingSlackScopes.
+    granted_scopes: text().array(),
+    credential_version: integer().notNull().default(1),
+    // Refresh lease/backoff bookkeeping for the Step 4 cron sweep.
+    refresh_claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_attempt_count: integer().notNull().default(0),
+    next_refresh_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_refreshed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_slack_oauth_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    index('IDX_slack_oauth_credentials_slack_team_id').on(table.slack_team_id),
+    // Supports the Step 4 cron sweep: claim live rows nearing expiry.
+    index('IDX_slack_oauth_credentials_refresh_due')
+      .on(table.access_token_expires_at)
+      .where(isNull(table.revoked_at)),
+    check('slack_oauth_credentials_credential_version_check', sql`${table.credential_version} > 0`),
+    check(
+      'slack_oauth_credentials_refresh_attempt_count_check',
+      sql`${table.refresh_attempt_count} >= 0`
+    ),
+    check('slack_oauth_credentials_slack_team_id_check', sql`${table.slack_team_id} <> ''`),
+  ]
+);
+
+export type SlackOAuthCredential = typeof slack_oauth_credentials.$inferSelect;
+export type NewSlackOAuthCredential = typeof slack_oauth_credentials.$inferInsert;
+
 // User Deployments
 
 export const deployments = pgTable(

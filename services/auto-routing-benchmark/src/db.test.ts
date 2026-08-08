@@ -125,7 +125,7 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
-      purpose: 'platform',
+      purpose: 'platform' as const,
     };
     const summaries: BenchmarkModelSummary[] = [
       {
@@ -169,7 +169,7 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
-      purpose: 'platform',
+      purpose: 'platform' as const,
     };
     const result = mapRunRow(runRow, []);
     expect(result.summaries).toEqual([]);
@@ -270,5 +270,64 @@ describe('rowsToRoutingTable', () => {
     const cand = reassembled.routes['implementation/code_generation']?.[0];
     expect(cand?.reasoningEffort).toBe('high');
     expect(cand && 'variant' in cand ? cand.variant : undefined).toBeUndefined();
+  });
+
+  it('reads back a reasoning_effort candidate row as effort-only', () => {
+    const tableRow = {
+      run_id: 'run-effort',
+      published_at: '2026-06-01T11:00:00.000Z',
+      generated_at: '2026-06-01T10:00:00.000Z',
+      min_accuracy: 0.7,
+      switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
+      source: 'benchmark',
+    };
+    const candidateRows = [
+      {
+        run_id: 'run-effort',
+        route_key: 'implementation/code_generation',
+        rank: 0,
+        model: 'model-a',
+        accuracy: 0.9,
+        avg_cost_usd: 0.001,
+        meets_threshold: true,
+        reasoning_effort: 'high',
+        variant: 'high',
+      },
+    ];
+    const table = rowsToRoutingTable(tableRow, candidateRows);
+    const cand = table.routes['implementation/code_generation']?.[0];
+    expect(cand?.reasoningEffort).toBe('high');
+    expect(cand && 'variant' in cand ? cand.variant : undefined).toBeUndefined();
+  });
+
+  it('reads back a variant-only candidate row as variant', () => {
+    const tableRow = {
+      run_id: 'run-variant',
+      published_at: '2026-06-01T11:00:00.000Z',
+      generated_at: '2026-06-01T10:00:00.000Z',
+      min_accuracy: 0.7,
+      switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
+      source: 'benchmark',
+    };
+    const candidateRows = [
+      {
+        run_id: 'run-variant',
+        route_key: 'implementation/code_generation',
+        rank: 0,
+        model: 'model-a',
+        accuracy: 0.9,
+        avg_cost_usd: 0.001,
+        meets_threshold: true,
+        reasoning_effort: null,
+        variant: 'max',
+      },
+    ];
+    const table = rowsToRoutingTable(tableRow, candidateRows);
+    const cand = table.routes['implementation/code_generation']?.[0];
+    expect(cand?.variant).toBe('max');
+    expect(cand?.reasoningEffort).toBeNull();
+    expect(RoutingTableSchema.parse(table)).toEqual(table);
   });
 });

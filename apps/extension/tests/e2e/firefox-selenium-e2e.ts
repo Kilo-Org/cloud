@@ -47,7 +47,7 @@ const chromeWorkflowNames = [
   'conversation survives side panel reload',
   'model and thinking controls wait for the model catalog',
   'model catalog failures can be retried',
-  'switching credit accounts clears the model while the next catalog loads',
+  'switching credit accounts keeps the conversation model and blocks sending until the next catalog loads',
   'stale organization model loads cannot overwrite the current catalog',
   'new conversation keeps the running request in its original tab',
   'analytics opt-out toggle persists across side panel reloads',
@@ -2425,7 +2425,7 @@ const scenarios: FirefoxScenario[] = [
       }),
   },
   {
-    name: 'switching credit accounts clears the model while the next catalog loads',
+    name: 'switching credit accounts keeps the conversation model and blocks sending until the next catalog loads',
     run: context => {
       const { promise: pendingOrgTwoModels, resolve: releaseOrgTwoModels } =
         Promise.withResolvers<void>();
@@ -2458,7 +2458,7 @@ const scenarios: FirefoxScenario[] = [
             await orgTwoModelsRequested;
             await clickButtonByLabel(session.driver, 'Close settings');
             assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
-            assert.match(await getModelTriggerText(session.driver), /Loading models/u);
+            assert.match(await getModelTriggerText(session.driver), /anthropic\/claude-sonnet-4/u);
             assert.equal(await isControlDisabled(session.driver, 'button[type="submit"]'), true);
             releaseOrgTwoModels();
             await waitForModel(session.driver, 'Org Two Model');

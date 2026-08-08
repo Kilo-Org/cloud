@@ -1,7 +1,9 @@
 import type {
   BenchmarkKind,
   BenchmarkModelSummary,
+  BenchmarkProfileStatus,
   BenchmarkRun,
+  BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
   RoutingTable,
@@ -10,7 +12,7 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -24,6 +26,7 @@ import {
   modelSummaries,
   routingTableCandidates,
   routingTables,
+  runLaneFailures,
   runModels,
 } from './db-schema';
 import { pickClassifierWinner } from './winner';
@@ -55,6 +58,27 @@ const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
 // and an unchunked 33-row insert fails with "too many SQL variables", which
 // stranded every pending Benchmark profile in production.
 const RUN_MODEL_INSERT_BATCH_SIZE = 18;
+
+// Statements that name a set of exact pairs bind two variables per entry on top
+// of a small fixed clause. 30 keeps each one well inside D1's 100-variable
+// ceiling — the same ceiling that once stranded every pending profile in prod.
+const PROFILE_ENTRY_FILTER_BATCH_SIZE = 30;
+
+/**
+ * Rows per config INSERT. D1 allows 100 bound variables per statement and the
+ * widest of these tables is 4 columns, so 20 rows always fits. The decider
+ * lists are catalog-sized and grow on their own — the auto list is refilled by
+ * a nightly sync — so they cannot go in one statement.
+ */
+const CONFIG_INSERT_BATCH_SIZE = 20;
+
+function batchRows<T>(rows: readonly T[]): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < rows.length; i += CONFIG_INSERT_BATCH_SIZE) {
+    batches.push(rows.slice(i, i + CONFIG_INSERT_BATCH_SIZE));
+  }
+  return batches;
+}
 
 // ---------------------------------------------------------------------------
 // Row mapping helpers
@@ -93,6 +117,7 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
   return {
     id: row.id,
     kind: row.kind,
+    purpose: row.purpose === 'user' ? 'user' : 'platform',
     status: row.status,
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -137,6 +162,7 @@ export async function replaceConfig(
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
     max_concurrency: number;
+    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
@@ -164,20 +190,14 @@ export async function replaceConfig(
     orm.delete(configDeciderModels),
     orm.delete(configAutoDeciderExclusions),
   ];
-  if (classifierModels.length > 0) {
-    stmts.push(
-      orm.insert(configClassifierModels).values(classifierModels.map(m => ({ model: m })))
-    );
+  for (const batch of batchRows(classifierModels)) {
+    stmts.push(orm.insert(configClassifierModels).values(batch.map(m => ({ model: m }))));
   }
-  if (deciderModels.length > 0) {
-    stmts.push(orm.insert(configDeciderModels).values(deciderModels));
+  for (const batch of batchRows(deciderModels)) {
+    stmts.push(orm.insert(configDeciderModels).values(batch));
   }
-  if (excludedAutoDeciderModels.length > 0) {
-    stmts.push(
-      orm
-        .insert(configAutoDeciderExclusions)
-        .values(excludedAutoDeciderModels.map(model => ({ model })))
-    );
+  for (const batch of batchRows(excludedAutoDeciderModels)) {
+    stmts.push(orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model }))));
   }
   await orm.batch(stmts);
 }
@@ -190,8 +210,8 @@ export async function replaceAutoDeciderModels(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm.delete(configAutoDeciderModels),
   ];
-  if (autoDeciderModels.length > 0) {
-    stmts.push(orm.insert(configAutoDeciderModels).values(autoDeciderModels));
+  for (const batch of batchRows(autoDeciderModels)) {
+    stmts.push(orm.insert(configAutoDeciderModels).values(batch));
   }
   await orm.batch(stmts);
 }
@@ -200,8 +220,8 @@ export async function replaceAutoDeciderModels(
 // Runs
 // ---------------------------------------------------------------------------
 
-/** Run purpose: platform publishes default artifacts; profile updates the registry only. */
-export type BenchmarkRunPurpose = 'platform' | 'profile';
+/** Which registry queue a run drains: the platform decider list, or owner pools. */
+export type { BenchmarkRunPurpose };
 
 export async function insertRun(
   db: D1Database,
@@ -327,13 +347,23 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
     });
 }
 
-export async function countCaseResults(db: D1Database, runId: string): Promise<number> {
-  const row = await drizzle(db)
-    .select({ n: count() })
+export type LaneCaseCount = { model: string; variant: string; rep: number; n: number };
+
+/** Per-lane case counts for run-completion accounting. Variant is storage form. */
+export async function countCaseResultsByLane(
+  db: D1Database,
+  runId: string
+): Promise<LaneCaseCount[]> {
+  return drizzle(db)
+    .select({
+      model: caseResults.model,
+      variant: caseResults.variant,
+      rep: caseResults.rep,
+      n: count(),
+    })
     .from(caseResults)
     .where(eq(caseResults.run_id, runId))
-    .get();
-  return row?.n ?? 0;
+    .groupBy(caseResults.model, caseResults.variant, caseResults.rep);
 }
 
 export async function getCaseResults(db: D1Database, runId: string): Promise<CaseResultRow[]> {
@@ -425,11 +455,24 @@ export async function getSummaries(
   return rows.map(mapSummaryRow);
 }
 
-export async function listRuns(db: D1Database, limit: number): Promise<BenchmarkRun[]> {
+export async function listRuns(
+  db: D1Database,
+  limit: number,
+  // Classifier, platform-decider and profile-decider runs interleave in one
+  // table and profile runs are by far the most frequent, so the admin list
+  // filters server-side instead of slicing a mixed page client-side.
+  filter: { kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
+): Promise<BenchmarkRun[]> {
   const orm = drizzle(db);
   const runRows = await orm
     .select()
     .from(benchmarkRuns)
+    .where(
+      and(
+        filter.kind ? eq(benchmarkRuns.kind, filter.kind) : undefined,
+        filter.purpose ? eq(benchmarkRuns.purpose, filter.purpose) : undefined
+      )
+    )
     .orderBy(desc(benchmarkRuns.started_at))
     .limit(limit);
 
@@ -474,22 +517,34 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
 }
 
-// The currently-running run of a kind, if any (used for the one-active-run-per-kind
-// admission pre-check). Stale runs are swept to 'failed' before this is consulted.
+// The currently-running run of a (kind, purpose), if any (used for the
+// one-active-run-per-slot admission pre-check). Platform and profile hold
+// independent slots. Stale runs are swept to 'failed' before this is consulted.
 export async function getRunningRun(
   db: D1Database,
-  kind: BenchmarkKind
+  kind: BenchmarkKind,
+  purpose: BenchmarkRunPurpose
 ): Promise<RunRow | undefined> {
   return drizzle(db)
     .select()
     .from(benchmarkRuns)
-    .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'running')))
+    .where(
+      and(
+        eq(benchmarkRuns.kind, kind),
+        eq(benchmarkRuns.purpose, purpose),
+        eq(benchmarkRuns.status, 'running')
+      )
+    )
     .get();
 }
 
 // True when a run of the same kind started later than this one has already
 // completed. Used to skip publishing so a slow older run can't overwrite a
 // newer run's published routing table / classifier winner.
+// Only platform runs publish, so only a newer completed PLATFORM run may
+// suppress this run's publication. Profile runs share the decider kind and
+// complete on their own cadence; counting them here would silently skip
+// publishing a perfectly good platform table.
 export async function existsNewerCompletedRun(
   db: D1Database,
   kind: BenchmarkKind,
@@ -502,6 +557,7 @@ export async function existsNewerCompletedRun(
     .where(
       and(
         eq(benchmarkRuns.kind, kind),
+        eq(benchmarkRuns.purpose, 'platform'),
         eq(benchmarkRuns.status, 'completed'),
         gt(benchmarkRuns.started_at, startedAt),
         ne(benchmarkRuns.id, runId)
@@ -534,11 +590,15 @@ export async function markProfilesRunningForRun(
   entries: readonly PoolEntry[],
   current: { engineIdentity: string; repetitions: number },
   nowIso: string = new Date().toISOString()
-): Promise<void> {
-  if (entries.length === 0) return;
+): Promise<PoolEntry[]> {
+  if (entries.length === 0) return [];
   const orm = drizzle(db);
+  // Returns the entries this run actually claimed. An entry already claimed by
+  // the other queue's run updates 0 rows and is dropped, so the pair is
+  // measured once instead of being benchmarked (and billed) twice.
+  const claimed: PoolEntry[] = [];
   for (const entry of entries) {
-    await orm
+    const result = await orm
       .update(benchmarkProfiles)
       .set({
         status: 'running',
@@ -559,7 +619,9 @@ export async function markProfilesRunningForRun(
           )
         )
       );
+    if ((result.meta.changes ?? 0) > 0) claimed.push(entry);
   }
+  return claimed;
 }
 
 /**
@@ -629,12 +691,144 @@ export async function markProfilesFailedForRun(
 }
 
 /**
- * Pending current-engine profile rows, oldest request first. Used by the single
- * decider-slot drain to claim the next batch.
+ * Production UPDATE for the per-entry failed transition at profile-run
+ * completion. Same run_id + status='running' no-clobber guard as the
+ * whole-run variants. Exported for honest SQLite tests.
+ */
+export function markProfilesFailedForEntriesStatement(
+  orm: ReturnType<typeof drizzle>,
+  runId: string,
+  /** Storage-form variant keys ('' = default variant). */
+  entries: readonly { model: string; variant: string }[],
+  failureReason: string,
+  nowIso: string
+) {
+  // or(...[]) evaluates to undefined and the WHERE would degrade to run_id +
+  // status='running', failing every running entry of the run. Refuse the
+  // destructive form at the boundary instead of relying on caller guards.
+  if (entries.length === 0) {
+    throw new Error('markProfilesFailedForEntriesStatement requires at least one entry');
+  }
+  return orm
+    .update(benchmarkProfiles)
+    .set({
+      status: 'failed',
+      failure_reason: boundProfileFailureReason(failureReason),
+      updated_at: nowIso,
+      completed_at: nowIso,
+    })
+    .where(
+      and(
+        eq(benchmarkProfiles.run_id, runId),
+        eq(benchmarkProfiles.status, 'running'),
+        or(
+          ...entries.map(e =>
+            and(eq(benchmarkProfiles.model, e.model), eq(benchmarkProfiles.variant, e.variant))
+          )
+        )
+      )
+    );
+}
+
+/**
+ * Transition the given entries claimed by this run to failed. Only rows still
+ * pointing at this run_id and still running are updated.
+ */
+export async function markProfilesFailedForEntries(
+  db: D1Database,
+  runId: string,
+  entries: readonly { model: string; variant: string }[],
+  failureReason: string,
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  if (entries.length === 0) return;
+  const orm = drizzle(db);
+  // Two bound variables per entry plus the fixed clause. A run can hold far
+  // more entries than D1's ceiling allows in one statement, so chunk.
+  for (let i = 0; i < entries.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    await markProfilesFailedForEntriesStatement(
+      orm,
+      runId,
+      entries.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE),
+      failureReason,
+      nowIso
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Lane failures (dead-lettered queue messages)
+// ---------------------------------------------------------------------------
+
+export type RunLaneFailureRow = typeof runLaneFailures.$inferSelect;
+
+/**
+ * Production INSERT for lane-death records. ON CONFLICT DO NOTHING so DLQ
+ * redelivery or several dead chunks of one lane never throw. Exported for
+ * honest SQLite tests.
+ */
+export function recordLaneFailureStatement(
+  orm: ReturnType<typeof drizzle>,
+  row: {
+    runId: string;
+    model: string;
+    /** Storage form ('' = default variant). */
+    variant: string;
+    rep: number;
+    chunk: number;
+    shard: number;
+    failedAtIso: string;
+  }
+) {
+  return orm
+    .insert(runLaneFailures)
+    .values({
+      run_id: row.runId,
+      model: row.model,
+      variant: row.variant,
+      rep: row.rep,
+      chunk: row.chunk,
+      shard: row.shard,
+      failed_at: row.failedAtIso,
+    })
+    .onConflictDoNothing();
+}
+
+/** Record that a run's lane chunk dead-lettered. Variant in storage form. */
+export async function recordLaneFailure(
+  db: D1Database,
+  row: {
+    runId: string;
+    model: string;
+    /** Storage form ('' = default variant). */
+    variant: string;
+    rep: number;
+    chunk: number;
+    shard: number;
+  },
+  failedAtIso: string = new Date().toISOString()
+): Promise<void> {
+  await recordLaneFailureStatement(drizzle(db), { ...row, failedAtIso });
+}
+
+/** Lane-death records of a run, at (model, variant, rep, chunk, shard) granularity. */
+export async function listLaneFailures(
+  db: D1Database,
+  runId: string
+): Promise<RunLaneFailureRow[]> {
+  return drizzle(db).select().from(runLaneFailures).where(eq(runLaneFailures.run_id, runId));
+}
+
+/**
+ * Pending current-engine registry rows for one queue, oldest request first.
+ * Used by the per-queue drain to claim the next batch. A row wanted by both
+ * queues appears in both listings — whichever run claims it first flips it to
+ * `running`, so it is still measured exactly once.
  */
 export async function listPendingCurrentProfiles(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number }
+  current: { engineIdentity: string; repetitions: number },
+  queue: BenchmarkRunPurpose
 ): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
   return drizzle(db)
     .select({
@@ -647,13 +841,179 @@ export async function listPendingCurrentProfiles(
       and(
         eq(benchmarkProfiles.status, 'pending'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
-        eq(benchmarkProfiles.repetitions, current.repetitions)
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        queue === 'platform'
+          ? eq(benchmarkProfiles.platform_requested, true)
+          : eq(benchmarkProfiles.user_requested, true)
       )
     )
     .orderBy(
       asc(benchmarkProfiles.requested_at),
       asc(benchmarkProfiles.model),
       asc(benchmarkProfiles.variant)
+    );
+}
+
+/** Registry row counts per status for one queue's current-engine rows. */
+export async function countCurrentProfilesByStatus(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  queue: BenchmarkRunPurpose
+): Promise<Array<{ status: BenchmarkProfileStatus; count: number }>> {
+  const rows = await drizzle(db)
+    .select({ status: benchmarkProfiles.status, n: count() })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        queue === 'platform'
+          ? eq(benchmarkProfiles.platform_requested, true)
+          : eq(benchmarkProfiles.user_requested, true)
+      )
+    )
+    .groupBy(benchmarkProfiles.status);
+  return rows.map(row => ({ status: row.status, count: row.n }));
+}
+
+/**
+ * Admin requeue: put failed current-engine rows of a queue back to `pending`.
+ * Charges no owner quota — this is the admin's own escape hatch, distinct from
+ * an owner's Retry. Returns how many rows moved.
+ */
+export async function requeueFailedCurrentProfiles(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  queue: BenchmarkRunPurpose | 'both',
+  nowIso: string = new Date().toISOString()
+): Promise<number> {
+  const queueFilter =
+    queue === 'both'
+      ? or(
+          eq(benchmarkProfiles.platform_requested, true),
+          eq(benchmarkProfiles.user_requested, true)
+        )
+      : queue === 'platform'
+        ? eq(benchmarkProfiles.platform_requested, true)
+        : eq(benchmarkProfiles.user_requested, true);
+  const result = await drizzle(db)
+    .update(benchmarkProfiles)
+    .set({
+      status: 'pending',
+      run_id: null,
+      failure_reason: null,
+      requested_at: nowIso,
+      updated_at: nowIso,
+      completed_at: null,
+    })
+    .where(
+      and(
+        eq(benchmarkProfiles.status, 'failed'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        queueFilter
+      )
+    );
+  return result.meta.changes ?? 0;
+}
+
+/**
+ * Reconcile the platform queue with the saved decider model list: every desired
+ * exact pair gets a current-engine registry row flagged platform_requested, and
+ * pairs that left the list lose the flag. Existing measurements are never
+ * discarded — a `ready` row only gains the flag, so a pair already measured for
+ * an owner pool is reused by the platform table instead of re-benchmarked.
+ */
+export async function syncPlatformRegistryRows(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number },
+  desired: readonly { model: string; variant: string | null }[],
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  const orm = drizzle(db);
+
+  // Clear every flag first, then re-set it per desired pair. Naming the desired
+  // set in one NOT(...) clause instead would bind two variables per model and
+  // blow D1's bound-variable ceiling once the decider list passes ~47 entries.
+  // Both statements run in one batch, so no drain sees a half-cleared queue.
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
+    clearPlatformRequestedStatement(orm, current),
+  ];
+
+  for (const entry of desired) {
+    stmts.push(claimPlatformRequestedStatement(orm, entry, current, nowIso));
+  }
+
+  await orm.batch(stmts);
+}
+
+/**
+ * Claim `platform_requested` for one desired pair, creating the row as pending
+ * when it does not exist yet. Exported for the reconcile-vs-reaper test.
+ */
+export function claimPlatformRequestedStatement(
+  orm: ReturnType<typeof drizzle>,
+  entry: { model: string; variant: string | null },
+  current: { engineIdentity: string; repetitions: number },
+  nowIso: string
+) {
+  return (
+    orm
+      .insert(benchmarkProfiles)
+      .values({
+        model: entry.model,
+        variant: variantToStorage(entry.variant),
+        engine_identity: current.engineIdentity,
+        repetitions: current.repetitions,
+        status: 'pending',
+        run_id: null,
+        failure_reason: null,
+        requested_at: nowIso,
+        updated_at: nowIso,
+        completed_at: null,
+        platform_requested: true,
+        user_requested: false,
+      })
+      // Only claim the flag on an existing row. Status is left alone so a
+      // ready measurement stays ready and a failed one stays failed until
+      // someone requeues it.
+      .onConflictDoUpdate({
+        target: [
+          benchmarkProfiles.model,
+          benchmarkProfiles.variant,
+          benchmarkProfiles.engine_identity,
+          benchmarkProfiles.repetitions,
+        ],
+        // updated_at is deliberately NOT bumped here. It times the row's
+        // measurement lifecycle — claim, settle — and the orphaned-claim
+        // reaper only touches rows untouched for hours. This reconcile runs
+        // every 15 minutes, so bumping it would hold every platform row
+        // permanently below the reaper's age guard and an orphaned claim
+        // would keep the queue unsettled forever.
+        set: { platform_requested: true },
+      })
+  );
+}
+
+/**
+ * Drop `platform_requested` across the current-engine registry, so a reconcile
+ * can re-set it per desired pair. Exported for the reconcile-vs-reaper test.
+ *
+ * Leaves `updated_at` alone for the reason given on the claim above.
+ */
+export function clearPlatformRequestedStatement(
+  orm: ReturnType<typeof drizzle>,
+  current: { engineIdentity: string; repetitions: number }
+) {
+  return orm
+    .update(benchmarkProfiles)
+    .set({ platform_requested: false })
+    .where(
+      and(
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        eq(benchmarkProfiles.platform_requested, true)
+      )
     );
 }
 
@@ -667,24 +1027,29 @@ export async function listReadyCurrentProfilesForEntries(
 ): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
   if (entries.length === 0) return [];
   const models = [...new Set(entries.map(e => e.model))];
-  const rows = await drizzle(db)
-    .select({
-      model: benchmarkProfiles.model,
-      variant: benchmarkProfiles.variant,
-      run_id: benchmarkProfiles.run_id,
-      engine_identity: benchmarkProfiles.engine_identity,
-      repetitions: benchmarkProfiles.repetitions,
-      status: benchmarkProfiles.status,
-    })
-    .from(benchmarkProfiles)
-    .where(
-      and(
-        inArray(benchmarkProfiles.model, models),
-        eq(benchmarkProfiles.status, 'ready'),
-        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
-        eq(benchmarkProfiles.repetitions, current.repetitions)
-      )
+  const orm = drizzle(db);
+  // One bound variable per model. The platform decider list is unbounded, so
+  // chunk rather than let a long list trip D1's ceiling.
+  const rows: Array<{ model: string; variant: string; run_id: string | null }> = [];
+  for (let i = 0; i < models.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    rows.push(
+      ...(await orm
+        .select({
+          model: benchmarkProfiles.model,
+          variant: benchmarkProfiles.variant,
+          run_id: benchmarkProfiles.run_id,
+        })
+        .from(benchmarkProfiles)
+        .where(
+          and(
+            inArray(benchmarkProfiles.model, models.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE)),
+            eq(benchmarkProfiles.status, 'ready'),
+            eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+            eq(benchmarkProfiles.repetitions, current.repetitions)
+          )
+        ))
     );
+  }
   const wanted = new Set(entries.map(e => exactPairKey(e.model, e.variant)));
   return rows
     .filter(row => wanted.has(exactPairKey(row.model, variantFromStorage(row.variant))))
@@ -705,23 +1070,99 @@ export async function getSummariesForRuns(
   runIds: readonly string[]
 ): Promise<BenchmarkModelSummaryWithRun[]> {
   if (runIds.length === 0) return [];
-  const rows = await drizzle(db)
-    .select()
-    .from(modelSummaries)
-    .where(inArray(modelSummaries.run_id, [...runIds]));
-  return rows.map(mapSummaryRowWithRun);
+  const orm = drizzle(db);
+  // One bound variable per run id. Each ready registry row carries its own
+  // measuring run, so this set grows with the decider list and with every
+  // requeue — chunk it rather than let it trip D1's ceiling and freeze the
+  // published table behind a swallowed error.
+  const ids = [...runIds];
+  const summaries: BenchmarkModelSummaryWithRun[] = [];
+  for (let i = 0; i < ids.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    const rows = await orm
+      .select()
+      .from(modelSummaries)
+      .where(inArray(modelSummaries.run_id, ids.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE)));
+    summaries.push(...rows.map(mapSummaryRowWithRun));
+  }
+  return summaries;
 }
 
 /**
  * Running decider run ids older than the stale threshold (for profile fail-over
  * after the bulk stale sweep).
  */
-export async function listStaleRunningDeciderRunIds(
+/**
+ * Fail registry rows stuck `running` with no live run behind them. Two ways in:
+ * a run reached a terminal state without settling its rows (its transition
+ * threw), or the claim landed and the run row was never written at all. Neither
+ * is reachable otherwise — the drain wants `pending`, requeue wants `failed`,
+ * and the stale sweep only looks at runs that are still `running`. Left alone
+ * they stay claimed forever, and because a claimed platform row keeps the queue
+ * unsettled, the platform routing table would never publish again.
+ *
+ * The age guard is what makes this safe to run from every sweep: a run marks
+ * itself completed just before settling its rows, so without it this would fail
+ * fully-measured entries mid-finalization and send them back to be re-measured
+ * at full cost.
+ */
+export function failOrphanedRunningProfilesStatement(
+  orm: ReturnType<typeof drizzle>,
+  failureReason: string,
+  olderThanIso: string,
+  nowIso: string
+) {
+  return orm
+    .update(benchmarkProfiles)
+    .set({
+      status: 'failed',
+      failure_reason: boundProfileFailureReason(failureReason),
+      updated_at: nowIso,
+      completed_at: nowIso,
+    })
+    .where(
+      and(
+        eq(benchmarkProfiles.status, 'running'),
+        lt(benchmarkProfiles.updated_at, olderThanIso),
+        notInArray(
+          benchmarkProfiles.run_id,
+          orm
+            .select({ id: benchmarkRuns.id })
+            .from(benchmarkRuns)
+            .where(eq(benchmarkRuns.status, 'running'))
+        )
+      )
+    );
+}
+
+export async function failOrphanedRunningProfiles(
+  db: D1Database,
+  failureReason: string,
+  olderThanIso: string,
+  nowIso: string = new Date().toISOString()
+): Promise<number> {
+  const result = await failOrphanedRunningProfilesStatement(
+    drizzle(db),
+    failureReason,
+    olderThanIso,
+    nowIso
+  );
+  return result.meta.changes ?? 0;
+}
+
+/** Release rows this run claimed back to `pending` (claim made, run never written). */
+export async function releaseProfileClaims(db: D1Database, runId: string): Promise<void> {
+  await drizzle(db)
+    .update(benchmarkProfiles)
+    .set({ status: 'pending', run_id: null, updated_at: new Date().toISOString() })
+    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+}
+
+export async function listStaleRunningDeciderRuns(
   db: D1Database,
   olderThanIso: string
-): Promise<string[]> {
+): Promise<Array<{ id: string; purpose: BenchmarkRunPurpose }>> {
   const rows = await drizzle(db)
-    .select({ id: benchmarkRuns.id })
+    .select({ id: benchmarkRuns.id, purpose: benchmarkRuns.purpose })
     .from(benchmarkRuns)
     .where(
       and(
@@ -730,7 +1171,7 @@ export async function listStaleRunningDeciderRunIds(
         lt(benchmarkRuns.started_at, olderThanIso)
       )
     );
-  return rows.map(r => r.id);
+  return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));
 }
 
 // ---------------------------------------------------------------------------
@@ -886,14 +1327,17 @@ export function rowsToRoutingTable(
   });
   for (const row of sorted) {
     routeMap[row.route_key] ??= [];
-    // Platform artifact compatibility: keep reading reasoning_effort exactly
-    // as today so published JSON shape stays effort-based during rolling deploys.
+    // Platform artifact compatibility: a row with a reasoning_effort keeps the
+    // exact current read shape. A variant-only row (non-enum key) returns variant.
+    const effort = parsePersistedReasoningEffort(row.reasoning_effort);
+    const variant = effort === null ? variantFromStorage(row.variant) : null;
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      reasoningEffort: parsePersistedReasoningEffort(row.reasoning_effort),
+      ...(variant !== null ? { variant } : {}),
+      reasoningEffort: effort,
     });
   }
   return {

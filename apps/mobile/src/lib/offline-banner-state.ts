@@ -1,6 +1,12 @@
 import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
 
-export const OFFLINE_BANNER_DEBOUNCE_MS = 1000;
+/**
+ * How long the connection must stay down before the banner appears. NetInfo
+ * reports a false `offline` for a moment after a long background, so a short
+ * window flashed the banner on every foreground. Hiding stays immediate: a
+ * banner that is up when the connection works is the worse error.
+ */
+export const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
 
 export type OfflineBannerTimer = {
   set(callback: () => void, delayMs: number): { cancel(): void };
@@ -19,10 +25,10 @@ export type OfflineBannerStore = {
 export function createOfflineBannerStore(options: {
   source: ConnectivitySource;
   timer: OfflineBannerTimer;
-  debounceMs?: number;
+  showDelayMs?: number;
 }): OfflineBannerStore {
   const { source, timer } = options;
-  const debounceMs = options.debounceMs ?? OFFLINE_BANNER_DEBOUNCE_MS;
+  const showDelayMs = options.showDelayMs ?? OFFLINE_BANNER_SHOW_DELAY_MS;
 
   let committedOnline = true;
   let pending: { cancel(): void } | null = null;
@@ -40,21 +46,20 @@ export function createOfflineBannerStore(options: {
     }
   }
 
-  function schedule(online: boolean): void {
-    cancelPending();
-    pending = timer.set(() => {
-      pending = null;
-      commit(online);
-    }, debounceMs);
-  }
-
   function handleSourceState(state: ConnectivityState): void {
     const online = isOnline(state);
+    cancelPending();
     if (online === committedOnline) {
-      cancelPending();
       return;
     }
-    schedule(online);
+    if (online) {
+      commit(true);
+      return;
+    }
+    pending = timer.set(() => {
+      pending = null;
+      commit(false);
+    }, showDelayMs);
   }
 
   const unsubscribeSource = source.subscribe(handleSourceState);

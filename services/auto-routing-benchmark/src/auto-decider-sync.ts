@@ -4,9 +4,15 @@ import {
   AutoBenchmarkDeciderCandidatesResponseSchema,
   type BenchmarkDeciderModel,
 } from '@kilocode/auto-routing-contracts';
-import { getBenchmarkConfig, mapConfigRows } from './config';
+import { mapConfigRows } from './config';
 import { getConfigRows, replaceAutoDeciderModels, type ConfigAutoDeciderModelRow } from './db';
-import { drainPendingProfileBatch, RunAlreadyActiveError, startRun, sweepStaleRuns } from './run';
+import {
+  drainQueues,
+  publishPlatformRoutingTable,
+  sweepStaleRuns,
+  syncPlatformRegistry,
+  type StartedQueueRun,
+} from './run';
 
 type SyncOptions = {
   fetchImpl?: typeof fetch;
@@ -16,12 +22,12 @@ type SyncOptions = {
 export type AutoDeciderSyncResult = {
   addedModels: string[];
   removedModels: string[];
-  startedRun: boolean;
-  runId: string | null;
-  skippedReason?: 'active-run';
-  activeRunId?: string;
-  /** Profile batch started when no platform start claimed the free slot. */
-  profileDrainRunId?: string | null;
+  /** Registry entries the platform decider list wants after the sync. */
+  platformEntries: number;
+  /** Runs started for each queue this cycle (at most one per queue). */
+  startedRuns: StartedQueueRun[];
+  /** Version of the republished platform table, or null when nothing changed. */
+  publishedVersion: string | null;
 };
 
 function modelKey(model: BenchmarkDeciderModel): string {
@@ -66,22 +72,6 @@ async function fetchAutoDeciderCandidates(
   return parsed.data.candidates;
 }
 
-async function tryDrainPendingProfiles(env: Env): Promise<string | null> {
-  try {
-    const drained = await drainPendingProfileBatch(env);
-    return drained?.runId ?? null;
-  } catch (error) {
-    console.warn(
-      JSON.stringify({
-        event: 'benchmark_profile_drain_error',
-        afterAutoDeciderSync: true,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    );
-    return null;
-  }
-}
-
 export async function syncAutoDeciderModels(
   env: Env,
   options: SyncOptions = {}
@@ -89,10 +79,7 @@ export async function syncAutoDeciderModels(
   const fetchImpl = options.fetchImpl ?? fetch;
   const syncedAt = (options.now ?? new Date()).toISOString();
 
-  // Stale-run cleanup only — not a slot claim. Pending-profile drain is deferred
-  // until after the platform-start decision so profile work never preempts a
-  // free slot that scheduled platform start needs (plan change 6 / res #5).
-  await sweepStaleRuns(env.BENCH_DB);
+  await sweepStaleRuns(env);
 
   const beforeRows = await getConfigRows(env.BENCH_DB);
   const beforeConfig = mapConfigRows(
@@ -133,56 +120,31 @@ export async function syncAutoDeciderModels(
     beforeRows.excludedAutoDeciderModels
   );
   const diff = diffModels(beforeConfig?.deciderModels ?? [], afterConfig?.deciderModels ?? []);
-  const changed = diff.added.length > 0 || diff.removed.length > 0;
-  const hasConfig = Boolean(await getBenchmarkConfig(env.BENCH_DB));
-  const platformStartNeeded = changed && hasConfig;
 
-  if (!platformStartNeeded) {
-    // No platform start this cycle → drain now so stranded pending work recovers.
-    const profileDrainRunId = await tryDrainPendingProfiles(env);
-    return {
-      addedModels: diff.added,
-      removedModels: diff.removed,
-      startedRun: false,
-      runId: null,
-      profileDrainRunId,
-    };
-  }
+  // Reconcile the platform queue with the (possibly changed) decider list, then
+  // drain both queues. Models that already have a ready registry row — measured
+  // for an owner pool or by an earlier run — are reused, never re-benchmarked.
+  const { desiredEntries } = await syncPlatformRegistry(env);
+  const startedRuns = await drainQueues(env, 'both');
 
-  // Platform scheduled start takes the free slot first; profile work never
-  // preempts. Occupied slot → log/skip that cycle (never fail job); leave
-  // pending rows untouched (no drain while the slot is held).
-  let run: Awaited<ReturnType<typeof startRun>>;
-  try {
-    run = await startRun(env, 'decider');
-  } catch (error) {
-    if (error instanceof RunAlreadyActiveError) {
-      console.log(
-        JSON.stringify({
-          event: 'auto_decider_sync_skipped_active_run',
-          activeRunId: error.activeRunId,
-        })
-      );
-      return {
-        addedModels: diff.added,
-        removedModels: diff.removed,
-        startedRun: false,
-        runId: null,
-        skippedReason: 'active-run',
-        activeRunId: error.activeRunId,
-        profileDrainRunId: null,
-      };
-    }
-    throw error;
-  }
+  // Republish from the registry: a removed model must leave the live table even
+  // when no new measurement was needed.
+  const published = await publishPlatformRoutingTable(env).catch(error => {
+    console.warn(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped',
+        afterAutoDeciderSync: true,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    return null;
+  });
 
-  // Platform run claimed the slot. Do NOT drain this cycle — the run's terminal
-  // transition (or a later cron with no platform start) drains pending work.
   return {
     addedModels: diff.added,
     removedModels: diff.removed,
-    startedRun: true,
-    runId: run.runId,
-    profileDrainRunId: null,
+    platformEntries: desiredEntries,
+    startedRuns,
+    publishedVersion: published?.version ?? null,
   };
 }

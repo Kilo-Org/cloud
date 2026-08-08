@@ -13,6 +13,8 @@ import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
+import { captureException } from '@sentry/nextjs';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -192,6 +194,42 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
+ * Dual-write the bot token into the encrypted `slack_oauth_credentials` store.
+ *
+ * Deliberately best-effort for now: nothing reads that store yet, so an unconfigured
+ * or failing encryption keyset must not break Slack installs. Step 3 moves the read
+ * paths onto the store, at which point this write becomes required and must move
+ * inside the same transaction as the `platform_integrations` write.
+ */
+async function mirrorSlackCredential({
+  integration,
+  owner,
+  teamId,
+  installation,
+}: {
+  integration: PlatformIntegration;
+  owner: Owner;
+  teamId: string;
+  installation: SlackInstallation;
+}): Promise<void> {
+  try {
+    await writeSlackCredential({
+      integrationId: integration.id,
+      slackTeamId: teamId,
+      owner,
+      botToken: installation.botToken,
+      botUserId: installation.botUserId ?? null,
+    });
+  } catch (error) {
+    captureException(error, {
+      level: 'error',
+      tags: { component: 'slack-service', op: 'mirror-slack-credential' },
+      extra: { integrationId: integration.id, teamId },
+    });
+  }
+}
+
+/**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
  */
 export async function upsertSlackInstallation({
@@ -247,6 +285,8 @@ export async function upsertSlackInstallation({
         .where(eq(platform_integrations.id, existing.id))
         .returning();
 
+      await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
+
       return updated;
     } catch (error) {
       if (isSlackWorkspaceUniqueViolation(error)) {
@@ -273,6 +313,8 @@ export async function upsertSlackInstallation({
         installed_at: new Date().toISOString(),
       })
       .returning();
+
+    await mirrorSlackCredential({ integration: created, owner, teamId, installation });
 
     return created;
   } catch (error) {

@@ -532,6 +532,30 @@ describe('workflow settings', () => {
     }
   });
 
+  it('renders three switches off on a fresh store', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({ ...DEFAULT_WORKFLOW_SETTINGS });
+
+    const { getByLabelText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      const toggle = getByLabelText('Allow workflows in safe mode');
+      if (toggle instanceof HTMLButtonElement) {
+        expect(toggle.disabled).toBe(false);
+      }
+    });
+
+    for (const label of [
+      'Allow workflows in safe mode',
+      'Auto-approve workflow changes',
+      'Auto-approve workflow runs',
+    ]) {
+      expect(getByLabelText(label).getAttribute('aria-checked')).toBe('false');
+    }
+  });
+
   it('calls deleteAgentWorkflow on delete click', async () => {
     mockUseAgentWorkflows.mockReturnValue({
       ...emptyResult,

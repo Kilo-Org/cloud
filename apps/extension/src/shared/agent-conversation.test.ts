@@ -7,9 +7,10 @@ import {
   createToolResult,
   createUserMessage,
   createWorkflowToolCall,
-  groupConversationEvents,
   getConversationScrollKey,
+  groupConversationEvents,
 } from './agent-conversation';
+import type { GroupedConversationItem } from './agent-conversation';
 
 describe('agent conversation events', () => {
   it('creates stable conversation events for messages and eval tools', () => {
@@ -130,6 +131,37 @@ describe('agent conversation events', () => {
     );
 
     expect(nextKey).not.toBe(firstKey);
+  });
+
+  it('marks an in-flight agent tool exchange in the scroll key', () => {
+    const toolCall = {
+      arguments: { filePath: 'src/auth.ts' },
+      id: 'tc-agent',
+      name: 'read',
+      source: 'agent' as const,
+      type: 'tool-call' as const,
+    };
+    const items: GroupedConversationItem[] = [{ toolCall, type: 'tool-exchange' }];
+
+    expect(getConversationScrollKey(items)).toBe('tc-agent:running');
+  });
+
+  it('keeps the result id in the scroll key once the tool exchange completes', () => {
+    const toolCall = {
+      arguments: { filePath: 'src/auth.ts' },
+      id: 'tc-agent',
+      name: 'read',
+      source: 'agent' as const,
+      type: 'tool-call' as const,
+    };
+    const result = createToolResult({
+      ok: true,
+      toolCallId: toolCall.id,
+      value: 'export const guard = () => true;',
+    });
+    const items: GroupedConversationItem[] = [{ result, toolCall, type: 'tool-exchange' }];
+
+    expect(getConversationScrollKey(items)).toBe(`tc-agent:${result.id}`);
   });
 
   it('creates remote MCP tool-call events', () => {

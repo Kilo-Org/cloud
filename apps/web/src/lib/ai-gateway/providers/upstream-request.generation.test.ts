@@ -20,6 +20,7 @@ const provider: Provider = {
   apiUrl: 'https://openrouter.example/api/v1',
   apiKey: 'test-api-key',
   supportedChatApis: [],
+  responseTransforms: null,
   transformRequest: async () => {},
 };
 

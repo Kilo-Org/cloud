@@ -613,6 +613,47 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).not.toContain('Do not run `git fetch`');
   });
 
+  it('only instructs sandbox-allowlisted glab commands in bash blocks (GitLab)', async () => {
+    // The cloud-agent-next command guard (CODE_REVIEW_ALLOWED_COMMANDS in
+    // session-service.ts) only permits `glab mr view/diff` and the
+    // `glab api --method POST/PUT` publishing forms. Any other glab
+    // invocation is auto-rejected in non-interactive review mode, so the
+    // prompt must never instruct one (e.g. a bare `glab api "projects/..."`
+    // GET silently kills the review before it can publish).
+    const allowedGlabLine =
+      /^glab (?:mr view \d+(?: --comments)?|mr diff \d+|api --method (?:POST|PUT) "projects\/)/;
+
+    for (const previousHeadSha of [null, 'prevsha456']) {
+      const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+        reviewId: 'review-456',
+        existingReviewState: previousHeadSha
+          ? existingReviewStateWithSummary
+          : existingReviewStateNoSummary,
+        platform: 'gitlab',
+        gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+        previousHeadSha,
+      });
+
+      const glabLines = [...prompt.matchAll(/```bash\n([\s\S]*?)```/g)]
+        .flatMap(match => match[1].split('\n'))
+        .map(line => line.trim())
+        .filter(line => line.startsWith('glab '));
+
+      expect(glabLines.length).toBeGreaterThan(0);
+      for (const line of glabLines) {
+        expect(line).toMatch(allowedGlabLine);
+      }
+
+      expect(prompt).toContain('glab mr view 10 --comments');
+      expect(prompt).toContain('Position rules');
+      expect(prompt).toContain('old_path');
+      expect(prompt).toContain('line_code');
+      // hardConstraints is appended without replacePlaceholders (see
+      // generateReviewPrompt), so an {MR_IID} there would render literally.
+      expect(prompt).not.toContain('{MR_IID}');
+    }
+  });
+
   it('does not include GitHub inline comment footer guidance for GitLab prompts', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       platform: 'gitlab',

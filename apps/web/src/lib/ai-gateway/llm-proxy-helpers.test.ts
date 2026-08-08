@@ -971,6 +971,69 @@ describe('makeErrorReadable', () => {
       ).resolves.toBeUndefined();
     }
   });
+
+  it('does not redact errors for custom model provider', async () => {
+    const response = Response.json(
+      { error: { message: 'Custom endpoint failure details' } },
+      { status: 500 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'custom',
+      requestedModel: 'kilo-internal/custom-endpoint',
+      request,
+      response,
+      isUserByok: false,
+    });
+
+    expect(result).toBeUndefined();
+  });
+
+  it('redacts errors for experiment provider', async () => {
+    const response = Response.json(
+      { error: { message: 'Internal experiment failure' } },
+      { status: 500 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'experiment',
+      requestedModel: 'experiment/test-model',
+      request,
+      response,
+      isUserByok: false,
+    });
+
+    expect(result).toBeDefined();
+    expect(result?.status).toBe(500);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'The upstream provider was unable to process the request',
+      error_type: 'upstream_error',
+      message: 'The upstream provider was unable to process the request',
+    });
+  });
+
+  it('redacts errors for stealth models', async () => {
+    const response = Response.json(
+      { error: { message: 'Upstream vendor secret error' } },
+      { status: 502 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'openrouter',
+      requestedModel: 'stealth/claude-opus-4.7',
+      request,
+      response,
+      isUserByok: false,
+    });
+
+    expect(result).toBeDefined();
+    expect(result?.status).toBe(502);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'The upstream provider was unable to process the request',
+      error_type: 'upstream_error',
+      message: 'The upstream provider was unable to process the request',
+    });
+  });
 });
 
 describe('extractHeaderAndLimitLength', () => {

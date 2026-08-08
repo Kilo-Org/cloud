@@ -512,11 +512,13 @@ export const computeBatchSummary = (attempts: readonly BenchAttemptStats[]): Ben
 
   const successCount = attempts.filter(attempt => attempt.success).length;
   const maxCreateToSavedSeconds = createTimes.length === 0 ? null : Math.max(...createTimes);
-  const speedGatePassed = attempts.every(
-    attempt =>
-      attempt.createToSavedSeconds !== null &&
-      attempt.createToSavedSeconds < BENCH_SPEED_LIMIT_SECONDS
-  );
+  const speedGatePassed =
+    attempts.length > 0 &&
+    attempts.every(
+      attempt =>
+        attempt.createToSavedSeconds !== null &&
+        attempt.createToSavedSeconds < BENCH_SPEED_LIMIT_SECONDS
+    );
 
   return {
     attempts: attempts.length,

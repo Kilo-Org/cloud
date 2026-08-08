@@ -471,6 +471,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   // Watchdog: a stalled response — before the first byte or mid-stream — surfaces as a typed, retriable error instead of hanging the turn forever. Each read races against the stall timer, so the guarantee holds even when the underlying fetch ignores its abort signal.
   const stallController = new AbortController();
   const stall: {
+    cancelReader?: () => void;
     error?: Error;
     reject?: (error: Error) => void;
     stalled: boolean;
@@ -488,7 +489,9 @@ export const fetchKiloGatewayChatCompletionStream = async ({
     stall.stalled = true;
     stall.error = new KiloGatewayStreamStalledError(message);
     stallController.abort();
+    // Reject before cancelling: cancel resolves the pending read as a clean end-of-stream, which must not win the race against the stall error.
     stall.reject?.(stall.error);
+    stall.cancelReader?.();
   };
   const armWatchdog = (): void => {
     clearTimeout(stall.timer);
@@ -538,6 +541,10 @@ export const fetchKiloGatewayChatCompletionStream = async ({
       throw new Error('Gateway chat completion stream did not include a body.');
     }
     const sourceReader = response.body.getReader();
+    stall.cancelReader = () => {
+      // eslint-disable-next-line promise/prefer-await-to-then -- Fire-and-forget socket cleanup must not block the stall path.
+      void sourceReader.cancel().catch(() => {});
+    };
     const watchedBody = new ReadableStream<Uint8Array>({
       cancel: reason => sourceReader.cancel(reason),
       async pull(controller) {

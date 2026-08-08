@@ -271,7 +271,9 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
           }
           await abortableDelay(STREAM_RETRY_DELAYS_MS[streamAttempt - 1] ?? 4000, signal);
           if (isSignalAborted(signal)) {
-            throw error;
+            const abortError = new Error('The user aborted a request.');
+            abortError.name = 'AbortError';
+            throw abortError;
           }
           return streamWithRetries(streamAttempt + 1);
         }
@@ -376,6 +378,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         if (
           turnUsedTools &&
           !continueNudgeSent &&
+          remainingRounds > 1 &&
           !isSignalAborted(signal) &&
           deservesContinueNudge(lastAssistantText)
         ) {

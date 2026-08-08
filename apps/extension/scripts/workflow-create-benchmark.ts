@@ -544,6 +544,7 @@ const loadToken = async (): Promise<{ token: string; userEmail: string | undefin
   try {
     response = await fetch(`${gatewayBase}/api/user`, {
       headers: { Authorization: `Bearer ${candidate}` },
+      signal: AbortSignal.timeout(15_000),
     });
   } catch {
     throw new BatchBlockerError(
@@ -1876,10 +1877,9 @@ const cleanupAttempt = async (
       try {
         await runStep('context close', context.close());
       } catch (error) {
+        // Record the failure but continue: profile removal and absence
+        // verification must still run so the token profile never survives.
         contextCloseFailure = error instanceof Error ? error.message : String(error);
-      }
-      if (contextCloseFailure !== null) {
-        throw new CleanupBlockerError(`context close failed: ${contextCloseFailure}`);
       }
     } else if (pendingCleanup !== undefined) {
       // The browser launch or close did not settle during setup. Cleanup owns
@@ -1917,6 +1917,10 @@ const cleanupAttempt = async (
     }
     if (!gone) {
       throw new CleanupBlockerError(`profile directory survived cleanup: ${userDataDir}`);
+    }
+    // The profile is verifiably gone; a failed context close is still a blocker.
+    if (contextCloseFailure !== null) {
+      throw new CleanupBlockerError(`context close failed: ${contextCloseFailure}`);
     }
   } catch (error) {
     cleanupController.abort();

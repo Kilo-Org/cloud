@@ -83,6 +83,7 @@ const unreachable = (message) => {
 };
 const findByText = (roots, target) => {
   const wanted = normText(target);
+  if (wanted === '') { return null; }
   let partial = null;
   for (const el of roots) {
     if (!isVisible(el)) continue;
@@ -109,7 +110,11 @@ const fillElement = (el, value) => {
     const option = [...el.options].find(
       (opt) => normText(opt.value) === normText(value) || normText(opt.textContent) === normText(value)
     );
-    el.value = option ? option.value : value;
+    if (!option) {
+      const labels = [...el.options].map((opt) => (opt.textContent ?? '').trim()).filter(Boolean);
+      throw new Error('No option matches "' + value + '". Options: ' + labels.join(', '));
+    }
+    el.value = option.value;
   } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
@@ -234,7 +239,7 @@ const page = {
  * scripts are used directly instead.
  */
 export const isFunctionExpressionScript = (script: string): boolean =>
-  /^\s*(?:async\b\s*)?(?:\(|function\b)/u.test(script);
+  /^\s*(?:async\s*)?\([^)]*\)\s*=>/u.test(script) || /^\s*async\s+function\b/u.test(script);
 
 /**
  * Build the injected page code for a single workflow page eval.

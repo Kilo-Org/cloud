@@ -51,7 +51,7 @@ describe('clickText', () => {
     });
 
     const result = await runPageCode(
-      'page.clickText("Search flights"); return { done: true, result: "ok" };'
+      'await page.clickText("Search flights"); return { done: true, result: "ok" };'
     );
 
     expect(result.ok).toBe(true);
@@ -69,7 +69,7 @@ describe('clickText', () => {
       hit = 'b';
     });
 
-    await runPageCode('page.clickText("search"); return { done: true, result: null };');
+    await runPageCode('await page.clickText("search"); return { done: true, result: null };');
 
     expect(hit).toBe('b');
   });
@@ -81,7 +81,7 @@ describe('clickText', () => {
       clicked = true;
     });
 
-    await runPageCode('page.clickText("Close dialog"); return { done: true, result: null };');
+    await runPageCode('await page.clickText("Close dialog"); return { done: true, result: null };');
 
     expect(clicked).toBe(true);
   });
@@ -90,7 +90,7 @@ describe('clickText', () => {
     document.body.innerHTML = '<button>Other</button>';
 
     const result = await runPageCode(
-      'page.clickText("Missing"); return { done: true, result: null };'
+      'await page.clickText("Missing"); return { done: true, result: null };'
     );
 
     expect(result.ok).toBe(false);
@@ -107,7 +107,7 @@ describe('fillLabel', () => {
     inputEl?.addEventListener('change', () => events.push('change'));
 
     const result = await runPageCode(
-      'page.fillLabel("where to?", input.destination); return { done: true, result: null };',
+      'await page.fillLabel("where to?", input.destination); return { done: true, result: null };',
       { input: { destination: 'Paris' } }
     );
 
@@ -119,7 +119,9 @@ describe('fillLabel', () => {
   it('fills an input through its <label for>', async () => {
     document.body.innerHTML = '<label for="city">City, St</label><input id="city" name="c">';
 
-    await runPageCode('page.fillLabel("City, St", "SF"); return { done: true, result: null };');
+    await runPageCode(
+      'await page.fillLabel("City, St", "SF"); return { done: true, result: null };'
+    );
 
     expect(document.querySelector<HTMLInputElement>('#city')?.value).toBe('SF');
   });
@@ -129,7 +131,7 @@ describe('fillLabel', () => {
       '<select aria-label="Cabin class"><option value="e">Economy</option><option value="b">Business</option></select>';
 
     await runPageCode(
-      'page.fillLabel("Cabin class", "Business"); return { done: true, result: null };'
+      'await page.fillLabel("Cabin class", "Business"); return { done: true, result: null };'
     );
 
     expect(document.querySelector('select')?.value).toBe('b');
@@ -137,7 +139,7 @@ describe('fillLabel', () => {
 
   it('fails with a clear error when no input matches', async () => {
     const result = await runPageCode(
-      'page.fillLabel("Missing", "x"); return { done: true, result: null };'
+      'await page.fillLabel("Missing", "x"); return { done: true, result: null };'
     );
 
     expect(result.ok).toBe(false);
@@ -211,7 +213,7 @@ describe('dry-run recording', () => {
     });
 
     const result = await runPageCode(
-      'page.fillLabel("City", "SF"); page.clickText("Go"); return { done: true, result: null };',
+      'await page.fillLabel("City", "SF"); await page.clickText("Go"); return { done: true, result: null };',
       { dryRun: true }
     );
 
@@ -240,7 +242,7 @@ describe('dry-run recording', () => {
     document.body.innerHTML = '<button>Go</button>';
 
     const result = await runPageCode(
-      'page.clickText("Go"); await page.waitForText("never appears", 100); return { done: true, result: null };',
+      'await page.clickText("Go"); await page.waitForText("never appears", 100); return { done: true, result: null };',
       { dryRun: true }
     );
 
@@ -255,7 +257,7 @@ describe('dry-run recording', () => {
     document.body.innerHTML = '<button>Go</button>';
 
     const result = await runPageCode(
-      'page.clickText("Go"); page.clickText("Only after go"); return { done: true, result: null };',
+      'await page.clickText("Go"); await page.clickText("Only after go"); return { done: true, result: null };',
       { dryRun: true }
     );
 
@@ -265,7 +267,7 @@ describe('dry-run recording', () => {
 
   it('fails hard on a missing target before any recorded action', async () => {
     const result = await runPageCode(
-      'page.clickText("Missing"); return { done: true, result: null };',
+      'await page.clickText("Missing"); return { done: true, result: null };',
       { dryRun: true }
     );
 

@@ -51,7 +51,8 @@ const saveWorkflowArgsSchema = z.object({
   params: z.array(agentWorkflowParamSchema).max(MAX_WORKFLOW_PARAM_COUNT).optional(),
   pathPrefix: z.string().optional(),
   scopeOrigin: z.string(),
-  script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
+  // Optional so an update (workflowId set) can keep the stored script.
+  script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH).optional(),
   startUrl: z.string().optional(),
   workflowId: z.string().optional(),
 });
@@ -154,7 +155,7 @@ export const formatEmptySearchMessage = (savedCount: number, query: string | und
 };
 
 const validateWorkflowInput = (
-  args: z.infer<typeof saveWorkflowArgsSchema>
+  args: Omit<z.infer<typeof saveWorkflowArgsSchema>, 'script'> & { readonly script: string }
 ): string | undefined => {
   if (args.script.length === 0) {
     return 'Workflow body must not be empty.';
@@ -341,9 +342,45 @@ const executeSaveWorkflow = async (
     rawParsed.data.startUrl,
     rawParsed.data.scopeOrigin
   );
+
+  const workflows = await loadAgentWorkflows(ctx.storage);
+  const existing =
+    rawParsed.data.workflowId === undefined
+      ? undefined
+      : workflows.find(item => item.id === rawParsed.data.workflowId);
+
+  // For a Create (no workflowId), check store fullness first.
+  if (rawParsed.data.workflowId === undefined) {
+    if (workflows.length >= MAX_WORKFLOW_COUNT) {
+      return {
+        ok: true,
+        value: {
+          reason: 'Workflow store is full. Delete a workflow first.',
+          saved: false,
+        },
+      };
+    }
+    if (rawParsed.data.script === undefined) {
+      return {
+        error:
+          'save_workflow requires script when creating a workflow: pass the workflow function body (or a full async function) as a string.',
+        ok: false,
+      };
+    }
+  } else if (existing === undefined) {
+    // For an Update, verify the workflow exists.
+    return {
+      error:
+        'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
+      ok: false,
+    };
+  }
+
+  // An update may omit script to keep the stored version.
   const parsed = {
     data: {
       ...rawParsed.data,
+      script: rawParsed.data.script ?? existing?.script ?? '',
       ...(resolvedStartUrl === undefined ? {} : { startUrl: resolvedStartUrl }),
     },
   };
@@ -355,30 +392,6 @@ const executeSaveWorkflow = async (
 
   const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId, params } =
     parsed.data;
-
-  // For a Create (no workflowId), check store fullness first.
-  if (workflowId === undefined) {
-    const workflows = await loadAgentWorkflows(ctx.storage);
-    if (workflows.length >= MAX_WORKFLOW_COUNT) {
-      return {
-        ok: true,
-        value: {
-          reason: 'Workflow store is full. Delete a workflow first.',
-          saved: false,
-        },
-      };
-    }
-  } else {
-    // For an Update, verify the workflow exists.
-    const workflows = await loadAgentWorkflows(ctx.storage);
-    if (!workflows.some(item => item.id === workflowId)) {
-      return {
-        error:
-          'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
-        ok: false,
-      };
-    }
-  }
 
   const draft = {
     createdAt: Date.now(),

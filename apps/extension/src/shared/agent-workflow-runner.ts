@@ -124,7 +124,17 @@ const fillElement = (el, value) => {
 };
 const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const waitLimit = (timeoutMs) =>
-  typeof timeoutMs === 'number' && timeoutMs > 0 ? Math.min(timeoutMs, 25000) : 10000;
+  typeof timeoutMs === 'number' && timeoutMs > 0 ? Math.min(timeoutMs, 25000) : 15000;
+const AUTO_WAIT_MS = 3000;
+const autoWait = async (resolveTarget) => {
+  const start = Date.now();
+  let found = resolveTarget();
+  while ((found === null || found === undefined) && pageIsReal() && Date.now() - start < AUTO_WAIT_MS) {
+    await sleepMs(100);
+    found = resolveTarget();
+  }
+  return found;
+};
 const CLICKABLE = 'a, button, [role="button"], [role="option"], [role="tab"], [role="menuitem"], [role="link"], [role="checkbox"], [role="radio"], input[type="submit"], input[type="button"], label, summary';
 const FILLABLE = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select, [contenteditable="true"], [role="combobox"], [role="textbox"], [role="searchbox"]';
 const page = {
@@ -133,30 +143,36 @@ const page = {
     if (el === null) { throw unreachable('No element matches selector: ' + selector); }
     return el;
   },
-  click(selector) {
-    const el = page.__q(selector);
+  async click(selector) {
+    const el = await autoWait(() => document.querySelector(selector));
+    if (el === null) { throw unreachable('No element matches selector: ' + selector); }
     if (dryRun) { dryRunActions.push({ action: 'click', selector }); return; }
     el.click();
   },
-  clickText(text) {
-    const el = findByText(document.querySelectorAll(CLICKABLE), text);
+  async clickText(text) {
+    const el = await autoWait(() => findByText(document.querySelectorAll(CLICKABLE), text));
     if (el === null) { throw unreachable('No clickable element with text: ' + text); }
     if (dryRun) { dryRunActions.push({ action: 'clickText', selector: text }); return; }
     el.click();
   },
-  fill(selector, value) {
-    const el = page.__q(selector);
+  async fill(selector, value) {
+    const el = await autoWait(() => document.querySelector(selector));
+    if (el === null) { throw unreachable('No element matches selector: ' + selector); }
     if (dryRun) { dryRunActions.push({ action: 'fill', selector }); return; }
     fillElement(el, value);
   },
-  fillLabel(labelText, value) {
-    let el = findByText(document.querySelectorAll(FILLABLE), labelText);
-    if (el === null) {
-      const label = findByText(document.querySelectorAll('label'), labelText);
-      if (label !== null) {
-        el = label.control ?? (label.htmlFor ? document.getElementById(label.htmlFor) : label.querySelector(FILLABLE));
+  async fillLabel(labelText, value) {
+    const resolveField = () => {
+      let el = findByText(document.querySelectorAll(FILLABLE), labelText);
+      if (el === null) {
+        const label = findByText(document.querySelectorAll('label'), labelText);
+        if (label !== null) {
+          el = label.control ?? (label.htmlFor ? document.getElementById(label.htmlFor) : label.querySelector(FILLABLE));
+        }
       }
-    }
+      return el;
+    };
+    const el = await autoWait(resolveField);
     if (el === null || el === undefined) { throw unreachable('No input with label, placeholder, or aria-label: ' + labelText); }
     if (dryRun) { dryRunActions.push({ action: 'fillLabel', selector: labelText }); return; }
     fillElement(el, value);

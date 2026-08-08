@@ -458,7 +458,7 @@ describe('agent LLM harness', () => {
     const definitions = createWorkflowToolDefinitions({ mode: 'safe' });
     const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
     expect(JSON.stringify(saveWorkflow?.function.parameters)).toContain(
-      'When updating, omitting pathPrefix, startUrl, or params clears the stored value.'
+      'When updating, omitting script keeps the stored script, while omitting pathPrefix, startUrl, or params clears the stored value.'
     );
   });
 

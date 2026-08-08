@@ -1,7 +1,6 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from 'jotai';
 import { toast } from 'sonner-native';
@@ -14,6 +13,7 @@ import {
   resolveContinuationDestinations,
   resolveContinueRemoteModel,
 } from '@/components/agents/continuation-seed';
+import { setContinuePickerBridge } from '@/components/agents/continue-picker-bridge';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
   appendNewSessionPrefill,
@@ -63,7 +63,6 @@ export function useContinueSession(args: {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const store = useStore();
-  const { showActionSheetWithOptions } = useActionSheet();
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);
@@ -254,30 +253,18 @@ export function useContinueSession(args: {
         }
 
         handedOff = true;
-        const labels = destinations.map(d =>
-          d.kind === 'cloud-agent' ? 'Cloud Agent' : d.instance.name
-        );
-        showActionSheetWithOptions(
-          {
-            title: 'Continue in a new session',
-            options: [...labels, 'Cancel'],
-            cancelButtonIndex: labels.length,
-          },
-          selected => {
-            if (selected === undefined || selected >= labels.length) {
-              busyRef.current = false;
-              setIsContinuing(false);
-              return;
-            }
-            const dest = destinations[selected];
-            if (!dest) {
-              busyRef.current = false;
-              setIsContinuing(false);
-              return;
-            }
+        const release = () => {
+          busyRef.current = false;
+          setIsContinuing(false);
+        };
+        setContinuePickerBridge({
+          destinations,
+          onSelect: dest => {
             void execute(dest, seed, fields);
-          }
-        );
+          },
+          onCancel: release,
+        });
+        router.push('/(app)/agent-chat/continue-picker' as Href);
       } finally {
         if (!handedOff) {
           busyRef.current = false;
@@ -295,7 +282,7 @@ export function useContinueSession(args: {
       queryClient,
       trpc,
       execute,
-      showActionSheetWithOptions,
+      router,
     ]
   );
 

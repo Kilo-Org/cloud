@@ -70,42 +70,23 @@ function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Response
       ];
     } else if (Array.isArray(message.output)) {
       const lastItem = message.output.at(-1);
-      if (
-        lastItem &&
-        typeof lastItem === 'object' &&
-        'type' in lastItem &&
-        lastItem.type === 'input_text'
-      ) {
-        (lastItem as OpenAI.Responses.ResponseInputText).prompt_cache_breakpoint = {
-          mode: 'explicit',
-        };
+      if (lastItem && lastItem.type === 'input_text') {
+        lastItem.prompt_cache_breakpoint = { mode: 'explicit' };
       }
     }
   }
 }
 
 function isEnvironmentDetailsChatCompletionsPart(part: OpenAI.ChatCompletionContentPart): boolean {
-  return (
-    part.type === 'text' &&
-    typeof part.text === 'string' &&
-    part.text.startsWith('<environment_details>')
-  );
+  return part.type === 'text' && part.text.startsWith('<environment_details>');
 }
 
 function isEnvironmentDetailsResponsesPart(part: OpenAI.Responses.ResponseInputContent): boolean {
-  return (
-    (part.type === 'input_text' || (part as { type?: string }).type === 'text') &&
-    typeof (part as { text?: string }).text === 'string' &&
-    (part as { text: string }).text.startsWith('<environment_details>')
-  );
+  return part.type === 'input_text' && part.text.startsWith('<environment_details>');
 }
 
 function isEnvironmentDetailsMessagesPart(part: Anthropic.ContentBlockParam): boolean {
-  return (
-    part.type === 'text' &&
-    typeof part.text === 'string' &&
-    part.text.startsWith('<environment_details>')
-  );
+  return part.type === 'text' && part.text.startsWith('<environment_details>');
 }
 
 function setCacheControlOnMessagesMessage(

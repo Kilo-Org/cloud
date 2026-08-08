@@ -18,6 +18,9 @@ import {
   createWorkflowToolCall,
 } from './agent-conversation';
 
+const supersededSnapshotContent =
+  '{"ok":true,"value":{"superseded":true,"note":"A newer snapshot of this tab replaced this one. Call get_page_snapshot for the current state."}}';
+
 describe('agent LLM harness', () => {
   it('defines the eval tool as an async function body contract', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('selected browser tab');
@@ -564,6 +567,357 @@ describe('agent LLM harness', () => {
         },
         id: 'call_save_1',
         type: 'function',
+      },
+    ]);
+  });
+
+  it('elides superseded same-tab page snapshots and keeps the latest in full', () => {
+    const firstCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_1',
+      tabId: 7,
+    });
+    const secondCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_2',
+      tabId: 7,
+    });
+    const firstSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-1',
+      text: 'First page text',
+      textTruncated: false,
+      title: 'First page',
+      url: 'https://example.com/1',
+    };
+    const secondSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-2',
+      text: 'Second page text',
+      textTruncated: false,
+      title: 'Second page',
+      url: 'https://example.com/2',
+    };
+    const firstResult = createToolResult({
+      ok: true,
+      toolCallId: firstCall.id,
+      value: firstSnapshot,
+    });
+    const secondResult = createToolResult({
+      ok: true,
+      toolCallId: secondCall.id,
+      value: secondSnapshot,
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents([firstCall, secondCall, firstResult, secondResult])
+    ).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_1',
+            type: 'function',
+          },
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_2',
+            type: 'function',
+          },
+        ],
+      },
+      {
+        content: supersededSnapshotContent,
+        role: 'tool',
+        tool_call_id: 'call_snap_1',
+      },
+      {
+        content: JSON.stringify({ ok: true, value: secondSnapshot }),
+        role: 'tool',
+        tool_call_id: 'call_snap_2',
+      },
+    ]);
+  });
+
+  it('keeps successful page snapshots on different tabs in full', () => {
+    const tabSevenCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_7',
+      tabId: 7,
+    });
+    const tabNineCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_9',
+      tabId: 9,
+    });
+    const tabSevenSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-7',
+      text: 'Seven page text',
+      textTruncated: false,
+      title: 'Seven page',
+      url: 'https://seven.example.com/',
+    };
+    const tabNineSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-9',
+      text: 'Nine page text',
+      textTruncated: false,
+      title: 'Nine page',
+      url: 'https://nine.example.com/',
+    };
+    const tabSevenResult = createToolResult({
+      ok: true,
+      toolCallId: tabSevenCall.id,
+      value: tabSevenSnapshot,
+    });
+    const tabNineResult = createToolResult({
+      ok: true,
+      toolCallId: tabNineCall.id,
+      value: tabNineSnapshot,
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents([tabSevenCall, tabNineCall, tabSevenResult, tabNineResult])
+    ).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_7',
+            type: 'function',
+          },
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_9',
+            type: 'function',
+          },
+        ],
+      },
+      {
+        content: JSON.stringify({ ok: true, value: tabSevenSnapshot }),
+        role: 'tool',
+        tool_call_id: 'call_snap_7',
+      },
+      {
+        content: JSON.stringify({ ok: true, value: tabNineSnapshot }),
+        role: 'tool',
+        tool_call_id: 'call_snap_9',
+      },
+    ]);
+  });
+
+  it('leaves failed page snapshots unchanged while eliding superseded same-tab successes', () => {
+    const firstCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_1',
+      tabId: 7,
+    });
+    const failedCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_failed',
+      tabId: 7,
+    });
+    const secondCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_2',
+      tabId: 7,
+    });
+    const firstSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-1',
+      text: 'First page text',
+      textTruncated: false,
+      title: 'First page',
+      url: 'https://example.com/1',
+    };
+    const secondSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-2',
+      text: 'Second page text',
+      textTruncated: false,
+      title: 'Second page',
+      url: 'https://example.com/2',
+    };
+    const firstResult = createToolResult({
+      ok: true,
+      toolCallId: firstCall.id,
+      value: firstSnapshot,
+    });
+    const failedResult = createToolResult({
+      error: 'Tab was closed.',
+      ok: false,
+      toolCallId: failedCall.id,
+    });
+    const secondResult = createToolResult({
+      ok: true,
+      toolCallId: secondCall.id,
+      value: secondSnapshot,
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents([
+        firstCall,
+        failedCall,
+        secondCall,
+        firstResult,
+        failedResult,
+        secondResult,
+      ])
+    ).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_1',
+            type: 'function',
+          },
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_failed',
+            type: 'function',
+          },
+          {
+            function: { arguments: '{}', name: 'get_page_snapshot' },
+            id: 'call_snap_2',
+            type: 'function',
+          },
+        ],
+      },
+      {
+        content: supersededSnapshotContent,
+        role: 'tool',
+        tool_call_id: 'call_snap_1',
+      },
+      {
+        content: '{"error":"Tab was closed.","ok":false}',
+        role: 'tool',
+        tool_call_id: 'call_snap_failed',
+      },
+      {
+        content: JSON.stringify({ ok: true, value: secondSnapshot }),
+        role: 'tool',
+        tool_call_id: 'call_snap_2',
+      },
+    ]);
+  });
+
+  it('leaves eval and element-detail results unchanged when same-tab snapshots are elided', () => {
+    const firstCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_1',
+      tabId: 7,
+    });
+    const evalCall = createEvalToolCall({
+      code: 'return document.title;',
+      providerToolCallId: 'call_eval',
+      tabId: 7,
+    });
+    const elementCall = createSafeToolCall({
+      elementId: 'node-1',
+      name: 'get_element_details',
+      providerToolCallId: 'call_elem',
+      snapshotId: 'snapshot-1',
+      tabId: 7,
+    });
+    const secondCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'call_snap_2',
+      tabId: 7,
+    });
+    const firstSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-1',
+      text: 'First page text',
+      textTruncated: false,
+      title: 'First page',
+      url: 'https://example.com/1',
+    };
+    const secondSnapshot = {
+      nodes: [],
+      nodesTruncated: false,
+      snapshotId: 'snapshot-2',
+      text: 'Second page text',
+      textTruncated: false,
+      title: 'Second page',
+      url: 'https://example.com/2',
+    };
+    const elementDetails = {
+      href: 'https://example.com/save',
+      id: 'node-1',
+      label: 'Save',
+      role: 'button',
+      state: { disabled: false },
+      tag: 'button',
+    };
+    const firstResult = createToolResult({
+      ok: true,
+      toolCallId: firstCall.id,
+      value: firstSnapshot,
+    });
+    const evalResult = createToolResult({
+      ok: true,
+      toolCallId: evalCall.id,
+      value: 'Kilo fixture',
+    });
+    const elementResult = createToolResult({
+      ok: true,
+      toolCallId: elementCall.id,
+      value: elementDetails,
+    });
+    const secondResult = createToolResult({
+      ok: true,
+      toolCallId: secondCall.id,
+      value: secondSnapshot,
+    });
+
+    const toolMessages = buildGatewayMessagesFromEvents([
+      firstCall,
+      evalCall,
+      elementCall,
+      secondCall,
+      firstResult,
+      evalResult,
+      elementResult,
+      secondResult,
+    ]).filter(message => message.role === 'tool');
+
+    expect(toolMessages).toStrictEqual([
+      {
+        content: supersededSnapshotContent,
+        role: 'tool',
+        tool_call_id: 'call_snap_1',
+      },
+      {
+        content: '{"ok":true,"value":"Kilo fixture"}',
+        role: 'tool',
+        tool_call_id: 'call_eval',
+      },
+      {
+        content: JSON.stringify({ ok: true, value: elementDetails }),
+        role: 'tool',
+        tool_call_id: 'call_elem',
+      },
+      {
+        content: JSON.stringify({ ok: true, value: secondSnapshot }),
+        role: 'tool',
+        tool_call_id: 'call_snap_2',
       },
     ]);
   });

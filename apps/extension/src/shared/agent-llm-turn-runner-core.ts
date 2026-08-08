@@ -1,10 +1,15 @@
+/* eslint-disable max-lines, promise/avoid-new, promise/no-multiple-resolved -- Turn loop with a transparent stream-retry tier; the cancellable delay needs a raw, guard-settled promise. */
 import { createAssistantMessage, createThinkingBlock } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import { runToolCalls } from './agent-tool-results';
 import type { FetchLike } from './auth';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 import type { KiloGatewayToolCallRequest, KiloGatewayToolDefinition } from './kilo-api-client';
-import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
+import {
+  fetchKiloGatewayChatCompletionStream,
+  KiloGatewayHttpError,
+  KiloGatewayStreamStalledError,
+} from './kilo-api-client';
 import type { EvalTabResult } from './tab-debugger';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
@@ -59,6 +64,38 @@ const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+
+// One transparent retry tier for failures the user cannot act on: a stalled stream, a transient network failure, or a retriable gateway status.
+const MAX_STREAM_ATTEMPTS = 3;
+const STREAM_RETRY_DELAYS_MS = [1000, 4000];
+
+const isRetriableStreamError = (error: unknown): boolean => {
+  if (error instanceof KiloGatewayStreamStalledError) {
+    return true;
+  }
+  if (error instanceof KiloGatewayHttpError) {
+    return error.status === 429 || error.status >= 500;
+  }
+  // Fetch network failures surface as TypeError ("Failed to fetch").
+  return error instanceof TypeError;
+};
+
+// eslint-disable-next-line promise/avoid-new -- A cancellable timer has no promise-returning primitive to defer to.
+const abortableDelay = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
+  new Promise(resolve => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal?.addEventListener('abort', finish, { once: true });
+  });
 
 export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   apiBaseUrl,
@@ -116,39 +153,71 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     let didStartAssistantStreaming = false;
 
     try {
-      const completion = await getGatewayChatCompletion(
-        nextEvents,
-        delta => {
-          streamedText += delta;
+      const streamOnce = (): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> =>
+        getGatewayChatCompletion(
+          nextEvents,
+          delta => {
+            streamedText += delta;
 
-          if (streamedAssistantEventId === undefined) {
-            const assistantEvent = createAssistantMessage(streamedText);
+            if (streamedAssistantEventId === undefined) {
+              const assistantEvent = createAssistantMessage(streamedText);
 
-            streamedAssistantEventId = assistantEvent.id;
-            didStartAssistantStreaming = true;
-            onAssistantStreaming?.(assistantEvent.id);
-            completionEvents.push(assistantEvent);
-            appendEvents([assistantEvent]);
-            return;
+              streamedAssistantEventId = assistantEvent.id;
+              didStartAssistantStreaming = true;
+              onAssistantStreaming?.(assistantEvent.id);
+              completionEvents.push(assistantEvent);
+              appendEvents([assistantEvent]);
+              return;
+            }
+
+            updateAssistantMessage(streamedAssistantEventId, streamedText);
+          },
+          delta => {
+            streamedThinkingText += delta;
+
+            if (streamedThinkingEventId === undefined) {
+              const thinkingEvent = createThinkingBlock(streamedThinkingText);
+
+              streamedThinkingEventId = thinkingEvent.id;
+              completionEvents.push(thinkingEvent);
+              appendEvents([thinkingEvent]);
+              return;
+            }
+
+            updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
           }
+        );
 
-          updateAssistantMessage(streamedAssistantEventId, streamedText);
-        },
-        delta => {
-          streamedThinkingText += delta;
-
-          if (streamedThinkingEventId === undefined) {
-            const thinkingEvent = createThinkingBlock(streamedThinkingText);
-
-            streamedThinkingEventId = thinkingEvent.id;
-            completionEvents.push(thinkingEvent);
-            appendEvents([thinkingEvent]);
-            return;
+      // Retry keeps the already-created streamed events and re-streams into them: text resets to empty, ids stay stable, so the UI never shows a duplicated or half-doubled message.
+      const streamWithRetries = async (
+        streamAttempt: number
+      ): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> => {
+        try {
+          return await streamOnce();
+        } catch (error) {
+          if (
+            streamAttempt >= MAX_STREAM_ATTEMPTS ||
+            !isRetriableStreamError(error) ||
+            isSignalAborted(signal)
+          ) {
+            throw error;
           }
-
-          updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
+          streamedText = '';
+          streamedThinkingText = '';
+          if (streamedAssistantEventId !== undefined) {
+            updateAssistantMessage(streamedAssistantEventId, '');
+          }
+          if (streamedThinkingEventId !== undefined) {
+            updateThinkingBlock(streamedThinkingEventId, '');
+          }
+          await abortableDelay(STREAM_RETRY_DELAYS_MS[streamAttempt - 1] ?? 4000, signal);
+          if (isSignalAborted(signal)) {
+            throw error;
+          }
+          return streamWithRetries(streamAttempt + 1);
         }
-      );
+      };
+      const completion = await streamWithRetries(1);
 
       if (completion.usage !== undefined) {
         onUsage?.(completion.usage);

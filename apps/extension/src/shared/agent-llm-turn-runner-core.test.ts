@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test -- Retry fixtures need attempt-conditional fakes and raw promises. */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createSafeToolCall, createUserMessage } from './agent-conversation';
@@ -339,5 +339,143 @@ describe('agent LLM turn runner core', () => {
     });
 
     expect(streamingCalls).toStrictEqual([]);
+  });
+});
+
+describe('stream retry', () => {
+  const baseOptions = (
+    fetch: FetchLike,
+    appendEvents: (events: AgentConversationEvent[]) => void
+  ) => ({
+    apiBaseUrl: 'https://app.kilo.ai',
+    appendEvents,
+    conversationEvents: [createUserMessage('Hello')],
+    executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: '' } }),
+    failureMessage: (error: unknown) =>
+      `failed: ${error instanceof Error ? error.message : String(error)}`,
+    fetch,
+    maxToolRounds: 4,
+    model: 'kilo-auto/efficient',
+    noResponseMessage: 'no response',
+    toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+      toolCalls.flatMap(toolCall =>
+        toolCall.name === 'get_page_snapshot'
+          ? [
+              createSafeToolCall({
+                name: 'get_page_snapshot',
+                tabId: 1,
+                providerToolCallId: toolCall.id,
+              }),
+            ]
+          : []
+      ),
+    token: 'token',
+    tooManyToolRoundsMessage: 'too many rounds',
+    tools: [],
+    updateAssistantMessage: () => {},
+    updateThinkingBlock: () => {},
+  });
+
+  it('retries a 503 response transparently and completes the turn', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(new Response('', { status: 503 }));
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Recovered."}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
+
+    expect(calls).toBe(2);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts).toContain('Recovered.');
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+  });
+
+  it('resets partially streamed text into the same event on retry', async () => {
+    let calls = 0;
+    const encoder = new TextEncoder();
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        // Streams one delta, then fails mid-stream with a network-ish TypeError.
+        // The delay lets the delta reach the consumer before the error lands.
+        return Promise.resolve(
+          new Response(
+            new ReadableStream<Uint8Array>({
+              async start(controller) {
+                controller.enqueue(
+                  encoder.encode('data: {"choices":[{"delta":{"content":"Half"}}]}\n\n')
+                );
+                await new Promise(resolve => setTimeout(resolve, 20));
+                controller.error(new TypeError('network glitch'));
+              },
+            }),
+            { headers: { 'Content-Type': 'text/event-stream' }, status: 200 }
+          )
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Full answer."}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+    const updates: { id: string; text: string }[] = [];
+    const options = {
+      ...baseOptions(fetch, events => appended.push(...events)),
+      updateAssistantMessage: (eventId: string, text: string) => {
+        updates.push({ id: eventId, text });
+      },
+    };
+
+    await runLlmTurn(options);
+
+    expect(calls).toBe(2);
+    // The retry cleared the half-streamed text, then re-streamed into the same event.
+    const firstAppendedMessage = appended.find(event => event.type === 'message');
+    expect(updates.some(update => update.text === '')).toBe(true);
+    expect(updates.at(-1)?.text).toBe('Full answer.');
+    expect(updates.every(update => update.id === firstAppendedMessage?.id)).toBe(true);
+  });
+
+  it('gives up after three attempts and reports the failure', { timeout: 15_000 }, async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(new Response('', { status: 503 }));
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
+
+    expect(calls).toBe(3);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
+  });
+
+  it('does not retry a non-retriable HTTP status', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(new Response('', { status: 401 }));
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
+
+    expect(calls).toBe(1);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
   });
 });

@@ -1,27 +1,15 @@
-/* eslint-disable max-lines -- Pinned harness decision contract: stored-workflow predicates, result classification, correlation, and batch aggregation read best as one cohesive module. */
+/* eslint-disable max-lines -- Pinned harness decision contract: stored-workflow predicates, run-evidence scoring, correlation, and batch aggregation read best as one cohesive module. */
 /**
- * Pure, dependency-free harness decision logic for the workflow-create
- * benchmark. Consumes only the driver's validated minimal shapes
- * (`BenchWorkflow` / `BenchEvent`), never raw storage values. Predicate
- * details carry booleans and short match summaries only; no page, result,
- * script, or user content enters the output.
+ * Pure harness decision logic for the workflow-create benchmark. Consumes
+ * only the driver's validated minimal shapes (`BenchWorkflow` / `BenchEvent`)
+ * plus a scenario spec, never raw storage values. Predicate details carry
+ * booleans and short match summaries only; no page, result, script, or user
+ * content enters the output.
  */
+import { ISO_DATE_RE, isoDateVariants } from './agent-workflow-bench-scenarios';
+import type { BenchScenario } from './agent-workflow-bench-scenarios';
 
-export const TARGET_SCOPE_ORIGIN = 'https://www.google.com';
-export const TARGET_PATH_PREFIX = '/travel/flights';
 export const BENCH_SPEED_LIMIT_SECONDS = 180;
-
-// Pinned scenario regexes (probe `live-workflow-probe.ts`).
-const DESTINATION_PARAM_RE = /destination|city|to\b|arrival|where/iu;
-const DATE_PARAM_RE = /date|day|when|time|departure/iu;
-const BUSINESS_RE = /business/iu;
-const ONE_WAY_RE = /one[\s-]?way/iu;
-const PRICE_RE = /(?:€|\$|USD|EUR)/iu;
-const CARRIER_WORD_RE =
-  /(?:airlines|airways|air serbia|airserbia|air france|lufthansa|fly|flynas)\b/iu;
-const CARRIER_CODE_RE = /[A-Z]{2}\s?\d{2,4}/u;
-const ISO_DATE_RE = /^20\d\d-\d\d-\d\d$/u;
-const DATE_SELECTOR_RE = /date|depart|when/iu;
 
 export interface BenchWorkflowParam {
   readonly description?: string | undefined;
@@ -74,11 +62,6 @@ export type BenchEvent =
   | BenchToolCallEvent
   | BenchToolResultEvent;
 
-export interface BenchFollowUp {
-  readonly date: string;
-  readonly destination: string;
-}
-
 export interface BenchPredicate {
   readonly detail: string;
   readonly pass: boolean;
@@ -88,7 +71,9 @@ export type BenchResultCheck = 'real' | 'dry-run' | 'none';
 
 export interface BenchCorrectnessInput {
   readonly events: readonly BenchEvent[];
-  readonly followUp?: BenchFollowUp | undefined;
+  /** Resolved follow-up values ({date} already substituted); undefined when no follow-up was sent. */
+  readonly followUpValues?: Readonly<Record<string, string>> | undefined;
+  readonly scenario: BenchScenario;
   readonly workflows: readonly BenchWorkflow[];
 }
 
@@ -134,35 +119,11 @@ export interface BenchToolExchange {
 
 /**
  * Correlation of every tool-result to its tool-call by `toolCallId`. A
- * A tool-result that matches no tool-call is omitted from named exchanges, so
+ * tool-result that matches no tool-call is omitted from named exchanges, so
  * it can never be read as a workflow run result.
  */
 export interface BenchToolCorrelation {
   readonly exchanges: readonly BenchToolExchange[];
-}
-
-interface DryRunAction {
-  readonly action: string;
-  readonly selector: string;
-}
-
-interface RealRunChecks {
-  readonly hasCarrier: boolean;
-  readonly hasDate: boolean;
-  readonly hasDestination: boolean;
-  readonly hasPrice: boolean;
-}
-
-interface ExpectedValues {
-  readonly date: string;
-  readonly destination: string;
-}
-
-interface ResultOutcome {
-  readonly extraPredicates: Record<string, BenchPredicate>;
-  readonly resultCheck: BenchResultCheck;
-  readonly resultDetail: string;
-  readonly resultPass: boolean;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -186,9 +147,7 @@ const findStringValues = (value: unknown, output: string[] = []): string[] => {
 
 /**
  * Correlate every tool-result with its tool-call by `toolCallId`
- * (`agent-conversation.ts` tool-result events carry no tool name). A
- * A tool-result that matches no tool-call is omitted from named exchanges, so
- * it can never be read as a workflow run result.
+ * (`agent-conversation.ts` tool-result events carry no tool name).
  */
 export const correlateToolExchanges = (events: readonly BenchEvent[]): BenchToolCorrelation => {
   const exchanges: BenchToolExchange[] = [];
@@ -228,7 +187,7 @@ export const selectLastValidRealRun = (
   return candidates.at(-1);
 };
 
-const selectLastDryRunCandidate = (
+const selectLastValidDryRun = (
   exchanges: readonly BenchToolExchange[]
 ): BenchToolExchange | undefined => {
   const candidates = exchanges.filter(exchange => {
@@ -236,6 +195,7 @@ const selectLastDryRunCandidate = (
     return (
       exchange.call.name === 'run_workflow' &&
       toolArguments['dryRun'] === true &&
+      hasNonEmptyInput(toolArguments['input']) &&
       exchange.result.ok
     );
   });
@@ -243,297 +203,255 @@ const selectLastDryRunCandidate = (
   return candidates.at(-1);
 };
 
-const findDestinationParamName = (workflow: BenchWorkflow | undefined): string | undefined =>
-  (workflow?.params ?? []).find(param =>
-    DESTINATION_PARAM_RE.test(`${param.name} ${param.description ?? ''}`)
-  )?.name;
-
-const extractDestination = (
-  workflow: BenchWorkflow | undefined,
-  input: unknown,
-  resultStrings: readonly string[]
-): string | undefined => {
-  if (!isRecord(input)) {
-    return undefined;
-  }
-
-  const paramName = findDestinationParamName(workflow);
-  if (paramName !== undefined) {
-    const value = input[paramName];
-    if (typeof value === 'string' && value.trim() !== '') {
-      return value;
-    }
-  }
-
-  // Fallback: the input string value that appears in the result strings.
-  // A date-looking or empty value can never be the destination.
-  return findStringValues(input).find(value => {
-    if (value.trim() === '' || ISO_DATE_RE.test(value)) {
-      return false;
-    }
-    return resultStrings.some(candidate => candidate.toLowerCase().includes(value.toLowerCase()));
-  });
-};
-
-const extractIsoDate = (input: unknown): string | undefined => {
-  if (!isRecord(input)) {
-    return undefined;
-  }
-
-  return findStringValues(input).find(value => ISO_DATE_RE.test(value));
-};
-
-interface ExtractExpectedValuesInput {
-  readonly dryRunCandidate: BenchToolExchange | undefined;
-  readonly followUp: BenchFollowUp | undefined;
-  readonly realRun: BenchToolExchange | undefined;
-  readonly workflow: BenchWorkflow | undefined;
-}
-
-const extractExpectedValues = (input: ExtractExpectedValuesInput): ExpectedValues | undefined => {
-  const { dryRunCandidate, followUp, realRun, workflow } = input;
-
-  if (followUp === undefined) {
-    const evidenceRun = realRun ?? dryRunCandidate;
-    if (evidenceRun === undefined) {
-      return undefined;
-    }
-
-    const resultStrings = findStringValues(evidenceRun.result.value);
-    const destination = extractDestination(
-      workflow,
-      evidenceRun.call.arguments['input'],
-      resultStrings
-    );
-    const date = extractIsoDate(evidenceRun.call.arguments['input']);
-
-    if (destination === undefined || date === undefined) {
-      return undefined;
-    }
-
-    return { date, destination };
-  }
-
-  return { date: followUp.date, destination: followUp.destination };
-};
-
-const checkRealRunResult = (
-  strings: readonly string[],
-  destination: string,
-  date: string
-): RealRunChecks => {
-  const lowerDestination = destination.toLowerCase();
-  const hasDestination = strings.some(value => value.toLowerCase().includes(lowerDestination));
-  const hasDate = strings.some(value => value.includes(date));
-  const hasPrice = strings.some(value => PRICE_RE.test(value) && /\d/iu.test(value));
-  const hasCarrier = strings.some(
-    value => CARRIER_WORD_RE.test(value) || CARRIER_CODE_RE.test(value)
-  );
-
-  return { hasCarrier, hasDate, hasDestination, hasPrice };
-};
-
-const checkDryRunInput = (input: unknown, destination: string, date: string): boolean => {
-  const values = findStringValues(input);
-  const lowerDestination = destination.toLowerCase();
-
-  return values.some(value => value.toLowerCase() === lowerDestination) && values.includes(date);
-};
-
-const readDryRunActions = (value: unknown): readonly DryRunAction[] => {
-  if (!isRecord(value)) {
-    return [];
-  }
-
-  const raw = value['dryRunActions'];
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-
-  const actions: DryRunAction[] = [];
-  for (const entry of raw) {
-    if (
-      isRecord(entry) &&
-      typeof entry['action'] === 'string' &&
-      typeof entry['selector'] === 'string'
-    ) {
-      actions.push({ action: entry['action'], selector: entry['selector'] });
-    }
-  }
-
-  return actions;
-};
-
-const checkDryRunActions = (actions: readonly DryRunAction[]): boolean => {
-  const hasFill = actions.some(action => action.action === 'fill');
-  const hasDateSelector = actions.some(action => DATE_SELECTOR_RE.test(action.selector));
-
-  return actions.length >= 2 && hasFill && hasDateSelector;
-};
-
 const predicate = (pass: boolean, detail: string): BenchPredicate => ({ detail, pass });
 
+/** Origin + optional path-prefix scope check, mirroring the product's matcher. */
+const scopeCovers = (
+  workflow: Pick<BenchWorkflow, 'scopeOrigin' | 'pathPrefix'>,
+  url: string
+): boolean => {
+  if (!URL.canParse(url)) {
+    return false;
+  }
+  const parsed = new URL(url);
+  if (parsed.origin !== workflow.scopeOrigin) {
+    return false;
+  }
+  const prefix = workflow.pathPrefix ?? '';
+  return prefix === '' || parsed.pathname.startsWith(prefix);
+};
+
 const scoreStoredWorkflowPredicates = (
+  scenario: BenchScenario,
   workflow: BenchWorkflow | undefined
 ): Record<string, BenchPredicate> => {
   const workflowStored = workflow !== undefined;
-  const scopeOriginMatched = workflow !== undefined && workflow.scopeOrigin === TARGET_SCOPE_ORIGIN;
-  const pathPrefixMatched =
-    workflow !== undefined && (workflow.pathPrefix ?? '') === TARGET_PATH_PREFIX;
+  const scopeOriginMatched =
+    workflow !== undefined && workflow.scopeOrigin === scenario.scopeOrigin;
+  const scopeCoversStart = workflow !== undefined && scopeCovers(workflow, scenario.startUrl);
   const approvedHashPresent =
     workflow !== undefined &&
     typeof workflow.approvedScriptHash === 'string' &&
     workflow.approvedScriptHash.length > 0;
 
   const params = workflow?.params ?? [];
-  const destinationParam = params.find(param =>
-    DESTINATION_PARAM_RE.test(`${param.name} ${param.description ?? ''}`)
-  );
-  const dateParam = params.find(param =>
-    DATE_PARAM_RE.test(`${param.name} ${param.description ?? ''}`)
-  );
-  const paramsPresent = destinationParam !== undefined && dateParam !== undefined;
+  const missingParams = scenario.expectedParams
+    .filter(
+      expected =>
+        !params.some(param => expected.re.test(`${param.name} ${param.description ?? ''}`))
+    )
+    .map(expected => expected.key);
 
   const script = workflow?.script ?? '';
-  const businessPresent = BUSINESS_RE.test(script);
-  const oneWayPresent = ONE_WAY_RE.test(script);
+  const missingMarkers = scenario.scriptMarkers
+    .filter(marker => !marker.re.test(script))
+    .map(marker => marker.key);
 
   return {
     approvedScriptHash: predicate(
       approvedHashPresent,
       `approved script hash present: ${String(approvedHashPresent)}`
     ),
-    pathPrefix: predicate(pathPrefixMatched, `path prefix matched: ${String(pathPrefixMatched)}`),
+    scopeCoversStartUrl: predicate(
+      scopeCoversStart,
+      `workflow scope covers the start URL: ${String(scopeCoversStart)}`
+    ),
     scopeOrigin: predicate(
       scopeOriginMatched,
       `scope origin matched: ${String(scopeOriginMatched)}`
     ),
-    scriptBusiness: predicate(
-      businessPresent,
-      `business marker present: ${String(businessPresent)}`
+    scriptMarkers: predicate(
+      missingMarkers.length === 0,
+      missingMarkers.length === 0
+        ? 'script markers present'
+        : `script markers missing: ${missingMarkers.join(', ')}`
     ),
-    scriptOneWay: predicate(oneWayPresent, `one-way marker present: ${String(oneWayPresent)}`),
     storedWorkflow: predicate(
       workflowStored,
       workflowStored ? 'workflow stored: true' : 'no workflow stored'
     ),
     workflowParams: predicate(
-      paramsPresent,
-      `destination and date params present: ${String(paramsPresent)}`
+      missingParams.length === 0,
+      missingParams.length === 0
+        ? 'expected params declared'
+        : `params missing: ${missingParams.join(', ')}`
     ),
   };
 };
 
-const classifyResult = (
-  expected: ExpectedValues | undefined,
-  realRun: BenchToolExchange | undefined,
-  dryRunCandidate: BenchToolExchange | undefined
-): ResultOutcome => {
-  if (expected === undefined) {
-    return {
-      extraPredicates: {},
-      resultCheck: 'none',
-      resultDetail: 'expected destination or date not found',
-      resultPass: false,
-    };
+/**
+ * Case-insensitive containment of any variant of `value` in the strings.
+ * A multi-part value (e.g. "microsoft/vscode") also matches when every token
+ * appears across the strings — models legitimately split such values into
+ * separate params or render them with different separators.
+ */
+const stringsContainValue = (strings: readonly string[], value: string): boolean => {
+  const variants = isoDateVariants(value).map(variant => variant.toLowerCase());
+  const direct = strings.some(entry => {
+    const lower = entry.toLowerCase();
+    return variants.some(variant => lower.includes(variant));
+  });
+  if (direct || ISO_DATE_RE.test(value)) {
+    return direct;
   }
+  const haystack = ` ${strings
+    .join(' ')
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, ' ')} `;
+  const tokens = value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter(Boolean);
+  return tokens.length > 0 && tokens.every(token => haystack.includes(` ${token} `));
+};
 
-  if (realRun !== undefined) {
-    const strings = findStringValues(realRun.result.value);
-    const checks = checkRealRunResult(strings, expected.destination, expected.date);
-    const resultPass =
-      checks.hasDestination && checks.hasDate && checks.hasPrice && checks.hasCarrier;
+interface RunOutcome {
+  readonly extraPredicates: Record<string, BenchPredicate>;
+  readonly resultCheck: BenchResultCheck;
+  readonly resultPass: boolean;
+}
 
-    return {
-      extraPredicates: {
-        resultHasCarrier: predicate(
-          checks.hasCarrier,
-          `carrier matched: ${String(checks.hasCarrier)}`
-        ),
-        resultHasDate: predicate(checks.hasDate, `date matched: ${String(checks.hasDate)}`),
-        resultHasDestination: predicate(
-          checks.hasDestination,
-          `destination matched: ${String(checks.hasDestination)}`
-        ),
-        resultHasPrice: predicate(checks.hasPrice, `price matched: ${String(checks.hasPrice)}`),
-      },
-      resultCheck: 'real',
-      resultDetail: [
-        `destination: ${String(checks.hasDestination)}`,
-        `date: ${String(checks.hasDate)}`,
-        `price: ${String(checks.hasPrice)}`,
-        `carrier: ${String(checks.hasCarrier)}`,
-      ].join(', '),
-      resultPass,
-    };
-  }
+const scoreEvidenceRun = ({
+  evidence,
+  followUpValues,
+  resultCheck,
+  scenario,
+}: {
+  readonly evidence: BenchToolExchange;
+  readonly followUpValues: Readonly<Record<string, string>>;
+  readonly resultCheck: Exclude<BenchResultCheck, 'none'>;
+  readonly scenario: BenchScenario;
+}): RunOutcome => {
+  const inputStrings = findStringValues(evidence.call.arguments['input']);
+  const missingInput = Object.entries(followUpValues)
+    .filter(([, value]) =>
+      ISO_DATE_RE.test(value)
+        ? !inputStrings.includes(value)
+        : !stringsContainValue(inputStrings, value)
+    )
+    .map(([key]) => key);
 
-  if (dryRunCandidate !== undefined) {
-    const inputBound = checkDryRunInput(
-      dryRunCandidate.call.arguments['input'],
-      expected.destination,
-      expected.date
-    );
-    const actionsSufficient = checkDryRunActions(readDryRunActions(dryRunCandidate.result.value));
+  const resultStrings = findStringValues(evidence.result.value);
+  const resultLength = resultStrings.join(' ').length;
 
-    return {
-      extraPredicates: {
-        dryRunActions: predicate(
-          actionsSufficient,
-          `dry-run actions sufficient: ${String(actionsSufficient)}`
-        ),
-        dryRunInput: predicate(
-          inputBound,
-          `destination and date in dry-run input: ${String(inputBound)}`
-        ),
-      },
-      resultCheck: 'dry-run',
-      resultDetail: `input: ${String(inputBound)}, actions: ${String(actionsSufficient)}`,
-      resultPass: inputBound && actionsSufficient,
-    };
-  }
+  const missingValues = scenario.resultMustContainValues.filter(key => {
+    const value = followUpValues[key];
+    return value === undefined || !stringsContainValue(resultStrings, value);
+  });
+
+  const failedContent = scenario.resultContentChecks
+    .filter(check => !resultStrings.some(entry => check.re.test(entry)))
+    .map(check => check.key);
+
+  const lengthOk = resultLength >= scenario.minResultChars;
+
+  const extraPredicates: Record<string, BenchPredicate> = {
+    resultContent: predicate(
+      failedContent.length === 0,
+      failedContent.length === 0
+        ? 'result content checks passed'
+        : `result content checks failed: ${failedContent.join(', ')}`
+    ),
+    resultHasValues: predicate(
+      missingValues.length === 0,
+      missingValues.length === 0
+        ? 'follow-up values present in result'
+        : `values missing from result: ${missingValues.join(', ')}`
+    ),
+    resultLength: predicate(
+      lengthOk,
+      `result length ${String(resultLength)} >= ${String(scenario.minResultChars)}: ${String(lengthOk)}`
+    ),
+    runInputBound: predicate(
+      missingInput.length === 0,
+      missingInput.length === 0
+        ? 'follow-up values present in run input'
+        : `values missing from run input: ${missingInput.join(', ')}`
+    ),
+  };
 
   return {
-    extraPredicates: {},
-    resultCheck: 'none',
-    resultDetail: 'no valid real run or dry-run fallback',
-    resultPass: false,
+    extraPredicates,
+    resultCheck,
+    resultPass:
+      missingInput.length === 0 &&
+      missingValues.length === 0 &&
+      failedContent.length === 0 &&
+      lengthOk,
   };
 };
 
 /**
- * Score one benchmark attempt's correctness. The stored-workflow predicates
- * are pinned to the fixed scenario; the result check uses the last valid real
- * run (non-dry, non-empty input, ok result) or, when none exists, the
- * contract-level dry-run fallback (input binds the expected values and the
- * recorded actions show a fill plus a date-ish selector).
+ * Score one benchmark attempt's correctness against its scenario spec.
+ * The verifying run is the last valid real run (non-dry, non-empty input, ok
+ * result) or, when none exists, the last ok dry run with a non-empty input —
+ * a URL-first script's dry run navigates and reads for real, so its result is
+ * held to the same content checks.
  */
 export const scoreWorkflowCorrectness = (input: BenchCorrectnessInput): BenchCorrectnessResult => {
   const [workflow] = input.workflows;
-  const predicates: Record<string, BenchPredicate> = scoreStoredWorkflowPredicates(workflow);
+  const { scenario } = input;
+  const predicates: Record<string, BenchPredicate> = scoreStoredWorkflowPredicates(
+    scenario,
+    workflow
+  );
 
   const { exchanges } = correlateToolExchanges(input.events);
-  const realRun = selectLastValidRealRun(exchanges);
-  const dryRunCandidate = selectLastDryRunCandidate(exchanges);
-  const expected = extractExpectedValues({
-    dryRunCandidate,
-    followUp: input.followUp,
-    realRun,
-    workflow,
-  });
+  const evidenceReal = selectLastValidRealRun(exchanges);
+  const evidenceDry = evidenceReal === undefined ? selectLastValidDryRun(exchanges) : undefined;
 
-  const outcome = classifyResult(expected, realRun, dryRunCandidate);
+  const resolveOutcome = (): { outcome: RunOutcome; runPredicate: BenchPredicate } => {
+    const noRun = (detail: string): { outcome: RunOutcome; runPredicate: BenchPredicate } => ({
+      outcome: { extraPredicates: {}, resultCheck: 'none', resultPass: false },
+      runPredicate: predicate(false, detail),
+    });
+    if (input.followUpValues === undefined) {
+      return noRun('no follow-up values to verify against');
+    }
+    if (evidenceReal !== undefined) {
+      const outcome = scoreEvidenceRun({
+        evidence: evidenceReal,
+        followUpValues: input.followUpValues,
+        resultCheck: 'real',
+        scenario,
+      });
+      return {
+        outcome,
+        runPredicate: predicate(
+          outcome.resultPass,
+          `real run verified: ${String(outcome.resultPass)}`
+        ),
+      };
+    }
+    if (evidenceDry !== undefined) {
+      const outcome = scoreEvidenceRun({
+        evidence: evidenceDry,
+        followUpValues: input.followUpValues,
+        resultCheck: 'dry-run',
+        scenario,
+      });
+      return {
+        outcome,
+        runPredicate: predicate(
+          outcome.resultPass,
+          `dry run verified: ${String(outcome.resultPass)}`
+        ),
+      };
+    }
+    return noRun('no valid run with input found');
+  };
+
+  const { outcome, runPredicate } = resolveOutcome();
   Object.assign(predicates, outcome.extraPredicates);
-  predicates['runWorkflowResult'] = predicate(outcome.resultPass, outcome.resultDetail);
+  predicates['runWorkflowResult'] = runPredicate;
 
   const storedPassed =
     predicates['storedWorkflow']?.pass === true &&
     predicates['scopeOrigin']?.pass === true &&
-    predicates['pathPrefix']?.pass === true &&
+    predicates['scopeCoversStartUrl']?.pass === true &&
     predicates['approvedScriptHash']?.pass === true &&
     predicates['workflowParams']?.pass === true &&
-    predicates['scriptBusiness']?.pass === true &&
-    predicates['scriptOneWay']?.pass === true;
+    predicates['scriptMarkers']?.pass === true;
 
   return {
     passed: storedPassed && outcome.resultPass,

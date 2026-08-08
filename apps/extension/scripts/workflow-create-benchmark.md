@@ -1,13 +1,36 @@
 # Workflow-create benchmark driver
 
-This driver measures how fast the extension can create a workflow for a fixed
-scenario in safe mode. It runs N identical attempts against Google Flights
+This driver measures how fast and how correctly the extension creates a
+workflow for a pinned scenario in safe mode. It runs N identical attempts
 with `kilo-auto/efficient` on the production gateway, records redacted
 per-attempt JSON plus a batch summary, and exits 0/1/2.
 
 The purpose is to pick optimization levers from measured evidence, not from
 intuition. Every metric, definition, and scenario pin is fixed; see the A/B
 protocol and honesty rules before changing anything.
+
+## Scenarios
+
+The golden-star scenarios live in
+`src/shared/agent-workflow-bench-scenarios.ts`. Each is one realistic
+"automate what I do in the browser" request on a public, login-free site,
+and each covers a different task shape:
+
+| Id | Site | Task shape |
+|---|---|---|
+| `flights` | Google Flights | JS-heavy SPA search with params (destination, date) |
+| `hn` | hn.algolia.com | query-parameter search (topic) |
+| `wikipedia` | en.wikipedia.org | path-encoded lookup (topic) |
+| `github` | github.com | filtered list with two params (repo, label) |
+| `weather` | forecast.weather.gov | classic GET-form site (city) |
+
+An attempt sends the scenario's create message, waits for a successful
+save, then always sends the pinned follow-up run request. Correctness is
+scored per scenario: the stored workflow's scope, params, and script
+markers, plus a verifying run whose input binds the pinned values and whose
+result carries the expected values and content (a price, points, a
+forecast, …). The verifying run is the last valid real run, or a dry run
+with real navigated content when no real run exists.
 
 ## Prerequisites
 
@@ -16,7 +39,7 @@ protocol and honesty rules before changing anything.
   driver validates it against `https://app.kilo.ai/api/user` before any
   attempt. The token lives only inside the throwaway browser profile, which is
   deleted and verified after each attempt.
-- Network access to `app.kilo.ai` and to Google.
+- Network access to `app.kilo.ai` and the scenario sites.
 - A display for headed Chromium. If the headed launch fails, the driver
   retries headless automatically and records which mode each attempt used.
 
@@ -36,17 +59,18 @@ Options:
 | Flag | Meaning |
 |---|---|
 | `--attempts <n>` | Number of attempts. Default `3`, min `1`, max `10`. |
+| `--scenario <id>` | Scenario id (see table above). Default `flights`. |
 | `--out <dir>` | Output directory. Default: a fresh temp directory. |
 | `--no-build` | Skip the self-build. The caller then owns build freshness. |
 | `--timeout-ms <ms>` | Per-attempt agent-phase deadline. Default `900000`. |
 | `--date <YYYY-MM-DD>` | Follow-up date. Default: today + 45 days. |
-| `--append` | Extend an existing batch in `--out`. Refuses a different `gitHead`, follow-up date, or org hash. |
+| `--append` | Extend an existing batch in `--out`. Refuses a different `gitHead`, scenario, follow-up date, or org hash. |
 
 Examples:
 
 ```sh
-# A faster probe batch of 2 attempts.
-pnpm exec tsx apps/extension/scripts/workflow-create-benchmark.ts --attempts 2
+# A faster probe batch of 2 attempts on the hn scenario.
+pnpm exec tsx apps/extension/scripts/workflow-create-benchmark.ts --attempts 2 --scenario hn
 
 # Match an earlier batch's follow-up date.
 pnpm exec tsx apps/extension/scripts/workflow-create-benchmark.ts --date 2026-09-21
@@ -78,12 +102,20 @@ page-content tool results keep only byte counts, and `run_workflow` results
 keep only `ok`, `pagesVisited`, and `resultChars`. No token, no raw storage
 value, and no user content is persisted.
 
+### Raw debugging artifacts
+
+`KILO_BENCH_RAW=1` additionally writes `attempt-<n>-raw.json` with the full
+unredacted transcript and stored workflows. This is for local failure
+analysis only. Never commit a raw artifact and never attach one to a PR: it
+contains page content and model text verbatim.
+
 ## A/B protocol
 
 Compare batches only when they share every variable except the one lever:
 
-- Same `N` and the same `--date` (the baseline's follow-up date).
-- Same scenario: page, message, model, mode, and settings.
+- Same `N`, the same `--scenario`, and the same `--date` (the baseline's
+  follow-up date).
+- Same scenario pins: page, message, model, mode, and settings.
 - Same attempt-by-attempt rendering-mode sequence: the ordered headed/headless
   flags of both batches must match position by position, not just in
   aggregate. A batch whose attempts mix modes (`mixedModes: true` in its
@@ -105,6 +137,6 @@ Compare batches only when they share every variable except the one lever:
 
 - Every batch records its `gitHead`; never compare batches recorded on
   different heads as if they were one population.
-- Never tune the product for the benchmark page by name.
+- Never tune the product for a benchmark site by name.
 - Never edit the driver, the scenario, or the stored script between the
   compared arms of one A/B step.

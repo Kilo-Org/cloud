@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, max-classes-per-file */
 import type {
   KiloGatewayChatCompletion,
   KiloGatewayChatMessage,
@@ -18,10 +18,32 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly onReasoningDelta?: ((delta: string) => void) | undefined;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
+  /** Abort and throw KiloGatewayStreamStalledError when no bytes arrive for this long. */
+  readonly stallTimeoutMs?: number | undefined;
   readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
 }
+
+/** A streaming request that stopped delivering bytes. Callers may retry. */
+export class KiloGatewayStreamStalledError extends Error {
+  constructor(stallTimeoutMs: number) {
+    super(`Gateway stream stalled: no data for ${String(stallTimeoutMs)} ms.`);
+    this.name = 'KiloGatewayStreamStalledError';
+  }
+}
+
+/** A non-OK gateway HTTP response. Callers may retry 429/5xx. */
+export class KiloGatewayHttpError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`Failed to fetch gateway chat completion stream: ${String(status)}`);
+    this.name = 'KiloGatewayHttpError';
+    this.status = status;
+  }
+}
+
+const DEFAULT_STALL_TIMEOUT_MS = 45_000;
 
 interface StreamingToolCallBuffer {
   arguments: string;
@@ -417,6 +439,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   onReasoningDelta = () => {},
   organizationId,
   signal,
+  stallTimeoutMs = DEFAULT_STALL_TIMEOUT_MS,
   thinkingEffort,
   token,
   tools,
@@ -431,26 +454,93 @@ export const fetchKiloGatewayChatCompletionStream = async ({
     tool_choice: tools.length === 0 ? 'none' : 'auto',
     tools,
   };
-  const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/gateway/v1/chat/completions`, {
-    body: JSON.stringify(
-      reasoningRequest === undefined ? requestBody : { ...requestBody, ...reasoningRequest }
-    ),
-    headers: {
-      Accept: 'text/event-stream',
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(organizationId === undefined || organizationId === ''
-        ? {}
-        : { [organizationHeaderName]: organizationId }),
-    },
-    method: 'POST',
-    ...(signal === undefined ? {} : { signal }),
+
+  // Watchdog: a stalled response — before the first byte or mid-stream — surfaces as a typed, retriable error instead of hanging the turn forever. Each read races against the stall timer, so the guarantee holds even when the underlying fetch ignores its abort signal.
+  const stallController = new AbortController();
+  const stall: {
+    reject?: (error: Error) => void;
+    stalled: boolean;
+    timer?: ReturnType<typeof setTimeout>;
+  } = { stalled: false };
+  // eslint-disable-next-line promise/avoid-new -- A deferred rejection has no promise-returning primitive to defer to.
+  const stallPromise = new Promise<never>((_resolve, reject) => {
+    stall.reject = reject;
   });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch gateway chat completion stream: ${response.status}`);
+  // The race consumes this rejection; this guard keeps it from surfacing as an unhandled rejection when the stream completes first.
+  // eslint-disable-next-line promise/prefer-await-to-then -- Marking the rejection handled must not block this function.
+  stallPromise.catch(() => {});
+  const armWatchdog = (): void => {
+    clearTimeout(stall.timer);
+    stall.timer = setTimeout(() => {
+      stall.stalled = true;
+      stallController.abort();
+      stall.reject?.(new KiloGatewayStreamStalledError(stallTimeoutMs));
+    }, stallTimeoutMs);
+  };
+  const onCallerAbort = (): void => {
+    stallController.abort();
+    const abortError = new Error('The user aborted a request.');
+    abortError.name = 'AbortError';
+    stall.reject?.(abortError);
+  };
+  if (signal?.aborted === true) {
+    stallController.abort();
   }
-  if (response.body === null) {
-    throw new Error('Gateway chat completion stream did not include a body.');
+  signal?.addEventListener('abort', onCallerAbort, { once: true });
+
+  try {
+    armWatchdog();
+    const response = await Promise.race([
+      fetch(`${trimTrailingSlash(apiBaseUrl)}/api/gateway/v1/chat/completions`, {
+        body: JSON.stringify(
+          reasoningRequest === undefined ? requestBody : { ...requestBody, ...reasoningRequest }
+        ),
+        headers: {
+          Accept: 'text/event-stream',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...(organizationId === undefined || organizationId === ''
+            ? {}
+            : { [organizationHeaderName]: organizationId }),
+        },
+        method: 'POST',
+        signal: stallController.signal,
+      }),
+      stallPromise,
+    ]);
+    if (!response.ok) {
+      throw new KiloGatewayHttpError(response.status);
+    }
+    if (response.body === null) {
+      throw new Error('Gateway chat completion stream did not include a body.');
+    }
+    const sourceReader = response.body.getReader();
+    const watchedBody = new ReadableStream<Uint8Array>({
+      cancel: reason => sourceReader.cancel(reason),
+      async pull(controller) {
+        const { done, value } = await Promise.race([sourceReader.read(), stallPromise]);
+        armWatchdog();
+        if (done) {
+          controller.close();
+          return;
+        }
+        if (value !== undefined) {
+          controller.enqueue(value);
+        }
+      },
+    });
+    return await consumeKiloGatewayChatCompletionStream(
+      watchedBody,
+      onContentDelta,
+      onReasoningDelta
+    );
+  } catch (error) {
+    if (stall.stalled && signal?.aborted !== true) {
+      throw new KiloGatewayStreamStalledError(stallTimeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(stall.timer);
+    signal?.removeEventListener('abort', onCallerAbort);
   }
-  return consumeKiloGatewayChatCompletionStream(response.body, onContentDelta, onReasoningDelta);
 };

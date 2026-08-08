@@ -76,9 +76,15 @@ export interface InspectableTab {
 }
 
 export interface PageSnapshotNode {
+  /** Absolute action URL of the enclosing form, for form fields. */
+  readonly formAction?: string;
+  /** Lowercase method of the enclosing form ("get" or "post"), for form fields. */
+  readonly formMethod?: string;
   readonly href?: string;
   readonly id: string;
   readonly label?: string;
+  /** The name attribute, for form fields — a GET form submits as formAction?name=value. */
+  readonly name?: string;
   readonly role: string;
   readonly state?: Record<string, boolean>;
   readonly tag: string;
@@ -628,9 +634,12 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
       }
 
       const node: {
+        formAction?: string;
+        formMethod?: string;
         href?: string;
         id: string;
         label?: string;
+        name?: string;
         role: string;
         state?: Record<string, boolean>;
         tag: string;
@@ -643,6 +652,25 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
 
       if (element instanceof HTMLAnchorElement && element.href !== '') {
         node.href = sanitizeUrl(element.href);
+      }
+
+      // Form fields carry their name and form target so a GET search form can be turned into a URL (formAction?name=value) without submitting it. An unparsable form action is omitted rather than failing the snapshot.
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        if (element.name !== '') {
+          node.name = element.name;
+        }
+        const { form } = element;
+        const rawAction = form === null ? null : (form.getAttribute('action') ?? '');
+        if (form !== null && rawAction !== null && URL.canParse(rawAction, location.href)) {
+          const action = new URL(rawAction, location.href);
+          action.hash = '';
+          node.formAction = action.toString();
+          node.formMethod = form.method === 'post' ? 'post' : 'get';
+        }
       }
 
       if (label !== '') {

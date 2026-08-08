@@ -12,9 +12,12 @@ import type { EvalTabResult, PageSnapshot, PageSnapshotNode } from '@/src/shared
 
 type SafeToolCall = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 const pageSnapshotNodeSchema = z.object({
+  formAction: z.string().optional(),
+  formMethod: z.string().optional(),
   href: z.string().optional(),
   id: z.string(),
   label: z.string().optional(),
+  name: z.string().optional(),
   role: z.string(),
   state: z.record(z.string(), z.boolean()).optional(),
   tag: z.string(),
@@ -37,9 +40,12 @@ const pageSnapshotSchema = z.object({
   url: z.string(),
 });
 const toPageSnapshotNode = (node: z.infer<typeof pageSnapshotNodeSchema>): PageSnapshotNode => ({
+  ...(node.formAction === undefined ? {} : { formAction: node.formAction }),
+  ...(node.formMethod === undefined ? {} : { formMethod: node.formMethod }),
   ...(node.href === undefined ? {} : { href: node.href }),
   id: node.id,
   ...(node.label === undefined ? {} : { label: node.label }),
+  ...(node.name === undefined ? {} : { name: node.name }),
   role: node.role,
   ...(node.state === undefined ? {} : { state: node.state }),
   tag: node.tag,

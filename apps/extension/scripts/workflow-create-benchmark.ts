@@ -1,11 +1,12 @@
-/* eslint-disable capitalized-comments, consistent-function-scoping, consistent-type-definitions, import/no-nodejs-modules, init-declarations, max-classes-per-file, max-lines, max-params, no-array-callback-reference, no-array-reverse, no-await-expression-member, no-await-in-loop, no-continue, no-negated-condition, no-unsafe-finally, numeric-separators-style, prefer-at, prefer-await-to-then, prefer-destructuring, prefer-top-level-await, promise/avoid-new, promise/prefer-await-to-callbacks, sort-keys, typescript-eslint/no-unsafe-type-assertion, unicorn/numeric-separators-style, unicorn/switch-case-braces, unicorn/prefer-string-replace-all, unicorn/no-array-sort, unicorn/no-useless-undefined */
+/* eslint-disable capitalized-comments, consistent-function-scoping, import/max-dependencies, consistent-type-definitions, import/no-nodejs-modules, init-declarations, max-classes-per-file, max-lines, max-params, no-array-callback-reference, no-array-reverse, no-await-expression-member, no-await-in-loop, no-continue, no-negated-condition, no-unsafe-finally, numeric-separators-style, prefer-at, prefer-await-to-then, prefer-destructuring, prefer-top-level-await, promise/avoid-new, promise/prefer-await-to-callbacks, sort-keys, typescript-eslint/no-unsafe-type-assertion, unicorn/numeric-separators-style, unicorn/switch-case-braces, unicorn/prefer-string-replace-all, unicorn/no-array-sort, unicorn/no-useless-undefined */
 /**
  * Workflow-create benchmark driver.
  *
- * Runs N identical safe-mode workflow-creation attempts against the fixed
- * Google Flights scenario with `kilo-auto/efficient` on the production
- * gateway, records redacted per-attempt JSON plus a summary, and returns
- * exit 0/1/2. See `workflow-create-benchmark.md` in this directory.
+ * Runs N identical safe-mode workflow-creation attempts against one pinned
+ * golden-star scenario (see `agent-workflow-bench-scenarios.ts`) with
+ * `kilo-auto/efficient` on the production gateway, records redacted
+ * per-attempt JSON plus a summary, and returns exit 0/1/2. See
+ * `workflow-create-benchmark.md` in this directory.
  *
  * Security contract:
  * - The Kilo CLI token lives only inside the throwaway browser profile, which
@@ -35,9 +36,9 @@ import {
   computeBatchSummary,
   selectLastValidRealRun,
   scoreWorkflowCorrectness,
-  TARGET_PATH_PREFIX,
-  TARGET_SCOPE_ORIGIN,
 } from '../src/shared/agent-workflow-bench-scoring';
+import { BENCH_SCENARIOS } from '../src/shared/agent-workflow-bench-scenarios';
+import type { BenchScenario } from '../src/shared/agent-workflow-bench-scenarios';
 import { agentWorkflowSchema } from '../src/shared/agent-workflows';
 import type {
   BenchAttemptStats,
@@ -53,13 +54,30 @@ const extensionPath = resolvePath(import.meta.dirname, '../.output/chrome-mv3');
 const extensionDir = resolvePath(import.meta.dirname, '..');
 const gatewayBase = 'https://app.kilo.ai';
 const gatewayChatCompletionsPath = '/api/gateway/v1/chat/completions';
-const targetUrl = `${TARGET_SCOPE_ORIGIN}${TARGET_PATH_PREFIX}`;
 const modelId = 'kilo-auto/efficient';
 const creditAccountLabel = 'Kilo';
-const createMessage =
-  'Create a workflow to get business class one way flights from Belgrade to a destination I pick, for a date I pick, one-way';
-const followUpDestination = 'Paris';
 const turnStabilitySeconds = 6;
+// KILO_BENCH_RAW=1 additionally writes attempt-<n>-raw.json with the full
+// unredacted transcript and stored workflows, for local debugging only.
+// Raw artifacts must never be committed or attached to a PR.
+const writeRawArtifacts = process.env['KILO_BENCH_RAW'] === '1';
+
+/** Resolve {key} placeholders in follow-up values and message. */
+const resolveFollowUp = (
+  scenario: BenchScenario,
+  followUpDate: string
+): { message: string; values: Record<string, string> } => {
+  const values: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(scenario.followUpValues)) {
+    values[key] = raw === '{date}' ? followUpDate : raw;
+  }
+  let message = scenario.followUpMessage;
+  for (const [key, value] of Object.entries(values)) {
+    message = message.replaceAll(`{${key}}`, value);
+  }
+  message = message.replaceAll('{date}', followUpDate);
+  return { message, values };
+};
 const benchSettings = {
   allowWorkflowsInSafeMode: true,
   autoApproveWorkflowChanges: true,
@@ -161,6 +179,7 @@ interface RedactedEvent {
 
 interface AttemptRecord {
   readonly attempt: number;
+  readonly scenarioId: string;
   readonly headless: boolean | null;
   readonly startedAtIso: string;
   readonly gitHead: string;
@@ -216,6 +235,7 @@ interface ParsedArgs {
   readonly timeoutMs: number;
   readonly date: string | null;
   readonly append: boolean;
+  readonly scenario: BenchScenario;
 }
 
 interface AgentPhaseResult {
@@ -362,8 +382,9 @@ Options:
   --no-build         skip the extension self-build; you own build freshness
   --timeout-ms <ms>  per-attempt agent-phase deadline (default 900000)
   --date <YYYY-MM-DD> follow-up date (default: today + 45 days)
+  --scenario <id>    scenario id: ${Object.keys(BENCH_SCENARIOS).join(', ')} (default flights)
   --append           extend an existing batch in --out; refuses a different
-                     gitHead, follow-up date, or org hash`;
+                     gitHead, scenario, follow-up date, or org hash`;
 
 const parseArgs = (argv: readonly string[]): ParsedArgs => {
   let attempts = 3;
@@ -372,6 +393,7 @@ const parseArgs = (argv: readonly string[]): ParsedArgs => {
   let timeoutMs = 900_000;
   let date: string | null = null;
   let append = false;
+  let scenario = BENCH_SCENARIOS['flights'];
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] ?? '';
@@ -414,6 +436,16 @@ const parseArgs = (argv: readonly string[]): ParsedArgs => {
         date = value;
         break;
       }
+      case '--scenario': {
+        const value = takeValue('--scenario');
+        scenario = BENCH_SCENARIOS[value];
+        if (scenario === undefined) {
+          throw new UsageError(
+            `--scenario must be one of: ${Object.keys(BENCH_SCENARIOS).join(', ')}`
+          );
+        }
+        break;
+      }
       case '--no-build':
         noBuild = true;
         break;
@@ -425,7 +457,11 @@ const parseArgs = (argv: readonly string[]): ParsedArgs => {
     }
   }
 
-  return { attempts, out, noBuild, timeoutMs, date, append };
+  if (scenario === undefined) {
+    throw new UsageError('internal: no scenario resolved');
+  }
+
+  return { attempts, out, noBuild, timeoutMs, date, append, scenario };
 };
 
 const listAttemptFiles = async (outDir: string): Promise<number[]> => {
@@ -901,21 +937,25 @@ const dismissConsent = async (page: Page): Promise<void> => {
   }
 };
 
-const openFlightsTab = async (context: BrowserContext, budget: SetupBudget): Promise<Page> => {
-  const flightsPage = await context.newPage();
-  await flightsPage.goto(targetUrl, {
+const openScenarioTab = async (
+  context: BrowserContext,
+  budget: SetupBudget,
+  scenario: BenchScenario
+): Promise<Page> => {
+  const scenarioPage = await context.newPage();
+  await scenarioPage.goto(scenario.startUrl, {
     timeout: budget.waitTimeoutFor(60_000),
     waitUntil: 'domcontentloaded',
   });
-  await dismissConsent(flightsPage);
-  await flightsPage.waitForTimeout(2000);
-  if (!flightsPage.url().includes('/travel/flights')) {
+  await dismissConsent(scenarioPage);
+  await scenarioPage.waitForTimeout(2000);
+  if (!scenarioPage.url().startsWith(scenario.scopeOrigin)) {
     throw new Error(
-      `Google consent or redirect did not settle on Google Flights: ${flightsPage.url()}`
+      `Consent or a redirect did not settle on the scenario page: ${scenarioPage.url()}`
     );
   }
-  await flightsPage.bringToFront();
-  return flightsPage;
+  await scenarioPage.bringToFront();
+  return scenarioPage;
 };
 
 // Reads the target-tab option list as aligned label/value pairs in one
@@ -995,7 +1035,11 @@ const readInspectableTabs = async (
   return tabEntries;
 };
 
-const verifyTargetTabUrl = async (sidePanel: Page, selectedValue: string): Promise<void> => {
+const verifyTargetTabUrl = async (
+  sidePanel: Page,
+  selectedValue: string,
+  scenario: BenchScenario
+): Promise<void> => {
   const tabId = Number(selectedValue);
   if (!Number.isInteger(tabId)) {
     throw new TypeError(`The selected target tab id is not an integer: "${selectedValue}".`);
@@ -1013,44 +1057,48 @@ const verifyTargetTabUrl = async (sidePanel: Page, selectedValue: string): Promi
   } catch {
     throw new Error(`The selected target tab has an invalid URL: "${target.url}".`);
   }
-  if (parsed.origin !== TARGET_SCOPE_ORIGIN || parsed.pathname !== TARGET_PATH_PREFIX) {
+  if (parsed.origin !== scenario.scopeOrigin) {
     throw new Error(
-      `Selected target tab is not Google Flights: ${target.url}; expected ${targetUrl}.`
+      `Selected target tab is not the scenario page: ${target.url}; expected ${scenario.startUrl}.`
     );
   }
 };
 
-const selectTargetTab = async (sidePanel: Page, budget: SetupBudget): Promise<void> => {
+const selectTargetTab = async (
+  sidePanel: Page,
+  budget: SetupBudget,
+  scenario: BenchScenario
+): Promise<void> => {
   const targetTab = sidePanel.locator('select[aria-label="Target tab"]');
   await targetTab.waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
 
-  const findFlightsOption = async (): Promise<{ label: string; value: string } | undefined> => {
+  const findScenarioOption = async (): Promise<{ label: string; value: string } | undefined> => {
     const options = await readTargetTabOptions(targetTab);
     if (options === null) {
       return undefined;
     }
     const option = options.find(
-      candidate => candidate.label.trim() !== '' && /flights/iu.test(candidate.label)
+      candidate => candidate.label.trim() !== '' && scenario.tabLabelRe.test(candidate.label)
     );
     if (option === undefined) {
       return undefined;
     }
     if (option.value === '') {
-      throw new Error('The Google Flights tab option has no selectable value.');
+      throw new Error('The scenario tab option has no selectable value.');
     }
     return option;
   };
 
-  await expect.poll(findFlightsOption, { timeout: budget.waitTimeoutFor(30_000) }).toBeDefined();
+  await expect.poll(findScenarioOption, { timeout: budget.waitTimeoutFor(30_000) }).toBeDefined();
 
-  const flightsOption = await findFlightsOption();
-  if (flightsOption === undefined) {
-    throw new Error('The Google Flights tab is not present in the target tab list.');
+  const scenarioOption = await findScenarioOption();
+  if (scenarioOption === undefined) {
+    throw new Error('The scenario tab is not present in the target tab list.');
   }
-  await targetTab.selectOption({ value: flightsOption.value });
+  await targetTab.selectOption({ value: scenarioOption.value });
 
   // Verify the selected option is the intended one by value identity, then
-  // verify its tab URL against the exact Google Flights origin and path.
+  // verify its tab URL against the scenario origin.
   const selected = await targetTab.evaluate((element): { label: string; value: string } | null => {
     if (!(element instanceof HTMLSelectElement)) {
       return null;
@@ -1061,15 +1109,13 @@ const selectTargetTab = async (sidePanel: Page, budget: SetupBudget): Promise<vo
     }
     return { label: option.textContent?.trim() ?? '', value: option.value };
   });
-  if (selected === null || selected.value !== flightsOption.value) {
-    throw new Error(
-      'The selected target tab value does not match the intended Google Flights tab.'
-    );
+  if (selected === null || selected.value !== scenarioOption.value) {
+    throw new Error('The selected target tab value does not match the intended scenario tab.');
   }
-  if (!/flights/iu.test(selected.label)) {
-    throw new Error(`Selected target tab is not Google Flights: "${selected.label}".`);
+  if (!scenario.tabLabelRe.test(selected.label)) {
+    throw new Error(`Selected target tab is not the scenario tab: "${selected.label}".`);
   }
-  await verifyTargetTabUrl(sidePanel, selected.value);
+  await verifyTargetTabUrl(sidePanel, selected.value, scenario);
 };
 
 const selectCreditAccount = async (sidePanel: Page, budget: SetupBudget): Promise<string> => {
@@ -1906,6 +1952,7 @@ const attemptToStats = (record: AttemptRecord): BenchAttemptStats => ({
 
 const buildFailedAttemptRecord = (input: {
   attempt: number;
+  scenarioId: string;
   headless: boolean | null;
   startedAtIso: string;
   gitHead: string;
@@ -1954,6 +2001,7 @@ const buildFailedAttemptRecord = (input: {
   }
   return {
     attempt: input.attempt,
+    scenarioId: input.scenarioId,
     headless: input.headless,
     startedAtIso: input.startedAtIso,
     gitHead: input.gitHead,
@@ -1992,11 +2040,12 @@ const buildFailedAttemptRecord = (input: {
 // ── One attempt ─────────────────────────────────────────────────────────────
 
 type AttemptRunResult =
-  | { kind: 'record'; record: AttemptRecord }
+  | { kind: 'record'; record: AttemptRecord; raw?: unknown }
   | { kind: 'blocker'; blocker: BlockerRecord };
 
 const runAttempt = async (input: {
   attempt: number;
+  scenario: BenchScenario;
   gitHead: string;
   token: string;
   userEmail: string | undefined;
@@ -2007,6 +2056,7 @@ const runAttempt = async (input: {
 }): Promise<AttemptRunResult> => {
   const {
     attempt,
+    scenario,
     gitHead,
     token,
     userEmail,
@@ -2015,6 +2065,7 @@ const runAttempt = async (input: {
     batchStartedAtMs,
     batchOrgIdHash,
   } = input;
+  const followUp = resolveFollowUp(scenario, followUpDate);
   const attemptStartMs = Date.now();
   const startedAtIso = new Date(attemptStartMs).toISOString();
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-workflow-create-bench-'));
@@ -2069,12 +2120,12 @@ const runAttempt = async (input: {
       seedWorkflowSettings(sidePanel, benchSettings)
     );
     checkGatewayBlocker();
-    await runSetupStep(setupBudget, 'flights tab setup', () =>
-      openFlightsTab(attemptContext, setupBudget)
+    await runSetupStep(setupBudget, 'scenario tab setup', () =>
+      openScenarioTab(attemptContext, setupBudget, scenario)
     );
     checkGatewayBlocker();
     await runSetupStep(setupBudget, 'target-tab setup', () =>
-      selectTargetTab(sidePanel, setupBudget)
+      selectTargetTab(sidePanel, setupBudget, scenario)
     );
     checkGatewayBlocker();
     creditAccount = await runSetupStep(setupBudget, 'credit-account setup', () =>
@@ -2093,7 +2144,7 @@ const runAttempt = async (input: {
     // ── Agent phase (the only phase governed by --timeout-ms) ──
     setupDone.value = true;
     const preTurnCount = (await snapshotTurn(sidePanel)).eventCount;
-    const submitAtMs = await sendMessage(sidePanel, createMessage);
+    const submitAtMs = await sendMessage(sidePanel, scenario.createMessage);
     createSentOffsetMs = submitAtMs - attemptStartMs;
     const deadlineMs = submitAtMs + timeoutMs;
     deadlineTimer = setTimeout(() => {
@@ -2124,9 +2175,11 @@ const runAttempt = async (input: {
 
     let verifyTimedOut = false;
     let finalSnapshot = createPhase.finalSnapshot;
-    if (!createPhase.timedOut && !autoRunObserved && Date.now() < deadlineMs) {
+    // The follow-up run always uses the pinned values, even after an
+    // auto-run: every attempt is verified against the same inputs.
+    if (!createPhase.timedOut && Date.now() < deadlineMs) {
       const verifyStartCount = (await snapshotTurn(sidePanel)).eventCount;
-      await sendMessage(sidePanel, `Run it for ${followUpDestination} on ${followUpDate}`);
+      await sendMessage(sidePanel, followUp.message);
       followUpSent = true;
       const verifyPhase = await pollAgentPhase({
         sidePanel,
@@ -2145,8 +2198,10 @@ const runAttempt = async (input: {
     if (createPhase.timedOut || verifyTimedOut) {
       return {
         kind: 'record',
+        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
         record: buildFailedAttemptRecord({
           attempt,
+          scenarioId: scenario.id,
           headless,
           startedAtIso,
           gitHead,
@@ -2174,8 +2229,10 @@ const runAttempt = async (input: {
     if (requests.length === 0) {
       return {
         kind: 'record',
+        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
         record: buildFailedAttemptRecord({
           attempt,
+          scenarioId: scenario.id,
           headless,
           startedAtIso,
           gitHead,
@@ -2212,8 +2269,10 @@ const runAttempt = async (input: {
       }
       return {
         kind: 'record',
+        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
         record: buildFailedAttemptRecord({
           attempt,
+          scenarioId: scenario.id,
           headless,
           startedAtIso,
           gitHead,
@@ -2235,11 +2294,13 @@ const runAttempt = async (input: {
     const correctness = scoreWorkflowCorrectness({
       workflows,
       events: finalBenchEvents,
-      followUp: followUpSent ? { destination: followUpDestination, date: followUpDate } : undefined,
+      scenario,
+      followUpValues: followUpSent ? followUp.values : undefined,
     });
 
     const record: AttemptRecord = {
       attempt,
+      scenarioId: scenario.id,
       headless,
       startedAtIso,
       gitHead,
@@ -2270,7 +2331,11 @@ const runAttempt = async (input: {
       failureReason: correctness.passed ? null : 'correctness-failed',
       transcript: redactTranscript(finalInternalEvents, collector.offsetByEventId, correlation),
     };
-    return { kind: 'record', record };
+    return {
+      kind: 'record',
+      record,
+      ...(writeRawArtifacts ? { raw: { events: finalInternalEvents, workflows } } : {}),
+    };
   } catch (error) {
     if (error instanceof BatchBlockerError) {
       return {
@@ -2301,8 +2366,10 @@ const runAttempt = async (input: {
     }
     return {
       kind: 'record',
+      ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
       record: buildFailedAttemptRecord({
         attempt,
+        scenarioId: scenario.id,
         headless,
         startedAtIso,
         gitHead,
@@ -2402,6 +2469,13 @@ const main = async (): Promise<number> => {
           '--append refused: the existing summary.gitHead differs from the current head'
         );
       }
+      const existingScenario = existingSummary['scenario'];
+      if (isRecord(existingScenario) && existingScenario['id'] !== parsed.scenario.id) {
+        throw new BatchBlockerError(
+          'build',
+          '--append refused: the existing summary scenario differs from --scenario'
+        );
+      }
       if (parsed.date === null) {
         const existingDate = existingSummary['followUpDate'];
         if (typeof existingDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(existingDate)) {
@@ -2484,6 +2558,7 @@ const main = async (): Promise<number> => {
       const attemptNumber = firstAttempt + offset;
       const result = await runAttempt({
         attempt: attemptNumber,
+        scenario: parsed.scenario,
         gitHead,
         token,
         userEmail,
@@ -2501,6 +2576,12 @@ const main = async (): Promise<number> => {
         join(outDir, `attempt-${attemptNumber}.json`),
         `${JSON.stringify(result.record, null, 2)}\n`
       );
+      if (result.raw !== undefined) {
+        await writeFile(
+          join(outDir, `attempt-${attemptNumber}-raw.json`),
+          `${JSON.stringify(result.raw, null, 2)}\n`
+        );
+      }
     }
 
     const attemptFiles = (await listAttemptFiles(outDir)).sort((left, right) => left - right);
@@ -2520,8 +2601,9 @@ const main = async (): Promise<number> => {
       attempts: attemptFiles.length,
       followUpDate,
       scenario: {
-        targetUrl,
-        createMessage,
+        id: parsed.scenario.id,
+        targetUrl: parsed.scenario.startUrl,
+        createMessage: parsed.scenario.createMessage,
         modelId,
         mode: 'safe',
         settings: { ...benchSettings },

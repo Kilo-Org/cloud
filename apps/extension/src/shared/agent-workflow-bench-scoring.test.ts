@@ -1,21 +1,26 @@
-/* eslint-disable max-lines -- Comprehensive coverage of every pinned scorer contract branch. */
+/* eslint-disable max-lines, unicorn/consistent-function-scoping -- Comprehensive coverage of the scenario-driven scorer contract. */
 import { describe, expect, it } from 'vitest';
 import {
   BENCH_SPEED_LIMIT_SECONDS,
   computeBatchSummary,
   correlateToolExchanges,
   scoreWorkflowCorrectness,
+  selectLastValidRealRun,
 } from './agent-workflow-bench-scoring';
-import type {
-  BenchAttemptStats,
-  BenchEvent,
-  BenchFollowUp,
-  BenchWorkflow,
-} from './agent-workflow-bench-scoring';
+import type { BenchAttemptStats, BenchEvent, BenchWorkflow } from './agent-workflow-bench-scoring';
+import { BENCH_SCENARIOS, isoDateVariants } from './agent-workflow-bench-scenarios';
 
-const scenarioWorkflow = (overrides: Partial<BenchWorkflow> = {}): BenchWorkflow => ({
+const { flights } = BENCH_SCENARIOS;
+const { hn } = BENCH_SCENARIOS;
+if (flights === undefined || hn === undefined) {
+  throw new Error('scenario registry is missing flights or hn');
+}
+
+const flightsFollowUp = { date: '2026-09-21', destination: 'Paris' };
+
+const flightsWorkflow = (overrides: Partial<BenchWorkflow> = {}): BenchWorkflow => ({
   approvedScriptHash: 'approved-hash-1234',
-  description: 'Business class one way flight search',
+  description: 'Business class flight search',
   id: 'wf-flights',
   name: 'Flights search',
   params: [
@@ -24,7 +29,7 @@ const scenarioWorkflow = (overrides: Partial<BenchWorkflow> = {}): BenchWorkflow
   ],
   pathPrefix: '/travel/flights',
   scopeOrigin: 'https://www.google.com',
-  script: 'const business = true; // business class one way flights search',
+  script: 'const url = "?q=business class flights"; return { navigate: url, state: {} }',
   ...overrides,
 });
 
@@ -49,564 +54,371 @@ const toolResult = (
     : { id: `res-${toolCallId}`, ok, toolCallId, type: 'tool-result', value };
 
 const parisResultValue = {
-  pagesVisited: 1,
-  result: {
-    flights: [{ airline: 'Lufthansa', date: '2026-09-21', price: '€ 245', route: 'Paris' }],
-  },
+  pagesVisited: 2,
+  result:
+    'Flights to Paris · departing Sep 21 · Lufthansa · € 245 · nonstop · business class — top results from the flight search page, sorted by best.',
   workflowName: 'Flights search',
 };
 
-const realRunEvents = (resultValue: unknown): BenchEvent[] => [
-  toolCall('call-save', 'save_workflow', { name: 'Flights search', workflowId: 'wf-flights' }),
-  toolResult('call-save', true, { saved: true, workflowId: 'wf-flights' }),
-  toolCall('call-run', 'run_workflow', {
-    input: { date: '2026-09-21', destination: 'Paris' },
-    workflowId: 'wf-flights',
-  }),
-  toolResult('call-run', true, resultValue),
-];
+let runCallCounter = 0;
+const runEvents = (input: Record<string, unknown>, resultValue: unknown, dryRun = false) => {
+  runCallCounter += 1;
+  const id = `call-run-${String(runCallCounter)}`;
+  return [
+    toolCall(id, 'run_workflow', {
+      input,
+      workflowId: 'wf-flights',
+      ...(dryRun ? { dryRun: true } : {}),
+    }),
+    toolResult(id, true, resultValue),
+  ];
+};
 
-const dryRunEvents = (input: Record<string, unknown>, actions: unknown): BenchEvent[] => [
-  toolCall('call-dry', 'run_workflow', { dryRun: true, input, workflowId: 'wf-flights' }),
-  toolResult('call-dry', true, {
-    dryRun: true,
-    dryRunActions: actions,
-    pagesVisited: 1,
-    result: { dryRun: true, note: 'recorded actions' },
-    workflowName: 'Flights search',
-  }),
-];
+describe('tool exchange correlation', () => {
+  it('joins results to calls by toolCallId and drops orphan results', () => {
+    const events: BenchEvent[] = [
+      toolCall('call-1', 'run_workflow', {}),
+      toolResult('call-1', true, { result: 'ok' }),
+      toolResult('call-orphan', true, { result: 'orphan' }),
+    ];
 
-const attempt = (overrides: Partial<BenchAttemptStats>): BenchAttemptStats => ({
-  createToSavedSeconds: 120,
-  llmCreateRequestCount: 5,
-  llmRequestCount: 6,
-  readCallsBeforeFirstSave: 2,
-  success: true,
-  toolCallCount: 7,
-  toolErrorCount: 1,
-  turnTotalSeconds: 130,
-  ...overrides,
+    const { exchanges } = correlateToolExchanges(events);
+
+    expect(exchanges).toHaveLength(1);
+    expect(exchanges[0]?.call.id).toBe('call-1');
+  });
 });
 
-describe('scoreWorkflowCorrectness stored-workflow predicates', () => {
-  it('passes every stored predicate and the real-run result check', () => {
+describe('real-run selection', () => {
+  it('skips dry runs, empty inputs, and failed results, and picks the last valid run', () => {
+    const events: BenchEvent[] = [
+      ...runEvents({ destination: 'Paris' }, { result: 'dry' }, true),
+      toolCall('call-empty', 'run_workflow', { input: {}, workflowId: 'wf' }),
+      toolResult('call-empty', true, { result: 'empty-input' }),
+      toolCall('call-failed', 'run_workflow', { input: { destination: 'x' }, workflowId: 'wf' }),
+      toolResult('call-failed', false),
+      toolCall('call-a', 'run_workflow', { input: { destination: 'Paris' }, workflowId: 'wf' }),
+      toolResult('call-a', true, { result: 'first' }),
+      toolCall('call-b', 'run_workflow', { input: { destination: 'Paris' }, workflowId: 'wf' }),
+      toolResult('call-b', true, { result: 'second' }),
+    ];
+
+    const run = selectLastValidRealRun(correlateToolExchanges(events).exchanges);
+
+    expect(run?.call.id).toBe('call-b');
+  });
+});
+
+describe('stored workflow predicates', () => {
+  const passingEvents = runEvents(flightsFollowUp, parisResultValue);
+
+  it('passes a fully correct flights attempt', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [scenarioWorkflow()],
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [flightsWorkflow({ script: 'business class ?q= flights search' })],
     });
 
-    const storedKeys = [
-      'approvedScriptHash',
-      'pathPrefix',
-      'scopeOrigin',
-      'scriptBusiness',
-      'scriptOneWay',
-      'storedWorkflow',
-      'workflowParams',
-    ] as const;
-
-    expect(result.resultCheck).toBe('real');
     expect(result.passed).toBe(true);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(true);
-    expect(storedKeys.every(key => result.predicates[key]?.pass === true)).toBe(true);
+    expect(result.resultCheck).toBe('real');
   });
 
-  it('reports no stored workflow', () => {
+  it('fails when no workflow is stored', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
       workflows: [],
     });
 
-    expect(result.predicates['storedWorkflow']?.pass).toBe(false);
-    expect(result.predicates['storedWorkflow']?.detail).toBe('no workflow stored');
     expect(result.passed).toBe(false);
+    expect(result.predicates['storedWorkflow']?.pass).toBe(false);
   });
 
-  it('fails the scope origin predicate on a mismatched origin', () => {
+  it('fails on a wrong scope origin', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [scenarioWorkflow({ scopeOrigin: 'https://www.bing.com' })],
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [
+        flightsWorkflow({
+          scopeOrigin: 'https://example.com',
+          script: 'business',
+        }),
+      ],
     });
 
     expect(result.predicates['scopeOrigin']?.pass).toBe(false);
     expect(result.passed).toBe(false);
   });
 
-  it('fails the path prefix predicate on a mismatched prefix', () => {
+  it('fails when the pathPrefix excludes the scenario start URL', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [scenarioWorkflow({ pathPrefix: '/search' })],
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [flightsWorkflow({ pathPrefix: '/maps', script: 'business' })],
     });
 
-    expect(result.predicates['pathPrefix']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
+    expect(result.predicates['scopeCoversStartUrl']?.pass).toBe(false);
   });
 
-  it('fails the approved hash predicate when the hash is empty', () => {
+  it('accepts an omitted pathPrefix', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [scenarioWorkflow({ approvedScriptHash: '' })],
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [flightsWorkflow({ pathPrefix: undefined, script: 'business' })],
+    });
+
+    expect(result.predicates['scopeCoversStartUrl']?.pass).toBe(true);
+  });
+
+  it('fails without an approved script hash', () => {
+    const result = scoreWorkflowCorrectness({
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [flightsWorkflow({ approvedScriptHash: undefined, script: 'business' })],
     });
 
     expect(result.predicates['approvedScriptHash']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
   });
 
-  it('fails the params predicate when the date param is missing', () => {
-    const workflow = scenarioWorkflow({
-      params: [{ description: 'The destination city to fly to', name: 'destination' }],
-    });
+  it('fails when an expected param is missing', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [workflow],
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [
+        flightsWorkflow({
+          params: [{ description: 'The destination city', name: 'destination' }],
+          script: 'business',
+        }),
+      ],
     });
 
     expect(result.predicates['workflowParams']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
+    expect(result.predicates['workflowParams']?.detail).toContain('date');
   });
 
-  it('fails the business marker predicate when the script lacks it', () => {
+  it('fails when a script marker is missing', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [scenarioWorkflow({ script: 'return { done: true, result: {} };' })],
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [flightsWorkflow({ script: 'economy only' })],
     });
 
-    expect(result.predicates['scriptBusiness']?.pass).toBe(false);
-    expect(result.predicates['scriptOneWay']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
-  });
-
-  it('fails the one-way marker predicate when the script lacks it', () => {
-    const result = scoreWorkflowCorrectness({
-      events: realRunEvents(parisResultValue),
-      workflows: [scenarioWorkflow({ script: 'const business = true; // return flights' })],
-    });
-
-    expect(result.predicates['scriptOneWay']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
+    expect(result.predicates['scriptMarkers']?.pass).toBe(false);
+    expect(result.predicates['scriptMarkers']?.detail).toContain('business');
   });
 });
 
-describe('scoreWorkflowCorrectness real-run result check', () => {
-  it('fails when the destination is missing from the result', () => {
+describe('run evidence scoring', () => {
+  const workflows = [flightsWorkflow({ script: 'business' })];
+
+  it('fails when the run input misses a follow-up value', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents({
-        pagesVisited: 1,
-        result: {
-          flights: [{ airline: 'Lufthansa', date: '2026-09-21', price: '€ 245', route: 'Nice' }],
-        },
-        workflowName: 'Flights search',
-      }),
-      workflows: [scenarioWorkflow()],
+      events: runEvents({ destination: 'Paris' }, parisResultValue),
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
 
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['resultHasDestination']?.pass).toBe(false);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
+    expect(result.predicates['runInputBound']?.pass).toBe(false);
+    expect(result.predicates['runInputBound']?.detail).toContain('date');
     expect(result.passed).toBe(false);
   });
 
-  it('fails when the date is missing from the result', () => {
+  it('fails when the result misses a required content check', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents({
-        pagesVisited: 1,
-        result: { flights: [{ airline: 'Lufthansa', price: '€ 245', route: 'Paris' }] },
-        workflowName: 'Flights search',
+      events: runEvents(flightsFollowUp, {
+        result: 'Flights to Paris found many results with no numbers or airline names here',
       }),
-      workflows: [scenarioWorkflow()],
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
 
-    expect(result.predicates['resultHasDate']?.pass).toBe(false);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
+    expect(result.predicates['resultContent']?.pass).toBe(false);
     expect(result.passed).toBe(false);
   });
 
-  it('fails when the result carries no price digits or currency', () => {
+  it('fails when the result misses the destination value', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents({
-        pagesVisited: 1,
-        result: { flights: [{ airline: 'Lufthansa', route: 'Paris' }] },
-        workflowName: 'Flights search',
+      events: runEvents(flightsFollowUp, {
+        result: 'Lufthansa € 245 business class flight list without the city name',
       }),
-      workflows: [scenarioWorkflow()],
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
 
-    expect(result.predicates['resultHasPrice']?.pass).toBe(false);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
+    expect(result.predicates['resultHasValues']?.pass).toBe(false);
   });
 
-  it('fails the price predicate on a date-only result', () => {
+  it('fails a too-short result', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents({
-        pagesVisited: 1,
-        result: {
-          flights: [{ airline: 'Lufthansa', date: '2026-09-21', route: 'Paris' }],
-        },
-        workflowName: 'Flights search',
-      }),
-      workflows: [scenarioWorkflow()],
+      events: runEvents(flightsFollowUp, { result: 'Paris €1 KL 123' }),
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
 
-    // A loose `$`-anchored currency regex would match the digit-carrying date.
-    // Only a literal currency plus a digit may pass the price predicate.
-    expect(result.predicates['resultHasDate']?.pass).toBe(true);
-    expect(result.predicates['resultHasPrice']?.pass).toBe(false);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
+    expect(result.predicates['resultLength']?.pass).toBe(false);
   });
 
-  it('fails when the result carries no carrier', () => {
+  it('uses a valid dry run with real content when no real run exists', () => {
     const result = scoreWorkflowCorrectness({
-      events: realRunEvents({
-        pagesVisited: 1,
-        result: { flights: [{ date: '2026-09-21', price: '€ 245', route: 'Paris' }] },
-        workflowName: 'Flights search',
-      }),
-      workflows: [scenarioWorkflow()],
-    });
-
-    expect(result.predicates['resultHasCarrier']?.pass).toBe(false);
-    expect(result.predicates['resultHasDestination']?.pass).toBe(true);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
-  });
-});
-
-describe('scoreWorkflowCorrectness real-run selection', () => {
-  it('selects the last ok real run with non-empty input', () => {
-    const events: BenchEvent[] = [
-      toolCall('call-save', 'save_workflow', { name: 'Flights search', workflowId: 'wf-flights' }),
-      toolResult('call-save', true, { saved: true, workflowId: 'wf-flights' }),
-      // An ok real run for Nice comes first.
-      toolCall('call-run-nice', 'run_workflow', {
-        input: { date: '2026-08-01', destination: 'Nice' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run-nice', true, {
-        pagesVisited: 1,
-        result: {
-          flights: [{ airline: 'Lufthansa', date: '2026-08-01', price: '€ 180', route: 'Nice' }],
-        },
-        workflowName: 'Flights search',
-      }),
-      // A dry run is not a real run.
-      toolCall('call-dry', 'run_workflow', {
-        dryRun: true,
-        input: { date: '2026-08-02', destination: 'Rome' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-dry', true, {
-        dryRun: true,
-        dryRunActions: [{ action: 'fill', selector: 'input[name="destination"]' }],
-        pagesVisited: 1,
-        result: { dryRun: true },
-        workflowName: 'Flights search',
-      }),
-      // An ok real run with empty input does not count.
-      toolCall('call-run-empty', 'run_workflow', { input: {}, workflowId: 'wf-flights' }),
-      toolResult('call-run-empty', true, {
-        pagesVisited: 1,
-        result: { flights: [] },
-        workflowName: 'Flights search',
-      }),
-      // A failed real run does not count.
-      toolCall('call-run-rome', 'run_workflow', {
-        input: { date: '2026-07-15', destination: 'Rome' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run-rome', false),
-      // The last ok real run wins: Paris.
-      toolCall('call-run-paris', 'run_workflow', {
-        input: { date: '2026-09-21', destination: 'Paris' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run-paris', true, parisResultValue),
-    ];
-
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    // Only the Paris run carries the expected destination; a wrong selection would fail.
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['resultHasDestination']?.pass).toBe(true);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(true);
-    expect(result.passed).toBe(true);
-  });
-
-  it('extracts the destination by param-name match and the date by ISO regex', () => {
-    const events: BenchEvent[] = [
-      toolCall('call-run', 'run_workflow', {
-        input: { date: '21.09.2026', destination: 'Paris', travelDate: '2026-09-21' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run', true, parisResultValue),
-    ];
-
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['resultHasDestination']?.pass).toBe(true);
-    expect(result.predicates['resultHasDate']?.pass).toBe(true);
-  });
-
-  it('extracts the destination from the input value echoed in the result', () => {
-    const events: BenchEvent[] = [
-      toolCall('call-run', 'run_workflow', {
-        input: { from: 'Belgrade', to: 'Paris' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run', true, {
-        pagesVisited: 1,
-        result: {
-          flights: [{ airline: 'Lufthansa', date: '2026-09-21', price: '€ 245', route: 'Paris' }],
-        },
-        workflowName: 'Flights search',
-      }),
-    ];
-
-    // No destination-ish param name; the date is missing from the input, so no check can run.
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    expect(result.resultCheck).toBe('none');
-    expect(result.passed).toBe(false);
-  });
-
-  it('extracts the destination via the echoed-result fallback when the param name does not match', () => {
-    const events: BenchEvent[] = [
-      toolCall('call-run', 'run_workflow', {
-        input: { from: 'Belgrade', to: 'Paris', travelDate: '2026-09-21' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run', true, {
-        pagesVisited: 1,
-        result: {
-          flights: [{ airline: 'Lufthansa', date: '2026-09-21', price: '€ 245', route: 'Paris' }],
-        },
-        workflowName: 'Flights search',
-      }),
-    ];
-
-    // No input key matches the workflow's `destination` param.
-    // The fallback selects the input value echoed in the result; the ISO date still binds.
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['resultHasDestination']?.pass).toBe(true);
-    expect(result.predicates['resultHasDate']?.pass).toBe(true);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(true);
-    expect(result.passed).toBe(true);
-  });
-
-  it('reports none when expected values cannot be extracted from the input', () => {
-    const events: BenchEvent[] = [
-      toolCall('call-run', 'run_workflow', {
-        input: { destination: 'Paris' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run', true, parisResultValue),
-    ];
-
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    expect(result.resultCheck).toBe('none');
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
-  });
-
-  it('prefers the follow-up destination and date over extracted values', () => {
-    const followUp: BenchFollowUp = { date: '2026-09-21', destination: 'Paris' };
-    const events: BenchEvent[] = [
-      toolCall('call-run', 'run_workflow', {
-        input: { date: '2026-08-01', destination: 'Berlin' },
-        workflowId: 'wf-flights',
-      }),
-      toolResult('call-run', true, parisResultValue),
-    ];
-
-    const result = scoreWorkflowCorrectness({
-      events,
-      followUp,
-      workflows: [scenarioWorkflow()],
-    });
-
-    // The result carries Paris, not Berlin, so only the follow-up values pass.
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['resultHasDestination']?.pass).toBe(true);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(true);
-  });
-});
-
-describe('scoreWorkflowCorrectness dry-run fallback', () => {
-  it('passes when input binds the params and the actions are sufficient', () => {
-    const result = scoreWorkflowCorrectness({
-      events: dryRunEvents({ date: '2026-09-21', destination: 'Paris' }, [
-        { action: 'fill', selector: 'input[name="destination"]' },
-        { action: 'click', selector: 'input[name="departureDate"]' },
-      ]),
-      workflows: [scenarioWorkflow()],
+      events: runEvents(flightsFollowUp, parisResultValue, true),
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
 
     expect(result.resultCheck).toBe('dry-run');
-    expect(result.predicates['dryRunInput']?.pass).toBe(true);
-    expect(result.predicates['dryRunActions']?.pass).toBe(true);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(true);
     expect(result.passed).toBe(true);
   });
 
-  it('fails when the dry-run input does not bind the expected destination', () => {
-    const followUp: BenchFollowUp = { date: '2026-09-21', destination: 'Paris' };
+  it('prefers the real run over a dry run', () => {
     const result = scoreWorkflowCorrectness({
-      events: dryRunEvents({ date: '2026-09-21', destination: 'Rome' }, [
-        { action: 'fill', selector: 'input[name="destination"]' },
-        { action: 'click', selector: 'input[name="departureDate"]' },
-      ]),
-      followUp,
-      workflows: [scenarioWorkflow()],
+      events: [
+        ...runEvents(flightsFollowUp, { result: 'dry note only' }, true),
+        ...runEvents(flightsFollowUp, parisResultValue),
+      ],
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
 
-    expect(result.resultCheck).toBe('dry-run');
-    expect(result.predicates['dryRunInput']?.pass).toBe(false);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
+    expect(result.resultCheck).toBe('real');
+    expect(result.passed).toBe(true);
   });
 
-  it('fails when the dry-run actions are insufficient', () => {
+  it('reports none without any valid run', () => {
     const result = scoreWorkflowCorrectness({
-      events: dryRunEvents({ date: '2026-09-21', destination: 'Paris' }, [
-        { action: 'fill', selector: 'input[name="destination"]' },
-      ]),
-      workflows: [scenarioWorkflow()],
+      events: [],
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
     });
-
-    expect(result.predicates['dryRunInput']?.pass).toBe(true);
-    expect(result.predicates['dryRunActions']?.pass).toBe(false);
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
-    expect(result.passed).toBe(false);
-  });
-
-  it('prefers a real run over the dry-run fallback', () => {
-    const events: BenchEvent[] = [
-      ...dryRunEvents({ date: '2026-09-21', destination: 'Paris' }, [
-        { action: 'fill', selector: 'input[name="destination"]' },
-        { action: 'click', selector: 'input[name="departureDate"]' },
-      ]),
-      ...realRunEvents(parisResultValue),
-    ];
-
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['dryRunInput']).toBeUndefined();
-    expect(result.passed).toBe(true);
-  });
-});
-
-describe('scoreWorkflowCorrectness toolCallId correlation', () => {
-  it('classes unmatched tool-results as unknown-tool and keeps them out of exchanges', () => {
-    const events: BenchEvent[] = [
-      ...realRunEvents(parisResultValue),
-      // A tool-result whose tool-call is absent stays an unknown-tool marker.
-      toolResult('call-ghost', true, parisResultValue),
-    ];
-
-    const correlation = correlateToolExchanges(events);
-    expect(correlation.exchanges).toHaveLength(2);
-
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
-
-    expect(result.resultCheck).toBe('real');
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(true);
-    expect(result.passed).toBe(true);
-  });
-
-  it('reports none when the only run evidence is an unmatched tool-result', () => {
-    const events: BenchEvent[] = [toolResult('call-ghost', true, parisResultValue)];
-
-    const correlation = correlateToolExchanges(events);
-    expect(correlation.exchanges).toHaveLength(0);
-
-    const result = scoreWorkflowCorrectness({ events, workflows: [scenarioWorkflow()] });
 
     expect(result.resultCheck).toBe('none');
-    expect(result.predicates['runWorkflowResult']?.pass).toBe(false);
     expect(result.passed).toBe(false);
+  });
+
+  it('reports none without follow-up values', () => {
+    const result = scoreWorkflowCorrectness({
+      events: runEvents(flightsFollowUp, parisResultValue),
+      followUpValues: undefined,
+      scenario: flights,
+      workflows,
+    });
+
+    expect(result.resultCheck).toBe('none');
+    expect(result.passed).toBe(false);
+  });
+
+  it('matches an ISO follow-up date shown as a human date in the result', () => {
+    const result = scoreWorkflowCorrectness({
+      events: runEvents(flightsFollowUp, parisResultValue),
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows,
+    });
+
+    // The pinned result text says "Sep 21", never "2026-09-21".
+    expect(result.predicates['resultHasValues']?.pass).toBe(true);
+  });
+
+  it('scores an hn attempt with topic-only params', () => {
+    const result = scoreWorkflowCorrectness({
+      events: [
+        toolCall('call-run', 'run_workflow', { input: { topic: 'rust' }, workflowId: 'wf-hn' }),
+        toolResult('call-run', true, {
+          result:
+            'Why Discord is switching from Go to Rust — 1205 points — 610 comments — and more rust stories from Hacker News search results',
+        }),
+      ],
+      followUpValues: { topic: 'rust' },
+      scenario: hn,
+      workflows: [
+        {
+          approvedScriptHash: 'hash',
+          description: 'HN topic search',
+          id: 'wf-hn',
+          name: 'HN search',
+          params: [{ description: 'The topic to search for', name: 'topic' }],
+          scopeOrigin: 'https://hn.algolia.com',
+          script: 'return { navigate: "https://hn.algolia.com/?query=" + input.topic, state: {} }',
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(true);
   });
 });
 
-describe('batch summary aggregation', () => {
-  it('computes the median and max over non-null samples with an odd count', () => {
+describe('iso date variants', () => {
+  it('renders human variants for an ISO date', () => {
+    expect(isoDateVariants('2026-09-21')).toStrictEqual([
+      '2026-09-21',
+      'Sep 21',
+      'September 21',
+      '21 Sep',
+      '21 September',
+    ]);
+  });
+
+  it('returns a non-ISO value unchanged', () => {
+    expect(isoDateVariants('Paris')).toStrictEqual(['Paris']);
+  });
+});
+
+describe('batch summary', () => {
+  const stats = (overrides: Partial<BenchAttemptStats>): BenchAttemptStats => ({
+    createToSavedSeconds: 60,
+    llmCreateRequestCount: 2,
+    llmRequestCount: 3,
+    readCallsBeforeFirstSave: 1,
+    success: true,
+    toolCallCount: 4,
+    toolErrorCount: 0,
+    turnTotalSeconds: 90,
+    ...overrides,
+  });
+
+  it('aggregates medians, success count, and the speed gate', () => {
     const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: 100 }),
-      attempt({ createToSavedSeconds: 200 }),
-      attempt({ createToSavedSeconds: 300 }),
+      stats({ createToSavedSeconds: 30 }),
+      stats({ createToSavedSeconds: 60 }),
+      stats({ createToSavedSeconds: 90, success: false }),
     ]);
 
     expect(summary.attempts).toBe(3);
-    expect(summary.medians.createToSavedSeconds).toBe(200);
-    expect(summary.maxCreateToSavedSeconds).toBe(300);
-    expect(summary.successCount).toBe(3);
-  });
-
-  it('averages the two middle samples for an even count', () => {
-    const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: 100 }),
-      attempt({ createToSavedSeconds: 200 }),
-      attempt({ createToSavedSeconds: 300 }),
-      attempt({ createToSavedSeconds: 400 }),
-    ]);
-
-    expect(summary.medians.createToSavedSeconds).toBe(250);
-    expect(summary.maxCreateToSavedSeconds).toBe(400);
-  });
-
-  it('skips null samples and counts only successes', () => {
-    const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: null, success: false }),
-      attempt({ createToSavedSeconds: 100, success: true }),
-      attempt({ createToSavedSeconds: 200, success: true }),
-    ]);
-
-    expect(summary.medians.createToSavedSeconds).toBe(150);
-    expect(summary.maxCreateToSavedSeconds).toBe(200);
     expect(summary.successCount).toBe(2);
-  });
-
-  it('reports null medians for an all-null metric', () => {
-    const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: null, turnTotalSeconds: null }),
-      attempt({ createToSavedSeconds: null, turnTotalSeconds: null }),
-    ]);
-
-    expect(summary.medians.createToSavedSeconds).toBeNull();
-    expect(summary.medians.turnTotalSeconds).toBeNull();
-    expect(summary.maxCreateToSavedSeconds).toBeNull();
-  });
-
-  it('passes the speed gate strictly below the limit', () => {
-    const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: BENCH_SPEED_LIMIT_SECONDS - 0.001 }),
-      attempt({ createToSavedSeconds: 100 }),
-    ]);
-
+    expect(summary.medians.createToSavedSeconds).toBe(60);
+    expect(summary.maxCreateToSavedSeconds).toBe(90);
     expect(summary.speedGatePassed).toBe(true);
   });
 
-  it('fails the speed gate at the limit boundary', () => {
-    const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: BENCH_SPEED_LIMIT_SECONDS }),
-      attempt({ createToSavedSeconds: 100 }),
-    ]);
-
-    expect(summary.speedGatePassed).toBe(false);
+  it('fails the speed gate when any attempt is at or over the limit or never saved', () => {
+    expect(
+      computeBatchSummary([stats({ createToSavedSeconds: BENCH_SPEED_LIMIT_SECONDS })])
+        .speedGatePassed
+    ).toBe(false);
+    expect(computeBatchSummary([stats({ createToSavedSeconds: null })]).speedGatePassed).toBe(
+      false
+    );
   });
 
-  it('fails the speed gate when any attempt has no measured time', () => {
-    const summary = computeBatchSummary([
-      attempt({ createToSavedSeconds: null }),
-      attempt({ createToSavedSeconds: 100 }),
-    ]);
+  it('reports null medians for an empty batch', () => {
+    const summary = computeBatchSummary([]);
 
-    expect(summary.speedGatePassed).toBe(false);
+    expect(summary.medians.createToSavedSeconds).toBeNull();
+    expect(summary.maxCreateToSavedSeconds).toBeNull();
+    expect(summary.successCount).toBe(0);
   });
 });

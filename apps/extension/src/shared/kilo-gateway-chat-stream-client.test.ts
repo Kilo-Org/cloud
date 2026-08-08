@@ -1,8 +1,10 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, no-promise-executor-return, promise/avoid-new, promise/always-return, promise/prefer-await-to-then, jest/no-conditional-in-test, unicorn/consistent-function-scoping -- Stream fixtures need raw promises and conditional fakes. */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   fetchKiloGatewayChatCompletionStream,
+  KiloGatewayHttpError,
+  KiloGatewayStreamStalledError,
   parseKiloGatewayChatCompletionStream,
 } from './kilo-api-client';
 import type { FetchLike } from './auth';
@@ -627,5 +629,123 @@ describe('kilo gateway chat stream client', () => {
       promptTokens: 500,
     });
     expect(completion.usage).not.toHaveProperty('costUsd');
+  });
+});
+
+describe('stall watchdog', () => {
+  it('throws KiloGatewayStreamStalledError when no bytes arrive for the stall timeout', async () => {
+    const fetch: FetchLike = () =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start() {
+              // Never enqueue, never close: a stalled stream.
+            },
+          }),
+          { headers: { 'Content-Type': 'text/event-stream' }, status: 200 }
+        )
+      );
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://gateway.test',
+        fetch,
+        messages: [],
+        model: 'test-model',
+        onContentDelta: () => {},
+        stallTimeoutMs: 50,
+        token: 'token',
+        tools: [],
+      })
+    ).rejects.toBeInstanceOf(KiloGatewayStreamStalledError);
+  });
+
+  it('completes when chunks keep arriving within the stall timeout', async () => {
+    const encoder = new TextEncoder();
+    const fetch: FetchLike = () =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            async start(controller) {
+              controller.enqueue(
+                encoder.encode('data: {"choices":[{"delta":{"content":"a"}}]}\n\n')
+              );
+              await new Promise(resolve => setTimeout(resolve, 40));
+              controller.enqueue(
+                encoder.encode('data: {"choices":[{"delta":{"content":"b"}}]}\n\n')
+              );
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            },
+          }),
+          { headers: { 'Content-Type': 'text/event-stream' }, status: 200 }
+        )
+      );
+
+    const completion = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://gateway.test',
+      fetch,
+      messages: [],
+      model: 'test-model',
+      onContentDelta: () => {},
+      stallTimeoutMs: 100,
+      token: 'token',
+      tools: [],
+    });
+
+    expect(completion.content).toBe('ab');
+  });
+
+  it('throws a typed KiloGatewayHttpError carrying the status', async () => {
+    const fetch: FetchLike = () => Promise.resolve(new Response('', { status: 503 }));
+
+    const failure = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://gateway.test',
+      fetch,
+      messages: [],
+      model: 'test-model',
+      onContentDelta: () => {},
+      token: 'token',
+      tools: [],
+    }).then(
+      () => {},
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(KiloGatewayHttpError);
+    expect(failure instanceof KiloGatewayHttpError ? failure.status : null).toBe(503);
+  });
+
+  it('reports a caller abort as an abort, not a stall', async () => {
+    const controller = new AbortController();
+    const fetch: FetchLike = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const abortError = new Error('aborted');
+          abortError.name = 'AbortError';
+          reject(abortError);
+        });
+      });
+
+    const pending = fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://gateway.test',
+      fetch,
+      messages: [],
+      model: 'test-model',
+      onContentDelta: () => {},
+      signal: controller.signal,
+      stallTimeoutMs: 10_000,
+      token: 'token',
+      tools: [],
+    });
+    controller.abort();
+
+    const failure = await pending.then(
+      () => {},
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure instanceof KiloGatewayStreamStalledError).toBe(false);
   });
 });

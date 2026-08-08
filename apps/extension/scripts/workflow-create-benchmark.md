@@ -27,7 +27,7 @@ lookups, and a zero-param "just run it" workflow.
 | `weather` | forecast.weather.gov | forecast for a city (GET form) |
 | `youtube` | youtube.com | videos about a topic |
 | `npm` | npmjs.com | package search |
-| `mdn` | developer.mozilla.org | docs search |
+| `tmdb` | themoviedb.org | movie lookup |
 | `stackoverflow` | stackoverflow.com | recent questions for a tag |
 | `arxiv` | arxiv.org | recent papers about a topic |
 | `openlibrary` | openlibrary.org | book search |

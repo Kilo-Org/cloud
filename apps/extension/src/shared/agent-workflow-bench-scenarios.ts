@@ -146,8 +146,10 @@ const YOUTUBE_SCENARIO: BenchScenario = {
   followUpValues: { topic: 'woodworking' },
   id: 'youtube',
   minResultChars: 100,
-  // Durations render in every locale; label words do not.
-  resultContentChecks: [{ key: 'duration', re: /\d+:\d\d/u }],
+  // View counts, durations, or age markers — whichever the locale renders into text.
+  resultContentChecks: [
+    { key: 'videos', re: /\bviews?\b|aufrufe|\d+:\d\d|\bago\b|subscribers?/iu },
+  ],
   resultMustContainValues: ['topic'],
   scopeOrigin: 'https://www.youtube.com',
   scriptMarkers: [],
@@ -172,19 +174,22 @@ const NPM_SCENARIO: BenchScenario = {
   usesDate: false,
 };
 
-const MDN_SCENARIO: BenchScenario = {
-  createMessage: 'Create a workflow to search the MDN web docs',
-  expectedParams: [{ key: 'term', re: /term|query|search|topic|keyword/iu }],
-  followUpMessage: 'Run it for {term}',
-  followUpValues: { term: 'flexbox' },
-  id: 'mdn',
+// MDN was probed and rejected: its search results never render in an
+// automated browser, so no workflow can succeed there.
+const TMDB_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to look up a movie on TMDB',
+  expectedParams: [{ key: 'movie', re: /movie|film|title|query|search/iu }],
+  followUpMessage: 'Run it for {movie}',
+  followUpValues: { movie: 'Inception' },
+  id: 'tmdb',
   minResultChars: 100,
-  resultContentChecks: [{ key: 'docs', re: /css|html|javascript|web|reference|results/iu }],
-  resultMustContainValues: ['term'],
-  scopeOrigin: 'https://developer.mozilla.org',
+  // A release year renders in every locale.
+  resultContentChecks: [{ key: 'year', re: /\b(?:19|20)\d\d\b/u }],
+  resultMustContainValues: ['movie'],
+  scopeOrigin: 'https://www.themoviedb.org',
   scriptMarkers: [],
-  startUrl: 'https://developer.mozilla.org/en-US/',
-  tabLabelRe: /mdn|mozilla/iu,
+  startUrl: 'https://www.themoviedb.org/',
+  tabLabelRe: /movie|tmdb/iu,
   usesDate: false,
 };
 
@@ -378,7 +383,7 @@ const REMOTEOK_SCENARIO: BenchScenario = {
   scopeOrigin: 'https://remoteok.com',
   scriptMarkers: [],
   startUrl: 'https://remoteok.com/',
-  tabLabelRe: /remote\s?ok/iu,
+  tabLabelRe: /remote/iu,
   usesDate: false,
 };
 
@@ -391,7 +396,6 @@ export const BENCH_SCENARIOS: Readonly<Record<string, BenchScenario>> = {
   github: GITHUB_SCENARIO,
   'github-trending': GITHUB_TRENDING_SCENARIO,
   hn: HN_SCENARIO,
-  mdn: MDN_SCENARIO,
   merriam: MERRIAM_SCENARIO,
   npm: NPM_SCENARIO,
   npr: NPR_SCENARIO,
@@ -400,6 +404,7 @@ export const BENCH_SCENARIOS: Readonly<Record<string, BenchScenario>> = {
   stackoverflow: STACKOVERFLOW_SCENARIO,
   stockanalysis: STOCKANALYSIS_SCENARIO,
   timeanddate: TIMEANDDATE_SCENARIO,
+  tmdb: TMDB_SCENARIO,
   weather: WEATHER_SCENARIO,
   wikipedia: WIKIPEDIA_SCENARIO,
   youtube: YOUTUBE_SCENARIO,

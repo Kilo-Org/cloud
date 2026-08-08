@@ -480,7 +480,18 @@ export const runWorkflow = async (
         []
       );
     }
-    await deps.navigateTab(tabId, workflow.startUrl);
+    try {
+      await deps.navigateTab(tabId, workflow.startUrl);
+    } catch (error) {
+      return resultWithActions(
+        {
+          error: `Navigation to the startUrl failed: ${error instanceof Error ? error.message : String(error)}`,
+          ok: false,
+        },
+        dryRun,
+        []
+      );
+    }
     if (isRunStopped(signal)) {
       return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, []);
     }
@@ -500,8 +511,20 @@ export const runWorkflow = async (
     }
 
     // B. Scope check on current tab URL.
-    // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
-    const url = await deps.getTabUrl(tabId);
+    let url = '';
+    try {
+      // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
+      url = await deps.getTabUrl(tabId);
+    } catch (error) {
+      return resultWithActions(
+        {
+          error: `Could not read the tab URL: ${error instanceof Error ? error.message : String(error)}`,
+          ok: false,
+        },
+        dryRun,
+        dryRunActions
+      );
+    }
     if (isRunStopped(signal)) {
       return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
     }
@@ -623,8 +646,20 @@ export const runWorkflow = async (
       }
 
       state = validationResult.nextState;
-      // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
-      await deps.navigateTab(tabId, validationResult.navigateUrl);
+      try {
+        // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
+        await deps.navigateTab(tabId, validationResult.navigateUrl);
+      } catch (error) {
+        return resultWithActions(
+          {
+            error: `Navigation to ${validationResult.navigateUrl} failed: ${error instanceof Error ? error.message : String(error)}`,
+            ok: false,
+            pageUrl: url,
+          },
+          dryRun,
+          dryRunActions
+        );
+      }
       // eslint-disable-next-line no-continue -- Clearer than deep nesting for this state machine.
       continue;
     }

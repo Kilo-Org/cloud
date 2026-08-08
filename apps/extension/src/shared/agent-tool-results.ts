@@ -31,7 +31,16 @@ export const runToolCalls = <ToolCall extends ToolCallEvent>(
       return results;
     }
 
-    const result = await executeToolCall(toolCall);
+    // A tool that throws must still produce an error tool-result: providers require a result for every call, and the model needs the failure text to react. Only an abort propagates.
+    const result: EvalTabResult = await executeToolCall(toolCall).catch((error: unknown) => {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+      return {
+        error: `${toolCall.name} failed: ${error instanceof Error ? error.message : String(error)}`,
+        ok: false as const,
+      };
+    });
 
     return runNext(index + 1, [...results, toToolResultEvent(toolCall, result)]);
   };

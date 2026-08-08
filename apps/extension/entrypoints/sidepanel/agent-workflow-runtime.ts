@@ -61,7 +61,7 @@ export const evalInTab = async (tabId: number, code: string): Promise<EvalTabRes
 };
 
 /**
- * Navigate a tab to a URL and wait for the matching page to finish loading.
+ * Navigate a tab to a URL and wait for the resulting page to finish loading.
  *
  * URL comparison: parse with new URL, compare origin + pathname + search,
  * ignore hash. No other normalization.
@@ -74,7 +74,13 @@ export const evalInTab = async (tabId: number, code: string): Promise<EvalTabRes
  * re-read of the returned tab state. If the tab already completed at the
  * matching URL, resolve immediately.
  *
- * If no matching load arrives within WORKFLOW_NAVIGATION_TIMEOUT_MS
+ * A completed load counts when the tab lands on the requested URL OR on any
+ * URL different from the pre-navigation one — servers legitimately redirect
+ * (a search endpoint to its results page, a canonicalizer, a login flow).
+ * The workflow runner re-checks the landed URL against the workflow scope
+ * before any script runs, so a redirect never widens what a script can do.
+ *
+ * If no such load arrives within WORKFLOW_NAVIGATION_TIMEOUT_MS
  * (30 s), reject with a timeout error.
  *
  * The listener and timer are always removed in a finally block.
@@ -85,6 +91,7 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
   if (tab.status === 'complete' && tab.url !== undefined && urlMatches(tab.url, url)) {
     return;
   }
+  const preNavigationUrl = tab.url;
 
   type TabListener = (updatedTabId: number, changeInfo: object, tabInfo: object) => void;
   let listener: TabListener | undefined = undefined;
@@ -118,6 +125,11 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
         fn();
       };
 
+      // The landed URL satisfies the navigation when it is the requested URL or any URL other than the page we navigated away from (a redirect).
+      const isAcceptableLandingUrl = (landedUrl: string): boolean =>
+        urlMatches(landedUrl, url) ||
+        (preNavigationUrl !== undefined && !urlMatches(landedUrl, preNavigationUrl));
+
       const checkIsCompleteAndMatching = (
         tabInfo:
           | {
@@ -130,7 +142,7 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
 
       timeoutHandle = setTimeout(() => {
         onDone(() => {
-          reject(new Error('Navigation timed out.'));
+          reject(new Error(`Navigation to ${url} timed out: the page never finished loading.`));
         });
       }, WORKFLOW_NAVIGATION_TIMEOUT_MS);
 
@@ -147,7 +159,7 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
         void (async (): Promise<void> => {
           try {
             const currentTab = await browser.tabs.get(tabId);
-            if (currentTab.url !== undefined && urlMatches(currentTab.url, url)) {
+            if (currentTab.url !== undefined && isAcceptableLandingUrl(currentTab.url)) {
               onDone(() => {
                 resolve();
               });

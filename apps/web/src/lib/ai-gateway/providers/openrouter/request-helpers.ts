@@ -317,7 +317,6 @@ export function removeCacheBreakpoints(request: GatewayRequest) {
   if (request.kind === 'chat_completions' && Array.isArray(request.body.messages)) {
     console.debug('[removeCacheBreakpoints] removing cache breakpoints from chat completions');
     deleteCacheControl(request.body.messages);
-    delete (request.body as Record<string, unknown>).prompt_cache_options;
   } else if (request.kind === 'responses' && Array.isArray(request.body.input)) {
     console.debug('[removeCacheBreakpoints] removing cache breakpoints from responses request');
     deleteCacheControl(request.body.input);

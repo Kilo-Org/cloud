@@ -394,7 +394,7 @@ describe('agent LLM harness', () => {
 
   it('gives a concise safe-mode workflow creation recipe and keeps the dangerous-mode recipe unchanged', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot, use targeted reads only when a required selector is missing, then call save_workflow as the next tool action with scopeOrigin set to the current origin and pathPrefix set to the current path, declare values that vary between runs as params, and do not end with text. The script must use only the documented page.* helpers and never document, querySelector, or page.goto.'
+      'When the user asks you to create a workflow in safe mode: take one page snapshot with get_page_snapshot and write the script directly from it. Safe reads never reveal CSS selectors — get_element_details only repeats a snapshot node and find_in_page only searches snapshot text — so do not call them to hunt for selectors; derive each script selector from the visible text, placeholders, or labels in the snapshot. Then call save_workflow as the next tool action with scopeOrigin set to the current origin and pathPrefix set to the current path, declare values that vary between runs as params, and do not end with text. The script must use only the documented page.* helpers and never document, querySelector, or page.goto.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
       'For a workflow you save in safe mode, write the script using only the page helpers listed in the save_workflow tool description'
@@ -408,6 +408,20 @@ describe('agent LLM harness', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'When the user asks you to create a workflow: in dangerous mode, first perform the task once with the page tools to verify the steps, then save the workflow, then verify it with run_workflow dryRun: true and report the planned actions. Follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user. Never start a real run of a workflow whose actions buy, send, delete, or otherwise change data without asking the user first.'
     );
+  });
+
+  it('tells the model that get_element_details never returns a CSS selector', () => {
+    const definitions = createSafeToolDefinitions({ supportsImages: false });
+    const elementDetails = definitions.find(tool => tool.function.name === 'get_element_details');
+
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
+      'use targeted reads only when a required selector is missing'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Safe reads never reveal CSS selectors');
+    expect(elementDetails?.function.description).toContain(
+      "The record repeats that node's snapshot fields (role, tag, label, text, href, state)"
+    );
+    expect(elementDetails?.function.description).toContain('never contains a CSS selector');
   });
 
   it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {

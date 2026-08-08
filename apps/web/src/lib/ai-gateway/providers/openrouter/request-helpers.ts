@@ -44,7 +44,7 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
 }
 
 function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
-  if (message.type === 'message') {
+  if ('content' in message) {
     if (typeof message.content === 'string') {
       message.content = [
         {
@@ -55,11 +55,11 @@ function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Response
       ];
     } else if (Array.isArray(message.content)) {
       const lastItem = message.content.at(-1);
-      if (lastItem && lastItem.type === 'input_text') {
+      if (lastItem && 'type' in lastItem && lastItem.type === 'input_text') {
         lastItem.prompt_cache_breakpoint = { mode: 'explicit' };
       }
     }
-  } else if (message.type === 'function_call_output') {
+  } else if ('output' in message) {
     if (typeof message.output === 'string') {
       message.output = [
         {
@@ -70,7 +70,7 @@ function setCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Response
       ];
     } else if (Array.isArray(message.output)) {
       const lastItem = message.output.at(-1);
-      if (lastItem && lastItem.type === 'input_text') {
+      if (lastItem && 'type' in lastItem && lastItem.type === 'input_text') {
         lastItem.prompt_cache_breakpoint = { mode: 'explicit' };
       }
     }
@@ -81,8 +81,12 @@ function isEnvironmentDetailsChatCompletionsPart(part: OpenAI.ChatCompletionCont
   return part.type === 'text' && part.text.startsWith('<environment_details>');
 }
 
-function isEnvironmentDetailsResponsesPart(part: OpenAI.Responses.ResponseInputContent): boolean {
-  return part.type === 'input_text' && part.text.startsWith('<environment_details>');
+function isEnvironmentDetailsResponsesPart(
+  part: OpenAI.Responses.ResponseInputContent | OpenAI.Responses.ResponseContent
+): boolean {
+  return (
+    'type' in part && part.type === 'input_text' && part.text.startsWith('<environment_details>')
+  );
 }
 
 function isEnvironmentDetailsMessagesPart(part: Anthropic.ContentBlockParam): boolean {
@@ -248,35 +252,32 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     };
 
     const systemMessage = request.body.input.find(
-      (msg): msg is Extract<OpenAI.Responses.ResponseInputItem, { type: 'message' }> =>
-        msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
+      msg => 'role' in msg && (msg.role === 'system' || msg.role === 'developer')
     );
     if (systemMessage) {
       console.debug(
-        `[addCacheBreakpoints] setting cache breakpoint on ${systemMessage.role} responses message`
+        `[addCacheBreakpoints] setting cache breakpoint on ${'role' in systemMessage ? systemMessage.role : 'system'} responses message`
       );
       setCacheBreakpointOnResponsesMessage(systemMessage);
     }
 
     const lastMessage = request.body.input.findLast(
-      (
-        msg
-      ): msg is
-        | Extract<OpenAI.Responses.ResponseInputItem, { type: 'message' }>
-        | Extract<OpenAI.Responses.ResponseInputItem, { type: 'function_call_output' }> =>
-        (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
+      msg =>
+        ('role' in msg && msg.role === 'user') ||
+        ('type' in msg && msg.type === 'function_call_output')
     );
     if (lastMessage) {
       if (
-        lastMessage.type === 'message' &&
+        'role' in lastMessage &&
         lastMessage.role === 'user' &&
+        'content' in lastMessage &&
         Array.isArray(lastMessage.content) &&
         lastMessage.content.length > 1
       ) {
         const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsResponsesPart);
         if (envIndex > 0) {
           const targetElement = lastMessage.content[envIndex - 1];
-          if (targetElement && targetElement.type === 'input_text') {
+          if (targetElement && 'type' in targetElement && targetElement.type === 'input_text') {
             console.debug(
               '[addCacheBreakpoints] setting cache breakpoint before environment details in responses'
             );
@@ -287,7 +288,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       }
 
       console.debug(
-        `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
+        `[addCacheBreakpoints] setting cache breakpoint on last ${'role' in lastMessage ? lastMessage.role : 'type' in lastMessage ? lastMessage.type : 'responses'} responses message`
       );
       setCacheBreakpointOnResponsesMessage(lastMessage);
     }

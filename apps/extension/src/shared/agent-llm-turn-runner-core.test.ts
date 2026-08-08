@@ -18,7 +18,7 @@ function* createGatewayResponses(): Generator<Response, Response> {
     'data: [DONE]\n\n',
   ]);
   yield streamResponse([
-    'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
     'data: {"choices":[],"usage":{"prompt_tokens":200,"completion_tokens":3,"total_tokens":203,"cost":0.001}}\n\n',
     'data: [DONE]\n\n',
   ]);
@@ -34,7 +34,7 @@ function* createToolOnlyGatewayResponses(rounds: number): Generator<Response, Re
   }
 
   return streamResponse([
-    'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
     'data: [DONE]\n\n',
   ]);
 }
@@ -64,7 +64,7 @@ describe('agent LLM turn runner core', () => {
     const usageCalls: unknown[] = [];
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
         'data: {"choices":[],"usage":{"completion_tokens":5,"prompt_tokens":999,"total_tokens":1004,"cost":0.0123}}\n\n',
         'data: [DONE]\n\n',
       ]);
@@ -212,7 +212,7 @@ describe('agent LLM turn runner core', () => {
     const fetch: FetchLike = () =>
       streamResponse([
         'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":" world"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -309,37 +309,41 @@ describe('agent LLM turn runner core', () => {
     expect(endedId).toBeUndefined();
   });
 
-  it('never fires onAssistantStreaming when the stream has no content deltas', async () => {
-    const streamingCalls: (string | undefined)[] = [];
-    // Empty stream: no onContentDelta calls, so the non-streamed start path never runs.
-    // Deltas absent means the defensive completion.content branch is not exercised here;
-    // The public stream client never produces content without deltas.
-    const fetch: FetchLike = () => streamResponse(['data: [DONE]\n\n']);
+  it(
+    'never fires onAssistantStreaming when the stream has no content deltas',
+    { timeout: 20_000 },
+    async () => {
+      const streamingCalls: (string | undefined)[] = [];
+      // Empty stream: no onContentDelta calls, so the non-streamed start path never runs.
+      // Deltas absent means the defensive completion.content branch is not exercised here;
+      // The public stream client never produces content without deltas.
+      const fetch: FetchLike = () => streamResponse(['data: [DONE]\n\n']);
 
-    await runLlmTurn({
-      apiBaseUrl: 'https://app.kilo.ai',
-      appendEvents: () => {},
-      conversationEvents: [createUserMessage('Hi')],
-      executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
-      failureMessage: String,
-      fetch,
-      maxToolRounds: 4,
-      model: 'anthropic/claude-sonnet-4',
-      noResponseMessage: 'No response.',
-      onAssistantStreaming: eventId => {
-        streamingCalls.push(eventId);
-      },
-      signal: undefined,
-      toToolCallEvents: () => [],
-      token: 'token-1',
-      tooManyToolRoundsMessage: 'Too many rounds.',
-      tools: [],
-      updateAssistantMessage: () => {},
-      updateThinkingBlock: () => {},
-    });
+      await runLlmTurn({
+        apiBaseUrl: 'https://app.kilo.ai',
+        appendEvents: () => {},
+        conversationEvents: [createUserMessage('Hi')],
+        executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+        failureMessage: String,
+        fetch,
+        maxToolRounds: 4,
+        model: 'anthropic/claude-sonnet-4',
+        noResponseMessage: 'No response.',
+        onAssistantStreaming: eventId => {
+          streamingCalls.push(eventId);
+        },
+        signal: undefined,
+        toToolCallEvents: () => [],
+        token: 'token-1',
+        tooManyToolRoundsMessage: 'Too many rounds.',
+        tools: [],
+        updateAssistantMessage: () => {},
+        updateThinkingBlock: () => {},
+      });
 
-    expect(streamingCalls).toStrictEqual([]);
-  });
+      expect(streamingCalls).toStrictEqual([]);
+    }
+  );
 });
 
 describe('stream retry', () => {
@@ -385,7 +389,7 @@ describe('stream retry', () => {
       }
       return Promise.resolve(
         streamResponse([
-          'data: {"choices":[{"delta":{"content":"Recovered."}}]}\n\n',
+          'data: {"choices":[{"delta":{"content":"Recovered."},"finish_reason":"stop"}]}\n\n',
           'data: [DONE]\n\n',
         ])
       );
@@ -425,7 +429,7 @@ describe('stream retry', () => {
       }
       return Promise.resolve(
         streamResponse([
-          'data: {"choices":[{"delta":{"content":"Full answer."}}]}\n\n',
+          'data: {"choices":[{"delta":{"content":"Full answer."},"finish_reason":"stop"}]}\n\n',
           'data: [DONE]\n\n',
         ])
       );
@@ -564,5 +568,119 @@ describe('truncated completion retry', () => {
     });
 
     expect(calls).toBe(1);
+  });
+});
+
+describe('continue nudge', () => {
+  const nudgeOptions = (fetch: FetchLike, appended: AgentConversationEvent[]) => ({
+    apiBaseUrl: 'https://app.kilo.ai',
+    appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+    conversationEvents: [createUserMessage('Create a workflow for this page')],
+    executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'snap' } }),
+    failureMessage: String,
+    fetch,
+    maxToolRounds: 6,
+    model: 'kilo-auto/efficient',
+    noResponseMessage: 'no response',
+    token: 'token',
+    tools: [],
+    tooManyToolRoundsMessage: 'too many rounds',
+    toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+      toolCalls.flatMap(toolCall =>
+        toolCall.name === 'get_page_snapshot'
+          ? [
+              createSafeToolCall({
+                name: 'get_page_snapshot',
+                providerToolCallId: toolCall.id,
+                tabId: 1,
+              }),
+            ]
+          : []
+      ),
+    updateAssistantMessage: () => {},
+    updateThinkingBlock: () => {},
+  });
+
+  it('sends one invisible continue after a tool-using turn ends on a short announcement', async () => {
+    const requestBodies: string[] = [];
+    let calls = 0;
+    const fetch: FetchLike = (_input, init) => {
+      requestBodies.push(typeof init?.body === 'string' ? init.body : '');
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"Creating the workflow now."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved and verified."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(nudgeOptions(fetch, appended));
+
+    expect(calls).toBe(3);
+    expect(requestBodies[2]).toContain('Continue: finish the request now');
+    const appendedTexts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(appendedTexts).toContain('Saved and verified.');
+    // The nudge is never persisted as a visible message.
+    expect(appendedTexts.some(text => text.includes('Continue: finish the request'))).toBe(false);
+  });
+
+  it('does not nudge a plain text answer with no tool use', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Short answer."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(1);
+  });
+
+  it('does not nudge when the model asks the user a question', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Which date should I use?"},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
   });
 });

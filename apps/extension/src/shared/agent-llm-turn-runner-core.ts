@@ -1,5 +1,9 @@
 /* eslint-disable max-lines, promise/avoid-new, promise/no-multiple-resolved -- Turn loop with a transparent stream-retry tier; the cancellable delay needs a raw, guard-settled promise. */
-import { createAssistantMessage, createThinkingBlock } from './agent-conversation';
+import {
+  createAssistantMessage,
+  createThinkingBlock,
+  createUserMessage,
+} from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import { runToolCalls } from './agent-tool-results';
 import type { FetchLike } from './auth';
@@ -100,6 +104,20 @@ class TruncatedCompletionError extends Error {
     this.name = 'TruncatedCompletionError';
   }
 }
+
+// Some models announce an action ("Creating the workflow…") and then stop, expecting to be re-invoked. A user would type "continue"; the harness sends that once, invisibly, when a tool-using turn ends on a short, question-free announcement of work. The nudge message is never persisted.
+const CONTINUE_NUDGE_TEXT =
+  'Continue: finish the request now, in this turn. If everything is already done, state the final result.';
+const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
+// First-person intent or a progressive verb: the model said what it is about to do rather than what it did.
+const ANNOUNCEMENT_RE =
+  /\b(?:i'?ll|i will|i am going to|let me|now i|next i)\b|\b\w+ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
+
+const deservesContinueNudge = (lastAssistantText: string): boolean =>
+  lastAssistantText.length > 0 &&
+  lastAssistantText.length < CONTINUE_NUDGE_MAX_TEXT_LENGTH &&
+  !lastAssistantText.includes('?') &&
+  ANNOUNCEMENT_RE.test(lastAssistantText);
 
 // eslint-disable-next-line promise/avoid-new -- A cancellable timer has no promise-returning primitive to defer to.
 const abortableDelay = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
@@ -210,17 +228,22 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         );
 
       // Retry keeps the already-created streamed events and re-streams into them: text resets to empty, ids stay stable, so the UI never shows a duplicated or half-doubled message.
+      let lastTruncatedCompletion:
+        | Awaited<ReturnType<typeof getGatewayChatCompletion>>
+        | undefined = undefined;
       const streamWithRetries = async (
         streamAttempt: number
       ): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> => {
         try {
           const completion = await streamOnce();
+          // A healthy stream always reports a finish_reason; a stream that ends without one died mid-flight. Either way, with no tool calls there is nothing to act on, so the attempt retries.
           if (
             completion.toolCalls.length === 0 &&
-            completion.finishReason !== undefined &&
-            TRUNCATED_FINISH_REASONS.has(completion.finishReason)
+            (completion.finishReason === undefined ||
+              TRUNCATED_FINISH_REASONS.has(completion.finishReason))
           ) {
-            throw new TruncatedCompletionError(completion.finishReason);
+            lastTruncatedCompletion = completion;
+            throw new TruncatedCompletionError(completion.finishReason ?? 'missing');
           }
           return completion;
         } catch (error) {
@@ -229,6 +252,13 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
             !isRetriableStreamError(error) ||
             isSignalAborted(signal)
           ) {
+            // When every attempt came back truncated, degrade to the last partial text rather than replacing it with a failure message.
+            if (
+              error instanceof TruncatedCompletionError &&
+              lastTruncatedCompletion !== undefined
+            ) {
+              return lastTruncatedCompletion;
+            }
             throw error;
           }
           streamedText = '';
@@ -315,6 +345,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   };
 
   try {
+    let turnUsedTools = false;
+    let continueNudgeSent = false;
     const continueConversation = async (
       nextConversationEvents: AgentConversationEvent[],
       remainingRounds: number
@@ -334,8 +366,27 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       nextConversationEvents.push(...completionEvents);
 
       if (toolCallEvents.length === 0) {
+        const lastAssistantText =
+          completionEvents
+            .toReversed()
+            .find(
+              (event): event is Extract<AgentConversationEvent, { type: 'message' }> =>
+                event.type === 'message' && event.role === 'assistant'
+            )?.text ?? '';
+        if (
+          turnUsedTools &&
+          !continueNudgeSent &&
+          !isSignalAborted(signal) &&
+          deservesContinueNudge(lastAssistantText)
+        ) {
+          continueNudgeSent = true;
+          // Ephemeral: sent to the model, never appended to the stored conversation.
+          nextConversationEvents.push(createUserMessage(CONTINUE_NUDGE_TEXT));
+          await continueConversation(nextConversationEvents, remainingRounds - 1);
+        }
         return;
       }
+      turnUsedTools = true;
 
       if (isSignalAborted(signal)) {
         appendEvents([createAssistantMessage('Stopped.')]);

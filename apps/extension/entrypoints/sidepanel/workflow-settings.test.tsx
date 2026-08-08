@@ -508,7 +508,7 @@ describe('workflow settings', () => {
     }
   });
 
-  it('renders three switches off on a fresh store', async () => {
+  it('renders three switches off on a fresh store after merge', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
     mockLoadWorkflowSettings.mockResolvedValue({ ...DEFAULT_WORKFLOW_SETTINGS });
 

@@ -9,6 +9,10 @@ import {
 import { CRON_SECRET } from '@/lib/config.server';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 
+// The cron job runs every 10 minutes, so if increasing the timeout beyond 8 minutes
+// becomes necessary, the cron schedule in vercel.json should probably be adjusted as well.
+export const maxDuration = 480;
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {

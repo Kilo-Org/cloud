@@ -165,8 +165,7 @@ const isFirefoxWebDriver = (driver: WebDriver): driver is FirefoxWebDriver => {
   return isRecord(candidate) && typeof candidate['installAddon'] === 'function';
 };
 
-// The real gateway always reports a finish_reason; append the terminal chunk
-// unless the fixture pins its own, or the turn runner retries the "truncated" stream.
+// The real gateway always reports a finish_reason; append the terminal chunk unless the fixture pins its own, or the turn runner retries the "truncated" stream.
 const chatCompletionStreamResponse = (events: unknown[]): string => {
   const terminal = events.some(event => JSON.stringify(event).includes('"finish_reason"'))
     ? []

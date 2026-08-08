@@ -43,10 +43,7 @@ const getToolResultHtmlLength = (body: unknown): string => {
   return toolResult.success ? String(toolResult.data.value) : 'unknown';
 };
 
-// The real gateway always reports a finish_reason; a canned completion
-// without one would look like a truncated stream and trigger the turn
-// runner's transparent retry. Append the terminal chunk unless the fixture
-// pins its own.
+// The real gateway always reports a finish_reason; a canned completion without one would look like a truncated stream and trigger the turn runner's transparent retry. Append the terminal chunk unless the fixture pins its own.
 const hasFinishReason = (events: unknown[]): boolean =>
   events.some(event => JSON.stringify(event).includes('"finish_reason"'));
 

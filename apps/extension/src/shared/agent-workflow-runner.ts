@@ -174,7 +174,15 @@ const page = {
   attr(selector, name) { return page.__q(selector).getAttribute(name); },
   exists(selector) { return document.querySelector(selector) !== null; },
   hasText(text) { return normText(document.body?.innerText).includes(normText(text)); },
+  sleep(ms) {
+    const capped = typeof ms === 'number' && ms > 0 ? Math.min(ms, 5000) : 0;
+    return sleepMs(capped);
+  },
+  navigate() {
+    throw new Error('page.navigate does not exist. To open another page, return { navigate: "<url>", state: { … } } from the script; the runner navigates and re-runs the script on the new page.');
+  },
   async waitFor(selector, timeoutMs) {
+    if (typeof selector === 'number') { return page.sleep(selector); }
     if (!pageIsReal()) { dryRunActions.push({ action: 'waitFor', selector }); return; }
     const limit = waitLimit(timeoutMs);
     const start = Date.now();
@@ -632,7 +640,7 @@ export const runWorkflow = async (
   // 5. Loop exhausted.
   return resultWithActions(
     {
-      error: `Workflow exceeded the page limit (${String(MAX_WORKFLOW_PAGES_PER_RUN)} pages). Check the script for a navigation loop.`,
+      error: `Workflow exceeded the page limit (${String(MAX_WORKFLOW_PAGES_PER_RUN)} pages). The script returned { navigate } on every page. Branch on state so the results page returns { done: true, result } — e.g. first page returns { navigate: url, state: { searched: true } }, and when state.searched is true the script reads the results and finishes.`,
       ok: false,
     },
     dryRun,

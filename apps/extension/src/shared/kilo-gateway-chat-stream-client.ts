@@ -53,6 +53,7 @@ interface StreamingToolCallBuffer {
 
 interface StreamingAccumulator {
   content: string;
+  finishReason: string | undefined;
   isDone: boolean;
   pendingText: string;
   reasoning: string;
@@ -131,6 +132,7 @@ const streamDataSchema = z.object({
         reasoning_details: z.array(z.unknown()).nullable().optional(),
         tool_calls: z.array(z.unknown()).optional(),
       }),
+      finish_reason: z.string().nullable().optional(),
     })
   ),
   usage: usageSchema.nullable().optional(),
@@ -305,6 +307,10 @@ const applyStreamingData = (
     return;
   }
 
+  if (typeof choice.finish_reason === 'string' && choice.finish_reason !== '') {
+    accumulator.finishReason = choice.finish_reason;
+  }
+
   const { delta } = choice;
   const { content, reasoning, reasoning_details: reasoningDetails, tool_calls: toolCalls } = delta;
 
@@ -337,6 +343,7 @@ const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatComplet
 
   return {
     ...(accumulator.content === '' ? {} : { content: accumulator.content }),
+    ...(accumulator.finishReason === undefined ? {} : { finishReason: accumulator.finishReason }),
     ...(accumulator.reasoning === '' ? {} : { reasoning: accumulator.reasoning }),
     ...(reasoningDetails.length === 0 ? {} : { reasoningDetails }),
     ...(accumulator.usage === undefined ? {} : { usage: accumulator.usage }),
@@ -353,6 +360,7 @@ export const parseKiloGatewayChatCompletionStream = (
 ): KiloGatewayChatCompletion => {
   const accumulator: StreamingAccumulator = {
     content: '',
+    finishReason: undefined,
     isDone: false,
     pendingText: '',
     reasoning: '',
@@ -411,6 +419,7 @@ const consumeKiloGatewayChatCompletionStream = async (
 ): Promise<KiloGatewayChatCompletion> => {
   const accumulator: StreamingAccumulator = {
     content: '',
+    finishReason: undefined,
     isDone: false,
     pendingText: '',
     reasoning: '',

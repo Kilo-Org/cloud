@@ -294,7 +294,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow exceeded the page limit (20 pages). Check the script for a navigation loop.',
+      error:
+        'Workflow exceeded the page limit (20 pages). The script returned { navigate } on every page. Branch on state so the results page returns { done: true, result } — e.g. first page returns { navigate: url, state: { searched: true } }, and when state.searched is true the script reads the results and finishes.',
       ok: false,
     });
   });

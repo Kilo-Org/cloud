@@ -308,3 +308,30 @@ describe('function-expression scripts', () => {
     expect((result.value as { result: string }).result).toBe('go');
   });
 });
+
+describe('navigation and sleep guards', () => {
+  it('page.navigate throws an instructive error', async () => {
+    const result = await runPageCode(
+      'await page.navigate("https://x.test"); return { done: true, result: null };'
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('return { navigate:');
+  });
+
+  it('waitFor with a number sleeps instead of querying', async () => {
+    const start = Date.now();
+    const result = await runPageCode(
+      'await page.waitFor(150); return { done: true, result: null };'
+    );
+
+    expect(result.ok).toBe(true);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(140);
+  });
+
+  it('page.sleep caps the delay', async () => {
+    const result = await runPageCode('await page.sleep(50); return { done: true, result: "ok" };');
+
+    expect(result.ok).toBe(true);
+  });
+});

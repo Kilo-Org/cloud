@@ -70,7 +70,7 @@ const MAX_STREAM_ATTEMPTS = 3;
 const STREAM_RETRY_DELAYS_MS = [1000, 4000];
 
 const isRetriableStreamError = (error: unknown): boolean => {
-  if (error instanceof KiloGatewayStreamStalledError) {
+  if (error instanceof KiloGatewayStreamStalledError || error instanceof TruncatedCompletionError) {
     return true;
   }
   if (error instanceof KiloGatewayHttpError) {
@@ -79,6 +79,29 @@ const isRetriableStreamError = (error: unknown): boolean => {
   // Fetch network failures surface as TypeError ("Failed to fetch").
   return error instanceof TypeError;
 };
+
+// Mirrors the gateway's own error-class finish reasons. A completion cut
+// short mid-thought (no tool calls to act on) is a provider fault the user
+// cannot fix, so the turn retries it transparently.
+const TRUNCATED_FINISH_REASONS = new Set([
+  'length',
+  'max_tokens',
+  'content_filter',
+  'content-filter',
+  'error',
+  'network_error',
+  'failed',
+  'model_context_window_exceeded',
+  'engine_overloaded',
+  'incomplete',
+]);
+
+class TruncatedCompletionError extends Error {
+  constructor(finishReason: string) {
+    super(`The model response was cut short (finish reason: ${finishReason}).`);
+    this.name = 'TruncatedCompletionError';
+  }
+}
 
 // eslint-disable-next-line promise/avoid-new -- A cancellable timer has no promise-returning primitive to defer to.
 const abortableDelay = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
@@ -193,7 +216,15 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         streamAttempt: number
       ): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> => {
         try {
-          return await streamOnce();
+          const completion = await streamOnce();
+          if (
+            completion.toolCalls.length === 0 &&
+            completion.finishReason !== undefined &&
+            TRUNCATED_FINISH_REASONS.has(completion.finishReason)
+          ) {
+            throw new TruncatedCompletionError(completion.finishReason);
+          }
+          return completion;
         } catch (error) {
           if (
             streamAttempt >= MAX_STREAM_ATTEMPTS ||

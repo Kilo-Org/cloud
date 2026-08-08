@@ -479,3 +479,90 @@ describe('stream retry', () => {
     expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
   });
 });
+
+describe('truncated completion retry', () => {
+  it('retries a completion cut short by finish_reason length with no tool calls', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"Creating"},"finish_reason":null}]}\n\n',
+            'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved the workflow."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+    const updates: string[] = [];
+    const options = {
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+      conversationEvents: [createUserMessage('Create a workflow')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
+      failureMessage: (error: unknown) =>
+        `failed: ${error instanceof Error ? error.message : String(error)}`,
+      fetch,
+      maxToolRounds: 4,
+      model: 'kilo-auto/efficient',
+      noResponseMessage: 'no response',
+      token: 'token',
+      tools: [],
+      tooManyToolRoundsMessage: 'too many rounds',
+      toToolCallEvents: () => [],
+      updateAssistantMessage: (_eventId: string, text: string) => {
+        updates.push(text);
+      },
+      updateThinkingBlock: () => {},
+    };
+
+    await runLlmTurn(options);
+
+    expect(calls).toBe(2);
+    expect(updates.at(-1)).toBe('Saved the workflow.');
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+  });
+
+  it('does not retry a completion that stopped normally', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"All done."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'kilo-auto/efficient',
+      noResponseMessage: 'no response',
+      token: 'token',
+      tools: [],
+      tooManyToolRoundsMessage: 'too many rounds',
+      toToolCallEvents: () => [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(calls).toBe(1);
+  });
+});

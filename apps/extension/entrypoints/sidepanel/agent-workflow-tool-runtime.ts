@@ -91,13 +91,24 @@ const NEXT_STEP_RUNS_ASK_USER =
 
 // ---------- helpers ----------
 
+// Zod's generic "Invalid input" gives a model nothing to act on for the one
+// field it most often garbles. Field-specific guidance replaces it.
+const ARGS_FIELD_GUIDANCE: Record<string, string> = {
+  script:
+    'script must be a non-empty string: the workflow function body (or a full async function) using the page.* helpers',
+};
+
 /**
  * Format a zod failure into a field-level message the model can act on.
  */
 const formatArgsError = (toolName: string, error: z.ZodError): string => {
   const details = error.issues
     .slice(0, 5)
-    .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .map(issue => {
+      const path = issue.path.join('.') || '(root)';
+      const guidance = ARGS_FIELD_GUIDANCE[path];
+      return `${path}: ${guidance ?? issue.message}`;
+    })
     .join('; ');
 
   return `Invalid arguments for ${toolName} — ${details}.`;

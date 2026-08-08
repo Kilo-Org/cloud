@@ -44,7 +44,6 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
   } else if (Array.isArray(message.content)) {
     const lastItem = message.content.at(-1);
     if (isObjectRecord(lastItem)) {
-      // @ts-expect-error non-standard extension
       lastItem.cache_control = { type: 'ephemeral' };
     }
   }
@@ -253,7 +252,6 @@ export function addCacheBreakpoints(request: GatewayRequest) {
             console.debug(
               '[addCacheBreakpoints] setting cache breakpoint before environment details in chat completions'
             );
-            // @ts-expect-error non-standard extension
             targetElement.cache_control = { type: 'ephemeral' };
             return;
           }

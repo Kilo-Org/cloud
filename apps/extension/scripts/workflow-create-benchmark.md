@@ -13,16 +13,33 @@ protocol and honesty rules before changing anything.
 
 The golden-star scenarios live in
 `src/shared/agent-workflow-bench-scenarios.ts`. Each is one realistic
-"automate what I do in the browser" request on a public, login-free site,
-and each covers a different task shape:
+"automate what I do in the browser" request on a public, login-free site.
+Together they cover the common task shapes: SPA searches, query-parameter
+searches, path-encoded lookups, filtered lists, GET forms, price/status
+lookups, and a zero-param "just run it" workflow.
 
-| Id | Site | Task shape |
+| Id | Site | Task |
 |---|---|---|
-| `flights` | Google Flights | JS-heavy SPA search with params (destination, date) |
-| `hn` | hn.algolia.com | query-parameter search (topic) |
-| `wikipedia` | en.wikipedia.org | path-encoded lookup (topic) |
-| `github` | github.com | filtered list with two params (repo, label) |
-| `weather` | forecast.weather.gov | classic GET-form site (city) |
+| `flights` | Google Flights | business-class flights (destination, date) |
+| `hn` | hn.algolia.com | stories about a topic |
+| `wikipedia` | en.wikipedia.org | article summary for a topic |
+| `github` | github.com | open issues by repo and label |
+| `weather` | forecast.weather.gov | forecast for a city (GET form) |
+| `youtube` | youtube.com | videos about a topic |
+| `npm` | npmjs.com | package search |
+| `mdn` | developer.mozilla.org | docs search |
+| `stackoverflow` | stackoverflow.com | recent questions for a tag |
+| `arxiv` | arxiv.org | recent papers about a topic |
+| `openlibrary` | openlibrary.org | book search |
+| `coingecko` | coingecko.com | cryptocurrency price |
+| `merriam` | merriam-webster.com | word definition |
+| `allrecipes` | allrecipes.com | recipes using an ingredient |
+| `npr` | text.npr.org | today's headlines (zero params) |
+| `github-trending` | github.com | trending repos for a language |
+| `crates` | crates.io | Rust crate search |
+| `timeanddate` | timeanddate.com | local time in a city |
+| `stockanalysis` | stockanalysis.com | stock price by ticker |
+| `remoteok` | remoteok.com | remote jobs for a keyword |
 
 An attempt sends the scenario's create message, waits for a successful
 save, then always sends the pinned follow-up run request. Correctness is

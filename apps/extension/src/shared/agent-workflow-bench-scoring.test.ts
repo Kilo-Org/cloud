@@ -422,3 +422,64 @@ describe('batch summary', () => {
     expect(summary.successCount).toBe(0);
   });
 });
+
+describe('zero-param scenarios', () => {
+  const npr = BENCH_SCENARIOS['npr'];
+  if (npr === undefined) {
+    throw new Error('scenario registry is missing npr');
+  }
+
+  const nprWorkflow: BenchWorkflow = {
+    approvedScriptHash: 'hash',
+    description: 'Top headlines',
+    id: 'wf-npr',
+    name: 'NPR headlines',
+    scopeOrigin: 'https://text.npr.org',
+    script: 'return { done: true, result: page.readText() };',
+  };
+
+  it('accepts a real run with no input when the scenario has no follow-up values', () => {
+    const result = scoreWorkflowCorrectness({
+      events: [
+        toolCall('call-npr', 'run_workflow', { workflowId: 'wf-npr' }),
+        toolResult('call-npr', true, {
+          result: `NPR : National Public Radio — top news headlines for today. ${'Wildfires spread across the west; markets rally; new science findings released. '.repeat(3)}`,
+        }),
+      ],
+      followUpValues: {},
+      scenario: npr,
+      workflows: [nprWorkflow],
+    });
+
+    expect(result.resultCheck).toBe('real');
+    expect(result.passed).toBe(true);
+  });
+
+  it('still fails a zero-param scenario without any run', () => {
+    const result = scoreWorkflowCorrectness({
+      events: [],
+      followUpValues: {},
+      scenario: npr,
+      workflows: [nprWorkflow],
+    });
+
+    expect(result.resultCheck).toBe('none');
+    expect(result.passed).toBe(false);
+  });
+});
+
+describe('scenario registry', () => {
+  it('holds twenty scenarios with unique ids, origins matching start URLs', () => {
+    const entries = Object.entries(BENCH_SCENARIOS);
+    expect(entries).toHaveLength(20);
+    for (const [key, scenario] of entries) {
+      expect(scenario.id).toBe(key);
+      expect(new URL(scenario.startUrl).origin).toBe(scenario.scopeOrigin);
+      expect(scenario.followUpMessage.length).toBeGreaterThan(0);
+      // Every followUpValues key referenced by the result checks exists.
+      for (const valueKey of scenario.resultMustContainValues) {
+        expect(Object.keys(scenario.followUpValues)).toContain(valueKey);
+      }
+    }
+  });
+});

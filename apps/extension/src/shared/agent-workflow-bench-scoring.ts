@@ -171,15 +171,21 @@ export const correlateToolExchanges = (events: readonly BenchEvent[]): BenchTool
 const hasNonEmptyInput = (input: unknown): boolean =>
   isRecord(input) && Object.keys(input).length > 0;
 
+/**
+ * The verifying run must carry an input when the scenario pins follow-up
+ * values; a zero-param scenario ("get today's headlines") legitimately runs
+ * with no input at all.
+ */
 export const selectLastValidRealRun = (
-  exchanges: readonly BenchToolExchange[]
+  exchanges: readonly BenchToolExchange[],
+  { requireInput = true }: { readonly requireInput?: boolean } = {}
 ): BenchToolExchange | undefined => {
   const candidates = exchanges.filter(exchange => {
     const toolArguments = exchange.call.arguments;
     return (
       exchange.call.name === 'run_workflow' &&
       toolArguments['dryRun'] !== true &&
-      hasNonEmptyInput(toolArguments['input']) &&
+      (!requireInput || hasNonEmptyInput(toolArguments['input'])) &&
       exchange.result.ok
     );
   });
@@ -188,14 +194,15 @@ export const selectLastValidRealRun = (
 };
 
 const selectLastValidDryRun = (
-  exchanges: readonly BenchToolExchange[]
+  exchanges: readonly BenchToolExchange[],
+  { requireInput = true }: { readonly requireInput?: boolean } = {}
 ): BenchToolExchange | undefined => {
   const candidates = exchanges.filter(exchange => {
     const toolArguments = exchange.call.arguments;
     return (
       exchange.call.name === 'run_workflow' &&
       toolArguments['dryRun'] === true &&
-      hasNonEmptyInput(toolArguments['input']) &&
+      (!requireInput || hasNonEmptyInput(toolArguments['input'])) &&
       exchange.result.ok
     );
   });
@@ -397,8 +404,10 @@ export const scoreWorkflowCorrectness = (input: BenchCorrectnessInput): BenchCor
   );
 
   const { exchanges } = correlateToolExchanges(input.events);
-  const evidenceReal = selectLastValidRealRun(exchanges);
-  const evidenceDry = evidenceReal === undefined ? selectLastValidDryRun(exchanges) : undefined;
+  const requireInput = Object.keys(input.followUpValues ?? {}).length > 0;
+  const evidenceReal = selectLastValidRealRun(exchanges, { requireInput });
+  const evidenceDry =
+    evidenceReal === undefined ? selectLastValidDryRun(exchanges, { requireInput }) : undefined;
 
   const resolveOutcome = (): { outcome: RunOutcome; runPredicate: BenchPredicate } => {
     const noRun = (detail: string): { outcome: RunOutcome; runPredicate: BenchPredicate } => ({

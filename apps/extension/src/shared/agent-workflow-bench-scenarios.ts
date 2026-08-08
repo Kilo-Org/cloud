@@ -138,12 +138,270 @@ const WEATHER_SCENARIO: BenchScenario = {
   usesDate: false,
 };
 
+const YOUTUBE_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to find YouTube videos about a topic',
+  expectedParams: [{ key: 'topic', re: /topic|query|search|term|keyword|subject/iu }],
+  followUpMessage: 'Run it for {topic}',
+  followUpValues: { topic: 'woodworking' },
+  id: 'youtube',
+  minResultChars: 100,
+  // Durations render in every locale; label words do not.
+  resultContentChecks: [{ key: 'duration', re: /\d+:\d\d/u }],
+  resultMustContainValues: ['topic'],
+  scopeOrigin: 'https://www.youtube.com',
+  scriptMarkers: [],
+  startUrl: 'https://www.youtube.com/',
+  tabLabelRe: /youtube/iu,
+  usesDate: false,
+};
+
+const NPM_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to search npm for packages',
+  expectedParams: [{ key: 'query', re: /package|query|search|term|keyword|name/iu }],
+  followUpMessage: 'Run it for {query}',
+  followUpValues: { query: 'markdown parser' },
+  id: 'npm',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'registry', re: /downloads|published|version|\d+\.\d+\.\d+/iu }],
+  resultMustContainValues: ['query'],
+  scopeOrigin: 'https://www.npmjs.com',
+  scriptMarkers: [],
+  startUrl: 'https://www.npmjs.com/',
+  tabLabelRe: /npm/iu,
+  usesDate: false,
+};
+
+const MDN_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to search the MDN web docs',
+  expectedParams: [{ key: 'term', re: /term|query|search|topic|keyword/iu }],
+  followUpMessage: 'Run it for {term}',
+  followUpValues: { term: 'flexbox' },
+  id: 'mdn',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'docs', re: /css|html|javascript|web|reference|results/iu }],
+  resultMustContainValues: ['term'],
+  scopeOrigin: 'https://developer.mozilla.org',
+  scriptMarkers: [],
+  startUrl: 'https://developer.mozilla.org/en-US/',
+  tabLabelRe: /mdn|mozilla/iu,
+  usesDate: false,
+};
+
+const STACKOVERFLOW_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to list recent Stack Overflow questions for a tag',
+  expectedParams: [{ key: 'tag', re: /tag|topic|technology|language/iu }],
+  followUpMessage: 'Run it for the {tag} tag',
+  followUpValues: { tag: 'kubernetes' },
+  id: 'stackoverflow',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'questions', re: /votes?|answers?|asked|views/iu }],
+  resultMustContainValues: ['tag'],
+  scopeOrigin: 'https://stackoverflow.com',
+  scriptMarkers: [],
+  startUrl: 'https://stackoverflow.com/questions',
+  tabLabelRe: /stack overflow|stackoverflow|newest questions/iu,
+  usesDate: false,
+};
+
+const ARXIV_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to find recent arXiv papers about a topic',
+  expectedParams: [{ key: 'topic', re: /topic|query|search|term|keyword|subject/iu }],
+  followUpMessage: 'Run it for {topic}',
+  followUpValues: { topic: 'diffusion models' },
+  id: 'arxiv',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'papers', re: /arxiv:\s?\d{4}|\bpdf\b|submitted/iu }],
+  resultMustContainValues: ['topic'],
+  scopeOrigin: 'https://arxiv.org',
+  scriptMarkers: [],
+  startUrl: 'https://arxiv.org/',
+  tabLabelRe: /arxiv/iu,
+  usesDate: false,
+};
+
+const OPENLIBRARY_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to search Open Library for books',
+  expectedParams: [{ key: 'book', re: /book|title|author|query|search|term/iu }],
+  followUpMessage: 'Run it for {book}',
+  followUpValues: { book: 'neuromancer' },
+  id: 'openlibrary',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'editions', re: /first published|editions?|by\s/iu }],
+  resultMustContainValues: ['book'],
+  scopeOrigin: 'https://openlibrary.org',
+  scriptMarkers: [],
+  startUrl: 'https://openlibrary.org/',
+  tabLabelRe: /open library/iu,
+  usesDate: false,
+};
+
+const COINGECKO_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to check the current price of a cryptocurrency',
+  expectedParams: [{ key: 'coin', re: /coin|crypto|currency|token|symbol|name/iu }],
+  followUpMessage: 'Run it for {coin}',
+  followUpValues: { coin: 'ethereum' },
+  id: 'coingecko',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'price', re: /\$\s?[\d,]+(?:\.\d+)?/u }],
+  resultMustContainValues: ['coin'],
+  scopeOrigin: 'https://www.coingecko.com',
+  scriptMarkers: [],
+  startUrl: 'https://www.coingecko.com/',
+  tabLabelRe: /coingecko|crypto/iu,
+  usesDate: false,
+};
+
+const MERRIAM_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to look up the definition of a word',
+  expectedParams: [{ key: 'word', re: /word|term|query/iu }],
+  followUpMessage: 'Run it for {word}',
+  followUpValues: { word: 'ephemeral' },
+  id: 'merriam',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'definition', re: /noun|verb|adjective|adverb|definition/iu }],
+  resultMustContainValues: ['word'],
+  scopeOrigin: 'https://www.merriam-webster.com',
+  scriptMarkers: [],
+  startUrl: 'https://www.merriam-webster.com/',
+  tabLabelRe: /merriam|dictionary/iu,
+  usesDate: false,
+};
+
+const ALLRECIPES_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to find recipes that use an ingredient',
+  expectedParams: [{ key: 'ingredient', re: /ingredient|food|query|search|term|dish/iu }],
+  followUpMessage: 'Run it for {ingredient}',
+  followUpValues: { ingredient: 'eggplant' },
+  id: 'allrecipes',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'recipes', re: /recipes?|ratings?/iu }],
+  resultMustContainValues: ['ingredient'],
+  scopeOrigin: 'https://www.allrecipes.com',
+  scriptMarkers: [],
+  startUrl: 'https://www.allrecipes.com/',
+  tabLabelRe: /allrecipes/iu,
+  usesDate: false,
+};
+
+// The zero-param shape: the workflow takes no input at all.
+const NPR_SCENARIO: BenchScenario = {
+  createMessage: "Create a workflow that gets me today's top news headlines from this site",
+  expectedParams: [],
+  followUpMessage: 'Run it',
+  followUpValues: {},
+  id: 'npr',
+  minResultChars: 200,
+  resultContentChecks: [{ key: 'headlines', re: /npr|news/iu }],
+  resultMustContainValues: [],
+  scopeOrigin: 'https://text.npr.org',
+  scriptMarkers: [],
+  startUrl: 'https://text.npr.org/',
+  tabLabelRe: /npr/iu,
+  usesDate: false,
+};
+
+const GITHUB_TRENDING_SCENARIO: BenchScenario = {
+  createMessage:
+    'Create a workflow to show trending GitHub repositories for a programming language',
+  expectedParams: [{ key: 'language', re: /language|lang/iu }],
+  followUpMessage: 'Run it for {language}',
+  followUpValues: { language: 'go' },
+  id: 'github-trending',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'stars', re: /stars?/iu }],
+  resultMustContainValues: ['language'],
+  scopeOrigin: 'https://github.com',
+  scriptMarkers: [],
+  startUrl: 'https://github.com/trending',
+  tabLabelRe: /trending/iu,
+  usesDate: false,
+};
+
+const CRATES_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to search crates.io for Rust crates',
+  expectedParams: [{ key: 'crate', re: /crate|package|query|search|term|name/iu }],
+  followUpMessage: 'Run it for {crate}',
+  followUpValues: { crate: 'serde' },
+  id: 'crates',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'downloads', re: /downloads|v?\d+\.\d+\.\d+|all-time/iu }],
+  resultMustContainValues: ['crate'],
+  scopeOrigin: 'https://crates.io',
+  scriptMarkers: [],
+  startUrl: 'https://crates.io/',
+  tabLabelRe: /crates/iu,
+  usesDate: false,
+};
+
+const TIMEANDDATE_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to get the current local time in a city',
+  expectedParams: [{ key: 'city', re: /city|location|place|where/iu }],
+  followUpMessage: 'Run it for {city}',
+  followUpValues: { city: 'Tokyo' },
+  id: 'timeanddate',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'clock', re: /\d{1,2}:\d\d/u }],
+  resultMustContainValues: ['city'],
+  scopeOrigin: 'https://www.timeanddate.com',
+  scriptMarkers: [],
+  startUrl: 'https://www.timeanddate.com/worldclock/',
+  tabLabelRe: /time and date|timeanddate|world clock/iu,
+  usesDate: false,
+};
+
+const STOCKANALYSIS_SCENARIO: BenchScenario = {
+  createMessage: "Create a workflow to check a stock's current price by ticker",
+  expectedParams: [{ key: 'ticker', re: /ticker|symbol|stock/iu }],
+  followUpMessage: 'Run it for {ticker}',
+  followUpValues: { ticker: 'msft' },
+  id: 'stockanalysis',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'price', re: /\d+\.\d\d/u }],
+  resultMustContainValues: ['ticker'],
+  scopeOrigin: 'https://stockanalysis.com',
+  scriptMarkers: [],
+  startUrl: 'https://stockanalysis.com/',
+  tabLabelRe: /stock analysis|stockanalysis/iu,
+  usesDate: false,
+};
+
+const REMOTEOK_SCENARIO: BenchScenario = {
+  createMessage: 'Create a workflow to find remote jobs for a keyword',
+  expectedParams: [{ key: 'keyword', re: /keyword|role|job|title|skill|search|query/iu }],
+  followUpMessage: 'Run it for {keyword}',
+  followUpValues: { keyword: 'devops' },
+  id: 'remoteok',
+  minResultChars: 100,
+  resultContentChecks: [{ key: 'jobs', re: /remote|apply|salary|jobs?/iu }],
+  resultMustContainValues: ['keyword'],
+  scopeOrigin: 'https://remoteok.com',
+  scriptMarkers: [],
+  startUrl: 'https://remoteok.com/',
+  tabLabelRe: /remote\s?ok/iu,
+  usesDate: false,
+};
+
 export const BENCH_SCENARIOS: Readonly<Record<string, BenchScenario>> = {
+  allrecipes: ALLRECIPES_SCENARIO,
+  arxiv: ARXIV_SCENARIO,
+  coingecko: COINGECKO_SCENARIO,
+  crates: CRATES_SCENARIO,
   flights: FLIGHTS_SCENARIO,
   github: GITHUB_SCENARIO,
+  'github-trending': GITHUB_TRENDING_SCENARIO,
   hn: HN_SCENARIO,
+  mdn: MDN_SCENARIO,
+  merriam: MERRIAM_SCENARIO,
+  npm: NPM_SCENARIO,
+  npr: NPR_SCENARIO,
+  openlibrary: OPENLIBRARY_SCENARIO,
+  remoteok: REMOTEOK_SCENARIO,
+  stackoverflow: STACKOVERFLOW_SCENARIO,
+  stockanalysis: STOCKANALYSIS_SCENARIO,
+  timeanddate: TIMEANDDATE_SCENARIO,
   weather: WEATHER_SCENARIO,
   wikipedia: WIKIPEDIA_SCENARIO,
+  youtube: YOUTUBE_SCENARIO,
 };
 
 const MONTH_NAMES = [

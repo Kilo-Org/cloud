@@ -392,45 +392,6 @@ const screenshotValueSchema = {
   },
 };
 
-const SUPERSEDED_SNAPSHOT_CONTENT =
-  '{"ok":true,"value":{"superseded":true,"note":"A newer snapshot of this tab replaced this one. Call get_page_snapshot for the current state."}}';
-
-const getElidedSnapshotToolCallIds = (events: AgentConversationEvent[]): ReadonlySet<string> => {
-  const toolCallsById = new Map<string, ToolCallEvent>();
-  const latestSnapshotToolCallIdByTabId = new Map<number, string>();
-
-  for (const event of events) {
-    if (event.type === 'tool-call') {
-      toolCallsById.set(event.id, event);
-    } else if (event.type === 'tool-result') {
-      const toolCall = toolCallsById.get(event.toolCallId);
-
-      if (toolCall !== undefined && toolCall.name === 'get_page_snapshot' && event.ok) {
-        latestSnapshotToolCallIdByTabId.set(toolCall.tabId, toolCall.id);
-      }
-    }
-  }
-
-  const elidedToolCallIds = new Set<string>();
-
-  for (const event of events) {
-    if (event.type === 'tool-result') {
-      const toolCall = toolCallsById.get(event.toolCallId);
-
-      if (
-        toolCall !== undefined &&
-        toolCall.name === 'get_page_snapshot' &&
-        event.ok &&
-        latestSnapshotToolCallIdByTabId.get(toolCall.tabId) !== toolCall.id
-      ) {
-        elidedToolCallIds.add(event.toolCallId);
-      }
-    }
-  }
-
-  return elidedToolCallIds;
-};
-
 const getToolResultValue = (
   event: ToolResultEvent,
   toolCall: ToolCallEvent,
@@ -487,20 +448,16 @@ const toScreenshotMessage = (
 const appendToolResultMessages = ({
   event,
   messages,
-  superseded = false,
   supportsImages,
   toolCall,
 }: {
   readonly event: ToolResultEvent;
   readonly messages: KiloGatewayChatMessage[];
-  readonly superseded?: boolean;
   readonly supportsImages: boolean;
   readonly toolCall: ToolCallEvent;
 }): void => {
   messages.push({
-    content: superseded
-      ? SUPERSEDED_SNAPSHOT_CONTENT
-      : toToolResultContent(event, toolCall, supportsImages),
+    content: toToolResultContent(event, toolCall, supportsImages),
     role: 'tool',
     tool_call_id: getProviderToolCallId(toolCall),
   });
@@ -558,7 +515,6 @@ export const buildGatewayMessagesFromEvents = (
   { supportsImages = false }: { readonly supportsImages?: boolean } = {}
 ): KiloGatewayChatMessage[] => {
   const toolCallsById = new Map<string, ToolCallEvent>();
-  const elidedSnapshotToolCallIds = getElidedSnapshotToolCallIds(events);
   const messages: KiloGatewayChatMessage[] = [
     { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
   ];
@@ -604,13 +560,7 @@ export const buildGatewayMessagesFromEvents = (
           const toolCall = toolCallsById.get(event.toolCallId);
 
           if (toolCall !== undefined) {
-            appendToolResultMessages({
-              event,
-              messages,
-              superseded: elidedSnapshotToolCallIds.has(event.toolCallId),
-              supportsImages,
-              toolCall,
-            });
+            appendToolResultMessages({ event, messages, supportsImages, toolCall });
           }
           break;
         }

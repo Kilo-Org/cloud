@@ -73,7 +73,7 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
-  test('adds a cache breakpoint before environment_details and at the end of the last user message in chat completions', () => {
+  test('adds a cache breakpoint before environment_details when the last message is a user message with multiple parts in chat completions', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
@@ -106,12 +106,11 @@ describe('addCacheBreakpoints', () => {
       {
         type: 'text',
         text: '<environment_details>\nOS: Linux\n</environment_details>',
-        cache_control: { type: 'ephemeral' },
       },
     ]);
   });
 
-  test('adds a cache breakpoint before environment_details on the last user message with environment_details across multi-turn chat completions', () => {
+  test('adds a cache breakpoint before environment_details on the last message in multi-turn chat completions', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
@@ -157,8 +156,41 @@ describe('addCacheBreakpoints', () => {
       {
         type: 'text',
         text: '<environment_details>\nTurn 2 env\n</environment_details>',
-        cache_control: { type: 'ephemeral' },
       },
+    ]);
+  });
+
+  test('adds a cache breakpoint at the end when the last message is a tool message even if previous user message had environment_details', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'User prompt' },
+              { type: 'text', text: '<environment_details>\nOS: Linux\n</environment_details>' },
+            ],
+          },
+          { role: 'assistant', content: 'Calling tool' },
+          { role: 'tool', content: 'Tool output' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    const userContent = request.body.messages.at(1)?.content;
+    expect(userContent).toEqual([
+      { type: 'text', text: 'User prompt' },
+      { type: 'text', text: '<environment_details>\nOS: Linux\n</environment_details>' },
+    ]);
+
+    const toolContent = request.body.messages.at(3)?.content;
+    expect(toolContent).toEqual([
+      { type: 'text', text: 'Tool output', cache_control: { type: 'ephemeral' } },
     ]);
   });
 
@@ -256,7 +288,7 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
-  test('adds a prompt_cache_breakpoint before environment_details and at the end of the last user message in responses', () => {
+  test('adds a prompt_cache_breakpoint before environment_details when the last message is a user message with multiple parts in responses', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
@@ -299,9 +331,38 @@ describe('addCacheBreakpoints', () => {
       {
         type: 'input_text',
         text: '<environment_details>\nCurrent time: 2026-08-08\n</environment_details>',
-        prompt_cache_breakpoint: { mode: 'explicit' },
       },
     ]);
+  });
+
+  test('does nothing for responses requests when prompt_cache_options is already present', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        prompt_cache_options: { mode: 'explicit' },
+        input: [
+          {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'input_text', text: 'First prompt' }],
+          },
+          {
+            type: 'function_call_output',
+            call_id: 'call_123',
+            output: [{ type: 'input_text', text: 'Tool output' }],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.prompt_cache_options).toEqual({ mode: 'explicit' });
+    const userMessage = request.body.input.at(0);
+    if (userMessage && userMessage.type === 'message' && Array.isArray(userMessage.content)) {
+      expect(userMessage.content[0]).toEqual({ type: 'input_text', text: 'First prompt' });
+    }
   });
 
   test('does nothing for responses requests when any prompt_cache_breakpoint or cache_control is already present', () => {
@@ -368,7 +429,7 @@ describe('addCacheBreakpoints', () => {
     ]);
   });
 
-  test('adds a cache breakpoint before environment_details in messages requests', () => {
+  test('adds a cache breakpoint before environment_details when the last message is a user message with multiple parts in messages', () => {
     const request: GatewayRequest = {
       kind: 'messages',
       body: {
@@ -403,7 +464,6 @@ describe('addCacheBreakpoints', () => {
       {
         type: 'text',
         text: '<environment_details>\nWorking directory: /workspace\n</environment_details>',
-        cache_control: { type: 'ephemeral' },
       },
     ]);
   });

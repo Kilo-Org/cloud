@@ -193,8 +193,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&
     request.body.messages.length > 1 &&
-    !containsCacheControl(request.body.messages) &&
-    !containsCacheControl((request.body as Record<string, unknown>).prompt_cache_options)
+    !containsCacheControl(request.body.messages)
   ) {
     const systemMessage = request.body.messages.find(msg => msg.role === 'system');
     if (systemMessage) {
@@ -204,32 +203,29 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       setCacheControlOnChatCompletionsMessage(systemMessage);
     }
 
-    const lastUserMessageWithEnvDetails = request.body.messages.findLast(
-      (msg): msg is OpenAI.ChatCompletionUserMessageParam =>
-        msg.role === 'user' &&
-        Array.isArray(msg.content) &&
-        msg.content.some(isEnvironmentDetailsChatCompletionsPart)
-    );
-    if (lastUserMessageWithEnvDetails && Array.isArray(lastUserMessageWithEnvDetails.content)) {
-      const envIndex = lastUserMessageWithEnvDetails.content.findIndex(
-        isEnvironmentDetailsChatCompletionsPart
-      );
-      if (envIndex > 0) {
-        const targetElement = lastUserMessageWithEnvDetails.content[envIndex - 1];
-        if (targetElement) {
-          console.debug(
-            '[addCacheBreakpoints] setting cache breakpoint before environment details in chat completions'
-          );
-          // @ts-expect-error non-standard extension
-          targetElement.cache_control = { type: 'ephemeral' };
-        }
-      }
-    }
-
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
     );
     if (lastMessage) {
+      if (
+        lastMessage.role === 'user' &&
+        Array.isArray(lastMessage.content) &&
+        lastMessage.content.length > 1
+      ) {
+        const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsChatCompletionsPart);
+        if (envIndex > 0) {
+          const targetElement = lastMessage.content[envIndex - 1];
+          if (targetElement) {
+            console.debug(
+              '[addCacheBreakpoints] setting cache breakpoint before environment details in chat completions'
+            );
+            // @ts-expect-error non-standard extension
+            targetElement.cache_control = { type: 'ephemeral' };
+            return;
+          }
+        }
+      }
+
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.role} chat completions message`
       );
@@ -239,11 +235,10 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     request.kind === 'responses' &&
     Array.isArray(request.body.input) &&
     request.body.input.length > 1 &&
-    !containsCacheControl(request.body.input) &&
-    !containsCacheControl((request.body as Record<string, unknown>).prompt_cache_options)
+    !request.body.prompt_cache_options &&
+    !containsCacheControl(request.body.input)
   ) {
     request.body.prompt_cache_options = {
-      ...(request.body as { prompt_cache_options?: Record<string, unknown> }).prompt_cache_options,
       mode: 'implicit',
     };
 
@@ -255,32 +250,29 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       setCacheBreakpointOnResponsesMessage(systemMessage);
     }
 
-    const lastUserMessageWithEnvDetails = request.body.input.findLast(
-      (item): item is Extract<OpenAI.Responses.ResponseInputItem, { type: 'message' }> =>
-        item.type === 'message' &&
-        item.role === 'user' &&
-        Array.isArray(item.content) &&
-        item.content.some(isEnvironmentDetailsResponsesPart)
-    );
-    if (lastUserMessageWithEnvDetails && Array.isArray(lastUserMessageWithEnvDetails.content)) {
-      const envIndex = lastUserMessageWithEnvDetails.content.findIndex(
-        isEnvironmentDetailsResponsesPart
-      );
-      if (envIndex > 0) {
-        const targetElement = lastUserMessageWithEnvDetails.content[envIndex - 1];
-        if (targetElement && targetElement.type === 'input_text') {
-          console.debug(
-            '[addCacheBreakpoints] setting cache breakpoint before environment details in responses'
-          );
-          targetElement.prompt_cache_breakpoint = { mode: 'explicit' };
-        }
-      }
-    }
-
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
     );
     if (lastMessage) {
+      if (
+        lastMessage.type === 'message' &&
+        lastMessage.role === 'user' &&
+        Array.isArray(lastMessage.content) &&
+        lastMessage.content.length > 1
+      ) {
+        const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsResponsesPart);
+        if (envIndex > 0) {
+          const targetElement = lastMessage.content[envIndex - 1];
+          if (targetElement && targetElement.type === 'input_text') {
+            console.debug(
+              '[addCacheBreakpoints] setting cache breakpoint before environment details in responses'
+            );
+            targetElement.prompt_cache_breakpoint = { mode: 'explicit' };
+            return;
+          }
+        }
+      }
+
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
       );
@@ -294,29 +286,26 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
     delete request.body.cache_control;
 
-    const lastUserMessageWithEnvDetails = request.body.messages.findLast(
-      msg =>
-        msg.role === 'user' &&
-        Array.isArray(msg.content) &&
-        msg.content.some(isEnvironmentDetailsMessagesPart)
-    );
-    if (lastUserMessageWithEnvDetails && Array.isArray(lastUserMessageWithEnvDetails.content)) {
-      const envIndex = lastUserMessageWithEnvDetails.content.findIndex(
-        isEnvironmentDetailsMessagesPart
-      );
-      if (envIndex > 0) {
-        const targetElement = lastUserMessageWithEnvDetails.content[envIndex - 1];
-        if (targetElement && isCacheableMessagesContentBlock(targetElement)) {
-          console.debug(
-            '[addCacheBreakpoints] setting cache breakpoint before environment details in messages'
-          );
-          targetElement.cache_control = cacheControl;
-        }
-      }
-    }
-
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
+      if (
+        lastMessage.role === 'user' &&
+        Array.isArray(lastMessage.content) &&
+        lastMessage.content.length > 1
+      ) {
+        const envIndex = lastMessage.content.findIndex(isEnvironmentDetailsMessagesPart);
+        if (envIndex > 0) {
+          const targetElement = lastMessage.content[envIndex - 1];
+          if (targetElement && isCacheableMessagesContentBlock(targetElement)) {
+            console.debug(
+              '[addCacheBreakpoints] setting cache breakpoint before environment details in messages'
+            );
+            targetElement.cache_control = cacheControl;
+            return;
+          }
+        }
+      }
+
       console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
       // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
@@ -332,7 +321,7 @@ export function removeCacheBreakpoints(request: GatewayRequest) {
   } else if (request.kind === 'responses' && Array.isArray(request.body.input)) {
     console.debug('[removeCacheBreakpoints] removing cache breakpoints from responses request');
     deleteCacheControl(request.body.input);
-    delete (request.body as Record<string, unknown>).prompt_cache_options;
+    delete request.body.prompt_cache_options;
   } else if (request.kind === 'messages') {
     console.debug('[removeCacheBreakpoints] removing cache breakpoints from messages request');
     delete request.body.cache_control;

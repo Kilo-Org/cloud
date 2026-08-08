@@ -63,8 +63,18 @@ function parseArgs(args: string[]): UsageEvidenceOptions {
   return { email, since };
 }
 
-const dedupeJoined = (values: Array<string | number | null>): string =>
-  [...new Set(values.filter(v => v !== null).map(String))].join(',');
+function dedupeJoined(values: Array<string | number | null>): string {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value);
+    if (seen.has(text)) continue;
+    seen.add(text);
+    unique.push(text);
+  }
+  return unique.join(',');
+}
 
 export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.includes('--help') || args.includes('-h')) {
@@ -82,15 +92,21 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     conditions.push(gt(microdollar_usage.created_at, since));
   }
 
+  // Select every plan-required per-row field. The metadata half can be
+  // null for a row without it, so all metadata fields stay nullable-safe in the row type.
   const rows = await db
     .select({
+      id: microdollar_usage.id,
       createdAt: microdollar_usage.created_at,
       model: microdollar_usage.model,
       requestedModel: microdollar_usage.requested_model,
       provider: microdollar_usage.provider,
+      hasError: microdollar_usage.has_error,
+      cost: microdollar_usage.cost,
       isUserByok: microdollar_usage_metadata.is_user_byok,
       statusCode: microdollar_usage_metadata.status_code,
       sessionId: microdollar_usage_metadata.session_id,
+      marketCost: microdollar_usage_metadata.market_cost,
     })
     .from(microdollar_usage)
     .leftJoin(microdollar_usage_metadata, eq(microdollar_usage_metadata.id, microdollar_usage.id))

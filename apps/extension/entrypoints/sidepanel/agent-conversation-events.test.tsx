@@ -1,4 +1,4 @@
-/* eslint-disable max-expects, jsx-no-new-object-as-prop -- test rendering helpers and fixture assertions */
+/* eslint-disable max-expects, jsx-no-new-object-as-prop, max-lines -- test rendering helpers and fixture assertions */
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
@@ -184,5 +184,125 @@ describe('workflow tool exchange rendering', () => {
 
     expect(container.textContent).toContain('save_memory');
     expect(container.textContent).toContain('completed');
+  });
+});
+
+describe('agent tool exchange rendering', () => {
+  it('renders a completed agent tool with its title, arguments, and result', () => {
+    const toolCall = {
+      arguments: { filePath: 'src/auth.ts' },
+      id: 'tc-agent-1',
+      name: 'read',
+      source: 'agent' as const,
+      title: 'src/auth.ts',
+      type: 'tool-call' as const,
+    };
+    const result = {
+      id: 'tr-agent-1',
+      ok: true,
+      toolCallId: 'tc-agent-1',
+      type: 'tool-result' as const,
+      value: 'export const guard = () => true;',
+    };
+    const item: GroupedConversationItem = {
+      result,
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    expect(container.textContent).toContain('read');
+    expect(container.textContent).toContain('completed');
+    expect(container.textContent).toContain('src/auth.ts');
+    expect(container.textContent).toContain('Arguments');
+    expect(container.textContent).toContain('filePath');
+    expect(container.textContent).toContain('Result');
+    expect(container.textContent).toContain('export const guard = () => true;');
+  });
+
+  it('renders a failed agent tool with the error label and reason', () => {
+    const toolCall = {
+      arguments: { filePath: 'src/auth.ts' },
+      id: 'tc-agent-2',
+      name: 'read',
+      source: 'agent' as const,
+      title: 'src/auth.ts',
+      type: 'tool-call' as const,
+    };
+    const result = {
+      error: 'File not found.',
+      id: 'tr-agent-2',
+      ok: false,
+      toolCallId: 'tc-agent-2',
+      type: 'tool-result' as const,
+    };
+    const item: GroupedConversationItem = {
+      result,
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    expect(container.textContent).toContain('read');
+    expect(container.textContent).toContain('failed');
+    expect(container.textContent).toContain('Error');
+    expect(container.textContent).toContain('File not found.');
+  });
+
+  it('renders a running agent tool without a result block', () => {
+    const toolCall = {
+      arguments: { filePath: 'src/auth.ts' },
+      id: 'tc-agent-3',
+      name: 'read',
+      source: 'agent' as const,
+      title: 'src/auth.ts',
+      type: 'tool-call' as const,
+    };
+    const item: GroupedConversationItem = {
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    expect(container.textContent).toContain('read');
+    expect(container.textContent).toContain('running');
+    expect(container.textContent).toContain('Arguments');
+    expect(container.textContent).not.toContain('Result');
+  });
+
+  it('renders an agent tool image and no result pre', () => {
+    const toolCall = {
+      arguments: { fullPage: false },
+      id: 'tc-agent-4',
+      name: 'browser_screenshot',
+      source: 'agent' as const,
+      title: 'viewport',
+      type: 'tool-call' as const,
+    };
+    const result = {
+      id: 'tr-agent-4',
+      imageDataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      ok: true,
+      toolCallId: 'tc-agent-4',
+      type: 'tool-result' as const,
+      value: 'captured',
+    };
+    const item: GroupedConversationItem = {
+      result,
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    const image = container.querySelector('img');
+    expect(image).not.toBeNull();
+    expect(image?.getAttribute('src')).toContain('data:image/png;base64,');
+    expect(image?.getAttribute('alt')).toBe('Image produced by browser_screenshot');
+    expect(container.textContent).not.toContain('captured');
   });
 });

@@ -6,12 +6,13 @@ import { useStore } from 'jotai';
 import { toast } from 'sonner-native';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
+import { listInstanceModels } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 
 import {
   buildContinuationSeed,
+  buildContinueRemoteSpawnInput,
   type ContinuationDestination,
   resolveContinuationDestinations,
-  resolveContinueRemoteModel,
 } from '@/components/agents/continuation-seed';
 import { setContinuePickerBridge } from '@/components/agents/continue-picker-bridge';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
@@ -25,12 +26,11 @@ import {
   getSpawnedAgentSessionPath,
 } from '@/components/agents/session-detail-routes';
 import { type useSessionManager } from '@/components/agents/session-provider';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { putSharePayload } from '@/lib/share-payload';
 import { appendShareParams } from '@/lib/share-navigation';
-import {
-  buildCreateRemoteSessionInput,
-  useRemoteInstanceSpawn,
-} from '@/lib/hooks/use-remote-instance-spawn';
+import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,
@@ -48,7 +48,7 @@ type InstancesResult = RouterOutputs['activeSessions']['listInstances'];
 export function useContinueSession(args: {
   organizationId: string | undefined;
   manager: ReturnType<typeof useSessionManager>;
-  models: { id: string; variants: string[] }[];
+  models: SessionModelOption[];
   modelsLoading: boolean;
 }): {
   continueSession: (input: {
@@ -63,6 +63,7 @@ export function useContinueSession(args: {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const store = useStore();
+  const connection = useUserWebConnection();
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);
@@ -111,13 +112,15 @@ export function useContinueSession(args: {
           }
           return;
         }
-        const remoteModel = resolveContinueRemoteModel(fields.model, fields.variant, args.models);
+        const catalogResult = await listInstanceModels(connection, dest.instance.connectionId);
         const outcome = await spawn(
           dest.instance.connectionId,
-          buildCreateRemoteSessionInput({
+          buildContinueRemoteSpawnInput({
             mode: fields.mode,
-            model: remoteModel.model,
-            variant: remoteModel.variant,
+            model: fields.model,
+            variant: fields.variant,
+            options: args.models,
+            catalogResult,
             organizationId: args.organizationId,
           })
         );
@@ -142,7 +145,7 @@ export function useContinueSession(args: {
         setIsContinuing(false);
       }
     },
-    [args.organizationId, args.models, router, runCloudCreate, spawn]
+    [args.organizationId, args.models, connection, router, runCloudCreate, spawn]
   );
 
   const fallback = useCallback(

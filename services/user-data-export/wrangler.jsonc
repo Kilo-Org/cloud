@@ -22,6 +22,7 @@
       "head_sampling_rate": 1,
     },
   },
+  "logpush": true,
   "routes": [
     {
       "pattern": "user-data-export.kilosessions.ai",

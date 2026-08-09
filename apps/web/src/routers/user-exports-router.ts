@@ -84,6 +84,7 @@ export const userExportsRouter = createTRPCRouter({
         SELECT requested_at
         FROM user_data_exports
         WHERE kilo_user_id = ${ctx.user.id}
+          AND status <> 'failed'
           AND requested_at > now() - interval '24 hours'
         ORDER BY requested_at DESC
         LIMIT 1

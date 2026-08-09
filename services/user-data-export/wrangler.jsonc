@@ -7,9 +7,21 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
-  "dev": { "port": 8818, "local_protocol": "http", "ip": "127.0.0.1" },
-  "limits": { "cpu_ms": 300000 },
-  "observability": { "enabled": true, "logs": { "enabled": true, "head_sampling_rate": 1 } },
+  "dev": {
+    "port": 8818,
+    "local_protocol": "http",
+    "ip": "127.0.0.1",
+  },
+  "limits": {
+    "cpu_ms": 300000,
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+    },
+  },
   "routes": [
     {
       "pattern": "user-data-export.kilosessions.ai",
@@ -19,11 +31,19 @@
   ],
   "vars": {
     "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+    "R2_BUCKET_NAME": "user-data-export",
     "USER_DATA_EXPORT_WEB_URL": "https://app.kilo.ai",
   },
-  "triggers": { "crons": ["*/5 * * * *"] },
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
   "queues": {
-    "producers": [{ "binding": "EXPORT_QUEUE", "queue": "user-data-export" }],
+    "producers": [
+      {
+        "binding": "EXPORT_QUEUE",
+        "queue": "user-data-export",
+      },
+    ],
     "consumers": [
       {
         "queue": "user-data-export",
@@ -41,7 +61,12 @@
       },
     ],
   },
-  "r2_buckets": [{ "binding": "EXPORT_BUCKET", "bucket_name": "user-data-export-local" }],
+  "r2_buckets": [
+    {
+      "binding": "EXPORT_BUCKET",
+      "bucket_name": "user-data-export",
+    },
+  ],
   "hyperdrive": [
     {
       "binding": "PRIMARY_STATE_DB",

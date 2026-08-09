@@ -23,7 +23,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `apps/web/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
-- `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption; used across many auth-related files. `[SECRET]`
+- `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `apps/web/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `apps/web/src/lib/trpc/init.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]

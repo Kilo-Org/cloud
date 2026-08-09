@@ -81,6 +81,22 @@ export function createStateDb(binding: HyperdriveBinding) {
       if (result?.attached) return 'attached';
       return result?.export_exists ? 'lost_lease' : 'deleted';
     },
+    async clearClaimedMultipartUpload(input: {
+      exportId: string;
+      generation: number;
+      leaseToken: string;
+      multipartUploadId: string;
+    }): Promise<boolean> {
+      const rows = await db.execute<{ id: string }>(sql`
+        UPDATE user_data_exports
+        SET status = 'processing', multipart_upload_id = NULL, updated_at = now()
+        WHERE id = ${input.exportId} AND dispatch_generation = ${input.generation}
+          AND lease_token = ${input.leaseToken}
+          AND multipart_upload_id = ${input.multipartUploadId}
+        RETURNING id
+      `);
+      return rows.rows.length > 0;
+    },
     async complete(input: {
       exportId: string;
       leaseToken: string;
@@ -179,8 +195,7 @@ export function createStateDb(binding: HyperdriveBinding) {
     async releaseForRetry(exportId: string, generation: number, leaseToken: string): Promise<void> {
       await db.execute(sql`
         UPDATE user_data_exports
-        SET status = 'queued', multipart_upload_id = NULL, lease_token = NULL,
-          lease_expires_at = NULL, updated_at = now()
+        SET status = 'queued', lease_token = NULL, lease_expires_at = NULL, updated_at = now()
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('processing', 'finalizing') AND lease_token = ${leaseToken}
       `);

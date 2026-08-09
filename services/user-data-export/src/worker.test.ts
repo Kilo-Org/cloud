@@ -7,6 +7,7 @@ import {
   exportArtifact,
   handleGenerationFailure,
   processScheduledExportWork,
+  recoverInterruptedMultipartUpload,
   resolveSourceAdapter,
   TerminalExportError,
   type ExportEnv,
@@ -210,6 +211,46 @@ describe('generation failure handling', () => {
       2,
       'lease-token'
     );
+  });
+});
+
+describe('interrupted multipart recovery', () => {
+  it('aborts the orphan and clears its lease-fenced database reference', async () => {
+    const abort = vi.fn();
+    const clear = vi.fn().mockResolvedValue(true);
+
+    await expect(recoverInterruptedMultipartUpload({ upload: { abort }, clear })).resolves.toBe(
+      true
+    );
+
+    expect(abort).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it('treats a missing orphan upload as already aborted', async () => {
+    const clear = vi.fn().mockResolvedValue(true);
+
+    await expect(
+      recoverInterruptedMultipartUpload({
+        upload: { abort: vi.fn().mockRejectedValue({ code: 10024 }) },
+        clear,
+      })
+    ).resolves.toBe(true);
+
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it('does not clear the database reference when abort fails transiently', async () => {
+    const clear = vi.fn();
+
+    await expect(
+      recoverInterruptedMultipartUpload({
+        upload: { abort: vi.fn().mockRejectedValue(new Error('R2 unavailable')) },
+        clear,
+      })
+    ).rejects.toThrow('R2 unavailable');
+
+    expect(clear).not.toHaveBeenCalled();
   });
 });
 

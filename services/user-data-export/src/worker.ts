@@ -105,6 +105,12 @@ function exportIdFromObjectKey(value: string): string | undefined {
   )?.[1];
 }
 
+function isMissingMultipartUpload(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const value = error as { code?: unknown; name?: unknown };
+  return value.code === 10024 || value.name === 'NoSuchUpload';
+}
+
 export const exportArtifact = {
   contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
   contentType: 'application/gzip',
@@ -157,6 +163,17 @@ export async function attachNewMultipartUpload(input: {
   }
 }
 
+export async function recoverInterruptedMultipartUpload(input: {
+  upload: Pick<R2MultipartUpload, 'abort'>;
+  clear: () => Promise<boolean>;
+}): Promise<boolean> {
+  try {
+    await input.upload.abort();
+  } catch (error) {
+    if (!isMissingMultipartUpload(error)) throw error;
+  }
+  return input.clear();
+}
 function jsonLine(record: ExportRecord): string {
   return `${JSON.stringify(record)}\n`;
 }
@@ -209,7 +226,6 @@ export async function processGenerateMessage(
 
   try {
     if (
-      job.multipart_upload_id ||
       job.dispatch_generation !== 0 ||
       job.current_source !== null ||
       job.source_cursor !== null
@@ -219,6 +235,31 @@ export async function processGenerateMessage(
         'This export was created by an older generator and must be requested again.',
         'Existing multipart export cannot be resumed by the one-shot generator'
       );
+    }
+
+    if (job.multipart_upload_id) {
+      const multipartUploadId = job.multipart_upload_id;
+      phase = 'orphan_cleanup';
+      const recovered = await recoverInterruptedMultipartUpload({
+        upload: env.EXPORT_BUCKET.resumeMultipartUpload(objectKey(job.id), multipartUploadId),
+        clear: () =>
+          state.clearClaimedMultipartUpload({
+            exportId: job.id,
+            generation: job.dispatch_generation,
+            leaseToken,
+            multipartUploadId,
+          }),
+      });
+      if (!recovered) {
+        logExportEvent('info', 'export_generation_skipped', {
+          exportId: job.id,
+          generation: job.dispatch_generation,
+          reason: 'lost_lease_during_orphan_cleanup',
+        });
+        return;
+      }
+      job.multipart_upload_id = null;
+      phase = 'claim';
     }
 
     const adapters = createSourceAdapters(createReplicaQuery(env.EXPORT_REPLICA_DB));
@@ -518,8 +559,7 @@ export async function deletePendingObjects(
         try {
           await bucket.resumeMultipartUpload(item.object_key, item.multipart_upload_id).abort();
         } catch (error) {
-          const value = error as { code?: number; name?: string };
-          if (value.code !== 10024 && value.name !== 'NoSuchUpload') throw error;
+          if (!isMissingMultipartUpload(error)) throw error;
         }
       }
       stage = 'r2_delete';

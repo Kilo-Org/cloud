@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { logExportEvent, safeError } from './observability';
+import { classifyFetchFailure, logExportEvent, safeError } from './observability';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -45,5 +45,40 @@ describe('export observability', () => {
     });
 
     expect(safeError(error)).toEqual({ errorName: 'Error' });
+  });
+});
+
+describe('classifyFetchFailure', () => {
+  it('distinguishes an AbortSignal timeout from a manual abort', () => {
+    expect(classifyFetchFailure(new DOMException('timed out', 'TimeoutError'))).toBe('timeout');
+    expect(classifyFetchFailure(new DOMException('aborted', 'AbortError'))).toBe('aborted');
+  });
+
+  it('recognizes a disallowed redirect thrown under redirect: error', () => {
+    expect(
+      classifyFetchFailure(new TypeError("Fetch API cannot follow a redirect in mode 'error'"))
+    ).toBe('redirect');
+  });
+
+  it('recognizes dropped connections and network failures', () => {
+    expect(classifyFetchFailure(new TypeError('Network connection lost.'))).toBe('connection');
+    expect(classifyFetchFailure(new TypeError('The connection was reset.'))).toBe('connection');
+    expect(classifyFetchFailure(new TypeError('fetch failed'))).toBe('connection');
+  });
+
+  it('falls back to unknown for unrecognized or non-error throws', () => {
+    expect(classifyFetchFailure(new TypeError('something unexpected'))).toBe('unknown');
+    expect(classifyFetchFailure({ message: 'redirect' })).toBe('unknown');
+    expect(classifyFetchFailure('redirect')).toBe('unknown');
+  });
+
+  it('never returns the original message text, only a fixed literal', () => {
+    const reason = classifyFetchFailure(
+      new TypeError('redirect to https://evil.example/?token=postgres://secret@host')
+    );
+    expect(reason).toBe('redirect');
+    expect(reason).not.toContain('secret');
+    expect(reason).not.toContain('token');
+    expect(reason).not.toContain('https');
   });
 });

@@ -97,7 +97,12 @@ export function exportHeader(job: ExportJob): string {
     exportId: job.id,
     requestedAt: strictIsoTimestamp(job.requested_at),
     generatedAt: new Date().toISOString(),
-    includedSources: ['app_builder_projects', 'microdollar_usage_metadata', 'system_prompt_prefix'],
+    includedSources: [
+      'kilocode_users',
+      'app_builder_projects',
+      'microdollar_usage_metadata',
+      'system_prompt_prefix',
+    ],
     snapshotAt: strictIsoTimestamp(job.snapshot_at),
   })}\n`;
 }

@@ -1,6 +1,10 @@
 import type { ExportCursor } from './contracts';
 
-export type ExportRecord = { source: string; field: string; value: string | null };
+export type ExportRecord = {
+  source: string;
+  field: string;
+  value: string | number | boolean | null;
+};
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
 export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
@@ -34,6 +38,16 @@ WHERE mu.kilo_user_id = $1
 ORDER BY mu.created_at, mu.id
 LIMIT $5`;
 
+const userQuery = `SELECT id, google_user_email, google_user_name, google_user_image_url,
+  created_at, updated_at, hosted_domain, microdollars_used, total_microdollars_acquired,
+  next_credit_expiration_at, auto_top_up_enabled, default_model, completed_welcome_form,
+  linkedin_url, github_url, discord_server_membership_verified_at,
+  openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier,
+  vercel_downstream_safety_identifier, customer_source, signup_ip, normalized_email, email_domain
+FROM kilocode_users
+WHERE id = $1
+LIMIT 1`;
+
 function cursorFor(row: Record<string, unknown>): ExportCursor {
   return { createdAt: new Date(String(row.created_at)).toISOString(), id: String(row.id) };
 }
@@ -65,8 +79,92 @@ function isoTimestamp(value: unknown, field: string): string {
   return timestamp.toISOString();
 }
 
+function nullableTimestamp(value: unknown, field: string): string | null {
+  if (value === null) return null;
+  return isoTimestamp(value, field);
+}
+
+function requiredBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== 'boolean') throw new Error(`Replica row has invalid ${field}`);
+  return value;
+}
+
+function safeNumber(value: unknown, field: string): number {
+  let number: unknown = value;
+  if (typeof value === 'bigint') {
+    number = Number(value);
+  } else if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+    number = Number(BigInt(value));
+  }
+  if (typeof number !== 'number' || !Number.isSafeInteger(number)) {
+    throw new Error(`Replica row has unsafe ${field}`);
+  }
+  return number;
+}
+
+const USER_FIELD_MAPPERS = [
+  ['id', (value: unknown) => requiredString(value, 'id')],
+  ['google_user_email', (value: unknown) => requiredString(value, 'google_user_email')],
+  ['google_user_name', (value: unknown) => requiredString(value, 'google_user_name')],
+  ['google_user_image_url', (value: unknown) => requiredString(value, 'google_user_image_url')],
+  ['created_at', (value: unknown) => isoTimestamp(value, 'created_at')],
+  ['updated_at', (value: unknown) => isoTimestamp(value, 'updated_at')],
+  ['hosted_domain', (value: unknown) => nullableString(value, 'hosted_domain')],
+  ['microdollars_used', (value: unknown) => safeNumber(value, 'microdollars_used')],
+  [
+    'total_microdollars_acquired',
+    (value: unknown) => safeNumber(value, 'total_microdollars_acquired'),
+  ],
+  [
+    'next_credit_expiration_at',
+    (value: unknown) => nullableTimestamp(value, 'next_credit_expiration_at'),
+  ],
+  ['auto_top_up_enabled', (value: unknown) => requiredBoolean(value, 'auto_top_up_enabled')],
+  ['default_model', (value: unknown) => nullableString(value, 'default_model')],
+  ['completed_welcome_form', (value: unknown) => requiredBoolean(value, 'completed_welcome_form')],
+  ['linkedin_url', (value: unknown) => nullableString(value, 'linkedin_url')],
+  ['github_url', (value: unknown) => nullableString(value, 'github_url')],
+  [
+    'discord_server_membership_verified_at',
+    (value: unknown) => nullableTimestamp(value, 'discord_server_membership_verified_at'),
+  ],
+  [
+    'openrouter_upstream_safety_identifier',
+    (value: unknown) => nullableString(value, 'openrouter_upstream_safety_identifier'),
+  ],
+  [
+    'openrouter_downstream_safety_identifier',
+    (value: unknown) => nullableString(value, 'openrouter_downstream_safety_identifier'),
+  ],
+  [
+    'vercel_downstream_safety_identifier',
+    (value: unknown) => nullableString(value, 'vercel_downstream_safety_identifier'),
+  ],
+  ['customer_source', (value: unknown) => nullableString(value, 'customer_source')],
+  ['signup_ip', (value: unknown) => nullableString(value, 'signup_ip')],
+  ['normalized_email', (value: unknown) => nullableString(value, 'normalized_email')],
+  ['email_domain', (value: unknown) => nullableString(value, 'email_domain')],
+] as const;
+
 export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
   return [
+    {
+      name: 'kilocode_users',
+      async readPage(input): Promise<SourcePage> {
+        if (input.cursor) return { records: [], nextCursor: null };
+        const rows = await query(userQuery, [input.kiloUserId]);
+        const row = rows[0];
+        if (!row) throw new Error('Export user was not found');
+        return {
+          records: USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
+            source: 'kilocode_users',
+            field,
+            value: mapValue(row[field]),
+          })),
+          nextCursor: null,
+        };
+      },
+    },
     {
       name: 'app_builder_projects',
       async readPage(input): Promise<SourcePage> {
@@ -135,4 +233,4 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
   ];
 }
 
-export const sourceQueries = { projectQuery, promptQuery };
+export const sourceQueries = { projectQuery, promptQuery, userQuery };

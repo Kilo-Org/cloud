@@ -90,6 +90,8 @@ import {
   platform_integrations,
   model_eval_ingestions,
   microdollar_usage,
+  microdollar_usage_metadata,
+  system_prompt_prefix,
   model_experiment,
   model_experiment_variant,
   model_experiment_variant_version,
@@ -222,6 +224,7 @@ describe('User', () => {
     await db.delete(model_experiment_variant_version);
     await db.delete(model_experiment_variant);
     await db.delete(model_experiment);
+    await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
     await db.delete(cloud_agent_feedback);
@@ -2555,6 +2558,96 @@ describe('User', () => {
 
       expect(anonymized?.promoterEmail).toBe(`deleted+${promoter.id}@deleted.invalid`);
       expect(retained?.promoterEmail).toBe(otherPromoter.google_user_email);
+    });
+
+    it('should nullify user_prompt_prefix and system_prompt_prefix_id in microdollar_usage_metadata for soft-deleted user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      const [spp] = await db
+        .insert(system_prompt_prefix)
+        .values({ system_prompt_prefix: `Test system prompt prefix ${randomUUID()}` })
+        .returning({ id: system_prompt_prefix.system_prompt_prefix_id });
+      if (!spp) throw new Error('Failed to insert system prompt prefix');
+
+      const user1UsageId = randomUUID();
+      const user2UsageId = randomUUID();
+
+      await db.insert(microdollar_usage).values([
+        {
+          id: user1UsageId,
+          kilo_user_id: user1.id,
+          cost: 1000,
+          input_tokens: 100,
+          output_tokens: 50,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: new Date().toISOString(),
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet',
+          has_error: false,
+        },
+        {
+          id: user2UsageId,
+          kilo_user_id: user2.id,
+          cost: 2000,
+          input_tokens: 200,
+          output_tokens: 100,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: new Date().toISOString(),
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet',
+          has_error: false,
+        },
+      ]);
+
+      await db.insert(microdollar_usage_metadata).values([
+        {
+          id: user1UsageId,
+          message_id: 'msg-1',
+          user_prompt_prefix: 'My private user prompt prefix 1',
+          system_prompt_prefix_id: spp.id,
+          system_prompt_length: 500,
+          max_tokens: 4096,
+          latency: 1.25,
+        },
+        {
+          id: user2UsageId,
+          message_id: 'msg-2',
+          user_prompt_prefix: 'My private user prompt prefix 2',
+          system_prompt_prefix_id: spp.id,
+          system_prompt_length: 500,
+          max_tokens: 4096,
+          latency: 2.5,
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      const [user1Meta] = await db
+        .select()
+        .from(microdollar_usage_metadata)
+        .where(eq(microdollar_usage_metadata.id, user1UsageId));
+      expect(user1Meta).toBeDefined();
+      expect(user1Meta?.user_prompt_prefix).toBeNull();
+      expect(user1Meta?.system_prompt_prefix_id).toBeNull();
+      expect(user1Meta?.max_tokens).toBe(4096);
+      expect(user1Meta?.latency).toBe(1.25);
+
+      const [user2Meta] = await db
+        .select()
+        .from(microdollar_usage_metadata)
+        .where(eq(microdollar_usage_metadata.id, user2UsageId));
+      expect(user2Meta).toBeDefined();
+      expect(user2Meta?.user_prompt_prefix).toBe('My private user prompt prefix 2');
+      expect(user2Meta?.system_prompt_prefix_id).toBe(spp.id);
+
+      const [retainedSpp] = await db
+        .select()
+        .from(system_prompt_prefix)
+        .where(eq(system_prompt_prefix.system_prompt_prefix_id, spp.id));
+      expect(retainedSpp).toBeDefined();
     });
 
     it('should anonymize kiloclaw admin audit logs where user is target', async () => {

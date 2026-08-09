@@ -93,11 +93,15 @@ export function DataExportsClient() {
 
   const requestMutation = useMutation(
     trpc.userExports.request.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Export requested', {
-          description: "We'll email you when it's ready to download.",
-        });
-        await queryClient.invalidateQueries({ queryKey: listQueryKey });
+      onSuccess: async result => {
+        if (result.status === 'ready') {
+          toast.info('Your latest export is already ready to download.');
+        } else {
+          toast.success('Export requested', {
+            description: "We'll email you when it's ready to download.",
+          });
+        }
+        await queryClient.resetQueries({ queryKey: listQueryKey });
       },
       onError: error => {
         toast.error('Export request failed', {
@@ -128,11 +132,15 @@ export function DataExportsClient() {
 
   const exports = listQuery.data?.pages.flatMap(page => page.exports);
   const activeExport = exports?.find(record => isActiveUserExportStatus(record.status));
+  const readyExport = exports?.find(record => getDisplayStatus(record) === 'ready');
   const activeExportCopy = activeExport
     ? USER_EXPORT_STATUS_COPY[getDisplayStatus(activeExport)]
     : null;
   const requestDisabled =
-    requestMutation.isPending || listQuery.isRefetching || Boolean(activeExport);
+    requestMutation.isPending ||
+    listQuery.isRefetching ||
+    Boolean(activeExport) ||
+    Boolean(readyExport);
 
   return (
     <div className="flex flex-col gap-6">
@@ -164,6 +172,11 @@ export function DataExportsClient() {
             <p id="data-exports-active-hint" className="text-muted-foreground text-sm">
               An export is already {activeExportCopy.label.toLowerCase()}. You can request another
               export when it finishes.
+            </p>
+          )}
+          {!activeExportCopy && readyExport && (
+            <p className="text-muted-foreground text-sm">
+              Your latest export is ready. Download it from Export history below.
             </p>
           )}
         </CardContent>

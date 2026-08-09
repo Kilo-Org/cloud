@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  attachNewMultipartUpload,
   consumeDeadLetterBatch,
   deletePendingObjects,
   exportHeader,
+  processScheduledExportWork,
   resolveSourceAdapter,
   type ExportEnv,
 } from './worker';
@@ -81,6 +83,58 @@ describe('source resume keys', () => {
 
   it('does not fall back when a persisted source key is unknown', () => {
     expect(resolveSourceAdapter([enabled], 'renamed-source')).toBeUndefined();
+  });
+});
+
+describe('first multipart upload attachment', () => {
+  it('aborts a newly created upload when account deletion removes the export row', async () => {
+    const abort = vi.fn();
+    const attach = vi.fn().mockResolvedValue('deleted');
+
+    await expect(
+      attachNewMultipartUpload({
+        upload: { uploadId: 'upload-id', abort },
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 0,
+        leaseToken: 'lease-token',
+        attach,
+      })
+    ).resolves.toBe('deleted');
+
+    expect(abort).toHaveBeenCalledOnce();
+  });
+
+  it('aborts its private upload without creating cleanup work when only the lease was lost', async () => {
+    const abort = vi.fn();
+
+    await expect(
+      attachNewMultipartUpload({
+        upload: { uploadId: 'upload-id', abort },
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 0,
+        leaseToken: 'lease-token',
+        attach: vi.fn().mockResolvedValue('lost_lease'),
+      })
+    ).resolves.toBe('lost_lease');
+
+    expect(abort).toHaveBeenCalledOnce();
+  });
+
+  it('aborts a newly created upload when persisting its ID fails', async () => {
+    const abort = vi.fn().mockResolvedValue(undefined);
+    const attach = vi.fn().mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      attachNewMultipartUpload({
+        upload: { uploadId: 'upload-id', abort },
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 0,
+        leaseToken: 'lease-token',
+        attach,
+      })
+    ).rejects.toThrow('database unavailable');
+
+    expect(abort).toHaveBeenCalledOnce();
   });
 });
 
@@ -167,5 +221,80 @@ describe('account-deletion object cleanup', () => {
 
     expect(bucket.delete).toHaveBeenCalledWith('exports/id/file.gz');
     expect(state.completeObjectDeletion).toHaveBeenCalledWith('exports/id/file.gz');
+  });
+});
+
+describe('scheduled export maintenance isolation', () => {
+  it('continues to multipart cleanup and outbox dispatch after an expiry delete fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const abort = vi.fn();
+    const send = vi.fn();
+    const state = {
+      expiredObjects: vi
+        .fn()
+        .mockResolvedValue([{ id: 'expired-id', r2_object_key: 'exports/expired/file.gz' }]),
+      markExpired: vi.fn(),
+      failedMultipartUploads: vi
+        .fn()
+        .mockResolvedValue([{ id: 'failed-id', multipart_upload_id: 'upload-id' }]),
+      clearMultipartUpload: vi.fn(),
+      pendingOutbox: vi
+        .fn()
+        .mockResolvedValue([{ id: 'outbox-id', export_id: 'export-id', generation: 2 }]),
+      markOutboxSent: vi.fn(),
+    };
+    const env = {
+      EXPORT_BUCKET: {
+        delete: vi.fn().mockRejectedValue(new Error('R2 unavailable')),
+        resumeMultipartUpload: vi.fn().mockReturnValue({ abort }),
+      },
+      EXPORT_QUEUE: { send },
+    };
+
+    await processScheduledExportWork(env, state);
+
+    expect(state.markExpired).not.toHaveBeenCalled();
+    expect(abort).toHaveBeenCalledOnce();
+    expect(state.clearMultipartUpload).toHaveBeenCalledWith('failed-id');
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ exportId: 'export-id', generation: 2 })
+    );
+    expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-id');
+    warn.mockRestore();
+  });
+
+  it('continues to outbox dispatch after a failed multipart abort', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const send = vi.fn();
+    const state = {
+      expiredObjects: vi.fn().mockResolvedValue([]),
+      markExpired: vi.fn(),
+      failedMultipartUploads: vi
+        .fn()
+        .mockResolvedValue([{ id: 'failed-id', multipart_upload_id: 'upload-id' }]),
+      clearMultipartUpload: vi.fn(),
+      pendingOutbox: vi
+        .fn()
+        .mockResolvedValue([{ id: 'outbox-id', export_id: 'export-id', generation: 2 }]),
+      markOutboxSent: vi.fn(),
+    };
+    const env = {
+      EXPORT_BUCKET: {
+        delete: vi.fn(),
+        resumeMultipartUpload: vi.fn().mockReturnValue({
+          abort: vi.fn().mockRejectedValue(new Error('R2 unavailable')),
+        }),
+      },
+      EXPORT_QUEUE: { send },
+    };
+
+    await processScheduledExportWork(env, state);
+
+    expect(state.clearMultipartUpload).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ exportId: 'export-id', generation: 2 })
+    );
+    expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-id');
+    warn.mockRestore();
   });
 });

@@ -57,6 +57,28 @@ describe('source adapters', () => {
     ]);
   });
 
+  it('normalizes PostgreSQL timestamps before persisting a source cursor', async () => {
+    const [projects] = createSourceAdapters(async () => [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        title: 'Owned project',
+        created_at: '2026-08-08 12:00:00+00',
+      },
+    ]);
+
+    const page = await projects.readPage?.({
+      kiloUserId: 'owner-user',
+      snapshotAt: '2026-08-08T13:00:00.000Z',
+      cursor: null,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({
+      createdAt: '2026-08-08T12:00:00.000Z',
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+  });
+
   it('maps prompt fields only from rows returned by the user-filtered usage query', async () => {
     const calls: Array<{ text: string; values: unknown[] }> = [];
     const prompts = createSourceAdapters(async (text, values) => {

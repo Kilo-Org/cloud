@@ -25,10 +25,14 @@ export const DownloadRequestSchema = z
 
 export type ExportCursor = { createdAt: string; id: string };
 
+const ExportCursorSchema = z
+  .object({
+    createdAt: z.string().datetime({ offset: true }),
+    id: z.string().min(1),
+  })
+  .strict();
+
 export function parseCursor(value: unknown): ExportCursor | null {
-  if (!value || typeof value !== 'object') return null;
-  const cursor = value as Record<string, unknown>;
-  return typeof cursor.createdAt === 'string' && typeof cursor.id === 'string'
-    ? { createdAt: cursor.createdAt, id: cursor.id }
-    : null;
+  const result = ExportCursorSchema.safeParse(value);
+  return result.success ? result.data : null;
 }

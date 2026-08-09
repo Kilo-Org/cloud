@@ -56,6 +56,15 @@ function nullableString(value: unknown, field: string): string | null {
   return requiredString(value, field);
 }
 
+function isoTimestamp(value: unknown, field: string): string {
+  if (!(typeof value === 'string' || value instanceof Date)) {
+    throw new Error(`Replica row has invalid ${field}`);
+  }
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) throw new Error(`Replica row has invalid ${field}`);
+  return timestamp.toISOString();
+}
+
 export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
   return [
     {
@@ -71,7 +80,7 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
           result.map(row => ({
             id: requiredString(row.id, 'id'),
             title: nullableString(row.title, 'title'),
-            created_at: requiredString(row.created_at, 'created_at'),
+            created_at: isoTimestamp(row.created_at, 'created_at'),
           }))
         );
         const lastRow = rows.at(-1);
@@ -97,7 +106,7 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
         ]).then(result =>
           result.map(row => ({
             id: requiredString(row.id, 'id'),
-            created_at: requiredString(row.created_at, 'created_at'),
+            created_at: isoTimestamp(row.created_at, 'created_at'),
             user_prompt_prefix: nullableString(row.user_prompt_prefix, 'user_prompt_prefix'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
           }))

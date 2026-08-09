@@ -52,6 +52,39 @@ export function createStateDb(binding: HyperdriveBinding) {
       `);
       return rows.rows[0] ?? null;
     },
+    async attachMultipartUpload(input: {
+      exportId: string;
+      generation: number;
+      leaseToken: string;
+      multipartUploadId: string;
+    }): Promise<'attached' | 'deleted' | 'lost_lease'> {
+      const rows = await db.execute<{ attached: boolean; export_exists: boolean }>(sql`
+        WITH attached AS (
+          UPDATE user_data_exports
+          SET multipart_upload_id = ${input.multipartUploadId}, updated_at = now()
+          WHERE id = ${input.exportId} AND dispatch_generation = ${input.generation}
+            AND lease_token = ${input.leaseToken} AND multipart_upload_id IS NULL
+          RETURNING id
+        ), existing AS (
+          SELECT EXISTS (
+            SELECT 1 FROM user_data_exports WHERE id = ${input.exportId}
+          ) AS export_exists
+        ), cleanup AS (
+          INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id)
+          SELECT ${`exports/${input.exportId}/kilo-data-export.jsonl.gz`}, ${input.multipartUploadId}
+          WHERE NOT EXISTS (SELECT 1 FROM attached)
+            AND NOT (SELECT export_exists FROM existing)
+          ON CONFLICT (object_key) DO UPDATE
+          SET multipart_upload_id = EXCLUDED.multipart_upload_id,
+            available_at = now(), updated_at = now()
+        )
+        SELECT EXISTS (SELECT 1 FROM attached) AS attached,
+          (SELECT export_exists FROM existing) AS export_exists
+      `);
+      const result = rows.rows[0];
+      if (result?.attached) return 'attached';
+      return result?.export_exists ? 'lost_lease' : 'deleted';
+    },
     async checkpoint(input: {
       exportId: string;
       leaseToken: string;

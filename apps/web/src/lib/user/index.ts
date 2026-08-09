@@ -1089,7 +1089,6 @@ export async function softDeleteUser(userId: string) {
         multipart_upload_id
       FROM user_data_exports
       WHERE kilo_user_id = ${userId}
-        AND (r2_object_key IS NOT NULL OR multipart_upload_id IS NOT NULL)
       ON CONFLICT (object_key) DO UPDATE
       SET multipart_upload_id = COALESCE(
         EXCLUDED.multipart_upload_id,

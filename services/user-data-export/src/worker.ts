@@ -55,6 +55,33 @@ export function resolveSourceAdapter(
     : adapters.find(adapter => adapter.name === persistedSource);
 }
 
+export async function attachNewMultipartUpload(input: {
+  upload: Pick<R2MultipartUpload, 'uploadId' | 'abort'>;
+  exportId: string;
+  generation: number;
+  leaseToken: string;
+  attach: (input: {
+    exportId: string;
+    generation: number;
+    leaseToken: string;
+    multipartUploadId: string;
+  }) => Promise<'attached' | 'deleted' | 'lost_lease'>;
+}): Promise<'attached' | 'deleted' | 'lost_lease'> {
+  try {
+    const result = await input.attach({
+      exportId: input.exportId,
+      generation: input.generation,
+      leaseToken: input.leaseToken,
+      multipartUploadId: input.upload.uploadId,
+    });
+    if (result !== 'attached') await input.upload.abort();
+    return result;
+  } catch (error) {
+    await input.upload.abort().catch(() => undefined);
+    throw error;
+  }
+}
+
 function jsonLine(record: ExportRecord): string {
   return `${JSON.stringify(record)}\n`;
 }
@@ -106,14 +133,25 @@ export async function processGenerateMessage(
     }
 
     const key = objectKey(job.id);
-    const upload = job.multipart_upload_id
-      ? env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id)
-      : await env.EXPORT_BUCKET.createMultipartUpload(key, {
-          httpMetadata: {
-            contentType: exportArtifact.contentType,
-            contentDisposition: exportArtifact.contentDisposition,
-          },
-        });
+    let upload: R2MultipartUpload;
+    if (job.multipart_upload_id) {
+      upload = env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id);
+    } else {
+      upload = await env.EXPORT_BUCKET.createMultipartUpload(key, {
+        httpMetadata: {
+          contentType: exportArtifact.contentType,
+          contentDisposition: exportArtifact.contentDisposition,
+        },
+      });
+      const attachResult = await attachNewMultipartUpload({
+        upload,
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        leaseToken,
+        attach: input => state.attachMultipartUpload(input),
+      });
+      if (attachResult !== 'attached') return;
+    }
     const encoder = new TextEncoder();
     const compressor = new CompressionStream('gzip');
     let isFinal = false;
@@ -261,25 +299,63 @@ export async function reconcile(env: ExportEnv): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
   await state.reconcile();
   await deletePendingObjects(env.EXPORT_BUCKET, state);
+  await processScheduledExportWork(env, state);
+  await dispatchReadyNotifications(env, state);
+}
+
+export async function processScheduledExportWork(
+  env: {
+    EXPORT_BUCKET: Pick<R2Bucket, 'delete' | 'resumeMultipartUpload'>;
+    EXPORT_QUEUE: Pick<Queue<ExportQueueMessage>, 'send'>;
+  },
+  state: Pick<
+    ReturnType<typeof createStateDb>,
+    | 'expiredObjects'
+    | 'markExpired'
+    | 'failedMultipartUploads'
+    | 'clearMultipartUpload'
+    | 'pendingOutbox'
+    | 'markOutboxSent'
+  >
+): Promise<void> {
   for (const item of await state.expiredObjects()) {
-    await env.EXPORT_BUCKET.delete(item.r2_object_key);
-    await state.markExpired(item.id);
+    try {
+      await env.EXPORT_BUCKET.delete(item.r2_object_key);
+      await state.markExpired(item.id);
+    } catch {
+      console.warn(JSON.stringify({ event: 'export_expiry_cleanup_failed', exportId: item.id }));
+    }
   }
   for (const item of await state.failedMultipartUploads()) {
-    const key = objectKey(item.id);
-    await env.EXPORT_BUCKET.resumeMultipartUpload(key, item.multipart_upload_id).abort();
-    await state.clearMultipartUpload(item.id);
+    try {
+      const key = objectKey(item.id);
+      await env.EXPORT_BUCKET.resumeMultipartUpload(key, item.multipart_upload_id).abort();
+      await state.clearMultipartUpload(item.id);
+    } catch {
+      console.warn(
+        JSON.stringify({ event: 'failed_export_multipart_cleanup_failed', exportId: item.id })
+      );
+    }
   }
   for (const item of await state.pendingOutbox()) {
-    await env.EXPORT_QUEUE.send({
-      version: 1,
-      operation: 'generate',
-      exportId: item.export_id,
-      generation: item.generation,
-    });
-    await state.markOutboxSent(item.id);
+    try {
+      await env.EXPORT_QUEUE.send({
+        version: 1,
+        operation: 'generate',
+        exportId: item.export_id,
+        generation: item.generation,
+      });
+      await state.markOutboxSent(item.id);
+    } catch {
+      console.warn(
+        JSON.stringify({
+          event: 'export_outbox_dispatch_failed',
+          exportId: item.export_id,
+          generation: item.generation,
+        })
+      );
+    }
   }
-  await dispatchReadyNotifications(env, state);
 }
 
 export async function deletePendingObjects(
@@ -303,6 +379,12 @@ export async function deletePendingObjects(
       await state.completeObjectDeletion(item.object_key);
     } catch {
       await state.recordObjectDeletionFailure(item.object_key);
+      console.warn(
+        JSON.stringify({
+          event: 'account_export_object_cleanup_failed',
+          objectKey: item.object_key,
+        })
+      );
     }
   }
 }

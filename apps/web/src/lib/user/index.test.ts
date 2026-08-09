@@ -904,6 +904,27 @@ describe('User', () => {
       expect(tombstone?.multipart_upload_id).toBe('multipart-upload-id');
     });
 
+    it('creates a deterministic cleanup tombstone before an export starts uploading', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({ kilo_user_id: user.id, snapshot_at: new Date().toISOString() })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(tombstone).toMatchObject({ multipart_upload_id: null });
+    });
+
     it('anonymizes recommendation dismissal actor references', async () => {
       const organizationOwner = await insertTestUser();
       const dismissingUser = await insertTestUser();

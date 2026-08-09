@@ -1,6 +1,14 @@
 import { AdmitExportSchema, DownloadRequestSchema } from './contracts';
 import type { ExportEnv } from './worker';
+import type { ExportQueueMessage } from './contracts';
+import type { StateDb } from './databases';
 import { createR2Client } from '@kilocode/worker-utils/r2-client';
+import { verifyKiloToken } from '@kilocode/worker-utils/kilo-token';
+import { extractBearerToken } from '@kilocode/worker-utils';
+import {
+  USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
+  USER_DATA_EXPORT_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const DOWNLOAD_EXPIRES_SECONDS = 300;
 const DOWNLOAD_CONTENT_DISPOSITION = 'attachment; filename="kilo-data-export.jsonl.gz"';
@@ -22,6 +30,41 @@ async function authorized(request: Request, expected: string): Promise<boolean> 
     crypto.subtle.digest('SHA-256', encoder.encode(expected)),
   ]);
   return left.byteLength === right.byteLength && crypto.subtle.timingSafeEqual(left, right);
+}
+
+async function authenticatedUserId(request: Request, env: ExportEnv): Promise<string | null> {
+  if (!(await authorized(request, env.INTERNAL_API_SECRET))) return null;
+  const token = extractBearerToken(request.headers.get('authorization'));
+  if (!token) return null;
+  try {
+    const payload = await verifyKiloToken(token, env.NEXTAUTH_SECRET, {
+      audience: USER_DATA_EXPORT_AUDIENCE,
+    });
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      payload.iat === undefined ||
+      payload.exp === undefined ||
+      payload.iat > now + 30 ||
+      payload.exp - payload.iat > USER_DATA_EXPORT_ASSERTION_TTL_SECONDS
+    ) {
+      return null;
+    }
+    return payload.kiloUserId;
+  } catch {
+    return null;
+  }
+}
+
+async function dispatchExport(
+  message: ExportQueueMessage,
+  kiloUserId: string,
+  state: Pick<StateDb, 'exportBelongsToUser' | 'markOutboxGenerationSent'>,
+  queue: Pick<Queue<ExportQueueMessage>, 'send'>
+): Promise<'accepted' | 'not_found'> {
+  if (!(await state.exportBelongsToUser(message.exportId, kiloUserId))) return 'not_found';
+  await queue.send(message);
+  await state.markOutboxGenerationSent(message.exportId, message.generation);
+  return 'accepted';
 }
 
 async function readJson(request: Request): Promise<unknown> {
@@ -58,7 +101,8 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') {
       return Response.json({ ok: true, service: 'user-data-export' });
     }
-    if (!(await authorized(request, env.INTERNAL_API_SECRET))) {
+    const kiloUserId = await authenticatedUserId(request, env);
+    if (!kiloUserId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     try {
@@ -66,12 +110,13 @@ export default {
         const parsed = AdmitExportSchema.safeParse(await readJson(request));
         if (!parsed.success)
           return Response.json({ error: 'Invalid export dispatch' }, { status: 400 });
-        await env.EXPORT_QUEUE.send(parsed.data);
         const { createStateDb } = await import('./databases');
-        await createStateDb(env.PRIMARY_STATE_DB).markOutboxGenerationSent(
-          parsed.data.exportId,
-          parsed.data.generation
-        );
+        const state = createStateDb(env.PRIMARY_STATE_DB);
+        if (
+          (await dispatchExport(parsed.data, kiloUserId, state, env.EXPORT_QUEUE)) === 'not_found'
+        ) {
+          return Response.json({ error: 'Export not found' }, { status: 404 });
+        }
         return Response.json({ accepted: true }, { status: 202 });
       }
       if (request.method === 'POST' && url.pathname === '/internal/exports/download') {
@@ -81,7 +126,7 @@ export default {
         const { createStateDb } = await import('./databases');
         const object = await createStateDb(env.PRIMARY_STATE_DB).readyObject(
           parsed.data.exportId,
-          parsed.data.kiloUserId
+          kiloUserId
         );
         if (!object) return Response.json({ error: 'Export not found' }, { status: 404 });
         const expiration = downloadExpiration(object.expires_at);
@@ -118,4 +163,4 @@ export default {
   },
 } satisfies ExportedHandler<ExportEnv>;
 
-export const __test__ = { downloadExpiration, readJson };
+export const __test__ = { downloadExpiration, readJson, authenticatedUserId, dispatchExport };

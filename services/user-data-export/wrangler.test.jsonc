@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
   "vars": {
     "INTERNAL_API_SECRET": "test-token",
+    "NEXTAUTH_SECRET": "test-nextauth-secret",
     "R2_ACCESS_KEY_ID": "test-access-key",
     "R2_SECRET_ACCESS_KEY": "test-secret-key",
     "R2_ACCOUNT_ID": "test-account",

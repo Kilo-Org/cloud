@@ -188,6 +188,14 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE export_id = ${exportId} AND generation = ${generation} AND operation = 'generate'
       `);
     },
+    async exportBelongsToUser(exportId: string, kiloUserId: string): Promise<boolean> {
+      const rows = await db.execute<{ id: string }>(sql`
+        SELECT id FROM user_data_exports
+        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        LIMIT 1
+      `);
+      return rows.rows.length > 0;
+    },
     async readyObject(exportId: string, kiloUserId: string): Promise<ReadyExportObject | null> {
       const rows = await db.execute<ReadyExportObject>(sql`
         SELECT r2_object_key, expires_at

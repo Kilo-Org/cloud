@@ -115,7 +115,11 @@ export const userExportsRouter = createTRPCRouter({
 
     // The outbox remains authoritative if the Worker is unavailable after commit.
     if (row.status === 'queued')
-      await dispatchUserDataExport({ exportId: row.id, generation: row.dispatch_generation });
+      await dispatchUserDataExport({
+        exportId: row.id,
+        generation: row.dispatch_generation,
+        kiloUserId: ctx.user.id,
+      });
     return serialize(row);
   }),
 

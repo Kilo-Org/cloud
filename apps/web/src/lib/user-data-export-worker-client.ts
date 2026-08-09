@@ -2,6 +2,11 @@ import 'server-only';
 
 import { z } from 'zod';
 import { INTERNAL_API_SECRET, USER_DATA_EXPORT_WORKER_URL } from '@/lib/config.server';
+import { generateInternalServiceToken } from '@/lib/tokens';
+import {
+  USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
+  USER_DATA_EXPORT_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const LOCAL_EXPORT_WORKER_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const DEPLOYED_EXPORT_WORKER_HOSTS = new Set(['user-data-export.kilosessions.ai']);
@@ -34,6 +39,7 @@ function exportWorkerUrl(value: string | undefined): URL | null {
 
 async function postExportWorker(
   path: string,
+  kiloUserId: string,
   body: object,
   fetchImpl: typeof fetch = fetch
 ): Promise<Response | null> {
@@ -41,12 +47,17 @@ async function postExportWorker(
   if (!baseUrl || !INTERNAL_API_SECRET) return null;
 
   const url = new URL(path, baseUrl);
+  const userAssertion = generateInternalServiceToken(kiloUserId, {
+    expiresIn: USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
+    audience: USER_DATA_EXPORT_AUDIENCE,
+  });
   try {
     const response = await fetchImpl(url, {
       method: 'POST',
       redirect: 'error',
       headers: {
         'content-type': 'application/json',
+        authorization: `Bearer ${userAssertion}`,
         'x-internal-api-key': INTERNAL_API_SECRET,
       },
       body: JSON.stringify(body),
@@ -61,8 +72,9 @@ async function postExportWorker(
 export async function dispatchUserDataExport(input: {
   exportId: string;
   generation: number;
+  kiloUserId: string;
 }): Promise<DispatchWorkerResponse> {
-  const response = await postExportWorker('/internal/exports/dispatch', {
+  const response = await postExportWorker('/internal/exports/dispatch', input.kiloUserId, {
     version: 1,
     operation: 'generate',
     exportId: input.exportId,
@@ -80,7 +92,10 @@ export async function requestUserDataExportDownload(input: {
   exportId: string;
   kiloUserId: string;
 }): Promise<DownloadWorkerResponse> {
-  const response = await postExportWorker('/internal/exports/download', { version: 1, ...input });
+  const response = await postExportWorker('/internal/exports/download', input.kiloUserId, {
+    version: 1,
+    exportId: input.exportId,
+  });
   if (!response) return { kind: 'unavailable', reason: 'not_configured' };
   if (response.status === 501) return { kind: 'unavailable', reason: 'not_implemented' };
   if (!response.ok) return { kind: 'unavailable', reason: 'not_configured' };

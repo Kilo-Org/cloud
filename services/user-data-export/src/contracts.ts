@@ -19,7 +19,6 @@ export const DownloadRequestSchema = z
   .object({
     version: z.literal(EXPORT_SCHEMA_VERSION),
     exportId: z.string().uuid(),
-    kiloUserId: z.string().min(1),
   })
   .strict();
 

@@ -1,5 +1,7 @@
 # @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=
+# @from NEXTAUTH_SECRET
+NEXTAUTH_SECRET=
 
 # Local-only placeholders. Production uses standard Worker secrets set with
 # `wrangler secret put`; never put production values in this file.

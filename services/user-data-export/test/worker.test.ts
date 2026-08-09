@@ -1,8 +1,22 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { USER_DATA_EXPORT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 
 describe('user-data-export worker', () => {
   const internalApiKey = String(env.INTERNAL_API_SECRET);
+  const nextAuthSecret = String(env.NEXTAUTH_SECRET);
+
+  async function userAssertion(options?: { audience?: string; expiresIn?: number }) {
+    const result = await signKiloToken({
+      userId: 'user-id',
+      pepper: null,
+      secret: nextAuthSecret,
+      expiresInSeconds: options?.expiresIn ?? 300,
+      audience: options?.audience ?? USER_DATA_EXPORT_AUDIENCE,
+    });
+    return result.token;
+  }
 
   it('keeps health public and rejects missing or incorrect internal API keys', async () => {
     const health = await SELF.fetch('https://worker.local/health');
@@ -20,20 +34,59 @@ describe('user-data-export worker', () => {
     expect(incorrectKey.status).toBe(401);
   });
 
-  it('accepts the standard internal API key header', async () => {
-    const response = await SELF.fetch('https://worker.local/internal/exports/dispatch', {
+  it('requires both the internal API key and user assertion', async () => {
+    const assertion = await userAssertion();
+    const missingAssertion = await SELF.fetch('https://worker.local/internal/exports/dispatch', {
       method: 'POST',
       headers: { 'x-internal-api-key': internalApiKey },
+      body: '{}',
+    });
+    expect(missingAssertion.status).toBe(401);
+
+    const missingInternalKey = await SELF.fetch('https://worker.local/internal/exports/dispatch', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${assertion}` },
+      body: '{}',
+    });
+    expect(missingInternalKey.status).toBe(401);
+
+    const response = await SELF.fetch('https://worker.local/internal/exports/dispatch', {
+      method: 'POST',
+      headers: {
+        authorization: `bearer ${assertion}`,
+        'x-internal-api-key': internalApiKey,
+      },
       body: '{}',
     });
 
     expect(response.status).toBe(400);
   });
 
+  it('rejects assertions with the wrong audience, expiration, or lifetime', async () => {
+    for (const assertion of [
+      await userAssertion({ audience: 'other-service' }),
+      await userAssertion({ expiresIn: -1 }),
+      await userAssertion({ expiresIn: 301 }),
+    ]) {
+      const response = await SELF.fetch('https://worker.local/internal/exports/dispatch', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${assertion}`,
+          'x-internal-api-key': internalApiKey,
+        },
+        body: '{}',
+      });
+      expect(response.status).toBe(401);
+    }
+  });
+
   it('rejects a chunked internal request body over 16 KiB', async () => {
     const response = await SELF.fetch('https://worker.local/internal/exports/dispatch', {
       method: 'POST',
-      headers: { 'x-internal-api-key': internalApiKey },
+      headers: {
+        authorization: `Bearer ${await userAssertion()}`,
+        'x-internal-api-key': internalApiKey,
+      },
       body: 'x'.repeat(16_385),
     });
 

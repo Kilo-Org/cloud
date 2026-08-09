@@ -20,6 +20,7 @@ export type ExportEnv = {
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
   INTERNAL_API_SECRET: string;
+  NEXTAUTH_SECRET: string;
   R2_ACCESS_KEY_ID: string;
   R2_SECRET_ACCESS_KEY: string;
   R2_ACCOUNT_ID: string;

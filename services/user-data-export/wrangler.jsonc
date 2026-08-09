@@ -10,6 +10,10 @@
   "observability": { "enabled": true, "logs": { "enabled": true, "head_sampling_rate": 1 } },
   "vars": {
     "INTERNAL_API_SECRET": "local-test-only-not-a-secret",
+    "R2_ACCESS_KEY_ID": "local-test-access-key",
+    "R2_SECRET_ACCESS_KEY": "local-test-secret-key",
+    "R2_ACCOUNT_ID": "local-account",
+    "R2_BUCKET_NAME": "user-data-export-local",
     "USER_DATA_EXPORT_WEB_URL": "http://127.0.0.1:3000",
   },
   "triggers": { "crons": ["*/5 * * * *"] },

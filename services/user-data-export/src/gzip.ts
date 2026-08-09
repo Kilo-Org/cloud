@@ -31,23 +31,54 @@ export async function gzipPaddingMember(size: number): Promise<Uint8Array> {
   return padded;
 }
 
-export function concatenateBytes(chunks: Uint8Array[], size: number): Uint8Array {
-  const result = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  if (offset !== size) throw new Error('Compressed export size does not match its chunks');
-  return result;
-}
+export type UploadedGzipPart = { partNumber: number; etag: string; sizeBytes: number };
 
-export function gzipMemberFitsPart(
-  currentSize: number,
-  memberSize: number,
-  partSize: number,
-  minimumPaddingSize: number
-): boolean {
-  const remaining = partSize - currentSize - memberSize;
-  return remaining === 0 || remaining >= minimumPaddingSize;
+export async function uploadGzipStream(input: {
+  stream: ReadableStream<Uint8Array>;
+  partBytes: number;
+  startPartNumber: number;
+  isFinal: () => boolean;
+  uploadPart: (partNumber: number, value: Uint8Array) => Promise<{ etag: string }>;
+}): Promise<UploadedGzipPart[]> {
+  const reader = input.stream.getReader();
+  const uploaded: UploadedGzipPart[] = [];
+  let partNumber = input.startPartNumber;
+  let buffer = new Uint8Array(input.partBytes);
+  let used = 0;
+
+  const flush = async (size: number) => {
+    const value = size === input.partBytes ? buffer : buffer.slice(0, size);
+    const part = await input.uploadPart(partNumber, value);
+    uploaded.push({ partNumber, etag: part.etag, sizeBytes: size });
+    partNumber += 1;
+    buffer = new Uint8Array(input.partBytes);
+    used = 0;
+  };
+
+  const append = async (chunk: Uint8Array) => {
+    let offset = 0;
+    while (offset < chunk.byteLength) {
+      const length = Math.min(input.partBytes - used, chunk.byteLength - offset);
+      buffer.set(chunk.subarray(offset, offset + length), used);
+      used += length;
+      offset += length;
+      if (used === input.partBytes) await flush(input.partBytes);
+    }
+  };
+
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    await append(result.value);
+  }
+
+  if (used > 0 && !input.isFinal()) {
+    const gap = input.partBytes - used;
+    const minimumPaddingSize = (await gzipMember('')).byteLength;
+    const paddingSize = gap >= minimumPaddingSize ? gap : gap + input.partBytes;
+    await append(await gzipPaddingMember(paddingSize));
+  }
+  if (used > 0) await flush(used);
+
+  return uploaded;
 }

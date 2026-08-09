@@ -7,7 +7,12 @@ export type R2ClientConfig = {
 };
 
 export type R2Client = {
-  getSignedURL: (bucket: string, path: string, expiresIn?: number) => Promise<string>;
+  getSignedURL: (
+    bucket: string,
+    path: string,
+    expiresIn?: number,
+    options?: { responseContentDisposition?: string }
+  ) => Promise<string>;
 };
 
 /**
@@ -22,9 +27,17 @@ export function createR2Client(config: R2ClientConfig): R2Client {
   });
 
   return {
-    async getSignedURL(bucket: string, path: string, expiresIn: number = 3600): Promise<string> {
+    async getSignedURL(
+      bucket: string,
+      path: string,
+      expiresIn: number = 3600,
+      options?: { responseContentDisposition?: string }
+    ): Promise<string> {
       const url = new URL(`/${bucket}/${path}`, config.endpoint);
       url.searchParams.set('X-Amz-Expires', String(expiresIn));
+      if (options?.responseContentDisposition) {
+        url.searchParams.set('response-content-disposition', options.responseContentDisposition);
+      }
 
       const signedRequest = await aws.sign(url.toString(), {
         method: 'GET',

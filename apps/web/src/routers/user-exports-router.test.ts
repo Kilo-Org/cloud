@@ -10,7 +10,10 @@ let owner: User;
 let stranger: User;
 
 beforeAll(async () => {
-  owner = await insertTestUser({ google_user_email: 'data-export-owner@example.com' });
+  owner = await insertTestUser({
+    google_user_email: 'data-export-owner@admin.example.com',
+    is_admin: true,
+  });
   stranger = await insertTestUser({ google_user_email: 'data-export-stranger@example.com' });
 });
 
@@ -23,6 +26,11 @@ describe('user exports router guards and serialization', () => {
   it('rejects API-token authentication for data export procedures', () => {
     expect(() => __test__.requireWebSession(true)).toThrow(TRPCError);
     expect(() => __test__.requireWebSession(false)).not.toThrow();
+  });
+
+  it('rejects non-admin users', async () => {
+    const caller = await createCallerForUser(stranger.id);
+    await expect(caller.userExports.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('normalizes database timestamp text into strict UTC ISO strings', () => {

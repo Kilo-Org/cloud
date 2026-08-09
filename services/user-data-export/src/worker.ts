@@ -5,11 +5,10 @@ import {
   type ExportJob,
   type HyperdriveBinding,
 } from './databases';
-import { concatenateBytes, gzipMember, gzipMemberFitsPart, gzipPaddingMember } from './gzip';
+import { uploadGzipStream } from './gzip';
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
 
 const PART_BYTES = 5 * 1024 * 1024;
-const MAX_UNCOMPRESSED_PAGE_BYTES = 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES_PER_INVOCATION = 32 * 1024 * 1024;
 const MAX_PAGES_PER_INVOCATION = 200;
 const PAGE_SIZE = 100;
@@ -20,6 +19,10 @@ export type ExportEnv = {
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
   INTERNAL_API_SECRET: string | { get(): Promise<string> };
+  R2_ACCESS_KEY_ID: string | { get(): Promise<string> };
+  R2_SECRET_ACCESS_KEY: string | { get(): Promise<string> };
+  R2_ACCOUNT_ID: string;
+  R2_BUCKET_NAME: string;
   USER_DATA_EXPORT_WEB_URL?: string;
 };
 
@@ -62,6 +65,10 @@ export async function processGenerateMessage(
   const leaseToken = crypto.randomUUID();
   const job = await state.claim(message.exportId, message.generation, leaseToken);
   if (!job) return;
+  let writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
+  let uploadParts:
+    | Promise<Array<{ partNumber: number; etag: string; sizeBytes: number }>>
+    | undefined;
 
   try {
     if (job.current_source === null && job.multipart_upload_id) {
@@ -75,17 +82,33 @@ export async function processGenerateMessage(
       throw new Error('Export job has an invalid current source');
     }
 
+    const key = objectKey(job.id);
+    const upload = job.multipart_upload_id
+      ? env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id)
+      : await env.EXPORT_BUCKET.createMultipartUpload(key, {
+          httpMetadata: {
+            contentType: exportArtifact.contentType,
+            contentDisposition: exportArtifact.contentDisposition,
+          },
+        });
     const encoder = new TextEncoder();
-    const compressedChunks: Uint8Array[] = [];
-    let compressedSize = 0;
+    const compressor = new CompressionStream('gzip');
+    let isFinal = false;
+    uploadParts = uploadGzipStream({
+      stream: compressor.readable,
+      partBytes: PART_BYTES,
+      startPartNumber: job.next_part_number,
+      isFinal: () => isFinal,
+      uploadPart: (partNumber, value) => upload.uploadPart(partNumber, value),
+    });
+    writer = compressor.writable.getWriter();
     let uncompressedSize = 0;
     let pageCount = 0;
     if (job.next_part_number === 1) {
-      const header = await gzipMember(exportHeader(job));
-      compressedChunks.push(header);
-      compressedSize += header.byteLength;
+      const header = encoder.encode(exportHeader(job));
+      await writer.write(header);
+      uncompressedSize += header.byteLength;
     }
-    const emptyMemberSize = (await gzipMember('')).byteLength;
     let cursor = parseCursor(job.source_cursor);
     let recordCount = 0;
     let nextSource: string | null = adapter.name;
@@ -105,20 +128,9 @@ export async function processGenerateMessage(
         limit: PAGE_SIZE,
       });
       const pagePayload = page.records.map(jsonLine).join('');
-      const pageBytes = encoder.encode(pagePayload).byteLength;
-      if (pageBytes > MAX_UNCOMPRESSED_PAGE_BYTES) {
-        throw new Error('Export page exceeds the bounded uncompressed page size');
-      }
-      const compressedPage = await gzipMember(pagePayload);
-      if (
-        !gzipMemberFitsPart(compressedSize, compressedPage.byteLength, PART_BYTES, emptyMemberSize)
-      ) {
-        if (compressedSize === 0) throw new Error('Compressed export page exceeds multipart size');
-        break;
-      }
-      compressedChunks.push(compressedPage);
-      compressedSize += compressedPage.byteLength;
-      uncompressedSize += pageBytes;
+      const pageBytes = encoder.encode(pagePayload);
+      await writer.write(pageBytes);
+      uncompressedSize += pageBytes.byteLength;
       pageCount += 1;
       recordCount += page.records.length;
       if (page.nextCursor) {
@@ -138,28 +150,17 @@ export async function processGenerateMessage(
       cursor = null;
       nextSource = adapter.name;
     }
-    if (nextSource && compressedSize < PART_BYTES) {
-      const padding = await gzipPaddingMember(PART_BYTES - compressedSize);
-      compressedChunks.push(padding);
-      compressedSize += padding.byteLength;
-    }
-    const payload = concatenateBytes(compressedChunks, compressedSize);
-    const key = objectKey(job.id);
-    const upload = job.multipart_upload_id
-      ? env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id)
-      : await env.EXPORT_BUCKET.createMultipartUpload(key, {
-          httpMetadata: {
-            contentType: exportArtifact.contentType,
-            contentDisposition: exportArtifact.contentDisposition,
-          },
-        });
-    const part = await upload.uploadPart(job.next_part_number, payload);
+    isFinal = nextSource === null;
+    await writer.close();
+    const parts = await uploadParts;
+    if (parts.length === 0) throw new Error('Compressed export produced no multipart data');
     const checkpointed = await state.checkpoint({
       exportId: job.id,
       leaseToken,
-      partNumber: job.next_part_number,
-      etag: part.etag,
-      sizeBytes: compressedSize,
+      parts: parts.map((part, index) => ({
+        ...part,
+        rowCount: index === parts.length - 1 ? recordCount : 0,
+      })),
       rowCount: recordCount,
       source: partSource,
       cursor,
@@ -173,6 +174,8 @@ export async function processGenerateMessage(
     // R2 upload cannot complete a multipart object whose part is not durable.
     if (nextSource) return;
   } catch (error) {
+    await writer?.abort(error).catch(() => undefined);
+    await uploadParts?.catch(() => undefined);
     await state.releaseForRetry(job.id, job.dispatch_generation, leaseToken);
     throw error;
   }

@@ -1,6 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { concatenateBytes, gzipMember, gzipMemberFitsPart, gzipPaddingMember } from './gzip';
+import { gzipMember, gzipPaddingMember, uploadGzipStream } from './gzip';
 import { exportArtifact } from './worker';
 
 describe('gzip export members', () => {
@@ -8,19 +8,46 @@ describe('gzip export members', () => {
     const header = await gzipMember('{"type":"header"}\n');
     const record = await gzipMember('{"value":"hello"}\n');
     const padding = await gzipPaddingMember(1024);
-    const archive = concatenateBytes(
-      [header, record, padding],
-      header.byteLength + record.byteLength + padding.byteLength
-    );
+    const archive = Buffer.concat([header, record, padding]);
 
     expect(gunzipSync(archive).toString()).toBe('{"type":"header"}\n{"value":"hello"}\n');
     expect(padding.byteLength).toBe(1024);
   });
 
-  it('leaves enough room for a complete padding member', () => {
-    expect(gzipMemberFitsPart(100, 80, 200, 20)).toBe(true);
-    expect(gzipMemberFitsPart(100, 81, 200, 20)).toBe(false);
-    expect(gzipMemberFitsPart(100, 100, 200, 20)).toBe(true);
+  it('streams a smaller final part without padding', async () => {
+    const parts: Uint8Array[] = [];
+    const uploaded = await uploadGzipStream({
+      stream: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7])]).stream(),
+      partBytes: 8,
+      startPartNumber: 3,
+      isFinal: () => true,
+      uploadPart: async (_partNumber, value) => {
+        parts.push(value.slice());
+        return { etag: `etag-${parts.length}` };
+      },
+    });
+
+    expect(uploaded).toEqual([{ partNumber: 3, etag: 'etag-1', sizeBytes: 7 }]);
+    expect(parts[0]).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6, 7]));
+  });
+
+  it('pads non-final output to uniform parts without decoded bytes', async () => {
+    const payload = '{"value":"hello"}\n';
+    const compressed = await gzipMember(payload);
+    const parts: Uint8Array[] = [];
+    await uploadGzipStream({
+      stream: new Blob([compressed]).stream(),
+      partBytes: 64,
+      startPartNumber: 1,
+      isFinal: () => false,
+      uploadPart: async (_partNumber, value) => {
+        parts.push(value.slice());
+        return { etag: `etag-${parts.length}` };
+      },
+    });
+
+    expect(parts.every(part => part.byteLength === 64)).toBe(true);
+    expect(gunzipSync(Buffer.concat(parts)).toString()).toBe(payload);
   });
 
   it('stores a gzip archive without HTTP content encoding', () => {

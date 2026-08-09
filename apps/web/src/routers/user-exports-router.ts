@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   dispatchUserDataExport,
   requestUserDataExportDownload,
@@ -64,7 +64,7 @@ function requireWebSession(authViaToken: boolean | undefined): void {
 }
 
 export const userExportsRouter = createTRPCRouter({
-  request: baseProcedure.mutation(async ({ ctx }) => {
+  request: adminProcedure.mutation(async ({ ctx }) => {
     requireWebSession(ctx.authViaToken);
     const { rows } = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ctx.user.id}, 0))`);
@@ -119,7 +119,7 @@ export const userExportsRouter = createTRPCRouter({
     return serialize(row);
   }),
 
-  list: baseProcedure.input(ListInputSchema).query(async ({ ctx, input }) => {
+  list: adminProcedure.input(ListInputSchema).query(async ({ ctx, input }) => {
     requireWebSession(ctx.authViaToken);
     const cursorFilter = input?.cursor
       ? sql`AND (created_at, id) < (
@@ -143,7 +143,7 @@ export const userExportsRouter = createTRPCRouter({
     };
   }),
 
-  createDownload: baseProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
+  createDownload: adminProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
     requireWebSession(ctx.authViaToken);
     const { rows } = await db.execute<{ id: string }>(sql`
       SELECT id FROM user_data_exports

@@ -24,6 +24,7 @@ type Part = { part_number: number; etag: string };
 type PendingNotification = { id: string };
 type StoredObject = { id: string; r2_object_key: string };
 type MultipartUpload = { id: string; multipart_upload_id: string };
+type ReadyExportObject = { r2_object_key: string; expires_at: string };
 
 export function createStateDb(binding: HyperdriveBinding) {
   const db = getWorkerDb(binding.connectionString, { statement_timeout: 30_000 });
@@ -52,9 +53,7 @@ export function createStateDb(binding: HyperdriveBinding) {
     async checkpoint(input: {
       exportId: string;
       leaseToken: string;
-      partNumber: number;
-      etag: string;
-      sizeBytes: number;
+      parts: Array<{ partNumber: number; etag: string; sizeBytes: number; rowCount: number }>;
       rowCount: number;
       source: string;
       cursor: ExportCursor | null;
@@ -62,28 +61,32 @@ export function createStateDb(binding: HyperdriveBinding) {
       nextGeneration: number;
       multipartUploadId: string;
     }): Promise<boolean> {
+      const nextPartNumber = input.parts.at(-1)?.partNumber;
+      if (nextPartNumber === undefined) throw new Error('Export checkpoint has no parts');
       const rows = await db.execute<{ id: string }>(sql`
         WITH candidate AS (
           SELECT id
           FROM user_data_exports
           WHERE id = ${input.exportId} AND lease_token = ${input.leaseToken}
           FOR UPDATE
-        ), inserted_part AS (
+        ), input_parts AS (
+          SELECT * FROM jsonb_to_recordset(${JSON.stringify(input.parts)}::jsonb)
+            AS part("partNumber" integer, etag text, "sizeBytes" bigint, "rowCount" integer)
+        ), inserted_parts AS (
           INSERT INTO user_data_export_parts (export_id, part_number, etag, size_bytes, source, end_cursor, row_count)
-          SELECT id, ${input.partNumber}, ${input.etag}, ${input.sizeBytes}, ${input.source},
-            ${JSON.stringify(input.cursor)}::jsonb, ${input.rowCount}
-          FROM candidate
-          ON CONFLICT (export_id, part_number) DO NOTHING
+          SELECT candidate.id, part."partNumber", part.etag, part."sizeBytes", ${input.source},
+            ${JSON.stringify(input.cursor)}::jsonb, part."rowCount"
+          FROM candidate CROSS JOIN input_parts AS part
           RETURNING export_id
         ), updated AS (
           UPDATE user_data_exports AS exports
           SET source_cursor = ${JSON.stringify(input.cursor)}::jsonb,
-            current_source = ${input.nextSource}, next_part_number = ${input.partNumber + 1},
+            current_source = ${input.nextSource}, next_part_number = ${nextPartNumber + 1},
             multipart_upload_id = ${input.multipartUploadId}, dispatch_generation = ${input.nextGeneration},
             row_count = exports.row_count + ${input.rowCount}, attempt_count = 0,
             lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-          FROM inserted_part
-          WHERE exports.id = inserted_part.export_id AND exports.lease_token = ${input.leaseToken}
+          FROM (SELECT DISTINCT export_id FROM inserted_parts) AS inserted
+          WHERE exports.id = inserted.export_id AND exports.lease_token = ${input.leaseToken}
           RETURNING exports.id
         )
         INSERT INTO user_data_export_outbox (export_id, generation, operation, available_at)
@@ -133,6 +136,16 @@ export function createStateDb(binding: HyperdriveBinding) {
         UPDATE user_data_export_outbox SET sent_at = now(), updated_at = now()
         WHERE export_id = ${exportId} AND generation = ${generation} AND operation = 'generate'
       `);
+    },
+    async readyObject(exportId: string, kiloUserId: string): Promise<ReadyExportObject | null> {
+      const rows = await db.execute<ReadyExportObject>(sql`
+        SELECT r2_object_key, expires_at
+        FROM user_data_exports
+        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+          AND status = 'ready' AND expires_at > now() AND r2_object_key IS NOT NULL
+        LIMIT 1
+      `);
+      return rows.rows[0] ?? null;
     },
     async releaseForRetry(exportId: string, generation: number, leaseToken: string): Promise<void> {
       await db.execute(sql`

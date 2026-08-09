@@ -41,13 +41,6 @@ const protectedRouteEntries: ProtectedRouteEntry[] = [
     },
   },
   {
-    route: '/data-exports',
-    render: async () => {
-      const { default: DataExportsPage } = await import('@/app/(app)/data-exports/page');
-      return DataExportsPage();
-    },
-  },
-  {
     route: '/security-agent/config',
     render: renderSecurityAgentLayout,
   },

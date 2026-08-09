@@ -25,11 +25,11 @@ describe('ExportQueueMessageSchema', () => {
 
 describe('parseCursor', () => {
   it('accepts strict ISO cursors and rejects malformed persisted values', () => {
-    expect(parseCursor({ createdAt: '2026-08-03T00:00:00.000Z', id: 'row-id' })).toEqual({
-      createdAt: '2026-08-03T00:00:00.000Z',
+    expect(parseCursor({ createdAt: '2026-08-03T00:00:00.123456Z', id: 'row-id' })).toEqual({
+      createdAt: '2026-08-03T00:00:00.123456Z',
       id: 'row-id',
     });
     expect(parseCursor({ createdAt: 'not-a-date', id: 'row-id' })).toBeNull();
-    expect(parseCursor({ createdAt: '2026-08-03T00:00:00.000Z', id: '' })).toBeNull();
+    expect(parseCursor({ createdAt: '2026-08-03T00:00:00.123456Z', id: '' })).toBeNull();
   });
 });

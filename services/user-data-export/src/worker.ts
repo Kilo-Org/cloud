@@ -346,6 +346,7 @@ export async function processScheduledExportWork(
     | 'clearMultipartUpload'
     | 'pendingOutbox'
     | 'markOutboxSent'
+    | 'recordOutboxFailure'
   >
 ): Promise<void> {
   for (const item of await state.expiredObjects()) {
@@ -377,6 +378,7 @@ export async function processScheduledExportWork(
       });
       await state.markOutboxSent(item.id);
     } catch {
+      await state.recordOutboxFailure(item.id);
       console.warn(
         JSON.stringify({
           event: 'export_outbox_dispatch_failed',

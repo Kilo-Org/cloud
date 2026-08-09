@@ -279,6 +279,7 @@ describe('scheduled export maintenance isolation', () => {
         .fn()
         .mockResolvedValue([{ id: 'outbox-id', export_id: 'export-id', generation: 2 }]),
       markOutboxSent: vi.fn(),
+      recordOutboxFailure: vi.fn(),
     };
     const env = {
       EXPORT_BUCKET: {
@@ -297,6 +298,7 @@ describe('scheduled export maintenance isolation', () => {
       expect.objectContaining({ exportId: 'export-id', generation: 2 })
     );
     expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-id');
+    expect(state.recordOutboxFailure).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 
@@ -314,6 +316,7 @@ describe('scheduled export maintenance isolation', () => {
         .fn()
         .mockResolvedValue([{ id: 'outbox-id', export_id: 'export-id', generation: 2 }]),
       markOutboxSent: vi.fn(),
+      recordOutboxFailure: vi.fn(),
     };
     const env = {
       EXPORT_BUCKET: {
@@ -332,6 +335,37 @@ describe('scheduled export maintenance isolation', () => {
       expect.objectContaining({ exportId: 'export-id', generation: 2 })
     );
     expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-id');
+    expect(state.recordOutboxFailure).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('backs off a failed outbox send without blocking later rows', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const send = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Queue unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const state = {
+      expiredObjects: vi.fn().mockResolvedValue([]),
+      markExpired: vi.fn(),
+      failedMultipartUploads: vi.fn().mockResolvedValue([]),
+      clearMultipartUpload: vi.fn(),
+      pendingOutbox: vi.fn().mockResolvedValue([
+        { id: 'outbox-1', export_id: 'export-1', generation: 1 },
+        { id: 'outbox-2', export_id: 'export-2', generation: 2 },
+      ]),
+      markOutboxSent: vi.fn(),
+      recordOutboxFailure: vi.fn(),
+    };
+    const env = {
+      EXPORT_BUCKET: { delete: vi.fn(), resumeMultipartUpload: vi.fn() },
+      EXPORT_QUEUE: { send },
+    };
+
+    await processScheduledExportWork(env, state);
+
+    expect(state.recordOutboxFailure).toHaveBeenCalledWith('outbox-1');
+    expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-2');
     warn.mockRestore();
   });
 });

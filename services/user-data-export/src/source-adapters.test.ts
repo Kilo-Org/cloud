@@ -44,7 +44,7 @@ describe('source adapters', () => {
           {
             id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             title: 'Owned project',
-            created_at: '2026-08-08T12:00:00.000Z',
+            created_at: '2026-08-08T12:00:00.000000Z',
           },
         ];
       }),
@@ -75,7 +75,7 @@ describe('source adapters', () => {
         {
           id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           title: 'Owned project',
-          created_at: '2026-08-08 12:00:00+00',
+          created_at: '2026-08-08T12:00:00.123456Z',
         },
       ]),
       'app_builder_projects'
@@ -89,7 +89,7 @@ describe('source adapters', () => {
     });
 
     expect(page?.nextCursor).toEqual({
-      createdAt: '2026-08-08T12:00:00.000Z',
+      createdAt: '2026-08-08T12:00:00.123456Z',
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     });
   });
@@ -102,7 +102,7 @@ describe('source adapters', () => {
         return [
           {
             id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-            created_at: '2026-08-08T12:00:00.000Z',
+            created_at: '2026-08-08T12:00:00.000000Z',
             user_prompt_prefix: 'User prompt',
             system_prompt_prefix: 'System prompt',
           },

@@ -3,7 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import { INTERNAL_API_SECRET, USER_DATA_EXPORT_WORKER_URL } from '@/lib/config.server';
 
-const LOCAL_EXPORT_WORKER_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const LOCAL_EXPORT_WORKER_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const DEPLOYED_EXPORT_WORKER_HOSTS = new Set(['user-data-export.kilosessions.ai']);
 const REQUEST_TIMEOUT_MS = 10_000;
 

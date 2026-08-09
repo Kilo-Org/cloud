@@ -171,6 +171,17 @@ export function createStateDb(binding: HyperdriveBinding) {
         sql`UPDATE user_data_export_outbox SET sent_at = now(), updated_at = now() WHERE id = ${id}`
       );
     },
+    async recordOutboxFailure(id: string): Promise<void> {
+      await db.execute(sql`
+        UPDATE user_data_export_outbox
+        SET attempt_count = attempt_count + 1,
+          available_at = now() + make_interval(
+            secs => LEAST(3600, 30 * power(2, LEAST(attempt_count, 7)))::integer
+          ),
+          updated_at = now()
+        WHERE id = ${id} AND sent_at IS NULL
+      `);
+    },
     async markOutboxGenerationSent(exportId: string, generation: number): Promise<void> {
       await db.execute(sql`
         UPDATE user_data_export_outbox SET sent_at = now(), updated_at = now()

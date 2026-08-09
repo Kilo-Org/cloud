@@ -509,7 +509,7 @@ export const user_data_exports = pgTable(
       .notNull(),
     kilo_user_id: text()
       .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
     status: text()
       .$type<'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired'>()
       .notNull()
@@ -528,7 +528,6 @@ export const user_data_exports = pgTable(
     size_bytes: bigint({ mode: 'number' }),
     r2_object_key: text(),
     r2_etag: text(),
-    sha256: text(),
     failure_code: text(),
     last_error_redacted: text(),
     requested_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -560,6 +559,9 @@ export const user_data_exports = pgTable(
     index('IDX_user_data_exports_ready_expiry')
       .on(table.expires_at, table.id)
       .where(sql`${table.status} = 'ready'`),
+    index('IDX_user_data_exports_failed_multipart')
+      .on(table.updated_at, table.id)
+      .where(sql`${table.status} = 'failed' AND ${table.multipart_upload_id} IS NOT NULL`),
     index('IDX_user_data_exports_email_lease_expiry')
       .on(table.email_lease_expires_at, table.id)
       .where(sql`${table.email_status} = 'sending'`),
@@ -586,10 +588,6 @@ export const user_data_exports = pgTable(
     check(
       'user_data_exports_ready_shape',
       sql`${table.status} <> 'ready' OR (${table.r2_object_key} IS NOT NULL AND ${table.size_bytes} IS NOT NULL AND ${table.completed_at} IS NOT NULL AND ${table.expires_at} IS NOT NULL)`
-    ),
-    check(
-      'user_data_exports_sha256_shape',
-      sql`${table.sha256} IS NULL OR ${table.sha256} ~ '^[a-f0-9]{64}$'`
     ),
     check(
       'user_data_exports_last_error_redacted_length',
@@ -636,6 +634,11 @@ export const user_data_export_object_deletions = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
+    index('IDX_user_data_export_object_deletions_ready').on(
+      table.available_at,
+      table.created_at,
+      table.object_key
+    ),
     check(
       'user_data_export_object_deletions_reason_check',
       sql`${table.reason} = 'account_deletion'`

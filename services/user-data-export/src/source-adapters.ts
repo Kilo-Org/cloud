@@ -20,7 +20,8 @@ export type SourceAdapter = {
   }) => Promise<SourcePage>;
 };
 
-const projectQuery = `SELECT id, title, created_at
+const projectQuery = `SELECT id, title,
+  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
 FROM app_builder_projects
 WHERE owned_by_user_id = $1
   AND created_at <= $2
@@ -28,7 +29,9 @@ WHERE owned_by_user_id = $1
 ORDER BY created_at, id
 LIMIT $5`;
 
-const promptQuery = `SELECT mu.id, mu.created_at, meta.user_prompt_prefix, spp.system_prompt_prefix
+const promptQuery = `SELECT mu.id,
+  to_char(mu.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+  meta.user_prompt_prefix, spp.system_prompt_prefix
 FROM microdollar_usage AS mu
 JOIN microdollar_usage_metadata AS meta ON meta.id = mu.id
 LEFT JOIN system_prompt_prefix AS spp ON spp.system_prompt_prefix_id = meta.system_prompt_prefix_id
@@ -49,7 +52,7 @@ WHERE id = $1
 LIMIT 1`;
 
 function cursorFor(row: Record<string, unknown>): ExportCursor {
-  return { createdAt: new Date(String(row.created_at)).toISOString(), id: String(row.id) };
+  return { createdAt: cursorTimestamp(row.created_at), id: requiredString(row.id, 'id') };
 }
 
 type ProjectRow = { id: string; title: string | null; created_at: string };
@@ -77,6 +80,13 @@ function isoTimestamp(value: unknown, field: string): string {
   const timestamp = new Date(value);
   if (Number.isNaN(timestamp.getTime())) throw new Error(`Replica row has invalid ${field}`);
   return timestamp.toISOString();
+}
+
+function cursorTimestamp(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(value)) {
+    throw new Error('Replica row has invalid created_at cursor');
+  }
+  return value;
 }
 
 function nullableTimestamp(value: unknown, field: string): string | null {
@@ -178,7 +188,7 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
           result.map(row => ({
             id: requiredString(row.id, 'id'),
             title: nullableString(row.title, 'title'),
-            created_at: isoTimestamp(row.created_at, 'created_at'),
+            created_at: cursorTimestamp(row.created_at),
           }))
         );
         const lastRow = rows.at(-1);
@@ -204,7 +214,7 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
         ]).then(result =>
           result.map(row => ({
             id: requiredString(row.id, 'id'),
-            created_at: isoTimestamp(row.created_at, 'created_at'),
+            created_at: cursorTimestamp(row.created_at),
             user_prompt_prefix: nullableString(row.user_prompt_prefix, 'user_prompt_prefix'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
           }))

@@ -9,6 +9,7 @@ describe('user data export Worker client', () => {
   it.each([
     ['http://127.0.0.1:8787', true],
     ['http://localhost:8787', true],
+    ['http://[::1]:8787', true],
     ['https://user-data-export.kilosessions.ai', true],
     ['https://example.com', false],
     ['https://user-data-export.kiloapps.io', false],

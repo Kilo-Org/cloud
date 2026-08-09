@@ -27,7 +27,7 @@ export type ExportCursor = { createdAt: string; id: string };
 
 const ExportCursorSchema = z
   .object({
-    createdAt: z.string().datetime({ offset: true }),
+    createdAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/),
     id: z.string().min(1),
   })
   .strict();

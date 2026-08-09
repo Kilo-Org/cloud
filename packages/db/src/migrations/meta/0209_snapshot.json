@@ -1,5 +1,5 @@
 {
-  "id": "608b6ea5-8132-49ad-bf6e-fbfeaf4f373d",
+  "id": "bb10f073-b973-4877-93b2-a8a8f48c5418",
   "prevId": "bb8cf2f4-68eb-423d-9bda-06d43e144f68",
   "version": "7",
   "dialect": "postgresql",
@@ -35415,7 +35415,35 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "IDX_user_data_export_object_deletions_ready": {
+          "name": "IDX_user_data_export_object_deletions_ready",
+          "columns": [
+            {
+              "expression": "available_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "object_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -35759,12 +35787,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "sha256": {
-          "name": "sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "failure_code": {
           "name": "failure_code",
           "type": "text",
@@ -35937,6 +35959,28 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_user_data_exports_failed_multipart": {
+          "name": "IDX_user_data_exports_failed_multipart",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"user_data_exports\".\"status\" = 'failed' AND \"user_data_exports\".\"multipart_upload_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_user_data_exports_email_lease_expiry": {
           "name": "IDX_user_data_exports_email_lease_expiry",
           "columns": [
@@ -35971,7 +36015,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -36014,10 +36058,6 @@
         "user_data_exports_ready_shape": {
           "name": "user_data_exports_ready_shape",
           "value": "\"user_data_exports\".\"status\" <> 'ready' OR (\"user_data_exports\".\"r2_object_key\" IS NOT NULL AND \"user_data_exports\".\"size_bytes\" IS NOT NULL AND \"user_data_exports\".\"completed_at\" IS NOT NULL AND \"user_data_exports\".\"expires_at\" IS NOT NULL)"
-        },
-        "user_data_exports_sha256_shape": {
-          "name": "user_data_exports_sha256_shape",
-          "value": "\"user_data_exports\".\"sha256\" IS NULL OR \"user_data_exports\".\"sha256\" ~ '^[a-f0-9]{64}$'"
         },
         "user_data_exports_last_error_redacted_length": {
           "name": "user_data_exports_last_error_redacted_length",

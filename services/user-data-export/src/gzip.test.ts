@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { gzipMember, gzipPaddingMember, uploadGzipStream } from './gzip';
-import { exportArtifact, isAllowedWebCallbackUrl } from './worker';
+import { exportArtifact, isAllowedWebCallbackUrl, redirectTargetHost } from './worker';
 
 describe('gzip export members', () => {
   it('concatenates independently compressed JSONL members into one gzip stream', async () => {
@@ -60,12 +60,28 @@ describe('gzip export members', () => {
   });
 
   it('allows HTTPS and loopback HTTP notification callbacks only', () => {
-    expect(isAllowedWebCallbackUrl('https://app.kilo.ai')).toBe(true);
-    expect(isAllowedWebCallbackUrl('https://staging-app.kilo.ai')).toBe(true);
+    expect(isAllowedWebCallbackUrl('https://api.kilo.ai')).toBe(true);
     expect(isAllowedWebCallbackUrl('http://localhost:3000')).toBe(true);
     expect(isAllowedWebCallbackUrl('http://127.0.0.1:3000')).toBe(true);
     expect(isAllowedWebCallbackUrl('https://example.com')).toBe(false);
-    expect(isAllowedWebCallbackUrl('http://app.kilo.ai')).toBe(false);
+    expect(isAllowedWebCallbackUrl('https://app.kilo.ai')).toBe(false);
+    expect(isAllowedWebCallbackUrl('http://api.kilo.ai')).toBe(false);
     expect(isAllowedWebCallbackUrl('not-a-url')).toBe(false);
+  });
+
+  it('reports only the redirect target host, never its path or query', () => {
+    const requestUrl = new URL('https://api.kilo.ai/api/internal/user-data-exports/ready');
+
+    const crossOrigin = new Response(null, {
+      status: 302,
+      headers: { location: 'https://login.kilo.ai/auth?token=secret-value' },
+    });
+    expect(redirectTargetHost(crossOrigin, requestUrl)).toBe('login.kilo.ai');
+
+    const relative = new Response(null, { status: 308, headers: { location: '/login?next=x' } });
+    expect(redirectTargetHost(relative, requestUrl)).toBe('api.kilo.ai');
+
+    const missing = new Response(null, { status: 302 });
+    expect(redirectTargetHost(missing, requestUrl)).toBe('unknown');
   });
 });

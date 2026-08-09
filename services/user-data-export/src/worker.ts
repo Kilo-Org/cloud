@@ -8,7 +8,7 @@ import {
 import { uploadGzipStream } from './gzip';
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
-import { logExportEvent, safeError } from './observability';
+import { classifyFetchFailure, logExportEvent, safeError } from './observability';
 
 const PART_BYTES = 5 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES_PER_INVOCATION = 32 * 1024 * 1024;
@@ -585,8 +585,11 @@ async function dispatchReadyNotifications(
       });
     } catch (error) {
       // The database-backed email lease remains authoritative for later sweeps.
+      // reason distinguishes a disallowed redirect / timeout / dropped connection,
+      // which safeError alone flattens into an opaque TypeError.
       logExportEvent('warn', 'export_notification_callback_failed', {
         exportId: item.id,
+        reason: classifyFetchFailure(error),
         ...safeError(error),
       });
     }

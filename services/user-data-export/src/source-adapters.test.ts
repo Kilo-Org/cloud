@@ -17,6 +17,15 @@ describe('source adapters', () => {
     ]);
   });
 
+  it('keeps persisted adapter names unique and separate from record source labels', () => {
+    const names = createSourceAdapters(async () => []).map(adapter => adapter.name);
+
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toContain('microdollar_usage_prompts');
+    expect(names).not.toContain('microdollar_usage_metadata');
+    expect(names).not.toContain('system_prompt_prefix');
+  });
+
   it('passes the authenticated owner to the project query and maps returned titles', async () => {
     const calls: Array<{ text: string; values: unknown[] }> = [];
     const [projects] = createSourceAdapters(async (text, values) => {

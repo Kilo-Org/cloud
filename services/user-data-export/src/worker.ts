@@ -7,6 +7,7 @@ import {
 } from './databases';
 import { uploadGzipStream } from './gzip';
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
+import type { SourceAdapter } from './source-adapters';
 
 const PART_BYTES = 5 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES_PER_INVOCATION = 32 * 1024 * 1024;
@@ -43,6 +44,15 @@ export function isAllowedWebCallbackUrl(value: string): boolean {
       (url.hostname === 'app.kilo.ai' || url.hostname === 'staging-app.kilo.ai')) ||
     (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
   );
+}
+
+export function resolveSourceAdapter(
+  adapters: SourceAdapter[],
+  persistedSource: string | null
+): SourceAdapter | undefined {
+  return persistedSource === null
+    ? adapters.find(adapter => adapter.readPage)
+    : adapters.find(adapter => adapter.name === persistedSource);
 }
 
 function jsonLine(record: ExportRecord): string {
@@ -90,7 +100,7 @@ export async function processGenerateMessage(
     }
 
     const adapters = createSourceAdapters(createReplicaQuery(env.EXPORT_REPLICA_DB));
-    let adapter = adapters.find(candidate => candidate.name === job.current_source) ?? adapters[0];
+    let adapter = resolveSourceAdapter(adapters, job.current_source);
     if (!adapter || !adapter.readPage) {
       throw new Error('Export job has an invalid current source');
     }

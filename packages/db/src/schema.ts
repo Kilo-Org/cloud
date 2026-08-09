@@ -632,6 +632,7 @@ export const user_data_export_object_deletions = pgTable(
     multipart_upload_id: text(),
     reason: text().$type<'account_deletion'>().notNull().default('account_deletion'),
     attempt_count: integer().notNull().default(0),
+    available_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

@@ -225,7 +225,8 @@ export function createStateDb(binding: HyperdriveBinding) {
       const rows = await db.execute<ObjectDeletion>(sql`
         SELECT object_key, multipart_upload_id
         FROM user_data_export_object_deletions
-        ORDER BY created_at, object_key
+        WHERE available_at <= now()
+        ORDER BY available_at, created_at, object_key
         LIMIT 100
       `);
       return rows.rows;
@@ -238,7 +239,11 @@ export function createStateDb(binding: HyperdriveBinding) {
     async recordObjectDeletionFailure(objectKey: string): Promise<void> {
       await db.execute(sql`
         UPDATE user_data_export_object_deletions
-        SET attempt_count = attempt_count + 1, updated_at = now()
+        SET attempt_count = attempt_count + 1,
+          available_at = now() + make_interval(
+            secs => LEAST(3600, 30 * power(2, LEAST(attempt_count, 7)))::integer
+          ),
+          updated_at = now()
         WHERE object_key = ${objectKey}
       `);
     },

@@ -3,6 +3,7 @@ CREATE TABLE "user_data_export_object_deletions" (
 	"multipart_upload_id" text,
 	"reason" text DEFAULT 'account_deletion' NOT NULL,
 	"attempt_count" integer DEFAULT 0 NOT NULL,
+	"available_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "user_data_export_object_deletions_reason_check" CHECK ("user_data_export_object_deletions"."reason" = 'account_deletion'),

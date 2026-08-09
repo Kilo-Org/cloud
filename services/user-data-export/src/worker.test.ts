@@ -3,6 +3,7 @@ import {
   consumeDeadLetterBatch,
   deletePendingObjects,
   exportHeader,
+  resolveSourceAdapter,
   type ExportEnv,
 } from './worker';
 import type { ExportJob } from './databases';
@@ -63,6 +64,23 @@ describe('export header timestamps', () => {
 
     expect(header.requestedAt).toBe('2026-08-09T05:00:00.123Z');
     expect(header.snapshotAt).toBe('2026-08-03T00:00:00.000Z');
+  });
+});
+
+describe('source resume keys', () => {
+  const enabled = {
+    name: 'enabled',
+    readPage: async () => ({ records: [], nextCursor: null }),
+  };
+
+  it('starts at the first enabled adapter only for a null source', () => {
+    expect(
+      resolveSourceAdapter([{ name: 'disabled', disabledReason: 'missing' }, enabled], null)
+    ).toBe(enabled);
+  });
+
+  it('does not fall back when a persisted source key is unknown', () => {
+    expect(resolveSourceAdapter([enabled], 'renamed-source')).toBeUndefined();
   });
 });
 

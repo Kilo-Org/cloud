@@ -136,11 +136,12 @@ export function DataExportsClient() {
   const activeExportCopy = activeExport
     ? USER_EXPORT_STATUS_COPY[getDisplayStatus(activeExport)]
     : null;
+  // TEMPORARY: pre-launch testing only. The readyExport gate is dropped so a new
+  // export can be requested while a prior one is still downloadable; restore
+  // `|| Boolean(readyExport)` before going live (pairs with the temporary 5-minute
+  // server throttle in user-exports-router.ts).
   const requestDisabled =
-    requestMutation.isPending ||
-    listQuery.isRefetching ||
-    Boolean(activeExport) ||
-    Boolean(readyExport);
+    requestMutation.isPending || listQuery.isRefetching || Boolean(activeExport);
 
   return (
     <div className="flex flex-col gap-6">

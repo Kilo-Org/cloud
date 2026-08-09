@@ -13,10 +13,6 @@ function downloadExpiration(objectExpiresAt: string, now: number = Date.now()) {
   return { expiresIn, expiresAt: new Date(now + expiresIn * 1000).toISOString() };
 }
 
-async function getInternalApiSecret(secret: ExportEnv['INTERNAL_API_SECRET']): Promise<string> {
-  return typeof secret === 'string' ? secret : secret.get();
-}
-
 async function getSecret(secret: string | { get(): Promise<string> }): Promise<string> {
   return typeof secret === 'string' ? secret : secret.get();
 }
@@ -27,7 +23,7 @@ async function authorized(
 ): Promise<boolean> {
   const received = request.headers.get('x-internal-api-key');
   if (!received) return false;
-  const expectedValue = await getInternalApiSecret(expected);
+  const expectedValue = await getSecret(expected);
   const encoder = new TextEncoder();
   const [left, right] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(received)),

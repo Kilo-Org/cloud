@@ -38,6 +38,7 @@ function formatExportTimestamp(isoTimestamp: string): string {
 function triggerBrowserDownload(url: string) {
   const anchor = document.createElement('a');
   anchor.href = url;
+  anchor.download = 'kilo-data-export.jsonl.gz';
   anchor.rel = 'noopener noreferrer';
   document.body.appendChild(anchor);
   anchor.click();

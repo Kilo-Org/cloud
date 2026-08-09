@@ -226,35 +226,6 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
   }
 }
 
-export function injectReasoningIntoContent(request: GatewayRequest) {
-  if (request.kind !== 'chat_completions') {
-    return;
-  }
-  for (const message of request.body.messages) {
-    if (message.role !== 'assistant') {
-      continue;
-    }
-
-    const reasoning =
-      'reasoning' in message && typeof message.reasoning === 'string'
-        ? message.reasoning
-        : 'reasoning_content' in message && typeof message.reasoning_content === 'string'
-          ? message.reasoning_content
-          : '';
-
-    if (reasoning) {
-      if (Array.isArray(message.content)) {
-        message.content.splice(0, 0, { type: 'text', text: `<think>${reasoning}</think>` });
-      } else {
-        message.content = `<think>${reasoning}</think>${message.content}`;
-      }
-      if ('reasoning' in message) delete message.reasoning;
-      if ('reasoning_content' in message) delete message.reasoning_content;
-      if ('reasoning_details' in message) delete message.reasoning_details;
-    }
-  }
-}
-
 export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletionRequest) {
   const body = request as OpenCodeSpecificProperties;
   delete body.description;

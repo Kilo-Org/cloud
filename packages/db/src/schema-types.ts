@@ -1915,15 +1915,6 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
-export const CustomLlmCompressionSchema = z.object({
-  enabled: z.literal(true),
-  base_url: z.url().optional(),
-  api_key: z.string().optional(),
-  model_alias: z.string(),
-});
-
-export type CustomLlmCompression = z.infer<typeof CustomLlmCompressionSchema>;
-
 const CustomLlmPropertyPathSchema = z
   .string()
   .min(1)
@@ -1942,12 +1933,10 @@ export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
   add_cache_breakpoints: z.boolean().optional(),
-  inject_reasoning_into_content: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  compression: CustomLlmCompressionSchema.optional(),
   thought_signature_mapping: CustomLlmPropertyPathSchema.optional(),
   thought_content_mapping: CustomLlmPropertyPathSchema.optional(),
 });

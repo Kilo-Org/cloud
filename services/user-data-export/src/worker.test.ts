@@ -7,6 +7,7 @@ import {
   exportArtifact,
   handleGenerationFailure,
   processScheduledExportWork,
+  persistCompletedExport,
   recoverInterruptedMultipartUpload,
   resolveSourceAdapter,
   TerminalExportError,
@@ -254,6 +255,26 @@ describe('interrupted multipart recovery', () => {
   });
 });
 
+describe('completed export persistence', () => {
+  it('accepts a ready row after the completion response is lost', async () => {
+    await expect(
+      persistCompletedExport({
+        complete: vi.fn().mockRejectedValue(new Error('database response lost')),
+        completedObjectMatches: vi.fn().mockResolvedValue(true),
+      })
+    ).resolves.toBe('already_completed');
+  });
+
+  it('rethrows an ambiguous completion when the ready object does not match', async () => {
+    await expect(
+      persistCompletedExport({
+        complete: vi.fn().mockRejectedValue(new Error('database unavailable')),
+        completedObjectMatches: vi.fn().mockResolvedValue(false),
+      })
+    ).rejects.toThrow('database unavailable');
+  });
+});
+
 describe('account-deletion object cleanup', () => {
   it('removes a tombstone only after R2 deletion succeeds', async () => {
     const state = {
@@ -390,6 +411,33 @@ describe('scheduled export maintenance isolation', () => {
     expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-id');
     expect(state.recordOutboxFailure).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('clears a failed multipart reference when the upload is already missing', async () => {
+    const state = {
+      expiredObjects: vi.fn().mockResolvedValue([]),
+      markExpired: vi.fn(),
+      failedMultipartUploads: vi
+        .fn()
+        .mockResolvedValue([{ id: 'failed-id', multipart_upload_id: 'upload-id' }]),
+      clearMultipartUpload: vi.fn(),
+      pendingOutbox: vi.fn().mockResolvedValue([]),
+      markOutboxSent: vi.fn(),
+      recordOutboxFailure: vi.fn(),
+    };
+    const env = {
+      EXPORT_BUCKET: {
+        delete: vi.fn(),
+        resumeMultipartUpload: vi.fn().mockReturnValue({
+          abort: vi.fn().mockRejectedValue({ name: 'NoSuchUpload' }),
+        }),
+      },
+      EXPORT_QUEUE: { send: vi.fn() },
+    };
+
+    await processScheduledExportWork(env, state);
+
+    expect(state.clearMultipartUpload).toHaveBeenCalledWith('failed-id');
   });
 
   it('continues to outbox dispatch after a failed multipart abort', async () => {

@@ -23,6 +23,7 @@ export type ExportJob = {
 type PendingNotification = { id: string };
 type StoredObject = { id: string; r2_object_key: string };
 type MultipartUpload = { id: string; multipart_upload_id: string };
+export type ExportCompletionResult = 'completed' | 'already_completed' | 'fenced';
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
 type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
 
@@ -104,17 +105,42 @@ export function createStateDb(binding: HyperdriveBinding) {
       etag: string;
       sizeBytes: number;
       rowCount: number;
-    }): Promise<boolean> {
-      const rows = await db.execute<{ id: string }>(sql`
-        UPDATE user_data_exports
-        SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
-          row_count = ${input.rowCount}, current_source = NULL, source_cursor = NULL,
-          completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
-          lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-        WHERE id = ${input.exportId} AND status = 'processing' AND lease_token = ${input.leaseToken}
-        RETURNING id
+    }): Promise<ExportCompletionResult> {
+      const rows = await db.execute<{ result: ExportCompletionResult }>(sql`
+        WITH completed AS (
+          UPDATE user_data_exports
+          SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
+            row_count = ${input.rowCount}, current_source = NULL, source_cursor = NULL,
+            completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
+            lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+          WHERE id = ${input.exportId} AND status = 'processing' AND lease_token = ${input.leaseToken}
+          RETURNING id
+        )
+        SELECT CASE
+          WHEN EXISTS (SELECT 1 FROM completed) THEN 'completed'
+          WHEN EXISTS (
+            SELECT 1 FROM user_data_exports
+            WHERE id = ${input.exportId} AND status = 'ready'
+              AND r2_object_key = ${input.objectKey} AND r2_etag = ${input.etag}
+          ) THEN 'already_completed'
+          ELSE 'fenced'
+        END AS result
       `);
-      return rows.rows.length > 0;
+      return rows.rows[0]?.result ?? 'fenced';
+    },
+    async completedObjectMatches(input: {
+      exportId: string;
+      objectKey: string;
+      etag: string;
+    }): Promise<boolean> {
+      const rows = await db.execute<{ matches: boolean }>(sql`
+        SELECT EXISTS (
+          SELECT 1 FROM user_data_exports
+          WHERE id = ${input.exportId} AND status = 'ready'
+            AND r2_object_key = ${input.objectKey} AND r2_etag = ${input.etag}
+        ) AS matches
+      `);
+      return rows.rows[0]?.matches ?? false;
     },
     async markFailed(
       exportId: string,

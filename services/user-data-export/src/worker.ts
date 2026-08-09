@@ -2,6 +2,7 @@ import { ExportQueueMessageSchema, type ExportQueueMessage } from './contracts';
 import {
   createReplicaQuery,
   createStateDb,
+  type ExportCompletionResult,
   type ExportJob,
   type HyperdriveBinding,
 } from './databases';
@@ -111,6 +112,14 @@ function isMissingMultipartUpload(error: unknown): boolean {
   return value.code === 10024 || value.name === 'NoSuchUpload';
 }
 
+async function abortMultipartUpload(upload: Pick<R2MultipartUpload, 'abort'>): Promise<void> {
+  try {
+    await upload.abort();
+  } catch (error) {
+    if (!isMissingMultipartUpload(error)) throw error;
+  }
+}
+
 export const exportArtifact = {
   contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
   contentType: 'application/gzip',
@@ -167,12 +176,19 @@ export async function recoverInterruptedMultipartUpload(input: {
   upload: Pick<R2MultipartUpload, 'abort'>;
   clear: () => Promise<boolean>;
 }): Promise<boolean> {
-  try {
-    await input.upload.abort();
-  } catch (error) {
-    if (!isMissingMultipartUpload(error)) throw error;
-  }
+  await abortMultipartUpload(input.upload);
   return input.clear();
+}
+export async function persistCompletedExport(input: {
+  complete: () => Promise<ExportCompletionResult>;
+  completedObjectMatches: () => Promise<boolean>;
+}): Promise<ExportCompletionResult> {
+  try {
+    return await input.complete();
+  } catch (error) {
+    if (await input.completedObjectMatches()) return 'already_completed';
+    throw error;
+  }
 }
 function jsonLine(record: ExportRecord): string {
   return `${JSON.stringify(record)}\n`;
@@ -221,6 +237,7 @@ export async function processGenerateMessage(
   let upload: R2MultipartUpload | undefined;
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let deadlineError: TerminalExportError | undefined;
+  let objectCompletionAttempted = false;
   let phase = 'claim';
   let activeSource = job.current_source;
 
@@ -356,22 +373,30 @@ export async function processGenerateMessage(
     const parts = await uploadParts;
     if (parts.length === 0) throw new Error('Compressed export produced no multipart data');
     if (deadlineError) throw deadlineError;
+    if (deadline) {
+      clearTimeout(deadline);
+      deadline = undefined;
+    }
     phase = 'object_finalize';
+    objectCompletionAttempted = true;
     const object = await upload.complete(
       parts.map(part => ({ partNumber: part.partNumber, etag: part.etag }))
     );
-    if (deadlineError) throw deadlineError;
     phase = 'state_update';
-    const completed = await state.complete({
-      exportId: job.id,
-      leaseToken,
-      rowCount: recordCount,
-      objectKey: key,
-      etag: object.etag,
-      sizeBytes: object.size,
+    const completion = await persistCompletedExport({
+      complete: () =>
+        state.complete({
+          exportId: job.id,
+          leaseToken,
+          rowCount: recordCount,
+          objectKey: key,
+          etag: object.etag,
+          sizeBytes: object.size,
+        }),
+      completedObjectMatches: () =>
+        state.completedObjectMatches({ exportId: job.id, objectKey: key, etag: object.etag }),
     });
-    if (!completed) {
-      await env.EXPORT_BUCKET.delete(key);
+    if (completion === 'fenced') {
       logExportEvent('warn', 'export_completion_fenced', {
         exportId: job.id,
         generation: job.dispatch_generation,
@@ -392,8 +417,19 @@ export async function processGenerateMessage(
     const failure = deadlineError ?? error;
     await writer?.abort(failure).catch(() => undefined);
     await uploadParts?.catch(() => undefined);
-    await upload?.abort().catch(() => undefined);
-    await env.EXPORT_BUCKET.delete(objectKey(job.id)).catch(() => undefined);
+    if (upload && !objectCompletionAttempted) {
+      try {
+        await abortMultipartUpload(upload);
+        await state.clearClaimedMultipartUpload({
+          exportId: job.id,
+          generation: job.dispatch_generation,
+          leaseToken,
+          multipartUploadId: upload.uploadId,
+        });
+      } catch {
+        // Preserve multipart_upload_id so reclaim or scheduled cleanup can retry the abort.
+      }
+    }
     const outcome = await handleGenerationFailure({
       error: failure,
       exportId: job.id,
@@ -508,7 +544,9 @@ export async function processScheduledExportWork(
     let stage = 'multipart_abort';
     try {
       const key = objectKey(item.id);
-      await env.EXPORT_BUCKET.resumeMultipartUpload(key, item.multipart_upload_id).abort();
+      await abortMultipartUpload(
+        env.EXPORT_BUCKET.resumeMultipartUpload(key, item.multipart_upload_id)
+      );
       stage = 'state_update';
       await state.clearMultipartUpload(item.id);
       logExportEvent('info', 'failed_export_multipart_deleted', { exportId: item.id });

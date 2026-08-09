@@ -246,6 +246,7 @@ export async function consumeDeadLetterBatch(
 export async function reconcile(env: ExportEnv): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
   await state.reconcile();
+  await deletePendingObjects(env.EXPORT_BUCKET, state);
   for (const item of await state.expiredObjects()) {
     await env.EXPORT_BUCKET.delete(item.r2_object_key);
     await state.markExpired(item.id);
@@ -265,6 +266,23 @@ export async function reconcile(env: ExportEnv): Promise<void> {
     await state.markOutboxSent(item.id);
   }
   await dispatchReadyNotifications(env, state);
+}
+
+export async function deletePendingObjects(
+  bucket: Pick<R2Bucket, 'delete'>,
+  state: Pick<
+    ReturnType<typeof createStateDb>,
+    'pendingObjectDeletions' | 'completeObjectDeletion' | 'recordObjectDeletionFailure'
+  >
+): Promise<void> {
+  for (const item of await state.pendingObjectDeletions()) {
+    try {
+      await bucket.delete(item.object_key);
+      await state.completeObjectDeletion(item.object_key);
+    } catch {
+      await state.recordObjectDeletionFailure(item.object_key);
+    }
+  }
 }
 
 async function dispatchReadyNotifications(

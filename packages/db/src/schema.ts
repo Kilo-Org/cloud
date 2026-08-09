@@ -621,6 +621,34 @@ export const user_data_exports = pgTable(
 export type UserDataExport = typeof user_data_exports.$inferSelect;
 export type NewUserDataExport = typeof user_data_exports.$inferInsert;
 
+/**
+ * R2 deletion work that must survive deletion of the owning user/export rows.
+ * Object keys contain random export IDs, not user identifiers.
+ */
+export const user_data_export_object_deletions = pgTable(
+  'user_data_export_object_deletions',
+  {
+    object_key: text().primaryKey().notNull(),
+    reason: text().$type<'account_deletion'>().notNull().default('account_deletion'),
+    attempt_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'user_data_export_object_deletions_reason_check',
+      sql`${table.reason} = 'account_deletion'`
+    ),
+    check(
+      'user_data_export_object_deletions_attempt_count_nonnegative',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
 export const user_data_export_parts = pgTable(
   'user_data_export_parts',
   {

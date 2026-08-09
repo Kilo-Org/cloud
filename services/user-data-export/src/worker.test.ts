@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { consumeDeadLetterBatch, type ExportEnv } from './worker';
+import { consumeDeadLetterBatch, deletePendingObjects, type ExportEnv } from './worker';
 
 function queueMessage(body: unknown) {
   return {
@@ -33,5 +33,36 @@ describe('dead-letter queue consumption', () => {
 
     expect(state.markFailed).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledOnce();
+  });
+});
+
+describe('account-deletion object cleanup', () => {
+  it('removes a tombstone only after R2 deletion succeeds', async () => {
+    const state = {
+      pendingObjectDeletions: vi.fn().mockResolvedValue([{ object_key: 'exports/id/file.gz' }]),
+      completeObjectDeletion: vi.fn(),
+      recordObjectDeletionFailure: vi.fn(),
+    };
+    const bucket = { delete: vi.fn() };
+
+    await deletePendingObjects(bucket, state);
+
+    expect(bucket.delete).toHaveBeenCalledWith('exports/id/file.gz');
+    expect(state.completeObjectDeletion).toHaveBeenCalledWith('exports/id/file.gz');
+    expect(state.recordObjectDeletionFailure).not.toHaveBeenCalled();
+  });
+
+  it('retains the tombstone and records a failed R2 deletion attempt', async () => {
+    const state = {
+      pendingObjectDeletions: vi.fn().mockResolvedValue([{ object_key: 'exports/id/file.gz' }]),
+      completeObjectDeletion: vi.fn(),
+      recordObjectDeletionFailure: vi.fn(),
+    };
+    const bucket = { delete: vi.fn().mockRejectedValue(new Error('R2 unavailable')) };
+
+    await deletePendingObjects(bucket, state);
+
+    expect(state.completeObjectDeletion).not.toHaveBeenCalled();
+    expect(state.recordObjectDeletionFailure).toHaveBeenCalledWith('exports/id/file.gz');
   });
 });

@@ -1,3 +1,13 @@
+CREATE TABLE "user_data_export_object_deletions" (
+	"object_key" text PRIMARY KEY NOT NULL,
+	"reason" text DEFAULT 'account_deletion' NOT NULL,
+	"attempt_count" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "user_data_export_object_deletions_reason_check" CHECK ("user_data_export_object_deletions"."reason" = 'account_deletion'),
+	CONSTRAINT "user_data_export_object_deletions_attempt_count_nonnegative" CHECK ("user_data_export_object_deletions"."attempt_count" >= 0)
+);
+--> statement-breakpoint
 CREATE TABLE "user_data_export_outbox" (
 	"id" uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
 	"export_id" uuid NOT NULL,

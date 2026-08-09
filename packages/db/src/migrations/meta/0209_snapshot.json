@@ -1,5 +1,5 @@
 {
-  "id": "bb59e0be-c68c-46a0-bd44-a83ce5266e6d",
+  "id": "87b9a0f8-ad73-4809-8a51-41ea2f9bf164",
   "prevId": "bb8cf2f4-68eb-423d-9bda-06d43e144f68",
   "version": "7",
   "dialect": "postgresql",
@@ -35361,6 +35361,62 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_data_export_object_deletions": {
+      "name": "user_data_export_object_deletions",
+      "schema": "",
+      "columns": {
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'account_deletion'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "user_data_export_object_deletions_reason_check": {
+          "name": "user_data_export_object_deletions_reason_check",
+          "value": "\"user_data_export_object_deletions\".\"reason\" = 'account_deletion'"
+        },
+        "user_data_export_object_deletions_attempt_count_nonnegative": {
+          "name": "user_data_export_object_deletions_attempt_count_nonnegative",
+          "value": "\"user_data_export_object_deletions\".\"attempt_count\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.user_data_export_outbox": {

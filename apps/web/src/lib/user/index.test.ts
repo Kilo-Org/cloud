@@ -64,6 +64,7 @@ import {
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_notification_preferences,
+  user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
   agent_environment_profiles,
@@ -834,6 +835,7 @@ describe('User', () => {
         .values({
           kilo_user_id: user.id,
           snapshot_at: new Date().toISOString(),
+          r2_object_key: `exports/${crypto.randomUUID()}/kilo-data-export.jsonl.gz`,
         })
         .returning();
       if (!exportJob) throw new Error('Failed to create user data export');
@@ -851,6 +853,7 @@ describe('User', () => {
       });
 
       await softDeleteUser(user.id);
+      if (!exportJob.r2_object_key) throw new Error('Export object key was not created');
 
       expect(
         await db.select().from(user_data_exports).where(eq(user_data_exports.id, exportJob.id))
@@ -861,6 +864,12 @@ describe('User', () => {
           .from(user_data_export_parts)
           .where(eq(user_data_export_parts.export_id, exportJob.id))
       ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_object_deletions)
+          .where(eq(user_data_export_object_deletions.object_key, exportJob.r2_object_key))
+      ).toHaveLength(1);
       expect(
         await db
           .select()

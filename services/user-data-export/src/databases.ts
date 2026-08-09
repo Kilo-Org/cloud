@@ -25,6 +25,7 @@ type PendingNotification = { id: string };
 type StoredObject = { id: string; r2_object_key: string };
 type MultipartUpload = { id: string; multipart_upload_id: string };
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
+type ObjectDeletion = { object_key: string };
 
 export function createStateDb(binding: HyperdriveBinding) {
   const db = getWorkerDb(binding.connectionString, { statement_timeout: 30_000 });
@@ -206,6 +207,27 @@ export function createStateDb(binding: HyperdriveBinding) {
         UPDATE user_data_exports
         SET multipart_upload_id = NULL, updated_at = now()
         WHERE id = ${exportId} AND status = 'failed'
+      `);
+    },
+    async pendingObjectDeletions(): Promise<ObjectDeletion[]> {
+      const rows = await db.execute<ObjectDeletion>(sql`
+        SELECT object_key
+        FROM user_data_export_object_deletions
+        ORDER BY created_at, object_key
+        LIMIT 100
+      `);
+      return rows.rows;
+    },
+    async completeObjectDeletion(objectKey: string): Promise<void> {
+      await db.execute(sql`
+        DELETE FROM user_data_export_object_deletions WHERE object_key = ${objectKey}
+      `);
+    },
+    async recordObjectDeletionFailure(objectKey: string): Promise<void> {
+      await db.execute(sql`
+        UPDATE user_data_export_object_deletions
+        SET attempt_count = attempt_count + 1, updated_at = now()
+        WHERE object_key = ${objectKey}
       `);
     },
     async parts(exportId: string): Promise<Part[]> {

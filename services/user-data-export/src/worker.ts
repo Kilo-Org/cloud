@@ -49,8 +49,7 @@ export function isAllowedWebCallbackUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return (
-      (url.protocol === 'https:' &&
-        (url.hostname === 'app.kilo.ai' || url.hostname === 'staging-app.kilo.ai')) ||
+      (url.protocol === 'https:' && url.hostname === 'api.kilo.ai') ||
       (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
     );
   } catch {
@@ -557,6 +556,21 @@ export async function deletePendingObjects(
   }
 }
 
+/**
+ * Extract only the host of a redirect target for diagnostics. Never returns the
+ * path or query (which could carry tokens), and never causes the redirect to be
+ * followed.
+ */
+export function redirectTargetHost(response: Response, requestUrl: URL): string {
+  const location = response.headers.get('location');
+  if (!location) return 'unknown';
+  try {
+    return new URL(location, requestUrl).host;
+  } catch {
+    return 'unparseable';
+  }
+}
+
 async function dispatchReadyNotifications(
   env: ExportEnv,
   state: ReturnType<typeof createStateDb>
@@ -567,11 +581,16 @@ async function dispatchReadyNotifications(
     return;
   }
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
+  const callbackUrl = new URL('/api/internal/user-data-exports/ready', baseUrl);
   for (const item of await state.pendingNotifications()) {
     try {
-      const response = await fetch(new URL('/api/internal/user-data-exports/ready', baseUrl), {
+      // redirect: 'manual' is fail-closed — we never follow a redirect and therefore
+      // never re-send x-internal-api-key to the redirect target. We still capture the
+      // redirect's target host (no path/query, so no secrets) to diagnose an
+      // unexpected 3xx on the api.kilo.ai callback path.
+      const response = await fetch(callbackUrl, {
         method: 'POST',
-        redirect: 'error',
+        redirect: 'manual',
         headers: {
           'content-type': 'application/json',
           'x-internal-api-key': env.INTERNAL_API_SECRET,
@@ -579,6 +598,15 @@ async function dispatchReadyNotifications(
         body: JSON.stringify({ exportId: item.id }),
         signal: AbortSignal.timeout(10_000),
       });
+      if (response.status >= 300 && response.status < 400) {
+        logExportEvent('warn', 'export_notification_callback_failed', {
+          exportId: item.id,
+          reason: 'redirect',
+          status: response.status,
+          redirectHost: redirectTargetHost(response, callbackUrl),
+        });
+        continue;
+      }
       logExportEvent(response.ok ? 'info' : 'warn', 'export_notification_callback_completed', {
         exportId: item.id,
         status: response.status,

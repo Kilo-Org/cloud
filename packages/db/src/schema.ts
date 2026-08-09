@@ -630,17 +630,12 @@ export const user_data_export_parts = pgTable(
     part_number: integer().notNull(),
     etag: text().notNull(),
     size_bytes: bigint({ mode: 'number' }).notNull(),
-    source: text().notNull(),
-    start_cursor: jsonb().$type<Record<string, unknown> | null>(),
-    end_cursor: jsonb().$type<Record<string, unknown> | null>(),
-    row_count: bigint({ mode: 'number' }).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
     primaryKey({ columns: [table.export_id, table.part_number] }),
     check('user_data_export_parts_part_number_positive', sql`${table.part_number} > 0`),
     check('user_data_export_parts_size_bytes_nonnegative', sql`${table.size_bytes} >= 0`),
-    check('user_data_export_parts_row_count_nonnegative', sql`${table.row_count} >= 0`),
   ]
 );
 

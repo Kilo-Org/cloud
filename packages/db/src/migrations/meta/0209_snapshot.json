@@ -1,5 +1,5 @@
 {
-  "id": "3ab21662-14a0-4f4c-b56e-741b35787806",
+  "id": "bb59e0be-c68c-46a0-bd44-a83ce5266e6d",
   "prevId": "bb8cf2f4-68eb-423d-9bda-06d43e144f68",
   "version": "7",
   "dialect": "postgresql",
@@ -35530,30 +35530,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "start_cursor": {
-          "name": "start_cursor",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_cursor": {
-          "name": "end_cursor",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "row_count": {
-          "name": "row_count",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -35597,10 +35573,6 @@
         "user_data_export_parts_size_bytes_nonnegative": {
           "name": "user_data_export_parts_size_bytes_nonnegative",
           "value": "\"user_data_export_parts\".\"size_bytes\" >= 0"
-        },
-        "user_data_export_parts_row_count_nonnegative": {
-          "name": "user_data_export_parts_row_count_nonnegative",
-          "value": "\"user_data_export_parts\".\"row_count\" >= 0"
         }
       },
       "isRLSEnabled": false

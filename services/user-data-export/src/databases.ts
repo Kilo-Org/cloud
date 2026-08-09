@@ -53,9 +53,8 @@ export function createStateDb(binding: HyperdriveBinding) {
     async checkpoint(input: {
       exportId: string;
       leaseToken: string;
-      parts: Array<{ partNumber: number; etag: string; sizeBytes: number; rowCount: number }>;
+      parts: Array<{ partNumber: number; etag: string; sizeBytes: number }>;
       rowCount: number;
-      source: string;
       cursor: ExportCursor | null;
       nextSource: string | null;
       nextGeneration: number;
@@ -71,11 +70,10 @@ export function createStateDb(binding: HyperdriveBinding) {
           FOR UPDATE
         ), input_parts AS (
           SELECT * FROM jsonb_to_recordset(${JSON.stringify(input.parts)}::jsonb)
-            AS part("partNumber" integer, etag text, "sizeBytes" bigint, "rowCount" integer)
+            AS part("partNumber" integer, etag text, "sizeBytes" bigint)
         ), inserted_parts AS (
-          INSERT INTO user_data_export_parts (export_id, part_number, etag, size_bytes, source, end_cursor, row_count)
-          SELECT candidate.id, part."partNumber", part.etag, part."sizeBytes", ${input.source},
-            ${JSON.stringify(input.cursor)}::jsonb, part."rowCount"
+          INSERT INTO user_data_export_parts (export_id, part_number, etag, size_bytes)
+          SELECT candidate.id, part."partNumber", part.etag, part."sizeBytes"
           FROM candidate CROSS JOIN input_parts AS part
           RETURNING export_id
         ), updated AS (
@@ -83,7 +81,7 @@ export function createStateDb(binding: HyperdriveBinding) {
           SET source_cursor = ${JSON.stringify(input.cursor)}::jsonb,
             current_source = ${input.nextSource}, next_part_number = ${nextPartNumber + 1},
             multipart_upload_id = ${input.multipartUploadId}, dispatch_generation = ${input.nextGeneration},
-            row_count = exports.row_count + ${input.rowCount}, attempt_count = 0,
+            row_count = exports.row_count + ${input.rowCount},
             lease_token = NULL, lease_expires_at = NULL, updated_at = now()
           FROM (SELECT DISTINCT export_id FROM inserted_parts) AS inserted
           WHERE exports.id = inserted.export_id AND exports.lease_token = ${input.leaseToken}
@@ -112,11 +110,16 @@ export function createStateDb(binding: HyperdriveBinding) {
       `);
       return rows.rows.length > 0;
     },
-    async markFailed(exportId: string): Promise<void> {
+    async markFailed(
+      exportId: string,
+      generation: number,
+      failureCode = 'queue_delivery_exhausted'
+    ): Promise<void> {
       await db.execute(sql`
-        UPDATE user_data_exports SET status = 'failed', failure_code = 'queue_delivery_exhausted',
+        UPDATE user_data_exports SET status = 'failed', failure_code = ${failureCode},
           lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-        WHERE id = ${exportId} AND status IN ('queued', 'processing', 'finalizing')
+        WHERE id = ${exportId} AND dispatch_generation = ${generation}
+          AND status IN ('queued', 'processing', 'finalizing')
       `);
     },
     async pendingOutbox(): Promise<ExportQueueRow[]> {
@@ -160,8 +163,7 @@ export function createStateDb(binding: HyperdriveBinding) {
         WITH stale AS (
           UPDATE user_data_exports
           SET status = 'queued', lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-          WHERE status IN ('processing', 'finalizing') AND attempt_count < 5
-            AND lease_expires_at < now()
+          WHERE status IN ('processing', 'finalizing') AND lease_expires_at < now()
           RETURNING id, dispatch_generation
         )
         UPDATE user_data_export_outbox AS outbox
@@ -170,12 +172,6 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE outbox.export_id = stale.id
           AND outbox.generation = stale.dispatch_generation
           AND outbox.operation = 'generate'
-      `);
-      await db.execute(sql`
-        UPDATE user_data_exports SET status = 'failed', failure_code = 'queue_delivery_exhausted',
-          lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-        WHERE status IN ('queued', 'processing', 'finalizing') AND attempt_count >= 5
-          AND (lease_expires_at IS NULL OR lease_expires_at < now())
       `);
     },
     async expiredObjects(): Promise<StoredObject[]> {

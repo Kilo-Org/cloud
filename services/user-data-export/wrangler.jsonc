@@ -28,6 +28,12 @@
         "max_concurrency": 1,
         "dead_letter_queue": "user-data-export-local-dlq",
       },
+      {
+        "queue": "user-data-export-local-dlq",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_concurrency": 1,
+      },
     ],
   },
   "r2_buckets": [{ "binding": "EXPORT_BUCKET", "bucket_name": "user-data-export-local" }],

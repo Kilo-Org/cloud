@@ -89,9 +89,12 @@ export function DataExportsClient() {
       onSuccess: result => {
         triggerBrowserDownload(result.downloadUrl);
       },
-      onError: () => {
+      onError: error => {
         toast.error('Download could not be started', {
-          description: 'Try again. If the export has expired, request a new one.',
+          description:
+            error.data?.code === 'PRECONDITION_FAILED'
+              ? 'Download signing is temporarily unavailable. Try again later.'
+              : 'Try again. If the export has expired, request a new one.',
         });
       },
     })

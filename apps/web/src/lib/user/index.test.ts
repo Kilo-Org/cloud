@@ -843,8 +843,6 @@ describe('User', () => {
         part_number: 1,
         etag: 'part-etag',
         size_bytes: 1,
-        source: 'app_builder_projects',
-        row_count: 0,
       });
       await db.insert(user_data_export_outbox).values({
         export_id: exportJob.id,

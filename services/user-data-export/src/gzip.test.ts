@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { gzipMember, gzipPaddingMember, uploadGzipStream } from './gzip';
-import { exportArtifact } from './worker';
+import { exportArtifact, isAllowedWebCallbackUrl } from './worker';
 
 describe('gzip export members', () => {
   it('concatenates independently compressed JSONL members into one gzip stream', async () => {
@@ -57,5 +57,14 @@ describe('gzip export members', () => {
       partBytes: 5 * 1024 * 1024,
     });
     expect(exportArtifact).not.toHaveProperty('contentEncoding');
+  });
+
+  it('allows HTTPS and loopback HTTP notification callbacks only', () => {
+    expect(isAllowedWebCallbackUrl('https://app.kilo.ai')).toBe(true);
+    expect(isAllowedWebCallbackUrl('https://staging-app.kilo.ai')).toBe(true);
+    expect(isAllowedWebCallbackUrl('http://localhost:3000')).toBe(true);
+    expect(isAllowedWebCallbackUrl('http://127.0.0.1:3000')).toBe(true);
+    expect(isAllowedWebCallbackUrl('https://example.com')).toBe(false);
+    expect(isAllowedWebCallbackUrl('http://app.kilo.ai')).toBe(false);
   });
 });

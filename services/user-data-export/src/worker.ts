@@ -36,6 +36,15 @@ export const exportArtifact = {
   partBytes: PART_BYTES,
 } as const;
 
+export function isAllowedWebCallbackUrl(value: string): boolean {
+  const url = new URL(value);
+  return (
+    (url.protocol === 'https:' &&
+      (url.hostname === 'app.kilo.ai' || url.hostname === 'staging-app.kilo.ai')) ||
+    (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
+  );
+}
+
 function jsonLine(record: ExportRecord): string {
   return `${JSON.stringify(record)}\n`;
 }
@@ -112,7 +121,6 @@ export async function processGenerateMessage(
     let cursor = parseCursor(job.source_cursor);
     let recordCount = 0;
     let nextSource: string | null = adapter.name;
-    let partSource = adapter.name;
 
     while (
       nextSource &&
@@ -146,7 +154,6 @@ export async function processGenerateMessage(
         break;
       }
       adapter = nextAdapter;
-      partSource = partSource === adapter.name ? partSource : 'multiple';
       cursor = null;
       nextSource = adapter.name;
     }
@@ -157,12 +164,8 @@ export async function processGenerateMessage(
     const checkpointed = await state.checkpoint({
       exportId: job.id,
       leaseToken,
-      parts: parts.map((part, index) => ({
-        ...part,
-        rowCount: index === parts.length - 1 ? recordCount : 0,
-      })),
+      parts,
       rowCount: recordCount,
-      source: partSource,
       cursor,
       nextSource,
       nextGeneration: job.dispatch_generation + 1,
@@ -226,6 +229,20 @@ export async function consumeExportBatch(
   }
 }
 
+export async function consumeDeadLetterBatch(
+  batch: { messages: ReadonlyArray<Pick<Message<unknown>, 'body' | 'ack'>> },
+  env: ExportEnv,
+  state: Pick<ReturnType<typeof createStateDb>, 'markFailed'> = createStateDb(env.PRIMARY_STATE_DB)
+): Promise<void> {
+  for (const message of batch.messages) {
+    const parsed = ExportQueueMessageSchema.safeParse(message.body);
+    if (parsed.success) {
+      await state.markFailed(parsed.data.exportId, parsed.data.generation);
+    }
+    message.ack();
+  }
+}
+
 export async function reconcile(env: ExportEnv): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
   await state.reconcile();
@@ -256,10 +273,7 @@ async function dispatchReadyNotifications(
 ): Promise<void> {
   if (!env.USER_DATA_EXPORT_WEB_URL) return;
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
-  const isLocal =
-    baseUrl.protocol === 'http:' &&
-    (baseUrl.hostname === 'localhost' || baseUrl.hostname === '127.0.0.1');
-  if (!isLocal) return;
+  if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) return;
   const internalApiSecret =
     typeof env.INTERNAL_API_SECRET === 'string'
       ? env.INTERNAL_API_SECRET

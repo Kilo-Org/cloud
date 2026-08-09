@@ -19,3 +19,20 @@ describe('download URL expiration', () => {
     expect(__test__.downloadExpiration('2026-08-09T02:59:59.000Z', now)).toBeNull();
   });
 });
+
+describe('internal request parsing', () => {
+  it('rejects chunked bodies larger than 16 KiB without relying on content-length', async () => {
+    const request = new Request('https://worker.local/internal', {
+      method: 'POST',
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('x'.repeat(16_385)));
+          controller.close();
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+
+    await expect(__test__.readJson(request)).rejects.toThrow('Request body is too large');
+  });
+});

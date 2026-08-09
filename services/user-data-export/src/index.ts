@@ -4,6 +4,7 @@ import { createR2Client } from '@kilocode/worker-utils/r2-client';
 
 const DOWNLOAD_EXPIRES_SECONDS = 300;
 const DOWNLOAD_CONTENT_DISPOSITION = 'attachment; filename="kilo-data-export.jsonl.gz"';
+const MAX_INTERNAL_REQUEST_BYTES = 16_384;
 
 function downloadExpiration(objectExpiresAt: string, now: number = Date.now()) {
   const remainingSeconds = Math.floor((new Date(objectExpiresAt).getTime() - now) / 1000);
@@ -37,8 +38,30 @@ async function authorized(
 
 async function readJson(request: Request): Promise<unknown> {
   const length = request.headers.get('content-length');
-  if (length && Number(length) > 16_384) throw new Error('Request body is too large');
-  return request.json<unknown>();
+  if (length && Number(length) > MAX_INTERNAL_REQUEST_BYTES)
+    throw new Error('Request body is too large');
+  if (!request.body) return null;
+  const bodyStream = request.body as ReadableStream<Uint8Array>;
+  const reader = bodyStream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    size += result.value.byteLength;
+    if (size > MAX_INTERNAL_REQUEST_BYTES) {
+      await reader.cancel('Request body is too large');
+      throw new Error('Request body is too large');
+    }
+    chunks.push(result.value);
+  }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(body)) as unknown;
 }
 
 export default {
@@ -101,8 +124,9 @@ export default {
     }
   },
   async queue(batch: MessageBatch<unknown>, env: ExportEnv): Promise<void> {
-    const { consumeExportBatch } = await import('./worker');
-    await consumeExportBatch(batch, env);
+    const { consumeDeadLetterBatch, consumeExportBatch } = await import('./worker');
+    if (batch.queue.endsWith('-dlq')) await consumeDeadLetterBatch(batch, env);
+    else await consumeExportBatch(batch, env);
   },
   async scheduled(_controller: ScheduledController, env: ExportEnv): Promise<void> {
     const { reconcile } = await import('./worker');
@@ -110,4 +134,4 @@ export default {
   },
 } satisfies ExportedHandler<ExportEnv>;
 
-export const __test__ = { downloadExpiration };
+export const __test__ = { downloadExpiration, readJson };

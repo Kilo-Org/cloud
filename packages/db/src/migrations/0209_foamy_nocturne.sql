@@ -19,15 +19,10 @@ CREATE TABLE "user_data_export_parts" (
 	"part_number" integer NOT NULL,
 	"etag" text NOT NULL,
 	"size_bytes" bigint NOT NULL,
-	"source" text NOT NULL,
-	"start_cursor" jsonb,
-	"end_cursor" jsonb,
-	"row_count" bigint NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "user_data_export_parts_export_id_part_number_pk" PRIMARY KEY("export_id","part_number"),
 	CONSTRAINT "user_data_export_parts_part_number_positive" CHECK ("user_data_export_parts"."part_number" > 0),
-	CONSTRAINT "user_data_export_parts_size_bytes_nonnegative" CHECK ("user_data_export_parts"."size_bytes" >= 0),
-	CONSTRAINT "user_data_export_parts_row_count_nonnegative" CHECK ("user_data_export_parts"."row_count" >= 0)
+	CONSTRAINT "user_data_export_parts_size_bytes_nonnegative" CHECK ("user_data_export_parts"."size_bytes" >= 0)
 );
 --> statement-breakpoint
 CREATE TABLE "user_data_exports" (

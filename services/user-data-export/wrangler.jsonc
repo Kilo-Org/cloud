@@ -8,6 +8,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "dev": { "port": 8818, "local_protocol": "http", "ip": "127.0.0.1" },
+  "limits": { "cpu_ms": 300000 },
   "observability": { "enabled": true, "logs": { "enabled": true, "head_sampling_rate": 1 } },
   "routes": [
     {
@@ -22,18 +23,18 @@
   },
   "triggers": { "crons": ["*/5 * * * *"] },
   "queues": {
-    "producers": [{ "binding": "EXPORT_QUEUE", "queue": "user-data-export-local" }],
+    "producers": [{ "binding": "EXPORT_QUEUE", "queue": "user-data-export" }],
     "consumers": [
       {
-        "queue": "user-data-export-local",
+        "queue": "user-data-export",
         "max_batch_size": 1,
         "max_retries": 4,
         "retry_delay": 60,
-        "max_concurrency": 1,
-        "dead_letter_queue": "user-data-export-local-dlq",
+        "max_concurrency": 5,
+        "dead_letter_queue": "user-data-export-dlq",
       },
       {
-        "queue": "user-data-export-local-dlq",
+        "queue": "user-data-export-dlq",
         "max_batch_size": 1,
         "max_batch_timeout": 5,
         "max_concurrency": 1,

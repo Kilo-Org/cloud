@@ -67,6 +67,7 @@ describe('getToolsAvailable', () => {
       getToolsAvailable(
         chatRequest({
           tools: [
+            null as never,
             { type: 'function', function: { name: '  search  ' } },
             { type: 'custom', custom: { name: 'browser' } },
             { type: 'function', function: { name: '' } },
@@ -76,19 +77,29 @@ describe('getToolsAvailable', () => {
     ).toEqual(['function:search', 'custom:browser', 'function:unknown']);
   });
 
-  test('labels responses tools and tolerates missing mcp server_label', () => {
+  test('labels responses tools and skips malformed entries', () => {
     expect(
       getToolsAvailable(
         responsesRequest({
           tools: [
+            null,
             { type: 'function', name: 'lookup' },
             { type: 'custom', name: 'browser' },
             { type: 'mcp' },
             { type: 'web_search_preview' },
+            {},
+            { type: 123 },
           ] as GatewayResponsesRequest['tools'],
         })
       )
-    ).toEqual(['function:lookup', 'custom:browser', 'mcp:unknown', 'web_search_preview']);
+    ).toEqual([
+      'function:lookup',
+      'custom:browser',
+      'mcp:unknown',
+      'web_search_preview',
+      'unknown:unknown',
+      'unknown:unknown',
+    ]);
   });
 
   test('labels messages tools', () => {

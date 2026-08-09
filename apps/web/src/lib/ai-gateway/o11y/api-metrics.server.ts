@@ -66,26 +66,34 @@ function labeledTool(kind: string, name: unknown): string {
   return trimmed ? `${kind}:${trimmed}` : `${kind}:unknown`;
 }
 
+function isObjectEntry<T>(value: T): value is T & object {
+  return typeof value === 'object' && value !== null;
+}
+
 export function getToolsAvailable(request: GatewayRequest): string[] {
   if (!Array.isArray(request.body.tools)) return [];
 
   if (request.kind === 'responses') {
-    return request.body.tools.map((tool): string => {
-      if (tool.type === 'function') return labeledTool('function', tool.name);
-      if (tool.type === 'custom') return labeledTool('custom', tool.name);
-      if (tool.type === 'mcp') return labeledTool('mcp', tool.server_label);
-      return tool.type;
+    return request.body.tools.flatMap((tool): string[] => {
+      if (!isObjectEntry(tool)) return [];
+      if (tool.type === 'function') return [labeledTool('function', tool.name)];
+      if (tool.type === 'custom') return [labeledTool('custom', tool.name)];
+      if (tool.type === 'mcp') return [labeledTool('mcp', tool.server_label)];
+      return typeof tool.type === 'string' && tool.type ? [tool.type] : ['unknown:unknown'];
     });
   }
 
   if (request.kind === 'messages') {
-    return request.body.tools.map((tool): string => labeledTool('function', tool.name));
+    return request.body.tools.flatMap((tool): string[] =>
+      isObjectEntry(tool) ? [labeledTool('function', tool.name)] : []
+    );
   }
 
-  return request.body.tools.map((tool): string => {
-    if (tool.type === 'function') return labeledTool('function', tool.function?.name);
-    if (tool.type === 'custom') return labeledTool('custom', tool.custom?.name);
-    return 'unknown:unknown';
+  return request.body.tools.flatMap((tool): string[] => {
+    if (!isObjectEntry(tool)) return [];
+    if (tool.type === 'function') return [labeledTool('function', tool.function?.name)];
+    if (tool.type === 'custom') return [labeledTool('custom', tool.custom?.name)];
+    return ['unknown:unknown'];
   });
 }
 

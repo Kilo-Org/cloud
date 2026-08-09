@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "user-data-export-local",
   "main": "src/index.ts",
-  "compatibility_date": "2026-06-10",
+  "compatibility_date": "2026-07-20",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,

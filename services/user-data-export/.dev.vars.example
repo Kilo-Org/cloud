@@ -1,0 +1,5 @@
+# @from INTERNAL_API_SECRET
+INTERNAL_API_SECRET=
+
+# @url nextjs
+USER_DATA_EXPORT_WEB_URL=http://localhost:3000

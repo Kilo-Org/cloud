@@ -22,6 +22,7 @@ const groups: ServiceGroup[] = [
     sectionBreakBefore: true,
   },
   { id: 'notifications', label: 'Notifications', alwaysOn: false },
+  { id: 'data-export', label: 'Data Export', alwaysOn: false },
   { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
@@ -81,6 +82,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
+  'user-data-export': {
+    group: 'data-export',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/user-data-export',
+  },
   // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
     group: 'auto-routing',
@@ -499,6 +505,10 @@ function workerEnvPrefix(): string[] {
   }
   if (portOffset > 0) {
     vars.push(`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=${localPostgresUrl()}`);
+    vars.push(
+      `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_PRIMARY_STATE_DB=${localPostgresUrl()}`,
+      `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_REPLICA_DB=${localPostgresUrl()}`
+    );
   }
   return vars.length > 0 ? ['env', ...vars] : [];
 }
@@ -699,6 +709,7 @@ export const services = new Map<string, ServiceDef>(serviceDefs.map(s => [s.name
 
 export const shortcuts: Record<string, string[]> = {
   app: ['nextjs'],
+  'data-export': ['nextjs', 'user-data-export'],
   'app-builder': [
     'nextjs',
     'cloud-agent-next',

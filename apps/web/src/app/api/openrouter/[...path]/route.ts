@@ -903,8 +903,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId ?? null
   );
 
-  const toolsAvailable = getToolsAvailable(requestBodyParsed);
-  const toolsUsed = getToolsUsed(requestBodyParsed);
+  let toolsAvailable: string[] = [];
+  let toolsUsed: string[] = [];
+  try {
+    toolsAvailable = getToolsAvailable(requestBodyParsed);
+    toolsUsed = getToolsUsed(requestBodyParsed);
+  } catch {
+    toolsAvailable = [];
+    toolsUsed = [];
+  }
 
   // Capture the bounded prompt for experimented requests AFTER provider
   // transforms have produced the canonical upstream body. Stored on the

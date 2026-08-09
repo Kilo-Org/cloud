@@ -101,6 +101,30 @@ function setCacheControlOnMessagesMessage(
   }
 }
 
+function setCacheControlOnMessagesSystem(
+  system: string | Anthropic.TextBlockParam[],
+  cacheControl: Anthropic.CacheControlEphemeral
+): Anthropic.TextBlockParam[] {
+  if (typeof system === 'string') {
+    return [
+      {
+        type: 'text',
+        text: system,
+        cache_control: cacheControl,
+      },
+    ];
+  }
+  const lastBlock = system.at(-1);
+  if (lastBlock) {
+    lastBlock.cache_control = cacheControl;
+  }
+  return system;
+}
+
+function isSystemOrDeveloperRole(role: string): boolean {
+  return role === 'system' || role === 'developer';
+}
+
 function isCacheableMessagesContentBlock(
   item: Anthropic.ContentBlockParam
 ): item is Exclude<
@@ -158,10 +182,10 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     request.body.messages.length > 1 &&
     !containsCacheControl(request.body.messages)
   ) {
-    const systemMessage = request.body.messages.find(msg => msg.role === 'system');
+    const systemMessage = request.body.messages.find(msg => isSystemOrDeveloperRole(msg.role));
     if (systemMessage) {
       console.debug(
-        '[addCacheBreakpoints] setting cache breakpoint on system chat completions message'
+        `[addCacheBreakpoints] setting cache breakpoint on ${systemMessage.role} chat completions message`
       );
       setCacheControlOnChatCompletionsMessage(systemMessage);
     }
@@ -181,10 +205,12 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     !containsCacheControl(request.body.input)
   ) {
     const systemMessage = request.body.input.find(
-      msg => msg.type === 'message' && msg.role === 'system'
+      msg => msg.type === 'message' && isSystemOrDeveloperRole(msg.role)
     );
-    if (systemMessage) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
+    if (systemMessage && systemMessage.type === 'message') {
+      console.debug(
+        `[addCacheBreakpoints] setting cache breakpoint on ${systemMessage.role} responses message`
+      );
       setCacheControlOnResponsesMessage(systemMessage);
     }
     const lastMessage = request.body.input.findLast(
@@ -199,14 +225,21 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'messages' &&
     request.body.messages.length > 1 &&
-    !containsCacheControl(request.body.messages)
+    !containsCacheControl(request.body.messages) &&
+    !containsCacheControl(request.body.system)
   ) {
+    const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
+    delete request.body.cache_control;
+
+    if (request.body.system) {
+      console.debug('[addCacheBreakpoints] setting cache breakpoint on messages system prompt');
+      request.body.system = setCacheControlOnMessagesSystem(request.body.system, cacheControl);
+    }
+
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
       // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
-      const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
-      delete request.body.cache_control;
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
   }
@@ -222,6 +255,9 @@ export function removeCacheBreakpoints(request: GatewayRequest) {
   } else if (request.kind === 'messages') {
     console.debug('[removeCacheBreakpoints] removing cache breakpoints from messages request');
     delete request.body.cache_control;
+    if (request.body.system) {
+      deleteCacheControl(request.body.system);
+    }
     deleteCacheControl(request.body.messages);
   }
 }

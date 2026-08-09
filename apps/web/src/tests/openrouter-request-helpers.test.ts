@@ -48,6 +48,30 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
+  test('adds a cache breakpoint to a developer message in chat completions', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'developer', content: 'Developer guidelines.' },
+          { role: 'user', content: 'Hello' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    const developerContent = request.body.messages.at(0)?.content;
+    expect(developerContent).toEqual([
+      {
+        type: 'text',
+        text: 'Developer guidelines.',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+  });
+
   test('adds a cache breakpoint to the last eligible chat completions message when there is no system message', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -165,6 +189,33 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
+  test('adds a cache breakpoint to a developer message in responses', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          { type: 'message', role: 'developer', content: 'Developer instructions.' },
+          { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hello' }] },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    const developerMessage = request.body.input.at(0);
+    expect(developerMessage).toMatchObject({ type: 'message', role: 'developer' });
+    if (!developerMessage || developerMessage.type !== 'message') return;
+    expect(developerMessage.content).toEqual([
+      {
+        type: 'input_text',
+        text: 'Developer instructions.',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+  });
+
   test('does nothing for responses requests when any cache_control is already present', () => {
     const request: GatewayRequest = {
       kind: 'responses',
@@ -205,6 +256,66 @@ describe('addCacheBreakpoints', () => {
         { type: 'input_text', text: 'Tool detail' },
       ],
     });
+  });
+
+  test('adds cache_control to the system prompt and last message of a messages request', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: 'System instructions',
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.cache_control).toBeUndefined();
+    expect(request.body.system).toEqual([
+      {
+        type: 'text',
+        text: 'System instructions',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+    ]);
+  });
+
+  test('adds cache_control to the last system block of a messages request', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: [
+          { type: 'text', text: 'Stable instructions' },
+          { type: 'text', text: 'Additional context' },
+        ],
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.system).toEqual([
+      { type: 'text', text: 'Stable instructions' },
+      {
+        type: 'text',
+        text: 'Additional context',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
   });
 
   test('adds cache_control to the last content block of a messages request', () => {
@@ -388,6 +499,13 @@ describe('removeCacheBreakpoints', () => {
         model: 'anthropic/claude-sonnet-4-5',
         max_tokens: 1024,
         cache_control: { type: 'ephemeral' },
+        system: [
+          {
+            type: 'text',
+            text: 'System instructions',
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',
@@ -408,6 +526,7 @@ describe('removeCacheBreakpoints', () => {
     removeCacheBreakpoints(request);
 
     expect(request.body.cache_control).toBeUndefined();
+    expect(containsCacheControlDeep(request.body.system)).toBe(false);
     expect(containsCacheControlDeep(request.body.messages)).toBe(false);
   });
 });

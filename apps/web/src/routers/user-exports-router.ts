@@ -73,8 +73,10 @@ export const userExportsRouter = createTRPCRouter({
           last_error_redacted AS failure_message, dispatch_generation
         FROM user_data_exports
         WHERE kilo_user_id = ${ctx.user.id}
-          AND (status IN ('queued', 'processing', 'finalizing')
-            OR (status = 'ready' AND expires_at > now()))
+          -- Only short-circuit on an in-progress export (return it instead of starting a
+          -- duplicate generation). A completed/ready export must not block requesting a
+          -- fresh one; that is governed solely by the re-request throttle below.
+          AND status IN ('queued', 'processing', 'finalizing')
         ORDER BY created_at DESC, id DESC
         LIMIT 1
       `);

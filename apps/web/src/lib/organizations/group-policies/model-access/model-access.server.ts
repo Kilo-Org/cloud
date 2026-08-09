@@ -5,6 +5,7 @@ import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
+import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -112,9 +113,16 @@ export async function getEffectiveModelDecision(
     ? new Set(policy.organizationProviderCeiling)
     : undefined;
 
+  async function lookupModelProviders(): Promise<ReadonlySet<string>> {
+    return (
+      getKiloExclusiveInferenceProviderRestriction(modelId) ??
+      (await providerLookup(normalizedModelId))
+    );
+  }
+
   async function decisionWithinOrganizationCeiling(): Promise<EffectiveModelDecision> {
     if (!organizationRoutes) return { allowed: true };
-    const modelProviders = await providerLookup(normalizedModelId);
+    const modelProviders = await lookupModelProviders();
     if (modelProviders.size === 0) {
       return { allowed: true, eligibleProviderRoutes: organizationRoutes };
     }
@@ -135,7 +143,7 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.providerAllowList.length === 0) {
     return { allowed: false, denialSource: 'no_grant' };
   }
-  const modelProviders = await providerLookup(normalizedModelId);
+  const modelProviders = await lookupModelProviders();
   if (modelProviders.size === 0) {
     return { allowed: false, denialSource: 'group_provider' };
   }

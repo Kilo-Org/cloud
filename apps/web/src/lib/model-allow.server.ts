@@ -1,4 +1,5 @@
 import 'server-only';
+import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
@@ -30,7 +31,9 @@ export function createAllowPredicateFromProviderAllowList(
     if (!providerAllowSet) {
       return true;
     }
-    const providerSlugs = await providerLookup(normalizedModelId);
+    const providerSlugs =
+      getKiloExclusiveInferenceProviderRestriction(modelId) ??
+      (await providerLookup(normalizedModelId));
     if (providerSlugs.size === 0) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));
   };

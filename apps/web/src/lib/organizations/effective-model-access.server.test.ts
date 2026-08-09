@@ -153,4 +153,89 @@ describe('effective organization model access', () => {
     );
     expect(decision).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
+
+  it('hides restricted exclusive models when every restricted provider is disabled', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['openai', 'fireworks'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const catalogLookup = async () => new Set(['fireworks', 'deepseek']);
+
+    expect(
+      await getEffectiveModelDecision(policy, 'deepseek/deepseek-v4-pro:discounted', catalogLookup)
+    ).toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
+  it('keeps restricted exclusive models when a restricted provider remains enabled', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['openai', 'deepseek'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const decision = await getEffectiveModelDecision(
+      policy,
+      'deepseek/deepseek-v4-pro:discounted',
+      async () => new Set(['fireworks'])
+    );
+
+    expect(decision.allowed).toBe(true);
+    expect([...decision.eligibleProviderRoutes!]).toEqual(['deepseek']);
+  });
+
+  it('does not apply exclusive restrictions to the unsuffixed catalog model', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['fireworks'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const catalogLookup = async () => new Set(['fireworks', 'deepseek']);
+
+    const exclusive = await getEffectiveModelDecision(
+      policy,
+      'deepseek/deepseek-v4-pro:discounted',
+      catalogLookup
+    );
+    const catalogModel = await getEffectiveModelDecision(
+      policy,
+      'deepseek/deepseek-v4-pro',
+      catalogLookup
+    );
+
+    expect(exclusive).toEqual({ allowed: false, denialSource: 'organization_provider' });
+    expect(catalogModel.allowed).toBe(true);
+    expect([...catalogModel.eligibleProviderRoutes!]).toEqual(['fireworks']);
+  });
+
+  it('still fail-opens unrestricted exclusive models without catalog metadata', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['openai'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const decision = await getEffectiveModelDecision(
+      policy,
+      'stealth/gpt-5.6-sol',
+      async () => new Set()
+    );
+
+    expect(decision.allowed).toBe(true);
+    expect([...decision.eligibleProviderRoutes!]).toEqual(['openai']);
+  });
 });

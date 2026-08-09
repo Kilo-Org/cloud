@@ -1,7 +1,6 @@
 import {
   addCacheBreakpoints,
   injectReasoningIntoContent,
-  removeCacheBreakpoints,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { CustomLlmCompression } from '@kilocode/db';
 import { api_request_compress_log, type CustomLlmApiConfig } from '@kilocode/db';
@@ -217,9 +216,6 @@ export function buildDirectProvider(
         Object.assign(context.extraHeaders, upstream.extra_headers);
       }
       context.request.body.model = upstream.internal_id;
-      if (upstream.remove_cache_breakpoints) {
-        removeCacheBreakpoints(context.request);
-      }
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
       }

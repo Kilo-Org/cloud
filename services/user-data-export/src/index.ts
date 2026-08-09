@@ -13,21 +13,13 @@ function downloadExpiration(objectExpiresAt: string, now: number = Date.now()) {
   return { expiresIn, expiresAt: new Date(now + expiresIn * 1000).toISOString() };
 }
 
-async function getSecret(secret: string | { get(): Promise<string> }): Promise<string> {
-  return typeof secret === 'string' ? secret : secret.get();
-}
-
-async function authorized(
-  request: Request,
-  expected: ExportEnv['INTERNAL_API_SECRET']
-): Promise<boolean> {
+async function authorized(request: Request, expected: string): Promise<boolean> {
   const received = request.headers.get('x-internal-api-key');
   if (!received) return false;
-  const expectedValue = await getSecret(expected);
   const encoder = new TextEncoder();
   const [left, right] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(received)),
-    crypto.subtle.digest('SHA-256', encoder.encode(expectedValue)),
+    crypto.subtle.digest('SHA-256', encoder.encode(expected)),
   ]);
   return left.byteLength === right.byteLength && crypto.subtle.timingSafeEqual(left, right);
 }
@@ -94,13 +86,9 @@ export default {
         if (!object) return Response.json({ error: 'Export not found' }, { status: 404 });
         const expiration = downloadExpiration(object.expires_at);
         if (!expiration) return Response.json({ error: 'Export not found' }, { status: 404 });
-        const [accessKeyId, secretAccessKey] = await Promise.all([
-          getSecret(env.R2_ACCESS_KEY_ID),
-          getSecret(env.R2_SECRET_ACCESS_KEY),
-        ]);
         const signer = createR2Client({
-          accessKeyId,
-          secretAccessKey,
+          accessKeyId: env.R2_ACCESS_KEY_ID,
+          secretAccessKey: env.R2_SECRET_ACCESS_KEY,
           endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
         });
         const downloadUrl = await signer.getSignedURL(

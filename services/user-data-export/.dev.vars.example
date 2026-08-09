@@ -1,5 +1,12 @@
 # @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=
 
+# Local-only placeholders. Production uses standard Worker secrets set with
+# `wrangler secret put`; never put production values in this file.
+R2_ACCESS_KEY_ID=local-test-access-key
+R2_SECRET_ACCESS_KEY=local-test-secret-key
+R2_ACCOUNT_ID=local-account
+R2_BUCKET_NAME=user-data-export-local
+
 # @url nextjs
 USER_DATA_EXPORT_WEB_URL=http://localhost:3000

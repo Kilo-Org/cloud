@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "user-data-export-local",
+  "name": "user-data-export",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-20",
   "compatibility_flags": ["nodejs_compat"],
@@ -8,13 +9,16 @@
   "preview_urls": false,
   "dev": { "port": 8818, "local_protocol": "http", "ip": "127.0.0.1" },
   "observability": { "enabled": true, "logs": { "enabled": true, "head_sampling_rate": 1 } },
+  "routes": [
+    {
+      "pattern": "user-data-export.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
   "vars": {
-    "INTERNAL_API_SECRET": "local-test-only-not-a-secret",
-    "R2_ACCESS_KEY_ID": "local-test-access-key",
-    "R2_SECRET_ACCESS_KEY": "local-test-secret-key",
-    "R2_ACCOUNT_ID": "local-account",
-    "R2_BUCKET_NAME": "user-data-export-local",
-    "USER_DATA_EXPORT_WEB_URL": "http://127.0.0.1:3000",
+    "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+    "USER_DATA_EXPORT_WEB_URL": "https://app.kilo.ai",
   },
   "triggers": { "crons": ["*/5 * * * *"] },
   "queues": {
@@ -40,7 +44,7 @@
   "hyperdrive": [
     {
       "binding": "PRIMARY_STATE_DB",
-      "id": "local-test-only-primary",
+      "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
     {

@@ -19,9 +19,9 @@ export type ExportEnv = {
   EXPORT_REPLICA_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
-  INTERNAL_API_SECRET: string | { get(): Promise<string> };
-  R2_ACCESS_KEY_ID: string | { get(): Promise<string> };
-  R2_SECRET_ACCESS_KEY: string | { get(): Promise<string> };
+  INTERNAL_API_SECRET: string;
+  R2_ACCESS_KEY_ID: string;
+  R2_SECRET_ACCESS_KEY: string;
   R2_ACCOUNT_ID: string;
   R2_BUCKET_NAME: string;
   USER_DATA_EXPORT_WEB_URL?: string;
@@ -396,11 +396,6 @@ async function dispatchReadyNotifications(
   if (!env.USER_DATA_EXPORT_WEB_URL) return;
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) return;
-  const internalApiSecret =
-    typeof env.INTERNAL_API_SECRET === 'string'
-      ? env.INTERNAL_API_SECRET
-      : await env.INTERNAL_API_SECRET.get();
-
   for (const item of await state.pendingNotifications()) {
     try {
       await fetch(new URL('/api/internal/user-data-exports/ready', baseUrl), {
@@ -408,7 +403,7 @@ async function dispatchReadyNotifications(
         redirect: 'error',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': internalApiSecret,
+          'x-internal-api-key': env.INTERNAL_API_SECRET,
         },
         body: JSON.stringify({ exportId: item.id }),
         signal: AbortSignal.timeout(10_000),

@@ -93,10 +93,10 @@ export const USER_EXPORT_STATUS_COPY: Record<
   },
   failed: {
     label: 'Failed',
-    description: 'The export could not be completed. You can request a new export.',
+    description: 'The export could not be completed. Request another export when available.',
   },
   expired: {
     label: 'Expired',
-    description: 'This export has expired. Request another export to download your data.',
+    description: 'This export has expired. Request another export when available.',
   },
 };

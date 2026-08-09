@@ -4,6 +4,10 @@ import { z } from 'zod';
 import { INTERNAL_API_SECRET, USER_DATA_EXPORT_WORKER_URL } from '@/lib/config.server';
 
 const LOCAL_EXPORT_WORKER_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const DEPLOYED_EXPORT_WORKER_HOSTS = new Set([
+  'user-data-export.kiloapps.io',
+  'user-data-export-staging.kiloapps.io',
+]);
 const REQUEST_TIMEOUT_MS = 10_000;
 
 type DispatchWorkerResponse =
@@ -24,7 +28,8 @@ function exportWorkerUrl(value: string | undefined): URL | null {
   try {
     const url = new URL(value);
     const isLocal = url.protocol === 'http:' && LOCAL_EXPORT_WORKER_HOSTS.has(url.hostname);
-    return isLocal ? url : null;
+    const isDeployed = url.protocol === 'https:' && DEPLOYED_EXPORT_WORKER_HOSTS.has(url.hostname);
+    return isLocal || isDeployed ? url : null;
   } catch {
     return null;
   }

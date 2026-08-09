@@ -70,7 +70,7 @@ export const userExportsRouter = createTRPCRouter({
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ctx.user.id}, 0))`);
       const existing = await tx.execute<UserExportRow>(sql`
         SELECT id, status, requested_at, started_at, completed_at, expires_at, size_bytes, row_count,
-          NULL::text AS failure_message, dispatch_generation
+          last_error_redacted AS failure_message, dispatch_generation
         FROM user_data_exports
         WHERE kilo_user_id = ${ctx.user.id}
           AND (status IN ('queued', 'processing', 'finalizing')
@@ -100,7 +100,7 @@ export const userExportsRouter = createTRPCRouter({
           INSERT INTO user_data_exports (kilo_user_id, snapshot_at)
           VALUES (${ctx.user.id}, ${EXPORT_DATA_CUTOFF}::timestamptz)
           RETURNING id, status, requested_at, started_at, completed_at, expires_at, size_bytes, row_count,
-            NULL::text AS failure_message, dispatch_generation
+            last_error_redacted AS failure_message, dispatch_generation
         ), outbox AS (
           INSERT INTO user_data_export_outbox (export_id, generation, operation, available_at)
           SELECT id, dispatch_generation, 'generate', now() FROM created
@@ -129,7 +129,7 @@ export const userExportsRouter = createTRPCRouter({
       : sql``;
     const { rows } = await db.execute<UserExportRow>(sql`
           SELECT id, status, requested_at, started_at, completed_at, expires_at, size_bytes, row_count,
-            NULL::text AS failure_message, dispatch_generation
+            last_error_redacted AS failure_message, dispatch_generation
       FROM user_data_exports
       WHERE kilo_user_id = ${ctx.user.id}
         ${cursorFilter}

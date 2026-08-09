@@ -49,12 +49,16 @@ function jsonLine(record: ExportRecord): string {
   return `${JSON.stringify(record)}\n`;
 }
 
-function exportHeader(job: ExportJob): string {
+function strictIsoTimestamp(value: string): string {
+  return new Date(value).toISOString();
+}
+
+export function exportHeader(job: ExportJob): string {
   return `${JSON.stringify({
     type: 'header',
     schemaVersion: 1,
     exportId: job.id,
-    requestedAt: job.snapshot_at,
+    requestedAt: strictIsoTimestamp(job.requested_at),
     generatedAt: new Date().toISOString(),
     includedSources: ['app_builder_projects', 'microdollar_usage_metadata', 'system_prompt_prefix'],
     unavailableSources: [
@@ -62,7 +66,7 @@ function exportHeader(job: ExportJob): string {
       { source: 'numbered_cli_journal', reason: 'source_not_found' },
     ],
     consistencyMode: 'membership_cutoff_with_fuzzy_mutable_values',
-    snapshotAt: job.snapshot_at,
+    snapshotAt: strictIsoTimestamp(job.snapshot_at),
   })}\n`;
 }
 
@@ -269,7 +273,7 @@ export async function reconcile(env: ExportEnv): Promise<void> {
 }
 
 export async function deletePendingObjects(
-  bucket: Pick<R2Bucket, 'delete'>,
+  bucket: Pick<R2Bucket, 'delete' | 'resumeMultipartUpload'>,
   state: Pick<
     ReturnType<typeof createStateDb>,
     'pendingObjectDeletions' | 'completeObjectDeletion' | 'recordObjectDeletionFailure'
@@ -277,6 +281,14 @@ export async function deletePendingObjects(
 ): Promise<void> {
   for (const item of await state.pendingObjectDeletions()) {
     try {
+      if (item.multipart_upload_id) {
+        try {
+          await bucket.resumeMultipartUpload(item.object_key, item.multipart_upload_id).abort();
+        } catch (error) {
+          const value = error as { code?: number; name?: string };
+          if (value.code !== 10024 && value.name !== 'NoSuchUpload') throw error;
+        }
+      }
       await bucket.delete(item.object_key);
       await state.completeObjectDeletion(item.object_key);
     } catch {

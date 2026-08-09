@@ -71,6 +71,21 @@ describe('user exports router guards and serialization', () => {
     expect(result.exports[0]?.id).toBe(row.id);
   });
 
+  it('returns redacted failure details for failed exports', async () => {
+    await db.insert(user_data_exports).values({
+      kilo_user_id: owner.id,
+      snapshot_at: new Date().toISOString(),
+      status: 'failed',
+      last_error_redacted: 'The export could not be completed after multiple attempts.',
+    });
+
+    const result = await (await createCallerForUser(owner.id)).userExports.list();
+
+    expect(result.exports[0]?.failureMessage).toBe(
+      'The export could not be completed after multiple attempts.'
+    );
+  });
+
   it('uses the fixed August 3 UTC data cutoff for new exports', async () => {
     const caller = await createCallerForUser(owner.id);
 

@@ -1,5 +1,6 @@
 CREATE TABLE "user_data_export_object_deletions" (
 	"object_key" text PRIMARY KEY NOT NULL,
+	"multipart_upload_id" text,
 	"reason" text DEFAULT 'account_deletion' NOT NULL,
 	"attempt_count" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

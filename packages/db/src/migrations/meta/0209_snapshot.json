@@ -1,5 +1,5 @@
 {
-  "id": "87b9a0f8-ad73-4809-8a51-41ea2f9bf164",
+  "id": "417cfd7d-db99-47b9-a40d-751023d20092",
   "prevId": "bb8cf2f4-68eb-423d-9bda-06d43e144f68",
   "version": "7",
   "dialect": "postgresql",
@@ -35372,6 +35372,12 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true
+        },
+        "multipart_upload_id": {
+          "name": "multipart_upload_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "reason": {
           "name": "reason",

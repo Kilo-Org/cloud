@@ -11,6 +11,7 @@ export type ExportJob = {
   kilo_user_id: string;
   status: 'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired';
   snapshot_at: string;
+  requested_at: string;
   current_source: string | null;
   source_cursor: unknown;
   multipart_upload_id: string | null;
@@ -25,7 +26,7 @@ type PendingNotification = { id: string };
 type StoredObject = { id: string; r2_object_key: string };
 type MultipartUpload = { id: string; multipart_upload_id: string };
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
-type ObjectDeletion = { object_key: string };
+type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
 
 export function createStateDb(binding: HyperdriveBinding) {
   const db = getWorkerDb(binding.connectionString, { statement_timeout: 30_000 });
@@ -46,7 +47,7 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
           AND (lease_expires_at IS NULL OR lease_expires_at < now())
-        RETURNING id, kilo_user_id, status, snapshot_at, current_source, source_cursor, multipart_upload_id,
+        RETURNING id, kilo_user_id, status, snapshot_at, requested_at, current_source, source_cursor, multipart_upload_id,
           next_part_number, dispatch_generation, lease_token, r2_object_key
       `);
       return rows.rows[0] ?? null;
@@ -82,7 +83,7 @@ export function createStateDb(binding: HyperdriveBinding) {
           SET source_cursor = ${JSON.stringify(input.cursor)}::jsonb,
             current_source = ${input.nextSource}, next_part_number = ${nextPartNumber + 1},
             multipart_upload_id = ${input.multipartUploadId}, dispatch_generation = ${input.nextGeneration},
-            row_count = exports.row_count + ${input.rowCount},
+            row_count = exports.row_count + ${input.rowCount}, attempt_count = 0,
             lease_token = NULL, lease_expires_at = NULL, updated_at = now()
           FROM (SELECT DISTINCT export_id FROM inserted_parts) AS inserted
           WHERE exports.id = inserted.export_id AND exports.lease_token = ${input.leaseToken}
@@ -105,7 +106,8 @@ export function createStateDb(binding: HyperdriveBinding) {
       const rows = await db.execute<{ id: string }>(sql`
         UPDATE user_data_exports
         SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
-          completed_at = now(), expires_at = now() + interval '7 days', lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+          completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
+          lease_token = NULL, lease_expires_at = NULL, updated_at = now()
         WHERE id = ${input.exportId} AND status = 'finalizing' AND lease_token = ${input.leaseToken}
         RETURNING id
       `);
@@ -118,6 +120,7 @@ export function createStateDb(binding: HyperdriveBinding) {
     ): Promise<void> {
       await db.execute(sql`
         UPDATE user_data_exports SET status = 'failed', failure_code = ${failureCode},
+          last_error_redacted = 'The export could not be completed after multiple attempts.',
           lease_token = NULL, lease_expires_at = NULL, updated_at = now()
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
@@ -161,10 +164,19 @@ export function createStateDb(binding: HyperdriveBinding) {
     },
     async reconcile(): Promise<void> {
       await db.execute(sql`
+        UPDATE user_data_exports
+        SET status = 'failed', failure_code = 'processing_attempts_exhausted',
+          last_error_redacted = 'The export could not be completed after multiple attempts.',
+          lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+        WHERE status IN ('processing', 'finalizing') AND attempt_count >= 5
+          AND lease_expires_at < now()
+      `);
+      await db.execute(sql`
         WITH stale AS (
           UPDATE user_data_exports
           SET status = 'queued', lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-          WHERE status IN ('processing', 'finalizing') AND lease_expires_at < now()
+          WHERE status IN ('processing', 'finalizing') AND attempt_count < 5
+            AND lease_expires_at < now()
           RETURNING id, dispatch_generation
         )
         UPDATE user_data_export_outbox AS outbox
@@ -211,7 +223,7 @@ export function createStateDb(binding: HyperdriveBinding) {
     },
     async pendingObjectDeletions(): Promise<ObjectDeletion[]> {
       const rows = await db.execute<ObjectDeletion>(sql`
-        SELECT object_key
+        SELECT object_key, multipart_upload_id
         FROM user_data_export_object_deletions
         ORDER BY created_at, object_key
         LIMIT 100

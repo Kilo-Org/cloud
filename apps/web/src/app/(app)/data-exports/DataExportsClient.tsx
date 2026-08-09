@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { AlertCircle, Download, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes } from '@/lib/kiloclaw/instance-display';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
   getDisplayStatus,
   getRefetchInterval,
@@ -64,15 +64,32 @@ function getExportDetailItems(record: UserExport, displayStatus: UserExportDispl
 
 export function DataExportsClient() {
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const listQueryKey = trpc.userExports.list.queryKey();
 
-  const listQuery = useQuery(
-    trpc.userExports.list.queryOptions(undefined, {
-      // Poll only while at least one visible export is queued or processing.
-      refetchInterval: query => getRefetchInterval(query.state.data),
-    })
-  );
+  const listQuery = useInfiniteQuery({
+    queryKey: listQueryKey,
+    queryFn: ({ pageParam }) =>
+      trpcClient.userExports.list.query(pageParam ? { cursor: pageParam } : undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    refetchInterval: query => {
+      const records = query.state.data?.pages.flatMap(page => page.exports);
+      const activeInterval = getRefetchInterval(
+        records ? { exports: records, nextCursor: null } : undefined
+      );
+      if (activeInterval !== false) return activeInterval;
+      const now = Date.now();
+      const nextExpiry = records
+        ?.map(record => (record.status === 'ready' ? record.expiresAt : null))
+        .filter((expiresAt): expiresAt is string => expiresAt !== null)
+        .map(expiresAt => Date.parse(expiresAt))
+        .filter(expiresAt => Number.isFinite(expiresAt) && expiresAt > now)
+        .sort((left, right) => left - right)[0];
+      return nextExpiry ? Math.min(2_147_483_647, Math.max(1_000, nextExpiry - now)) : false;
+    },
+  });
 
   const requestMutation = useMutation(
     trpc.userExports.request.mutationOptions({
@@ -81,6 +98,14 @@ export function DataExportsClient() {
           description: "We'll email you when it's ready to download.",
         });
         await queryClient.invalidateQueries({ queryKey: listQueryKey });
+      },
+      onError: error => {
+        toast.error('Export request failed', {
+          description:
+            error.data?.code === 'TOO_MANY_REQUESTS'
+              ? error.message
+              : 'The export could not be requested. Wait a moment and try again.',
+        });
       },
     })
   );
@@ -101,12 +126,13 @@ export function DataExportsClient() {
     })
   );
 
-  const exports = listQuery.data?.exports;
+  const exports = listQuery.data?.pages.flatMap(page => page.exports);
   const activeExport = exports?.find(record => isActiveUserExportStatus(record.status));
   const activeExportCopy = activeExport
     ? USER_EXPORT_STATUS_COPY[getDisplayStatus(activeExport)]
     : null;
-  const requestDisabled = requestMutation.isPending || Boolean(activeExport);
+  const requestDisabled =
+    requestMutation.isPending || listQuery.isRefetching || Boolean(activeExport);
 
   return (
     <div className="flex flex-col gap-6">
@@ -139,15 +165,6 @@ export function DataExportsClient() {
               An export is already {activeExportCopy.label.toLowerCase()}. You can request another
               export when it finishes.
             </p>
-          )}
-          {requestMutation.isError && (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertTitle>Export request failed</AlertTitle>
-              <AlertDescription>
-                The export could not be requested. Wait a moment and try again.
-              </AlertDescription>
-            </Alert>
           )}
         </CardContent>
       </Card>
@@ -204,9 +221,6 @@ export function DataExportsClient() {
                 <ExportHistoryRow
                   key={record.id}
                   record={record}
-                  isRetrying={requestMutation.isPending}
-                  onRetry={() => requestMutation.mutate()}
-                  isDownloadPending={downloadMutation.isPending}
                   isPreparingThisDownload={
                     downloadMutation.isPending && downloadMutation.variables?.exportId === record.id
                   }
@@ -214,6 +228,24 @@ export function DataExportsClient() {
                 />
               ))}
             </ul>
+          )}
+          {listQuery.hasNextPage && (
+            <Button
+              className="mt-4"
+              variant="outline"
+              size="sm"
+              onClick={() => void listQuery.fetchNextPage()}
+              disabled={listQuery.isFetchingNextPage}
+            >
+              {listQuery.isFetchingNextPage ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Loading more...
+                </>
+              ) : (
+                'Load more'
+              )}
+            </Button>
           )}
         </CardContent>
       </Card>
@@ -223,24 +255,13 @@ export function DataExportsClient() {
 
 type ExportHistoryRowProps = {
   record: UserExport;
-  isRetrying: boolean;
-  onRetry: () => void;
-  isDownloadPending: boolean;
   isPreparingThisDownload: boolean;
   onDownload: () => void;
 };
 
-function ExportHistoryRow({
-  record,
-  isRetrying,
-  onRetry,
-  isDownloadPending,
-  isPreparingThisDownload,
-  onDownload,
-}: ExportHistoryRowProps) {
+function ExportHistoryRow({ record, isPreparingThisDownload, onDownload }: ExportHistoryRowProps) {
   const displayStatus = getDisplayStatus(record);
   const copy = USER_EXPORT_STATUS_COPY[displayStatus];
-  const isActive = displayStatus === 'queued' || displayStatus === 'processing';
   const requestedLabel = formatExportTimestamp(record.requestedAt);
   const detailItems = getExportDetailItems(record, displayStatus);
 
@@ -251,7 +272,7 @@ function ExportHistoryRow({
           <Badge variant={STATUS_BADGE_VARIANT[displayStatus]}>{copy.label}</Badge>
           <span className="text-muted-foreground text-sm">Requested {requestedLabel}</span>
         </div>
-        <p role={isActive ? 'status' : undefined} className="text-sm">
+        <p role="status" aria-live="polite" className="text-sm">
           {copy.description}
           {displayStatus === 'failed' && record.failureMessage ? ` ${record.failureMessage}` : ''}
         </p>
@@ -264,7 +285,7 @@ function ExportHistoryRow({
           <Button
             size="sm"
             onClick={onDownload}
-            disabled={isDownloadPending}
+            disabled={isPreparingThisDownload}
             aria-label={`Download export requested ${requestedLabel}`}
           >
             {isPreparingThisDownload ? (
@@ -278,18 +299,6 @@ function ExportHistoryRow({
                 Download
               </>
             )}
-          </Button>
-        )}
-        {displayStatus === 'failed' && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onRetry}
-            disabled={isRetrying}
-            aria-label={`Retry the failed export requested ${requestedLabel}`}
-          >
-            <RefreshCw />
-            Retry export
           </Button>
         )}
       </div>

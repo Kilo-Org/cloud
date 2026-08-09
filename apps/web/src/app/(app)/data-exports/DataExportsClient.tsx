@@ -136,10 +136,9 @@ export function DataExportsClient() {
   const activeExportCopy = activeExport
     ? USER_EXPORT_STATUS_COPY[getDisplayStatus(activeExport)]
     : null;
-  // TEMPORARY: pre-launch testing only. The readyExport gate is dropped so a new
-  // export can be requested while a prior one is still downloadable; restore
-  // `|| Boolean(readyExport)` before going live (pairs with the temporary 5-minute
-  // server throttle in user-exports-router.ts).
+  // A ready/downloadable export must not block requesting a new one — only disable
+  // while a request is in flight, the list is refetching, or an export is actively
+  // generating. The re-request throttle is enforced server-side.
   const requestDisabled =
     requestMutation.isPending || listQuery.isRefetching || Boolean(activeExport);
 

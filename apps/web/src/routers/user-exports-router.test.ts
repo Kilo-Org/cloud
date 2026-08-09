@@ -126,6 +126,29 @@ describe('user exports router guards and serialization', () => {
     );
   });
 
+  it('allows a fresh request when a ready export exists but is past the throttle window', async () => {
+    const pastThrottle = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const [ready] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: owner.id,
+        snapshot_at: pastThrottle,
+        status: 'ready',
+        r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
+        size_bytes: 1,
+        requested_at: pastThrottle,
+        completed_at: pastThrottle,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .returning({ id: user_data_exports.id });
+
+    const requested = await (await createCallerForUser(owner.id)).userExports.request();
+
+    // A still-downloadable ready export must not short-circuit a new request.
+    expect(requested.id).not.toBe(ready.id);
+    expect(requested.status).toBe('queued');
+  });
+
   it('does not authorize another user or an expired export for download', async () => {
     const [ready] = await db
       .insert(user_data_exports)

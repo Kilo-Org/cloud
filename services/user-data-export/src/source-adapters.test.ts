@@ -16,6 +16,8 @@ describe('source adapters', () => {
     expect(sourceQueries.projectQuery).not.toContain('created_by_user_id');
     expect(sourceQueries.promptQuery).toContain('FROM microdollar_usage AS mu');
     expect(sourceQueries.promptQuery).toContain('mu.kilo_user_id = $1');
+    expect(sourceQueries.promptQuery).toContain('meta.id AS metadata_id');
+    expect(sourceQueries.promptQuery).toContain('meta.created_at');
   });
 
   it('reports unresolved sources as disabled without querying them', () => {
@@ -101,8 +103,10 @@ describe('source adapters', () => {
         calls.push({ text, values });
         return [
           {
-            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-            created_at: '2026-08-08T12:00:00.000000Z',
+            usage_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            usage_created_at: '2026-08-08T12:00:00.000000Z',
+            metadata_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            metadata_created_at: '2026-08-08T12:00:01.000000Z',
             user_prompt_prefix: 'User prompt',
             system_prompt_prefix: 'System prompt',
           },
@@ -127,6 +131,8 @@ describe('source adapters', () => {
     expect(page?.records).toEqual([
       {
         source: 'microdollar_usage_metadata',
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        createdAt: '2026-08-08T12:00:01.000Z',
         field: 'user_prompt_prefix',
         value: 'User prompt',
       },
@@ -136,6 +142,72 @@ describe('source adapters', () => {
         value: 'System prompt',
       },
     ]);
+  });
+
+  it('preserves a null metadata timestamp without attributing usage identity to the system lookup', async () => {
+    const prompts = requireAdapter(
+      createSourceAdapters(async () => [
+        {
+          usage_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          usage_created_at: '2026-08-08T12:00:00.000000Z',
+          metadata_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          metadata_created_at: null,
+          user_prompt_prefix: null,
+          system_prompt_prefix: null,
+        },
+      ]),
+      'microdollar_usage_prompts'
+    );
+
+    const page = await prompts.readPage?.({
+      kiloUserId: 'owner-user',
+      snapshotAt: '2026-08-08T13:00:00.000Z',
+      cursor: null,
+      limit: 100,
+    });
+
+    expect(page?.records).toEqual([
+      {
+        source: 'microdollar_usage_metadata',
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        createdAt: null,
+        field: 'user_prompt_prefix',
+        value: null,
+      },
+      {
+        source: 'system_prompt_prefix',
+        field: 'system_prompt_prefix',
+        value: null,
+      },
+    ]);
+  });
+
+  it('paginates prompts by usage identity rather than metadata provenance', async () => {
+    const prompts = requireAdapter(
+      createSourceAdapters(async () => [
+        {
+          usage_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          usage_created_at: '2026-08-08T12:00:00.000000Z',
+          metadata_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          metadata_created_at: '2026-08-08T12:05:00.000000Z',
+          user_prompt_prefix: null,
+          system_prompt_prefix: null,
+        },
+      ]),
+      'microdollar_usage_prompts'
+    );
+
+    const page = await prompts.readPage?.({
+      kiloUserId: 'owner-user',
+      snapshotAt: '2026-08-08T13:00:00.000Z',
+      cursor: null,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      createdAt: '2026-08-08T12:00:00.000000Z',
+    });
   });
 
   it('exports the matched Kilo user columns with their JSON value types', async () => {

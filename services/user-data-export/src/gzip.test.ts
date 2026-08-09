@@ -1,17 +1,15 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { gzipMember, gzipPaddingMember, uploadGzipStream } from './gzip';
+import { gzipMember, uploadGzipStream } from './gzip';
 import { exportArtifact, isAllowedWebCallbackUrl, redirectTargetHost } from './worker';
 
 describe('gzip export members', () => {
   it('concatenates independently compressed JSONL members into one gzip stream', async () => {
     const header = await gzipMember('{"type":"header"}\n');
     const record = await gzipMember('{"value":"hello"}\n');
-    const padding = await gzipPaddingMember(1024);
-    const archive = Buffer.concat([header, record, padding]);
+    const archive = Buffer.concat([header, record]);
 
     expect(gunzipSync(archive).toString()).toBe('{"type":"header"}\n{"value":"hello"}\n');
-    expect(padding.byteLength).toBe(1024);
   });
 
   it('streams a smaller final part without padding', async () => {
@@ -31,14 +29,30 @@ describe('gzip export members', () => {
     expect(parts[0]).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6, 7]));
   });
 
-  it('pads non-final output to uniform parts without decoded bytes', async () => {
-    const payload = '{"value":"hello"}\n';
-    const compressed = await gzipMember(payload);
+  it('rejects a non-final stream that cannot form a legal multipart boundary', async () => {
     const parts: Uint8Array[] = [];
-    await uploadGzipStream({
-      stream: new Blob([compressed]).stream(),
-      partBytes: 64,
-      startPartNumber: 1,
+    await expect(
+      uploadGzipStream({
+        stream: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7])]).stream(),
+        partBytes: 8,
+        startPartNumber: 2,
+        isFinal: () => false,
+        uploadPart: async (_partNumber, value) => {
+          parts.push(value.slice());
+          return { etag: `etag-${parts.length}` };
+        },
+      })
+    ).rejects.toThrow('Non-final compressed export did not fill an R2 multipart part');
+
+    expect(parts).toEqual([]);
+  });
+
+  it('uploads full non-final parts without padding', async () => {
+    const parts: Uint8Array[] = [];
+    const uploaded = await uploadGzipStream({
+      stream: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])]).stream(),
+      partBytes: 8,
+      startPartNumber: 2,
       isFinal: () => false,
       uploadPart: async (_partNumber, value) => {
         parts.push(value.slice());
@@ -46,8 +60,8 @@ describe('gzip export members', () => {
       },
     });
 
-    expect(parts.every(part => part.byteLength === 64)).toBe(true);
-    expect(gunzipSync(Buffer.concat(parts)).toString()).toBe(payload);
+    expect(uploaded).toEqual([{ partNumber: 2, etag: 'etag-1', sizeBytes: 8 }]);
+    expect(parts).toEqual([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])]);
   });
 
   it('stores a gzip archive without HTTP content encoding', () => {

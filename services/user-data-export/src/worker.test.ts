@@ -6,6 +6,7 @@ import {
   deletePendingObjects,
   dispatchContinuation,
   exportHeader,
+  hasProcessingTimeRemaining,
   processScheduledExportWork,
   resolveSourceAdapter,
   type ExportEnv,
@@ -141,6 +142,15 @@ describe('source resume keys', () => {
 
   it('does not fall back when a persisted source key is unknown', () => {
     expect(resolveSourceAdapter([enabled], 'renamed-source')).toBeUndefined();
+  });
+});
+
+describe('generation processing budget', () => {
+  it('continues until the ten-minute safety budget is exhausted', () => {
+    const startedAt = Date.UTC(2026, 7, 9, 20, 0, 0);
+
+    expect(hasProcessingTimeRemaining(startedAt, startedAt + 10 * 60 * 1000 - 1)).toBe(true);
+    expect(hasProcessingTimeRemaining(startedAt, startedAt + 10 * 60 * 1000)).toBe(false);
   });
 });
 

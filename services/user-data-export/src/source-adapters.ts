@@ -4,6 +4,8 @@ export type ExportRecord = {
   source: string;
   field: string;
   value: string | number | boolean | null;
+  id?: string;
+  createdAt?: string | null;
 };
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
@@ -29,8 +31,10 @@ WHERE owned_by_user_id = $1
 ORDER BY created_at, id
 LIMIT $5`;
 
-const promptQuery = `SELECT mu.id,
-  to_char(mu.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+const promptQuery = `SELECT mu.id AS usage_id,
+  to_char(mu.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS usage_created_at,
+  meta.id AS metadata_id,
+  to_char(meta.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS metadata_created_at,
   meta.user_prompt_prefix, spp.system_prompt_prefix
 FROM microdollar_usage AS mu
 JOIN microdollar_usage_metadata AS meta ON meta.id = mu.id
@@ -57,8 +61,10 @@ function cursorFor(row: Record<string, unknown>): ExportCursor {
 
 type ProjectRow = { id: string; title: string | null; created_at: string };
 type PromptRow = {
-  id: string;
-  created_at: string;
+  usage_id: string;
+  usage_created_at: string;
+  metadata_id: string;
+  metadata_created_at: string | null;
   user_prompt_prefix: string | null;
   system_prompt_prefix: string | null;
 };
@@ -213,8 +219,10 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
           input.limit,
         ]).then(result =>
           result.map(row => ({
-            id: requiredString(row.id, 'id'),
-            created_at: cursorTimestamp(row.created_at),
+            usage_id: requiredString(row.usage_id, 'usage_id'),
+            usage_created_at: cursorTimestamp(row.usage_created_at),
+            metadata_id: requiredString(row.metadata_id, 'metadata_id'),
+            metadata_created_at: nullableTimestamp(row.metadata_created_at, 'metadata_created_at'),
             user_prompt_prefix: nullableString(row.user_prompt_prefix, 'user_prompt_prefix'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
           }))
@@ -222,6 +230,8 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
         const records = rows.flatMap(row => [
           {
             source: 'microdollar_usage_metadata',
+            id: row.metadata_id,
+            createdAt: row.metadata_created_at,
             field: 'user_prompt_prefix',
             value: row.user_prompt_prefix == null ? null : String(row.user_prompt_prefix),
           },
@@ -234,7 +244,10 @@ export function createSourceAdapters(query: ReplicaQuery): SourceAdapter[] {
         const lastRow = rows.at(-1);
         return {
           records,
-          nextCursor: rows.length === input.limit && lastRow ? cursorFor(lastRow) : null,
+          nextCursor:
+            rows.length === input.limit && lastRow
+              ? { createdAt: lastRow.usage_created_at, id: lastRow.usage_id }
+              : null,
         };
       },
     },

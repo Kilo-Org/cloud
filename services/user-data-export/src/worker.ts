@@ -11,9 +11,12 @@ import type { SourceAdapter } from './source-adapters';
 import { classifyFetchFailure, logExportEvent, safeError } from './observability';
 
 const PART_BYTES = 5 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES_PER_INVOCATION = 32 * 1024 * 1024;
-const MAX_PAGES_PER_INVOCATION = 200;
-const PAGE_SIZE = 100;
+const MAX_PROCESSING_MS = 10 * 60 * 1000;
+const PAGE_SIZE = 1_000;
+
+export function hasProcessingTimeRemaining(startedAt: number, now: number = Date.now()): boolean {
+  return now - startedAt < MAX_PROCESSING_MS;
+}
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
@@ -231,6 +234,7 @@ export async function processGenerateMessage(
     }
     const encoder = new TextEncoder();
     const compressor = new CompressionStream('gzip');
+    const processingStartedAt = Date.now();
     let isFinal = false;
     uploadParts = uploadGzipStream({
       stream: compressor.readable,
@@ -251,11 +255,7 @@ export async function processGenerateMessage(
     let recordCount = 0;
     let nextSource: string | null = adapter.name;
 
-    while (
-      nextSource &&
-      pageCount < MAX_PAGES_PER_INVOCATION &&
-      uncompressedSize < MAX_UNCOMPRESSED_BYTES_PER_INVOCATION
-    ) {
+    while (nextSource && hasProcessingTimeRemaining(processingStartedAt)) {
       const readPage = adapter.readPage;
       if (!readPage) throw new Error('Export job has an invalid current source');
       phase = 'source_read';

@@ -1084,15 +1084,22 @@ export async function softDeleteUser(userId: string) {
     // ── 2. Hard-delete PII tables ────────────────────────────────────────
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
     await tx.execute(sql`
-      INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id)
+      INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
       SELECT COALESCE(r2_object_key, 'exports/' || id::text || '/kilo-data-export.jsonl.gz'),
-        multipart_upload_id
+        multipart_upload_id,
+        CASE
+          WHEN lease_expires_at > now() THEN lease_expires_at
+          ELSE now()
+        END
       FROM user_data_exports
       WHERE kilo_user_id = ${userId}
       ON CONFLICT (object_key) DO UPDATE
       SET multipart_upload_id = COALESCE(
         EXCLUDED.multipart_upload_id,
         user_data_export_object_deletions.multipart_upload_id
+      ), available_at = GREATEST(
+        user_data_export_object_deletions.available_at,
+        EXCLUDED.available_at
       ), updated_at = now()
     `);
     await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));

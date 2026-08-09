@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  attachNewMultipartUpload,
   consumeDeadLetterBatch,
   consumeExportBatch,
   deletePendingObjects,
-  dispatchContinuation,
   exportHeader,
+  exportArtifact,
+  handleFencedCompletion,
+  handleGenerationFailure,
   processScheduledExportWork,
+  persistCompletedExport,
+  recoverInterruptedMultipartUpload,
   resolveSourceAdapter,
+  TerminalExportError,
   type ExportEnv,
 } from './worker';
 import type { ExportJob } from './databases';
@@ -127,6 +131,16 @@ describe('export header timestamps', () => {
   });
 });
 
+describe('export artifact metadata', () => {
+  it('stores a downloadable gzip object without transparent content encoding', () => {
+    expect(exportArtifact).toEqual({
+      contentType: 'application/gzip',
+      contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
+    });
+    expect(exportArtifact).not.toHaveProperty('contentEncoding');
+  });
+});
+
 describe('source resume keys', () => {
   const enabled = {
     name: 'enabled',
@@ -144,91 +158,142 @@ describe('source resume keys', () => {
   });
 });
 
-describe('first multipart upload attachment', () => {
-  it('aborts a newly created upload when account deletion removes the export row', async () => {
-    const abort = vi.fn();
-    const attach = vi.fn().mockResolvedValue('deleted');
+describe('generation failure handling', () => {
+  it('marks terminal deadlines failed without releasing them for retry', async () => {
+    const markFailed = vi.fn();
+    const releaseForRetry = vi.fn();
 
     await expect(
-      attachNewMultipartUpload({
-        upload: { uploadId: 'upload-id', abort },
+      handleGenerationFailure({
+        error: new TerminalExportError(
+          'export_deadline_exceeded',
+          'The export was too large to complete within the processing limit.',
+          'deadline exceeded'
+        ),
         exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 0,
+        generation: 2,
         leaseToken: 'lease-token',
-        attach,
+        phase: 'compression_finalize',
+        source: 'microdollar_usage_prompts',
+        markFailed,
+        releaseForRetry,
       })
-    ).resolves.toBe('deleted');
+    ).resolves.toBe('failed');
 
-    expect(abort).toHaveBeenCalledOnce();
+    expect(markFailed).toHaveBeenCalledWith({
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 2,
+      leaseToken: 'lease-token',
+      failureCode: 'export_deadline_exceeded',
+      redactedMessage: 'The export was too large to complete within the processing limit.',
+    });
+    expect(releaseForRetry).not.toHaveBeenCalled();
   });
 
-  it('aborts its private upload without creating cleanup work when only the lease was lost', async () => {
-    const abort = vi.fn();
+  it('keeps transient failures on the retry path', async () => {
+    const markFailed = vi.fn();
+    const releaseForRetry = vi.fn();
 
     await expect(
-      attachNewMultipartUpload({
-        upload: { uploadId: 'upload-id', abort },
+      handleGenerationFailure({
+        error: new Error('temporary'),
         exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 0,
+        generation: 2,
         leaseToken: 'lease-token',
-        attach: vi.fn().mockResolvedValue('lost_lease'),
+        phase: 'source_read',
+        source: 'microdollar_usage_prompts',
+        markFailed,
+        releaseForRetry,
       })
-    ).resolves.toBe('lost_lease');
+    ).resolves.toBe('retry');
 
-    expect(abort).toHaveBeenCalledOnce();
-  });
-
-  it('aborts a newly created upload when persisting its ID fails', async () => {
-    const abort = vi.fn().mockResolvedValue(undefined);
-    const attach = vi.fn().mockRejectedValue(new Error('database unavailable'));
-
-    await expect(
-      attachNewMultipartUpload({
-        upload: { uploadId: 'upload-id', abort },
-        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 0,
-        leaseToken: 'lease-token',
-        attach,
-      })
-    ).rejects.toThrow('database unavailable');
-
-    expect(abort).toHaveBeenCalledOnce();
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(releaseForRetry).toHaveBeenCalledWith(
+      'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      2,
+      'lease-token'
+    );
   });
 });
 
-describe('continuation dispatch', () => {
-  it('sends the next generation and marks its outbox row sent', async () => {
-    const send = vi.fn();
-    const markSent = vi.fn();
+describe('interrupted multipart recovery', () => {
+  it('aborts the orphan and clears its lease-fenced database reference', async () => {
+    const abort = vi.fn();
+    const clear = vi.fn().mockResolvedValue(true);
 
-    await dispatchContinuation({
-      queue: { send },
-      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-      generation: 4,
-      markSent,
-    });
+    await expect(recoverInterruptedMultipartUpload({ upload: { abort }, clear })).resolves.toBe(
+      true
+    );
 
-    expect(send).toHaveBeenCalledWith({
-      version: 1,
-      operation: 'generate',
-      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-      generation: 4,
-    });
-    expect(markSent).toHaveBeenCalledWith('f6ba5ce5-9061-4f7f-9ec6-76f047573f1c', 4);
+    expect(abort).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
   });
 
-  it('leaves the outbox unsent when immediate Queue publication fails', async () => {
-    const markSent = vi.fn();
+  it('treats a missing orphan upload as already aborted', async () => {
+    const clear = vi.fn().mockResolvedValue(true);
 
     await expect(
-      dispatchContinuation({
-        queue: { send: vi.fn().mockRejectedValue(new Error('Queue unavailable')) },
-        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 4,
-        markSent,
+      recoverInterruptedMultipartUpload({
+        upload: { abort: vi.fn().mockRejectedValue({ code: 10024 }) },
+        clear,
       })
-    ).resolves.toBeUndefined();
-    expect(markSent).not.toHaveBeenCalled();
+    ).resolves.toBe(true);
+
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it('does not clear the database reference when abort fails transiently', async () => {
+    const clear = vi.fn();
+
+    await expect(
+      recoverInterruptedMultipartUpload({
+        upload: { abort: vi.fn().mockRejectedValue(new Error('R2 unavailable')) },
+        clear,
+      })
+    ).rejects.toThrow('R2 unavailable');
+
+    expect(clear).not.toHaveBeenCalled();
+  });
+});
+
+describe('completed export persistence', () => {
+  it('accepts a ready row after the completion response is lost', async () => {
+    await expect(
+      persistCompletedExport({
+        complete: vi.fn().mockRejectedValue(new Error('database response lost')),
+        completedObjectMatches: vi.fn().mockResolvedValue(true),
+      })
+    ).resolves.toBe('already_completed');
+  });
+
+  it('rethrows an ambiguous completion when the ready object does not match', async () => {
+    await expect(
+      persistCompletedExport({
+        complete: vi.fn().mockRejectedValue(new Error('database unavailable')),
+        completedObjectMatches: vi.fn().mockResolvedValue(false),
+      })
+    ).rejects.toThrow('database unavailable');
+  });
+});
+
+describe('fenced completion cleanup', () => {
+  it('asks the database to schedule terminal object cleanup', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const scheduleObjectDeletion = vi.fn().mockResolvedValue(true);
+
+    await expect(
+      handleFencedCompletion({
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 0,
+        scheduleObjectDeletion,
+      })
+    ).resolves.toBe(true);
+
+    expect(scheduleObjectDeletion).toHaveBeenCalledOnce();
+    expect(parsedLog(warn)).toMatchObject({
+      event: 'export_completion_fenced',
+      cleanupScheduled: true,
+    });
   });
 });
 
@@ -368,6 +433,33 @@ describe('scheduled export maintenance isolation', () => {
     expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-id');
     expect(state.recordOutboxFailure).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('clears a failed multipart reference when the upload is already missing', async () => {
+    const state = {
+      expiredObjects: vi.fn().mockResolvedValue([]),
+      markExpired: vi.fn(),
+      failedMultipartUploads: vi
+        .fn()
+        .mockResolvedValue([{ id: 'failed-id', multipart_upload_id: 'upload-id' }]),
+      clearMultipartUpload: vi.fn(),
+      pendingOutbox: vi.fn().mockResolvedValue([]),
+      markOutboxSent: vi.fn(),
+      recordOutboxFailure: vi.fn(),
+    };
+    const env = {
+      EXPORT_BUCKET: {
+        delete: vi.fn(),
+        resumeMultipartUpload: vi.fn().mockReturnValue({
+          abort: vi.fn().mockRejectedValue({ name: 'NoSuchUpload' }),
+        }),
+      },
+      EXPORT_QUEUE: { send: vi.fn() },
+    };
+
+    await processScheduledExportWork(env, state);
+
+    expect(state.clearMultipartUpload).toHaveBeenCalledWith('failed-id');
   });
 
   it('continues to outbox dispatch after a failed multipart abort', async () => {

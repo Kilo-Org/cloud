@@ -1,6 +1,5 @@
 import { getWorkerDb, pg } from '@kilocode/db/client';
 import { sql } from 'drizzle-orm';
-import type { ExportCursor } from './contracts';
 import type { ReplicaQuery } from './source-adapters';
 
 export type HyperdriveBinding = { connectionString: string };
@@ -21,10 +20,10 @@ export type ExportJob = {
   r2_object_key: string | null;
 };
 
-type Part = { part_number: number; etag: string };
 type PendingNotification = { id: string };
 type StoredObject = { id: string; r2_object_key: string };
 type MultipartUpload = { id: string; multipart_upload_id: string };
+export type ExportCompletionResult = 'completed' | 'already_completed' | 'fenced';
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
 type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
 
@@ -42,7 +41,7 @@ export function createStateDb(binding: HyperdriveBinding) {
               WHEN current_source IS NULL AND multipart_upload_id IS NOT NULL THEN 'finalizing'
               ELSE 'processing'
             END,
-            lease_token = ${leaseToken}, lease_expires_at = now() + interval '14 minutes',
+            lease_token = ${leaseToken}, lease_expires_at = now() + interval '16 minutes',
             attempt_count = attempt_count + 1, started_at = COALESCE(started_at, now()), updated_at = now()
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
@@ -66,9 +65,7 @@ export function createStateDb(binding: HyperdriveBinding) {
             AND lease_token = ${input.leaseToken} AND multipart_upload_id IS NULL
           RETURNING id
         ), existing AS (
-          SELECT EXISTS (
-            SELECT 1 FROM user_data_exports WHERE id = ${input.exportId}
-          ) AS export_exists
+          SELECT EXISTS (SELECT 1 FROM user_data_exports WHERE id = ${input.exportId}) AS export_exists
         ), cleanup AS (
           INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id)
           SELECT ${`exports/${input.exportId}/kilo-data-export.jsonl.gz`}, ${input.multipartUploadId}
@@ -85,47 +82,19 @@ export function createStateDb(binding: HyperdriveBinding) {
       if (result?.attached) return 'attached';
       return result?.export_exists ? 'lost_lease' : 'deleted';
     },
-    async checkpoint(input: {
+    async clearClaimedMultipartUpload(input: {
       exportId: string;
+      generation: number;
       leaseToken: string;
-      parts: Array<{ partNumber: number; etag: string; sizeBytes: number }>;
-      rowCount: number;
-      cursor: ExportCursor | null;
-      nextSource: string | null;
-      nextGeneration: number;
       multipartUploadId: string;
     }): Promise<boolean> {
-      const nextPartNumber = input.parts.at(-1)?.partNumber;
-      if (nextPartNumber === undefined) throw new Error('Export checkpoint has no parts');
       const rows = await db.execute<{ id: string }>(sql`
-        WITH candidate AS (
-          SELECT id
-          FROM user_data_exports
-          WHERE id = ${input.exportId} AND lease_token = ${input.leaseToken}
-          FOR UPDATE
-        ), input_parts AS (
-          SELECT * FROM jsonb_to_recordset(${JSON.stringify(input.parts)}::jsonb)
-            AS part("partNumber" integer, etag text, "sizeBytes" bigint)
-        ), inserted_parts AS (
-          INSERT INTO user_data_export_parts (export_id, part_number, etag, size_bytes)
-          SELECT candidate.id, part."partNumber", part.etag, part."sizeBytes"
-          FROM candidate CROSS JOIN input_parts AS part
-          RETURNING export_id
-        ), updated AS (
-          UPDATE user_data_exports AS exports
-          SET source_cursor = ${JSON.stringify(input.cursor)}::jsonb,
-            current_source = ${input.nextSource}, next_part_number = ${nextPartNumber + 1},
-            multipart_upload_id = ${input.multipartUploadId}, dispatch_generation = ${input.nextGeneration},
-            row_count = exports.row_count + ${input.rowCount}, attempt_count = 0,
-            lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-          FROM (SELECT DISTINCT export_id FROM inserted_parts) AS inserted
-          WHERE exports.id = inserted.export_id AND exports.lease_token = ${input.leaseToken}
-          RETURNING exports.id
-        )
-        INSERT INTO user_data_export_outbox (export_id, generation, operation, available_at)
-        SELECT id, ${input.nextGeneration}, 'generate', now() FROM updated
-        ON CONFLICT (export_id, generation, operation) DO NOTHING
-        RETURNING export_id AS id
+        UPDATE user_data_exports
+        SET status = 'processing', multipart_upload_id = NULL, updated_at = now()
+        WHERE id = ${input.exportId} AND dispatch_generation = ${input.generation}
+          AND lease_token = ${input.leaseToken}
+          AND multipart_upload_id = ${input.multipartUploadId}
+        RETURNING id
       `);
       return rows.rows.length > 0;
     },
@@ -135,28 +104,87 @@ export function createStateDb(binding: HyperdriveBinding) {
       objectKey: string;
       etag: string;
       sizeBytes: number;
+      rowCount: number;
+    }): Promise<ExportCompletionResult> {
+      const rows = await db.execute<{ result: ExportCompletionResult }>(sql`
+        WITH completed AS (
+          UPDATE user_data_exports
+          SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
+            row_count = ${input.rowCount}, current_source = NULL, source_cursor = NULL,
+            completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
+            lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+          WHERE id = ${input.exportId} AND status = 'processing' AND lease_token = ${input.leaseToken}
+          RETURNING id
+        )
+        SELECT CASE
+          WHEN EXISTS (SELECT 1 FROM completed) THEN 'completed'
+          WHEN EXISTS (
+            SELECT 1 FROM user_data_exports
+            WHERE id = ${input.exportId} AND status = 'ready'
+              AND r2_object_key = ${input.objectKey} AND r2_etag = ${input.etag}
+          ) THEN 'already_completed'
+          ELSE 'fenced'
+        END AS result
+      `);
+      return rows.rows[0]?.result ?? 'fenced';
+    },
+    async completedObjectMatches(input: {
+      exportId: string;
+      objectKey: string;
+      etag: string;
     }): Promise<boolean> {
-      const rows = await db.execute<{ id: string }>(sql`
-        UPDATE user_data_exports
-        SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
-          completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
-          lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-        WHERE id = ${input.exportId} AND status = 'finalizing' AND lease_token = ${input.leaseToken}
-        RETURNING id
+      const rows = await db.execute<{ matches: boolean }>(sql`
+        SELECT EXISTS (
+          SELECT 1 FROM user_data_exports
+          WHERE id = ${input.exportId} AND status = 'ready'
+            AND r2_object_key = ${input.objectKey} AND r2_etag = ${input.etag}
+        ) AS matches
+      `);
+      return rows.rows[0]?.matches ?? false;
+    },
+    async scheduleTerminalObjectDeletion(input: {
+      exportId: string;
+      objectKey: string;
+    }): Promise<boolean> {
+      const rows = await db.execute<{ object_key: string }>(sql`
+        INSERT INTO user_data_export_object_deletions (object_key, available_at)
+        SELECT ${input.objectKey}, now()
+        FROM user_data_exports
+        WHERE id = ${input.exportId} AND status IN ('failed', 'expired')
+        ON CONFLICT (object_key) DO UPDATE
+        SET available_at = LEAST(user_data_export_object_deletions.available_at, now()),
+          updated_at = now()
+        RETURNING object_key
       `);
       return rows.rows.length > 0;
     },
     async markFailed(
       exportId: string,
       generation: number,
-      failureCode = 'queue_delivery_exhausted'
+      failureCode = 'queue_delivery_exhausted',
+      redactedMessage = 'The export could not be completed after multiple attempts.'
     ): Promise<void> {
       await db.execute(sql`
         UPDATE user_data_exports SET status = 'failed', failure_code = ${failureCode},
-          last_error_redacted = 'The export could not be completed after multiple attempts.',
+          last_error_redacted = ${redactedMessage},
           lease_token = NULL, lease_expires_at = NULL, updated_at = now()
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
+      `);
+    },
+    async markLeasedExportFailed(input: {
+      exportId: string;
+      generation: number;
+      leaseToken: string;
+      failureCode: string;
+      redactedMessage: string;
+    }): Promise<void> {
+      await db.execute(sql`
+        UPDATE user_data_exports SET status = 'failed', failure_code = ${input.failureCode},
+          last_error_redacted = ${input.redactedMessage}, lease_token = NULL,
+          lease_expires_at = NULL, updated_at = now()
+        WHERE id = ${input.exportId} AND dispatch_generation = ${input.generation}
+          AND status IN ('processing', 'finalizing') AND lease_token = ${input.leaseToken}
       `);
     },
     async pendingOutbox(): Promise<ExportQueueRow[]> {
@@ -298,12 +326,6 @@ export function createStateDb(binding: HyperdriveBinding) {
           updated_at = now()
         WHERE object_key = ${objectKey}
       `);
-    },
-    async parts(exportId: string): Promise<Part[]> {
-      const rows = await db.execute<Part>(sql`
-        SELECT part_number, etag FROM user_data_export_parts WHERE export_id = ${exportId} ORDER BY part_number
-      `);
-      return rows.rows;
     },
     async pendingNotifications(): Promise<PendingNotification[]> {
       const rows = await db.execute<PendingNotification>(sql`

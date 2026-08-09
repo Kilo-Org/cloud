@@ -1,62 +1,29 @@
-import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { gzipMember, gzipPaddingMember, uploadGzipStream } from './gzip';
-import { exportArtifact, isAllowedWebCallbackUrl, redirectTargetHost } from './worker';
+import { uploadGzipStream } from './gzip';
+import { isAllowedWebCallbackUrl, redirectTargetHost } from './worker';
 
-describe('gzip export members', () => {
-  it('concatenates independently compressed JSONL members into one gzip stream', async () => {
-    const header = await gzipMember('{"type":"header"}\n');
-    const record = await gzipMember('{"value":"hello"}\n');
-    const padding = await gzipPaddingMember(1024);
-    const archive = Buffer.concat([header, record, padding]);
-
-    expect(gunzipSync(archive).toString()).toBe('{"type":"header"}\n{"value":"hello"}\n');
-    expect(padding.byteLength).toBe(1024);
-  });
-
-  it('streams a smaller final part without padding', async () => {
-    const parts: Uint8Array[] = [];
-    const uploaded = await uploadGzipStream({
-      stream: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7])]).stream(),
-      partBytes: 8,
-      startPartNumber: 3,
-      isFinal: () => true,
+describe('uploadGzipStream', () => {
+  it('flushes full parts periodically and one short final part', async () => {
+    const values: Uint8Array[] = [];
+    const parts = await uploadGzipStream({
+      stream: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])]).stream(),
+      partBytes: 4,
       uploadPart: async (_partNumber, value) => {
-        parts.push(value.slice());
-        return { etag: `etag-${parts.length}` };
+        values.push(value.slice());
+        return { etag: `etag-${values.length}` };
       },
     });
 
-    expect(uploaded).toEqual([{ partNumber: 3, etag: 'etag-1', sizeBytes: 7 }]);
-    expect(parts[0]).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6, 7]));
-  });
-
-  it('pads non-final output to uniform parts without decoded bytes', async () => {
-    const payload = '{"value":"hello"}\n';
-    const compressed = await gzipMember(payload);
-    const parts: Uint8Array[] = [];
-    await uploadGzipStream({
-      stream: new Blob([compressed]).stream(),
-      partBytes: 64,
-      startPartNumber: 1,
-      isFinal: () => false,
-      uploadPart: async (_partNumber, value) => {
-        parts.push(value.slice());
-        return { etag: `etag-${parts.length}` };
-      },
-    });
-
-    expect(parts.every(part => part.byteLength === 64)).toBe(true);
-    expect(gunzipSync(Buffer.concat(parts)).toString()).toBe(payload);
-  });
-
-  it('stores a gzip archive without HTTP content encoding', () => {
-    expect(exportArtifact).toEqual({
-      contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
-      contentType: 'application/gzip',
-      partBytes: 5 * 1024 * 1024,
-    });
-    expect(exportArtifact).not.toHaveProperty('contentEncoding');
+    expect(parts).toEqual([
+      { partNumber: 1, etag: 'etag-1', sizeBytes: 4 },
+      { partNumber: 2, etag: 'etag-2', sizeBytes: 4 },
+      { partNumber: 3, etag: 'etag-3', sizeBytes: 1 },
+    ]);
+    expect(values).toEqual([
+      new Uint8Array([1, 2, 3, 4]),
+      new Uint8Array([5, 6, 7, 8]),
+      new Uint8Array([9]),
+    ]);
   });
 
   it('allows HTTPS and loopback HTTP notification callbacks only', () => {

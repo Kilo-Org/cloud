@@ -2,6 +2,8 @@ import { env, SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { USER_DATA_EXPORT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import { gunzipSync } from 'node:zlib';
+import { uploadGzipStream } from '../src/gzip';
 
 describe('user-data-export worker', () => {
   const internalApiKey = String(env.INTERNAL_API_SECRET);
@@ -91,5 +93,40 @@ describe('user-data-export worker', () => {
     });
 
     expect(response.status).toBe(400);
+  });
+
+  it('stores a compact gzip object in R2', async () => {
+    const key = `test/${crypto.randomUUID()}.jsonl.gz`;
+    const payload = `${'{"source":"test","value":null}\n'.repeat(10_000)}`;
+    const compressor = new CompressionStream('gzip');
+    const upload = await env.EXPORT_BUCKET.createMultipartUpload(key, {
+      httpMetadata: {
+        contentType: 'application/gzip',
+        contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
+      },
+    });
+    const parts = uploadGzipStream({
+      stream: compressor.readable,
+      partBytes: 5 * 1024 * 1024,
+      uploadPart: (partNumber, value) => upload.uploadPart(partNumber, value),
+    });
+    const writer = compressor.writable.getWriter();
+    await writer.write(new TextEncoder().encode(payload));
+    await writer.close();
+
+    const uploaded = await parts;
+    const stored = await upload.complete(
+      uploaded.map(part => ({ partNumber: part.partNumber, etag: part.etag }))
+    );
+    const object = await env.EXPORT_BUCKET.get(key);
+    if (!object) throw new Error('Test gzip object was not stored');
+
+    expect(stored?.size).toBeLessThan(payload.length);
+    expect(object?.httpMetadata).toMatchObject({
+      contentType: 'application/gzip',
+      contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
+    });
+    expect(gunzipSync(await object.arrayBuffer()).toString()).toBe(payload);
+    await env.EXPORT_BUCKET.delete(key);
   });
 });

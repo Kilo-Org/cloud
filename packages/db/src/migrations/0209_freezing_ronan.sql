@@ -36,7 +36,6 @@ CREATE TABLE "user_data_exports" (
 	"status" text DEFAULT 'queued' NOT NULL,
 	"schema_version" integer DEFAULT 1 NOT NULL,
 	"snapshot_at" timestamp with time zone NOT NULL,
-	"replica_target_lsn" text,
 	"current_source" text,
 	"source_cursor" jsonb,
 	"multipart_upload_id" text,

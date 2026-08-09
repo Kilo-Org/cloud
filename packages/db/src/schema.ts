@@ -516,7 +516,6 @@ export const user_data_exports = pgTable(
       .default('queued'),
     schema_version: integer().notNull().default(1),
     snapshot_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    replica_target_lsn: text(),
     current_source: text(),
     source_cursor: jsonb().$type<Record<string, unknown> | null>(),
     multipart_upload_id: text(),

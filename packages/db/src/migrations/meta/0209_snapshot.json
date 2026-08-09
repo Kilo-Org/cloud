@@ -1,5 +1,5 @@
 {
-  "id": "0b2fc784-80b5-476e-9e34-734ffc62769e",
+  "id": "3ab21662-14a0-4f4c-b56e-741b35787806",
   "prevId": "bb8cf2f4-68eb-423d-9bda-06d43e144f68",
   "version": "7",
   "dialect": "postgresql",
@@ -35641,12 +35641,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
-        },
-        "replica_target_lsn": {
-          "name": "replica_target_lsn",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "current_source": {
           "name": "current_source",

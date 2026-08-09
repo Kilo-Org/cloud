@@ -63,6 +63,18 @@ describe('user exports router guards and serialization', () => {
     expect(result.exports[0]?.id).toBe(row.id);
   });
 
+  it('uses the fixed August 3 UTC data cutoff for new exports', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    const requested = await caller.userExports.request();
+    const [row] = await db
+      .select({ snapshotAt: user_data_exports.snapshot_at })
+      .from(user_data_exports)
+      .where(eq(user_data_exports.id, requested.id));
+
+    expect(new Date(row.snapshotAt).toISOString()).toBe('2026-08-03T00:00:00.000Z');
+  });
+
   it('does not authorize another user or an expired export for download', async () => {
     const [ready] = await db
       .insert(user_data_exports)

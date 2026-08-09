@@ -13,6 +13,7 @@ import {
 const ExportIdSchema = z.object({ exportId: z.string().uuid() });
 const ListInputSchema = z.object({ cursor: z.string().uuid().optional() }).optional();
 const PAGE_SIZE = 20;
+const EXPORT_DATA_CUTOFF = '2026-08-03T00:00:00.000Z';
 
 type UserExportRow = {
   id: string;
@@ -97,7 +98,7 @@ export const userExportsRouter = createTRPCRouter({
       return tx.execute<UserExportRow>(sql`
         WITH created AS (
           INSERT INTO user_data_exports (kilo_user_id, snapshot_at)
-          VALUES (${ctx.user.id}, now())
+          VALUES (${ctx.user.id}, ${EXPORT_DATA_CUTOFF}::timestamptz)
           RETURNING id, status, requested_at, started_at, completed_at, expires_at, size_bytes, row_count,
             NULL::text AS failure_message, dispatch_generation
         ), outbox AS (

@@ -69,7 +69,7 @@ describe('getToolsAvailable', () => {
           tools: [
             { type: 'function', function: { name: '  search  ' } },
             { type: 'custom', custom: { name: 'browser' } },
-            { type: 'function', function: {} },
+            { type: 'function', function: { name: '' } },
           ],
         })
       )

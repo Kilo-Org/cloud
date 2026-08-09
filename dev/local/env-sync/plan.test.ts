@@ -159,6 +159,30 @@ test('generates the auto routing worker URL for local Next.js', () => {
   }
 });
 
+test('generates the user data export Worker URL for local Next.js', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+
+    assert.deepEqual(
+      plan.envDevLocalChanges.find(change => change.key === 'USER_DATA_EXPORT_WORKER_URL'),
+      {
+        key: 'USER_DATA_EXPORT_WORKER_URL',
+        oldValue: undefined,
+        newValue: `http://localhost:${getService('user-data-export').port}`,
+      }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('reconciles an incorrect generated web override to its template literal', () => {
   const repo = createRepo({
     '.env.local': 'ATTACHMENTS_BUCKET=production-bucket\n',

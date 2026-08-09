@@ -33,7 +33,8 @@
     "./client-error": "./src/client-error.ts",
     "./review-agents": "./src/review-agents.ts",
     "./code-review-council": "./src/code-review-council.ts",
-    "./scheduled-job-observability": "./src/scheduled-job-observability.ts"
+    "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
+    "./r2-client": "./src/r2-client.ts"
   },
   "scripts": {
     "test": "vitest run",

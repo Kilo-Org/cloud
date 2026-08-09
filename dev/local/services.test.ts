@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  applyPortOffset,
   candidatePortOffsets,
   clearDevLogs,
   computePortOffset,
@@ -171,6 +172,42 @@ test('keeps auto routing workers in their own opt-in group', () => {
   const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
   assert.ok(!alwaysOn.includes('auto-routing'));
   assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
+});
+
+test('registers user data export with worktree-aware ports and dependencies', () => {
+  const service = getService('user-data-export');
+
+  assert.equal(service.group, 'data-export');
+  assert.equal(service.type, 'worker');
+  assert.equal(service.dir, 'services/user-data-export');
+  assert.equal(service.port, 8818 + portOffset);
+  assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
+  assert.deepEqual(resolveTargets(['data-export']), [
+    'stripe',
+    'redis',
+    'postgres',
+    'redis-http',
+    'nextjs',
+    'user-data-export',
+  ]);
+});
+
+test('points both user data export Hyperdrive bindings at the offset database', () => {
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(1200);
+    const command = getService('user-data-export').command.join(' ');
+    assert.match(
+      command,
+      /CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_PRIMARY_STATE_DB=.*localhost:6632/
+    );
+    assert.match(
+      command,
+      /CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_REPLICA_DB=.*localhost:6632/
+    );
+  } finally {
+    applyPortOffset(initialOffset);
+  }
 });
 
 test('keeps auto routing package dev script compatible with local launcher flags', () => {

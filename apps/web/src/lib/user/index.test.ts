@@ -64,6 +64,7 @@ import {
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_notification_preferences,
+  user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
   agent_environment_profiles,
@@ -115,6 +116,9 @@ import {
   mcp_gateway_oauth_clients,
   mcp_gateway_oauth_grants,
   deployments_ephemeral,
+  user_data_exports,
+  user_data_export_parts,
+  user_data_export_outbox,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -168,6 +172,9 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(deployments_ephemeral);
+    await db.delete(user_data_export_parts);
+    await db.delete(user_data_export_outbox);
+    await db.delete(user_data_exports);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -821,6 +828,103 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes user data export state and dependent multipart and outbox rows', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+          r2_object_key: `exports/${crypto.randomUUID()}/kilo-data-export.jsonl.gz`,
+        })
+        .returning();
+      if (!exportJob) throw new Error('Failed to create user data export');
+
+      await db.insert(user_data_export_parts).values({
+        export_id: exportJob.id,
+        part_number: 1,
+        etag: 'part-etag',
+        size_bytes: 1,
+      });
+      await db.insert(user_data_export_outbox).values({
+        export_id: exportJob.id,
+        generation: 0,
+        operation: 'generate',
+      });
+
+      await softDeleteUser(user.id);
+      if (!exportJob.r2_object_key) throw new Error('Export object key was not created');
+
+      expect(
+        await db.select().from(user_data_exports).where(eq(user_data_exports.id, exportJob.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_parts)
+          .where(eq(user_data_export_parts.export_id, exportJob.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_object_deletions)
+          .where(eq(user_data_export_object_deletions.object_key, exportJob.r2_object_key))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_outbox)
+          .where(eq(user_data_export_outbox.export_id, exportJob.id))
+      ).toHaveLength(0);
+    });
+
+    it('preserves in-flight multipart details for Worker cleanup', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+          multipart_upload_id: 'multipart-upload-id',
+          next_part_number: 2,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(tombstone?.multipart_upload_id).toBe('multipart-upload-id');
+    });
+
+    it('creates a deterministic cleanup tombstone before an export starts uploading', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({ kilo_user_id: user.id, snapshot_at: new Date().toISOString() })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(tombstone).toMatchObject({ multipart_upload_id: null });
+    });
+
     it('anonymizes recommendation dismissal actor references', async () => {
       const organizationOwner = await insertTestUser();
       const dismissingUser = await insertTestUser();

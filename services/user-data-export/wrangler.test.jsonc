@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "user-data-export-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+  "vars": { "INTERNAL_API_SECRET": "test-token" },
+  "r2_buckets": [{ "binding": "EXPORT_BUCKET", "bucket_name": "user-data-export-test" }],
+  "queues": { "producers": [{ "binding": "EXPORT_QUEUE", "queue": "user-data-export-test" }] },
+}

@@ -115,6 +115,9 @@ import {
   mcp_gateway_oauth_clients,
   mcp_gateway_oauth_grants,
   deployments_ephemeral,
+  user_data_exports,
+  user_data_export_parts,
+  user_data_export_outbox,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -168,6 +171,9 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(deployments_ephemeral);
+    await db.delete(user_data_export_parts);
+    await db.delete(user_data_export_outbox);
+    await db.delete(user_data_exports);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -821,6 +827,50 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes user data export state and dependent multipart and outbox rows', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+        })
+        .returning();
+      if (!exportJob) throw new Error('Failed to create user data export');
+
+      await db.insert(user_data_export_parts).values({
+        export_id: exportJob.id,
+        part_number: 1,
+        etag: 'part-etag',
+        size_bytes: 1,
+        source: 'app_builder_projects',
+        row_count: 0,
+      });
+      await db.insert(user_data_export_outbox).values({
+        export_id: exportJob.id,
+        generation: 0,
+        operation: 'generate',
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db.select().from(user_data_exports).where(eq(user_data_exports.id, exportJob.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_parts)
+          .where(eq(user_data_export_parts.export_id, exportJob.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_outbox)
+          .where(eq(user_data_export_outbox.export_id, exportJob.id))
+      ).toHaveLength(0);
+    });
+
     it('anonymizes recommendation dismissal actor references', async () => {
       const organizationOwner = await insertTestUser();
       const dismissingUser = await insertTestUser();

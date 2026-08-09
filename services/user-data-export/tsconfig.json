@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ESNext"],
+    "types": ["@types/node", "./worker-configuration.d.ts", "vitest/globals"]
+  },
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "vitest.config.ts"]
+}

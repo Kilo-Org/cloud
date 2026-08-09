@@ -104,6 +104,7 @@ import {
   deployments_ephemeral,
   microdollar_usage,
   microdollar_usage_metadata,
+  user_data_exports,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -972,6 +973,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - user_data_exports and their multipart/outbox state (external export
+ *   object deletion remains the Worker reconciler's responsibility)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
  * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
  *   immediate cleanup scheduled)
@@ -1080,6 +1083,7 @@ export async function softDeleteUser(userId: string) {
 
     // ── 2. Hard-delete PII tables ────────────────────────────────────────
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+    await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
     await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
     await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
     await tx

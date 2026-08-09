@@ -340,6 +340,47 @@ describe('addCacheBreakpoints', () => {
     ]);
   });
 
+  test('migrates top-level cache_control onto the last message when system already has cache_control', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+        system: [
+          {
+            type: 'text',
+            text: 'System instructions',
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.cache_control).toBeUndefined();
+    expect(request.body.system).toEqual([
+      {
+        type: 'text',
+        text: 'System instructions',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      {
+        type: 'text',
+        text: 'Latest prompt',
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+      },
+    ]);
+  });
+
   test('adds nested cache_control when an unhonored top-level value is present', () => {
     const request: GatewayRequest = {
       kind: 'messages',

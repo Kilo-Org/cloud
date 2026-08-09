@@ -225,13 +225,12 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'messages' &&
     request.body.messages.length > 1 &&
-    !containsCacheControl(request.body.messages) &&
-    !containsCacheControl(request.body.system)
+    !containsCacheControl(request.body.messages)
   ) {
     const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
     delete request.body.cache_control;
 
-    if (request.body.system) {
+    if (request.body.system && !containsCacheControl(request.body.system)) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on messages system prompt');
       request.body.system = setCacheControlOnMessagesSystem(request.body.system, cacheControl);
     }

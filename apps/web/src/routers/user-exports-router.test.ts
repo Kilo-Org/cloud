@@ -98,6 +98,34 @@ describe('user exports router guards and serialization', () => {
     expect(new Date(row.snapshotAt).toISOString()).toBe('2026-08-03T00:00:00.000Z');
   });
 
+  it('allows an immediate fresh request after a failed export', async () => {
+    const [failed] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: owner.id,
+        snapshot_at: new Date().toISOString(),
+        status: 'failed',
+        failure_code: 'queue_delivery_exhausted',
+        last_error_redacted: 'The export could not be completed after multiple attempts.',
+      })
+      .returning({ id: user_data_exports.id });
+
+    const requested = await (await createCallerForUser(owner.id)).userExports.request();
+
+    expect(requested.id).not.toBe(failed.id);
+    expect(requested.status).toBe('queued');
+    const rows = await db
+      .select({ id: user_data_exports.id, status: user_data_exports.status })
+      .from(user_data_exports)
+      .where(eq(user_data_exports.kilo_user_id, owner.id));
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { id: failed.id, status: 'failed' },
+        { id: requested.id, status: 'queued' },
+      ])
+    );
+  });
+
   it('does not authorize another user or an expired export for download', async () => {
     const [ready] = await db
       .insert(user_data_exports)

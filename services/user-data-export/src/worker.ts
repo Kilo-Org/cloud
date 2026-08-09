@@ -8,6 +8,7 @@ import {
 import { uploadGzipStream } from './gzip';
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
+import { logExportEvent, safeError } from './observability';
 
 const PART_BYTES = 5 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES_PER_INVOCATION = 32 * 1024 * 1024;
@@ -30,6 +31,12 @@ export type ExportEnv = {
 
 function objectKey(exportId: string): string {
   return `exports/${exportId}/kilo-data-export.jsonl.gz`;
+}
+
+function exportIdFromObjectKey(value: string): string | undefined {
+  return /^exports\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/kilo-data-export\.jsonl\.gz$/i.exec(
+    value
+  )?.[1];
 }
 
 export const exportArtifact = {
@@ -101,8 +108,17 @@ export async function dispatchContinuation(input: {
       generation: input.generation,
     });
     await input.markSent(input.exportId, input.generation);
-  } catch {
+    logExportEvent('info', 'export_continuation_dispatched', {
+      exportId: input.exportId,
+      generation: input.generation,
+    });
+  } catch (error) {
     // The transactional outbox remains available for scheduled recovery.
+    logExportEvent('warn', 'export_continuation_deferred', {
+      exportId: input.exportId,
+      generation: input.generation,
+      ...safeError(error),
+    });
   }
 }
 
@@ -138,14 +154,29 @@ export async function processGenerateMessage(
   const state = createStateDb(env.PRIMARY_STATE_DB);
   const leaseToken = crypto.randomUUID();
   const job = await state.claim(message.exportId, message.generation, leaseToken);
-  if (!job) return;
+  if (!job) {
+    logExportEvent('info', 'export_generation_skipped', {
+      exportId: message.exportId,
+      generation: message.generation,
+      reason: 'not_claimable',
+    });
+    return;
+  }
   let writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
   let uploadParts:
     | Promise<Array<{ partNumber: number; etag: string; sizeBytes: number }>>
     | undefined;
+  let phase = 'claim';
+  let activeSource = job.current_source;
 
   try {
     if (job.current_source === null && job.multipart_upload_id) {
+      phase = 'finalization';
+      logExportEvent('info', 'export_finalization_started', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        nextPartNumber: job.next_part_number,
+      });
       await finalizeExport(env, state, job, leaseToken);
       return;
     }
@@ -155,11 +186,20 @@ export async function processGenerateMessage(
     if (!adapter || !adapter.readPage) {
       throw new Error('Export job has an invalid current source');
     }
+    activeSource = adapter.name;
 
     const key = objectKey(job.id);
+    phase = 'multipart';
     let upload: R2MultipartUpload;
     if (job.multipart_upload_id) {
       upload = env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id);
+      logExportEvent('info', 'export_generation_attempt_started', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        source: adapter.name,
+        uploadMode: 'resumed',
+        nextPartNumber: job.next_part_number,
+      });
     } else {
       upload = await env.EXPORT_BUCKET.createMultipartUpload(key, {
         httpMetadata: {
@@ -174,7 +214,21 @@ export async function processGenerateMessage(
         leaseToken,
         attach: input => state.attachMultipartUpload(input),
       });
-      if (attachResult !== 'attached') return;
+      if (attachResult !== 'attached') {
+        logExportEvent('info', 'export_generation_skipped', {
+          exportId: job.id,
+          generation: job.dispatch_generation,
+          reason: attachResult,
+        });
+        return;
+      }
+      logExportEvent('info', 'export_generation_attempt_started', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        source: adapter.name,
+        uploadMode: 'created',
+        nextPartNumber: job.next_part_number,
+      });
     }
     const encoder = new TextEncoder();
     const compressor = new CompressionStream('gzip');
@@ -205,6 +259,8 @@ export async function processGenerateMessage(
     ) {
       const readPage = adapter.readPage;
       if (!readPage) throw new Error('Export job has an invalid current source');
+      phase = 'source_read';
+      activeSource = adapter.name;
       const page = await readPage({
         kiloUserId: job.kilo_user_id,
         snapshotAt: job.snapshot_at,
@@ -234,9 +290,11 @@ export async function processGenerateMessage(
       nextSource = adapter.name;
     }
     isFinal = nextSource === null;
+    phase = 'compression_finalize';
     await writer.close();
     const parts = await uploadParts;
     if (parts.length === 0) throw new Error('Compressed export produced no multipart data');
+    phase = 'checkpoint';
     const checkpointed = await state.checkpoint({
       exportId: job.id,
       leaseToken,
@@ -247,7 +305,25 @@ export async function processGenerateMessage(
       nextGeneration: job.dispatch_generation + 1,
       multipartUploadId: upload.uploadId,
     });
-    if (!checkpointed) return;
+    if (!checkpointed) {
+      logExportEvent('warn', 'export_checkpoint_rejected', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+      });
+      return;
+    }
+
+    logExportEvent('info', 'export_generation_checkpointed', {
+      exportId: job.id,
+      generation: job.dispatch_generation,
+      nextGeneration: job.dispatch_generation + 1,
+      source: adapter.name,
+      nextSource,
+      pageCount,
+      rowCount: recordCount,
+      partCount: parts.length,
+      uncompressedBytes: uncompressedSize,
+    });
 
     await dispatchContinuation({
       queue: env.EXPORT_QUEUE,
@@ -263,6 +339,13 @@ export async function processGenerateMessage(
     await writer?.abort(error).catch(() => undefined);
     await uploadParts?.catch(() => undefined);
     await state.releaseForRetry(job.id, job.dispatch_generation, leaseToken);
+    logExportEvent('error', 'export_generation_failed', {
+      exportId: job.id,
+      generation: job.dispatch_generation,
+      phase,
+      source: activeSource,
+      ...safeError(error),
+    });
     throw error;
   }
 }
@@ -284,29 +367,55 @@ async function finalizeExport(
     verified = await env.EXPORT_BUCKET.head(key);
   }
   if (!verified) throw new Error('Completed export object was not found');
-  await state.complete({
+  const completed = await state.complete({
     exportId: job.id,
     leaseToken,
     objectKey: key,
     etag: verified.etag,
     sizeBytes: verified.size,
   });
+  if (!completed) {
+    logExportEvent('warn', 'export_completion_fenced', {
+      exportId: job.id,
+      generation: job.dispatch_generation,
+      reason: 'lost_lease_or_terminal_state',
+    });
+    return;
+  }
+  logExportEvent('info', 'export_completed', {
+    exportId: job.id,
+    generation: job.dispatch_generation,
+    sizeBytes: verified.size,
+  });
 }
 
 export async function consumeExportBatch(
   batch: MessageBatch<unknown>,
-  env: ExportEnv
+  env: ExportEnv,
+  processMessage: (
+    env: ExportEnv,
+    message: ExportQueueMessage
+  ) => Promise<void> = processGenerateMessage
 ): Promise<void> {
   for (const message of batch.messages) {
     const parsed = ExportQueueMessageSchema.safeParse(message.body);
     if (!parsed.success) {
+      logExportEvent('warn', 'export_queue_message_invalid', {
+        validationIssueCount: parsed.error.issues.length,
+      });
       message.ack();
       continue;
     }
     try {
-      await processGenerateMessage(env, parsed.data);
+      await processMessage(env, parsed.data);
       message.ack();
-    } catch {
+    } catch (error) {
+      logExportEvent('warn', 'export_queue_retry_requested', {
+        exportId: parsed.data.exportId,
+        generation: parsed.data.generation,
+        attempt: message.attempts,
+        ...safeError(error),
+      });
       message.retry({ delaySeconds: 60 });
     }
   }
@@ -321,6 +430,14 @@ export async function consumeDeadLetterBatch(
     const parsed = ExportQueueMessageSchema.safeParse(message.body);
     if (parsed.success) {
       await state.markFailed(parsed.data.exportId, parsed.data.generation);
+      logExportEvent('error', 'export_message_dead_lettered', {
+        exportId: parsed.data.exportId,
+        generation: parsed.data.generation,
+      });
+    } else {
+      logExportEvent('error', 'export_dead_letter_message_invalid', {
+        validationIssueCount: parsed.error.issues.length,
+      });
     }
     message.ack();
   }
@@ -351,22 +468,34 @@ export async function processScheduledExportWork(
   >
 ): Promise<void> {
   for (const item of await state.expiredObjects()) {
+    let stage = 'r2_delete';
     try {
       await env.EXPORT_BUCKET.delete(item.r2_object_key);
+      stage = 'state_update';
       await state.markExpired(item.id);
-    } catch {
-      console.warn(JSON.stringify({ event: 'export_expiry_cleanup_failed', exportId: item.id }));
+      logExportEvent('info', 'export_expired_object_deleted', { exportId: item.id });
+    } catch (error) {
+      logExportEvent('warn', 'export_expiry_cleanup_failed', {
+        exportId: item.id,
+        stage,
+        ...safeError(error),
+      });
     }
   }
   for (const item of await state.failedMultipartUploads()) {
+    let stage = 'multipart_abort';
     try {
       const key = objectKey(item.id);
       await env.EXPORT_BUCKET.resumeMultipartUpload(key, item.multipart_upload_id).abort();
+      stage = 'state_update';
       await state.clearMultipartUpload(item.id);
-    } catch {
-      console.warn(
-        JSON.stringify({ event: 'failed_export_multipart_cleanup_failed', exportId: item.id })
-      );
+      logExportEvent('info', 'failed_export_multipart_deleted', { exportId: item.id });
+    } catch (error) {
+      logExportEvent('warn', 'failed_export_multipart_cleanup_failed', {
+        exportId: item.id,
+        stage,
+        ...safeError(error),
+      });
     }
   }
   for (const item of await state.pendingOutbox()) {
@@ -378,15 +507,17 @@ export async function processScheduledExportWork(
         generation: item.generation,
       });
       await state.markOutboxSent(item.id);
-    } catch {
+      logExportEvent('info', 'export_outbox_dispatched', {
+        exportId: item.export_id,
+        generation: item.generation,
+      });
+    } catch (error) {
       await state.recordOutboxFailure(item.id);
-      console.warn(
-        JSON.stringify({
-          event: 'export_outbox_dispatch_failed',
-          exportId: item.export_id,
-          generation: item.generation,
-        })
-      );
+      logExportEvent('warn', 'export_outbox_dispatch_failed', {
+        exportId: item.export_id,
+        generation: item.generation,
+        ...safeError(error),
+      });
     }
   }
 }
@@ -399,6 +530,8 @@ export async function deletePendingObjects(
   >
 ): Promise<void> {
   for (const item of await state.pendingObjectDeletions()) {
+    const exportId = exportIdFromObjectKey(item.object_key);
+    let stage = item.multipart_upload_id ? 'multipart_abort' : 'r2_delete';
     try {
       if (item.multipart_upload_id) {
         try {
@@ -408,16 +541,18 @@ export async function deletePendingObjects(
           if (value.code !== 10024 && value.name !== 'NoSuchUpload') throw error;
         }
       }
+      stage = 'r2_delete';
       await bucket.delete(item.object_key);
+      stage = 'state_update';
       await state.completeObjectDeletion(item.object_key);
-    } catch {
+      logExportEvent('info', 'account_export_object_deleted', { exportId });
+    } catch (error) {
       await state.recordObjectDeletionFailure(item.object_key);
-      console.warn(
-        JSON.stringify({
-          event: 'account_export_object_cleanup_failed',
-          objectKey: item.object_key,
-        })
-      );
+      logExportEvent('warn', 'account_export_object_cleanup_failed', {
+        exportId,
+        stage,
+        ...safeError(error),
+      });
     }
   }
 }
@@ -428,13 +563,13 @@ async function dispatchReadyNotifications(
 ): Promise<void> {
   if (!env.USER_DATA_EXPORT_WEB_URL) return;
   if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) {
-    console.warn(JSON.stringify({ event: 'export_notification_callback_url_invalid' }));
+    logExportEvent('warn', 'export_notification_callback_url_invalid');
     return;
   }
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   for (const item of await state.pendingNotifications()) {
     try {
-      await fetch(new URL('/api/internal/user-data-exports/ready', baseUrl), {
+      const response = await fetch(new URL('/api/internal/user-data-exports/ready', baseUrl), {
         method: 'POST',
         redirect: 'error',
         headers: {
@@ -444,8 +579,16 @@ async function dispatchReadyNotifications(
         body: JSON.stringify({ exportId: item.id }),
         signal: AbortSignal.timeout(10_000),
       });
-    } catch {
+      logExportEvent(response.ok ? 'info' : 'warn', 'export_notification_callback_completed', {
+        exportId: item.id,
+        status: response.status,
+      });
+    } catch (error) {
       // The database-backed email lease remains authoritative for later sweeps.
+      logExportEvent('warn', 'export_notification_callback_failed', {
+        exportId: item.id,
+        ...safeError(error),
+      });
     }
   }
 }

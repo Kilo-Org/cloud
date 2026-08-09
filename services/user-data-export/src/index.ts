@@ -9,6 +9,7 @@ import {
   USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { logExportEvent, safeError } from './observability';
 
 const DOWNLOAD_EXPIRES_SECONDS = 300;
 const DOWNLOAD_CONTENT_DISPOSITION = 'attachment; filename="kilo-data-export.jsonl.gz"';
@@ -103,34 +104,62 @@ export default {
     }
     const kiloUserId = await authenticatedUserId(request, env);
     if (!kiloUserId) {
+      logExportEvent('warn', 'export_http_unauthorized', {
+        method: request.method,
+        path: url.pathname,
+      });
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     try {
       if (request.method === 'POST' && url.pathname === '/internal/exports/dispatch') {
         const parsed = AdmitExportSchema.safeParse(await readJson(request));
-        if (!parsed.success)
+        if (!parsed.success) {
+          logExportEvent('warn', 'export_http_invalid_request', {
+            operation: 'dispatch',
+            validationIssueCount: parsed.error.issues.length,
+          });
           return Response.json({ error: 'Invalid export dispatch' }, { status: 400 });
+        }
         const { createStateDb } = await import('./databases');
         const state = createStateDb(env.PRIMARY_STATE_DB);
         if (
           (await dispatchExport(parsed.data, kiloUserId, state, env.EXPORT_QUEUE)) === 'not_found'
         ) {
+          logExportEvent('warn', 'export_dispatch_not_found', {
+            exportId: parsed.data.exportId,
+            generation: parsed.data.generation,
+          });
           return Response.json({ error: 'Export not found' }, { status: 404 });
         }
+        logExportEvent('info', 'export_dispatch_accepted', {
+          exportId: parsed.data.exportId,
+          generation: parsed.data.generation,
+        });
         return Response.json({ accepted: true }, { status: 202 });
       }
       if (request.method === 'POST' && url.pathname === '/internal/exports/download') {
         const parsed = DownloadRequestSchema.safeParse(await readJson(request));
-        if (!parsed.success)
+        if (!parsed.success) {
+          logExportEvent('warn', 'export_http_invalid_request', {
+            operation: 'download',
+            validationIssueCount: parsed.error.issues.length,
+          });
           return Response.json({ error: 'Invalid download request' }, { status: 400 });
+        }
         const { createStateDb } = await import('./databases');
         const object = await createStateDb(env.PRIMARY_STATE_DB).readyObject(
           parsed.data.exportId,
           kiloUserId
         );
-        if (!object) return Response.json({ error: 'Export not found' }, { status: 404 });
+        if (!object) {
+          logExportEvent('warn', 'export_download_not_found', { exportId: parsed.data.exportId });
+          return Response.json({ error: 'Export not found' }, { status: 404 });
+        }
         const expiration = downloadExpiration(object.expires_at);
-        if (!expiration) return Response.json({ error: 'Export not found' }, { status: 404 });
+        if (!expiration) {
+          logExportEvent('warn', 'export_download_expired', { exportId: parsed.data.exportId });
+          return Response.json({ error: 'Export not found' }, { status: 404 });
+        }
         const signer = createR2Client({
           accessKeyId: env.R2_ACCESS_KEY_ID,
           secretAccessKey: env.R2_SECRET_ACCESS_KEY,
@@ -142,13 +171,22 @@ export default {
           expiration.expiresIn,
           { responseContentDisposition: DOWNLOAD_CONTENT_DISPOSITION }
         );
+        logExportEvent('info', 'export_download_signed', {
+          exportId: parsed.data.exportId,
+          expiresInSeconds: expiration.expiresIn,
+        });
         return Response.json(
           { downloadUrl, expiresAt: expiration.expiresAt },
           { headers: { 'cache-control': 'private, no-store' } }
         );
       }
       return Response.json({ error: 'Not found' }, { status: 404 });
-    } catch {
+    } catch (error) {
+      logExportEvent('error', 'export_http_failed', {
+        method: request.method,
+        path: url.pathname,
+        ...safeError(error),
+      });
       return Response.json({ error: 'Invalid request' }, { status: 400 });
     }
   },
@@ -159,7 +197,20 @@ export default {
   },
   async scheduled(_controller: ScheduledController, env: ExportEnv): Promise<void> {
     const { reconcile } = await import('./worker');
-    await reconcile(env);
+    const startedAt = Date.now();
+    logExportEvent('info', 'export_reconcile_started');
+    try {
+      await reconcile(env);
+      logExportEvent('info', 'export_reconcile_completed', {
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      logExportEvent('error', 'export_reconcile_failed', {
+        durationMs: Date.now() - startedAt,
+        ...safeError(error),
+      });
+      throw error;
+    }
   },
 } satisfies ExportedHandler<ExportEnv>;
 

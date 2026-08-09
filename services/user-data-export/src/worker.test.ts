@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   attachNewMultipartUpload,
   consumeDeadLetterBatch,
+  consumeExportBatch,
   deletePendingObjects,
   dispatchContinuation,
   exportHeader,
@@ -11,13 +12,69 @@ import {
 } from './worker';
 import type { ExportJob } from './databases';
 
+afterEach(() => vi.restoreAllMocks());
+
 function queueMessage(body: unknown) {
   return {
     body,
+    attempts: 3,
     ack: vi.fn(),
     retry: vi.fn(),
   };
 }
+
+function parsedLog(spy: ReturnType<typeof vi.spyOn>, index = 0): Record<string, unknown> {
+  return JSON.parse(String(spy.mock.calls[index]?.[0])) as Record<string, unknown>;
+}
+
+describe('queue observability', () => {
+  it('logs safe retry context and keeps exception messages out of logs', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const message = queueMessage({
+      version: 1,
+      operation: 'generate',
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 3,
+    });
+
+    await consumeExportBatch(
+      { messages: [message] } as unknown as MessageBatch<unknown>,
+      {} as ExportEnv,
+      vi.fn().mockRejectedValue(new Error('database secret and row contents'))
+    );
+
+    expect(parsedLog(warn)).toEqual({
+      event: 'export_queue_retry_requested',
+      service: 'user-data-export',
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 3,
+      attempt: 3,
+      errorName: 'Error',
+    });
+    expect(warn.mock.calls[0]?.[0]).not.toContain('database secret');
+    expect(message.retry).toHaveBeenCalledWith({ delaySeconds: 60 });
+    expect(message.ack).not.toHaveBeenCalled();
+  });
+
+  it('logs malformed messages without serializing their payload', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const message = queueMessage({ token: 'secret-token', rows: ['private'] });
+
+    await consumeExportBatch(
+      { messages: [message] } as unknown as MessageBatch<unknown>,
+      {} as ExportEnv,
+      vi.fn()
+    );
+
+    expect(parsedLog(warn)).toEqual({
+      event: 'export_queue_message_invalid',
+      service: 'user-data-export',
+      validationIssueCount: expect.any(Number),
+    });
+    expect(warn.mock.calls[0]?.[0]).not.toContain('secret-token');
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+});
 
 describe('dead-letter queue consumption', () => {
   it('generation-fences terminal failure and acknowledges the message', async () => {
@@ -194,10 +251,13 @@ describe('account-deletion object cleanup', () => {
   });
 
   it('retains the tombstone and records a failed R2 deletion attempt', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const exportId = 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c';
+    const objectKey = `exports/${exportId}/kilo-data-export.jsonl.gz`;
     const state = {
       pendingObjectDeletions: vi
         .fn()
-        .mockResolvedValue([{ object_key: 'exports/id/file.gz', multipart_upload_id: null }]),
+        .mockResolvedValue([{ object_key: objectKey, multipart_upload_id: null }]),
       completeObjectDeletion: vi.fn(),
       recordObjectDeletionFailure: vi.fn(),
     };
@@ -209,7 +269,15 @@ describe('account-deletion object cleanup', () => {
     await deletePendingObjects(bucket, state);
 
     expect(state.completeObjectDeletion).not.toHaveBeenCalled();
-    expect(state.recordObjectDeletionFailure).toHaveBeenCalledWith('exports/id/file.gz');
+    expect(state.recordObjectDeletionFailure).toHaveBeenCalledWith(objectKey);
+    expect(parsedLog(warn)).toEqual({
+      event: 'account_export_object_cleanup_failed',
+      service: 'user-data-export',
+      exportId,
+      stage: 'r2_delete',
+      errorName: 'Error',
+    });
+    expect(warn.mock.calls[0]?.[0]).not.toContain(objectKey);
   });
 
   it('aborts an in-flight multipart upload before deleting its key', async () => {

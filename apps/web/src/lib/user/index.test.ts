@@ -925,6 +925,36 @@ describe('User', () => {
       expect(tombstone).toMatchObject({ multipart_upload_id: null });
     });
 
+    it('delays deterministic object cleanup until an active export lease expires', async () => {
+      const user = await insertTestUser();
+      const leaseExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+          status: 'processing',
+          lease_token: crypto.randomUUID(),
+          lease_expires_at: leaseExpiresAt,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(new Date(tombstone?.available_at ?? '').toISOString()).toBe(
+        new Date(leaseExpiresAt).toISOString()
+      );
+    });
+
     it('anonymizes recommendation dismissal actor references', async () => {
       const organizationOwner = await insertTestUser();
       const dismissingUser = await insertTestUser();

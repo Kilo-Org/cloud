@@ -1,21 +1,84 @@
-import { ExportQueueMessageSchema, type ExportQueueMessage, parseCursor } from './contracts';
+import { ExportQueueMessageSchema, type ExportQueueMessage } from './contracts';
 import {
   createReplicaQuery,
   createStateDb,
   type ExportJob,
   type HyperdriveBinding,
 } from './databases';
-import { uploadGzipStream } from './gzip';
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
+import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError } from './observability';
 
+const MAX_PROCESSING_MS = 13 * 60 * 1000;
+const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;
-const MAX_PROCESSING_MS = 10 * 60 * 1000;
 const PAGE_SIZE = 1_000;
 
-export function hasProcessingTimeRemaining(startedAt: number, now: number = Date.now()): boolean {
-  return now - startedAt < MAX_PROCESSING_MS;
+export class TerminalExportError extends Error {
+  constructor(
+    readonly failureCode: string,
+    readonly redactedMessage: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'TerminalExportError';
+  }
+}
+
+function exportDeadlineError(): TerminalExportError {
+  return new TerminalExportError(
+    'export_deadline_exceeded',
+    'The export was too large to complete within the processing limit.',
+    'Export exceeded the 13-minute processing deadline'
+  );
+}
+
+export async function handleGenerationFailure(input: {
+  error: unknown;
+  exportId: string;
+  generation: number;
+  leaseToken: string;
+  phase: string;
+  source: string | null;
+  markFailed: (input: {
+    exportId: string;
+    generation: number;
+    leaseToken: string;
+    failureCode: string;
+    redactedMessage: string;
+  }) => Promise<void>;
+  releaseForRetry: (exportId: string, generation: number, leaseToken: string) => Promise<void>;
+}): Promise<'failed' | 'retry'> {
+  if (input.error instanceof TerminalExportError) {
+    await input.markFailed({
+      exportId: input.exportId,
+      generation: input.generation,
+      leaseToken: input.leaseToken,
+      failureCode: input.error.failureCode,
+      redactedMessage: input.error.redactedMessage,
+    });
+    logExportEvent('error', 'export_generation_failed', {
+      exportId: input.exportId,
+      generation: input.generation,
+      phase: input.phase,
+      source: input.source,
+      terminal: true,
+      ...safeError(input.error),
+    });
+    return 'failed';
+  }
+
+  await input.releaseForRetry(input.exportId, input.generation, input.leaseToken);
+  logExportEvent('error', 'export_generation_failed', {
+    exportId: input.exportId,
+    generation: input.generation,
+    phase: input.phase,
+    source: input.source,
+    terminal: false,
+    ...safeError(input.error),
+  });
+  return 'retry';
 }
 
 export type ExportEnv = {
@@ -45,7 +108,6 @@ function exportIdFromObjectKey(value: string): string | undefined {
 export const exportArtifact = {
   contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
   contentType: 'application/gzip',
-  partBytes: PART_BYTES,
 } as const;
 
 export function isAllowedWebCallbackUrl(value: string): boolean {
@@ -68,7 +130,6 @@ export function resolveSourceAdapter(
     ? adapters.find(adapter => adapter.readPage)
     : adapters.find(adapter => adapter.name === persistedSource);
 }
-
 export async function attachNewMultipartUpload(input: {
   upload: Pick<R2MultipartUpload, 'uploadId' | 'abort'>;
   exportId: string;
@@ -93,34 +154,6 @@ export async function attachNewMultipartUpload(input: {
   } catch (error) {
     await input.upload.abort().catch(() => undefined);
     throw error;
-  }
-}
-
-export async function dispatchContinuation(input: {
-  queue: Pick<Queue<ExportQueueMessage>, 'send'>;
-  exportId: string;
-  generation: number;
-  markSent: (exportId: string, generation: number) => Promise<void>;
-}): Promise<void> {
-  try {
-    await input.queue.send({
-      version: 1,
-      operation: 'generate',
-      exportId: input.exportId,
-      generation: input.generation,
-    });
-    await input.markSent(input.exportId, input.generation);
-    logExportEvent('info', 'export_continuation_dispatched', {
-      exportId: input.exportId,
-      generation: input.generation,
-    });
-  } catch (error) {
-    // The transactional outbox remains available for scheduled recovery.
-    logExportEvent('warn', 'export_continuation_deferred', {
-      exportId: input.exportId,
-      generation: input.generation,
-      ...safeError(error),
-    });
   }
 }
 
@@ -168,19 +201,24 @@ export async function processGenerateMessage(
   let uploadParts:
     | Promise<Array<{ partNumber: number; etag: string; sizeBytes: number }>>
     | undefined;
+  let upload: R2MultipartUpload | undefined;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let deadlineError: TerminalExportError | undefined;
   let phase = 'claim';
   let activeSource = job.current_source;
 
   try {
-    if (job.current_source === null && job.multipart_upload_id) {
-      phase = 'finalization';
-      logExportEvent('info', 'export_finalization_started', {
-        exportId: job.id,
-        generation: job.dispatch_generation,
-        nextPartNumber: job.next_part_number,
-      });
-      await finalizeExport(env, state, job, leaseToken);
-      return;
+    if (
+      job.multipart_upload_id ||
+      job.dispatch_generation !== 0 ||
+      job.current_source !== null ||
+      job.source_cursor !== null
+    ) {
+      throw new TerminalExportError(
+        'retired_multipart_export',
+        'This export was created by an older generator and must be requested again.',
+        'Existing multipart export cannot be resumed by the one-shot generator'
+      );
     }
 
     const adapters = createSourceAdapters(createReplicaQuery(env.EXPORT_REPLICA_DB));
@@ -192,70 +230,53 @@ export async function processGenerateMessage(
 
     const key = objectKey(job.id);
     phase = 'multipart';
-    let upload: R2MultipartUpload;
-    if (job.multipart_upload_id) {
-      upload = env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id);
-      logExportEvent('info', 'export_generation_attempt_started', {
-        exportId: job.id,
-        generation: job.dispatch_generation,
-        source: adapter.name,
-        uploadMode: 'resumed',
-        nextPartNumber: job.next_part_number,
-      });
-    } else {
-      upload = await env.EXPORT_BUCKET.createMultipartUpload(key, {
-        httpMetadata: {
-          contentType: exportArtifact.contentType,
-          contentDisposition: exportArtifact.contentDisposition,
-        },
-      });
-      const attachResult = await attachNewMultipartUpload({
-        upload,
-        exportId: job.id,
-        generation: job.dispatch_generation,
-        leaseToken,
-        attach: input => state.attachMultipartUpload(input),
-      });
-      if (attachResult !== 'attached') {
-        logExportEvent('info', 'export_generation_skipped', {
-          exportId: job.id,
-          generation: job.dispatch_generation,
-          reason: attachResult,
-        });
-        return;
-      }
-      logExportEvent('info', 'export_generation_attempt_started', {
-        exportId: job.id,
-        generation: job.dispatch_generation,
-        source: adapter.name,
-        uploadMode: 'created',
-        nextPartNumber: job.next_part_number,
-      });
-    }
+    upload = await env.EXPORT_BUCKET.createMultipartUpload(key, {
+      httpMetadata: {
+        contentType: exportArtifact.contentType,
+        contentDisposition: exportArtifact.contentDisposition,
+      },
+    });
+    const attachResult = await attachNewMultipartUpload({
+      upload,
+      exportId: job.id,
+      generation: job.dispatch_generation,
+      leaseToken,
+      attach: input => state.attachMultipartUpload(input),
+    });
+    if (attachResult !== 'attached') return;
+    logExportEvent('info', 'export_generation_attempt_started', {
+      exportId: job.id,
+      generation: job.dispatch_generation,
+      source: adapter.name,
+      uploadMode: 'single_invocation_multipart',
+    });
     const encoder = new TextEncoder();
     const compressor = new CompressionStream('gzip');
     const processingStartedAt = Date.now();
-    let isFinal = false;
+    const activeUpload = upload;
     uploadParts = uploadGzipStream({
       stream: compressor.readable,
       partBytes: PART_BYTES,
-      startPartNumber: job.next_part_number,
-      isFinal: () => isFinal,
-      uploadPart: (partNumber, value) => upload.uploadPart(partNumber, value),
+      uploadPart: (partNumber, value) => activeUpload.uploadPart(partNumber, value),
     });
     writer = compressor.writable.getWriter();
+    deadline = setTimeout(() => {
+      deadlineError = exportDeadlineError();
+      void writer?.abort(deadlineError).catch(() => undefined);
+    }, MAX_PROCESSING_MS);
     let uncompressedSize = 0;
     let pageCount = 0;
-    if (job.next_part_number === 1) {
-      const header = encoder.encode(exportHeader(job));
-      await writer.write(header);
-      uncompressedSize += header.byteLength;
-    }
-    let cursor = parseCursor(job.source_cursor);
+    const header = encoder.encode(exportHeader(job));
+    await writer.write(header);
+    uncompressedSize += header.byteLength;
+    let cursor = null;
     let recordCount = 0;
     let nextSource: string | null = adapter.name;
 
-    while (nextSource && hasProcessingTimeRemaining(processingStartedAt)) {
+    while (nextSource) {
+      if (Date.now() - processingStartedAt >= SOURCE_PROCESSING_MS) {
+        throw deadlineError ?? exportDeadlineError();
+      }
       const readPage = adapter.readPage;
       if (!readPage) throw new Error('Export job has an invalid current source');
       phase = 'source_read';
@@ -266,10 +287,11 @@ export async function processGenerateMessage(
         cursor,
         limit: PAGE_SIZE,
       });
-      const pagePayload = page.records.map(jsonLine).join('');
-      const pageBytes = encoder.encode(pagePayload);
-      await writer.write(pageBytes);
-      uncompressedSize += pageBytes.byteLength;
+      for (const record of page.records) {
+        const recordBytes = encoder.encode(jsonLine(record));
+        await writer.write(recordBytes);
+        uncompressedSize += recordBytes.byteLength;
+      }
       pageCount += 1;
       recordCount += page.records.length;
       if (page.nextCursor) {
@@ -288,104 +310,64 @@ export async function processGenerateMessage(
       cursor = null;
       nextSource = adapter.name;
     }
-    isFinal = nextSource === null;
     phase = 'compression_finalize';
     await writer.close();
     const parts = await uploadParts;
     if (parts.length === 0) throw new Error('Compressed export produced no multipart data');
-    phase = 'checkpoint';
-    const checkpointed = await state.checkpoint({
+    if (deadlineError) throw deadlineError;
+    phase = 'object_finalize';
+    const object = await upload.complete(
+      parts.map(part => ({ partNumber: part.partNumber, etag: part.etag }))
+    );
+    if (deadlineError) throw deadlineError;
+    phase = 'state_update';
+    const completed = await state.complete({
       exportId: job.id,
       leaseToken,
-      parts,
       rowCount: recordCount,
-      cursor,
-      nextSource,
-      nextGeneration: job.dispatch_generation + 1,
-      multipartUploadId: upload.uploadId,
+      objectKey: key,
+      etag: object.etag,
+      sizeBytes: object.size,
     });
-    if (!checkpointed) {
-      logExportEvent('warn', 'export_checkpoint_rejected', {
+    if (!completed) {
+      await env.EXPORT_BUCKET.delete(key);
+      logExportEvent('warn', 'export_completion_fenced', {
         exportId: job.id,
         generation: job.dispatch_generation,
+        reason: 'lost_lease_or_terminal_state',
       });
       return;
     }
 
-    logExportEvent('info', 'export_generation_checkpointed', {
+    logExportEvent('info', 'export_completed', {
       exportId: job.id,
       generation: job.dispatch_generation,
-      nextGeneration: job.dispatch_generation + 1,
-      source: adapter.name,
-      nextSource,
       pageCount,
       rowCount: recordCount,
-      partCount: parts.length,
       uncompressedBytes: uncompressedSize,
+      sizeBytes: object.size,
     });
-
-    await dispatchContinuation({
-      queue: env.EXPORT_QUEUE,
-      exportId: job.id,
-      generation: job.dispatch_generation + 1,
-      markSent: (exportId, generation) => state.markOutboxGenerationSent(exportId, generation),
-    });
-
-    // Finalization runs from the checkpointed continuation so a crash after the
-    // R2 upload cannot complete a multipart object whose part is not durable.
-    if (nextSource) return;
   } catch (error) {
-    await writer?.abort(error).catch(() => undefined);
+    const failure = deadlineError ?? error;
+    await writer?.abort(failure).catch(() => undefined);
     await uploadParts?.catch(() => undefined);
-    await state.releaseForRetry(job.id, job.dispatch_generation, leaseToken);
-    logExportEvent('error', 'export_generation_failed', {
+    await upload?.abort().catch(() => undefined);
+    await env.EXPORT_BUCKET.delete(objectKey(job.id)).catch(() => undefined);
+    const outcome = await handleGenerationFailure({
+      error: failure,
       exportId: job.id,
       generation: job.dispatch_generation,
+      leaseToken,
       phase,
       source: activeSource,
-      ...safeError(error),
+      markFailed: input => state.markLeasedExportFailed(input),
+      releaseForRetry: (exportId, generation, token) =>
+        state.releaseForRetry(exportId, generation, token),
     });
-    throw error;
+    if (outcome === 'retry') throw failure;
+  } finally {
+    if (deadline) clearTimeout(deadline);
   }
-}
-
-async function finalizeExport(
-  env: ExportEnv,
-  state: ReturnType<typeof createStateDb>,
-  job: ExportJob,
-  leaseToken: string
-): Promise<void> {
-  if (!job.multipart_upload_id)
-    throw new Error('Final export is missing its multipart upload checkpoint');
-  const key = objectKey(job.id);
-  let verified = await env.EXPORT_BUCKET.head(key);
-  if (!verified) {
-    const upload = env.EXPORT_BUCKET.resumeMultipartUpload(key, job.multipart_upload_id);
-    const parts = await state.parts(job.id);
-    await upload.complete(parts.map(item => ({ partNumber: item.part_number, etag: item.etag })));
-    verified = await env.EXPORT_BUCKET.head(key);
-  }
-  if (!verified) throw new Error('Completed export object was not found');
-  const completed = await state.complete({
-    exportId: job.id,
-    leaseToken,
-    objectKey: key,
-    etag: verified.etag,
-    sizeBytes: verified.size,
-  });
-  if (!completed) {
-    logExportEvent('warn', 'export_completion_fenced', {
-      exportId: job.id,
-      generation: job.dispatch_generation,
-      reason: 'lost_lease_or_terminal_state',
-    });
-    return;
-  }
-  logExportEvent('info', 'export_completed', {
-    exportId: job.id,
-    generation: job.dispatch_generation,
-    sizeBytes: verified.size,
-  });
 }
 
 export async function consumeExportBatch(

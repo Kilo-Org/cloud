@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  attachNewMultipartUpload,
   consumeDeadLetterBatch,
   consumeExportBatch,
   deletePendingObjects,
-  dispatchContinuation,
   exportHeader,
-  hasProcessingTimeRemaining,
+  exportArtifact,
+  handleGenerationFailure,
   processScheduledExportWork,
   resolveSourceAdapter,
+  TerminalExportError,
   type ExportEnv,
 } from './worker';
 import type { ExportJob } from './databases';
@@ -128,6 +128,16 @@ describe('export header timestamps', () => {
   });
 });
 
+describe('export artifact metadata', () => {
+  it('stores a downloadable gzip object without transparent content encoding', () => {
+    expect(exportArtifact).toEqual({
+      contentType: 'application/gzip',
+      contentDisposition: 'attachment; filename="kilo-data-export.jsonl.gz"',
+    });
+    expect(exportArtifact).not.toHaveProperty('contentEncoding');
+  });
+});
+
 describe('source resume keys', () => {
   const enabled = {
     name: 'enabled',
@@ -145,100 +155,61 @@ describe('source resume keys', () => {
   });
 });
 
-describe('generation processing budget', () => {
-  it('continues until the ten-minute safety budget is exhausted', () => {
-    const startedAt = Date.UTC(2026, 7, 9, 20, 0, 0);
-
-    expect(hasProcessingTimeRemaining(startedAt, startedAt + 10 * 60 * 1000 - 1)).toBe(true);
-    expect(hasProcessingTimeRemaining(startedAt, startedAt + 10 * 60 * 1000)).toBe(false);
-  });
-});
-
-describe('first multipart upload attachment', () => {
-  it('aborts a newly created upload when account deletion removes the export row', async () => {
-    const abort = vi.fn();
-    const attach = vi.fn().mockResolvedValue('deleted');
+describe('generation failure handling', () => {
+  it('marks terminal deadlines failed without releasing them for retry', async () => {
+    const markFailed = vi.fn();
+    const releaseForRetry = vi.fn();
 
     await expect(
-      attachNewMultipartUpload({
-        upload: { uploadId: 'upload-id', abort },
+      handleGenerationFailure({
+        error: new TerminalExportError(
+          'export_deadline_exceeded',
+          'The export was too large to complete within the processing limit.',
+          'deadline exceeded'
+        ),
         exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 0,
+        generation: 2,
         leaseToken: 'lease-token',
-        attach,
+        phase: 'compression_finalize',
+        source: 'microdollar_usage_prompts',
+        markFailed,
+        releaseForRetry,
       })
-    ).resolves.toBe('deleted');
+    ).resolves.toBe('failed');
 
-    expect(abort).toHaveBeenCalledOnce();
-  });
-
-  it('aborts its private upload without creating cleanup work when only the lease was lost', async () => {
-    const abort = vi.fn();
-
-    await expect(
-      attachNewMultipartUpload({
-        upload: { uploadId: 'upload-id', abort },
-        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 0,
-        leaseToken: 'lease-token',
-        attach: vi.fn().mockResolvedValue('lost_lease'),
-      })
-    ).resolves.toBe('lost_lease');
-
-    expect(abort).toHaveBeenCalledOnce();
-  });
-
-  it('aborts a newly created upload when persisting its ID fails', async () => {
-    const abort = vi.fn().mockResolvedValue(undefined);
-    const attach = vi.fn().mockRejectedValue(new Error('database unavailable'));
-
-    await expect(
-      attachNewMultipartUpload({
-        upload: { uploadId: 'upload-id', abort },
-        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 0,
-        leaseToken: 'lease-token',
-        attach,
-      })
-    ).rejects.toThrow('database unavailable');
-
-    expect(abort).toHaveBeenCalledOnce();
-  });
-});
-
-describe('continuation dispatch', () => {
-  it('sends the next generation and marks its outbox row sent', async () => {
-    const send = vi.fn();
-    const markSent = vi.fn();
-
-    await dispatchContinuation({
-      queue: { send },
+    expect(markFailed).toHaveBeenCalledWith({
       exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-      generation: 4,
-      markSent,
+      generation: 2,
+      leaseToken: 'lease-token',
+      failureCode: 'export_deadline_exceeded',
+      redactedMessage: 'The export was too large to complete within the processing limit.',
     });
-
-    expect(send).toHaveBeenCalledWith({
-      version: 1,
-      operation: 'generate',
-      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-      generation: 4,
-    });
-    expect(markSent).toHaveBeenCalledWith('f6ba5ce5-9061-4f7f-9ec6-76f047573f1c', 4);
+    expect(releaseForRetry).not.toHaveBeenCalled();
   });
 
-  it('leaves the outbox unsent when immediate Queue publication fails', async () => {
-    const markSent = vi.fn();
+  it('keeps transient failures on the retry path', async () => {
+    const markFailed = vi.fn();
+    const releaseForRetry = vi.fn();
 
     await expect(
-      dispatchContinuation({
-        queue: { send: vi.fn().mockRejectedValue(new Error('Queue unavailable')) },
+      handleGenerationFailure({
+        error: new Error('temporary'),
         exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        generation: 4,
-        markSent,
+        generation: 2,
+        leaseToken: 'lease-token',
+        phase: 'source_read',
+        source: 'microdollar_usage_prompts',
+        markFailed,
+        releaseForRetry,
       })
-    ).resolves.toBeUndefined();
-    expect(markSent).not.toHaveBeenCalled();
+    ).resolves.toBe('retry');
+
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(releaseForRetry).toHaveBeenCalledWith(
+      'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      2,
+      'lease-token'
+    );
   });
 });
 

@@ -1,5 +1,5 @@
 {
-  "id": "558d8065-d71b-4461-bbd7-0e0eeaed1d8f",
+  "id": "608b6ea5-8132-49ad-bf6e-fbfeaf4f373d",
   "prevId": "bb8cf2f4-68eb-423d-9bda-06d43e144f68",
   "version": "7",
   "dialect": "postgresql",
@@ -36006,10 +36006,6 @@
         "user_data_exports_size_bytes_nonnegative": {
           "name": "user_data_exports_size_bytes_nonnegative",
           "value": "\"user_data_exports\".\"size_bytes\" IS NULL OR \"user_data_exports\".\"size_bytes\" >= 0"
-        },
-        "user_data_exports_multipart_checkpoint_shape": {
-          "name": "user_data_exports_multipart_checkpoint_shape",
-          "value": "\"user_data_exports\".\"multipart_upload_id\" IS NULL OR \"user_data_exports\".\"next_part_number\" > 1"
         },
         "user_data_exports_lease_shape": {
           "name": "user_data_exports_lease_shape",

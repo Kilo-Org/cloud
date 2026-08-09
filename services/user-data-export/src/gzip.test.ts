@@ -66,5 +66,6 @@ describe('gzip export members', () => {
     expect(isAllowedWebCallbackUrl('http://127.0.0.1:3000')).toBe(true);
     expect(isAllowedWebCallbackUrl('https://example.com')).toBe(false);
     expect(isAllowedWebCallbackUrl('http://app.kilo.ai')).toBe(false);
+    expect(isAllowedWebCallbackUrl('not-a-url')).toBe(false);
   });
 });

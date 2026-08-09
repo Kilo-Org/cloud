@@ -580,10 +580,6 @@ export const user_data_exports = pgTable(
       sql`${table.size_bytes} IS NULL OR ${table.size_bytes} >= 0`
     ),
     check(
-      'user_data_exports_multipart_checkpoint_shape',
-      sql`${table.multipart_upload_id} IS NULL OR ${table.next_part_number} > 1`
-    ),
-    check(
       'user_data_exports_lease_shape',
       sql`(${table.lease_token} IS NULL) = (${table.lease_expires_at} IS NULL)`
     ),

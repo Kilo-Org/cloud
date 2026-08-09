@@ -50,7 +50,7 @@
     },
     {
       "binding": "EXPORT_REPLICA_DB",
-      "id": "local-test-only-replica",
+      "id": "bcc8d2f3a24f4929b5ee91cf77b1c5fa",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],

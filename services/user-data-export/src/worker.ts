@@ -38,12 +38,16 @@ export const exportArtifact = {
 } as const;
 
 export function isAllowedWebCallbackUrl(value: string): boolean {
-  const url = new URL(value);
-  return (
-    (url.protocol === 'https:' &&
-      (url.hostname === 'app.kilo.ai' || url.hostname === 'staging-app.kilo.ai')) ||
-    (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
-  );
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === 'https:' &&
+        (url.hostname === 'app.kilo.ai' || url.hostname === 'staging-app.kilo.ai')) ||
+      (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function resolveSourceAdapter(
@@ -79,6 +83,25 @@ export async function attachNewMultipartUpload(input: {
   } catch (error) {
     await input.upload.abort().catch(() => undefined);
     throw error;
+  }
+}
+
+export async function dispatchContinuation(input: {
+  queue: Pick<Queue<ExportQueueMessage>, 'send'>;
+  exportId: string;
+  generation: number;
+  markSent: (exportId: string, generation: number) => Promise<void>;
+}): Promise<void> {
+  try {
+    await input.queue.send({
+      version: 1,
+      operation: 'generate',
+      exportId: input.exportId,
+      generation: input.generation,
+    });
+    await input.markSent(input.exportId, input.generation);
+  } catch {
+    // The transactional outbox remains available for scheduled recovery.
   }
 }
 
@@ -224,6 +247,13 @@ export async function processGenerateMessage(
       multipartUploadId: upload.uploadId,
     });
     if (!checkpointed) return;
+
+    await dispatchContinuation({
+      queue: env.EXPORT_QUEUE,
+      exportId: job.id,
+      generation: job.dispatch_generation + 1,
+      markSent: (exportId, generation) => state.markOutboxGenerationSent(exportId, generation),
+    });
 
     // Finalization runs from the checkpointed continuation so a crash after the
     // R2 upload cannot complete a multipart object whose part is not durable.
@@ -394,8 +424,11 @@ async function dispatchReadyNotifications(
   state: ReturnType<typeof createStateDb>
 ): Promise<void> {
   if (!env.USER_DATA_EXPORT_WEB_URL) return;
+  if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) {
+    console.warn(JSON.stringify({ event: 'export_notification_callback_url_invalid' }));
+    return;
+  }
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
-  if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) return;
   for (const item of await state.pendingNotifications()) {
     try {
       await fetch(new URL('/api/internal/user-data-exports/ready', baseUrl), {

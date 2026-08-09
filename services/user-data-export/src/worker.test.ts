@@ -3,6 +3,7 @@ import {
   attachNewMultipartUpload,
   consumeDeadLetterBatch,
   deletePendingObjects,
+  dispatchContinuation,
   exportHeader,
   processScheduledExportWork,
   resolveSourceAdapter,
@@ -135,6 +136,42 @@ describe('first multipart upload attachment', () => {
     ).rejects.toThrow('database unavailable');
 
     expect(abort).toHaveBeenCalledOnce();
+  });
+});
+
+describe('continuation dispatch', () => {
+  it('sends the next generation and marks its outbox row sent', async () => {
+    const send = vi.fn();
+    const markSent = vi.fn();
+
+    await dispatchContinuation({
+      queue: { send },
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 4,
+      markSent,
+    });
+
+    expect(send).toHaveBeenCalledWith({
+      version: 1,
+      operation: 'generate',
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 4,
+    });
+    expect(markSent).toHaveBeenCalledWith('f6ba5ce5-9061-4f7f-9ec6-76f047573f1c', 4);
+  });
+
+  it('leaves the outbox unsent when immediate Queue publication fails', async () => {
+    const markSent = vi.fn();
+
+    await expect(
+      dispatchContinuation({
+        queue: { send: vi.fn().mockRejectedValue(new Error('Queue unavailable')) },
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 4,
+        markSent,
+      })
+    ).resolves.toBeUndefined();
+    expect(markSent).not.toHaveBeenCalled();
   });
 });
 

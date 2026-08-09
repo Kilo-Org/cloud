@@ -76,7 +76,6 @@ CREATE TABLE "user_data_exports" (
 	CONSTRAINT "user_data_exports_attempt_count_nonnegative" CHECK ("user_data_exports"."attempt_count" >= 0),
 	CONSTRAINT "user_data_exports_row_count_nonnegative" CHECK ("user_data_exports"."row_count" >= 0),
 	CONSTRAINT "user_data_exports_size_bytes_nonnegative" CHECK ("user_data_exports"."size_bytes" IS NULL OR "user_data_exports"."size_bytes" >= 0),
-	CONSTRAINT "user_data_exports_multipart_checkpoint_shape" CHECK ("user_data_exports"."multipart_upload_id" IS NULL OR "user_data_exports"."next_part_number" > 1),
 	CONSTRAINT "user_data_exports_lease_shape" CHECK (("user_data_exports"."lease_token" IS NULL) = ("user_data_exports"."lease_expires_at" IS NULL)),
 	CONSTRAINT "user_data_exports_ready_shape" CHECK ("user_data_exports"."status" <> 'ready' OR ("user_data_exports"."r2_object_key" IS NOT NULL AND "user_data_exports"."size_bytes" IS NOT NULL AND "user_data_exports"."completed_at" IS NOT NULL AND "user_data_exports"."expires_at" IS NOT NULL)),
 	CONSTRAINT "user_data_exports_sha256_shape" CHECK ("user_data_exports"."sha256" IS NULL OR "user_data_exports"."sha256" ~ '^[a-f0-9]{64}$'),

@@ -152,7 +152,7 @@ describe('addCacheBreakpoints', () => {
     expect(systemContent.at(-1)).toMatchObject({
       type: 'input_text',
       text: 'You are helpful.',
-      cache_control: { type: 'ephemeral' },
+      prompt_cache_breakpoint: { mode: 'explicit' },
     });
 
     const lastItem = request.body.input.at(-1);
@@ -160,12 +160,16 @@ describe('addCacheBreakpoints', () => {
       type: 'function_call_output',
       output: [
         { type: 'input_text', text: 'Tool output' },
-        { type: 'input_text', text: 'Tool detail', cache_control: { type: 'ephemeral' } },
+        {
+          type: 'input_text',
+          text: 'Tool detail',
+          prompt_cache_breakpoint: { mode: 'explicit' },
+        },
       ],
     });
   });
 
-  test('does nothing for responses requests when any cache_control is already present', () => {
+  test('does nothing for responses requests when any prompt_cache_breakpoint is already present', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
@@ -178,8 +182,7 @@ describe('addCacheBreakpoints', () => {
               {
                 type: 'input_text',
                 text: 'First prompt',
-                // @ts-expect-error non-standard cache_control extension
-                cache_control: { type: 'ephemeral' },
+                prompt_cache_breakpoint: { mode: 'explicit' },
               },
             ],
           },
@@ -374,11 +377,11 @@ describe('removeCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
     if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
-    expect(containsCacheControlDeep(request.body.input)).toBe(true);
+    expect(containsCacheBreakpointDeep(request.body.input)).toBe(true);
 
     removeCacheBreakpoints(request);
 
-    expect(containsCacheControlDeep(request.body.input)).toBe(false);
+    expect(containsCacheBreakpointDeep(request.body.input)).toBe(false);
   });
 
   test('removes top-level and nested cache_control from a messages request', () => {
@@ -423,4 +426,17 @@ function containsCacheControlDeep(value: unknown): boolean {
     return true;
   }
   return Object.values(value).some(containsCacheControlDeep);
+}
+
+function containsCacheBreakpointDeep(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsCacheBreakpointDeep);
+  }
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (Object.hasOwn(value, 'prompt_cache_breakpoint')) {
+    return true;
+  }
+  return Object.values(value).some(containsCacheBreakpointDeep);
 }

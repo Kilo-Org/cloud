@@ -5,6 +5,7 @@ import {
   deletePendingObjects,
   exportHeader,
   exportArtifact,
+  handleFencedCompletion,
   handleGenerationFailure,
   processScheduledExportWork,
   persistCompletedExport,
@@ -272,6 +273,27 @@ describe('completed export persistence', () => {
         completedObjectMatches: vi.fn().mockResolvedValue(false),
       })
     ).rejects.toThrow('database unavailable');
+  });
+});
+
+describe('fenced completion cleanup', () => {
+  it('asks the database to schedule terminal object cleanup', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const scheduleObjectDeletion = vi.fn().mockResolvedValue(true);
+
+    await expect(
+      handleFencedCompletion({
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 0,
+        scheduleObjectDeletion,
+      })
+    ).resolves.toBe(true);
+
+    expect(scheduleObjectDeletion).toHaveBeenCalledOnce();
+    expect(parsedLog(warn)).toMatchObject({
+      event: 'export_completion_fenced',
+      cleanupScheduled: true,
+    });
   });
 });
 

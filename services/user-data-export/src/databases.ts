@@ -142,6 +142,22 @@ export function createStateDb(binding: HyperdriveBinding) {
       `);
       return rows.rows[0]?.matches ?? false;
     },
+    async scheduleTerminalObjectDeletion(input: {
+      exportId: string;
+      objectKey: string;
+    }): Promise<boolean> {
+      const rows = await db.execute<{ object_key: string }>(sql`
+        INSERT INTO user_data_export_object_deletions (object_key, available_at)
+        SELECT ${input.objectKey}, now()
+        FROM user_data_exports
+        WHERE id = ${input.exportId} AND status IN ('failed', 'expired')
+        ON CONFLICT (object_key) DO UPDATE
+        SET available_at = LEAST(user_data_export_object_deletions.available_at, now()),
+          updated_at = now()
+        RETURNING object_key
+      `);
+      return rows.rows.length > 0;
+    },
     async markFailed(
       exportId: string,
       generation: number,

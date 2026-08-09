@@ -190,6 +190,22 @@ export async function persistCompletedExport(input: {
     throw error;
   }
 }
+
+export async function handleFencedCompletion(input: {
+  exportId: string;
+  generation: number;
+  scheduleObjectDeletion: () => Promise<boolean>;
+}): Promise<boolean> {
+  const cleanupScheduled = await input.scheduleObjectDeletion();
+  logExportEvent('warn', 'export_completion_fenced', {
+    exportId: input.exportId,
+    generation: input.generation,
+    reason: 'lost_lease_or_terminal_state',
+    cleanupScheduled,
+  });
+  return cleanupScheduled;
+}
+
 function jsonLine(record: ExportRecord): string {
   return `${JSON.stringify(record)}\n`;
 }
@@ -397,10 +413,11 @@ export async function processGenerateMessage(
         state.completedObjectMatches({ exportId: job.id, objectKey: key, etag: object.etag }),
     });
     if (completion === 'fenced') {
-      logExportEvent('warn', 'export_completion_fenced', {
+      await handleFencedCompletion({
         exportId: job.id,
         generation: job.dispatch_generation,
-        reason: 'lost_lease_or_terminal_state',
+        scheduleObjectDeletion: () =>
+          state.scheduleTerminalObjectDeletion({ exportId: job.id, objectKey: key }),
       });
       return;
     }

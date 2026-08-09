@@ -98,11 +98,6 @@ export function exportHeader(job: ExportJob): string {
     requestedAt: strictIsoTimestamp(job.requested_at),
     generatedAt: new Date().toISOString(),
     includedSources: ['app_builder_projects', 'microdollar_usage_metadata', 'system_prompt_prefix'],
-    unavailableSources: [
-      { source: 'app_builder_messages', reason: 'source_table_dropped' },
-      { source: 'numbered_cli_journal', reason: 'source_not_found' },
-    ],
-    consistencyMode: 'membership_cutoff_with_fuzzy_mutable_values',
     snapshotAt: strictIsoTimestamp(job.snapshot_at),
   })}\n`;
 }

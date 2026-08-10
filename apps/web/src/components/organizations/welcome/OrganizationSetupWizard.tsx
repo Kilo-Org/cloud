@@ -21,12 +21,12 @@ import {
   GitBranch,
   Key,
   Loader2,
-  Mail,
   RefreshCw,
   Route,
   Terminal,
   Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   ORGANIZATION_ONBOARDING_STEP_KEYS,
@@ -902,7 +902,7 @@ function SetupStatus({
   detail,
   children,
 }: {
-  icon: typeof Mail;
+  icon: LucideIcon;
   title: string;
   detail: string;
   children?: React.ReactNode;
@@ -927,7 +927,7 @@ function ChoiceCard({
   disabled = false,
   href,
 }: {
-  icon: typeof Mail;
+  icon: LucideIcon;
   title: string;
   description: string;
   actionLabel: string;

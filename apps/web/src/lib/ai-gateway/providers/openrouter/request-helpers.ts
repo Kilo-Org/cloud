@@ -43,22 +43,34 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
   }
 }
 
-function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
-  if (message.type === 'message') {
+const RESPONSES_PROMPT_CACHE_BREAKPOINT: OpenAI.Responses.ResponseInputText.PromptCacheBreakpoint =
+  {
+    mode: 'explicit',
+  };
+
+function isResponsesInputMessage(
+  message: OpenAI.Responses.ResponseInputItem
+): message is OpenAI.Responses.EasyInputMessage | OpenAI.Responses.ResponseInputItem.Message {
+  return (
+    message.type === 'message' &&
+    (message.role === 'user' || message.role === 'system' || message.role === 'developer')
+  );
+}
+
+function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
+  if (isResponsesInputMessage(message)) {
     if (typeof message.content === 'string') {
       message.content = [
         {
           type: 'input_text',
           text: message.content,
-          // @ts-expect-error non-standard extension
-          cache_control: { type: 'ephemeral' },
+          prompt_cache_breakpoint: RESPONSES_PROMPT_CACHE_BREAKPOINT,
         },
       ];
-    } else {
+    } else if (Array.isArray(message.content)) {
       const lastItem = message.content.at(-1);
       if (lastItem) {
-        // @ts-expect-error non-standard extension
-        lastItem.cache_control = { type: 'ephemeral' };
+        lastItem.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
     }
   } else if (message.type === 'function_call_output') {
@@ -67,15 +79,13 @@ function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInp
         {
           type: 'input_text',
           text: message.output,
-          // @ts-expect-error non-standard extension
-          cache_control: { type: 'ephemeral' },
+          prompt_cache_breakpoint: RESPONSES_PROMPT_CACHE_BREAKPOINT,
         },
       ];
-    } else {
+    } else if (Array.isArray(message.output)) {
       const lastItem = message.output.at(-1);
       if (lastItem) {
-        // @ts-expect-error non-standard extension
-        lastItem.cache_control = { type: 'ephemeral' };
+        lastItem.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
     }
   }
@@ -127,7 +137,7 @@ function containsCacheControl(value: unknown): boolean {
   if (!isObjectRecord(value)) {
     return false;
   }
-  if (Object.hasOwn(value, 'cache_control')) {
+  if (Object.hasOwn(value, 'cache_control') || Object.hasOwn(value, 'prompt_cache_breakpoint')) {
     return true;
   }
   return Object.values(value).some(containsCacheControl);
@@ -167,7 +177,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     );
     if (systemMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
-      setCacheControlOnResponsesMessage(systemMessage);
+      setPromptCacheBreakpointOnResponsesMessage(systemMessage);
     }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
@@ -176,7 +186,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
       );
-      setCacheControlOnResponsesMessage(lastMessage);
+      setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
   } else if (
     request.kind === 'messages' &&

@@ -177,6 +177,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`
+- `DATA_EXPORT_POSTGRES_URL` - Connection string for the separate, read-only data export database, loaded out of band and read by `apps/web/src/lib/data-export/db.ts`. Optional: when unset, data export reads are disabled and the application still starts. `[SECRET]`
+- `DATA_EXPORT_DATABASE_CA` - Optional CA certificate content (PEM) for the data export database, for when it does not share the primary's CA. Falls back to `DATABASE_CA`; remote connections require TLS either way. [SERVER]
 
 ### Redis & Queue
 

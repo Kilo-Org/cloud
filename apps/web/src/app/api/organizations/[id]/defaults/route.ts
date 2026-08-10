@@ -110,7 +110,8 @@ export async function GET(
     if (
       policy.memberGrant.mode === 'unrestricted' &&
       policy.organizationModelDenyList.length === 0 &&
-      !policy.organizationProviderCeiling
+      !policy.organizationProviderCeiling &&
+      !policy.requireModelInCurrentSnapshot
     ) {
       // No restrictions - use PRIMARY_DEFAULT_MODEL directly
       defaultModel = PRIMARY_DEFAULT_MODEL;

@@ -142,6 +142,7 @@ export async function validateOrganizationAutoTarget(
   }
 
   const restrictions = {
+    requireModelInCurrentSnapshot: organization.plan === 'enterprise',
     providerAllowList:
       organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
     modelDenyList:

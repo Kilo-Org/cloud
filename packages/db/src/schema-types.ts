@@ -1915,15 +1915,6 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
-export const CustomLlmCompressionSchema = z.object({
-  enabled: z.literal(true),
-  base_url: z.url().optional(),
-  api_key: z.string().optional(),
-  model_alias: z.string(),
-});
-
-export type CustomLlmCompression = z.infer<typeof CustomLlmCompressionSchema>;
-
 const CustomLlmPropertyPathSchema = z
   .string()
   .min(1)
@@ -1942,13 +1933,10 @@ export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
   add_cache_breakpoints: z.boolean().optional(),
-  remove_cache_breakpoints: z.boolean().optional(),
-  inject_reasoning_into_content: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  compression: CustomLlmCompressionSchema.optional(),
   thought_signature_mapping: CustomLlmPropertyPathSchema.optional(),
   thought_content_mapping: CustomLlmPropertyPathSchema.optional(),
 });
@@ -1971,6 +1959,20 @@ export const GoogleServiceAccountKeySchema = z.object({
 
 export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
 
+export const CustomLlmApiKeyCredentialsSchema = z.object({
+  type: z.literal('api_key'),
+  api_key: z.string().min(1),
+});
+
+export type CustomLlmApiKeyCredentials = z.infer<typeof CustomLlmApiKeyCredentialsSchema>;
+
+export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
+  CustomLlmApiKeyCredentialsSchema,
+  GoogleServiceAccountKeySchema,
+]);
+
+export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
+
 const CustomLlmDefinitionBaseSchema = z.object({
   ...CustomLlmMetadataSchema.shape,
   ...CustomLlmApiConfigSchema.shape,
@@ -1981,7 +1983,7 @@ const CustomLlmDefinitionBaseSchema = z.object({
 
 export const CustomLlmDefinitionSchema = z.union([
   CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.string(),
+    api_key: z.string().optional(),
     google_service_account: z.never().optional(),
   }),
   CustomLlmDefinitionBaseSchema.extend({

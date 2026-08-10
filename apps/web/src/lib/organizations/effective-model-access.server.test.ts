@@ -4,6 +4,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from './effective-model-access.server';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -38,6 +39,15 @@ function context(
   };
 }
 
+const currentSnapshotLookup = async (modelId: string) =>
+  new Set(
+    {
+      'anthropic/claude': ['anthropic'],
+      'openai/gpt-4o': ['openai'],
+      'openai/o3': ['openai'],
+    }[modelId] ?? []
+  );
+
 describe('effective organization model access', () => {
   it('preserves current organization access outside Enterprise', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
@@ -46,14 +56,104 @@ describe('effective organization model access', () => {
         defaultPolicies: [],
       })
     );
-    expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(true);
+    expect(
+      (await getEffectiveModelDecision(policy, 'anthropic/claude', async () => new Set())).allowed
+    ).toBe(true);
   });
 
-  it('preserves organization access when no model access policy is configured', async () => {
+  it('denies Enterprise model aliases missing from the current snapshot', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { model_deny_list: ['x-ai/grok-4.5'] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    const decision = await getEffectiveModelDecision(policy, 'grok-4.5', async () => new Set());
+
+    expect(decision).toEqual({ allowed: false, denialSource: 'organization_model' });
+  });
+
+  it('requires snapshot membership for Enterprise without configured restrictions', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: { ...context().organization, settings: {} },
+        defaultPolicies: [],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'grok-4.5', async () => new Set())
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+    await expect(
+      getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)
+    ).resolves.toEqual({ allowed: true });
+  });
+
+  it('excludes latest aliases from model restrictions while enforcing provider routes', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: {
+            model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+            provider_allow_list: ['anthropic'],
+          },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => {
+        throw new Error('latest aliases must not use snapshot provider metadata');
+      })
+    ).resolves.toEqual({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['anthropic']),
+    });
+  });
+
+  it('denies latest aliases when the organization allows no providers', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: {
+            model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+            provider_allow_list: [],
+          },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
+  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+    'keeps %s exempt from effective Enterprise restrictions',
+    async modelId => {
+      const policy = evaluateEffectiveModelAccessPolicy(context());
+
+      await expect(
+        getEffectiveModelDecision(policy, modelId, async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    }
+  );
+
+  it('allows known snapshot models when no model access policy is configured', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({ defaultPolicies: [], groupPolicies: [] })
     );
-    expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(true);
+    expect(
+      (await getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)).allowed
+    ).toBe(true);
     expect((await getEffectiveModelDecision(policy, 'openai/o3')).allowed).toBe(false);
   });
 
@@ -87,15 +187,21 @@ describe('effective organization model access', () => {
         ],
       })
     );
-    expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(true);
-    expect((await getEffectiveModelDecision(policy, 'openai/gpt-4o')).allowed).toBe(false);
+    expect(
+      (await getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)).allowed
+    ).toBe(true);
+    expect(
+      (await getEffectiveModelDecision(policy, 'openai/gpt-4o', currentSnapshotLookup)).allowed
+    ).toBe(false);
   });
 
   it('lets all dominate selected and none within the organization ceiling', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({ groupPolicies: [[{ type: 'model_access', data: { mode: 'all' } }]] })
     );
-    expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(true);
+    expect(
+      (await getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)).allowed
+    ).toBe(true);
     expect((await getEffectiveModelDecision(policy, 'openai/o3')).allowed).toBe(false);
   });
 
@@ -117,7 +223,7 @@ describe('effective organization model access', () => {
       'unknown/model',
       async () => new Set()
     );
-    expect(decision).toMatchObject({ allowed: false, denialSource: 'group_provider' });
+    expect(decision).toMatchObject({ allowed: false, denialSource: 'organization_model' });
   });
 
   it('intersects provider-derived grants with the organization ceiling', async () => {
@@ -219,23 +325,31 @@ describe('effective organization model access', () => {
     expect([...catalogModel.eligibleProviderRoutes!]).toEqual(['fireworks']);
   });
 
-  it('still fail-opens unrestricted exclusive models without catalog metadata', async () => {
+  it('still evaluates restricted exclusive models missing from the snapshot', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai'], model_deny_list: [] },
+          settings: { provider_allow_list: ['openai', 'deepseek'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const decision = await getEffectiveModelDecision(
+    const emptySnapshot = async () => new Set<string>();
+
+    const restricted = await getEffectiveModelDecision(
+      policy,
+      'deepseek/deepseek-v4-pro:discounted',
+      emptySnapshot
+    );
+    const unrestricted = await getEffectiveModelDecision(
       policy,
       'stealth/gpt-5.6-sol',
-      async () => new Set()
+      emptySnapshot
     );
 
-    expect(decision.allowed).toBe(true);
-    expect([...decision.eligibleProviderRoutes!]).toEqual(['openai']);
+    expect(restricted.allowed).toBe(true);
+    expect([...restricted.eligibleProviderRoutes!]).toEqual(['deepseek']);
+    expect(unrestricted).toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 });

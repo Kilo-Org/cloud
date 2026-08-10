@@ -61,6 +61,7 @@ export const subjects = {
   securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
   recommendationsDigest: 'Kilo: Your weekly recommendations',
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
+  userDataExportReady: 'Your Kilo account export is ready',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -450,6 +451,20 @@ export async function sendAccountDeletionConfirmationEmail(to: string): Promise<
     to,
     templateName: 'accountDeletionRequest',
     templateVars: { email: to },
+  });
+}
+
+export async function sendUserDataExportReadyEmail(
+  to: string,
+  props: { expiresAt: Date }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'userDataExportReady',
+    templateVars: {
+      data_exports_url: `${NEXTAUTH_URL}/data-exports`,
+      expiry_date: formatDate(props.expiresAt),
+    },
   });
 }
 

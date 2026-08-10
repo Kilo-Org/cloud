@@ -56,7 +56,7 @@ const extensionPath = resolvePath(import.meta.dirname, '../.output/chrome-mv3');
 const extensionDir = resolvePath(import.meta.dirname, '..');
 const gatewayBase = 'https://app.kilo.ai';
 const gatewayChatCompletionsPath = '/api/gateway/v1/chat/completions';
-const modelId = 'kilo-auto/efficient';
+let modelId = 'kilo-auto/efficient';
 const creditAccountLabel = 'Kilo';
 const turnStabilitySeconds = 6;
 // KILO_BENCH_RAW=1 additionally writes attempt-<n>-raw.json with the full
@@ -214,6 +214,7 @@ interface ParsedArgs {
   readonly date: string | null;
   readonly append: boolean;
   readonly scenario: BenchScenario;
+  readonly model: string | null;
 }
 
 interface AgentPhaseResult {
@@ -361,8 +362,9 @@ Options:
   --timeout-ms <ms>  per-attempt agent-phase deadline (default 900000)
   --date <YYYY-MM-DD> follow-up date (default: today + 45 days)
   --scenario <id>    scenario id: ${Object.keys(BENCH_SCENARIOS).join(', ')} (default flights)
+  --model <id>       gateway model id (default kilo-auto/efficient)
   --append           extend an existing batch in --out; refuses a different
-                     gitHead, scenario, follow-up date, or org hash`;
+                     gitHead, scenario, model, follow-up date, or org hash`;
 
 const parseArgs = (argv: readonly string[]): ParsedArgs => {
   let attempts = 3;
@@ -372,6 +374,7 @@ const parseArgs = (argv: readonly string[]): ParsedArgs => {
   let date: string | null = null;
   let append = false;
   let scenario = BENCH_SCENARIOS['flights'];
+  let model: string | null = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] ?? '';
@@ -424,6 +427,14 @@ const parseArgs = (argv: readonly string[]): ParsedArgs => {
         }
         break;
       }
+      case '--model': {
+        const value = takeValue('--model');
+        if (!/^[\w.:-]+\/[\w.:-]+$/u.test(value)) {
+          throw new UsageError('--model must be a gateway model id like vendor/name');
+        }
+        model = value;
+        break;
+      }
       case '--no-build':
         noBuild = true;
         break;
@@ -439,7 +450,7 @@ const parseArgs = (argv: readonly string[]): ParsedArgs => {
     throw new UsageError('internal: no scenario resolved');
   }
 
-  return { attempts, out, noBuild, timeoutMs, date, append, scenario };
+  return { attempts, out, noBuild, timeoutMs, date, append, scenario, model };
 };
 
 const listAttemptFiles = async (outDir: string): Promise<number[]> => {
@@ -2411,6 +2422,9 @@ const main = async (): Promise<number> => {
     console.error(usage);
     return 2;
   }
+  if (parsed.model !== null) {
+    modelId = parsed.model;
+  }
 
   const batchStartedAtMs = Date.now();
 
@@ -2475,6 +2489,12 @@ const main = async (): Promise<number> => {
         throw new BatchBlockerError(
           'build',
           '--append refused: the existing summary scenario differs from --scenario'
+        );
+      }
+      if (isRecord(existingScenario) && existingScenario['modelId'] !== modelId) {
+        throw new BatchBlockerError(
+          'build',
+          '--append refused: the existing summary modelId differs from --model'
         );
       }
       if (parsed.date === null) {

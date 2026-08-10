@@ -122,6 +122,12 @@ const deservesContinueNudge = (lastAssistantText: string): boolean =>
   !lastAssistantText.includes('?') &&
   ANNOUNCEMENT_RE.test(lastAssistantText);
 
+// A turn that ends with thinking but no assistant text and no tool calls never answered the user; the model spent its completion reasoning and stopped. The finish reason is healthy, so the retry tier never sees it — the nudge does.
+const endedThinkingOnly = (
+  completionEvents: readonly AgentConversationEvent[],
+  lastAssistantText: string
+): boolean => lastAssistantText.length === 0 && completionEvents.length > 0;
+
 // eslint-disable-next-line promise/avoid-new -- A cancellable timer has no promise-returning primitive to defer to.
 const abortableDelay = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
   new Promise(resolve => {
@@ -386,11 +392,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
                 event.type === 'message' && event.role === 'assistant'
             )?.text ?? '';
         if (
-          turnUsedTools &&
           !continueNudgeSent &&
           remainingRounds > 1 &&
           !isSignalAborted(signal) &&
-          deservesContinueNudge(lastAssistantText)
+          (endedThinkingOnly(completionEvents, lastAssistantText) ||
+            (turnUsedTools && deservesContinueNudge(lastAssistantText)))
         ) {
           continueNudgeSent = true;
           // Ephemeral: sent to the model, never appended to the stored conversation.

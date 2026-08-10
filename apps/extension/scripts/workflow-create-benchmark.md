@@ -81,7 +81,8 @@ Options:
 | `--no-build` | Skip the self-build. The caller then owns build freshness. |
 | `--timeout-ms <ms>` | Per-attempt agent-phase deadline. Default `900000`. |
 | `--date <YYYY-MM-DD>` | Follow-up date. Default: today + 45 days. |
-| `--append` | Extend an existing batch in `--out`. Refuses a different `gitHead`, scenario, follow-up date, or org hash. |
+| `--model <id>` | Gateway model id. Default `kilo-auto/efficient`. |
+| `--append` | Extend an existing batch in `--out`. Refuses a different `gitHead`, scenario, model, follow-up date, or org hash. |
 
 Examples:
 

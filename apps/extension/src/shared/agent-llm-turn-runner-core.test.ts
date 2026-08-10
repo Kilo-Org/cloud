@@ -642,6 +642,67 @@ describe('continue nudge', () => {
     expect(appendedTexts.some(text => text.includes('Continue: finish the request'))).toBe(false);
   });
 
+  it('nudges a turn that ends on thinking with no assistant text', async () => {
+    const requestBodies: string[] = [];
+    let calls = 0;
+    const fetch: FetchLike = (_input, init) => {
+      requestBodies.push(typeof init?.body === 'string' ? init.body : '');
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"reasoning":"The user wants a workflow. I should look at the page."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(3);
+    expect(requestBodies[2]).toContain('Continue: finish the request now');
+  });
+
+  it('nudges a thinking-only end even before any tool use', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"reasoning":"Planning the workflow…"},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Here is the workflow plan."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+
   it('does not nudge a plain text answer with no tool use', async () => {
     let calls = 0;
     const fetch: FetchLike = () => {

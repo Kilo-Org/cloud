@@ -137,6 +137,37 @@ describe('runWorkflow function', () => {
     expect(deps.navigateUrls).toStrictEqual(['https://shop.example.com/page2']);
   });
 
+  it('recovers when a real click navigates mid-eval and destroys the context', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        { error: '{"code":-32000,"message":"Execution context was destroyed."}', ok: false },
+        { ok: true, value: { dryRunActions: [], ok: true, value: { done: true, result: 'ok' } } },
+      ],
+      tabUrls: ['https://shop.example.com/search', 'https://shop.example.com/results'],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 1, result: 'ok' });
+  }, 10_000);
+
+  it('does not treat a destroyed context as navigation in a dry run', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        { error: '{"code":-32000,"message":"Execution context was destroyed."}', ok: false },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+    expect(result).toStrictEqual({
+      dryRunActions: [],
+      error: '{"code":-32000,"message":"Execution context was destroyed."}',
+      ok: false,
+      pageUrl: 'https://shop.example.com/page',
+    });
+  });
+
   it('fails with thrown script error and page URL', async () => {
     const workflow = await buildApprovedWorkflow();
     const deps = createDeps({

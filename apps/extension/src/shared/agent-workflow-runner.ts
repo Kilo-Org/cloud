@@ -40,6 +40,12 @@ interface WorkflowRunnerDeps {
   navigateTab(tabId: number, url: string): Promise<void>;
 }
 
+// CDP surfaces a mid-eval page navigation as one of these context errors.
+const isNavigationDestroyedEval = (error: string): boolean =>
+  error.includes('Execution context was destroyed') ||
+  error.includes('Cannot find context with specified id') ||
+  error.includes('Inspected target navigated or closed');
+
 const scriptEnvelopeSchema = z.object({
   dryRunActions: z
     .array(z.object({ action: z.string(), selector: z.string() }))
@@ -534,6 +540,7 @@ export const runWorkflow = async (
   // Page for scripts written against the old contract.
   let state: unknown = { input: normalizedInput };
   let pagesVisited = 0;
+  let navigationRecoveries = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
 
   // 4. Loop, at most MAX_WORKFLOW_PAGES_PER_RUN iterations.
@@ -583,6 +590,16 @@ export const runWorkflow = async (
       return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
     }
     if (!evalResult.ok) {
+      // A real click can navigate the page mid-eval; the destroyed execution context IS the navigation the script wanted. Re-run the script on the landed page with the same state, exactly like the { navigate } path. Fixed 1.5 s settle and a 3-recovery cap; add a load-complete dep if flaky pages surface.
+      if (!dryRun && isNavigationDestroyedEval(evalResult.error) && navigationRecoveries < 3) {
+        navigationRecoveries += 1;
+        // eslint-disable-next-line no-await-in-loop, promise/avoid-new -- Sequential workflow execution by design; a plain settle delay has no promise-returning primitive to defer to.
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 1500);
+        });
+        // eslint-disable-next-line no-continue -- Mirrors the { navigate } path: same state, next page iteration.
+        continue;
+      }
       return resultWithActions(
         { error: evalResult.error, ok: false, pageUrl: url },
         dryRun,

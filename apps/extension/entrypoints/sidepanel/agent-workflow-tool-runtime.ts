@@ -54,7 +54,11 @@ const saveWorkflowArgsSchema = z.object({
   // Optional so an update (workflowId set) can keep the stored script.
   script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH).optional(),
   startUrl: z.string().optional(),
-  workflowId: z.string().optional(),
+  // A model often sends workflowId: "" for a create; a blank id means "no id", so coerce it to undefined instead of failing the update lookup.
+  workflowId: z
+    .string()
+    .optional()
+    .transform(value => (value === undefined || value.trim() === '' ? undefined : value)),
 });
 
 const searchWorkflowsArgsSchema = z.object({

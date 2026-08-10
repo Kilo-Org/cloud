@@ -338,6 +338,23 @@ describe('save_workflow', () => {
     });
   });
 
+  it('treats a blank workflowId as a create, not a failed update', async () => {
+    const ctx = createBaseCtx();
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'Created',
+        scopeOrigin: 'https://example.com',
+        script: 'return 2;',
+        workflowId: '',
+      }),
+      ctx
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it('rejects invalid scopeOrigin', async () => {
     const ctx = createBaseCtx();
     const result = await executeWorkflowToolCall(

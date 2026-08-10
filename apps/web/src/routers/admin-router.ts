@@ -33,6 +33,8 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
+import { redisClient } from '@/lib/redis';
+import { SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY } from '@/lib/redis-keys';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -2076,17 +2078,21 @@ export const adminRouter = createTRPCRouter({
       return result;
     }),
     getLastSync: adminProcedure.query(async () => {
-      const [latest] = await db
-        .select({ id: modelsByProvider.id, data: modelsByProvider.data })
-        .from(modelsByProvider)
-        .orderBy(desc(modelsByProvider.id))
-        .limit(1);
-      if (!latest) return null;
+      const [[latest], lastCompletedAt] = await Promise.all([
+        db
+          .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+          .from(modelsByProvider)
+          .orderBy(desc(modelsByProvider.id))
+          .limit(1),
+        redisClient.get<string>(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY),
+      ]);
+      if (!latest && !lastCompletedAt) return null;
       return {
-        id: latest.id,
-        generated_at: latest.data.generated_at,
-        total_providers: latest.data.total_providers,
-        total_models: latest.data.total_models,
+        id: latest?.id ?? null,
+        generated_at: latest?.data.generated_at ?? null,
+        completed_at: lastCompletedAt ?? null,
+        total_providers: latest?.data.total_providers ?? 0,
+        total_models: latest?.data.total_models ?? 0,
       };
     }),
   }),

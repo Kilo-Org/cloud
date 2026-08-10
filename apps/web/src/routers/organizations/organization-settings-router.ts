@@ -380,6 +380,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
               currentSettings.default_model !== ORG_AUTO_MODEL.id
             ) {
               const isAllowed = createAllowPredicateFromRestrictions({
+                requireModelInCurrentSnapshot: true,
                 providerAllowList: settingsUpdate.provider_allow_list,
                 modelDenyList: settingsUpdate.model_deny_list ?? [],
               });

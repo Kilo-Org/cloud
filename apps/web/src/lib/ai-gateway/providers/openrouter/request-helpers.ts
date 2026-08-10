@@ -133,24 +133,6 @@ function containsCacheControl(value: unknown): boolean {
   return Object.values(value).some(containsCacheControl);
 }
 
-function deleteCacheControl(value: unknown): void {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      deleteCacheControl(item);
-    }
-    return;
-  }
-  if (!isObjectRecord(value)) {
-    return;
-  }
-  if (Object.hasOwn(value, 'cache_control')) {
-    delete value.cache_control;
-  }
-  for (const item of Object.values(value)) {
-    deleteCacheControl(item);
-  }
-}
-
 export function addCacheBreakpoints(request: GatewayRequest) {
   if (
     request.kind === 'chat_completions' &&
@@ -212,20 +194,6 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   }
 }
 
-export function removeCacheBreakpoints(request: GatewayRequest) {
-  if (request.kind === 'chat_completions' && Array.isArray(request.body.messages)) {
-    console.debug('[removeCacheBreakpoints] removing cache breakpoints from chat completions');
-    deleteCacheControl(request.body.messages);
-  } else if (request.kind === 'responses' && Array.isArray(request.body.input)) {
-    console.debug('[removeCacheBreakpoints] removing cache breakpoints from responses request');
-    deleteCacheControl(request.body.input);
-  } else if (request.kind === 'messages') {
-    console.debug('[removeCacheBreakpoints] removing cache breakpoints from messages request');
-    delete request.body.cache_control;
-    deleteCacheControl(request.body.messages);
-  }
-}
-
 export function fixResponsesRequest(request: GatewayResponsesRequest) {
   if (!Array.isArray(request.input)) {
     return;
@@ -254,35 +222,6 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
     }
     if ('reasoning_details' in message) {
       delete message.reasoning_details;
-    }
-  }
-}
-
-export function injectReasoningIntoContent(request: GatewayRequest) {
-  if (request.kind !== 'chat_completions') {
-    return;
-  }
-  for (const message of request.body.messages) {
-    if (message.role !== 'assistant') {
-      continue;
-    }
-
-    const reasoning =
-      'reasoning' in message && typeof message.reasoning === 'string'
-        ? message.reasoning
-        : 'reasoning_content' in message && typeof message.reasoning_content === 'string'
-          ? message.reasoning_content
-          : '';
-
-    if (reasoning) {
-      if (Array.isArray(message.content)) {
-        message.content.splice(0, 0, { type: 'text', text: `<think>${reasoning}</think>` });
-      } else {
-        message.content = `<think>${reasoning}</think>${message.content}`;
-      }
-      if ('reasoning' in message) delete message.reasoning;
-      if ('reasoning_content' in message) delete message.reasoning_content;
-      if ('reasoning_details' in message) delete message.reasoning_details;
     }
   }
 }

@@ -28,6 +28,7 @@ import { redisClient } from '@/lib/redis';
 import {
   GATEWAY_METADATA_REDIS_KEYS,
   type RedisKey,
+  SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
   vercelInferenceProvidersRedisKey,
 } from '@/lib/redis-keys';
 import {
@@ -36,15 +37,11 @@ import {
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import {
-  openRouterToVercelInferenceProviderId,
-  VercelInferenceProviderIdSchema,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
@@ -190,63 +187,6 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   // Note: Models still contain redundant provider info in endpoint.provider_info, etc.
   // This is now available in the comprehensive providers array, but we keep it for compatibility
   return data.data.models;
-}
-
-function injectExtraProviderModels(
-  vercelModels: Record<string, StoredModel>,
-  providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
-) {
-  const openRouterModels = new Map<string, OpenRouterModel>();
-  for (const { models } of providerModelData) {
-    for (const model of models) {
-      openRouterModels.set(model.slug, model);
-    }
-  }
-  for (const model of openRouterModels.values()) {
-    const vercelModel = vercelModels[mapModelIdToVercel(model.slug)];
-    if (!vercelModel) continue;
-
-    const vercelInferenceProviders = new Set(
-      vercelModel.endpoints
-        .map(
-          endpoint =>
-            VercelInferenceProviderIdSchema.safeParse(endpoint.provider_name ?? endpoint.tag).data
-        )
-        .filter(p => p !== undefined)
-    );
-
-    for (const providerData of providerModelData) {
-      const vercelProviderId = VercelInferenceProviderIdSchema.safeParse(
-        openRouterToVercelInferenceProviderId(providerData.provider.slug)
-      ).data;
-      const endpoint = vercelModel.endpoints.find(e => e.provider_name === vercelProviderId);
-      if (
-        vercelProviderId &&
-        endpoint &&
-        vercelInferenceProviders.has(vercelProviderId) &&
-        !providerData.models.some(m => m.slug === model.slug)
-      ) {
-        const freeSuffixIndex = model.name.indexOf(' (free)');
-        const m = {
-          ...model,
-          name: freeSuffixIndex >= 0 ? model.name.substring(0, freeSuffixIndex) : model.name,
-          context_length: endpoint.context_length ?? model.context_length,
-          endpoint: {
-            ...model.endpoint,
-            provider_display_name: providerData.provider.displayName,
-            is_free: !endpoint.pricing?.prompt,
-            pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
-          },
-        };
-        console.warn(
-          '[injectExtraProviderModels] Adding missing model to provider %s: %s',
-          providerData.provider.name,
-          m.name
-        );
-        providerData.models.push(m);
-      }
-    }
-  }
 }
 
 async function syncProviders(
@@ -545,9 +485,13 @@ export async function syncAndStoreProviders() {
   const direct_byok_model_counts = await syncDirectByokModels();
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
+  const completed_at = new Date().toISOString();
+  await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completed_at);
+
   return {
     id: result.id,
     generated_at: result.data.generated_at,
+    completed_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
     direct_byok_model_counts,

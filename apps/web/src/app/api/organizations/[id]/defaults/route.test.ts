@@ -99,6 +99,32 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 
+  test('Enterprise without configured restrictions still requires snapshot membership', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Enterprise Snapshot Org', user.id);
+    mockedGetProviderSlugsForModel.mockResolvedValue(new Set());
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [makeOpenRouterModel(PRIMARY_DEFAULT_MODEL)],
+    });
+    mockedGetAuthorizedOrgContext.mockResolvedValue({
+      success: true,
+      data: {
+        user: { ...user, role: 'owner' },
+        organization: {
+          ...organization,
+          plan: 'enterprise' as const,
+          settings: {},
+        },
+      },
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000'), {
+      params: Promise.resolve({ id: organization.id }),
+    });
+
+    expect(response.status).toBe(409);
+  });
+
   test('deny list blocking PRIMARY_DEFAULT_MODEL falls back to first non-denied model from OpenRouter', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);

@@ -47,8 +47,11 @@ describe('CustomLlmDefinitionSchema authentication', () => {
     ).toBe(true);
   });
 
-  it('requires exactly one authentication method', () => {
-    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(false);
+  it('accepts definition without credentials in JSON definition', () => {
+    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
+  });
+
+  it('rejects definitions with multiple credential methods', () => {
     expect(
       CustomLlmDefinitionSchema.safeParse({
         ...baseDefinition,

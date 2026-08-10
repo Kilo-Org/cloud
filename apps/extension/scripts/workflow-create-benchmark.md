@@ -49,6 +49,53 @@ result carries the expected values and content (a price, points, a
 forecast, …). The verifying run is the last valid real run, or a dry run
 with real navigated content when no real run exists.
 
+## Task scenarios (use-case benchmark)
+
+The workflow scenarios cover one use case: repeatable automation. The task
+scenarios in `src/shared/agent-task-bench-scenarios.ts` cover the rest of
+the most popular browser-agent use cases. The ranking is data-driven, from
+install counts, feature-popularity reviews, and platform feature bets for
+the top AI browser extensions and agentic browsers (Sider 5M installs,
+Monica 3M, Merlin 900k, MaxAI 700k, Immersive Translate 20M+, Edge
+Copilot, Gemini in Chrome, Perplexity Comet, HARPA AI):
+
+1. Summarize the page — the lead feature of every top extension.
+2. Page Q&A — the core sidebar function (chat grounded in the open tab).
+3. Write and reply — draft text from page content.
+4. Translate — full-page translation to the user's language.
+5. AI search/research — search-grounded answers (needs web search; gap).
+6. Multi-tab compare — read several tabs (single-tab harness today; gap).
+7. Agentic actions — fill forms, log in, operate the page.
+8. Repeatable automation — the twenty workflow scenarios above.
+
+Reading tasks (1, 2, 4) carry roughly 80% of real usage; acting tasks lead
+the marketing but trail in adoption. Use cases 5 and 6 are documented gaps:
+the harness has no web-search tool and reads only the selected tab.
+
+| Id | Use case | Site | Mode | Task |
+|---|---|---|---|---|
+| `summarize-article` | summarize | paulgraham.com | safe | summarize a ~67k-char essay end to end |
+| `qa-deep-fact` | page-qa | en.wikipedia.org | safe | a fact ~50k chars into the page |
+| `extract-table` | extract | books.toscrape.com | safe | titles and prices as a markdown table |
+| `translate-page` | translate | de.wikipedia.org | safe | English summary of a German page |
+| `draft-reply` | draft | github.com | safe | grounded reply to a closed issue |
+| `action-login` | act | saucedemo.com | dangerous | log in, count products |
+| `action-cart` | act | saucedemo.com | dangerous | log in, add to cart, read badge |
+
+A task attempt sends one pinned message and scores the final assistant
+answer: pinned content checks, a minimum length, and — for facts a model
+could know from training — the same pattern must also appear in an ok tool
+result. That evidence rule exists because the truncation-era baseline
+model answered a summarize task "from familiarity" with the essay while
+presenting it as page content. Action scenarios additionally require at
+least one ok `eval` exchange. Task batches gate on the turn total
+(`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
+
+The deep-content scenarios exist because the page snapshot text is a
+bounded window (8000 chars). `summarize-article` and `qa-deep-fact` fail
+on any harness that cannot read or search past that window; they hold the
+fix honest (snapshot `textStart` paging plus full-page `find_in_page`).
+
 ## Prerequisites
 
 - Repository dependencies installed (`pnpm install` at the repo root).

@@ -105,6 +105,7 @@ const builtInToolNameSchema = z.enum([
   'save_workflow',
   'search_memories',
   'search_workflows',
+  'web_search',
 ]);
 // Built-in tools plus dynamically mapped remote MCP tools (mcp_<slug>_<tool>).
 const gatewayToolNameSchema = z.union([

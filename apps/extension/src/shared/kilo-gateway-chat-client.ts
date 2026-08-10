@@ -12,6 +12,7 @@ export type KiloGatewayToolName =
   | 'save_workflow'
   | 'search_memories'
   | 'search_workflows'
+  | 'web_search'
   | `mcp_${string}`;
 
 export type KiloGatewayChatContentPart =

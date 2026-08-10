@@ -5,7 +5,8 @@ export type SafeToolName =
   | 'get_memory'
   | 'get_page_snapshot'
   | 'get_viewport_screenshot'
-  | 'search_memories';
+  | 'search_memories'
+  | 'web_search';
 export type WorkflowToolName =
   | 'delete_workflow'
   | 'get_workflow'

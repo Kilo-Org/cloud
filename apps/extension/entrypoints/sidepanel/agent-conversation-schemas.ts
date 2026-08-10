@@ -29,6 +29,7 @@ export const conversationEventSchema = z.union([
       'get_page_snapshot',
       'get_viewport_screenshot',
       'search_memories',
+      'web_search',
     ]),
     providerToolCallId: z.string().optional(),
     query: z.string().optional(),

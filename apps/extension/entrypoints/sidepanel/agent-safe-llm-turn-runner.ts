@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies -- The safe turn runner wires every safe-mode tool family: page tools, workflows, remote MCP, and web search. */
 import type {
   AgentConversationEvent,
   RemoteMcpToolCallEvent,
@@ -14,6 +15,7 @@ import type {
 } from '@/src/shared/kilo-api-client';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { executeSafeToolCall } from './agent-safe-tool-runtime';
+import { executeWebSearchToolCall } from './agent-web-search-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
@@ -85,6 +87,15 @@ export const runSafeLlmTurn = ({
         return executeRemoteMcpToolCall === undefined
           ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
           : executeRemoteMcpToolCall(toolCall);
+      }
+
+      if (toolCall.name === 'web_search') {
+        return executeWebSearchToolCall(toolCall, {
+          apiBaseUrl: options.apiBaseUrl,
+          fetch: options.fetch,
+          organizationId: options.organizationId,
+          token: options.token,
+        });
       }
 
       return executeSafeToolCall(toolCall);

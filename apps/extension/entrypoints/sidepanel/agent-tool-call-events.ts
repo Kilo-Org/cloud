@@ -46,7 +46,8 @@ const isSafeToolName = (name: string): name is SafeToolName =>
   name === 'get_memory' ||
   name === 'get_page_snapshot' ||
   name === 'get_viewport_screenshot' ||
-  name === 'search_memories';
+  name === 'search_memories' ||
+  name === 'web_search';
 
 export const isWorkflowToolName = (name: string): name is WorkflowToolName =>
   name === 'delete_workflow' ||

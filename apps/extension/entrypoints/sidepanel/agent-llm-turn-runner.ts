@@ -18,6 +18,7 @@ import type {
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { executeEvalToolCall } from './agent-eval-runtime';
 import { executeSafeToolCall } from './agent-safe-tool-runtime';
+import { executeWebSearchToolCall } from './agent-web-search-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
@@ -90,9 +91,20 @@ export const runDangerousLlmTurn = ({
           : executeRemoteMcpToolCall(toolCall);
       }
 
-      return toolCall.name === 'eval'
-        ? executeEvalToolCall(toolCall)
-        : executeSafeToolCall(toolCall);
+      if (toolCall.name === 'eval') {
+        return executeEvalToolCall(toolCall);
+      }
+
+      if (toolCall.name === 'web_search') {
+        return executeWebSearchToolCall(toolCall, {
+          apiBaseUrl: options.apiBaseUrl,
+          fetch: options.fetch,
+          organizationId: options.organizationId,
+          token: options.token,
+        });
+      }
+
+      return executeSafeToolCall(toolCall);
     },
     failureMessage: error =>
       `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

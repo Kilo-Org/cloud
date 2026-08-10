@@ -110,7 +110,7 @@ export const scoreTaskCorrectness = ({
     actionPerformed: predicate(
       actionOk,
       scenario.requiresAction
-        ? `ok eval exchange present: ${String(actionOk)}`
+        ? `ok action exchange (eval or real run_workflow) present: ${String(actionOk)}`
         : 'no action required'
     ),
     answerContent: predicate(

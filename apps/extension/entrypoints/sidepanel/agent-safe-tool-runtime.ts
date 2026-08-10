@@ -205,6 +205,11 @@ const getFindResults = (snapshot: PageSnapshot, query: string) => {
 };
 
 export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalTabResult> => {
+  if (toolCall.name === 'web_search') {
+    // Web search needs the caller's auth context; the turn runners route it to executeWebSearchToolCall before this dispatch.
+    return { error: 'Web search is not available in this context.', ok: false };
+  }
+
   if (toolCall.name === 'search_memories') {
     const query = toolCall.query?.trim();
 

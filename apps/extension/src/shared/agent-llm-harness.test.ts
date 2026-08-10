@@ -88,6 +88,7 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'web_search',
       'search_memories',
       'get_memory',
     ]);
@@ -95,6 +96,7 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'web_search',
       'search_memories',
       'get_memory',
       'get_viewport_screenshot',

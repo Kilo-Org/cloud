@@ -1,9 +1,11 @@
 /**
  * Task scenario registry for the use-case benchmark.
  *
- * Each scenario is one realistic single-message request on a public,
- * login-free page, pinned to the most popular browser-agent use cases
- * (summarize, page Q&A, extract, translate, draft, act on the page).
+ * Each scenario is one realistic single-message request on a public page
+ * (the action scenarios log in to a demo shop with published test
+ * credentials), pinned to the most popular browser-agent use cases
+ * (summarize, page Q&A, extract, translate, draft, research, act on the
+ * page).
  * Unlike the workflow scenarios, correctness is scored on the final
  * assistant answer: pinned content checks, a minimum length, and — for
  * facts a model could know from training — tool-result evidence.
@@ -193,6 +195,28 @@ const ACTION_CART_SCENARIO: BenchTaskScenario = {
   useCase: 'act',
 };
 
+/**
+ * Answer a question the selected page cannot answer, via web_search. The
+ * year is trivia any model knows, so it requires tool evidence: the pass
+ * proves the answer came from returned search results.
+ */
+const WEB_RESEARCH_SCENARIO: BenchTaskScenario = {
+  answerChecks: [
+    { key: 'year', re: /1889/u, requireToolEvidence: true },
+    { key: 'source', re: /https?:\/\/|\bwww\.|\w+\.(?:com|org|net|fr|paris)\b/iu },
+  ],
+  id: 'web-research',
+  kind: 'task',
+  message:
+    'Search the web: in which year was the Eiffel Tower completed? Give the year and cite a source URL.',
+  minAnswerChars: 20,
+  mode: 'safe',
+  requiresAction: false,
+  startUrl: 'https://example.com/',
+  tabLabelRe: /example/iu,
+  useCase: 'research',
+};
+
 export const TASK_BENCH_SCENARIOS: Readonly<Record<string, BenchTaskScenario>> = {
   'action-cart': ACTION_CART_SCENARIO,
   'action-login': ACTION_LOGIN_SCENARIO,
@@ -201,4 +225,5 @@ export const TASK_BENCH_SCENARIOS: Readonly<Record<string, BenchTaskScenario>> =
   'qa-deep-fact': QA_DEEP_FACT_SCENARIO,
   'summarize-article': SUMMARIZE_ARTICLE_SCENARIO,
   'translate-page': TRANSLATE_PAGE_SCENARIO,
+  'web-research': WEB_RESEARCH_SCENARIO,
 };

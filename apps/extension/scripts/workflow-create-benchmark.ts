@@ -1643,6 +1643,7 @@ const pageContentTools = new Set([
   'get_element_details',
   'get_viewport_screenshot',
   'eval',
+  'web_search',
 ]);
 
 const capScalar = (value: unknown): unknown => {

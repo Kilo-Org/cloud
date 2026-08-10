@@ -55,7 +55,8 @@ function EnterpriseOnlyMessage() {
 
 // NOTE: pricing formatting is shared with the model selector UI.
 
-function formatPriceCompact(raw: string): string {
+function formatPriceCompact(raw: string | null): string {
+  if (raw === null) return '—';
   return formatPrice(raw).replace('/1M tokens', '/1M');
 }
 
@@ -157,8 +158,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     if (organizationData.settings?.provider_allow_list !== undefined) {
       return organizationData.settings.provider_allow_list;
     }
-    return selectors.allProviderSlugsWithEndpoints;
-  }, [organizationData, selectors.allProviderSlugsWithEndpoints]);
+    return selectors.allProviderSlugs;
+  }, [organizationData, selectors.allProviderSlugs]);
 
   useEffect(() => {
     if (!organizationData) return;
@@ -269,10 +270,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
     const offerings: ProviderOffering[] = [];
     for (const provider of openRouterProviders) {
-      const model = provider.models.find(
-        m => m.endpoint && normalizeModelId(m.slug) === infoModel.modelId
-      );
-      if (!model || !model.endpoint) continue;
+      const model = provider.models.find(m => normalizeModelId(m.slug) === infoModel.modelId);
+      if (!model) continue;
 
       offerings.push({
         providerSlug: provider.slug,
@@ -280,8 +279,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
-        promptPrice: model.endpoint.pricing.prompt,
-        completionPrice: model.endpoint.pricing.completion,
+        promptPrice: model.endpoint?.pricing.prompt ?? null,
+        completionPrice: model.endpoint?.pricing.completion ?? null,
       });
     }
 
@@ -295,7 +294,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     for (const provider of openRouterProviders) {
       let count = 0;
       for (const model of provider.models) {
-        if (!model.endpoint) continue;
         if (allowedModelIds.has(normalizeModelId(model.slug))) {
           count++;
         }
@@ -309,7 +307,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const providerRows = useMemo((): ProviderRow[] => {
     const rows: ProviderRow[] = [];
     for (const provider of openRouterProviders) {
-      const providerModels = provider.models.filter(m => m.endpoint);
+      const providerModels = provider.models;
       if (providerModels.length === 0) {
         continue;
       }
@@ -414,7 +412,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
     const rows: ProviderModelRow[] = [];
     for (const model of provider.models) {
-      if (!model.endpoint) continue;
       const normalizedModelId = normalizeModelId(model.slug);
       const sourceIndex = rows.length;
       rows.push({
@@ -422,8 +419,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        promptPrice: model.endpoint.pricing.prompt,
-        completionPrice: model.endpoint.pricing.completion,
+        promptPrice: model.endpoint?.pricing.prompt ?? null,
+        completionPrice: model.endpoint?.pricing.completion ?? null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });

@@ -136,7 +136,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     expect(selections).toEqual([]);
   });
 
-  test('models without endpoint are excluded', () => {
+  test('models without endpoint are included', () => {
     const openRouterProviders = [
       {
         slug: 'anthropic',
@@ -156,7 +156,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     expect(selections).toEqual([
       {
         slug: 'anthropic',
-        models: ['anthropic/claude-3-opus'],
+        models: ['anthropic/claude-3-opus', 'anthropic/disabled-model'],
       },
     ]);
   });

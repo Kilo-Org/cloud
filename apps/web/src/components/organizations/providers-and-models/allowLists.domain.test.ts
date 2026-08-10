@@ -1,7 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  buildModelProvidersIndex,
   canonicalizeDenyList,
   canonicalizeProviderAllowList,
+  collectUniqueCatalogModels,
+  computeAllProviderSlugs,
   computeAllowedModelIds,
   computeEnabledProviderSlugs,
   deriveProviderAllowListFromLegacyDenyList,
@@ -77,6 +80,61 @@ describe('allowLists.domain', () => {
       draftModelDenyList: ['anthropic/claude-3-opus'],
     });
     expect(next).toEqual(['anthropic/claude-3-opus', 'openai/gpt-4.1']);
+  });
+
+  test('collectUniqueCatalogModels includes models without endpoints', () => {
+    const models = collectUniqueCatalogModels([
+      {
+        models: [
+          { slug: 'anthropic/claude-3-opus', endpoint: { pricing: {} }, name: 'Opus' },
+          { slug: 'anthropic/unrouted', name: 'Unrouted' },
+        ],
+      },
+    ]);
+
+    expect(models.map(model => model.slug)).toEqual([
+      'anthropic/claude-3-opus',
+      'anthropic/unrouted',
+    ]);
+  });
+
+  test('collectUniqueCatalogModels prefers a live endpoint when deduping', () => {
+    const models = collectUniqueCatalogModels([
+      { models: [{ slug: 'openai/gpt-4', name: 'without-endpoint' }] },
+      { models: [{ slug: 'openai/gpt-4', endpoint: { pricing: {} }, name: 'with-endpoint' }] },
+    ]);
+
+    expect(models).toEqual([
+      { slug: 'openai/gpt-4', endpoint: { pricing: {} }, name: 'with-endpoint' },
+    ]);
+  });
+
+  test('buildModelProvidersIndex includes providers for models without endpoints', () => {
+    const index = buildModelProvidersIndex([
+      {
+        slug: 'anthropic',
+        models: [{ slug: 'anthropic/unrouted' }],
+      },
+      {
+        slug: 'amazon-bedrock',
+        models: [{ slug: 'anthropic/unrouted', endpoint: { pricing: {} } }],
+      },
+    ]);
+
+    expect([...(index.get('anthropic/unrouted') ?? [])].sort()).toEqual([
+      'amazon-bedrock',
+      'anthropic',
+    ]);
+  });
+
+  test('computeAllProviderSlugs includes providers that only offer unrouted models', () => {
+    const slugs = computeAllProviderSlugs([
+      { slug: 'empty', models: [] },
+      { slug: 'unrouted-only', models: [{ slug: 'vendor/unrouted' }] },
+      { slug: 'live', models: [{ slug: 'vendor/live', endpoint: { pricing: {} } }] },
+    ]);
+
+    expect(slugs).toEqual(['live', 'unrouted-only']);
   });
 
   test('toggleModelAllowed(allow) removes model from deny list', () => {

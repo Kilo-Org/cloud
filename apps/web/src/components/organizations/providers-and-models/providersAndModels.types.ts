@@ -27,8 +27,8 @@ export type ProviderOffering = {
   providerIconUrl: string | null;
   trains: boolean;
   retainsPrompts: boolean;
-  promptPrice: string;
-  completionPrice: string;
+  promptPrice: string | null;
+  completionPrice: string | null;
 };
 
 export type ProviderModelRow = {
@@ -36,8 +36,8 @@ export type ProviderModelRow = {
   modelName: string;
   preferredIndex: number | undefined;
   sourceIndex: number;
-  promptPrice: string;
-  completionPrice: string;
+  promptPrice: string | null;
+  completionPrice: string | null;
   trains: boolean;
   retainsPrompts: boolean;
 };

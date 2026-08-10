@@ -167,28 +167,25 @@ export function useOpenRouterModelsAndProviders() {
       byokEnabled: false,
       icon: provider.icon,
       ignoredProviderModels: [],
-      models: provider.models, // Include all models, filtering will happen in the UI hook
+      models: provider.models,
     }));
   }, [query.data]);
 
-  // Extract all models from all providers for backward compatibility (only models with endpoints)
+  // A model can be offered by multiple providers. Dedupe by slug and prefer a live endpoint
+  // when one exists, but still include snapshot models that currently have none.
   const models = useMemo((): OpenRouterModel[] => {
     if (!query.data) return [];
 
-    // A model can be offered by multiple providers. For consumers that just want a list of
-    // selectable model ids, dedupe by model slug.
     const modelBySlug = new Map<string, OpenRouterModel>();
     for (const provider of query.data.providers) {
       for (const model of provider.models) {
-        if (!model.endpoint) continue;
-        if (!modelBySlug.has(model.slug)) {
+        const existing = modelBySlug.get(model.slug);
+        if (!existing || (!existing.endpoint && model.endpoint)) {
           modelBySlug.set(model.slug, model);
         }
       }
     }
-
-    const modelsWithEndpoints = [...modelBySlug.values()];
-    return modelsWithEndpoints;
+    return [...modelBySlug.values()];
   }, [query.data]);
 
   return {

@@ -39,10 +39,25 @@ export function canonicalizeProviderAllowList(raw: ReadonlyArray<string> | undef
 
 export function deriveProviderAllowListFromLegacyDenyList(
   providerDenyList: ReadonlyArray<string> | undefined,
-  allProviderSlugsWithEndpoints: ReadonlyArray<string>
+  allProviderSlugs: ReadonlyArray<string>
 ): string[] {
   const denied = new Set(providerDenyList ?? []);
-  return sortUniqueStrings(allProviderSlugsWithEndpoints.filter(slug => !denied.has(slug)));
+  return sortUniqueStrings(allProviderSlugs.filter(slug => !denied.has(slug)));
+}
+
+export function collectUniqueCatalogModels<T extends { slug: string; endpoint?: unknown }>(
+  providers: ReadonlyArray<{ models: ReadonlyArray<T> }>
+): T[] {
+  const modelBySlug = new Map<string, T>();
+  for (const provider of providers) {
+    for (const model of provider.models) {
+      const existing = modelBySlug.get(model.slug);
+      if (!existing || (!existing.endpoint && model.endpoint)) {
+        modelBySlug.set(model.slug, model);
+      }
+    }
+  }
+  return [...modelBySlug.values()];
 }
 
 export function buildModelProvidersIndex(
@@ -51,7 +66,6 @@ export function buildModelProvidersIndex(
   const index = new Map<string, Set<string>>();
   for (const provider of openRouterProviders) {
     for (const model of provider.models) {
-      if (!model.endpoint) continue;
       const normalizedModelId = normalizeModelId(model.slug);
       const existing = index.get(normalizedModelId);
       if (existing) {
@@ -64,20 +78,20 @@ export function buildModelProvidersIndex(
   return index;
 }
 
-export function computeAllProviderSlugsWithEndpoints(
+export function computeAllProviderSlugs(
   openRouterProviders: OpenRouterProviderModelsSnapshot
 ): string[] {
   return openRouterProviders
-    .filter(provider => provider.models.some(model => model.endpoint))
+    .filter(provider => provider.models.length > 0)
     .map(provider => provider.slug)
     .sort((a, b) => a.localeCompare(b));
 }
 
 export function computeEnabledProviderSlugs(
   draftProviderAllowList: ReadonlyArray<string>,
-  allProviderSlugsWithEndpoints: ReadonlyArray<string>
+  allProviderSlugs: ReadonlyArray<string>
 ): Set<string> {
-  const known = new Set(allProviderSlugsWithEndpoints);
+  const known = new Set(allProviderSlugs);
   return new Set(draftProviderAllowList.filter(slug => known.has(slug)));
 }
 

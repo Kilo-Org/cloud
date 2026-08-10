@@ -47,7 +47,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
     if (providerAllowSet && !providerAllowSet.has(provider.slug)) continue;
 
     const availableModels = provider.models
-      .filter(model => model.endpoint && !modelDenySet.has(normalizeModelId(model.slug)))
+      .filter(model => !modelDenySet.has(normalizeModelId(model.slug)))
       .map(model => model.slug);
 
     if (availableModels.length > 0) {

@@ -47,7 +47,7 @@ export function ModelDetailsDialog({
   offerings: ReadonlyArray<ProviderOffering>;
   allowedModelIds: ReadonlySet<string>;
   enabledProviderSlugs: ReadonlySet<string>;
-  formatPriceCompact: (raw: string) => string;
+  formatPriceCompact: (raw: string | null) => string;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
   onClose: () => void;

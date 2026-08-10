@@ -7,6 +7,7 @@ import { ModelsTab } from '@/components/organizations/providers-and-models/Model
 import { ProvidersTab } from '@/components/organizations/providers-and-models/ProvidersTab';
 import {
   buildModelProvidersIndex,
+  collectUniqueCatalogModels,
   sortUniqueStrings,
 } from '@/components/organizations/providers-and-models/allowLists.domain';
 import type {
@@ -50,15 +51,7 @@ export function ModelAccessPolicyEditor({
   const editorData =
     editorDataQuery.data?.policyType === 'model_access' ? editorDataQuery.data : undefined;
   const providers = useMemo(() => editorData?.catalog.providers ?? [], [editorData]);
-  const models = useMemo(() => {
-    const modelsBySlug = new Map<string, (typeof providers)[number]['models'][number]>();
-    providers.forEach(provider =>
-      provider.models.forEach(model => {
-        if (model.endpoint && !modelsBySlug.has(model.slug)) modelsBySlug.set(model.slug, model);
-      })
-    );
-    return [...modelsBySlug.values()];
-  }, [providers]);
+  const models = useMemo(() => collectUniqueCatalogModels(providers), [providers]);
   const [mode, setMode] = useState<Mode>(policy.data.mode);
   const [modelIds, setModelIds] = useState<string[]>(
     policy.data.mode === 'selected' ? policy.data.model_allow_list : []
@@ -137,7 +130,7 @@ export function ModelAccessPolicyEditor({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
-        modelCount: provider.models.filter(model => model.endpoint).length,
+        modelCount: provider.models.length,
         trains: provider.dataPolicy.training,
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
@@ -195,8 +188,7 @@ export function ModelAccessPolicyEditor({
       const models = providers.find(item => item.slug === provider.providerSlug)?.models ?? [];
       counts.set(
         provider.providerSlug,
-        models.filter(model => model.endpoint && selectedModels.has(normalizeModelId(model.slug)))
-          .length
+        models.filter(model => selectedModels.has(normalizeModelId(model.slug))).length
       );
     });
     return counts;

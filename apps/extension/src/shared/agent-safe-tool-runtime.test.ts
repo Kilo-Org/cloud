@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- memory-tool cases live with the existing runtime suite */
 import { describe, expect, it, vi } from 'vitest';
-import { PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
+import { FIND_TEXT_MESSAGE, PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
 import { createSafeToolCall } from './agent-conversation';
 import type { AgentMemory } from './agent-memories';
 
@@ -90,6 +90,8 @@ describe('safe tool runtime', () => {
         nodesTruncated: false,
         snapshotId: 'snapshot-1',
         text: 'Original button',
+        textStart: 0,
+        textTotalChars: 'Original button'.length,
         textTruncated: false,
         title: 'Original page',
         url: 'https://example.com/',
@@ -157,6 +159,8 @@ describe('safe tool runtime', () => {
         nodesTruncated: false,
         snapshotId: 'snapshot-2',
         text: 'Small page',
+        textStart: 0,
+        textTotalChars: 'Small page'.length,
         textTruncated: false,
         title: 'Small',
         url: 'https://example.com/',
@@ -164,7 +168,7 @@ describe('safe tool runtime', () => {
     });
   });
 
-  it('returns ranked find results with page text fallback and truncation metadata', async () => {
+  it('returns ranked find results merging full-page text matches and truncation metadata', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({
       ok: true,
@@ -201,6 +205,19 @@ describe('safe tool runtime', () => {
       },
       type: PAGE_SNAPSHOT_MESSAGE,
     });
+    // The full-page text search runs as its own injected call and can match beyond the snapshot window.
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        ok: true,
+        value: {
+          matches: [{ excerpt: 'paragraph has keyword outside', offset: 9021 }],
+          textTotalChars: 12_000,
+          totalMatches: 1,
+        },
+      },
+      type: FIND_TEXT_MESSAGE,
+    });
 
     await expect(
       executeSafeToolCall(
@@ -222,8 +239,9 @@ describe('safe tool runtime', () => {
             tag: 'button',
           },
           {
-            excerpt: 'Plain paragraph has keyword outside captured nodes.',
+            excerpt: 'paragraph has keyword outside',
             matchedField: 'pageText',
+            offset: 9021,
             role: 'document',
             tag: 'body',
           },
@@ -236,10 +254,72 @@ describe('safe tool runtime', () => {
             text: 'Documentation',
           },
         ],
+        note: 'Each pageText excerpt carries its character offset in the full page text. To read the section around a match, call get_page_snapshot with textStart set near that offset.',
         snapshotId: 'snapshot-3',
         totalMatches: 3,
         truncated: false,
       },
+    });
+    expect(mocks.sendMessage.mock.calls[1]?.[0]).toStrictEqual({
+      query: 'keyword',
+      tabId: 7,
+      type: FIND_TEXT_MESSAGE,
+    });
+  });
+
+  it('pages the snapshot text window with textStart and appends a continuation note', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        ok: true,
+        value: {
+          nodes: [],
+          snapshotId: 'snapshot-4',
+          text: 'middle window',
+          textStart: 8000,
+          textTotalChars: 40_000,
+          textTruncated: true,
+          title: 'Long page',
+          url: 'https://example.com/long',
+        },
+      },
+      type: PAGE_SNAPSHOT_MESSAGE,
+    });
+
+    await expect(
+      executeSafeToolCall(
+        createSafeToolCall({
+          name: 'get_page_snapshot',
+          tabId: 7,
+          textStart: 8000,
+        })
+      )
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: {
+        limits: {
+          maxNodeCount: 80,
+          maxNodeTextLength: 500,
+          maxTextLength: 8000,
+        },
+        nodes: [],
+        nodesTruncated: false,
+        note: 'Page text shows characters 8000-8013 of 40000. To read on, call get_page_snapshot with textStart: 8013; to jump to a specific fact, use find_in_page — it searches the full page text.',
+        snapshotId: 'snapshot-4',
+        text: 'middle window',
+        textStart: 8000,
+        textTotalChars: 40_000,
+        textTruncated: true,
+        title: 'Long page',
+        url: 'https://example.com/long',
+      },
+    });
+
+    expect(mocks.sendMessage.mock.calls[0]?.[0]).toStrictEqual({
+      tabId: 7,
+      textStart: 8000,
+      type: PAGE_SNAPSHOT_MESSAGE,
     });
   });
 

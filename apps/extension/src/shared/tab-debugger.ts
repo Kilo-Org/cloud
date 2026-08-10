@@ -5,6 +5,7 @@ export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
+export const FIND_TEXT_MESSAGE = 'kilo.tabs.findText';
 export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 
@@ -103,9 +104,25 @@ export interface PageSnapshot {
   readonly nodesTruncated: boolean;
   readonly snapshotId: string;
   readonly text: string;
+  /** Character offset of `text` inside the full visible page text. */
+  readonly textStart: number;
+  /** Length of the full visible page text this window was cut from. */
+  readonly textTotalChars: number;
   readonly textTruncated: boolean;
   readonly title: string;
   readonly url: string;
+}
+
+export interface PageTextMatch {
+  readonly excerpt: string;
+  /** Character offset of the match inside the full visible page text. */
+  readonly offset: number;
+}
+
+export interface PageTextSearchResult {
+  readonly matches: PageTextMatch[];
+  readonly textTotalChars: number;
+  readonly totalMatches: number;
 }
 
 export interface ViewportScreenshot {
@@ -139,8 +156,15 @@ export type TabDebuggerRequest =
     }
   | {
       readonly tabId: number;
+      readonly textStart?: number;
       readonly timeoutMs?: number;
       readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
+    }
+  | {
+      readonly query: string;
+      readonly tabId: number;
+      readonly timeoutMs?: number;
+      readonly type: typeof FIND_TEXT_MESSAGE;
     }
   | {
       readonly tabId: number;
@@ -162,6 +186,11 @@ export type TabDebuggerResponse =
       readonly result: EvalTabResult;
       readonly ok: true;
       readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof FIND_TEXT_MESSAGE;
     }
   | {
       readonly result: EvalTabResult;
@@ -195,8 +224,15 @@ const tabDebuggerRequestSchema = z.union([
   }),
   z.object({
     tabId: z.number(),
+    textStart: z.number().optional(),
     timeoutMs: z.number().optional(),
     type: z.literal(PAGE_SNAPSHOT_MESSAGE),
+  }),
+  z.object({
+    query: z.string(),
+    tabId: z.number(),
+    timeoutMs: z.number().optional(),
+    type: z.literal(FIND_TEXT_MESSAGE),
   }),
   z.object({
     tabId: z.number(),
@@ -224,6 +260,11 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(PAGE_SNAPSHOT_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(FIND_TEXT_MESSAGE),
   }),
   z.object({
     ok: z.literal(true),
@@ -444,10 +485,12 @@ const runInjectedEval = (code: string): unknown =>
   new Function(`return (async () => { ${code} })()`)();
 
 /* eslint-disable unicorn/consistent-function-scoping */
-const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
+const runInjectedPageSnapshot = (timeoutMsText: string, textStartText?: string): PageSnapshot => {
   const maxTextLength = 8000;
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
+  const textStartRaw = Number(textStartText ?? '0');
+  const textStart = Number.isFinite(textStartRaw) && textStartRaw > 0 ? textStartRaw : 0;
   const timeoutMs = Number(timeoutMsText);
   const deadline =
     Number.isFinite(timeoutMs) && timeoutMs > 0
@@ -514,28 +557,32 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
 
     return true;
   };
-  const getPageText = (): { text: string; truncated: boolean } => {
+  const getPageText = (): { text: string; start: number; totalChars: number } => {
+    // The full visible text is always collected so a window can start at any offset and the total length is exact. The walk stays deadline-bounded.
     const root = document.body ?? document.documentElement;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const parts: string[] = [];
-    let length = 0;
     let node = walker.nextNode();
 
-    while (node !== null && length < maxTextLength) {
+    while (node !== null) {
       checkDeadline();
 
       const text = normalize(node.textContent ?? '');
       if (text !== '' && isRenderedTextNode(node)) {
         parts.push(text);
-        length += text.length + 1;
       }
 
       node = walker.nextNode();
     }
 
-    const text = normalize(parts.join(' '));
+    const fullText = normalize(parts.join(' '));
+    const start = Math.min(textStart, fullText.length);
 
-    return { text: truncate(text, maxTextLength), truncated: text.length > maxTextLength };
+    return {
+      start,
+      text: fullText.slice(start, start + maxTextLength),
+      totalChars: fullText.length,
+    };
   };
   const getRole = (element: Element): string => {
     const explicitRole = element.getAttribute('role');
@@ -701,10 +748,87 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
     nodesTruncated: candidates.length > maxNodeCount || elementNode !== null,
     snapshotId: `snapshot-${Date.now().toString(36)}`,
     text: pageText.text,
-    textTruncated: pageText.truncated,
+    textStart: pageText.start,
+    textTotalChars: pageText.totalChars,
+    textTruncated: pageText.start + pageText.text.length < pageText.totalChars,
     title: document.title,
     url: sanitizeUrl(location.href),
   };
+};
+
+/**
+ * Search the full visible page text (not the bounded snapshot window) for a
+ * plain-text query. Returns up to 20 matches with a short excerpt and the
+ * character offset of each match, so a follow-up snapshot can read around it
+ * via textStart.
+ */
+const runInjectedFindText = (query: string, timeoutMsText: string): PageTextSearchResult => {
+  const maxMatches = 20;
+  const excerptRadius = 120;
+  const timeoutMs = Number(timeoutMsText);
+  const deadline =
+    Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? performance.now() + timeoutMs
+      : Number.POSITIVE_INFINITY;
+  const checkDeadline = (): void => {
+    if (performance.now() > deadline) {
+      throw new Error('Page text search timed out.');
+    }
+  };
+  const normalize = (value: string): string => value.replaceAll(/\s+/gu, ' ').trim();
+  const nonRenderedTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'TITLE']);
+  const isRenderedTextNode = (textNode: Node): boolean => {
+    for (let element = textNode.parentElement; element !== null; element = element.parentElement) {
+      if (nonRenderedTags.has(element.tagName) || element.getAttribute('aria-hidden') === 'true') {
+        return false;
+      }
+
+      const style = getComputedStyle(element);
+
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return false;
+      }
+    }
+
+    return true;
+  };
+  const root = document.body ?? document.documentElement;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const parts: string[] = [];
+  let node = walker.nextNode();
+
+  while (node !== null) {
+    checkDeadline();
+
+    const text = normalize(node.textContent ?? '');
+    if (text !== '' && isRenderedTextNode(node)) {
+      parts.push(text);
+    }
+
+    node = walker.nextNode();
+  }
+
+  const fullText = normalize(parts.join(' '));
+  const haystack = fullText.toLowerCase();
+  const needle = normalize(query).toLowerCase();
+  const matches: PageTextMatch[] = [];
+  let totalMatches = 0;
+
+  if (needle !== '') {
+    let offset = haystack.indexOf(needle);
+    while (offset !== -1) {
+      checkDeadline();
+      totalMatches += 1;
+      if (matches.length < maxMatches) {
+        const start = Math.max(0, offset - excerptRadius);
+        const end = Math.min(fullText.length, offset + needle.length + excerptRadius);
+        matches.push({ excerpt: fullText.slice(start, end), offset });
+      }
+      offset = haystack.indexOf(needle, offset + needle.length);
+    }
+  }
+
+  return { matches, textTotalChars: fullText.length, totalMatches };
 };
 /* eslint-enable unicorn/consistent-function-scoping */
 
@@ -847,17 +971,19 @@ export const evalInTabWithScripting = async ({
 export const getPageSnapshotInTabWithScripting = async ({
   scriptingApi,
   tabId,
+  textStart = 0,
   timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
 }: {
   readonly scriptingApi: BrowserScriptingApi;
   readonly tabId: number;
+  readonly textStart?: number;
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
-          args: [String(timeoutMs)],
+          args: [String(timeoutMs), String(textStart)],
           func: runInjectedPageSnapshot,
           target: { tabId },
           world: 'MAIN',
@@ -882,6 +1008,51 @@ export const getPageSnapshotInTabWithScripting = async ({
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to read page snapshot.',
+      ok: false,
+    };
+  }
+};
+
+export const findTextInTabWithScripting = async ({
+  query,
+  scriptingApi,
+  tabId,
+  timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
+}: {
+  readonly query: string;
+  readonly scriptingApi: BrowserScriptingApi;
+  readonly tabId: number;
+  readonly timeoutMs?: number;
+}): Promise<EvalTabResult> => {
+  try {
+    const [response] = await withTimeout(
+      Promise.resolve(
+        scriptingApi.executeScript({
+          args: [query, String(timeoutMs)],
+          func: runInjectedFindText,
+          target: { tabId },
+          world: 'MAIN',
+        })
+      ),
+      timeoutMs
+    );
+
+    if (response?.error !== undefined) {
+      const detail = extractInjectionErrorText(response.error);
+
+      return {
+        error:
+          detail === undefined
+            ? 'Failed to search the page text.'
+            : `Failed to search the page text: ${detail}`,
+        ok: false,
+      };
+    }
+
+    return { ok: true, value: response?.result };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to search the page text.',
       ok: false,
     };
   }

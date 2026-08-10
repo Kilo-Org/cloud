@@ -47,9 +47,9 @@ describe('final answer selection', () => {
   });
 
   it('returns an empty string when no assistant message exists', () => {
-    expect(selectFinalAnswer([{ id: 'message-0', role: 'user', text: 'hi', type: 'message' }])).toBe(
-      ''
-    );
+    expect(
+      selectFinalAnswer([{ id: 'message-0', role: 'user', text: 'hi', type: 'message' }])
+    ).toBe('');
   });
 });
 
@@ -114,10 +114,7 @@ describe('task correctness scoring', () => {
     expect(withoutAction.predicates['actionPerformed']?.pass).toBe(false);
 
     const withAction = scoreTaskCorrectness({
-      events: [
-        ...toolExchange('eval', { count: 6 }),
-        answerEvent('There are 6 products listed.'),
-      ],
+      events: [...toolExchange('eval', { count: 6 }), answerEvent('There are 6 products listed.')],
       scenario: actionScenario,
     });
     expect(withAction.passed).toBe(true);

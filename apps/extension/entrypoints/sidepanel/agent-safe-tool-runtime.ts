@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- The safe-tool runtime holds snapshot paging, full-text search, and memory reads as one dispatch surface. */
 import { browser, storage } from '#imports';
 import { z } from 'zod';
 import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
 import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
 import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
 import {
+  FIND_TEXT_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   isTabDebuggerResponse,
@@ -35,9 +37,16 @@ const pageSnapshotSchema = z.object({
   nodesTruncated: z.boolean().optional(),
   snapshotId: z.string().optional(),
   text: z.string(),
+  textStart: z.number().optional(),
+  textTotalChars: z.number().optional(),
   textTruncated: z.boolean().optional(),
   title: z.string(),
   url: z.string(),
+});
+const pageTextSearchSchema = z.object({
+  matches: z.array(z.object({ excerpt: z.string(), offset: z.number() })),
+  textTotalChars: z.number(),
+  totalMatches: z.number(),
 });
 const toPageSnapshotNode = (node: z.infer<typeof pageSnapshotNodeSchema>): PageSnapshotNode => ({
   ...(node.formAction === undefined ? {} : { formAction: node.formAction }),
@@ -77,14 +86,17 @@ const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnaps
   nodesTruncated: snapshot.nodesTruncated ?? false,
   snapshotId: snapshot.snapshotId ?? createSnapshotId(),
   text: snapshot.text,
+  textStart: snapshot.textStart ?? 0,
+  textTotalChars: snapshot.textTotalChars ?? snapshot.text.length,
   textTruncated: snapshot.textTruncated ?? false,
   title: snapshot.title,
   url: snapshot.url,
 });
 
-const readPageSnapshot = async (tabId: number): Promise<EvalTabResult> => {
+const readPageSnapshot = async (tabId: number, textStart?: number): Promise<EvalTabResult> => {
   const response: unknown = await browser.runtime.sendMessage({
     tabId,
+    ...(textStart === undefined ? {} : { textStart }),
     type: PAGE_SNAPSHOT_MESSAGE,
   });
 
@@ -97,6 +109,28 @@ const readPageSnapshot = async (tabId: number): Promise<EvalTabResult> => {
   }
 
   if (response.type !== PAGE_SNAPSHOT_MESSAGE) {
+    return { error: 'Extension background returned the wrong response.', ok: false };
+  }
+
+  return response.result;
+};
+
+const readFindText = async (tabId: number, query: string): Promise<EvalTabResult> => {
+  const response: unknown = await browser.runtime.sendMessage({
+    query,
+    tabId,
+    type: FIND_TEXT_MESSAGE,
+  });
+
+  if (!isTabDebuggerResponse(response)) {
+    return { error: 'Extension background returned an invalid response.', ok: false };
+  }
+
+  if (!response.ok) {
+    return { error: response.error, ok: false };
+  }
+
+  if (response.type !== FIND_TEXT_MESSAGE) {
     return { error: 'Extension background returned the wrong response.', ok: false };
   }
 
@@ -124,8 +158,8 @@ const readViewportScreenshot = async (tabId: number): Promise<EvalTabResult> => 
   return response.result;
 };
 
-const getSnapshot = async (tabId: number): Promise<PageSnapshot | string> => {
-  const result = await readPageSnapshot(tabId);
+const getSnapshot = async (tabId: number, textStart?: number): Promise<PageSnapshot | string> => {
+  const result = await readPageSnapshot(tabId, textStart);
 
   if (!result.ok) {
     return result.error;
@@ -149,40 +183,41 @@ const findMatchedField = (
   query: string
 ): (typeof searchableFields)[number] | undefined =>
   searchableFields.find(field => node[field]?.toLowerCase().includes(query.toLowerCase()) === true);
-const getExcerpt = (text: string, query: string): string => {
-  const index = text.toLowerCase().indexOf(query.toLowerCase());
-  const start = Math.max(0, index - 40);
-  const end = Math.min(text.length, index + query.length + 40);
-
-  return text.slice(start, end);
-};
-const getFindResults = (snapshot: PageSnapshot, query: string) => {
+const getFindResults = (
+  snapshot: PageSnapshot,
+  query: string,
+  textSearch: z.infer<typeof pageTextSearchSchema>
+) => {
   const nodeMatches = snapshot.nodes.flatMap(node => {
     const matchedField = findMatchedField(node, query);
 
     return matchedField === undefined ? [] : [{ ...node, matchedField }];
   });
-  const pageTextMatch = snapshot.text.toLowerCase().includes(query.toLowerCase())
-    ? [
-        {
-          excerpt: getExcerpt(snapshot.text, query),
-          matchedField: 'pageText',
-          role: 'document',
-          tag: 'body',
-        },
-      ]
-    : [];
-  const matches = [...nodeMatches, ...pageTextMatch].toSorted(
+  // Full-page text matches come from the injected search, so a fact beyond the bounded snapshot window is still found; the offset lets the model read around a match with get_page_snapshot textStart.
+  const textMatches = textSearch.matches.map(match => ({
+    excerpt: match.excerpt,
+    matchedField: 'pageText',
+    offset: match.offset,
+    role: 'document',
+    tag: 'body',
+  }));
+  const matches = [...nodeMatches, ...textMatches].toSorted(
     (left, right) =>
       ['text', 'label', 'pageText', 'href', 'role', 'tag'].indexOf(left.matchedField) -
       ['text', 'label', 'pageText', 'href', 'role', 'tag'].indexOf(right.matchedField)
   );
   const maxMatches = 20;
+  const totalMatches = nodeMatches.length + textSearch.totalMatches;
 
   return {
     matches: matches.slice(0, maxMatches),
+    ...(textSearch.matches.length > 0
+      ? {
+          note: 'Each pageText excerpt carries its character offset in the full page text. To read the section around a match, call get_page_snapshot with textStart set near that offset.',
+        }
+      : {}),
     snapshotId: snapshot.snapshotId,
-    totalMatches: matches.length,
+    totalMatches,
     truncated: matches.length > maxMatches,
   };
 };
@@ -249,17 +284,18 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
       : { ok: true, value: element };
   }
 
-  const snapshot = await getSnapshot(toolCall.tabId);
-
-  if (typeof snapshot === 'string') {
-    return { error: snapshot, ok: false };
-  }
-
   if (toolCall.name === 'get_page_snapshot') {
+    const snapshot = await getSnapshot(toolCall.tabId, toolCall.textStart);
+
+    if (typeof snapshot === 'string') {
+      return { error: snapshot, ok: false };
+    }
+
     // Serving the same unchanged page again only burns context and invites a snapshot loop; a compact marker tells the model to act on what it already has.
     const contentKey = JSON.stringify({
       nodes: snapshot.nodes,
       text: snapshot.text,
+      textStart: snapshot.textStart,
       title: snapshot.title,
       url: snapshot.url,
     });
@@ -275,6 +311,16 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
         },
       };
     }
+    if (snapshot.textTruncated) {
+      const nextStart = snapshot.textStart + snapshot.text.length;
+      return {
+        ok: true,
+        value: {
+          ...snapshot,
+          note: `Page text shows characters ${String(snapshot.textStart)}-${String(nextStart)} of ${String(snapshot.textTotalChars)}. To read on, call get_page_snapshot with textStart: ${String(nextStart)}; to jump to a specific fact, use find_in_page — it searches the full page text.`,
+        },
+      };
+    }
     return { ok: true, value: snapshot };
   }
 
@@ -284,5 +330,23 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
     return { error: 'Search query is required.', ok: false };
   }
 
-  return { ok: true, value: getFindResults(snapshot, query) };
+  const snapshot = await getSnapshot(toolCall.tabId);
+
+  if (typeof snapshot === 'string') {
+    return { error: snapshot, ok: false };
+  }
+
+  const findResult = await readFindText(toolCall.tabId, query);
+
+  if (!findResult.ok) {
+    return findResult;
+  }
+
+  const textSearch = pageTextSearchSchema.safeParse(findResult.value);
+
+  if (!textSearch.success) {
+    return { error: 'Page text search returned an invalid result.', ok: false };
+  }
+
+  return { ok: true, value: getFindResults(snapshot, query, textSearch.data) };
 };

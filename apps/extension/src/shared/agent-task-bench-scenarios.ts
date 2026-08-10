@@ -45,10 +45,11 @@ export interface BenchTaskScenario {
  * truncated head misses the later ones.
  */
 const SUMMARIZE_ARTICLE_SCENARIO: BenchTaskScenario = {
+  // The deep themes require tool evidence: this essay is in training data, and the baseline model summarized the truncated page "from familiarity" — the pass must prove the later sections were actually read.
   answerChecks: [
     { key: 'curiosity', re: /curiosity|curious/iu },
-    { key: 'procrastination', re: /procrastinat|putting.{1,8}off|distract/iu },
-    { key: 'originality', re: /original/iu },
+    { key: 'procrastination', re: /procrastinat/iu, requireToolEvidence: true },
+    { key: 'originality', re: /original/iu, requireToolEvidence: true },
   ],
   id: 'summarize-article',
   kind: 'task',
@@ -88,7 +89,8 @@ const EXTRACT_TABLE_SCENARIO: BenchTaskScenario = {
   answerChecks: [
     { key: 'table', re: /\|[^\n]+\|/u },
     { key: 'price', re: /£\s?\d+\.\d\d/u, requireToolEvidence: true },
-    { key: 'title', re: /a light in the attic/iu, requireToolEvidence: true },
+    // The site itself truncates long titles ("A Light in the ..."), so the pinned title must be one that renders fully.
+    { key: 'title', re: /tipping the velvet/iu, requireToolEvidence: true },
   ],
   id: 'extract-table',
   kind: 'task',

@@ -1150,8 +1150,9 @@ const selectAgentMode = async (
   }
   await safeToggle.click();
   await sidePanel.getByRole('button', { name: /^Dangerous\b/ }).click();
+  // The active-mode toggle label reads "Danger mode: Arbitrary webpage control".
   await sidePanel
-    .getByRole('button', { name: /Dangerous mode/ })
+    .getByRole('button', { name: /Danger mode/ })
     .waitFor({ state: 'visible', timeout: budget.waitTimeoutFor(30_000) });
 };
 

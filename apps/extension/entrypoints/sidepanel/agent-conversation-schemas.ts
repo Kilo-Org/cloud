@@ -34,6 +34,7 @@ export const conversationEventSchema = z.union([
     query: z.string().optional(),
     snapshotId: z.string().optional(),
     tabId: z.number(),
+    textStart: z.number().optional(),
     type: z.literal('tool-call'),
   }),
   z.object({

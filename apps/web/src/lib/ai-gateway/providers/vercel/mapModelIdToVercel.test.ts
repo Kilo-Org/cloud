@@ -16,34 +16,64 @@ import {
 } from '@/lib/ai-gateway/providers/openai';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
+import {
+  CLAUDE_FABLE_LATEST_MODEL_ALIAS,
+  CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
+  CLAUDE_OPUS_LATEST_MODEL_ALIAS,
+  CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+  DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
+  GEMINI_FLASH_LATEST_MODEL_ALIAS,
+  GEMINI_PRO_LATEST_MODEL_ALIAS,
+  GPT_LATEST_MODEL_ALIAS,
+  GPT_MINI_LATEST_MODEL_ALIAS,
+  GROK_LATEST_MODEL_ALIAS,
+  KIMI_LATEST_MODEL_ALIAS,
+  LATEST_MODEL_ALIASES,
+} from '@/lib/ai-gateway/latest-model-aliases';
 
 describe('mapModelIdToVercel', () => {
   describe('tilde-prefixed latest aliases', () => {
     it.each([
-      ['~anthropic/claude-fable-latest', CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],
-      ['~anthropic/claude-opus-latest', CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID],
-      ['~anthropic/claude-sonnet-latest', CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID],
-      ['~anthropic/claude-haiku-latest', CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],
-      ['~openai/gpt-latest', GPT_CURRENT_VERCEL_MODEL_ID],
-      ['~openai/gpt-mini-latest', GPT_MINI_CURRENT_VERCEL_MODEL_ID],
-      ['~moonshotai/kimi-latest', KIMI_CURRENT_VERCEL_MODEL_ID],
-      ['~google/gemini-pro-latest', GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
-      ['~google/gemini-flash-latest', GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
-      ['~x-ai/grok-latest', GROK_CURRENT_VERCEL_MODEL_ID],
+      [CLAUDE_FABLE_LATEST_MODEL_ALIAS, CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],
+      [CLAUDE_OPUS_LATEST_MODEL_ALIAS, CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID],
+      [CLAUDE_SONNET_LATEST_MODEL_ALIAS, CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID],
+      [CLAUDE_HAIKU_LATEST_MODEL_ALIAS, CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],
+      [GPT_LATEST_MODEL_ALIAS, GPT_CURRENT_VERCEL_MODEL_ID],
+      [GPT_MINI_LATEST_MODEL_ALIAS, GPT_MINI_CURRENT_VERCEL_MODEL_ID],
+      [KIMI_LATEST_MODEL_ALIAS, KIMI_CURRENT_VERCEL_MODEL_ID],
+      [GEMINI_PRO_LATEST_MODEL_ALIAS, GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
+      [GEMINI_FLASH_LATEST_MODEL_ALIAS, GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
+      [GROK_LATEST_MODEL_ALIAS, GROK_CURRENT_VERCEL_MODEL_ID],
+      [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-flash-0731'],
     ])('maps %s to the current Vercel model id', (input, expected) => {
       expect(mapModelIdToVercel(input)).toBe(expected);
     });
 
+    it('exports every latest alias in one list', () => {
+      expect(LATEST_MODEL_ALIASES).toEqual([
+        CLAUDE_FABLE_LATEST_MODEL_ALIAS,
+        CLAUDE_OPUS_LATEST_MODEL_ALIAS,
+        CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+        CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
+        GPT_LATEST_MODEL_ALIAS,
+        GPT_MINI_LATEST_MODEL_ALIAS,
+        KIMI_LATEST_MODEL_ALIAS,
+        GEMINI_PRO_LATEST_MODEL_ALIAS,
+        GEMINI_FLASH_LATEST_MODEL_ALIAS,
+        GROK_LATEST_MODEL_ALIAS,
+        DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
+      ]);
+    });
+
     it('does not map a latest alias that is missing the leading tilde', () => {
-      expect(mapModelIdToVercel('anthropic/claude-opus-latest')).toBe(
-        'anthropic/claude-opus-latest'
+      expect(mapModelIdToVercel('deepseek/deepseek-v4-flash-latest')).toBe(
+        'deepseek/deepseek-v4-flash-latest'
       );
     });
   });
 
   describe('hardcoded OpenRouter → Vercel mapping', () => {
     it.each([
-      ['deepseek/deepseek-v4-flash-latest', 'deepseek/deepseek-v4-flash-0731'],
       ['mistralai/codestral-2508', 'mistral/codestral'],
       ['mistralai/devstral-2512', 'mistral/devstral-2'],
       ['mistralai/mistral-embed-2312', 'mistral/mistral-embed'],

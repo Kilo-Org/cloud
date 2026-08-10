@@ -131,9 +131,6 @@ async function checkManualBYOK(
         const body = context.request.body as Record<string, unknown>;
         for (const key of credential.definition.remove_from_body ?? []) delete body[key];
         Object.assign(body, credential.definition.extra_body ?? {});
-        if (context.request.kind === 'messages') {
-          context.extraHeaders['anthropic-version'] = '2023-06-01';
-        }
         Object.assign(context.extraHeaders, credential.definition.extra_headers ?? {});
         context.request.body.model = credential.model.id;
         if (credential.resolvedModel.addCacheBreakpoints) {

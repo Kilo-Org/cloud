@@ -32,24 +32,28 @@ export function formatDirectByokModelId(provider: DirectByokProvider, model: Dir
   return (provider.id + '/' + model.id).toLowerCase();
 }
 
-function convertModel(
-  provider: DirectByokProvider,
-  model: DirectByokModel,
-  preferredIndex: number
-) {
-  const id = formatDirectByokModelId(provider, model);
-  const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
+type ByokModelCatalogEntryInput = {
+  id: string;
+  name: string;
+  contextLength: number;
+  maxCompletionTokens: number;
+  supportsImageInput: boolean;
+  supportsReasoning: boolean;
+  opencode: OpenCodeSettings;
+};
+
+function createByokModelCatalogEntry(input: ByokModelCatalogEntryInput) {
   return {
-    id,
-    canonical_slug: id,
+    id: input.id,
+    canonical_slug: input.id,
     hugging_face_id: '',
-    name,
+    name: input.name,
     created: 631148400, // our clients do not care about this field, we can fix it later if that changes
     description: '',
-    context_length: model.context_length,
+    context_length: input.contextLength,
     architecture: {
-      modality: model.flags?.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: ['text'].concat(model.flags?.includes('vision') ? ['image'] : []),
+      modality: input.supportsImageInput ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      input_modalities: ['text'].concat(input.supportsImageInput ? ['image'] : []),
       output_modalities: ['text'],
       tokenizer: 'Other',
       instruct_type: null,
@@ -64,23 +68,42 @@ function convertModel(
       input_cache_read: '0.00000000',
     },
     top_provider: {
-      context_length: model.context_length,
-      max_completion_tokens: model.max_completion_tokens,
+      context_length: input.contextLength,
+      max_completion_tokens: input.maxCompletionTokens,
       is_moderated: false,
     },
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools'].concat(
-      model.flags?.includes('reasoning') ? ['reasoning'] : []
+      input.supportsReasoning ? ['reasoning'] : []
     ),
     default_parameters: {},
-    preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
-    opencode: {
-      ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
-      variants:
-        model.variants ??
-        (model.flags?.includes('reasoning') ? getFallbackModelVariants(id) : undefined),
-    } satisfies OpenCodeSettings,
+    opencode: input.opencode,
+  };
+}
+
+function convertModel(
+  provider: DirectByokProvider,
+  model: DirectByokModel,
+  preferredIndex: number
+) {
+  const id = formatDirectByokModelId(provider, model);
+  return {
+    ...createByokModelCatalogEntry({
+      id,
+      name: `${DIRECT_BYOK_PROVIDERS_META[provider.id]}: ${model.name}`,
+      contextLength: model.context_length,
+      maxCompletionTokens: model.max_completion_tokens,
+      supportsImageInput: model.flags?.includes('vision') ?? false,
+      supportsReasoning: model.flags?.includes('reasoning') ?? false,
+      opencode: {
+        ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
+        variants:
+          model.variants ??
+          (model.flags?.includes('reasoning') ? getFallbackModelVariants(id) : undefined),
+      },
+    }),
+    preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
   };
 }
 
@@ -91,46 +114,18 @@ async function convertManualModel(
 ) {
   const resolved = resolveManualByokModel(definition, model);
   const id = formatManualByokModelId(providerId, model.id);
-  return {
+  return createByokModelCatalogEntry({
     id,
-    canonical_slug: id,
-    hugging_face_id: '',
     name: `${definition.name}: ${resolved.name}`,
-    created: 631148400,
-    description: '',
-    context_length: resolved.contextLength,
-    architecture: {
-      modality: resolved.supportsImageInput ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: ['text'].concat(resolved.supportsImageInput ? ['image'] : []),
-      output_modalities: ['text'],
-      tokenizer: 'Other',
-      instruct_type: null,
-    },
-    pricing: {
-      prompt: '0.0000000',
-      completion: '0.0000000',
-      request: '0',
-      image: '0',
-      web_search: '0',
-      internal_reasoning: '0',
-      input_cache_read: '0.00000000',
-    },
-    top_provider: {
-      context_length: resolved.contextLength,
-      max_completion_tokens: resolved.maxCompletionTokens,
-      is_moderated: false,
-    },
-    per_request_limits: null,
-    supported_parameters: ['max_tokens', 'temperature', 'tools'].concat(
-      resolved.supportsReasoning ? ['reasoning'] : []
-    ),
-    default_parameters: {},
-    hasUserByokAvailable: true,
+    contextLength: resolved.contextLength,
+    maxCompletionTokens: resolved.maxCompletionTokens,
+    supportsImageInput: resolved.supportsImageInput,
+    supportsReasoning: resolved.supportsReasoning,
     opencode: {
       ai_sdk_provider: resolved.preferredAiSdkProvider,
       variants: await getModelVariants(id, resolved.supportsReasoning),
-    } satisfies OpenCodeSettings,
-  };
+    },
+  });
 }
 
 async function getManualByokModels(owner: { userId: string } | { organizationId: string }) {

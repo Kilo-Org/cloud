@@ -88,7 +88,6 @@ function testManualProvider(
 ) {
   const headers = new Headers({ 'Content-Type': 'application/json' });
   headers.set(useXApiKey ? 'X-Api-Key' : 'Authorization', useXApiKey ? apiKey : `Bearer ${apiKey}`);
-  if (apiKind === 'messages') headers.set('anthropic-version', '2023-06-01');
   const body =
     apiKind === 'responses'
       ? { model, input: 'Say hi', max_output_tokens: 1 }

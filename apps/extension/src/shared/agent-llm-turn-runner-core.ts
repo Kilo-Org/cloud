@@ -116,10 +116,13 @@ const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
 const ANNOUNCEMENT_RE =
   /\b(?:i'?ll|i will|i'?m \w+ing|i am \w+ing|i am going to|let me|now i|next i)\b|^\s*\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
 
+// A real question to the user ends the message with "?"; a mid-text "?" is usually a URL query string (…/search?q=) or code, not a question, so only a trailing "?" suppresses the nudge.
+const endsWithQuestion = (text: string): boolean => text.trimEnd().endsWith('?');
+
 const deservesContinueNudge = (lastAssistantText: string): boolean =>
   lastAssistantText.length > 0 &&
   lastAssistantText.length < CONTINUE_NUDGE_MAX_TEXT_LENGTH &&
-  !lastAssistantText.includes('?') &&
+  !endsWithQuestion(lastAssistantText) &&
   ANNOUNCEMENT_RE.test(lastAssistantText);
 
 // A turn that ends with thinking but no assistant text and no tool calls never answered the user; the model spent its completion reasoning and stopped. The finish reason is healthy, so the retry tier never sees it — the nudge does.

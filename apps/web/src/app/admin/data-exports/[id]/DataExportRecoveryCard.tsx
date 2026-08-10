@@ -22,6 +22,7 @@ import type { DataExportDetail } from '../data-export-types';
 import {
   recoveryConfirmationMatches,
   redispatchToastCopy,
+  resetRetryDialogAfterSuccess,
   resolveRecoveryActionGate,
   retryToastCopy,
   type RecoveryActionKey,
@@ -88,6 +89,10 @@ export function DataExportRecoveryCard({ detail }: { detail: DataExportDetail })
   const retryMutation = useMutation(
     trpc.admin.userDataExports.cancelAndRetry.mutationOptions({
       onSuccess: async (result: RecoveryMutationResult & { replacementExportId: string }) => {
+        resetRetryDialogAfterSuccess({
+          close: () => setOpenAction(null),
+          clearConfirmation: () => setRetryConfirm(''),
+        });
         queryClient.removeQueries(
           trpc.admin.userDataExports.detail.queryFilter({ exportId: detail.id })
         );

@@ -5,6 +5,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   recoveryConfirmationMatches,
   redispatchToastCopy,
+  resetRetryDialogAfterSuccess,
   resolveRecoveryActionGate,
   retryToastCopy,
 } from './data-export-recovery';
@@ -48,6 +49,18 @@ describe('recoveryConfirmationMatches', () => {
     expect(recoveryConfirmationMatches(EXPORT_ID.toUpperCase(), EXPORT_ID)).toBe(false);
     expect(recoveryConfirmationMatches(EXPORT_ID.slice(0, 8), EXPORT_ID)).toBe(false);
     expect(recoveryConfirmationMatches('', EXPORT_ID)).toBe(false);
+  });
+});
+
+describe('resetRetryDialogAfterSuccess', () => {
+  it('closes the retry dialog and clears the typed export ID before navigation', () => {
+    const close = jest.fn();
+    const clearConfirmation = jest.fn();
+
+    resetRetryDialogAfterSuccess({ close, clearConfirmation });
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(clearConfirmation).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -26,6 +26,14 @@ export function recoveryConfirmationMatches(input: string, exportId: string): bo
   return input.length > 0 && input === exportId;
 }
 
+export function resetRetryDialogAfterSuccess(input: {
+  close: () => void;
+  clearConfirmation: () => void;
+}): void {
+  input.close();
+  input.clearConfirmation();
+}
+
 export type RecoveryToastCopy = {
   kind: 'success' | 'warning';
   title: string;

@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -26,6 +26,9 @@ describe('adminUserDataExportsRouter', () => {
   let recoveryOwner: User;
   let exportIds: string[] = [];
   let deletionKeys: string[] = [];
+  let failedExportId: string;
+  let leasedProcessingExportId: string;
+  let cleanupDueBaseline = 0;
 
   beforeAll(async () => {
     const suffix = `${Date.now()}-${crypto.randomUUID()}`;
@@ -51,6 +54,12 @@ describe('adminUserDataExportsRouter', () => {
 
   beforeEach(async () => {
     mockDispatchUserDataExport.mockResolvedValue({ kind: 'accepted' });
+    const dueCleanup = await db.execute<{ count: string }>(sql`
+      SELECT count(*)::text AS count
+      FROM user_data_export_object_deletions
+      WHERE available_at <= now()
+    `);
+    cleanupDueBaseline = Number(dueCleanup.rows[0]?.count ?? 0);
     const now = Date.now();
     const rows = await db
       .insert(user_data_exports)
@@ -104,15 +113,23 @@ describe('adminUserDataExportsRouter', () => {
           started_at: new Date(now - 850_000).toISOString(),
         },
       ])
-      .returning({ id: user_data_exports.id, status: user_data_exports.status });
+      .returning({
+        id: user_data_exports.id,
+        status: user_data_exports.status,
+        kiloUserId: user_data_exports.kilo_user_id,
+      });
     exportIds = rows.map(row => row.id);
-    const processing = rows.find(row => row.status === 'processing');
+    const processing = rows.find(
+      row => row.status === 'processing' && row.kiloUserId === leaseLessOwner.id
+    );
     const failed = rows.find(row => row.status === 'failed');
     const processingWithoutLease = rows.find(
-      row => row.status === 'processing' && row.id !== processing?.id
+      row => row.status === 'processing' && row.kiloUserId === owner.id
     );
     if (!processing || !failed || !processingWithoutLease)
       throw new Error('Expected export fixtures');
+    leasedProcessingExportId = processing.id;
+    failedExportId = failed.id;
     await db.insert(user_data_export_outbox).values([
       {
         export_id: processing.id,
@@ -200,7 +217,7 @@ describe('adminUserDataExportsRouter', () => {
       staleLeases: 1,
       pendingDispatches: 1,
       failed: 1,
-      cleanupDue: 1,
+      cleanupDue: cleanupDueBaseline + 1,
       emailUnhealthy: 1,
     });
     expect(result.asOf).toMatch(/Z$/);
@@ -253,20 +270,11 @@ describe('adminUserDataExportsRouter', () => {
 
   it('returns legacy part aggregates, outbox history, and redacted failure details', async () => {
     const caller = await createCallerForUser(admin.id);
-    const processing = await db.query.user_data_exports.findFirst({
-      where: eq(user_data_exports.status, 'processing'),
-      columns: { id: true },
-    });
-    const failed = await db.query.user_data_exports.findFirst({
-      where: eq(user_data_exports.status, 'failed'),
-      columns: { id: true },
-    });
-    if (!processing || !failed) throw new Error('Expected export fixtures');
 
     const processingDetail = await caller.admin.userDataExports.detail({
-      exportId: processing.id,
+      exportId: leasedProcessingExportId,
     });
-    const failedDetail = await caller.admin.userDataExports.detail({ exportId: failed.id });
+    const failedDetail = await caller.admin.userDataExports.detail({ exportId: failedExportId });
 
     expect(processingDetail.parts).toEqual({
       count: 1,

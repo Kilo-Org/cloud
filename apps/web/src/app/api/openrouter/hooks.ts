@@ -12,6 +12,7 @@ import {
   NormalizedOpenRouterResponse,
   type OpenRouterModel,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { collectUniqueCatalogModels } from '@/components/organizations/providers-and-models/allowLists.domain';
 import * as z from 'zod';
 
 interface OpenRouterProvider {
@@ -171,21 +172,9 @@ export function useOpenRouterModelsAndProviders() {
     }));
   }, [query.data]);
 
-  // A model can be offered by multiple providers. Dedupe by slug and prefer a live endpoint
-  // when one exists, but still include snapshot models that currently have none.
   const models = useMemo((): OpenRouterModel[] => {
     if (!query.data) return [];
-
-    const modelBySlug = new Map<string, OpenRouterModel>();
-    for (const provider of query.data.providers) {
-      for (const model of provider.models) {
-        const existing = modelBySlug.get(model.slug);
-        if (!existing || (!existing.endpoint && model.endpoint)) {
-          modelBySlug.set(model.slug, model);
-        }
-      }
-    }
-    return [...modelBySlug.values()];
+    return collectUniqueCatalogModels(query.data.providers);
   }, [query.data]);
 
   return {

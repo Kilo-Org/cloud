@@ -15,12 +15,16 @@ jest.mock('@/lib/ai-gateway/providers/openrouter/sync-providers', () => ({
 
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
-import { GET } from './route';
+import { GET, maxDuration } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
 describe('GET /api/cron/sync-providers', () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it('exports maxDuration of 8 minutes (480 seconds)', () => {
+    expect(maxDuration).toBe(480);
+  });
 
   it('emits one event at the cron boundary with aggregate provider counts', async () => {
     jest.mocked(syncAndStoreProviders).mockResolvedValue({

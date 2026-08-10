@@ -177,7 +177,6 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   if (
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&
-    request.body.messages.length > 1 &&
     !containsCacheControl(request.body.messages)
   ) {
     const systemMessage = request.body.messages.find(msg => msg.role === 'system');
@@ -199,7 +198,6 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'responses' &&
     Array.isArray(request.body.input) &&
-    request.body.input.length > 1 &&
     !containsCacheControl(request.body.input)
   ) {
     const systemMessage = request.body.input.find(
@@ -218,11 +216,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       );
       setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
-  } else if (
-    request.kind === 'messages' &&
-    request.body.messages.length > 1 &&
-    !containsCacheControl(request.body.messages)
-  ) {
+  } else if (request.kind === 'messages' && !containsCacheControl(request.body.messages)) {
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');

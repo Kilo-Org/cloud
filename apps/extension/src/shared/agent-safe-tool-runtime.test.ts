@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- memory-tool cases live with the existing runtime suite */
 import { describe, expect, it, vi } from 'vitest';
-import { FIND_TEXT_MESSAGE, PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
+import { PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
 import { createSafeToolCall } from './agent-conversation';
 import type { AgentMemory } from './agent-memories';
 
@@ -170,6 +170,7 @@ describe('safe tool runtime', () => {
 
   it('returns ranked find results merging full-page text matches and truncation metadata', async () => {
     mocks.sendMessage.mockReset();
+    // One injection serves find_in_page: the snapshot carries the full-page text matches.
     mocks.sendMessage.mockResolvedValueOnce({
       ok: true,
       result: {
@@ -198,25 +199,14 @@ describe('safe tool runtime', () => {
           nodesTruncated: false,
           snapshotId: 'snapshot-3',
           text: 'Plain paragraph has keyword outside captured nodes.',
-          textTruncated: false,
+          textMatches: [{ excerpt: 'paragraph has keyword outside', offset: 9021 }],
+          textTruncated: true,
           title: 'Find page',
+          totalTextMatches: 1,
           url: 'https://example.com/',
         },
       },
       type: PAGE_SNAPSHOT_MESSAGE,
-    });
-    // The full-page text search runs as its own injected call and can match beyond the snapshot window.
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      result: {
-        ok: true,
-        value: {
-          matches: [{ excerpt: 'paragraph has keyword outside', offset: 9021 }],
-          textTotalChars: 12_000,
-          totalMatches: 1,
-        },
-      },
-      type: FIND_TEXT_MESSAGE,
     });
 
     await expect(
@@ -260,10 +250,47 @@ describe('safe tool runtime', () => {
         truncated: false,
       },
     });
-    expect(mocks.sendMessage.mock.calls[1]?.[0]).toStrictEqual({
+    expect(mocks.sendMessage.mock.calls[0]?.[0]).toStrictEqual({
       query: 'keyword',
       tabId: 7,
-      type: FIND_TEXT_MESSAGE,
+      type: PAGE_SNAPSHOT_MESSAGE,
+    });
+    expect(mocks.sendMessage.mock.calls[1]).toBeUndefined();
+  });
+
+  it('reports truncation when the page has more text matches than it returns', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        ok: true,
+        value: {
+          nodes: [],
+          snapshotId: 'snapshot-5',
+          text: 'keyword everywhere',
+          textMatches: [...Array.from({ length: 20 }).keys()].map(index => ({
+            excerpt: `match ${String(index)}`,
+            offset: index * 100,
+          })),
+          title: 'Busy page',
+          totalTextMatches: 500,
+          url: 'https://example.com/busy',
+        },
+      },
+      type: PAGE_SNAPSHOT_MESSAGE,
+    });
+
+    const result = await executeSafeToolCall(
+      createSafeToolCall({
+        name: 'find_in_page',
+        query: 'keyword',
+        tabId: 7,
+      })
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { totalMatches: 500, truncated: true },
     });
   });
 

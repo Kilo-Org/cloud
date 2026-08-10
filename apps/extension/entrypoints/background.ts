@@ -17,13 +17,11 @@ import type {
 } from '@/src/shared/side-panel';
 import {
   EVAL_TAB_MESSAGE,
-  FIND_TEXT_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   evalInTab,
   evalInTabWithScripting,
-  findTextInTabWithScripting,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
   isTabDebuggerRequest,
@@ -116,6 +114,7 @@ const handleTabDebuggerRequest = async ({
           result: await getPageSnapshotInTabWithScripting({
             scriptingApi,
             tabId: request.tabId,
+            ...(request.query === undefined ? {} : { query: request.query }),
             ...(request.textStart === undefined ? {} : { textStart: request.textStart }),
             ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
           }),
@@ -124,23 +123,6 @@ const handleTabDebuggerRequest = async ({
       }
 
       return { error: 'Page snapshot API is unavailable.', ok: false };
-    }
-
-    if (request.type === FIND_TEXT_MESSAGE) {
-      if (scriptingApi) {
-        return {
-          ok: true,
-          result: await findTextInTabWithScripting({
-            query: request.query,
-            scriptingApi,
-            tabId: request.tabId,
-            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-          }),
-          type: FIND_TEXT_MESSAGE,
-        };
-      }
-
-      return { error: 'Page text search API is unavailable.', ok: false };
     }
 
     if (request.type === VIEWPORT_SCREENSHOT_MESSAGE) {

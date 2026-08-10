@@ -316,7 +316,7 @@ describe('tab debugger helpers', () => {
       calls.map(call => ({ args: call.args, target: call.target, world: call.world }))
     ).toStrictEqual([
       {
-        args: ['123', '0'],
+        args: ['123', '0', ''],
         target: { tabId: 7 },
         world: 'MAIN',
       },

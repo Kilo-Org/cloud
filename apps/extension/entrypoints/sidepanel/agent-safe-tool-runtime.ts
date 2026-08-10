@@ -5,7 +5,6 @@ import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-co
 import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
 import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
 import {
-  FIND_TEXT_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   isTabDebuggerResponse,
@@ -37,16 +36,13 @@ const pageSnapshotSchema = z.object({
   nodesTruncated: z.boolean().optional(),
   snapshotId: z.string().optional(),
   text: z.string(),
+  textMatches: z.array(z.object({ excerpt: z.string(), offset: z.number() })).optional(),
   textStart: z.number().optional(),
   textTotalChars: z.number().optional(),
   textTruncated: z.boolean().optional(),
   title: z.string(),
+  totalTextMatches: z.number().optional(),
   url: z.string(),
-});
-const pageTextSearchSchema = z.object({
-  matches: z.array(z.object({ excerpt: z.string(), offset: z.number() })),
-  textTotalChars: z.number(),
-  totalMatches: z.number(),
 });
 const toPageSnapshotNode = (node: z.infer<typeof pageSnapshotNodeSchema>): PageSnapshotNode => ({
   ...(node.formAction === undefined ? {} : { formAction: node.formAction }),
@@ -86,16 +82,24 @@ const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnaps
   nodesTruncated: snapshot.nodesTruncated ?? false,
   snapshotId: snapshot.snapshotId ?? createSnapshotId(),
   text: snapshot.text,
+  ...(snapshot.textMatches === undefined ? {} : { textMatches: snapshot.textMatches }),
   textStart: snapshot.textStart ?? 0,
   textTotalChars: snapshot.textTotalChars ?? snapshot.text.length,
   textTruncated: snapshot.textTruncated ?? false,
   title: snapshot.title,
+  ...(snapshot.totalTextMatches === undefined
+    ? {}
+    : { totalTextMatches: snapshot.totalTextMatches }),
   url: snapshot.url,
 });
 
-const readPageSnapshot = async (tabId: number, textStart?: number): Promise<EvalTabResult> => {
+const readPageSnapshot = async (
+  tabId: number,
+  { query, textStart }: { readonly query?: string; readonly textStart?: number } = {}
+): Promise<EvalTabResult> => {
   const response: unknown = await browser.runtime.sendMessage({
     tabId,
+    ...(query === undefined ? {} : { query }),
     ...(textStart === undefined ? {} : { textStart }),
     type: PAGE_SNAPSHOT_MESSAGE,
   });
@@ -109,28 +113,6 @@ const readPageSnapshot = async (tabId: number, textStart?: number): Promise<Eval
   }
 
   if (response.type !== PAGE_SNAPSHOT_MESSAGE) {
-    return { error: 'Extension background returned the wrong response.', ok: false };
-  }
-
-  return response.result;
-};
-
-const readFindText = async (tabId: number, query: string): Promise<EvalTabResult> => {
-  const response: unknown = await browser.runtime.sendMessage({
-    query,
-    tabId,
-    type: FIND_TEXT_MESSAGE,
-  });
-
-  if (!isTabDebuggerResponse(response)) {
-    return { error: 'Extension background returned an invalid response.', ok: false };
-  }
-
-  if (!response.ok) {
-    return { error: response.error, ok: false };
-  }
-
-  if (response.type !== FIND_TEXT_MESSAGE) {
     return { error: 'Extension background returned the wrong response.', ok: false };
   }
 
@@ -158,8 +140,11 @@ const readViewportScreenshot = async (tabId: number): Promise<EvalTabResult> => 
   return response.result;
 };
 
-const getSnapshot = async (tabId: number, textStart?: number): Promise<PageSnapshot | string> => {
-  const result = await readPageSnapshot(tabId, textStart);
+const getSnapshot = async (
+  tabId: number,
+  options: { readonly query?: string; readonly textStart?: number } = {}
+): Promise<PageSnapshot | string> => {
+  const result = await readPageSnapshot(tabId, options);
 
   if (!result.ok) {
     return result.error;
@@ -183,42 +168,39 @@ const findMatchedField = (
   query: string
 ): (typeof searchableFields)[number] | undefined =>
   searchableFields.find(field => node[field]?.toLowerCase().includes(query.toLowerCase()) === true);
-const getFindResults = (
-  snapshot: PageSnapshot,
-  query: string,
-  textSearch: z.infer<typeof pageTextSearchSchema>
-) => {
+const getFindResults = (snapshot: PageSnapshot, query: string) => {
   const nodeMatches = snapshot.nodes.flatMap(node => {
     const matchedField = findMatchedField(node, query);
 
     return matchedField === undefined ? [] : [{ ...node, matchedField }];
   });
   // Full-page text matches come from the injected search, so a fact beyond the bounded snapshot window is still found; the offset lets the model read around a match with get_page_snapshot textStart.
-  const textMatches = textSearch.matches.map(match => ({
+  const textMatches = (snapshot.textMatches ?? []).map(match => ({
     excerpt: match.excerpt,
     matchedField: 'pageText',
     offset: match.offset,
     role: 'document',
     tag: 'body',
   }));
-  const matches = [...nodeMatches, ...textMatches].toSorted(
+  const merged = [...nodeMatches, ...textMatches].toSorted(
     (left, right) =>
       ['text', 'label', 'pageText', 'href', 'role', 'tag'].indexOf(left.matchedField) -
       ['text', 'label', 'pageText', 'href', 'role', 'tag'].indexOf(right.matchedField)
   );
   const maxMatches = 20;
-  const totalMatches = nodeMatches.length + textSearch.totalMatches;
+  const matches = merged.slice(0, maxMatches);
+  const totalMatches = nodeMatches.length + (snapshot.totalTextMatches ?? 0);
 
   return {
-    matches: matches.slice(0, maxMatches),
-    ...(textSearch.matches.length > 0
+    matches,
+    ...(textMatches.length > 0
       ? {
           note: 'Each pageText excerpt carries its character offset in the full page text. To read the section around a match, call get_page_snapshot with textStart set near that offset.',
         }
       : {}),
     snapshotId: snapshot.snapshotId,
     totalMatches,
-    truncated: matches.length > maxMatches,
+    truncated: totalMatches > matches.length,
   };
 };
 
@@ -285,7 +267,10 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
   }
 
   if (toolCall.name === 'get_page_snapshot') {
-    const snapshot = await getSnapshot(toolCall.tabId, toolCall.textStart);
+    const snapshot = await getSnapshot(
+      toolCall.tabId,
+      toolCall.textStart === undefined ? {} : { textStart: toolCall.textStart }
+    );
 
     if (typeof snapshot === 'string') {
       return { error: snapshot, ok: false };
@@ -330,23 +315,12 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
     return { error: 'Search query is required.', ok: false };
   }
 
-  const snapshot = await getSnapshot(toolCall.tabId);
+  // One injection serves both halves of find_in_page: the snapshot nodes and the full-page text matches come from the same walk.
+  const snapshot = await getSnapshot(toolCall.tabId, { query });
 
   if (typeof snapshot === 'string') {
     return { error: snapshot, ok: false };
   }
 
-  const findResult = await readFindText(toolCall.tabId, query);
-
-  if (!findResult.ok) {
-    return findResult;
-  }
-
-  const textSearch = pageTextSearchSchema.safeParse(findResult.value);
-
-  if (!textSearch.success) {
-    return { error: 'Page text search returned an invalid result.', ok: false };
-  }
-
-  return { ok: true, value: getFindResults(snapshot, query, textSearch.data) };
+  return { ok: true, value: getFindResults(snapshot, query) };
 };

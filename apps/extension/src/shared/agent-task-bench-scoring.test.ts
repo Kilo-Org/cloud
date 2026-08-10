@@ -70,6 +70,21 @@ describe('task correctness scoring', () => {
     expect(result.predicates['toolEvidence']?.pass).toBe(false);
   });
 
+  it('ignores harness metadata strings as evidence', () => {
+    // A paging note like "characters 16000-24000 of 233274" contains "3327"; only page-derived strings count.
+    const events: BenchEvent[] = [
+      ...toolExchange('get_page_snapshot', {
+        note: 'Page text shows characters 16000-24000 of 233274.',
+        snapshotId: 'snapshot-room 3327',
+        text: 'unrelated page text',
+      }),
+      answerEvent('He died in room 3327 of the Hotel New Yorker.'),
+    ];
+    const result = scoreTaskCorrectness({ events, scenario: scenario() });
+    expect(result.passed).toBe(false);
+    expect(result.predicates['toolEvidence']?.pass).toBe(false);
+  });
+
   it('ignores evidence from failed tool results', () => {
     const events: BenchEvent[] = [
       ...toolExchange('find_in_page', { excerpt: 'room 3327' }, false),

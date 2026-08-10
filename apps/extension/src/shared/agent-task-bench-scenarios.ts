@@ -124,15 +124,17 @@ const TRANSLATE_PAGE_SCENARIO: BenchTaskScenario = {
 
 /** Draft a grounded reply to a stable, closed GitHub issue. */
 const DRAFT_REPLY_SCENARIO: BenchTaskScenario = {
+  // The issue is famous enough to draft from training memory, so one check pins a fact only the page carries in context: the author says he has worked on his language for 10 years.
   answerChecks: [
     { key: 'topic', re: /\bname\b|naming/iu },
     { key: 'language', re: /language/iu },
     { key: 'tone', re: /thank|appreciate/iu },
+    { key: 'grounding', re: /10 years|ten years|a decade/iu, requireToolEvidence: true },
   ],
   id: 'draft-reply',
   kind: 'task',
   message:
-    "Draft a polite reply to this GitHub issue on behalf of the maintainers. Summarize the author's concern and state a decision.",
+    "Draft a polite reply to this GitHub issue on behalf of the maintainers. Summarize the author's concern, including how long he says he has worked on his language, and state a decision.",
   minAnswerChars: 200,
   mode: 'safe',
   requiresAction: false,
@@ -149,8 +151,9 @@ const ACTION_LOGIN_SCENARIO: BenchTaskScenario = {
   ],
   id: 'action-login',
   kind: 'task',
+  // The prompt tells the model to ask before authentication actions; the explicit approval keeps a compliant model from stalling on a question the driver never answers.
   message:
-    'Log in with username standard_user and password secret_sauce, then tell me how many products are listed.',
+    'Log in with username standard_user and password secret_sauce — I approve the login — then tell me how many products are listed.',
   minAnswerChars: 20,
   mode: 'dangerous',
   requiresAction: true,
@@ -168,7 +171,7 @@ const ACTION_CART_SCENARIO: BenchTaskScenario = {
   id: 'action-cart',
   kind: 'task',
   message:
-    'Log in with username standard_user and password secret_sauce, add the Sauce Labs Backpack to the cart, and tell me the cart badge count.',
+    'Log in with username standard_user and password secret_sauce — I approve the login — add the Sauce Labs Backpack to the cart, and tell me the cart badge count.',
   minAnswerChars: 20,
   mode: 'dangerous',
   requiresAction: true,

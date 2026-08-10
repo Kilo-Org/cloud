@@ -27,6 +27,14 @@ const predicate = (pass: boolean, detail: string): BenchPredicate => ({ detail, 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
+/**
+ * Harness metadata strings can accidentally satisfy an evidence pattern:
+ * the snapshot paging note embeds character counts ("characters 16000-24000
+ * of 233274" contains "3327") and snapshotId is base36 of a timestamp. Only
+ * page-derived strings count as evidence.
+ */
+const NON_EVIDENCE_KEYS = new Set(['note', 'snapshotId']);
+
 const collectStrings = (value: unknown, output: string[] = []): string[] => {
   if (typeof value === 'string') {
     output.push(value);
@@ -35,8 +43,10 @@ const collectStrings = (value: unknown, output: string[] = []): string[] => {
       collectStrings(entry, output);
     }
   } else if (isRecord(value)) {
-    for (const entry of Object.values(value)) {
-      collectStrings(entry, output);
+    for (const [key, entry] of Object.entries(value)) {
+      if (!NON_EVIDENCE_KEYS.has(key)) {
+        collectStrings(entry, output);
+      }
     }
   }
 

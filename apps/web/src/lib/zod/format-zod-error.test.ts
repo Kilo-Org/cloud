@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { z } from 'zod';
 import { formatZodIssue, formatZodIssues, formatZodError } from './format-zod-error';
 import { deepStrict } from './deep-strict';
-import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 
 describe('formatZodIssue', () => {
   test('formats issue with path', () => {
@@ -43,43 +43,29 @@ describe('formatZodIssue', () => {
 });
 
 describe('formatZodIssues with unions', () => {
-  const schema = deepStrict(CustomLlmDefinitionSchema);
+  const schema = deepStrict(CustomLlmCredentialsSchema);
 
-  test('formats initial definition errors cleanly without ": Invalid input"', () => {
-    const initialDefinition = {
-      internal_id: '',
-      display_name: '',
-      context_length: 0,
-      max_completion_tokens: 0,
-      base_url: '',
+  test('formats initial credentials errors cleanly without ": Invalid input"', () => {
+    const invalidCredentials = {
+      type: 'api_key',
       api_key: '',
-      organization_ids: [],
     };
 
-    const result = schema.safeParse(initialDefinition);
+    const result = schema.safeParse(invalidCredentials);
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = formatZodIssues(result.error.issues);
       expect(messages).not.toContain(': Invalid input');
       expect(messages).not.toContain('Invalid input');
-      expect(messages).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('internal_id'),
-          expect.stringContaining('base_url'),
-        ])
-      );
+      expect(messages.some(m => m.includes('api_key'))).toBe(true);
     }
   });
 
-  test('picks the API key branch when api_key is present and fields have typos', () => {
+  test('picks the API key branch when type is api_key and fields have typos', () => {
     const typoInput = {
-      internal_id: 'model-1',
-      dispaly_name: 'Typo Name',
-      context_length: 1000,
-      max_completion_tokens: 100,
-      base_url: 'https://example.com',
+      type: 'api_key',
       api_key: 'secret',
-      organization_ids: [],
+      extra_key: 'unexpected',
     };
 
     const result = schema.safeParse(typoInput);
@@ -87,32 +73,22 @@ describe('formatZodIssues with unions', () => {
     if (!result.success) {
       const messages = formatZodIssues(result.error.issues);
       expect(messages).not.toContain(': Invalid input');
-      expect(messages).toContain('Unrecognized key: "dispaly_name"');
-      expect(messages.some(m => m.includes('display_name'))).toBe(true);
-      expect(messages.some(m => m.includes('google_service_account'))).toBe(false);
+      expect(messages).toContain('Unrecognized key: "extra_key"');
     }
   });
 
-  test('picks the Google service account branch when google_service_account is present', () => {
+  test('picks the Google service account branch when type is service_account', () => {
     const gsaInput = {
-      internal_id: 'model-1',
-      display_name: 'Vertex Gemini',
-      context_length: 1000,
-      max_completion_tokens: 100,
-      base_url: 'https://example.com',
-      organization_ids: [],
-      google_service_account: {
-        type: 'service_account',
-        project_id: 'proj',
-        private_key_id: 'key-id',
-        private_key: 'pk',
-        client_email: 'invalid-email',
-        client_id: '123',
-        auth_uri: 'https://accounts.google.com',
-        token_uri: 'https://oauth2.googleapis.com',
-        auth_provider_x509_cert_url: 'https://example.com',
-        client_x509_cert_url: 'https://example.com',
-      },
+      type: 'service_account',
+      project_id: 'proj',
+      private_key_id: 'key-id',
+      private_key: 'pk',
+      client_email: 'invalid-email',
+      client_id: '123',
+      auth_uri: 'https://accounts.google.com',
+      token_uri: 'https://oauth2.googleapis.com',
+      auth_provider_x509_cert_url: 'https://example.com',
+      client_x509_cert_url: 'https://example.com',
     };
 
     const result = schema.safeParse(gsaInput);
@@ -120,12 +96,13 @@ describe('formatZodIssues with unions', () => {
     if (!result.success) {
       const messages = formatZodIssues(result.error.issues);
       expect(messages).not.toContain(': Invalid input');
-      expect(messages.some(m => m.includes('google_service_account.client_email'))).toBe(true);
+      expect(messages.some(m => m.includes('client_email'))).toBe(true);
       expect(messages.some(m => m.includes('api_key'))).toBe(false);
     }
   });
 
-  test('formats common invalid fields when no credentials are provided', () => {
+  test('formats definition errors for CustomLlmDefinitionSchema', () => {
+    const defSchema = deepStrict(CustomLlmDefinitionSchema);
     const invalidInput = {
       internal_id: '',
       display_name: 'Model 1',
@@ -135,7 +112,7 @@ describe('formatZodIssues with unions', () => {
       organization_ids: [],
     };
 
-    const result = schema.safeParse(invalidInput);
+    const result = defSchema.safeParse(invalidInput);
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = formatZodIssues(result.error.issues);

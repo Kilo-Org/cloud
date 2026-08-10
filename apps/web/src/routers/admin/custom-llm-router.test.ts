@@ -65,31 +65,9 @@ describe('adminCustomLlmRouter', () => {
       expect(decrypted.api_key).toBe('sk-test-secret-key-123');
     });
 
-    it('quietly migrates legacy api_key from definition JSON on save', async () => {
+    it('creates a new custom LLM with Google Service Account credentials', async () => {
       const caller = await createCallerForUser(admin.id);
-      const publicId = 'kilo-internal/test-model-legacy-key';
-
-      const result = await caller.admin.customLlm.upsert({
-        public_id: publicId,
-        definition: {
-          ...validDefinition,
-          api_key: 'sk-legacy-migrated-key',
-        } as CustomLlmDefinition,
-      });
-
-      expect(result.public_id).toBe(publicId);
-      expect((result.definition as Record<string, unknown>).api_key).toBeUndefined();
-
-      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
-      expect(row).toBeDefined();
-      expect((row.definition as Record<string, unknown>).api_key).toBeUndefined();
-      const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
-      expect(decrypted.api_key).toBe('sk-legacy-migrated-key');
-    });
-
-    it('quietly migrates legacy google_service_account from definition JSON on save', async () => {
-      const caller = await createCallerForUser(admin.id);
-      const publicId = 'kilo-internal/test-model-legacy-gsa';
+      const publicId = 'kilo-internal/test-model-gsa';
 
       const gsa = {
         type: 'service_account' as const,
@@ -106,42 +84,19 @@ describe('adminCustomLlmRouter', () => {
 
       const result = await caller.admin.customLlm.upsert({
         public_id: publicId,
-        definition: {
-          ...validDefinition,
-          google_service_account: gsa,
-        } as unknown as CustomLlmDefinition,
+        definition: validDefinition,
+        credentials: gsa,
       });
 
       expect(result.public_id).toBe(publicId);
-      expect((result.definition as Record<string, unknown>).google_service_account).toBeUndefined();
 
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       expect(row).toBeDefined();
-      expect((row.definition as Record<string, unknown>).google_service_account).toBeUndefined();
+      expect(row.encrypted_api_key).toBeDefined();
       const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
+      expect(decrypted.type).toBe('service_account');
       expect(decrypted.project_id).toBe('test-project');
       expect(decrypted.private_key).toBe('pk-secret');
-    });
-
-    it('discards legacy credentials from definition if credentials are provided separately', async () => {
-      const caller = await createCallerForUser(admin.id);
-      const publicId = 'kilo-internal/test-model-discard-legacy';
-
-      const result = await caller.admin.customLlm.upsert({
-        public_id: publicId,
-        definition: {
-          ...validDefinition,
-          api_key: 'sk-old-to-discard',
-        } as CustomLlmDefinition,
-        credentials: { type: 'api_key', api_key: 'sk-new-chosen-key' },
-      });
-
-      expect(result.public_id).toBe(publicId);
-      expect((result.definition as Record<string, unknown>).api_key).toBeUndefined();
-
-      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
-      const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
-      expect(decrypted.api_key).toBe('sk-new-chosen-key');
     });
 
     it('rejects creating new custom LLM when credentials are completely missing', async () => {

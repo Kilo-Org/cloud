@@ -110,37 +110,31 @@ async function checkCustomLlm(
     return null;
   }
 
-  let apiKey: string | undefined;
-  if (row?.encrypted_api_key) {
-    const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(decrypted);
-    } catch {
-      return null;
-    }
-    const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
-    if (!parsedCredentials.success) {
-      return null;
-    }
-    if (parsedCredentials.data.type === 'api_key') {
-      apiKey = parsedCredentials.data.api_key;
-    } else if (parsedCredentials.data.type === 'service_account') {
-      apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
-    }
-  } else if (typeof customLlm.api_key === 'string') {
-    apiKey = customLlm.api_key;
-  } else if (customLlm.google_service_account) {
-    apiKey = await getGoogleServiceAccountAccessToken(customLlm.google_service_account);
+  if (!row?.encrypted_api_key) {
+    return null;
   }
 
-  if (!apiKey) {
+  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(decrypted);
+  } catch {
     return null;
+  }
+  const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
+  if (!parsedCredentials.success) {
+    return null;
+  }
+
+  let apiKey: string;
+  if (parsedCredentials.data.type === 'api_key') {
+    apiKey = parsedCredentials.data.api_key;
+  } else {
+    apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
   }
 
   const resolvedCustomLlm = {
     ...customLlm,
-    google_service_account: undefined,
     api_key: apiKey,
   };
   return {

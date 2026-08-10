@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 
+export const revalidate = 3600;
+
 type DefaultsResponse = {
   defaultModel: string;
   defaultFreeModel: string;

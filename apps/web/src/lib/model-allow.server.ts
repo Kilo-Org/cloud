@@ -3,6 +3,7 @@ import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/m
 import {
   CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,
+  isOpenRouterNativeModel,
   normalizeModelId,
 } from '@/lib/ai-gateway/model-utils';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
@@ -47,17 +48,25 @@ export function createAllowPredicateFromProviderAllowList(
     const normalizedModelId = normalizeModelId(modelId);
     if (!requireModelInCurrentSnapshot && !providerAllowSet && modelDenySet.size === 0) return true;
     if (await isModelRestrictionExempt(modelId)) return true;
-    // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
-    if (isLatestModelAlias(normalizedModelId)) {
-      // Provider compatibility is enforced at inference through provider routing options.
-      return !providerAllowSet || providerAllowSet.size > 0;
-    }
     if (modelDenySet.has(normalizedModelId)) {
       return false;
     }
-    const providerSlugs =
-      getKiloExclusiveInferenceProviderRestriction(modelId) ??
-      (await providerLookup(normalizedModelId));
+    const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
+    const providerSlugs = exclusiveProviders ?? (await providerLookup(normalizedModelId));
+    if (
+      exclusiveProviders === undefined &&
+      ((isLatestModelAlias(normalizedModelId) && providerSlugs.size === 0) ||
+        isOpenRouterNativeModel(normalizedModelId))
+    ) {
+      if (
+        requireModelInCurrentSnapshot &&
+        isOpenRouterNativeModel(normalizedModelId) &&
+        providerSlugs.size === 0
+      ) {
+        return false;
+      }
+      return !providerAllowSet || providerAllowSet.size > 0;
+    }
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

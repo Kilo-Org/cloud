@@ -93,7 +93,7 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: true });
   });
 
-  it('excludes latest aliases from model restrictions while enforcing provider routes', async () => {
+  it('applies deny lists to latest aliases once they are in the snapshot', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -108,9 +108,54 @@ describe('effective organization model access', () => {
     );
 
     await expect(
-      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => {
-        throw new Error('latest aliases must not use snapshot provider metadata');
+      getEffectiveModelDecision(
+        policy,
+        CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+        async () => new Set(['anthropic'])
+      )
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+  });
+
+  it('uses snapshot providers for latest aliases after sync', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: {
+            provider_allow_list: ['anthropic'],
+          },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
+    );
+
+    await expect(
+      getEffectiveModelDecision(
+        policy,
+        CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+        async () => new Set(['anthropic'])
+      )
+    ).resolves.toEqual({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['anthropic']),
+    });
+  });
+
+  it('allows unsynced latest aliases through the organization provider ceiling', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: {
+            provider_allow_list: ['anthropic'],
+          },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => new Set())
     ).resolves.toEqual({
       allowed: true,
       eligibleProviderRoutes: new Set(['anthropic']),
@@ -132,7 +177,7 @@ describe('effective organization model access', () => {
     );
 
     await expect(
-      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS)
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => new Set())
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 

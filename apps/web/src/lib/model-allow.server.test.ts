@@ -90,26 +90,57 @@ describe('model access predicates', () => {
     await expect(isAllowed('x-ai/grok-4.6')).resolves.toBe(true);
   });
 
-  test('latest aliases bypass model restrictions but retain provider availability', async () => {
-    const withProviders = createAllowPredicateFromRestrictions(
+  test('latest aliases honor deny lists and use snapshot routes when present', async () => {
+    const denied = createAllowPredicateFromRestrictions(
       {
         requireModelInCurrentSnapshot: true,
         providerAllowList: ['anthropic'],
         modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
       },
-      lookup({})
+      lookup({ [CLAUDE_SONNET_LATEST_MODEL_ALIAS]: ['anthropic'] })
     );
-    const withoutProviders = createAllowPredicateFromRestrictions(
+    const allowed = createAllowPredicateFromRestrictions(
       {
         requireModelInCurrentSnapshot: true,
-        providerAllowList: [],
-        modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      },
+      lookup({ [CLAUDE_SONNET_LATEST_MODEL_ALIAS]: ['anthropic'] })
+    );
+    const unsynced = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
       },
       lookup({})
     );
 
-    await expect(withProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(true);
-    await expect(withoutProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
+    await expect(denied(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
+    await expect(allowed(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(true);
+    await expect(unsynced(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(true);
+  });
+
+  test('OpenRouter-native models require snapshot membership and ignore fake provider slugs', async () => {
+    const missing = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      },
+      lookup({})
+    );
+    const present = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
+      },
+      lookup({ 'openrouter/free': ['openrouter'] })
+    );
+
+    await expect(missing('openrouter/free')).resolves.toBe(false);
+    await expect(present('openrouter/free')).resolves.toBe(true);
   });
 
   test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(

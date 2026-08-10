@@ -16,6 +16,11 @@ export const KILOCODE_KILO_PROVIDER_PREFIX = 'kilo/';
 export const KILOCLAW_KILO_PROVIDER_PREFIX = 'kilocode/';
 export const CUSTOM_LLM_PREFIX = 'kilo-internal/';
 export const KILO_AUTO_MODEL_PREFIX = 'kilo-auto/';
+export const OPENROUTER_NATIVE_MODEL_PREFIX = 'openrouter/';
+
+export function isOpenRouterNativeModel(modelId: string): boolean {
+  return modelId.startsWith(OPENROUTER_NATIVE_MODEL_PREFIX);
+}
 
 /**
  * Normalize a model ID by removing the `:free`, `:exacto`, etc. suffixes if present.

@@ -42,6 +42,10 @@ import {
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter/inject-extra-provider-models';
+import {
+  fetchOpenRouterPublicModels,
+  injectOpenRouterCatalogOnlyModels,
+} from '@/lib/ai-gateway/providers/openrouter/inject-openrouter-catalog-only-models';
 import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
@@ -275,6 +279,7 @@ async function syncProviders(
   }
 
   injectSupportedFimModels(providerModelData);
+  injectOpenRouterCatalogOnlyModels(providerModelData, await fetchOpenRouterPublicModels());
 
   applyFreeEndpointDataPolicy({
     providerModelData,

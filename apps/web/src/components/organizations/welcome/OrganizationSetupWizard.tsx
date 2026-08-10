@@ -385,9 +385,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     balanceMicrodollars={organizationSummaryQuery.data?.balanceMicrodollars ?? 0}
                     organizationLoading={organizationSummaryQuery.isLoading}
                     userRole={userRole}
-                    recommendationsDigestEnabled={
-                      organizationSummaryQuery.data?.recommendationsDigestEnabled ?? false
-                    }
                     onBack={() => navigate('invite-team')}
                   />
                 ) : (
@@ -725,7 +722,6 @@ function CompletionScreen({
   balanceMicrodollars,
   organizationLoading,
   userRole,
-  recommendationsDigestEnabled,
   onBack,
 }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
@@ -735,7 +731,6 @@ function CompletionScreen({
   balanceMicrodollars: number;
   organizationLoading: boolean;
   userRole: OrganizationRole;
-  recommendationsDigestEnabled: boolean;
   onBack: () => void;
 }) {
   const complete = completedCount === totalCount;
@@ -781,11 +776,6 @@ function CompletionScreen({
               Configured for you
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
-              <SetupStatus
-                icon={Mail}
-                title="Weekly recommendations"
-                detail={recommendationsDigestEnabled ? 'Enabled' : 'Not enabled'}
-              />
               <SetupStatus icon={Route} title="Auto routing" detail="Best accuracy per dollar" />
             </div>
           </section>

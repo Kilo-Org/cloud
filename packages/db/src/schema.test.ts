@@ -102,6 +102,39 @@ async function expectStorePurchaseConstraintViolation(
   });
 }
 
+describe('user data export cleanup reasons', () => {
+  afterEach(async () => {
+    await schemaTestDb.db.execute(sql`
+      DELETE FROM user_data_export_object_deletions
+      WHERE object_key LIKE 'exports/schema-recovery-test-%'
+    `);
+  });
+
+  it.each(['account_deletion', 'admin_cancel', 'admin_replace'] as const)(
+    'accepts %s cleanup work',
+    async reason => {
+      const key = `exports/schema-recovery-test-${reason}/kilo-data-export.jsonl.gz`;
+      await expect(
+        schemaTestDb.db.insert(schema.user_data_export_object_deletions).values({
+          object_key: key,
+          reason,
+        })
+      ).resolves.toBeDefined();
+    }
+  );
+
+  it('rejects unknown cleanup reasons', async () => {
+    await expect(
+      schemaTestDb.db.execute(sql`
+        INSERT INTO user_data_export_object_deletions (object_key, reason)
+        VALUES ('exports/schema-recovery-test-unknown/kilo-data-export.jsonl.gz', 'unknown')
+      `)
+    ).rejects.toMatchObject({
+      cause: { constraint: 'user_data_export_object_deletions_reason_check' },
+    });
+  });
+});
+
 type EphemeralDeploymentInsert = typeof schema.deployments_ephemeral.$inferInsert;
 type CodingPlanInventoryInsert = typeof schema.coding_plan_key_inventory.$inferInsert;
 type CodingPlanSubscriptionInsert = typeof schema.coding_plan_subscriptions.$inferInsert;

@@ -58,6 +58,8 @@ const createSnapshotId = (): string => {
   return id;
 };
 const snapshotCache = new Map<string, PageSnapshot>();
+// Last snapshot served per tab, for the unchanged-page fast path. Content only — snapshotId always differs.
+const lastServedSnapshotByTab = new Map<number, { contentKey: string; snapshotId: string }>();
 const getSnapshotCacheKey = (tabId: number, snapshotId: string): string => `${tabId}:${snapshotId}`;
 const cacheSnapshot = (tabId: number, snapshot: PageSnapshot): void => {
   snapshotCache.set(getSnapshotCacheKey(tabId, snapshot.snapshotId), snapshot);
@@ -254,6 +256,25 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
   }
 
   if (toolCall.name === 'get_page_snapshot') {
+    // Serving the same unchanged page again only burns context and invites a snapshot loop; a compact marker tells the model to act on what it already has.
+    const contentKey = JSON.stringify({
+      nodes: snapshot.nodes,
+      text: snapshot.text,
+      title: snapshot.title,
+      url: snapshot.url,
+    });
+    const last = lastServedSnapshotByTab.get(toolCall.tabId);
+    lastServedSnapshotByTab.set(toolCall.tabId, { contentKey, snapshotId: snapshot.snapshotId });
+    if (last !== undefined && last.contentKey === contentKey) {
+      return {
+        ok: true,
+        value: {
+          note: `The page is unchanged since snapshot ${last.snapshotId}; a new snapshot would be identical. Act on it now — fill, click, run or save the workflow — instead of taking another snapshot.`,
+          snapshotId: last.snapshotId,
+          unchanged: true,
+        },
+      };
+    }
     return { ok: true, value: snapshot };
   }
 

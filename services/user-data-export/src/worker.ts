@@ -35,6 +35,12 @@ function exportDeadlineError(): TerminalExportError {
   );
 }
 
+export function hasRetiredGeneratorState(
+  job: Pick<ExportJob, 'current_source' | 'source_cursor' | 'next_part_number'>
+): boolean {
+  return job.current_source !== null || job.source_cursor !== null || job.next_part_number !== 1;
+}
+
 export async function handleGenerationFailure(input: {
   error: unknown;
   exportId: string;
@@ -258,11 +264,7 @@ export async function processGenerateMessage(
   let activeSource = job.current_source;
 
   try {
-    if (
-      job.dispatch_generation !== 0 ||
-      job.current_source !== null ||
-      job.source_cursor !== null
-    ) {
+    if (hasRetiredGeneratorState(job)) {
       throw new TerminalExportError(
         'retired_multipart_export',
         'This export was created by an older generator and must be requested again.',

@@ -47,7 +47,7 @@ describe('dispatch authorization', () => {
 
   it("does not enqueue or acknowledge another user's export", async () => {
     const state = {
-      exportBelongsToUser: vi.fn().mockResolvedValue(false),
+      exportGenerationBelongsToUser: vi.fn().mockResolvedValue(false),
       markOutboxGenerationSent: vi.fn(),
     };
     const queue = { send: vi.fn() };
@@ -55,14 +55,18 @@ describe('dispatch authorization', () => {
     await expect(__test__.dispatchExport(message, 'other-user', state, queue)).resolves.toBe(
       'not_found'
     );
-    expect(state.exportBelongsToUser).toHaveBeenCalledWith(message.exportId, 'other-user');
+    expect(state.exportGenerationBelongsToUser).toHaveBeenCalledWith(
+      message.exportId,
+      message.generation,
+      'other-user'
+    );
     expect(queue.send).not.toHaveBeenCalled();
     expect(state.markOutboxGenerationSent).not.toHaveBeenCalled();
   });
 
   it('enqueues an owned export without putting the assertion in the message', async () => {
     const state = {
-      exportBelongsToUser: vi.fn().mockResolvedValue(true),
+      exportGenerationBelongsToUser: vi.fn().mockResolvedValue(true),
       markOutboxGenerationSent: vi.fn(),
     };
     const queue = { send: vi.fn() };

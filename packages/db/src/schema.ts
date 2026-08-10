@@ -624,7 +624,10 @@ export const user_data_export_object_deletions = pgTable(
   {
     object_key: text().primaryKey().notNull(),
     multipart_upload_id: text(),
-    reason: text().$type<'account_deletion'>().notNull().default('account_deletion'),
+    reason: text()
+      .$type<'account_deletion' | 'admin_cancel' | 'admin_replace'>()
+      .notNull()
+      .default('account_deletion'),
     attempt_count: integer().notNull().default(0),
     available_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -641,7 +644,7 @@ export const user_data_export_object_deletions = pgTable(
     ),
     check(
       'user_data_export_object_deletions_reason_check',
-      sql`${table.reason} = 'account_deletion'`
+      sql`${table.reason} IN ('account_deletion', 'admin_cancel', 'admin_replace')`
     ),
     check(
       'user_data_export_object_deletions_attempt_count_nonnegative',

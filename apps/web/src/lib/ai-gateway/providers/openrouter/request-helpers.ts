@@ -24,7 +24,22 @@ export function hasMiddleOutTransform(request: GatewayRequest) {
   );
 }
 
-function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
+function findEnvironmentDetailsCacheTargetIndex(
+  content: ReadonlyArray<{ type: string; text?: string }>
+) {
+  const environmentDetailsIndex = content.findIndex(
+    (item, index) =>
+      index > 0 &&
+      (item.type === 'text' || item.type === 'input_text') &&
+      item.text?.startsWith('<environment_details>')
+  );
+  return environmentDetailsIndex > 0 ? environmentDetailsIndex - 1 : undefined;
+}
+
+function setCacheControlOnChatCompletionsMessage(
+  message: OpenAI.ChatCompletionMessageParam,
+  isFinalMessage = false
+) {
   if (typeof message.content === 'string') {
     message.content = [
       {
@@ -35,10 +50,15 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
       },
     ];
   } else if (Array.isArray(message.content)) {
-    const lastItem = message.content.at(-1);
-    if (lastItem) {
+    const cacheTargetIndex =
+      isFinalMessage && message.role === 'user'
+        ? findEnvironmentDetailsCacheTargetIndex(message.content)
+        : undefined;
+    const cacheTarget =
+      cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+    if (cacheTarget) {
       // @ts-expect-error non-standard extension
-      lastItem.cache_control = { type: 'ephemeral' };
+      cacheTarget.cache_control = { type: 'ephemeral' };
     }
   }
 }
@@ -57,7 +77,10 @@ function isResponsesInputMessage(
   );
 }
 
-function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
+function setPromptCacheBreakpointOnResponsesMessage(
+  message: OpenAI.Responses.ResponseInputItem,
+  isFinalMessage = false
+) {
   if (isResponsesInputMessage(message)) {
     if (typeof message.content === 'string') {
       message.content = [
@@ -68,9 +91,14 @@ function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Re
         },
       ];
     } else if (Array.isArray(message.content)) {
-      const lastItem = message.content.at(-1);
-      if (lastItem) {
-        lastItem.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
+      const cacheTargetIndex =
+        isFinalMessage && message.role === 'user'
+          ? findEnvironmentDetailsCacheTargetIndex(message.content)
+          : undefined;
+      const cacheTarget =
+        cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+      if (cacheTarget) {
+        cacheTarget.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
     }
   } else if (message.type === 'function_call_output') {
@@ -93,7 +121,8 @@ function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Re
 
 function setCacheControlOnMessagesMessage(
   message: Anthropic.MessageParam,
-  cacheControl: Anthropic.CacheControlEphemeral
+  cacheControl: Anthropic.CacheControlEphemeral,
+  isFinalMessage = false
 ) {
   if (typeof message.content === 'string') {
     message.content = [
@@ -104,9 +133,21 @@ function setCacheControlOnMessagesMessage(
       },
     ];
   } else {
-    const lastItem = message.content.findLast(isCacheableMessagesContentBlock);
-    if (lastItem) {
-      lastItem.cache_control = cacheControl;
+    const environmentDetailsCacheTargetIndex =
+      isFinalMessage && message.role === 'user'
+        ? findEnvironmentDetailsCacheTargetIndex(message.content)
+        : undefined;
+    const environmentDetailsCacheTarget =
+      environmentDetailsCacheTargetIndex === undefined
+        ? undefined
+        : message.content[environmentDetailsCacheTargetIndex];
+    const cacheTarget =
+      environmentDetailsCacheTarget &&
+      isCacheableMessagesContentBlock(environmentDetailsCacheTarget)
+        ? environmentDetailsCacheTarget
+        : message.content.findLast(isCacheableMessagesContentBlock);
+    if (cacheTarget) {
+      cacheTarget.cache_control = cacheControl;
     }
   }
 }
@@ -164,7 +205,10 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.role} chat completions message`
       );
-      setCacheControlOnChatCompletionsMessage(lastMessage);
+      setCacheControlOnChatCompletionsMessage(
+        lastMessage,
+        lastMessage === request.body.messages.at(-1)
+      );
     }
   } else if (
     request.kind === 'responses' &&
@@ -186,7 +230,10 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
       );
-      setPromptCacheBreakpointOnResponsesMessage(lastMessage);
+      setPromptCacheBreakpointOnResponsesMessage(
+        lastMessage,
+        lastMessage === request.body.input.at(-1)
+      );
     }
   } else if (
     request.kind === 'messages' &&
@@ -199,7 +246,11 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
       const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
       delete request.body.cache_control;
-      setCacheControlOnMessagesMessage(lastMessage, cacheControl);
+      setCacheControlOnMessagesMessage(
+        lastMessage,
+        cacheControl,
+        lastMessage === request.body.messages.at(-1)
+      );
     }
   }
 }

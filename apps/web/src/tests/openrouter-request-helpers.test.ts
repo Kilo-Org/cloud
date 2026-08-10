@@ -70,6 +70,33 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
+  test('adds a cache breakpoint before environment details in the final chat completions user message', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              { type: 'text', text: '<environment_details>dynamic context' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: '<environment_details>dynamic context' },
+    ]);
+  });
+
   test('does nothing for chat completions requests when any cache_control is already present', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -207,6 +234,43 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
+  test('adds a cache breakpoint before environment details in the final responses user message', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          { type: 'message', role: 'user', content: 'First prompt' },
+          {
+            type: 'message',
+            role: 'user',
+            content: [
+              { type: 'input_text', text: 'Latest prompt' },
+              { type: 'input_text', text: '<environment_details>dynamic context' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    const lastMessage = request.body.input.at(-1);
+    expect(lastMessage).toMatchObject({
+      type: 'message',
+      role: 'user',
+      content: [
+        {
+          type: 'input_text',
+          text: 'Latest prompt',
+          prompt_cache_breakpoint: { mode: 'explicit' },
+        },
+        { type: 'input_text', text: '<environment_details>dynamic context' },
+      ],
+    });
+  });
+
   test('adds cache_control to the last content block of a messages request', () => {
     const request: GatewayRequest = {
       kind: 'messages',
@@ -260,6 +324,34 @@ describe('addCacheBreakpoints', () => {
         text: 'Latest detail',
         cache_control: { type: 'ephemeral', ttl: '1h' },
       },
+    ]);
+  });
+
+  test('adds cache_control before environment details in the final messages user message', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              { type: 'text', text: '<environment_details>dynamic context' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: '<environment_details>dynamic context' },
     ]);
   });
 

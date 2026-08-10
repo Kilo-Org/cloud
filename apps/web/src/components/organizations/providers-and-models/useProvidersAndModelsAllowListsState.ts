@@ -5,7 +5,7 @@ import {
   canonicalizeProviderAllowList,
   computeAllowedModelIds,
   computeAllModelIds,
-  computeAllProviderSlugsWithEndpoints,
+  computeAllProviderSlugs,
   computeEnabledProviderSlugs,
   stringListsEqual,
   toggleModelAllowed,
@@ -214,7 +214,7 @@ export function providersAndModelsAllowListsReducer(
 }
 
 export type ProvidersAndModelsAllowListsSelectors = {
-  allProviderSlugsWithEndpoints: string[];
+  allProviderSlugs: string[];
   enabledProviderSlugs: Set<string>;
   allowedModelIds: Set<string>;
   allModelIds: string[];
@@ -262,8 +262,8 @@ export function useProvidersAndModelsAllowListsState(params: {
   const initialProviderAllowList = state.status === 'ready' ? state.initialProviderAllowList : null;
   const initialModelDenyList = state.status === 'ready' ? state.initialModelDenyList : null;
 
-  const allProviderSlugsWithEndpoints = useMemo(() => {
-    return computeAllProviderSlugsWithEndpoints(openRouterProviders);
+  const allProviderSlugs = useMemo(() => {
+    return computeAllProviderSlugs(openRouterProviders);
   }, [openRouterProviders]);
 
   const allModelIds = useMemo(() => {
@@ -276,8 +276,8 @@ export function useProvidersAndModelsAllowListsState(params: {
 
   const enabledProviderSlugs = useMemo(() => {
     if (!draftProviderAllowList) return new Set<string>();
-    return computeEnabledProviderSlugs(draftProviderAllowList, allProviderSlugsWithEndpoints);
-  }, [allProviderSlugsWithEndpoints, draftProviderAllowList]);
+    return computeEnabledProviderSlugs(draftProviderAllowList, allProviderSlugs);
+  }, [allProviderSlugs, draftProviderAllowList]);
 
   const allowedModelIds = useMemo(() => {
     if (!draftModelDenyList) return new Set<string>();
@@ -328,7 +328,7 @@ export function useProvidersAndModelsAllowListsState(params: {
 
   const selectors: ProvidersAndModelsAllowListsSelectors = useMemo(
     () => ({
-      allProviderSlugsWithEndpoints,
+      allProviderSlugs,
       enabledProviderSlugs,
       allowedModelIds,
       allModelIds,
@@ -337,7 +337,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     }),
     [
       allModelIds,
-      allProviderSlugsWithEndpoints,
+      allProviderSlugs,
       allowedModelIds,
       enabledProviderSlugs,
       hasUnsavedChanges,

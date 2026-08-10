@@ -23,7 +23,7 @@ export const Normal: Story = {
 
 export const ReducedMotion: Story = {
   parameters: {
-    chromatic: { pauseAnimationAtEnd: true },
+    chromatic: { prefersReducedMotion: 'reduce' },
   },
   render: Normal.render,
 };

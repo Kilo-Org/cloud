@@ -1,11 +1,18 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { custom_llm2 } from '@kilocode/db/schema';
-import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  type CustomLlmCredentials,
+  type EncryptedData,
+} from '@kilocode/db/schema-types';
 import { asc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 
 const publicIdSchema = z
   .string()
@@ -15,6 +22,7 @@ const publicIdSchema = z
 const UpsertCustomLlmSchema = z.object({
   public_id: publicIdSchema,
   definition: CustomLlmDefinitionSchema,
+  credentials: CustomLlmCredentialsSchema.optional(),
 });
 
 const DeleteCustomLlmSchema = z.object({
@@ -23,7 +31,13 @@ const DeleteCustomLlmSchema = z.object({
 
 export const adminCustomLlmRouter = createTRPCRouter({
   list: adminProcedure.query(async () => {
-    const rows = await db.select().from(custom_llm2).orderBy(asc(custom_llm2.public_id));
+    const rows = await db
+      .select({
+        public_id: custom_llm2.public_id,
+        definition: custom_llm2.definition,
+      })
+      .from(custom_llm2)
+      .orderBy(asc(custom_llm2.public_id));
     return { items: rows };
   }),
 
@@ -32,12 +46,64 @@ export const adminCustomLlmRouter = createTRPCRouter({
       where: eq(custom_llm2.public_id, input.public_id),
     });
 
+    let encrypted_api_key: EncryptedData | undefined = undefined;
+
+    if (input.credentials) {
+      if (!BYOK_ENCRYPTION_KEY) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'BYOK_ENCRYPTION_KEY is not configured',
+        });
+      }
+      encrypted_api_key = encryptApiKey(JSON.stringify(input.credentials), BYOK_ENCRYPTION_KEY);
+    } else if (typeof input.definition.api_key === 'string' && input.definition.api_key.trim()) {
+      // Quietly migrate legacy api_key from definition to encrypted storage
+      if (!BYOK_ENCRYPTION_KEY) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'BYOK_ENCRYPTION_KEY is not configured',
+        });
+      }
+      const migratedCredentials: CustomLlmCredentials = {
+        type: 'api_key',
+        api_key: input.definition.api_key.trim(),
+      };
+      encrypted_api_key = encryptApiKey(JSON.stringify(migratedCredentials), BYOK_ENCRYPTION_KEY);
+    } else if (input.definition.google_service_account) {
+      // Quietly migrate legacy google_service_account from definition to encrypted storage
+      if (!BYOK_ENCRYPTION_KEY) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'BYOK_ENCRYPTION_KEY is not configured',
+        });
+      }
+      encrypted_api_key = encryptApiKey(
+        JSON.stringify(input.definition.google_service_account),
+        BYOK_ENCRYPTION_KEY
+      );
+    } else if (existing?.encrypted_api_key) {
+      encrypted_api_key = existing.encrypted_api_key;
+    } else {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Credentials are required when creating a custom LLM',
+      });
+    }
+
+    const { api_key: _k, google_service_account: _g, ...cleanDefinition } = input.definition;
+
     if (existing) {
       const [updated] = await db
         .update(custom_llm2)
-        .set({ definition: input.definition })
+        .set({
+          definition: cleanDefinition,
+          encrypted_api_key,
+        })
         .where(eq(custom_llm2.public_id, input.public_id))
-        .returning();
+        .returning({
+          public_id: custom_llm2.public_id,
+          definition: custom_llm2.definition,
+        });
 
       return updated;
     }
@@ -46,9 +112,13 @@ export const adminCustomLlmRouter = createTRPCRouter({
       .insert(custom_llm2)
       .values({
         public_id: input.public_id,
-        definition: input.definition,
+        definition: cleanDefinition,
+        encrypted_api_key,
       })
-      .returning();
+      .returning({
+        public_id: custom_llm2.public_id,
+        definition: custom_llm2.definition,
+      });
 
     return inserted;
   }),

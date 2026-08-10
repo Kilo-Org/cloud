@@ -125,23 +125,23 @@ describe('formatZodIssues with unions', () => {
     }
   });
 
-  test('shows both authentication options when neither is provided', () => {
-    const noAuthInput = {
-      internal_id: 'model-1',
+  test('formats common invalid fields when no credentials are provided', () => {
+    const invalidInput = {
+      internal_id: '',
       display_name: 'Model 1',
       context_length: 1000,
       max_completion_tokens: 100,
-      base_url: 'https://example.com',
+      base_url: 'not-a-url',
       organization_ids: [],
     };
 
-    const result = schema.safeParse(noAuthInput);
+    const result = schema.safeParse(invalidInput);
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = formatZodIssues(result.error.issues);
       expect(messages).not.toContain(': Invalid input');
-      expect(messages.some(m => m.includes('api_key'))).toBe(true);
-      expect(messages.some(m => m.includes('google_service_account'))).toBe(true);
+      expect(messages.some(m => m.includes('internal_id'))).toBe(true);
+      expect(messages.some(m => m.includes('base_url'))).toBe(true);
     }
   });
 

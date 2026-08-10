@@ -137,6 +137,22 @@ describe('getToolsUsed', () => {
     ).toEqual(['function:search', 'custom:browser']);
   });
 
+  test('ignores non-array chat completion tool_calls', () => {
+    expect(
+      getToolsUsed(
+        chatRequest({
+          messages: [
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: { id: '1', type: 'function' } as never,
+            },
+          ],
+        })
+      )
+    ).toEqual([]);
+  });
+
   test('tolerates responses tool calls with missing names', () => {
     expect(
       getToolsUsed(

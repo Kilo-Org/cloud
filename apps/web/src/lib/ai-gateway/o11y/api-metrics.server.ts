@@ -141,7 +141,9 @@ export function getToolsUsed(request: GatewayRequest): string[] {
     if (!message || typeof message !== 'object') continue;
     if (message.role !== 'assistant') continue;
 
-    for (const toolCall of message.tool_calls ?? []) {
+    if (!Array.isArray(message.tool_calls)) continue;
+
+    for (const toolCall of message.tool_calls) {
       if (!toolCall || typeof toolCall !== 'object') continue;
       if (toolCall.type === 'function') {
         used.push(labeledTool('function', toolCall.function?.name));

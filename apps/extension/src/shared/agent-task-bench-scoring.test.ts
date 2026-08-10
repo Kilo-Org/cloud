@@ -183,6 +183,44 @@ const stats = (turnTotalSeconds: number | null) => ({
   turnTotalSeconds,
 });
 
+describe('answer check quorum', () => {
+  const quorumScenario = scenario({
+    answerChecks: [
+      { key: 'alpha', re: /alpha/iu },
+      { key: 'beta', re: /beta/iu, requireToolEvidence: true },
+      { key: 'gamma', re: /gamma/iu },
+    ],
+    minAnswerCheckPasses: 2,
+  });
+
+  it('passes when the quorum is met and evidence gates hold', () => {
+    const events: BenchEvent[] = [
+      ...toolExchange('get_page_snapshot', { text: 'page mentions beta deep down' }),
+      answerEvent('The piece covers alpha and beta at length.'),
+    ];
+    expect(scoreTaskCorrectness({ events, scenario: quorumScenario }).passed).toBe(true);
+  });
+
+  it('never relaxes tool evidence through the quorum', () => {
+    // The answer meets the quorum via alpha and gamma, but beta has no tool evidence.
+    const events: BenchEvent[] = [
+      ...toolExchange('get_page_snapshot', { text: 'unrelated page text' }),
+      answerEvent('The piece covers alpha and gamma at length.'),
+    ];
+    const result = scoreTaskCorrectness({ events, scenario: quorumScenario });
+    expect(result.passed).toBe(false);
+    expect(result.predicates['toolEvidence']?.pass).toBe(false);
+  });
+
+  it('fails below the quorum', () => {
+    const events: BenchEvent[] = [
+      ...toolExchange('get_page_snapshot', { text: 'page mentions beta deep down' }),
+      answerEvent('The piece covers beta only.'),
+    ];
+    expect(scoreTaskCorrectness({ events, scenario: quorumScenario }).passed).toBe(false);
+  });
+});
+
 describe('task batch summary', () => {
   it('gates on the task turn total, not on save timing', () => {
     const summary = computeTaskBatchSummary([stats(30), stats(TASK_SPEED_LIMIT_SECONDS - 1)]);

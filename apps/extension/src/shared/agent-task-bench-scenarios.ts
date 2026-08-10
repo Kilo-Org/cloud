@@ -23,12 +23,19 @@ export interface BenchTaskCheck {
 }
 
 export interface BenchTaskScenario {
-  /** Every answer check must pass; evidence-flagged checks also need a tool-result match. */
+  /** Answer checks; evidence-flagged checks also need a tool-result match. */
   readonly answerChecks: readonly BenchTaskCheck[];
   readonly id: string;
   readonly kind: 'task';
   readonly message: string;
   readonly minAnswerChars: number;
+  /**
+   * Minimum answerChecks whose pattern must appear in the answer. Defaults
+   * to all of them. A generative task (a summary) may set a quorum: a model
+   * that provably read the whole page can still choose its own top themes.
+   * Tool-evidence requirements are never relaxed by the quorum.
+   */
+  readonly minAnswerCheckPasses?: number;
   readonly mode: 'dangerous' | 'safe';
   /** True when the scenario needs at least one ok eval exchange (an action, not a lookup). */
   readonly requiresAction: boolean;
@@ -60,6 +67,8 @@ const SUMMARIZE_ARTICLE_SCENARIO: BenchTaskScenario = {
   message:
     'Summarize this essay for me in a few paragraphs. Cover its main themes from beginning to end.',
   minAnswerChars: 400,
+  // A full-read summary may still pick its own top themes; two of three must appear, and both deep-theme evidence gates stay mandatory.
+  minAnswerCheckPasses: 2,
   mode: 'safe',
   requiresAction: false,
   startUrl: 'https://www.paulgraham.com/greatwork.html',

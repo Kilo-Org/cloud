@@ -86,6 +86,8 @@ export const scoreTaskCorrectness = ({
   const failedChecks = scenario.answerChecks
     .filter(check => !check.re.test(answer))
     .map(check => check.key);
+  const requiredPasses = scenario.minAnswerCheckPasses ?? scenario.answerChecks.length;
+  const contentOk = scenario.answerChecks.length - failedChecks.length >= requiredPasses;
   const missingEvidence = scenario.answerChecks
     .filter(
       check =>
@@ -112,10 +114,10 @@ export const scoreTaskCorrectness = ({
         : 'no action required'
     ),
     answerContent: predicate(
-      failedChecks.length === 0,
+      contentOk,
       failedChecks.length === 0
         ? 'answer content checks passed'
-        : `answer content checks failed: ${failedChecks.join(', ')}`
+        : `answer content checks ${contentOk ? 'met quorum; missed' : 'failed'}: ${failedChecks.join(', ')} (${String(scenario.answerChecks.length - failedChecks.length)}/${String(requiredPasses)} required)`
     ),
     answerLength: predicate(
       lengthOk,
@@ -130,7 +132,7 @@ export const scoreTaskCorrectness = ({
   };
 
   return {
-    passed: failedChecks.length === 0 && missingEvidence.length === 0 && lengthOk && actionOk,
+    passed: contentOk && missingEvidence.length === 0 && lengthOk && actionOk,
     predicates,
   };
 };

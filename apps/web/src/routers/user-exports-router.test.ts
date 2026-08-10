@@ -126,8 +126,29 @@ describe('user exports router guards and serialization', () => {
     );
   });
 
+  it('rejects a new request within one hour of a ready export', async () => {
+    const withinThrottle = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    await db.insert(user_data_exports).values({
+      kilo_user_id: owner.id,
+      snapshot_at: withinThrottle,
+      status: 'ready',
+      r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
+      size_bytes: 1,
+      requested_at: withinThrottle,
+      completed_at: withinThrottle,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    const request = (await createCallerForUser(owner.id)).userExports.request();
+
+    await expect(request).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'You can request one data export every hour',
+    });
+  });
+
   it('allows a fresh request when a ready export exists but is past the throttle window', async () => {
-    const pastThrottle = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const pastThrottle = new Date(Date.now() - 61 * 60 * 1000).toISOString();
     const [ready] = await db
       .insert(user_data_exports)
       .values({

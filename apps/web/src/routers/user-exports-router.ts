@@ -87,15 +87,14 @@ export const userExportsRouter = createTRPCRouter({
         FROM user_data_exports
         WHERE kilo_user_id = ${ctx.user.id}
           AND status <> 'failed'
-          -- TEMPORARY: throttle lowered to 5 minutes for pre-launch testing; restore to 24 hours before going live.
-          AND requested_at > now() - interval '5 minutes'
+          AND requested_at > now() - interval '1 hour'
         ORDER BY requested_at DESC
         LIMIT 1
       `);
       if (recent.rows[0]) {
         throw new TRPCError({
           code: 'TOO_MANY_REQUESTS',
-          message: 'You can request one data export every 24 hours',
+          message: 'You can request one data export every hour',
         });
       }
 

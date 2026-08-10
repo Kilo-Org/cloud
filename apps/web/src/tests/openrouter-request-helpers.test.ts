@@ -70,7 +70,7 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
-  test('adds a cache breakpoint before environment details in the final chat completions user message', () => {
+  test('adds a cache breakpoint before environment details in a chat completions user message', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
@@ -85,13 +85,14 @@ describe('addCacheBreakpoints', () => {
               { type: 'text', text: '<environment_details>dynamic context' },
             ],
           },
+          { role: 'assistant', content: 'Latest response' },
         ],
       },
     };
 
     addCacheBreakpoints(request);
 
-    expect(request.body.messages.at(-1)?.content).toEqual([
+    expect(request.body.messages.at(-2)?.content).toEqual([
       { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
       { type: 'text', text: '<environment_details>dynamic context' },
     ]);
@@ -234,7 +235,7 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
-  test('adds a cache breakpoint before environment details in the final responses user message', () => {
+  test('adds a cache breakpoint before environment details in a responses user message', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
@@ -249,6 +250,12 @@ describe('addCacheBreakpoints', () => {
               { type: 'input_text', text: '<environment_details>dynamic context' },
             ],
           },
+          {
+            type: 'function_call',
+            call_id: 'call_123',
+            name: 'get_context',
+            arguments: '{}',
+          },
         ],
       },
     };
@@ -256,8 +263,8 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
-    const lastMessage = request.body.input.at(-1);
-    expect(lastMessage).toMatchObject({
+    const userMessage = request.body.input.at(-2);
+    expect(userMessage).toMatchObject({
       type: 'message',
       role: 'user',
       content: [
@@ -327,7 +334,7 @@ describe('addCacheBreakpoints', () => {
     ]);
   });
 
-  test('adds cache_control before environment details in the final messages user message', () => {
+  test('adds cache_control before environment details in a messages user message', () => {
     const request: GatewayRequest = {
       kind: 'messages',
       body: {
@@ -343,13 +350,14 @@ describe('addCacheBreakpoints', () => {
               { type: 'text', text: '<environment_details>dynamic context' },
             ],
           },
+          { role: 'assistant', content: '' },
         ],
       },
     };
 
     addCacheBreakpoints(request);
 
-    expect(request.body.messages.at(-1)?.content).toEqual([
+    expect(request.body.messages.at(-2)?.content).toEqual([
       { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
       { type: 'text', text: '<environment_details>dynamic context' },
     ]);

@@ -36,10 +36,7 @@ function findEnvironmentDetailsCacheTargetIndex(
   return environmentDetailsIndex > 0 ? environmentDetailsIndex - 1 : undefined;
 }
 
-function setCacheControlOnChatCompletionsMessage(
-  message: OpenAI.ChatCompletionMessageParam,
-  isFinalUserMessage: boolean
-) {
+function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
   if (typeof message.content === 'string') {
     message.content = [
       {
@@ -50,9 +47,8 @@ function setCacheControlOnChatCompletionsMessage(
       },
     ];
   } else if (Array.isArray(message.content)) {
-    const cacheTargetIndex = isFinalUserMessage
-      ? findEnvironmentDetailsCacheTargetIndex(message.content)
-      : undefined;
+    const cacheTargetIndex =
+      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
     const cacheTarget =
       cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
     if (cacheTarget) {
@@ -76,10 +72,7 @@ function isResponsesInputMessage(
   );
 }
 
-function setPromptCacheBreakpointOnResponsesMessage(
-  message: OpenAI.Responses.ResponseInputItem,
-  isFinalUserMessage: boolean
-) {
+function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
   if (isResponsesInputMessage(message)) {
     if (typeof message.content === 'string') {
       message.content = [
@@ -90,9 +83,10 @@ function setPromptCacheBreakpointOnResponsesMessage(
         },
       ];
     } else if (Array.isArray(message.content)) {
-      const cacheTargetIndex = isFinalUserMessage
-        ? findEnvironmentDetailsCacheTargetIndex(message.content)
-        : undefined;
+      const cacheTargetIndex =
+        message.role === 'user'
+          ? findEnvironmentDetailsCacheTargetIndex(message.content)
+          : undefined;
       const cacheTarget =
         cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
       if (cacheTarget) {
@@ -119,8 +113,7 @@ function setPromptCacheBreakpointOnResponsesMessage(
 
 function setCacheControlOnMessagesMessage(
   message: Anthropic.MessageParam,
-  cacheControl: Anthropic.CacheControlEphemeral,
-  isFinalUserMessage: boolean
+  cacheControl: Anthropic.CacheControlEphemeral
 ) {
   if (typeof message.content === 'string') {
     message.content = [
@@ -131,9 +124,8 @@ function setCacheControlOnMessagesMessage(
       },
     ];
   } else {
-    const environmentDetailsCacheTargetIndex = isFinalUserMessage
-      ? findEnvironmentDetailsCacheTargetIndex(message.content)
-      : undefined;
+    const environmentDetailsCacheTargetIndex =
+      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
     const environmentDetailsCacheTarget =
       environmentDetailsCacheTargetIndex === undefined
         ? undefined
@@ -193,7 +185,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         '[addCacheBreakpoints] setting cache breakpoint on system chat completions message'
       );
-      setCacheControlOnChatCompletionsMessage(systemMessage, false);
+      setCacheControlOnChatCompletionsMessage(systemMessage);
     }
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
@@ -202,10 +194,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.role} chat completions message`
       );
-      setCacheControlOnChatCompletionsMessage(
-        lastMessage,
-        lastMessage.role === 'user' && lastMessage === request.body.messages.at(-1)
-      );
+      setCacheControlOnChatCompletionsMessage(lastMessage);
     }
   } else if (
     request.kind === 'responses' &&
@@ -218,7 +207,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     );
     if (systemMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
-      setPromptCacheBreakpointOnResponsesMessage(systemMessage, false);
+      setPromptCacheBreakpointOnResponsesMessage(systemMessage);
     }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
@@ -227,12 +216,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
       );
-      setPromptCacheBreakpointOnResponsesMessage(
-        lastMessage,
-        isResponsesInputMessage(lastMessage) &&
-          lastMessage.role === 'user' &&
-          lastMessage === request.body.input.at(-1)
-      );
+      setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
   } else if (
     request.kind === 'messages' &&
@@ -245,11 +229,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
       const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
       delete request.body.cache_control;
-      setCacheControlOnMessagesMessage(
-        lastMessage,
-        cacheControl,
-        lastMessage.role === 'user' && lastMessage === request.body.messages.at(-1)
-      );
+      setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
   }
 }

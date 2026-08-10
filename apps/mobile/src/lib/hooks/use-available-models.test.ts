@@ -1,13 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { toModelOptions } from './use-available-models';
+import { toModelOptions, useOrgDefaultModel } from './use-available-models';
+
+const { getItemAsync } = vi.hoisted(() => ({
+  getItemAsync: vi.fn(),
+}));
+
+const { useQueryMock } = vi.hoisted(() => ({
+  useQueryMock: vi.fn(),
+}));
 
 // Stub native/expo modules so pure-node Vitest can resolve the
 // module graph when importing from use-available-models.ts.
-vi.mock('expo-secure-store', () => ({}));
-vi.mock('@tanstack/react-query', () => ({}));
+vi.mock('expo-secure-store', () => ({ getItemAsync }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: useQueryMock }));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
-vi.mock('@/lib/storage-keys', () => ({ AUTH_TOKEN_KEY: 'mock-token' }));
+vi.mock('@/lib/storage-keys', () => ({ AUTH_TOKEN_KEY: 'auth-token-key' }));
 
 describe('toModelOptions', () => {
   it('passes pricing through to the ModelOption', () => {
@@ -32,5 +40,76 @@ describe('toModelOptions', () => {
 
   it('returns empty array for undefined data', () => {
     expect(toModelOptions(undefined)).toEqual([]);
+  });
+});
+
+describe('useOrgDefaultModel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not specify Authorization header when organization id is not present', async () => {
+    getItemAsync.mockResolvedValue('test-jwt-token');
+    const captured = { queryFn: vi.fn() };
+    useQueryMock.mockImplementation((options: { queryFn: () => Promise<unknown> }) => {
+      captured.queryFn = vi.fn(options.queryFn);
+      return { data: undefined, isLoading: false };
+    });
+
+    useOrgDefaultModel(undefined);
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enabled: false,
+      })
+    );
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ defaultModel: 'kilo-auto/balanced' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(captured.queryFn()).rejects.toThrow('Missing organizationId');
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('specifies Authorization header when organization id is present', async () => {
+    getItemAsync.mockResolvedValue('test-jwt-token');
+    const captured = { queryFn: vi.fn() };
+    useQueryMock.mockImplementation((options: { queryFn: () => Promise<unknown> }) => {
+      captured.queryFn = vi.fn(options.queryFn);
+      return { data: { defaultModel: 'org-default-model' }, isLoading: false };
+    });
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ defaultModel: 'org-default-model' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const hookResult = useOrgDefaultModel('org-123');
+    expect(hookResult.defaultModel).toBe('org-default-model');
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['org-default-model', 'org-123'],
+        enabled: true,
+      })
+    );
+
+    const result = await captured.queryFn();
+    expect(result).toEqual({ defaultModel: 'org-default-model' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.example.com/api/organizations/org-123/defaults',
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer test-jwt-token',
+        },
+      }
+    );
+
+    vi.unstubAllGlobals();
   });
 });

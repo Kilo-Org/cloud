@@ -139,12 +139,17 @@ async function fetchModels(organizationId: string | undefined): Promise<ModelRes
   }
 }
 
-async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
+async function fetchOrgDefaults(
+  organizationId: string | undefined
+): Promise<{ defaultModel: string }> {
   const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-  const response = await fetch(`${API_BASE_URL}/api/organizations/${organizationId}/defaults`, {
+  const url = organizationId
+    ? `${API_BASE_URL}/api/organizations/${organizationId}/defaults`
+    : `${API_BASE_URL}/api/defaults`;
+  const response = await fetch(url, {
     headers: {
       Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(organizationId && token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
   if (!response.ok) {

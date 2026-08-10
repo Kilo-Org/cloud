@@ -169,6 +169,11 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
 
+/** Whether the reasoning expander has content worth showing. */
+export function shouldRenderReasoningPart(part: Part): boolean {
+  return isReasoningPart(part) && part.text.trim() !== '';
+}
+
 /** Check if a part is a StepStartPart */
 export function isStepStartPart(part: Part): part is StepStartPart {
   return part.type === 'step-start';

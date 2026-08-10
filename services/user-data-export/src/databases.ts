@@ -114,7 +114,7 @@ export function createStateDb(binding: HyperdriveBinding) {
           UPDATE user_data_exports
           SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
             row_count = ${input.rowCount}, current_source = NULL, source_cursor = NULL,
-            completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
+            completed_at = now(), expires_at = now() + interval '24 hours', multipart_upload_id = NULL,
             lease_token = NULL, lease_expires_at = NULL, updated_at = now()
           WHERE id = ${input.exportId} AND status = 'processing' AND lease_token = ${input.leaseToken}
           RETURNING id

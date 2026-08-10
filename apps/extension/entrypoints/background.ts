@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- The background tab-debugger dispatcher grew a full-text search route alongside snapshot, eval, and screenshot. */
 import { storage } from '#imports';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';

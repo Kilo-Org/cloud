@@ -45,11 +45,15 @@ export interface BenchTaskScenario {
  * truncated head misses the later ones.
  */
 const SUMMARIZE_ARTICLE_SCENARIO: BenchTaskScenario = {
-  // The deep themes require tool evidence: this essay is in training data, and the baseline model summarized the truncated page "from familiarity" — the pass must prove the later sections were actually read.
+  // The deep themes require tool evidence: this essay is in training data, and the baseline model summarized the truncated page "from familiarity" — the pass must prove the later sections were actually read. Each theme accepts its honest paraphrases: a good summary can say "distraction" for procrastination or "novel ideas" for originality.
   answerChecks: [
     { key: 'curiosity', re: /curiosity|curious/iu },
-    { key: 'procrastination', re: /procrastinat/iu, requireToolEvidence: true },
-    { key: 'originality', re: /original/iu, requireToolEvidence: true },
+    {
+      key: 'procrastination',
+      re: /procrastinat|distract|putting.{1,12}off/iu,
+      requireToolEvidence: true,
+    },
+    { key: 'originality', re: /original|novel|new ideas/iu, requireToolEvidence: true },
   ],
   id: 'summarize-article',
   kind: 'task',

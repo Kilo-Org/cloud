@@ -94,9 +94,15 @@ export const scoreTaskCorrectness = ({
     .map(check => check.key);
 
   const lengthOk = answer.length >= scenario.minAnswerChars;
+  // Both harness action paths count: direct eval, or a real (non-dry) run of a stored workflow.
   const actionOk =
     !scenario.requiresAction ||
-    exchanges.some(exchange => exchange.call.name === 'eval' && exchange.result.ok);
+    exchanges.some(
+      exchange =>
+        exchange.result.ok &&
+        (exchange.call.name === 'eval' ||
+          (exchange.call.name === 'run_workflow' && exchange.call.arguments['dryRun'] !== true))
+    );
 
   const predicates: Record<string, BenchPredicate> = {
     actionPerformed: predicate(

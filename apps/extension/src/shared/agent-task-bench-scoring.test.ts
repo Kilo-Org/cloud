@@ -116,6 +116,42 @@ describe('task correctness scoring', () => {
     expect(result.predicates['answerContent']?.pass).toBe(false);
   });
 
+  it('accepts a real workflow run as the action for action scenarios', () => {
+    const actionScenario = scenario({
+      answerChecks: [{ key: 'count', re: /6/u }],
+      requiresAction: true,
+    });
+    const viaWorkflow = scoreTaskCorrectness({
+      events: [
+        {
+          arguments: { input: { item: 'backpack' }, workflowId: 'workflow-1' },
+          id: 'call-run',
+          name: 'run_workflow',
+          type: 'tool-call',
+        },
+        { id: 'result-run', ok: true, toolCallId: 'call-run', type: 'tool-result', value: 'ok' },
+        answerEvent('There are 6 products listed.'),
+      ],
+      scenario: actionScenario,
+    });
+    expect(viaWorkflow.passed).toBe(true);
+
+    const viaDryRun = scoreTaskCorrectness({
+      events: [
+        {
+          arguments: { dryRun: true, workflowId: 'workflow-1' },
+          id: 'call-dry',
+          name: 'run_workflow',
+          type: 'tool-call',
+        },
+        { id: 'result-dry', ok: true, toolCallId: 'call-dry', type: 'tool-result', value: 'ok' },
+        answerEvent('There are 6 products listed.'),
+      ],
+      scenario: actionScenario,
+    });
+    expect(viaDryRun.passed).toBe(false);
+  });
+
   it('requires an ok eval exchange for action scenarios', () => {
     const actionScenario = scenario({
       answerChecks: [{ key: 'count', re: /6/u }],

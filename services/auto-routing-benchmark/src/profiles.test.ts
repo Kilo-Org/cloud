@@ -24,6 +24,7 @@ type EventRow = {
 
 type PendingStmt =
   | { kind: 'event'; values: Omit<EventRow, 'id'>; guarded: boolean }
+  | { kind: 'claim_user_requested'; entries: string[] }
   | {
       kind: 'profile';
       values: ProfileRow;
@@ -132,6 +133,8 @@ vi.mock('drizzle-orm/d1', () => {
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
+      platform_requested: row.platform_requested === true,
+      user_requested: row.user_requested !== false,
     };
   }
 
@@ -170,6 +173,25 @@ vi.mock('drizzle-orm/d1', () => {
             return createSelectBuilder('profiles');
           },
         };
+      },
+      update() {
+        const stmt: PendingStmt = { kind: 'claim_user_requested', entries: [] };
+        const builder = {
+          set() {
+            return builder;
+          },
+          where(clause: unknown) {
+            // The claim's WHERE is an and() tree that this mock does not walk,
+            // so `entries` stays empty and these tests only prove the statement
+            // is issued. What it actually updates is covered for real against
+            // SQLite in profiles-sql.test.ts.
+            const models = (clause as { models?: string[] } | null)?.models;
+            if (models) stmt.entries = models;
+            return builder;
+          },
+          __stmt: stmt,
+        };
+        return builder;
       },
       insert(table: { __tableName?: string }) {
         const isEvents = table.__tableName === 'profile_request_events';
@@ -251,6 +273,12 @@ vi.mock('drizzle-orm/d1', () => {
   }
 
   function applyStmt(stmt: PendingStmt) {
+    if (stmt.kind === 'claim_user_requested') {
+      // Not simulated: this mock does not read the claim's WHERE tree, so it
+      // cannot know which rows to touch. What the claim updates is verified
+      // against real SQLite in profiles-sql.test.ts.
+      return;
+    }
     if (stmt.kind === 'event') {
       if (stmt.guarded && hasActiveCurrentProfile(stmt.values)) {
         // INSERT...SELECT...WHERE NOT EXISTS → zero rows.
@@ -369,6 +397,8 @@ function profileRow(
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,
+    platform_requested: false,
+    user_requested: true,
     ...partial,
   };
 }

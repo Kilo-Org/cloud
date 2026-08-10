@@ -8,6 +8,7 @@ import {
   loadWorkflowSettings,
   saveWorkflowSettings,
 } from '@/src/shared/agent-workflows-storage';
+import { DEFAULT_WORKFLOW_SETTINGS } from '@/src/shared/agent-workflows';
 import type { AgentWorkflowSettings } from '@/src/shared/agent-workflows';
 import { useAgentWorkflows } from './use-agent-workflows';
 import { WorkflowRow } from './workflow-row';
@@ -21,9 +22,74 @@ import {
 const EMPTY_MESSAGE =
   'No workflows yet. Ask Kilo to save one — for example "Create a workflow that checks the price of this item" — or repeat steps on a site and Kilo offers to save them.';
 const LOAD_ERROR_MESSAGE = "Couldn't load workflows. Try again.";
+const DELETE_ERROR_MESSAGE = "Couldn't delete the workflow. Try again.";
+
+const SETTINGS_TOGGLE_ROWS = [
+  {
+    description: '',
+    key: 'allowWorkflowsInSafeMode',
+    label: 'Allow workflows in safe mode',
+  },
+  {
+    description:
+      'Save workflow changes without the approval card, and delete without the confirm click.',
+    key: 'autoApproveWorkflowChanges',
+    label: 'Auto-approve workflow changes',
+  },
+  {
+    description: 'Let Kilo start a workflow run without asking first.',
+    key: 'autoApproveWorkflowRuns',
+    label: 'Auto-approve workflow runs',
+  },
+] as const satisfies readonly {
+  description: string;
+  key: keyof AgentWorkflowSettings;
+  label: string;
+}[];
 
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
+
+const SettingsToggle = ({
+  checked,
+  description,
+  disabled,
+  label,
+  onToggle,
+}: {
+  checked: boolean;
+  description: string;
+  disabled: boolean;
+  label: string;
+  onToggle: () => void;
+}): JSX.Element => (
+  <div className="flex items-start justify-between gap-3">
+    <div className="min-w-0 flex-1">
+      <p className="type-body font-medium text-foreground">{label}</p>
+      {description === '' ? null : (
+        <p className="type-body mt-0.5 text-foreground-muted">{description}</p>
+      )}
+    </div>
+    <button
+      aria-checked={checked}
+      aria-label={label}
+      className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected ${
+        checked ? 'border-brand-primary bg-brand-primary' : 'border-border bg-surface-overlay'
+      }`}
+      disabled={disabled}
+      onClick={onToggle}
+      role="switch"
+      type="button"
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-0.5 size-3.5 rounded-full transition ${
+          checked ? 'left-4 bg-brand-primary-foreground' : 'left-0.5 bg-foreground-muted'
+        }`}
+      />
+    </button>
+  </div>
+);
 
 export const WorkflowSettings = (): JSX.Element => {
   const { isLoaded, loadError, reload, workflows } = useAgentWorkflows();
@@ -44,17 +110,18 @@ export const WorkflowSettings = (): JSX.Element => {
       : runningConversationIds.includes(activeConversationId);
 
   const [settings, setSettings] = useState<AgentWorkflowSettings>({
-    allowWorkflowsInSafeMode: false,
+    ...DEFAULT_WORKFLOW_SETTINGS,
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
 
   const setRunRequest = useSetAtom(workflowRunRequestAtom);
   const setIsSettingsOpen = useSetAtom(settingsDialogOpenAtom);
 
   useEffect(() => {
     void (async () => {
-      let loaded: AgentWorkflowSettings = { allowWorkflowsInSafeMode: false };
+      let loaded: AgentWorkflowSettings = { ...DEFAULT_WORKFLOW_SETTINGS };
       try {
         loaded = await loadWorkflowSettings(storage);
       } catch {
@@ -65,32 +132,43 @@ export const WorkflowSettings = (): JSX.Element => {
     })();
   }, []);
 
-  const onToggle = useCallback(() => {
-    if (settingsSaving) {
-      return;
-    }
-
-    const prior = settings;
-    setSettingsSaving(true);
-    const next: AgentWorkflowSettings = {
-      allowWorkflowsInSafeMode: !prior.allowWorkflowsInSafeMode,
-    };
-    setSettings(next);
-
-    void (async () => {
-      try {
-        await saveWorkflowSettings(storage, next);
-      } catch {
-        // Roll back to the prior value on failure so UI and storage stay consistent.
-        setSettings(prior);
-      } finally {
-        setSettingsSaving(false);
+  const onToggle = useCallback(
+    (key: keyof AgentWorkflowSettings) => {
+      if (settingsSaving) {
+        return;
       }
-    })();
-  }, [settings, settingsSaving]);
+
+      const prior = settings;
+      setSettingsSaving(true);
+      const next: AgentWorkflowSettings = {
+        ...prior,
+        [key]: !prior[key],
+      };
+      setSettings(next);
+
+      void (async () => {
+        try {
+          await saveWorkflowSettings(storage, next);
+        } catch {
+          // Roll back to the prior value on failure so UI and storage stay consistent.
+          setSettings(prior);
+        } finally {
+          setSettingsSaving(false);
+        }
+      })();
+    },
+    [settings, settingsSaving]
+  );
 
   const handleDelete = useCallback((id: string) => {
-    void deleteAgentWorkflow(storage, id);
+    setDeleteError(false);
+    void (async () => {
+      try {
+        await deleteAgentWorkflow(storage, id);
+      } catch {
+        setDeleteError(true);
+      }
+    })();
   }, []);
 
   const handleRun = useCallback(
@@ -106,32 +184,19 @@ export const WorkflowSettings = (): JSX.Element => {
       aria-label="Workflows"
       className="min-w-0 rounded-xl border border-border bg-surface-raised p-3"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="type-body font-medium text-foreground">Allow workflows in safe mode</p>
-        </div>
-        <button
-          aria-checked={settings.allowWorkflowsInSafeMode}
-          aria-label="Allow workflows in safe mode"
-          className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected ${
-            settings.allowWorkflowsInSafeMode
-              ? 'border-brand-primary bg-brand-primary'
-              : 'border-border bg-surface-overlay'
-          }`}
-          disabled={!settingsLoaded || settingsSaving}
-          onClick={onToggle}
-          role="switch"
-          type="button"
-        >
-          <span
-            aria-hidden="true"
-            className={`absolute top-0.5 size-3.5 rounded-full transition ${
-              settings.allowWorkflowsInSafeMode
-                ? 'left-4 bg-brand-primary-foreground'
-                : 'left-0.5 bg-foreground-muted'
-            }`}
+      <div className="flex flex-col gap-3">
+        {SETTINGS_TOGGLE_ROWS.map(row => (
+          <SettingsToggle
+            checked={settings[row.key]}
+            description={row.description}
+            disabled={!settingsLoaded || settingsSaving}
+            key={row.key}
+            label={row.label}
+            onToggle={() => {
+              onToggle(row.key);
+            }}
           />
-        </button>
+        ))}
       </div>
 
       <h2 className="type-label mt-3 text-foreground-muted">Saved workflows</h2>
@@ -156,19 +221,25 @@ export const WorkflowSettings = (): JSX.Element => {
       ) : null}
 
       {view.kind === 'list' ? (
-        <ul className="mt-2 flex flex-col gap-2">
-          {view.items.map(item => (
-            <WorkflowRow
-              activeConversationRunning={activeConversationRunning}
-              allowWorkflowsInSafeMode={settings.allowWorkflowsInSafeMode}
-              isDangerousMode={isDangerousMode}
-              item={item}
-              key={item.id}
-              onDelete={handleDelete}
-              onRun={handleRun}
-            />
-          ))}
-        </ul>
+        <>
+          {deleteError ? (
+            <p className="type-body mt-2 text-status-red-400">{DELETE_ERROR_MESSAGE}</p>
+          ) : null}
+          <ul className="mt-2 flex flex-col gap-2">
+            {view.items.map(item => (
+              <WorkflowRow
+                activeConversationRunning={activeConversationRunning}
+                allowWorkflowsInSafeMode={settings.allowWorkflowsInSafeMode}
+                autoApproveChanges={settings.autoApproveWorkflowChanges}
+                isDangerousMode={isDangerousMode}
+                item={item}
+                key={item.id}
+                onDelete={handleDelete}
+                onRun={handleRun}
+              />
+            ))}
+          </ul>
+        </>
       ) : null}
     </section>
   );

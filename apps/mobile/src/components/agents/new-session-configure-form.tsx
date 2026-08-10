@@ -13,8 +13,9 @@ import {
   type AgentAttachmentCandidate,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
 
 type NewSessionConfigureFormProps = {
@@ -27,10 +28,10 @@ type NewSessionConfigureFormProps = {
   mode: AgentMode;
   model: string;
   variant: string;
-  modelOptions: ModelOption[];
+  modelOptions: (ModelOption | SessionModelOption)[];
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
-  onModelSelect: (modelId: string, variant: string) => void;
+  onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;

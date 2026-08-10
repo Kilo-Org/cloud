@@ -95,19 +95,24 @@ export const AgentsComposer = ({
         placeholder="Send a message…"
         value={draft}
       />
-      <div className="mt-2 grid gap-2">
+      <div className="mt-2 flex gap-2">
         <button
-          className={
-            isStreaming
-              ? 'type-label h-9 w-full rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background'
-              : 'type-label h-9 w-full rounded-md border border-transparent bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle'
-          }
-          disabled={isStreaming ? !canInterrupt : isSendDisabled}
-          onClick={isStreaming && canInterrupt ? onStop : undefined}
-          type={isStreaming && canInterrupt ? 'button' : 'submit'}
+          className={`type-label h-9 ${isStreaming ? 'flex-1' : 'w-full'} rounded-md border border-transparent bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle`}
+          disabled={isSendDisabled}
+          type="submit"
         >
-          {isStreaming ? 'Stop' : 'Send message'}
+          Send message
         </button>
+        {isStreaming ? (
+          <button
+            className="type-label h-9 w-20 shrink-0 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!canInterrupt}
+            onClick={onStop}
+            type="button"
+          >
+            Stop
+          </button>
+        ) : null}
       </div>
     </form>
   );

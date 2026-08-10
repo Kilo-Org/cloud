@@ -495,6 +495,219 @@ export const kilocode_users = pgTable(
 
 export type User = typeof kilocode_users.$inferSelect;
 
+/**
+ * Durable control-plane state for an asynchronous user data export. Export
+ * content is stored externally; this table intentionally stores only its
+ * object metadata and redacted operational errors.
+ */
+export const user_data_exports = pgTable(
+  'user_data_exports',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    status: text()
+      .$type<'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired'>()
+      .notNull()
+      .default('queued'),
+    schema_version: integer().notNull().default(1),
+    snapshot_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    current_source: text(),
+    source_cursor: jsonb().$type<Record<string, unknown> | null>(),
+    multipart_upload_id: text(),
+    next_part_number: integer().notNull().default(1),
+    dispatch_generation: integer().notNull().default(0),
+    lease_token: uuid(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attempt_count: integer().notNull().default(0),
+    row_count: bigint({ mode: 'number' }).notNull().default(0),
+    size_bytes: bigint({ mode: 'number' }),
+    r2_object_key: text(),
+    r2_etag: text(),
+    failure_code: text(),
+    last_error_redacted: text(),
+    requested_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    email_status: text()
+      .$type<'pending' | 'sending' | 'sent' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    email_attempt_count: integer().notNull().default(0),
+    email_lease_token: uuid(),
+    email_lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    email_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_user_data_exports_single_active')
+      .on(table.kilo_user_id)
+      .where(sql`${table.status} IN ('queued', 'processing', 'finalizing')`),
+    index('IDX_user_data_exports_user_created').on(table.kilo_user_id, table.created_at, table.id),
+    index('IDX_user_data_exports_lease_expiry')
+      .on(table.lease_expires_at, table.id)
+      .where(sql`${table.status} IN ('processing', 'finalizing')`),
+    index('IDX_user_data_exports_ready_expiry')
+      .on(table.expires_at, table.id)
+      .where(sql`${table.status} = 'ready'`),
+    index('IDX_user_data_exports_failed_multipart')
+      .on(table.updated_at, table.id)
+      .where(sql`${table.status} = 'failed' AND ${table.multipart_upload_id} IS NOT NULL`),
+    index('IDX_user_data_exports_email_lease_expiry')
+      .on(table.email_lease_expires_at, table.id)
+      .where(sql`${table.email_status} = 'sending'`),
+    check(
+      'user_data_exports_status_check',
+      sql`${table.status} IN ('queued', 'processing', 'finalizing', 'ready', 'failed', 'expired')`
+    ),
+    check('user_data_exports_schema_version_positive', sql`${table.schema_version} > 0`),
+    check('user_data_exports_next_part_number_positive', sql`${table.next_part_number} > 0`),
+    check(
+      'user_data_exports_dispatch_generation_nonnegative',
+      sql`${table.dispatch_generation} >= 0`
+    ),
+    check('user_data_exports_attempt_count_nonnegative', sql`${table.attempt_count} >= 0`),
+    check('user_data_exports_row_count_nonnegative', sql`${table.row_count} >= 0`),
+    check(
+      'user_data_exports_size_bytes_nonnegative',
+      sql`${table.size_bytes} IS NULL OR ${table.size_bytes} >= 0`
+    ),
+    check(
+      'user_data_exports_lease_shape',
+      sql`(${table.lease_token} IS NULL) = (${table.lease_expires_at} IS NULL)`
+    ),
+    check(
+      'user_data_exports_ready_shape',
+      sql`${table.status} <> 'ready' OR (${table.r2_object_key} IS NOT NULL AND ${table.size_bytes} IS NOT NULL AND ${table.completed_at} IS NOT NULL AND ${table.expires_at} IS NOT NULL)`
+    ),
+    check(
+      'user_data_exports_last_error_redacted_length',
+      sql`${table.last_error_redacted} IS NULL OR length(${table.last_error_redacted}) <= 500`
+    ),
+    check(
+      'user_data_exports_email_attempt_count_nonnegative',
+      sql`${table.email_attempt_count} >= 0`
+    ),
+    check(
+      'user_data_exports_email_status_check',
+      sql`${table.email_status} IN ('pending', 'sending', 'sent', 'failed')`
+    ),
+    check(
+      'user_data_exports_email_lease_shape',
+      sql`(${table.email_status} = 'sending') = (${table.email_lease_token} IS NOT NULL AND ${table.email_lease_expires_at} IS NOT NULL)`
+    ),
+    check(
+      'user_data_exports_email_sent_shape',
+      sql`(${table.email_status} = 'sent') = (${table.email_sent_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type UserDataExport = typeof user_data_exports.$inferSelect;
+export type NewUserDataExport = typeof user_data_exports.$inferInsert;
+
+/**
+ * R2 deletion work that must survive deletion of the owning user/export rows.
+ * Object keys contain random export IDs, not user identifiers.
+ */
+export const user_data_export_object_deletions = pgTable(
+  'user_data_export_object_deletions',
+  {
+    object_key: text().primaryKey().notNull(),
+    multipart_upload_id: text(),
+    reason: text().$type<'account_deletion'>().notNull().default('account_deletion'),
+    attempt_count: integer().notNull().default(0),
+    available_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_user_data_export_object_deletions_ready').on(
+      table.available_at,
+      table.created_at,
+      table.object_key
+    ),
+    check(
+      'user_data_export_object_deletions_reason_check',
+      sql`${table.reason} = 'account_deletion'`
+    ),
+    check(
+      'user_data_export_object_deletions_attempt_count_nonnegative',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export const user_data_export_parts = pgTable(
+  'user_data_export_parts',
+  {
+    export_id: uuid()
+      .notNull()
+      .references(() => user_data_exports.id, { onDelete: 'cascade' }),
+    part_number: integer().notNull(),
+    etag: text().notNull(),
+    size_bytes: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.export_id, table.part_number] }),
+    check('user_data_export_parts_part_number_positive', sql`${table.part_number} > 0`),
+    check('user_data_export_parts_size_bytes_nonnegative', sql`${table.size_bytes} >= 0`),
+  ]
+);
+
+export type UserDataExportPart = typeof user_data_export_parts.$inferSelect;
+
+export const user_data_export_outbox = pgTable(
+  'user_data_export_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    export_id: uuid()
+      .notNull()
+      .references(() => user_data_exports.id, { onDelete: 'cascade' }),
+    generation: integer().notNull(),
+    operation: text().$type<'generate'>().notNull().default('generate'),
+    available_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    attempt_count: integer().notNull().default(0),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_user_data_export_outbox_generation_operation').on(
+      table.export_id,
+      table.generation,
+      table.operation
+    ),
+    index('IDX_user_data_export_outbox_pending')
+      .on(table.available_at, table.created_at, table.id)
+      .where(sql`${table.sent_at} IS NULL`),
+    check('user_data_export_outbox_operation_check', sql`${table.operation} = 'generate'`),
+    check('user_data_export_outbox_generation_nonnegative', sql`${table.generation} >= 0`),
+    check('user_data_export_outbox_attempt_count_nonnegative', sql`${table.attempt_count} >= 0`),
+  ]
+);
+
+export type UserDataExportOutbox = typeof user_data_export_outbox.$inferSelect;
+
 export const user_affiliate_attributions = pgTable(
   'user_affiliate_attributions',
   {
@@ -3918,6 +4131,84 @@ export const platform_access_token_credentials = pgTable(
 export type PlatformAccessTokenCredential = typeof platform_access_token_credentials.$inferSelect;
 export type NewPlatformAccessTokenCredential =
   typeof platform_access_token_credentials.$inferInsert;
+
+/**
+ * Encrypted Slack bot credentials, one row per Slack `platform_integrations` row.
+ *
+ * Deliberately a separate table rather than extra columns on `platform_oauth_credentials`:
+ * `GitLabOAuthCredentialRowSchema` in `packages/worker-utils/src/gitlab-credential.ts` is
+ * `.strict()` and `git-token-service` selects that whole row, so any column added to
+ * `platform_oauth_credentials` fails GitLab refresh closed to `reconnect_required`.
+ *
+ * Also deliberately not more `platform_integrations.metadata` jsonb: that column is
+ * spread-merged in several places, is read wholesale for unrelated queries, and cannot
+ * carry typed expiry or refresh bookkeeping.
+ *
+ * The refresh-bookkeeping columns (`refresh_token_encrypted`, `access_token_expires_at`,
+ * `refresh_claimed_at`, `refresh_attempt_count`, `next_refresh_attempt_at`,
+ * `last_refreshed_at`) are inert until Slack token rotation is enabled on the app.
+ * They exist now so enabling rotation needs no further migration.
+ *
+ * PII: there is no direct user FK. User-owned rows are removed by the
+ * `platform_integrations` cascade, which `softDeleteUser` already triggers by deleting
+ * that user's `platform_integrations`. Org-owned rows correctly survive user deletion.
+ */
+export const slack_oauth_credentials = pgTable(
+  'slack_oauth_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    // Slack workspace ID (`T...`). Mirrors platform_integrations.platform_installation_id
+    // and is part of the encryption AAD, so it must not be updated in place.
+    slack_team_id: text().notNull(),
+    slack_enterprise_id: text(),
+    is_enterprise_install: boolean().notNull().default(false),
+    bot_user_id: text(),
+    access_token_encrypted: text().notNull(),
+    // Null while tokens are long-lived; populated from `expires_in` once rotation is on.
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // Null until rotation is enabled on the Slack app.
+    refresh_token_encrypted: text(),
+    // Scopes Slack actually granted, as opposed to the scopes we asked for. Null until
+    // the install path can observe the real OAuth response; see getMissingSlackScopes.
+    granted_scopes: text().array(),
+    credential_version: integer().notNull().default(1),
+    // Refresh lease/backoff bookkeeping for the Step 4 cron sweep.
+    refresh_claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_attempt_count: integer().notNull().default(0),
+    next_refresh_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_refreshed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_slack_oauth_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    index('IDX_slack_oauth_credentials_slack_team_id').on(table.slack_team_id),
+    // Supports the Step 4 cron sweep: claim live rows nearing expiry.
+    index('IDX_slack_oauth_credentials_refresh_due')
+      .on(table.access_token_expires_at)
+      .where(isNull(table.revoked_at)),
+    check('slack_oauth_credentials_credential_version_check', sql`${table.credential_version} > 0`),
+    check(
+      'slack_oauth_credentials_refresh_attempt_count_check',
+      sql`${table.refresh_attempt_count} >= 0`
+    ),
+    check('slack_oauth_credentials_slack_team_id_check', sql`${table.slack_team_id} <> ''`),
+  ]
+);
+
+export type SlackOAuthCredential = typeof slack_oauth_credentials.$inferSelect;
+export type NewSlackOAuthCredential = typeof slack_oauth_credentials.$inferInsert;
 
 // User Deployments
 

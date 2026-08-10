@@ -102,6 +102,9 @@ import {
   coding_plan_availability_intents,
   coding_plan_subscriptions,
   deployments_ephemeral,
+  microdollar_usage,
+  microdollar_usage_metadata,
+  user_data_exports,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -970,6 +973,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - user_data_exports and their multipart/outbox state (external object keys
+ *   are copied to durable deletion tombstones for Worker cleanup)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
  * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
  *   immediate cleanup scheduled)
@@ -978,6 +983,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   authorizations created by the user are removed, including organization grants)
  * - Organization GitLab PAT credentials authorized by the user (parent integration suspended;
  *   project access-token credentials preserved)
+ * - slack_oauth_credentials (encrypted Slack bot tokens; removed via the
+ *   platform_integrations cascade below. Organization-owned Slack credentials are
+ *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -1075,6 +1083,26 @@ export async function softDeleteUser(userId: string) {
 
     // ── 2. Hard-delete PII tables ────────────────────────────────────────
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+    await tx.execute(sql`
+      INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
+      SELECT COALESCE(r2_object_key, 'exports/' || id::text || '/kilo-data-export.jsonl.gz'),
+        multipart_upload_id,
+        CASE
+          WHEN lease_expires_at > now() THEN lease_expires_at
+          ELSE now()
+        END
+      FROM user_data_exports
+      WHERE kilo_user_id = ${userId}
+      ON CONFLICT (object_key) DO UPDATE
+      SET multipart_upload_id = COALESCE(
+        EXCLUDED.multipart_upload_id,
+        user_data_export_object_deletions.multipart_upload_id
+      ), available_at = GREATEST(
+        user_data_export_object_deletions.available_at,
+        EXCLUDED.available_at
+      ), updated_at = now()
+    `);
+    await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
     await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
     await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
     await tx
@@ -1533,6 +1561,18 @@ export async function softDeleteUser(userId: string) {
           )`
         )
       );
+
+    // Microdollar usage metadata: strip user-authored prompt prefix and system prompt reference
+    await tx.execute(sql`
+      UPDATE ${microdollar_usage_metadata}
+      SET user_prompt_prefix = NULL,
+          system_prompt_prefix_id = NULL
+      WHERE id IN (
+        SELECT id FROM ${microdollar_usage}
+        WHERE kilo_user_id = ${userId}
+      )
+      AND (user_prompt_prefix IS NOT NULL OR system_prompt_prefix_id IS NOT NULL)
+    `);
 
     // ── 4. Nullify FK references ─────────────────────────────────────────
     await tx

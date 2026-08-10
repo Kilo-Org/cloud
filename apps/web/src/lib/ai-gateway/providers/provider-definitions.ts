@@ -9,6 +9,7 @@ export default {
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: getEnvVariable('OPENROUTER_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: null,
     async transformRequest() {},
   },
   ALIBABA: {
@@ -17,6 +18,7 @@ export default {
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
     // Prompt caching is not supported on the responses API for Alibaba; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
+    responseTransforms: null,
     async transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
     },
@@ -27,6 +29,7 @@ export default {
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
     // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
+    responseTransforms: null,
     async transformRequest(context) {
       if (!isReasoningExplicitlyDisabled(context.request)) {
         context.request.body.thinking = { type: 'enabled' };
@@ -49,6 +52,7 @@ export default {
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
     supportedChatApis: ['chat_completions', 'responses', 'messages'],
+    responseTransforms: null,
     async transformRequest(context) {
       delete context.request.body.provider;
     },
@@ -58,6 +62,7 @@ export default {
     apiUrl: 'https://api.mistral.ai/v1',
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     supportedChatApis: [],
+    responseTransforms: null,
     async transformRequest() {},
   },
   STREAMLAKE: {
@@ -65,6 +70,7 @@ export default {
     apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
     apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
     supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
     async transformRequest(context) {
       delete context.request.body.provider;
     },
@@ -74,6 +80,7 @@ export default {
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: null,
     async transformRequest(context) {
       await applyVercelSettings(context.model, context.request, context.userByok);
     },

@@ -30,6 +30,7 @@ describe('GET /api/cron/sync-providers', () => {
     jest.mocked(syncAndStoreProviders).mockResolvedValue({
       id: 1,
       generated_at: '2026-07-20T00:00:00.000Z',
+      completed_at: '2026-07-20T00:05:00.000Z',
       total_models: 42,
       total_providers: 12,
       direct_byok_model_counts: {},

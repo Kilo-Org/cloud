@@ -28,6 +28,7 @@ import { redisClient } from '@/lib/redis';
 import {
   GATEWAY_METADATA_REDIS_KEYS,
   type RedisKey,
+  SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
   vercelInferenceProvidersRedisKey,
 } from '@/lib/redis-keys';
 import {
@@ -484,9 +485,13 @@ export async function syncAndStoreProviders() {
   const direct_byok_model_counts = await syncDirectByokModels();
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
+  const completed_at = new Date().toISOString();
+  await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completed_at);
+
   return {
     id: result.id,
     generated_at: result.data.generated_at,
+    completed_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
     direct_byok_model_counts,

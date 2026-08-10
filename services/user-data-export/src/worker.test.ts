@@ -7,6 +7,7 @@ import {
   exportArtifact,
   handleFencedCompletion,
   handleGenerationFailure,
+  hasRetiredGeneratorState,
   processScheduledExportWork,
   persistCompletedExport,
   recoverInterruptedMultipartUpload,
@@ -155,6 +156,28 @@ describe('source resume keys', () => {
 
   it('does not fall back when a persisted source key is unknown', () => {
     expect(resolveSourceAdapter([enabled], 'renamed-source')).toBeUndefined();
+  });
+});
+
+describe('one-shot generator state', () => {
+  it('allows generation bumps used only for stale-message fencing', () => {
+    expect(
+      hasRetiredGeneratorState({
+        current_source: null,
+        source_cursor: null,
+        next_part_number: 1,
+      })
+    ).toBe(false);
+  });
+
+  it('rejects persisted cursor and part state from the retired generator', () => {
+    expect(
+      hasRetiredGeneratorState({
+        current_source: 'kilocode_users',
+        source_cursor: { id: 'cursor' },
+        next_part_number: 2,
+      })
+    ).toBe(true);
   });
 });
 

@@ -72,7 +72,10 @@ export function createStateDb(binding: HyperdriveBinding) {
           WHERE NOT EXISTS (SELECT 1 FROM attached)
             AND NOT (SELECT export_exists FROM existing)
           ON CONFLICT (object_key) DO UPDATE
-          SET multipart_upload_id = EXCLUDED.multipart_upload_id,
+          SET multipart_upload_id = COALESCE(
+              EXCLUDED.multipart_upload_id,
+              user_data_export_object_deletions.multipart_upload_id
+            ),
             available_at = now(), updated_at = now()
         )
         SELECT EXISTS (SELECT 1 FROM attached) AS attached,
@@ -189,8 +192,15 @@ export function createStateDb(binding: HyperdriveBinding) {
     },
     async pendingOutbox(): Promise<ExportQueueRow[]> {
       const rows = await db.execute<ExportQueueRow>(sql`
-        SELECT id, export_id, generation FROM user_data_export_outbox
-        WHERE sent_at IS NULL AND available_at <= now() ORDER BY created_at LIMIT 100
+        SELECT outbox.id, outbox.export_id, outbox.generation
+        FROM user_data_export_outbox outbox
+        INNER JOIN user_data_exports exports
+          ON exports.id = outbox.export_id
+          AND exports.dispatch_generation = outbox.generation
+          AND exports.status IN ('queued', 'processing', 'finalizing')
+        WHERE outbox.sent_at IS NULL AND outbox.available_at <= now()
+        ORDER BY outbox.created_at, outbox.id
+        LIMIT 100
       `);
       return rows.rows;
     },
@@ -216,10 +226,16 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE export_id = ${exportId} AND generation = ${generation} AND operation = 'generate'
       `);
     },
-    async exportBelongsToUser(exportId: string, kiloUserId: string): Promise<boolean> {
+    async exportGenerationBelongsToUser(
+      exportId: string,
+      generation: number,
+      kiloUserId: string
+    ): Promise<boolean> {
       const rows = await db.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
         WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+          AND dispatch_generation = ${generation}
+          AND status IN ('queued', 'processing', 'finalizing')
         LIMIT 1
       `);
       return rows.rows.length > 0;

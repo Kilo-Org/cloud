@@ -74,6 +74,7 @@ import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
+import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
@@ -2378,4 +2379,5 @@ export const adminRouter = createTRPCRouter({
   securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
+  userDataExports: adminUserDataExportsRouter,
 });

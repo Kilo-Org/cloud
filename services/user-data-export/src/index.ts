@@ -59,10 +59,13 @@ async function authenticatedUserId(request: Request, env: ExportEnv): Promise<st
 async function dispatchExport(
   message: ExportQueueMessage,
   kiloUserId: string,
-  state: Pick<StateDb, 'exportBelongsToUser' | 'markOutboxGenerationSent'>,
+  state: Pick<StateDb, 'exportGenerationBelongsToUser' | 'markOutboxGenerationSent'>,
   queue: Pick<Queue<ExportQueueMessage>, 'send'>
 ): Promise<'accepted' | 'not_found'> {
-  if (!(await state.exportBelongsToUser(message.exportId, kiloUserId))) return 'not_found';
+  if (
+    !(await state.exportGenerationBelongsToUser(message.exportId, message.generation, kiloUserId))
+  )
+    return 'not_found';
   await queue.send(message);
   await state.markOutboxGenerationSent(message.exportId, message.generation);
   return 'accepted';

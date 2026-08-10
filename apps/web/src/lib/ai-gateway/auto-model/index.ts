@@ -11,16 +11,20 @@ import {
 } from '@kilocode/db/schema-types';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 
+export type AutoModelPricing = {
+  prompt: string;
+  completion: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+};
+
 export type AutoModel = {
   id: string;
   name: string;
   description: string;
   context_length: number;
   max_completion_tokens: number;
-  prompt_price: string;
-  completion_price: string;
-  input_cache_read_price: string | undefined;
-  input_cache_write_price: string | undefined;
+  pricing: AutoModelPricing;
   supports_images: boolean;
   supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
@@ -88,16 +92,18 @@ export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true },
 };
 
+const UNKNOWN_PRICING: AutoModelPricing = {
+  prompt: '-1',
+  completion: '-1',
+};
+
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
   name: 'Auto Frontier',
   description: 'Highest performance and capability for any task.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  prompt_price: '0.000005',
-  completion_price: '0.000025',
-  input_cache_read_price: '0.0000005',
-  input_cache_write_price: '0.00000625',
+  pricing: UNKNOWN_PRICING,
   supports_images: true,
   supports_pdf: true,
   opencode_settings: {
@@ -114,10 +120,12 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
     'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
-  prompt_price: '0',
-  completion_price: '0',
-  input_cache_read_price: '0',
-  input_cache_write_price: '0',
+  pricing: {
+    prompt: '0',
+    completion: '0',
+    input_cache_read: '0',
+    input_cache_write: '0',
+  },
   supports_images: false,
   supports_pdf: false,
   opencode_settings: undefined,
@@ -129,10 +137,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   description: 'Great balance of price and capability.',
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
-  prompt_price: '0.000000325',
-  completion_price: '0.00000195',
-  input_cache_read_price: '0.0000000325',
-  input_cache_write_price: '0.00000040625',
+  pricing: UNKNOWN_PRICING,
   supports_images: true,
   supports_pdf: false,
   opencode_settings: undefined,
@@ -144,10 +149,11 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   description: 'Automatically routes your request to a small model.',
   context_length: 262144,
   max_completion_tokens: 32768,
-  prompt_price: '0.00000005',
-  completion_price: '0.0000004',
-  input_cache_read_price: '0.000000005',
-  input_cache_write_price: undefined,
+  pricing: {
+    prompt: '0.00000005',
+    completion: '0.0000004',
+    input_cache_read: '0.000000005',
+  },
   supports_images: true,
   supports_pdf: false,
   opencode_settings: undefined,

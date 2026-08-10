@@ -1959,24 +1959,27 @@ export const GoogleServiceAccountKeySchema = z.object({
 
 export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
 
-const CustomLlmDefinitionBaseSchema = z.object({
+export const CustomLlmApiKeyCredentialsSchema = z.object({
+  type: z.literal('api_key'),
+  api_key: z.string().min(1),
+});
+
+export type CustomLlmApiKeyCredentials = z.infer<typeof CustomLlmApiKeyCredentialsSchema>;
+
+export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
+  CustomLlmApiKeyCredentialsSchema,
+  GoogleServiceAccountKeySchema,
+]);
+
+export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
+
+export const CustomLlmDefinitionSchema = z.object({
   ...CustomLlmMetadataSchema.shape,
   ...CustomLlmApiConfigSchema.shape,
   display_name: z.string(),
   organization_ids: z.array(z.string()),
   pricing: CustomLlmPricingSchema.optional(),
 });
-
-export const CustomLlmDefinitionSchema = z.union([
-  CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.string(),
-    google_service_account: z.never().optional(),
-  }),
-  CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.never().optional(),
-    google_service_account: GoogleServiceAccountKeySchema,
-  }),
-]);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

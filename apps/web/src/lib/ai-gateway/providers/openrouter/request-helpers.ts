@@ -237,6 +237,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     !containsCacheControl(request.body.system) &&
     !containsCacheControl(request.body.messages)
   ) {
+    // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
     const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
     delete request.body.cache_control;
     if (request.body.system) {
@@ -246,7 +247,6 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
-      // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
   }

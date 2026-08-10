@@ -78,6 +78,7 @@ const mockUser = {
   google_user_name: 'Jean du Plessis',
   google_user_email: 'jean@kilo.ai',
   google_user_image_url: '',
+  is_admin: true,
 };
 
 const mockOrganizations = [

@@ -1,0 +1,83 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "user-data-export",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "port": 8818,
+    "local_protocol": "http",
+    "ip": "127.0.0.1",
+  },
+  "limits": {
+    "cpu_ms": 300000,
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+    },
+  },
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "user-data-export.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+    "R2_BUCKET_NAME": "user-data-export",
+    "USER_DATA_EXPORT_WEB_URL": "https://api.kilo.ai",
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "EXPORT_QUEUE",
+        "queue": "user-data-export",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "user-data-export",
+        "max_batch_size": 1,
+        "max_retries": 4,
+        "retry_delay": 60,
+        "max_concurrency": 5,
+        "dead_letter_queue": "user-data-export-dlq",
+      },
+      {
+        "queue": "user-data-export-dlq",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_concurrency": 1,
+      },
+    ],
+  },
+  "r2_buckets": [
+    {
+      "binding": "EXPORT_BUCKET",
+      "bucket_name": "user-data-export",
+    },
+  ],
+  "hyperdrive": [
+    {
+      "binding": "PRIMARY_STATE_DB",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+    {
+      "binding": "EXPORT_REPLICA_DB",
+      "id": "bcc8d2f3a24f4929b5ee91cf77b1c5fa",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+}

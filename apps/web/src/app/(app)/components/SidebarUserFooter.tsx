@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
-import { BookOpen, ChevronsUpDown, Download, LogOut, UserCog } from 'lucide-react';
+import { BookOpen, ChevronsUpDown, Download, FileDown, LogOut, UserCog } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -18,6 +18,7 @@ type User = {
   google_user_name: string;
   google_user_email: string;
   google_user_image_url: string;
+  is_admin: boolean;
 };
 
 type SidebarUserFooterProps = {
@@ -85,6 +86,12 @@ export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooter
               <UserCog className="h-4 w-4" />
               Connected Accounts
             </DropdownMenuItem>
+            {user.is_admin && (
+              <DropdownMenuItem onClick={() => router.push('/data-exports')}>
+                <FileDown className="h-4 w-4" />
+                Data exports
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => router.push('/install')}>
               <Download className="h-4 w-4" />
               Install

@@ -5,9 +5,12 @@ import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
+import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { isModelRestrictionExempt } from '@/lib/model-allow.server';
+import { isLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
 import { db } from '@/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
@@ -15,6 +18,7 @@ import {
 } from '@/lib/organizations/organization-group-policy-context.server';
 
 export type EffectiveOrganizationModelPolicy = {
+  requireModelInCurrentSnapshot: boolean;
   organizationModelDenyList: string[];
   organizationProviderCeiling?: string[];
   memberGrant:
@@ -47,9 +51,9 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
-
   if (!organizationRestrictionsEnabled) {
     return {
+      requireModelInCurrentSnapshot: false,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -63,6 +67,7 @@ export function evaluateEffectiveModelAccessPolicy(
     .filter(policy => policy.type === 'model_access');
   if (policies.length === 0 || policies.some(policy => policy.data.mode === 'all')) {
     return {
+      requireModelInCurrentSnapshot: true,
       organizationModelDenyList,
       organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
@@ -73,6 +78,7 @@ export function evaluateEffectiveModelAccessPolicy(
 
   const selectedPolicies = policies.filter(policy => policy.data.mode === 'selected');
   return {
+    requireModelInCurrentSnapshot: true,
     organizationModelDenyList,
     organizationProviderCeiling,
     memberGrant: {
@@ -105,7 +111,21 @@ export async function getEffectiveModelDecision(
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
-  if (policy.organizationModelDenyList.includes(normalizedModelId)) {
+  if (await isModelRestrictionExempt(modelId)) {
+    return { allowed: true };
+  }
+  // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
+  const latestAlias = isLatestModelAlias(normalizedModelId);
+  if (!latestAlias && policy.organizationModelDenyList.includes(normalizedModelId)) {
+    return { allowed: false, denialSource: 'organization_model' };
+  }
+  const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
+  const currentModelProviders =
+    exclusiveProviders ??
+    (policy.requireModelInCurrentSnapshot && !latestAlias
+      ? await providerLookup(normalizedModelId)
+      : undefined);
+  if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
   }
   const organizationRoutes = policy.organizationProviderCeiling
@@ -114,9 +134,15 @@ export async function getEffectiveModelDecision(
 
   async function decisionWithinOrganizationCeiling(): Promise<EffectiveModelDecision> {
     if (!organizationRoutes) return { allowed: true };
-    const modelProviders = await providerLookup(normalizedModelId);
+    if (latestAlias) {
+      // Aliases have no snapshot endpoints, so pass the ceiling through to provider.only.
+      return organizationRoutes.size > 0
+        ? { allowed: true, eligibleProviderRoutes: organizationRoutes }
+        : { allowed: false, denialSource: 'organization_provider' };
+    }
+    const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
     if (modelProviders.size === 0) {
-      return { allowed: true, eligibleProviderRoutes: organizationRoutes };
+      return { allowed: false, denialSource: 'organization_model' };
     }
     const eligibleProviderRoutes = new Set(
       [...modelProviders].filter(provider => organizationRoutes.has(provider))
@@ -135,7 +161,9 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.providerAllowList.length === 0) {
     return { allowed: false, denialSource: 'no_grant' };
   }
-  const modelProviders = await providerLookup(normalizedModelId);
+  const modelProviders = latestAlias
+    ? new Set(policy.memberGrant.providerAllowList)
+    : (currentModelProviders ?? (await providerLookup(normalizedModelId)));
   if (modelProviders.size === 0) {
     return { allowed: false, denialSource: 'group_provider' };
   }

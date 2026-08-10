@@ -19,6 +19,10 @@ export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains')
 
 export const VERCEL_ROUTING_REDIS_KEY = redisKey('ai-gateway:vercel-routing-percentage');
 
+export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(
+  'ai-gateway:sync-providers:last-completed-at'
+);
+
 export const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: redisKey('ai-gateway.metadata:all-providers'),
   // Lightweight lists of language model ids used for existence checks without

@@ -32,6 +32,7 @@ import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { isLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
@@ -476,7 +477,11 @@ export function checkOrganizationModelRestrictions(params: {
   // Model/provider access restrictions only apply to Enterprise plans.
   if (params.organizationPlan === 'enterprise') {
     const modelDenyList = params.settings.model_deny_list;
-    if (modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)) {
+    // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
+    if (
+      !isLatestModelAlias(normalizedModelId) &&
+      modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)
+    ) {
       return { error: modelNotAllowedResponse() };
     }
   }

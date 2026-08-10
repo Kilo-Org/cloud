@@ -2,6 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import {
   autoFreeModels,
   findKiloExclusiveModel,
+  getKiloExclusiveInferenceProviderRestriction,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   selectAutoFreeCandidate,
@@ -16,6 +17,7 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
+import { deepseek_v4_pro_discounted_model } from './providers/deepseek';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
@@ -336,5 +338,29 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
     expect(
       shouldRedactModelNameInMicrodollarUsage('openrouter', claude_opus_4_7_stealth_model.public_id)
     ).toBe(true);
+  });
+});
+
+describe('getKiloExclusiveInferenceProviderRestriction', () => {
+  test('returns the routing allow-list for restricted exclusive models', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(deepseek_v4_pro_discounted_model.public_id)
+    ).toEqual(new Set(['deepseek']));
+    expect(getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)).toEqual(
+      new Set(['tencent'])
+    );
+  });
+
+  test('does not treat unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_stealth_model.public_id)
+    ).toBeUndefined();
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
+    ).toBeUndefined();
+    expect(
+      getKiloExclusiveInferenceProviderRestriction('deepseek/deepseek-v4-pro')
+    ).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviderRestriction('unknown/model')).toBeUndefined();
   });
 });

@@ -2757,7 +2757,11 @@ export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
+  encrypted_api_key: jsonb().$type<EncryptedData>(),
 });
+
+export type CustomLlm2 = typeof custom_llm2.$inferSelect;
+export type NewCustomLlm2 = typeof custom_llm2.$inferInsert;
 
 export const user_admin_notes = pgTable(
   'user_admin_notes',

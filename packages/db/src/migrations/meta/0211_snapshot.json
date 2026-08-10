@@ -1,6 +1,6 @@
 {
-  "id": "0c4ef4f4-59b7-413c-9e2f-07c4d9de8c6e",
-  "prevId": "bb10f073-b973-4877-93b2-a8a8f48c5418",
+  "id": "b39d704e-acae-4e84-8bc7-50bde1ea73ae",
+  "prevId": "0c4ef4f4-59b7-413c-9e2f-07c4d9de8c6e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -35457,7 +35457,7 @@
       "checkConstraints": {
         "user_data_export_object_deletions_reason_check": {
           "name": "user_data_export_object_deletions_reason_check",
-          "value": "\"user_data_export_object_deletions\".\"reason\" = 'account_deletion'"
+          "value": "\"user_data_export_object_deletions\".\"reason\" IN ('account_deletion', 'admin_cancel', 'admin_replace')"
         },
         "user_data_export_object_deletions_attempt_count_nonnegative": {
           "name": "user_data_export_object_deletions_attempt_count_nonnegative",

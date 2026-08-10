@@ -24,6 +24,18 @@ export function hasMiddleOutTransform(request: GatewayRequest) {
   );
 }
 
+function findEnvironmentDetailsCacheTargetIndex(
+  content: ReadonlyArray<{ type: string; text?: string }>
+) {
+  const environmentDetailsIndex = content.findIndex(
+    (item, index) =>
+      index > 0 &&
+      (item.type === 'text' || item.type === 'input_text') &&
+      item.text?.startsWith('<environment_details>')
+  );
+  return environmentDetailsIndex > 0 ? environmentDetailsIndex - 1 : undefined;
+}
+
 function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
   if (typeof message.content === 'string') {
     message.content = [
@@ -35,30 +47,50 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
       },
     ];
   } else if (Array.isArray(message.content)) {
-    const lastItem = message.content.at(-1);
-    if (lastItem) {
+    const cacheTargetIndex =
+      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
+    const cacheTarget =
+      cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+    if (cacheTarget) {
       // @ts-expect-error non-standard extension
-      lastItem.cache_control = { type: 'ephemeral' };
+      cacheTarget.cache_control = { type: 'ephemeral' };
     }
   }
 }
 
-function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
-  if (message.type === 'message') {
+const RESPONSES_PROMPT_CACHE_BREAKPOINT: OpenAI.Responses.ResponseInputText.PromptCacheBreakpoint =
+  {
+    mode: 'explicit',
+  };
+
+function isResponsesInputMessage(
+  message: OpenAI.Responses.ResponseInputItem
+): message is OpenAI.Responses.EasyInputMessage | OpenAI.Responses.ResponseInputItem.Message {
+  return (
+    message.type === 'message' &&
+    (message.role === 'user' || message.role === 'system' || message.role === 'developer')
+  );
+}
+
+function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.ResponseInputItem) {
+  if (isResponsesInputMessage(message)) {
     if (typeof message.content === 'string') {
       message.content = [
         {
           type: 'input_text',
           text: message.content,
-          // @ts-expect-error non-standard extension
-          cache_control: { type: 'ephemeral' },
+          prompt_cache_breakpoint: RESPONSES_PROMPT_CACHE_BREAKPOINT,
         },
       ];
-    } else {
-      const lastItem = message.content.at(-1);
-      if (lastItem) {
-        // @ts-expect-error non-standard extension
-        lastItem.cache_control = { type: 'ephemeral' };
+    } else if (Array.isArray(message.content)) {
+      const cacheTargetIndex =
+        message.role === 'user'
+          ? findEnvironmentDetailsCacheTargetIndex(message.content)
+          : undefined;
+      const cacheTarget =
+        cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+      if (cacheTarget) {
+        cacheTarget.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
     }
   } else if (message.type === 'function_call_output') {
@@ -67,15 +99,13 @@ function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInp
         {
           type: 'input_text',
           text: message.output,
-          // @ts-expect-error non-standard extension
-          cache_control: { type: 'ephemeral' },
+          prompt_cache_breakpoint: RESPONSES_PROMPT_CACHE_BREAKPOINT,
         },
       ];
-    } else {
+    } else if (Array.isArray(message.output)) {
       const lastItem = message.output.at(-1);
       if (lastItem) {
-        // @ts-expect-error non-standard extension
-        lastItem.cache_control = { type: 'ephemeral' };
+        lastItem.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
     }
   }
@@ -94,9 +124,19 @@ function setCacheControlOnMessagesMessage(
       },
     ];
   } else {
-    const lastItem = message.content.findLast(isCacheableMessagesContentBlock);
-    if (lastItem) {
-      lastItem.cache_control = cacheControl;
+    const environmentDetailsCacheTargetIndex =
+      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
+    const environmentDetailsCacheTarget =
+      environmentDetailsCacheTargetIndex === undefined
+        ? undefined
+        : message.content[environmentDetailsCacheTargetIndex];
+    const cacheTarget =
+      environmentDetailsCacheTarget &&
+      isCacheableMessagesContentBlock(environmentDetailsCacheTarget)
+        ? environmentDetailsCacheTarget
+        : message.content.findLast(isCacheableMessagesContentBlock);
+    if (cacheTarget) {
+      cacheTarget.cache_control = cacheControl;
     }
   }
 }
@@ -127,28 +167,10 @@ function containsCacheControl(value: unknown): boolean {
   if (!isObjectRecord(value)) {
     return false;
   }
-  if (Object.hasOwn(value, 'cache_control')) {
+  if (Object.hasOwn(value, 'cache_control') || Object.hasOwn(value, 'prompt_cache_breakpoint')) {
     return true;
   }
   return Object.values(value).some(containsCacheControl);
-}
-
-function deleteCacheControl(value: unknown): void {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      deleteCacheControl(item);
-    }
-    return;
-  }
-  if (!isObjectRecord(value)) {
-    return;
-  }
-  if (Object.hasOwn(value, 'cache_control')) {
-    delete value.cache_control;
-  }
-  for (const item of Object.values(value)) {
-    deleteCacheControl(item);
-  }
 }
 
 export function addCacheBreakpoints(request: GatewayRequest) {
@@ -185,7 +207,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     );
     if (systemMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
-      setCacheControlOnResponsesMessage(systemMessage);
+      setPromptCacheBreakpointOnResponsesMessage(systemMessage);
     }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
@@ -194,7 +216,7 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       console.debug(
         `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
       );
-      setCacheControlOnResponsesMessage(lastMessage);
+      setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
   } else if (
     request.kind === 'messages' &&
@@ -209,20 +231,6 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       delete request.body.cache_control;
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
-  }
-}
-
-export function removeCacheBreakpoints(request: GatewayRequest) {
-  if (request.kind === 'chat_completions' && Array.isArray(request.body.messages)) {
-    console.debug('[removeCacheBreakpoints] removing cache breakpoints from chat completions');
-    deleteCacheControl(request.body.messages);
-  } else if (request.kind === 'responses' && Array.isArray(request.body.input)) {
-    console.debug('[removeCacheBreakpoints] removing cache breakpoints from responses request');
-    deleteCacheControl(request.body.input);
-  } else if (request.kind === 'messages') {
-    console.debug('[removeCacheBreakpoints] removing cache breakpoints from messages request');
-    delete request.body.cache_control;
-    deleteCacheControl(request.body.messages);
   }
 }
 
@@ -254,35 +262,6 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
     }
     if ('reasoning_details' in message) {
       delete message.reasoning_details;
-    }
-  }
-}
-
-export function injectReasoningIntoContent(request: GatewayRequest) {
-  if (request.kind !== 'chat_completions') {
-    return;
-  }
-  for (const message of request.body.messages) {
-    if (message.role !== 'assistant') {
-      continue;
-    }
-
-    const reasoning =
-      'reasoning' in message && typeof message.reasoning === 'string'
-        ? message.reasoning
-        : 'reasoning_content' in message && typeof message.reasoning_content === 'string'
-          ? message.reasoning_content
-          : '';
-
-    if (reasoning) {
-      if (Array.isArray(message.content)) {
-        message.content.splice(0, 0, { type: 'text', text: `<think>${reasoning}</think>` });
-      } else {
-        message.content = `<think>${reasoning}</think>${message.content}`;
-      }
-      if ('reasoning' in message) delete message.reasoning;
-      if ('reasoning_content' in message) delete message.reasoning_content;
-      if ('reasoning_details' in message) delete message.reasoning_details;
     }
   }
 }

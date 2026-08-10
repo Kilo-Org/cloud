@@ -1002,9 +1002,6 @@ importers:
       google-auth-library:
         specifier: 10.6.2
         version: 10.6.2
-      headroom-ai:
-        specifier: ^0.22.4
-        version: 0.22.4(@ai-sdk/provider@4.0.3)(@anthropic-ai/sdk@0.104.1(zod@4.4.3))(ai@7.0.29(zod@4.4.3))(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3))
       jotai:
         specifier: 2.18.1
         version: 2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
@@ -13418,24 +13415,6 @@ packages:
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
-
-  headroom-ai@0.22.4:
-    resolution: {integrity: sha512-9a0rgB/jsWe8gs/ggyUwe6E8DYwKAuBvlUml2ApwlUjb5EfJ611X6X+WG0SiXw3nO6sdyV1/+Ah5uw9P7ecnjw==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      '@ai-sdk/provider': '>=1.0.0'
-      '@anthropic-ai/sdk': '>=0.30.0'
-      ai: '>=6.0.0'
-      openai: '>=4.0.0'
-    peerDependenciesMeta:
-      '@ai-sdk/provider':
-        optional: true
-      '@anthropic-ai/sdk':
-        optional: true
-      ai:
-        optional: true
-      openai:
-        optional: true
 
   hermes-compiler@250829098.0.16:
     resolution: {integrity: sha512-xsgzk+mUyvt9t1nUbF8USBlYxajTUtPJhVZ86q85s/SEoMKCF+52YZcudb0ENSnV3T3lV9mgB3s6R7+pH90zgw==}
@@ -30649,13 +30628,6 @@ snapshots:
       '@types/hast': 3.0.4
 
   he@1.2.0: {}
-
-  headroom-ai@0.22.4(@ai-sdk/provider@4.0.3)(@anthropic-ai/sdk@0.104.1(zod@4.4.3))(ai@7.0.29(zod@4.4.3))(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)):
-    optionalDependencies:
-      '@ai-sdk/provider': 4.0.3
-      '@anthropic-ai/sdk': 0.104.1(zod@4.4.3)
-      ai: 7.0.29(zod@4.4.3)
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
 
   hermes-compiler@250829098.0.16: {}
 

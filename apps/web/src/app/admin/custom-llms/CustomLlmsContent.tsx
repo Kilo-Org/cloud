@@ -25,8 +25,8 @@ import {
   useUpsertCustomLlm,
   useDeleteCustomLlm,
 } from '@/app/admin/api/custom-llms/hooks';
-import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
-import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
@@ -35,11 +35,13 @@ import { Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
+const StrictCustomLlmCredentialsSchema = deepStrict(CustomLlmCredentialsSchema);
 
 type EditorState = {
   open: boolean;
   mode: 'create' | 'edit';
   publicId: string;
+  credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
 };
@@ -50,14 +52,19 @@ const INITIAL_DEFINITION: CustomLlmDefinition = {
   context_length: 0,
   max_completion_tokens: 0,
   base_url: '',
-  api_key: '',
   organization_ids: [],
+};
+
+const INITIAL_CREDENTIALS: CustomLlmCredentials = {
+  type: 'api_key',
+  api_key: '',
 };
 
 const initialEditorState: EditorState = {
   open: false,
   mode: 'create',
   publicId: '',
+  credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
 };
@@ -73,6 +80,7 @@ export function CustomLlmsContent() {
       open: true,
       mode: 'create',
       publicId: '',
+      credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
     });
@@ -83,6 +91,7 @@ export function CustomLlmsContent() {
       open: true,
       mode: 'edit',
       publicId,
+      credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
     });
@@ -107,24 +116,56 @@ export function CustomLlmsContent() {
       return;
     }
 
-    let parsed: unknown;
+    let parsedCredentials: CustomLlmCredentials | undefined = undefined;
+    const trimmedCredentialsJson = editor.credentialsJson.trim();
+
+    if (trimmedCredentialsJson) {
+      let rawCredentials: unknown;
+      try {
+        rawCredentials = JSON.parse(trimmedCredentialsJson);
+      } catch {
+        setEditor(prev => ({ ...prev, validationError: 'Invalid credentials JSON syntax' }));
+        return;
+      }
+
+      const credResult = StrictCustomLlmCredentialsSchema.safeParse(rawCredentials);
+      if (!credResult.success) {
+        setEditor(prev => ({
+          ...prev,
+          validationError: `Credentials error: ${formatZodError(credResult.error)}`,
+        }));
+        return;
+      }
+      parsedCredentials = credResult.data;
+    }
+
+    let parsedDefinition: unknown;
     try {
-      parsed = JSON.parse(editor.definitionJson);
+      parsedDefinition = JSON.parse(editor.definitionJson);
     } catch {
-      setEditor(prev => ({ ...prev, validationError: 'Invalid JSON syntax' }));
+      setEditor(prev => ({ ...prev, validationError: 'Invalid definition JSON syntax' }));
       return;
     }
 
-    const result = StrictCustomLlmDefinitionSchema.safeParse(parsed);
-    if (!result.success) {
-      setEditor(prev => ({ ...prev, validationError: formatZodError(result.error) }));
+    const defResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    if (!defResult.success) {
+      setEditor(prev => ({ ...prev, validationError: formatZodError(defResult.error) }));
+      return;
+    }
+
+    if (editor.mode === 'create' && !parsedCredentials) {
+      setEditor(prev => ({
+        ...prev,
+        validationError: 'Credentials (JSON) are required when creating a custom LLM',
+      }));
       return;
     }
 
     try {
       await upsertMutation.mutateAsync({
         public_id: trimmedPublicId,
-        definition: result.data,
+        definition: defResult.data,
+        credentials: parsedCredentials,
       });
       toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
       closeEditor();
@@ -157,9 +198,9 @@ export function CustomLlmsContent() {
 
       <p className="text-muted-foreground">
         Manage custom LLM definitions stored in the <code>custom_llm2</code> table. Each entry has a{' '}
-        <code>public_id</code> and a JSON <code>definition</code> that is validated against{' '}
-        <code>CustomLlmDefinitionSchema</code>. Authentication requires either <code>api_key</code>{' '}
-        or a standard Google Cloud service-account JSON key in <code>google_service_account</code>.
+        <code>public_id</code>, encrypted credentials (such as API keys or Google Cloud
+        service-account keys), and a JSON <code>definition</code> validated against{' '}
+        <code>CustomLlmDefinitionSchema</code>.
       </p>
 
       {isLoading ? (
@@ -241,10 +282,45 @@ export function CustomLlmsContent() {
             </div>
 
             <div>
+              <div className="flex items-center justify-between">
+                <Label>Credentials (JSON)</Label>
+                {editor.mode === 'edit' && (
+                  <span className="text-muted-foreground text-xs">
+                    (optional: leave empty to keep existing encrypted credentials)
+                  </span>
+                )}
+              </div>
+              <div className="border-input mt-1 overflow-hidden rounded-md border">
+                <Editor
+                  height="160px"
+                  defaultLanguage="json"
+                  value={editor.credentialsJson}
+                  onChange={(value: string | undefined) =>
+                    setEditor(prev => ({
+                      ...prev,
+                      credentialsJson: value ?? '',
+                      validationError: null,
+                    }))
+                  }
+                  theme="vs-dark"
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: 2,
+                    formatOnPaste: true,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
               <Label>Definition (JSON)</Label>
               <div className="border-input mt-1 overflow-hidden rounded-md border">
                 <Editor
-                  height="400px"
+                  height="340px"
                   defaultLanguage="json"
                   value={editor.definitionJson}
                   onChange={(value: string | undefined) =>

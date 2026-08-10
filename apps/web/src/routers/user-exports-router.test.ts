@@ -86,7 +86,7 @@ describe('user exports router guards and serialization', () => {
     );
   });
 
-  it('uses the fixed August 3 UTC data cutoff for new exports', async () => {
+  it('uses the fixed August 2 08:40 UTC data cutoff for new exports', async () => {
     const caller = await createCallerForUser(owner.id);
 
     const requested = await caller.userExports.request();
@@ -95,7 +95,7 @@ describe('user exports router guards and serialization', () => {
       .from(user_data_exports)
       .where(eq(user_data_exports.id, requested.id));
 
-    expect(new Date(row.snapshotAt).toISOString()).toBe('2026-08-03T00:00:00.000Z');
+    expect(new Date(row.snapshotAt).toISOString()).toBe('2026-08-02T08:40:00.000Z');
   });
 
   it('allows an immediate fresh request after a failed export', async () => {
@@ -124,6 +124,29 @@ describe('user exports router guards and serialization', () => {
         { id: requested.id, status: 'queued' },
       ])
     );
+  });
+
+  it('allows a fresh request when a ready export exists but is past the throttle window', async () => {
+    const pastThrottle = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const [ready] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: owner.id,
+        snapshot_at: pastThrottle,
+        status: 'ready',
+        r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
+        size_bytes: 1,
+        requested_at: pastThrottle,
+        completed_at: pastThrottle,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .returning({ id: user_data_exports.id });
+
+    const requested = await (await createCallerForUser(owner.id)).userExports.request();
+
+    // A still-downloadable ready export must not short-circuit a new request.
+    expect(requested.id).not.toBe(ready.id);
+    expect(requested.status).toBe('queued');
   });
 
   it('does not authorize another user or an expired export for download', async () => {

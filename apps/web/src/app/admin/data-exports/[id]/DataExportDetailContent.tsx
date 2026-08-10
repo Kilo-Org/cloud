@@ -496,18 +496,25 @@ export function DataExportDetailContent({ exportId }: { exportId: string }) {
 
   if (detailQuery.isError) {
     const isNotFound = detailQuery.error.data?.code === 'NOT_FOUND';
+    const isInvalidId = detailQuery.error.data?.code === 'BAD_REQUEST';
     return (
       <div className="flex w-full flex-col gap-6">
         <h2 className="text-2xl font-bold">Data export {shortId(exportId)}</h2>
         <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>
-            {isNotFound ? 'Data export not found' : 'Data export could not load'}
+            {isNotFound
+              ? 'Data export not found'
+              : isInvalidId
+                ? 'Invalid export ID'
+                : 'Data export could not load'}
           </AlertTitle>
           <AlertDescription>
             {isNotFound
               ? 'No export with this ID exists. Check the ID or return to the export list.'
-              : detailQuery.error.message || 'Refresh the page to try again.'}
+              : isInvalidId
+                ? 'The export ID in this URL is not a valid UUID.'
+                : detailQuery.error.message || 'Refresh the page to try again.'}
           </AlertDescription>
         </Alert>
         <Button variant="secondary" size="sm" className="h-fit w-fit" asChild>

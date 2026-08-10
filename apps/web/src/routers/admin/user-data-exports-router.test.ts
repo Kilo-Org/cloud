@@ -22,6 +22,7 @@ describe('adminUserDataExportsRouter', () => {
   let admin: User;
   let regularUser: User;
   let owner: User;
+  let leaseLessOwner: User;
   let recoveryOwner: User;
   let exportIds: string[] = [];
   let deletionKeys: string[] = [];
@@ -38,6 +39,9 @@ describe('adminUserDataExportsRouter', () => {
     owner = await insertTestUser({
       google_user_email: `data-export-health-owner-${suffix}@example.com`,
       google_user_name: 'Export Owner',
+    });
+    leaseLessOwner = await insertTestUser({
+      google_user_email: `data-export-lease-less-owner-${suffix}@example.com`,
     });
     recoveryOwner = await insertTestUser({
       google_user_email: `data-export-recovery-owner-${suffix}@example.com`,
@@ -61,7 +65,7 @@ describe('adminUserDataExportsRouter', () => {
           requested_at: new Date(now - 3_600_000).toISOString(),
         },
         {
-          kilo_user_id: owner.id,
+          kilo_user_id: leaseLessOwner.id,
           status: 'processing',
           snapshot_at: new Date(now - 86_400_000).toISOString(),
           current_source: 'kilocode_users',
@@ -89,12 +93,26 @@ describe('adminUserDataExportsRouter', () => {
           email_lease_expires_at: new Date(now - 60_000).toISOString(),
           requested_at: new Date(now - 1_500_000).toISOString(),
         },
+        {
+          kilo_user_id: owner.id,
+          status: 'processing',
+          snapshot_at: new Date(now - 86_400_000).toISOString(),
+          dispatch_generation: 0,
+          lease_token: null,
+          lease_expires_at: null,
+          requested_at: new Date(now - 900_000).toISOString(),
+          started_at: new Date(now - 850_000).toISOString(),
+        },
       ])
       .returning({ id: user_data_exports.id, status: user_data_exports.status });
     exportIds = rows.map(row => row.id);
     const processing = rows.find(row => row.status === 'processing');
     const failed = rows.find(row => row.status === 'failed');
-    if (!processing || !failed) throw new Error('Expected export fixtures');
+    const processingWithoutLease = rows.find(
+      row => row.status === 'processing' && row.id !== processing?.id
+    );
+    if (!processing || !failed || !processingWithoutLease)
+      throw new Error('Expected export fixtures');
     await db.insert(user_data_export_outbox).values([
       {
         export_id: processing.id,
@@ -106,6 +124,11 @@ describe('adminUserDataExportsRouter', () => {
         export_id: failed.id,
         generation: 0,
         sent_at: new Date(now - 3_500_000).toISOString(),
+      },
+      {
+        export_id: processingWithoutLease.id,
+        generation: 0,
+        sent_at: new Date(now - 800_000).toISOString(),
       },
     ]);
     await db.insert(user_data_export_parts).values({
@@ -131,7 +154,15 @@ describe('adminUserDataExportsRouter', () => {
   afterAll(async () => {
     await db
       .delete(kilocode_users)
-      .where(inArray(kilocode_users.id, [admin.id, regularUser.id, owner.id, recoveryOwner.id]));
+      .where(
+        inArray(kilocode_users.id, [
+          admin.id,
+          regularUser.id,
+          owner.id,
+          leaseLessOwner.id,
+          recoveryOwner.id,
+        ])
+      );
   });
 
   it('requires admin access', async () => {
@@ -164,8 +195,8 @@ describe('adminUserDataExportsRouter', () => {
     const result = await (await createCallerForUser(admin.id)).admin.userDataExports.summary();
 
     expect(result).toMatchObject({
-      active: 1,
-      needsAttention: 3,
+      active: 2,
+      needsAttention: 4,
       staleLeases: 1,
       pendingDispatches: 1,
       failed: 1,
@@ -184,8 +215,8 @@ describe('adminUserDataExportsRouter', () => {
       search: owner.google_user_email,
     });
 
-    expect(all.pagination.total).toBe(3);
-    expect(all.rows).toHaveLength(3);
+    expect(all.pagination.total).toBe(4);
+    expect(all.rows).toHaveLength(4);
     expect(all.rows.map(row => row.health.severity)).toEqual(
       expect.arrayContaining(['error', 'degraded'])
     );
@@ -197,6 +228,27 @@ describe('adminUserDataExportsRouter', () => {
       email: 'retry_due',
       reasons: expect.arrayContaining(['email_retry_due']),
     });
+    expect(
+      all.rows.find(row => row.status === 'processing' && row.health.execution === 'inconsistent')
+        ?.health
+    ).toMatchObject({
+      severity: 'error',
+      dispatch: 'published',
+      reasons: expect.arrayContaining(['processing_without_lease']),
+    });
+  });
+
+  it('normalizes out-of-range pages to the first page', async () => {
+    const result = await (
+      await createCallerForUser(admin.id)
+    ).admin.userDataExports.list({
+      health: 'all',
+      page: 10_000,
+      limit: 2,
+    });
+
+    expect(result.pagination).toMatchObject({ page: 1, limit: 2, total: 4, totalPages: 2 });
+    expect(result.rows).toHaveLength(2);
   });
 
   it('returns legacy part aggregates, outbox history, and redacted failure details', async () => {

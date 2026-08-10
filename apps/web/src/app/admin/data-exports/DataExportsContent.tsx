@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertCircle, RefreshCw, Search, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
@@ -66,32 +66,50 @@ export function DataExportsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const filters = parseDataExportFilters(searchParams);
+  const desiredFiltersRef = useRef(filters);
+  const pendingQueryRef = useRef<string | null>(null);
+  const [isNavigationLocked, setIsNavigationLocked] = useState(false);
+  const [isNavigationPending, startNavigation] = useTransition();
 
   const [searchDraft, setSearchDraft] = useState(filters.search ?? '');
   useEffect(() => {
-    setSearchDraft(filters.search ?? '');
-  }, [filters.search]);
+    desiredFiltersRef.current = filters;
+  }, [filters.emailStatus, filters.health, filters.page, filters.search, filters.status]);
+  useEffect(() => {
+    if (pendingQueryRef.current === null || pendingQueryRef.current !== searchParams.toString())
+      return;
+    pendingQueryRef.current = null;
+    setIsNavigationLocked(false);
+  }, [searchParams]);
+  useEffect(() => setSearchDraft(filters.search ?? ''), [filters.search]);
 
   const summaryQuery = useQuery(trpc.admin.userDataExports.summary.queryOptions());
-  const listQuery = useQuery(
-    trpc.admin.userDataExports.list.queryOptions({
+  const listQuery = useQuery({
+    ...trpc.admin.userDataExports.list.queryOptions({
       page: filters.page,
       limit: PAGE_SIZE,
       health: filters.health,
       status: filters.status,
       emailStatus: filters.emailStatus,
       search: filters.search,
-    })
-  );
+    }),
+    placeholderData: keepPreviousData,
+  });
 
   const updateFilters = useCallback(
     (next: Partial<DataExportFilters>) => {
-      const merged: DataExportFilters = { ...filters, ...next };
+      const merged: DataExportFilters = { ...desiredFiltersRef.current, ...next };
+      desiredFiltersRef.current = merged;
       const params = applyDataExportFilters(searchParams, merged);
       const queryString = params.toString();
-      router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+      if (queryString === searchParams.toString()) return;
+      pendingQueryRef.current = queryString;
+      setIsNavigationLocked(true);
+      startNavigation(() => {
+        router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+      });
     },
-    [filters, pathname, router, searchParams]
+    [pathname, router, searchParams]
   );
 
   const updateFilterAndResetPage = useCallback(
@@ -122,6 +140,40 @@ export function DataExportsContent() {
   const rows = listQuery.data?.rows ?? [];
   const pagination = listQuery.data?.pagination;
   const asOf = listQuery.data?.asOf ?? summaryQuery.data?.asOf;
+  const normalizedPage = pagination?.page;
+
+  useEffect(() => {
+    if (
+      normalizedPage === undefined ||
+      normalizedPage === filters.page ||
+      listQuery.isFetching ||
+      listQuery.isPlaceholderData ||
+      isNavigationPending
+    )
+      return;
+    const normalized = { ...filters, page: normalizedPage };
+    desiredFiltersRef.current = normalized;
+    const params = applyDataExportFilters(searchParams, normalized);
+    const queryString = params.toString();
+    if (queryString === searchParams.toString()) return;
+    pendingQueryRef.current = queryString;
+    setIsNavigationLocked(true);
+    startNavigation(() => {
+      router.replace(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    });
+  }, [
+    filters,
+    isNavigationPending,
+    listQuery.isFetching,
+    listQuery.isPlaceholderData,
+    normalizedPage,
+    pathname,
+    router,
+    searchParams,
+  ]);
+
+  const controlsDisabled = isNavigationLocked || isNavigationPending;
+  const currentPage = pagination?.page ?? filters.page;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -166,6 +218,7 @@ export function DataExportsContent() {
             </Label>
             <Select
               value={filters.health}
+              disabled={controlsDisabled}
               onValueChange={value =>
                 updateFilterAndResetPage({ health: parseHealthFilter(value) })
               }
@@ -188,6 +241,7 @@ export function DataExportsContent() {
             </Label>
             <Select
               value={filters.status ?? 'any'}
+              disabled={controlsDisabled}
               onValueChange={value =>
                 updateFilterAndResetPage({ status: parseStatusFilter(value) })
               }
@@ -210,6 +264,7 @@ export function DataExportsContent() {
             </Label>
             <Select
               value={filters.emailStatus ?? 'any'}
+              disabled={controlsDisabled}
               onValueChange={value =>
                 updateFilterAndResetPage({ emailStatus: parseEmailStatusFilter(value) })
               }
@@ -241,15 +296,29 @@ export function DataExportsContent() {
               onChange={event => setSearchDraft(event.target.value)}
               placeholder="Export ID, user ID, or email"
               maxLength={MAX_SEARCH_LENGTH}
+              disabled={controlsDisabled}
               className="w-full sm:w-72"
             />
           </div>
           <div className="flex gap-2">
-            <Button type="submit" variant="secondary" size="sm" className="h-9">
+            <Button
+              type="submit"
+              variant="secondary"
+              size="sm"
+              className="h-9"
+              disabled={controlsDisabled}
+            >
               <Search /> Search
             </Button>
             {filters.search || searchDraft ? (
-              <Button type="button" variant="ghost" size="sm" className="h-9" onClick={clearSearch}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9"
+                onClick={clearSearch}
+                disabled={controlsDisabled}
+              >
                 <X /> Clear
               </Button>
             ) : null}
@@ -270,6 +339,11 @@ export function DataExportsContent() {
         </Alert>
       ) : (
         <>
+          {listQuery.isFetching && !listQuery.isLoading ? (
+            <p className="text-muted-foreground flex items-center gap-2 text-xs" role="status">
+              <RefreshCw className="size-3 animate-spin" /> Updating results…
+            </p>
+          ) : null}
           <DataExportsTable rows={rows} asOf={asOf} isLoading={listQuery.isLoading} />
           <div className="flex flex-col items-start justify-between gap-3 text-sm sm:flex-row sm:items-center">
             <p className="text-muted-foreground">
@@ -281,17 +355,20 @@ export function DataExportsContent() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => updateFilters({ page: Math.max(1, filters.page - 1) })}
-                disabled={filters.page <= 1 || listQuery.isFetching}
+                onClick={() => updateFilters({ page: Math.max(1, currentPage - 1) })}
+                disabled={currentPage <= 1 || listQuery.isFetching || controlsDisabled}
               >
                 Previous
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => updateFilters({ page: filters.page + 1 })}
+                onClick={() => updateFilters({ page: currentPage + 1 })}
                 disabled={
-                  !pagination || filters.page >= pagination.totalPages || listQuery.isFetching
+                  !pagination ||
+                  currentPage >= pagination.totalPages ||
+                  listQuery.isFetching ||
+                  controlsDisabled
                 }
               >
                 Next

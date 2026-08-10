@@ -74,16 +74,22 @@ function DataExportRow({ row, asOf }: { row: DataExportListRow; asOf: string | u
           {humanizeToken(row.status)}
         </Badge>
       </TableCell>
-      <TableCell className="min-w-44 text-sm">
+      <TableCell className="w-56 max-w-56 text-sm">
         <div className="flex flex-col gap-0.5">
           <Link
-            className="text-link hover:text-link-hover rounded-sm underline decoration-current/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="text-link hover:text-link-hover block max-w-56 truncate rounded-sm underline decoration-current/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             href={`/admin/users/${encodeURIComponent(row.user.id)}`}
+            title={row.user.email}
           >
             {row.user.email}
           </Link>
           {row.user.name ? (
-            <span className="text-muted-foreground text-xs">{row.user.name}</span>
+            <span
+              className="text-muted-foreground block max-w-56 truncate text-xs"
+              title={row.user.name}
+            >
+              {row.user.name}
+            </span>
           ) : null}
         </div>
       </TableCell>

@@ -166,6 +166,28 @@ describe('DataExportsTable', () => {
     expect(html).toContain('clear the search');
   });
 
+  it('bounds long user values while preserving the full text in titles', () => {
+    const longEmail = `${'long-user-'.repeat(10)}@example.com`;
+    const longName = 'Very long operator-visible user name '.repeat(4);
+    const html = renderToStaticMarkup(
+      React.createElement(DataExportsTable, {
+        rows: [
+          {
+            ...healthyRow,
+            user: { ...healthyRow.user, email: longEmail, name: longName },
+          },
+        ],
+        asOf: summaryFixture.asOf,
+        isLoading: false,
+      })
+    );
+
+    expect(html).toContain('w-56 max-w-56');
+    expect(html).toContain(`title="${longEmail}"`);
+    expect(html).toContain(`title="${longName}"`);
+    expect(html).toContain('truncate');
+  });
+
   it('renders skeleton rows while loading without rows', () => {
     const html = renderToStaticMarkup(
       React.createElement(DataExportsTable, {

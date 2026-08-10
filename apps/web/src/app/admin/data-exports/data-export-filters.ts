@@ -18,6 +18,7 @@ export type DataExportFilters = {
 
 export const DEFAULT_HEALTH_FILTER: DataExportHealthFilter = 'needs_attention';
 export const MAX_SEARCH_LENGTH = 320;
+export const MAX_PAGE = 10_000;
 
 const HEALTH_FILTERS: readonly DataExportHealthFilter[] = [
   'needs_attention',
@@ -41,8 +42,9 @@ const EMAIL_STATUS_FILTERS: readonly DataExportEmailStatusFilter[] = [
 ];
 
 export function parsePage(value: string | null): number {
-  const page = Number.parseInt(value ?? '', 10);
-  return Number.isFinite(page) && page > 0 ? page : 1;
+  if (!value || !/^\d+$/.test(value)) return 1;
+  const page = Number.parseInt(value, 10);
+  return Number.isFinite(page) && page > 0 ? Math.min(page, MAX_PAGE) : 1;
 }
 
 export function parseHealthFilter(value: string | null): DataExportHealthFilter {

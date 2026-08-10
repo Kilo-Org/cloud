@@ -22,8 +22,9 @@ const ExportStatusSchema = z.enum([
 ]);
 const EmailStatusSchema = z.enum(['pending', 'sending', 'sent', 'failed']);
 const HealthFilterSchema = z.enum(['needs_attention', 'active', 'terminal', 'all']);
+const MAX_PAGE = 10_000;
 const ListInputSchema = z.object({
-  page: z.number().int().positive().default(1),
+  page: z.number().int().min(1).max(MAX_PAGE).default(1),
   limit: z.number().int().min(1).max(100).default(25),
   health: HealthFilterSchema.default('needs_attention'),
   status: ExportStatusSchema.optional(),
@@ -284,6 +285,7 @@ const needsAttentionSql = sql`
     )
     OR (e.status NOT IN ('queued', 'processing', 'finalizing') AND e.lease_token IS NOT NULL)
     OR (e.status = 'queued' AND e.lease_token IS NOT NULL)
+    OR (e.status = 'processing' AND e.lease_token IS NULL)
     OR (e.status = 'finalizing' AND e.lease_token IS NULL)
     OR (e.current_source IS NOT NULL OR e.source_cursor IS NOT NULL OR e.next_part_number <> 1)
     OR EXISTS (SELECT 1 FROM user_data_export_parts legacy_parts WHERE legacy_parts.export_id = e.id)
@@ -415,15 +417,8 @@ export const adminUserDataExportsRouter = createTRPCRouter({
 
   list: adminProcedure.input(ListInputSchema).query(async ({ input }) => {
     const where = listConditions(input);
-    const offset = (input.page - 1) * input.limit;
-    const [asOfResult, rowsResult, totalResult] = await Promise.all([
+    const [asOfResult, totalResult] = await Promise.all([
       readDb.execute<{ as_of: string }>(sql`SELECT now() AS as_of`),
-      readDb.execute<ExportRow>(sql`
-        ${baseSelect}
-        ${where}
-        ORDER BY e.created_at DESC, e.id DESC
-        LIMIT ${input.limit} OFFSET ${offset}
-      `),
       readDb.execute<{ total: number | string }>(sql`
         SELECT count(*)::text AS total
         FROM user_data_exports e
@@ -437,14 +432,23 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     ]);
     const asOf = iso(asOfResult.rows[0]?.as_of ?? new Date().toISOString());
     const total = number(totalResult.rows[0]?.total ?? 0) ?? 0;
+    const totalPages = Math.ceil(total / input.limit);
+    const page = totalPages === 0 || input.page > totalPages ? 1 : input.page;
+    const offset = (page - 1) * input.limit;
+    const rowsResult = await readDb.execute<ExportRow>(sql`
+      ${baseSelect}
+      ${where}
+      ORDER BY e.created_at DESC, e.id DESC
+      LIMIT ${input.limit} OFFSET ${offset}
+    `);
     return {
       asOf,
       rows: rowsResult.rows.map(row => serialize(row, asOf)),
       pagination: {
-        page: input.page,
+        page,
         limit: input.limit,
         total,
-        totalPages: Math.ceil(total / input.limit),
+        totalPages,
       },
     };
   }),

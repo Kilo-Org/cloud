@@ -130,6 +130,8 @@ export function classifyExportHealth(input: ExportHealthInput, asOf: string): Ex
   if (input.status === 'failed') reasons.push('export_failed');
   if (execution === 'lease_attempts_exhausted') reasons.push('lease_attempts_exhausted');
   else if (execution === 'lease_recovery_due') reasons.push('lease_recovery_due');
+  if (input.status === 'processing' && !input.hasWorkerLease)
+    reasons.push('processing_without_lease');
   if (dispatch === 'missing') reasons.push('active_outbox_missing');
   if ((input.currentOutboxAttemptCount ?? 0) > 0 && dispatch !== 'not_applicable')
     reasons.push('outbox_dispatch_retry');
@@ -149,6 +151,7 @@ export function classifyExportHealth(input: ExportHealthInput, asOf: string): Ex
     [
       'export_failed',
       'lease_attempts_exhausted',
+      'processing_without_lease',
       'active_outbox_missing',
       'email_retry_stranded',
       'finalizing_without_lease',

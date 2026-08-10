@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import React, { Suspense } from 'react';
 
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -33,7 +33,7 @@ export default async function DataExportDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const exportId = decodeURIComponent(id);
+  const exportId = id;
 
   const breadcrumbs = (
     <>

@@ -87,6 +87,24 @@ describe('classifyExportHealth', () => {
     );
   });
 
+  it('classifies processing without a worker lease as an error', () => {
+    const health = classifyExportHealth(
+      input({
+        status: 'processing',
+        hasWorkerLease: false,
+        leaseExpiresAt: null,
+      }),
+      AS_OF
+    );
+
+    expect(health).toMatchObject({
+      severity: 'error',
+      execution: 'inconsistent',
+      dispatch: 'published',
+      reasons: expect.arrayContaining(['processing_without_lease']),
+    });
+  });
+
   it('distinguishes retryable and stranded email delivery', () => {
     const retryable = classifyExportHealth(
       input({

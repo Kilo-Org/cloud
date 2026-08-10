@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   applyDataExportFilters,
+  MAX_PAGE,
   parseDataExportFilters,
   parseEmailStatusFilter,
   parseHealthFilter,
@@ -15,6 +16,7 @@ describe('parsePage', () => {
     expect(parsePage(null)).toBe(1);
     expect(parsePage('')).toBe(1);
     expect(parsePage('abc')).toBe(1);
+    expect(parsePage('2junk')).toBe(1);
     expect(parsePage('0')).toBe(1);
     expect(parsePage('-3')).toBe(1);
     expect(parsePage('1.9')).toBe(1);
@@ -23,6 +25,7 @@ describe('parsePage', () => {
   it('parses positive integers', () => {
     expect(parsePage('2')).toBe(2);
     expect(parsePage('25')).toBe(25);
+    expect(parsePage(String(MAX_PAGE + 1))).toBe(MAX_PAGE);
   });
 });
 

@@ -151,4 +151,36 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
     await expect(isAllowed('openai/gpt-4.1')).resolves.toBe(true);
   });
+
+  test('provider allow list hides restricted exclusive models when every restricted provider is disabled', async () => {
+    const isAllowed = createAllowPredicateFromProviderAllowList(
+      undefined,
+      ['openai', 'fireworks'],
+      lookup({ 'deepseek/deepseek-v4-pro': ['fireworks', 'deepseek'] })
+    );
+
+    await expect(isAllowed('deepseek/deepseek-v4-pro:discounted')).resolves.toBe(false);
+    await expect(isAllowed('deepseek/deepseek-v4-pro')).resolves.toBe(true);
+  });
+
+  test('provider allow list keeps restricted exclusive models when a restricted provider remains enabled', async () => {
+    const isAllowed = createAllowPredicateFromProviderAllowList(
+      undefined,
+      ['openai', 'deepseek'],
+      lookup({ 'deepseek/deepseek-v4-pro': ['fireworks'] })
+    );
+
+    await expect(isAllowed('deepseek/deepseek-v4-pro:discounted')).resolves.toBe(true);
+  });
+
+  test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
+    const isAllowed = createAllowPredicateFromProviderAllowList(
+      undefined,
+      ['deepseek'],
+      lookup({})
+    );
+
+    await expect(isAllowed('deepseek/deepseek-v4-pro:discounted')).resolves.toBe(true);
+    await expect(isAllowed('stealth/gpt-5.6-sol')).resolves.toBe(false);
+  });
 });

@@ -163,3 +163,17 @@ export function isDeadFreeModel(model: string): boolean {
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
   return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
 }
+
+/**
+ * Routing allow-list for a live exclusive model. `undefined` means the model is
+ * not a restricted exclusive and catalog provider metadata should be used.
+ */
+export function getKiloExclusiveInferenceProviderRestriction(
+  modelId: string
+): ReadonlySet<string> | undefined {
+  const exclusive = findKiloExclusiveModel(modelId);
+  if (!exclusive || exclusive.inference_provider_restriction.length === 0) {
+    return undefined;
+  }
+  return new Set(exclusive.inference_provider_restriction);
+}

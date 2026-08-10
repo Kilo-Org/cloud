@@ -1973,24 +1973,13 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
-const CustomLlmDefinitionBaseSchema = z.object({
+export const CustomLlmDefinitionSchema = z.object({
   ...CustomLlmMetadataSchema.shape,
   ...CustomLlmApiConfigSchema.shape,
   display_name: z.string(),
   organization_ids: z.array(z.string()),
   pricing: CustomLlmPricingSchema.optional(),
 });
-
-export const CustomLlmDefinitionSchema = z.union([
-  CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.string().optional(),
-    google_service_account: z.never().optional(),
-  }),
-  CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.never().optional(),
-    google_service_account: GoogleServiceAccountKeySchema,
-  }),
-]);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

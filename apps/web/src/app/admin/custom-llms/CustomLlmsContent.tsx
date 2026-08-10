@@ -153,12 +153,7 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (
-      editor.mode === 'create' &&
-      !parsedCredentials &&
-      !defResult.data.api_key &&
-      !defResult.data.google_service_account
-    ) {
+    if (editor.mode === 'create' && !parsedCredentials) {
       setEditor(prev => ({
         ...prev,
         validationError: 'Credentials (JSON) are required when creating a custom LLM',

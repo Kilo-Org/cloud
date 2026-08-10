@@ -1,4 +1,5 @@
 import 'server-only';
+import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
 import {
   CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,
@@ -54,7 +55,9 @@ export function createAllowPredicateFromProviderAllowList(
     if (modelDenySet.has(normalizedModelId)) {
       return false;
     }
-    const providerSlugs = await providerLookup(normalizedModelId);
+    const providerSlugs =
+      getKiloExclusiveInferenceProviderRestriction(modelId) ??
+      (await providerLookup(normalizedModelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

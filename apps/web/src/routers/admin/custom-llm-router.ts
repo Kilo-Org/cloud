@@ -4,7 +4,6 @@ import { custom_llm2 } from '@kilocode/db/schema';
 import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
-  type CustomLlmCredentials,
   type EncryptedData,
 } from '@kilocode/db/schema-types';
 import { asc, eq } from 'drizzle-orm';
@@ -56,31 +55,6 @@ export const adminCustomLlmRouter = createTRPCRouter({
         });
       }
       encrypted_api_key = encryptApiKey(JSON.stringify(input.credentials), BYOK_ENCRYPTION_KEY);
-    } else if (typeof input.definition.api_key === 'string' && input.definition.api_key.trim()) {
-      // Quietly migrate legacy api_key from definition to encrypted storage
-      if (!BYOK_ENCRYPTION_KEY) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'BYOK_ENCRYPTION_KEY is not configured',
-        });
-      }
-      const migratedCredentials: CustomLlmCredentials = {
-        type: 'api_key',
-        api_key: input.definition.api_key.trim(),
-      };
-      encrypted_api_key = encryptApiKey(JSON.stringify(migratedCredentials), BYOK_ENCRYPTION_KEY);
-    } else if (input.definition.google_service_account) {
-      // Quietly migrate legacy google_service_account from definition to encrypted storage
-      if (!BYOK_ENCRYPTION_KEY) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'BYOK_ENCRYPTION_KEY is not configured',
-        });
-      }
-      encrypted_api_key = encryptApiKey(
-        JSON.stringify(input.definition.google_service_account),
-        BYOK_ENCRYPTION_KEY
-      );
     } else if (existing?.encrypted_api_key) {
       encrypted_api_key = existing.encrypted_api_key;
     } else {
@@ -90,13 +64,11 @@ export const adminCustomLlmRouter = createTRPCRouter({
       });
     }
 
-    const { api_key: _k, google_service_account: _g, ...cleanDefinition } = input.definition;
-
     if (existing) {
       const [updated] = await db
         .update(custom_llm2)
         .set({
-          definition: cleanDefinition,
+          definition: input.definition,
           encrypted_api_key,
         })
         .where(eq(custom_llm2.public_id, input.public_id))
@@ -112,7 +84,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
       .insert(custom_llm2)
       .values({
         public_id: input.public_id,
-        definition: cleanDefinition,
+        definition: input.definition,
         encrypted_api_key,
       })
       .returning({

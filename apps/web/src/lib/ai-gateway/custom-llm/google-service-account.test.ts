@@ -1,5 +1,9 @@
 import { GoogleAuth } from 'google-auth-library';
-import { CustomLlmDefinitionSchema, type GoogleServiceAccountKey } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  type GoogleServiceAccountKey,
+} from '@kilocode/db/schema-types';
 import { getGoogleServiceAccountAccessToken } from './google-service-account';
 
 jest.mock('google-auth-library');
@@ -31,34 +35,19 @@ const baseDefinition = {
   organization_ids: ['org-1'],
 };
 
-describe('CustomLlmDefinitionSchema authentication', () => {
-  it('accepts legacy API key authentication', () => {
+describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
+  it('accepts API key credentials', () => {
     expect(
-      CustomLlmDefinitionSchema.safeParse({ ...baseDefinition, api_key: 'partner-token' }).success
+      CustomLlmCredentialsSchema.safeParse({ type: 'api_key', api_key: 'partner-token' }).success
     ).toBe(true);
   });
 
   it('accepts Google Cloud service account authentication', () => {
-    expect(
-      CustomLlmDefinitionSchema.safeParse({
-        ...baseDefinition,
-        google_service_account: serviceAccount('private-key'),
-      }).success
-    ).toBe(true);
+    expect(CustomLlmCredentialsSchema.safeParse(serviceAccount('private-key')).success).toBe(true);
   });
 
-  it('accepts definition without credentials in JSON definition', () => {
+  it('validates custom LLM definition without credentials', () => {
     expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
-  });
-
-  it('rejects definitions with multiple credential methods', () => {
-    expect(
-      CustomLlmDefinitionSchema.safeParse({
-        ...baseDefinition,
-        api_key: 'partner-token',
-        google_service_account: serviceAccount('private-key'),
-      }).success
-    ).toBe(false);
   });
 });
 

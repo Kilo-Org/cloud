@@ -32,7 +32,9 @@ const errorBodySchema = z.object({ error: z.string() });
 const trimTrailingSlash = (value: string): string =>
   value.endsWith('/') ? value.slice(0, -1) : value;
 
-type FetchOutcome = { readonly ok: true; readonly response: Response } | { readonly ok: false; readonly reason: string };
+type FetchOutcome =
+  | { readonly ok: true; readonly response: Response }
+  | { readonly ok: false; readonly reason: string };
 
 const postSearch = async (query: string, context: WebSearchContext): Promise<FetchOutcome> => {
   try {

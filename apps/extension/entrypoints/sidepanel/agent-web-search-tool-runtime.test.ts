@@ -4,8 +4,7 @@ import { executeWebSearchToolCall } from './agent-web-search-tool-runtime';
 
 const webSearchCall = (query?: string) => (query === undefined ? {} : { query });
 
-const jsonResponse = (status: number, body: unknown): Response =>
-  Response.json(body, { status });
+const jsonResponse = (status: number, body: unknown): Response => Response.json(body, { status });
 
 const context = (fetchMock: FetchLike) => ({
   apiBaseUrl: 'https://app.kilo.ai/',

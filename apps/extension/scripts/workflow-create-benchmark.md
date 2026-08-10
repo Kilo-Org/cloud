@@ -63,14 +63,14 @@ Copilot, Gemini in Chrome, Perplexity Comet, HARPA AI):
 2. Page Q&A — the core sidebar function (chat grounded in the open tab).
 3. Write and reply — draft text from page content.
 4. Translate — full-page translation to the user's language.
-5. AI search/research — search-grounded answers (needs web search; gap).
+5. AI search/research — search-grounded answers via the `web_search` tool.
 6. Multi-tab compare — read several tabs (single-tab harness today; gap).
 7. Agentic actions — fill forms, log in, operate the page.
 8. Repeatable automation — the twenty workflow scenarios above.
 
 Reading tasks (1, 2, 4) carry roughly 80% of real usage; acting tasks lead
-the marketing but trail in adoption. Use cases 5 and 6 are documented gaps:
-the harness has no web-search tool and reads only the selected tab.
+the marketing but trail in adoption. Use case 6 remains a documented gap:
+the harness reads only the selected tab.
 
 | Id | Use case | Site | Mode | Task |
 |---|---|---|---|---|
@@ -79,6 +79,7 @@ the harness has no web-search tool and reads only the selected tab.
 | `extract-table` | extract | books.toscrape.com | safe | titles and prices as a markdown table |
 | `translate-page` | translate | de.wikipedia.org | safe | English summary of a German page |
 | `draft-reply` | draft | github.com | safe | grounded reply to a closed issue |
+| `web-research` | research | example.com | safe | a fact the page cannot answer, via `web_search` |
 | `action-login` | act | saucedemo.com | dangerous | log in, count products |
 | `action-cart` | act | saucedemo.com | dangerous | log in, add to cart, read badge |
 

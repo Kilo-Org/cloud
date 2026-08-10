@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FetchLike } from '@/src/shared/auth';
-import { executeWebSearchToolCall } from './agent-web-search-tool-runtime';
+import {
+  createWebSearchExecutor,
+  executeWebSearchToolCall,
+  MAX_SEARCHES_PER_TURN,
+} from './agent-web-search-tool-runtime';
 
 const webSearchCall = (query?: string) => (query === undefined ? {} : { query });
 
 const jsonResponse = (status: number, body: unknown): Response => Response.json(body, { status });
 
 const context = (fetchMock: FetchLike) => ({
-  apiBaseUrl: 'https://app.kilo.ai/',
+  apiBaseUrl: 'https://app.kilo.ai',
   fetch: fetchMock,
   organizationId: 'org-1',
   token: 'token-1',
@@ -111,5 +115,40 @@ describe('web search tool runtime', () => {
       ...context(fetchMock),
     });
     expect(result).toStrictEqual({ error: 'Web search failed: offline', ok: false });
+  });
+});
+
+describe('web search executor', () => {
+  // A Response body reads once, so every call needs a fresh one.
+  const okFetch = () =>
+    vi.fn<FetchLike>(() => jsonResponse(200, { results: [{ url: 'https://example.org/a' }] }));
+
+  it('forwards the turn abort signal so a stopped turn does not leave a billable request', async () => {
+    const controller = new AbortController();
+    const fetchMock = okFetch();
+    const runSearch = createWebSearchExecutor({
+      ...context(fetchMock),
+      signal: controller.signal,
+    });
+
+    await runSearch({ query: 'anything' });
+
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+  });
+
+  it('caps how many searches one turn may bill', async () => {
+    const fetchMock = okFetch();
+    const runSearch = createWebSearchExecutor(context(fetchMock));
+
+    for (let index = 0; index < MAX_SEARCHES_PER_TURN; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- the cap is sequential by definition
+      const allowed = await runSearch({ query: `query ${String(index)}` });
+      expect(allowed.ok).toBe(true);
+    }
+
+    const blocked = await runSearch({ query: 'one too many' });
+
+    expect(blocked.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(MAX_SEARCHES_PER_TURN);
   });
 });

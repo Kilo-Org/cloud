@@ -18,7 +18,7 @@ import type {
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { executeEvalToolCall } from './agent-eval-runtime';
 import { executeSafeToolCall } from './agent-safe-tool-runtime';
-import { executeWebSearchToolCall } from './agent-web-search-tool-runtime';
+import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
@@ -70,8 +70,17 @@ export const runDangerousLlmTurn = ({
   workflowToolContext,
   workflowTools = [],
   ...options
-}: RunDangerousLlmTurnOptions): Promise<void> =>
-  runLlmTurn<DangerousToolCallEvent>({
+}: RunDangerousLlmTurnOptions): Promise<void> => {
+  // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
+  const runWebSearch = createWebSearchExecutor({
+    apiBaseUrl: options.apiBaseUrl,
+    fetch: options.fetch,
+    organizationId: options.organizationId,
+    signal: options.signal,
+    token: options.token,
+  });
+
+  return runLlmTurn<DangerousToolCallEvent>({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
@@ -96,12 +105,7 @@ export const runDangerousLlmTurn = ({
       }
 
       if (toolCall.name === 'web_search') {
-        return executeWebSearchToolCall(toolCall, {
-          apiBaseUrl: options.apiBaseUrl,
-          fetch: options.fetch,
-          organizationId: options.organizationId,
-          token: options.token,
-        });
+        return runWebSearch(toolCall);
       }
 
       return executeSafeToolCall(toolCall);
@@ -126,3 +130,4 @@ export const runDangerousLlmTurn = ({
       ...remoteMcpTools,
     ],
   });
+};

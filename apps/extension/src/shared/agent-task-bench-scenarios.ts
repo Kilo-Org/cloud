@@ -203,7 +203,8 @@ const ACTION_CART_SCENARIO: BenchTaskScenario = {
 const WEB_RESEARCH_SCENARIO: BenchTaskScenario = {
   answerChecks: [
     { key: 'year', re: /1889/u, requireToolEvidence: true },
-    { key: 'source', re: /https?:\/\/|\bwww\.|\w+\.(?:com|org|net|fr|paris)\b/iu },
+    // The scenario's own tab is example.com, so only an off-tab URL proves a citation.
+    { key: 'source', re: /https?:\/\/(?!example\.com)/iu },
   ],
   id: 'web-research',
   kind: 'task',

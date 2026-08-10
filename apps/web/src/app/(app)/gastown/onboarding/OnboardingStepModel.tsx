@@ -117,7 +117,9 @@ function PresetCard({
         <motion.div
           layoutId="preset-ring"
           className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-white/20"
-          transition={shouldReduce ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
+          transition={
+            shouldReduce ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }
+          }
         />
       )}
 
@@ -160,7 +162,9 @@ function CustomCard({ isSelected, onSelect }: { isSelected: boolean; onSelect: (
         <motion.div
           layoutId="preset-ring"
           className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-white/20"
-          transition={shouldReduce ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
+          transition={
+            shouldReduce ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }
+          }
         />
       )}
 

@@ -226,7 +226,9 @@ export function BeadBoard({
             key={status}
             initial={shouldReduce ? {} : { opacity: 0, y: 12 }}
             animate={shouldReduce ? {} : { opacity: 1, y: 0 }}
-            transition={shouldReduce ? { duration: 0 } : { delay: colIdx * 0.08, duration: 0.3 }}
+            transition={
+              shouldReduce ? { duration: 0 } : { delay: colIdx * 0.08, duration: 0.3 }
+            }
           >
             <div className="mb-3 flex items-center gap-2">
               <span
@@ -266,11 +268,15 @@ export function BeadBoard({
                     initial={shouldReduce ? {} : { opacity: 0, scale: 0.95, y: 10 }}
                     animate={shouldReduce ? {} : { opacity: 1, scale: 1, y: 0 }}
                     exit={shouldReduce ? {} : { opacity: 0, scale: 0.95, y: -10 }}
-                    transition={shouldReduce ? { duration: 0 } : {
-                      layout: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
-                      opacity: { duration: 0.2 },
-                      scale: { duration: 0.2 },
-                    }}
+                    transition={
+                      shouldReduce
+                        ? { duration: 0 }
+                        : {
+                            layout: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+                            opacity: { duration: 0.2 },
+                            scale: { duration: 0.2 },
+                          }
+                    }
                   >
                     <BeadCard
                       bead={bead}

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs';
 import { TypingIndicator } from '@/components/cloud-agent-next/TypingIndicator';
 import HeaderLogo from '@/components/HeaderLogo';
 

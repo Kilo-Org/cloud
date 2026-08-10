@@ -226,9 +226,7 @@ export function BeadBoard({
             key={status}
             initial={shouldReduce ? {} : { opacity: 0, y: 12 }}
             animate={shouldReduce ? {} : { opacity: 1, y: 0 }}
-            transition={
-              shouldReduce ? { duration: 0 } : { delay: colIdx * 0.08, duration: 0.3 }
-            }
+            transition={shouldReduce ? { duration: 0 } : { delay: colIdx * 0.08, duration: 0.3 }}
           >
             <div className="mb-3 flex items-center gap-2">
               <span

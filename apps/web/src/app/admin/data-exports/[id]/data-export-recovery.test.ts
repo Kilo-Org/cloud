@@ -209,7 +209,7 @@ describe('recovery dialog copy', () => {
 
     expect(html).toContain('Permanently removes this export without a replacement');
     expect(html).toContain('execution state and outbox history');
-    expect(html).toContain('Queues deletion of the stored artifact and any open multipart upload');
+    expect(html).toContain('Queues deletion when a stored artifact, open multipart upload');
     expect(html).toContain('the user may request another export immediately');
     expect(html).toContain('signed download URL may keep working for up to 5 minutes');
   });
@@ -218,6 +218,7 @@ describe('recovery dialog copy', () => {
     const html = renderToStaticMarkup(React.createElement(RetryConsequences));
 
     expect(html).toContain('Removes this export and its history');
+    expect(html).toContain('queues cleanup when needed');
     expect(html).toContain('new export ID from the same snapshot');
     expect(html).toContain('24-hour request limit is bypassed');
   });

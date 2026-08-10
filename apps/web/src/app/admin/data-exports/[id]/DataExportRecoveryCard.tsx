@@ -41,6 +41,8 @@ type RecoveryMutationResult = {
   generation: number;
 };
 
+type CleanupResult = { cleanup: 'queued' | 'not_needed' };
+
 export function DataExportRecoveryCard({ detail }: { detail: DataExportDetail }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -69,7 +71,7 @@ export function DataExportRecoveryCard({ detail }: { detail: DataExportDetail })
 
   const purgeMutation = useMutation(
     trpc.admin.userDataExports.cancelAndPurge.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (result: CleanupResult) => {
         queryClient.removeQueries(
           trpc.admin.userDataExports.detail.queryFilter({ exportId: detail.id })
         );
@@ -77,10 +79,15 @@ export function DataExportRecoveryCard({ detail }: { detail: DataExportDetail })
           queryClient.invalidateQueries(trpc.admin.userDataExports.list.queryFilter()),
           queryClient.invalidateQueries(trpc.admin.userDataExports.summary.queryFilter()),
         ]);
-        toast.success('Export canceled and purge queued', {
-          description:
-            'Artifact and multipart cleanup is queued. The user can request a new export immediately.',
-        });
+        toast.success(
+          result.cleanup === 'queued' ? 'Export canceled and purge queued' : 'Export canceled',
+          {
+            description:
+              result.cleanup === 'queued'
+                ? 'Artifact or multipart cleanup is queued. The user can request a new export immediately.'
+                : 'No stored artifact or multipart upload needed cleanup. The user can request a new export immediately.',
+          }
+        );
         router.replace('/admin/data-exports');
       },
     })

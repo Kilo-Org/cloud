@@ -67,7 +67,7 @@ export function DataExportsContent() {
   const searchParams = useSearchParams();
   const filters = parseDataExportFilters(searchParams);
   const desiredFiltersRef = useRef(filters);
-  const pendingQueryRef = useRef<string | null>(null);
+  const hasPendingNavigationRef = useRef(false);
   const [isNavigationLocked, setIsNavigationLocked] = useState(false);
   const [isNavigationPending, startNavigation] = useTransition();
 
@@ -76,9 +76,8 @@ export function DataExportsContent() {
     desiredFiltersRef.current = filters;
   }, [filters.emailStatus, filters.health, filters.page, filters.search, filters.status]);
   useEffect(() => {
-    if (pendingQueryRef.current === null || pendingQueryRef.current !== searchParams.toString())
-      return;
-    pendingQueryRef.current = null;
+    if (!hasPendingNavigationRef.current) return;
+    hasPendingNavigationRef.current = false;
     setIsNavigationLocked(false);
   }, [searchParams]);
   useEffect(() => setSearchDraft(filters.search ?? ''), [filters.search]);
@@ -103,7 +102,7 @@ export function DataExportsContent() {
       const params = applyDataExportFilters(searchParams, merged);
       const queryString = params.toString();
       if (queryString === searchParams.toString()) return;
-      pendingQueryRef.current = queryString;
+      hasPendingNavigationRef.current = true;
       setIsNavigationLocked(true);
       startNavigation(() => {
         router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
@@ -156,7 +155,7 @@ export function DataExportsContent() {
     const params = applyDataExportFilters(searchParams, normalized);
     const queryString = params.toString();
     if (queryString === searchParams.toString()) return;
-    pendingQueryRef.current = queryString;
+    hasPendingNavigationRef.current = true;
     setIsNavigationLocked(true);
     startNavigation(() => {
       router.replace(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });

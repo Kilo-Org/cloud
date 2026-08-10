@@ -4,13 +4,13 @@ import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import {
   classifyExportHealth,
   type ExportEmailStatus,
   type ExportHealthInput,
   type ExportStatus,
 } from './user-data-export-health';
+import { recordDataExportRecovery } from './user-data-export-recovery-audit';
 
 const ExportStatusSchema = z.enum([
   'queued',
@@ -22,7 +22,7 @@ const ExportStatusSchema = z.enum([
 ]);
 const EmailStatusSchema = z.enum(['pending', 'sending', 'sent', 'failed']);
 const HealthFilterSchema = z.enum(['needs_attention', 'active', 'terminal', 'all']);
-const MAX_PAGE = 10_000;
+const MAX_PAGE = 400;
 const ListInputSchema = z.object({
   page: z.number().int().min(1).max(MAX_PAGE).default(1),
   limit: z.number().int().min(1).max(100).default(25),
@@ -150,7 +150,7 @@ async function lockRecoveryTarget(
     SELECT id, blocked_reason FROM kilocode_users WHERE id = ${ownerId} FOR UPDATE
   `);
   const ownerRow = owner.rows[0];
-  if (!ownerRow || isSoftDeletedBlockedReason(ownerRow.blocked_reason)) {
+  if (!ownerRow || ownerRow.blocked_reason !== null) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'The export owner is no longer eligible for recovery',
@@ -182,7 +182,11 @@ async function scheduleCleanup(
   tx: DbTransaction,
   target: RecoveryTarget,
   reason: 'admin_cancel' | 'admin_replace'
-): Promise<void> {
+): Promise<boolean> {
+  const hasLiveLease =
+    target.lease_expires_at !== null && new Date(target.lease_expires_at).getTime() > Date.now();
+  if (target.r2_object_key === null && target.multipart_upload_id === null && !hasLiveLease)
+    return false;
   await tx.execute(sql`
     INSERT INTO user_data_export_object_deletions (
       object_key, multipart_upload_id, reason, available_at
@@ -201,6 +205,7 @@ async function scheduleCleanup(
         ),
         updated_at = now()
   `);
+  return true;
 }
 
 async function dispatchAfterCommit(input: {
@@ -208,8 +213,12 @@ async function dispatchAfterCommit(input: {
   generation: number;
   kiloUserId: string;
 }) {
-  const result = await dispatchUserDataExport(input);
-  return { dispatch: result.kind === 'accepted' ? ('sent' as const) : ('pending' as const) };
+  try {
+    const result = await dispatchUserDataExport(input);
+    return { dispatch: result.kind === 'accepted' ? ('sent' as const) : ('pending' as const) };
+  } catch {
+    return { dispatch: 'pending' as const };
+  }
 }
 
 function healthInput(row: ExportRow): ExportHealthInput {
@@ -268,7 +277,6 @@ const needsAttentionSql = sql`
     OR (e.status IN ('queued', 'processing', 'finalizing') AND o.id IS NULL)
     OR (e.status IN ('processing', 'finalizing') AND e.lease_expires_at < now())
     OR (e.status IN ('queued', 'processing', 'finalizing') AND COALESCE(o.attempt_count, 0) > 0)
-    OR (e.status = 'failed' AND e.multipart_upload_id IS NOT NULL)
     OR (e.status = 'ready' AND e.expires_at <= now() AND e.r2_object_key IS NOT NULL)
     OR (
       e.status = 'ready' AND e.expires_at > now()
@@ -564,7 +572,7 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     };
   }),
 
-  redispatch: adminProcedure.input(RecoveryInputSchema).mutation(async ({ input }) => {
+  redispatch: adminProcedure.input(RecoveryInputSchema).mutation(async ({ ctx, input }) => {
     const result = await db.transaction(async tx => {
       const target = await lockRecoveryTarget(tx, input);
       if (!ACTIVE_STATUSES.includes(target.status as (typeof ACTIVE_STATUSES)[number])) {
@@ -612,6 +620,16 @@ export const adminUserDataExportsRouter = createTRPCRouter({
       `);
       return { exportId: target.id, kiloUserId: target.kilo_user_id, generation: nextGeneration };
     });
+    recordDataExportRecovery({
+      action: 'redispatch',
+      actorAdminId: ctx.user.id,
+      exportOwnerId: result.kiloUserId,
+      exportId: result.exportId,
+      expectedGeneration: input.expectedGeneration,
+      resultingGeneration: result.generation,
+      replacementExportId: null,
+      cleanupQueued: false,
+    });
     return {
       exportId: result.exportId,
       generation: result.generation,
@@ -619,22 +637,35 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     };
   }),
 
-  cancelAndPurge: adminProcedure.input(RecoveryInputSchema).mutation(async ({ input }) => {
+  cancelAndPurge: adminProcedure.input(RecoveryInputSchema).mutation(async ({ ctx, input }) => {
     const result = await db.transaction(async tx => {
       const target = await lockRecoveryTarget(tx, input);
-      await scheduleCleanup(tx, target, 'admin_cancel');
+      const cleanupQueued = await scheduleCleanup(tx, target, 'admin_cancel');
       const deleted = await tx.execute<{ id: string }>(sql`
         DELETE FROM user_data_exports
         WHERE id = ${target.id} AND dispatch_generation = ${target.dispatch_generation}
         RETURNING id
       `);
       if (!deleted.rows[0]) conflict('This export changed while it was being canceled');
-      return { exportId: target.id };
+      return { exportId: target.id, kiloUserId: target.kilo_user_id, cleanupQueued };
     });
-    return { ...result, cleanup: 'queued' as const };
+    recordDataExportRecovery({
+      action: 'cancel_and_purge',
+      actorAdminId: ctx.user.id,
+      exportOwnerId: result.kiloUserId,
+      exportId: result.exportId,
+      expectedGeneration: input.expectedGeneration,
+      resultingGeneration: null,
+      replacementExportId: null,
+      cleanupQueued: result.cleanupQueued,
+    });
+    return {
+      exportId: result.exportId,
+      cleanup: result.cleanupQueued ? ('queued' as const) : ('not_needed' as const),
+    };
   }),
 
-  cancelAndRetry: adminProcedure.input(RecoveryInputSchema).mutation(async ({ input }) => {
+  cancelAndRetry: adminProcedure.input(RecoveryInputSchema).mutation(async ({ ctx, input }) => {
     const result = await db.transaction(async tx => {
       const target = await lockRecoveryTarget(tx, input);
       const blocker = await tx.execute<{ id: string }>(sql`
@@ -649,7 +680,7 @@ export const adminUserDataExportsRouter = createTRPCRouter({
       if (blocker.rows[0]) {
         conflict('This user already has another active or downloadable export');
       }
-      await scheduleCleanup(tx, target, 'admin_replace');
+      const cleanupQueued = await scheduleCleanup(tx, target, 'admin_replace');
       const deleted = await tx.execute<{ id: string }>(sql`
         DELETE FROM user_data_exports
         WHERE id = ${target.id} AND dispatch_generation = ${target.dispatch_generation}
@@ -679,13 +710,24 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         replacementExportId: row.id,
         kiloUserId: row.kilo_user_id,
         generation: row.dispatch_generation,
+        cleanupQueued,
       };
+    });
+    recordDataExportRecovery({
+      action: 'cancel_and_retry',
+      actorAdminId: ctx.user.id,
+      exportOwnerId: result.kiloUserId,
+      exportId: input.exportId,
+      expectedGeneration: input.expectedGeneration,
+      resultingGeneration: result.generation,
+      replacementExportId: result.replacementExportId,
+      cleanupQueued: result.cleanupQueued,
     });
     return {
       exportId: result.exportId,
       replacementExportId: result.replacementExportId,
       generation: result.generation,
-      cleanup: 'queued' as const,
+      cleanup: result.cleanupQueued ? ('queued' as const) : ('not_needed' as const),
       ...(await dispatchAfterCommit(result)),
     };
   }),

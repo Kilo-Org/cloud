@@ -1,6 +1,10 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
+import {
+  setDataExportRecoveryAuditSinkForTest,
+  type DataExportRecoveryAuditEvent,
+} from './user-data-export-recovery-audit';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -29,6 +33,7 @@ describe('adminUserDataExportsRouter', () => {
   let failedExportId: string;
   let leasedProcessingExportId: string;
   let cleanupDueBaseline = 0;
+  let recoveryAuditEvents: DataExportRecoveryAuditEvent[] = [];
 
   beforeAll(async () => {
     const suffix = `${Date.now()}-${crypto.randomUUID()}`;
@@ -53,6 +58,8 @@ describe('adminUserDataExportsRouter', () => {
   });
 
   beforeEach(async () => {
+    recoveryAuditEvents = [];
+    setDataExportRecoveryAuditSinkForTest(event => recoveryAuditEvents.push(event));
     mockDispatchUserDataExport.mockResolvedValue({ kind: 'accepted' });
     const dueCleanup = await db.execute<{ count: string }>(sql`
       SELECT count(*)::text AS count
@@ -165,6 +172,7 @@ describe('adminUserDataExportsRouter', () => {
         .delete(user_data_export_object_deletions)
         .where(inArray(user_data_export_object_deletions.object_key, deletionKeys));
     deletionKeys = [];
+    setDataExportRecoveryAuditSinkForTest(null);
     jest.clearAllMocks();
   });
 
@@ -260,12 +268,21 @@ describe('adminUserDataExportsRouter', () => {
       await createCallerForUser(admin.id)
     ).admin.userDataExports.list({
       health: 'all',
-      page: 10_000,
+      page: 400,
       limit: 2,
     });
 
     expect(result.pagination).toMatchObject({ page: 1, limit: 2, total: 4, totalPages: 2 });
     expect(result.rows).toHaveLength(2);
+  });
+
+  it('rejects pages beyond the bounded offset window', async () => {
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.list({
+        health: 'all',
+        page: 401,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('returns legacy part aggregates, outbox history, and redacted failure details', async () => {
@@ -376,6 +393,17 @@ describe('adminUserDataExportsRouter', () => {
       generation: 4,
       kiloUserId: recoveryOwner.id,
     });
+    expect(recoveryAuditEvents).toContainEqual({
+      event: 'admin_data_export_recovery',
+      action: 'redispatch',
+      actorAdminId: admin.id,
+      exportOwnerId: recoveryOwner.id,
+      exportId: target.id,
+      expectedGeneration: 3,
+      resultingGeneration: 4,
+      replacementExportId: null,
+      cleanupQueued: false,
+    });
   });
 
   it('rejects recovery when the expected generation is stale', async () => {
@@ -395,6 +423,99 @@ describe('adminUserDataExportsRouter', () => {
     expect(
       await db.query.user_data_exports.findFirst({ where: eq(user_data_exports.id, target.id) })
     ).toBeDefined();
+  });
+
+  it('rejects recovery for a blocked owner', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'failed',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'manual_security_block' })
+      .where(eq(kilocode_users.id, recoveryOwner.id));
+    try {
+      await expect(
+        (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+          exportId: target.id,
+          expectedGeneration: 0,
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    } finally {
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: null })
+        .where(eq(kilocode_users.id, recoveryOwner.id));
+    }
+  });
+
+  it('rejects recovery when the artifact key is not canonical', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'failed',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+        r2_object_key: 'exports/unexpected/kilo-data-export.jsonl.gz',
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+        exportId: target.id,
+        expectedGeneration: 0,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('rejects redispatch while the worker lease is live', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'processing',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+        lease_token: crypto.randomUUID(),
+        lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.redispatch({
+        exportId: target.id,
+        expectedGeneration: 0,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('rejects redispatch when the export already records an artifact', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'queued',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+    await db
+      .update(user_data_exports)
+      .set({ r2_object_key: `exports/${target.id}/kilo-data-export.jsonl.gz` })
+      .where(eq(user_data_exports.id, target.id));
+
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.redispatch({
+        exportId: target.id,
+        expectedGeneration: 0,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
 
   it('cancels an export, cascades checkpoint state, and persists cleanup work', async () => {
@@ -450,6 +571,70 @@ describe('adminUserDataExportsRouter', () => {
       multipart_upload_id: 'purge-upload',
       reason: 'admin_cancel',
     });
+    expect(recoveryAuditEvents).toContainEqual(
+      expect.objectContaining({
+        event: 'admin_data_export_recovery',
+        action: 'cancel_and_purge',
+        actorAdminId: admin.id,
+        exportOwnerId: recoveryOwner.id,
+        exportId: target.id,
+        expectedGeneration: 2,
+        cleanupQueued: true,
+      })
+    );
+  });
+
+  it('skips cleanup work for a pristine lease-free export', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'queued',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+    const key = `exports/${target.id}/kilo-data-export.jsonl.gz`;
+
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+        exportId: target.id,
+        expectedGeneration: 0,
+      })
+    ).resolves.toMatchObject({ exportId: target.id, cleanup: 'not_needed' });
+    expect(
+      await db.query.user_data_export_object_deletions.findFirst({
+        where: eq(user_data_export_object_deletions.object_key, key),
+      })
+    ).toBeUndefined();
+  });
+
+  it('queues deferred cleanup for a pristine export with a live lease', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'processing',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+        lease_token: crypto.randomUUID(),
+        lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+    const key = `exports/${target.id}/kilo-data-export.jsonl.gz`;
+    deletionKeys.push(key);
+
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+        exportId: target.id,
+        expectedGeneration: 0,
+      })
+    ).resolves.toMatchObject({ cleanup: 'queued' });
+    expect(
+      await db.query.user_data_export_object_deletions.findFirst({
+        where: eq(user_data_export_object_deletions.object_key, key),
+      })
+    ).toBeDefined();
   });
 
   it('creates a pristine replacement from the same logical snapshot and durable outbox', async () => {
@@ -474,10 +659,7 @@ describe('adminUserDataExportsRouter', () => {
     exportIds.push(target.id);
     const key = `exports/${target.id}/kilo-data-export.jsonl.gz`;
     deletionKeys.push(key);
-    mockDispatchUserDataExport.mockResolvedValueOnce({
-      kind: 'unavailable',
-      reason: 'not_configured',
-    });
+    mockDispatchUserDataExport.mockRejectedValueOnce(new Error('token signing failed'));
 
     const result = await (
       await createCallerForUser(admin.id)
@@ -525,6 +707,17 @@ describe('adminUserDataExportsRouter', () => {
         where: eq(user_data_export_object_deletions.object_key, key),
       })
     ).toMatchObject({ reason: 'admin_replace', multipart_upload_id: 'replace-upload' });
+    expect(recoveryAuditEvents).toContainEqual(
+      expect.objectContaining({
+        event: 'admin_data_export_recovery',
+        action: 'cancel_and_retry',
+        actorAdminId: admin.id,
+        exportOwnerId: recoveryOwner.id,
+        exportId: target.id,
+        replacementExportId: result.replacementExportId,
+        cleanupQueued: true,
+      })
+    );
   });
 
   it('rejects replacement when another usable export exists for the owner', async () => {

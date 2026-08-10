@@ -18,7 +18,7 @@ export type DataExportFilters = {
 
 export const DEFAULT_HEALTH_FILTER: DataExportHealthFilter = 'needs_attention';
 export const MAX_SEARCH_LENGTH = 320;
-export const MAX_PAGE = 10_000;
+export const MAX_PAGE = 400;
 
 const HEALTH_FILTERS: readonly DataExportHealthFilter[] = [
   'needs_attention',

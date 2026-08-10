@@ -120,7 +120,9 @@ export function PurgeConsequences() {
       <p>Permanently removes this export without a replacement. This cannot be undone.</p>
       <ul className="list-disc space-y-1 pl-5">
         <li>Deletes the control-plane record, including execution state and outbox history.</li>
-        <li>Queues deletion of the stored artifact and any open multipart upload.</li>
+        <li>
+          Queues deletion when a stored artifact, open multipart upload, or active lease exists.
+        </li>
         <li>No replacement export is created; the user may request another export immediately.</li>
         <li>An existing signed download URL may keep working for up to 5 minutes.</li>
       </ul>
@@ -133,7 +135,7 @@ export function RetryConsequences() {
     <div className="flex flex-col gap-2 text-sm">
       <p>Replaces this export with a fresh one generated from the same snapshot.</p>
       <ul className="list-disc space-y-1 pl-5">
-        <li>Removes this export and its history, and queues artifact cleanup.</li>
+        <li>Removes this export and its history, and queues cleanup when needed.</li>
         <li>Creates a new export with a new export ID from the same snapshot.</li>
         <li>The user&apos;s 24-hour request limit is bypassed.</li>
       </ul>

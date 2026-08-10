@@ -85,11 +85,16 @@ the harness has no web-search tool and reads only the selected tab.
 A task attempt sends one pinned message and scores the final assistant
 answer: pinned content checks, a minimum length, and — for facts a model
 could know from training — the same pattern must also appear in an ok tool
-result. That evidence rule exists because the truncation-era baseline
-model answered a summarize task "from familiarity" with the essay while
-presenting it as page content. Action scenarios additionally require at
-least one ok `eval` exchange. Task batches gate on the turn total
-(`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
+result (harness metadata strings such as the paging note and snapshotId
+never count). That evidence rule exists because the truncation-era
+baseline model answered a summarize task "from familiarity" with the essay
+while presenting it as page content. A generative scenario may set
+`minAnswerCheckPasses`: a model that provably read the whole page can
+still pick its own top themes, so the summary needs a quorum of theme
+checks, while evidence gates always stay mandatory. Action scenarios
+additionally require one ok action exchange — `eval` or a real (non-dry)
+`run_workflow`, both legitimate harness action paths. Task batches gate on
+the turn total (`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
 
 The deep-content scenarios exist because the page snapshot text is a
 bounded window (8000 chars). `summarize-article` and `qa-deep-fact` fail

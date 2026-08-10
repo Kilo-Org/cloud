@@ -93,7 +93,9 @@ if (!parsedUrl.ok && parsedUrl.reason === 'invalid') {
   );
 }
 
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+// WHATWG URL keeps the brackets on an IPv6 literal, so `new URL(...).hostname`
+// yields '[::1]'. The bare form is kept for callers passing a hostname directly.
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 /**
  * The export database is a different host from the primary, so it does not

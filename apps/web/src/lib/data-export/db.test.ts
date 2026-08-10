@@ -31,14 +31,31 @@ describe('resolveSslConfig', () => {
   const originalCa = process.env.DATABASE_CA;
   const originalExportCa = process.env.DATA_EXPORT_DATABASE_CA;
 
+  // Assigning undefined to process.env stores the truthy string 'undefined', which
+  // would leak into every other test file sharing this Jest worker and give their
+  // drizzle pools a bogus PEM CA. Delete the key instead.
+  function restore(key: string, value: string | undefined): void {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
   afterEach(() => {
-    process.env.DATABASE_CA = originalCa;
-    process.env.DATA_EXPORT_DATABASE_CA = originalExportCa;
+    restore('DATABASE_CA', originalCa);
+    restore('DATA_EXPORT_DATABASE_CA', originalExportCa);
   });
 
   it('disables TLS only for local hosts', () => {
     expect(resolveSslConfig('localhost')).toBe(false);
     expect(resolveSslConfig('127.0.0.1')).toBe(false);
+  });
+
+  it('treats a bracketed IPv6 loopback as local', () => {
+    // new URL('postgresql://u:p@[::1]:5432/db').hostname === '[::1]'
+    expect(resolveSslConfig(new URL('postgresql://u:p@[::1]:5432/db').hostname)).toBe(false);
+    expect(resolveSslConfig('::1')).toBe(false);
   });
 
   it('requires TLS for remote hosts even with no CA configured', () => {

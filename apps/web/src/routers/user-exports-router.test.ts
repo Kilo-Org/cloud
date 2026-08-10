@@ -86,7 +86,7 @@ describe('user exports router guards and serialization', () => {
     );
   });
 
-  it('uses the fixed August 3 UTC data cutoff for new exports', async () => {
+  it('uses the fixed August 2 08:40 UTC data cutoff for new exports', async () => {
     const caller = await createCallerForUser(owner.id);
 
     const requested = await caller.userExports.request();
@@ -95,7 +95,7 @@ describe('user exports router guards and serialization', () => {
       .from(user_data_exports)
       .where(eq(user_data_exports.id, requested.id));
 
-    expect(new Date(row.snapshotAt).toISOString()).toBe('2026-08-03T00:00:00.000Z');
+    expect(new Date(row.snapshotAt).toISOString()).toBe('2026-08-02T08:40:00.000Z');
   });
 
   it('allows an immediate fresh request after a failed export', async () => {

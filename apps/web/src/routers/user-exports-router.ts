@@ -13,7 +13,7 @@ import {
 const ExportIdSchema = z.object({ exportId: z.string().uuid() });
 const ListInputSchema = z.object({ cursor: z.string().uuid().optional() }).optional();
 const PAGE_SIZE = 20;
-const EXPORT_DATA_CUTOFF = '2026-08-03T00:00:00.000Z';
+const EXPORT_DATA_CUTOFF = '2026-08-02T08:40:00.000Z';
 
 type UserExportRow = {
   id: string;

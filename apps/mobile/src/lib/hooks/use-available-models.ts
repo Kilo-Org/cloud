@@ -164,13 +164,10 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
   const { data, isLoading } = useQuery({
     queryKey: ['org-default-model', organizationId] as const,
     queryFn: async () => {
-      if (!organizationId) {
-        throw new Error('Missing organizationId');
-      }
       const defaults = await fetchOrgDefaults(organizationId);
       return defaults;
     },
-    enabled: Boolean(organizationId),
+    enabled: true,
     staleTime: 60_000,
   });
   return { defaultModel: data?.defaultModel, isLoading };

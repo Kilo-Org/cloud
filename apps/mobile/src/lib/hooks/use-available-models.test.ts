@@ -53,15 +53,8 @@ describe('useOrgDefaultModel', () => {
     const captured = { queryFn: vi.fn() };
     useQueryMock.mockImplementation((options: { queryFn: () => Promise<unknown> }) => {
       captured.queryFn = vi.fn(options.queryFn);
-      return { data: undefined, isLoading: false };
+      return { data: { defaultModel: 'kilo-auto/balanced' }, isLoading: false };
     });
-
-    useOrgDefaultModel(undefined);
-    expect(useQueryMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        enabled: false,
-      })
-    );
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -69,8 +62,22 @@ describe('useOrgDefaultModel', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await expect(captured.queryFn()).rejects.toThrow('Missing organizationId');
-    expect(mockFetch).not.toHaveBeenCalled();
+    const hookResult = useOrgDefaultModel(undefined);
+    expect(hookResult.defaultModel).toBe('kilo-auto/balanced');
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['org-default-model', undefined],
+        enabled: true,
+      })
+    );
+
+    const result = await captured.queryFn();
+    expect(result).toEqual({ defaultModel: 'kilo-auto/balanced' });
+    expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/api/defaults', {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
 
     vi.unstubAllGlobals();
   });

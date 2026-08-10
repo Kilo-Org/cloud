@@ -150,7 +150,7 @@ export function DataExportsClient() {
           <CardDescription>
             The export includes your App Builder project titles and the prompt prefixes recorded
             with your usage history. Large accounts can take a while to generate. We&apos;ll email
-            you when it&apos;s ready, and downloads expire 7 days after that.
+            you when it&apos;s ready, and downloads expire 24 hours after that.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-3">

@@ -12,11 +12,11 @@ jest.mock('next/navigation', () => ({ notFound: mockNotFound }));
 jest.mock('./DataExportsClient', () => ({ DataExportsClient: () => null }));
 
 describe('DataExportsPage', () => {
-  it('requires Kilo admin authentication', async () => {
+  it('requires user authentication', async () => {
     mockGetUserFromAuth.mockResolvedValue({ user: null });
     const { default: DataExportsPage } = await import('./page');
 
     await expect(DataExportsPage()).rejects.toThrow('NEXT_NOT_FOUND');
-    expect(mockGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
+    expect(mockGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: false });
   });
 });

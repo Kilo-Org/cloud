@@ -28,9 +28,9 @@ describe('user exports router guards and serialization', () => {
     expect(() => __test__.requireWebSession(false)).not.toThrow();
   });
 
-  it('rejects non-admin users', async () => {
+  it('allows non-admin users to list their exports', async () => {
     const caller = await createCallerForUser(stranger.id);
-    await expect(caller.userExports.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.userExports.list()).resolves.toEqual({ exports: [], nextCursor: null });
   });
 
   it('normalizes database timestamp text into strict UTC ISO strings', () => {
@@ -87,7 +87,7 @@ describe('user exports router guards and serialization', () => {
   });
 
   it('uses the fixed August 2 08:40 UTC data cutoff for new exports', async () => {
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createCallerForUser(stranger.id);
 
     const requested = await caller.userExports.request();
     const [row] = await db
@@ -153,7 +153,7 @@ describe('user exports router guards and serialization', () => {
     const [ready] = await db
       .insert(user_data_exports)
       .values({
-        kilo_user_id: stranger.id,
+        kilo_user_id: owner.id,
         snapshot_at: new Date().toISOString(),
         status: 'ready',
         r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
@@ -165,7 +165,7 @@ describe('user exports router guards and serialization', () => {
     const [expired] = await db
       .insert(user_data_exports)
       .values({
-        kilo_user_id: owner.id,
+        kilo_user_id: stranger.id,
         snapshot_at: new Date().toISOString(),
         status: 'ready',
         r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
@@ -174,7 +174,7 @@ describe('user exports router guards and serialization', () => {
         expires_at: new Date(Date.now() - 60_000).toISOString(),
       })
       .returning();
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createCallerForUser(stranger.id);
 
     await expect(caller.userExports.createDownload({ exportId: ready.id })).rejects.toMatchObject({
       code: 'NOT_FOUND',

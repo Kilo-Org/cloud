@@ -141,6 +141,20 @@ function setCacheControlOnMessagesMessage(
   }
 }
 
+function setCacheControlOnMessagesSystem(
+  system: NonNullable<Anthropic.MessageCreateParams['system']>,
+  cacheControl: Anthropic.CacheControlEphemeral
+): NonNullable<Anthropic.MessageCreateParams['system']> {
+  if (typeof system === 'string') {
+    return [{ type: 'text', text: system, cache_control: cacheControl }];
+  }
+  const cacheTarget = system.at(-1);
+  if (cacheTarget) {
+    cacheTarget.cache_control = cacheControl;
+  }
+  return system;
+}
+
 function isCacheableMessagesContentBlock(
   item: Anthropic.ContentBlockParam
 ): item is Exclude<
@@ -200,12 +214,14 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     Array.isArray(request.body.input) &&
     !containsCacheControl(request.body.input)
   ) {
-    const systemMessage = request.body.input.find(
-      msg => msg.type === 'message' && msg.role === 'system'
+    const instructionsMessage = request.body.input.findLast(
+      msg => msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
     );
-    if (systemMessage) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
-      setPromptCacheBreakpointOnResponsesMessage(systemMessage);
+    if (instructionsMessage) {
+      console.debug(
+        '[addCacheBreakpoints] setting cache breakpoint on instructions responses message'
+      );
+      setPromptCacheBreakpointOnResponsesMessage(instructionsMessage);
     }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
@@ -216,13 +232,21 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       );
       setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
-  } else if (request.kind === 'messages' && !containsCacheControl(request.body.messages)) {
+  } else if (
+    request.kind === 'messages' &&
+    !containsCacheControl(request.body.system) &&
+    !containsCacheControl(request.body.messages)
+  ) {
+    const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
+    delete request.body.cache_control;
+    if (request.body.system) {
+      console.debug('[addCacheBreakpoints] setting cache breakpoint on messages system prompt');
+      request.body.system = setCacheControlOnMessagesSystem(request.body.system, cacheControl);
+    }
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
       console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
       // Vercel AI Gateway does not honor top-level cache_control on Messages API requests.
-      const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
-      delete request.body.cache_control;
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
   }

@@ -135,14 +135,18 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * Collect every string leaf of a JSON-ish value. `excludeKeys` skips record
- * entries under those keys (harness metadata that must not count as evidence).
+ * Collect every string, number, and boolean leaf of a JSON-ish value as text.
+ * A numeric eval result (`{ ok: true, value: 6 }`) is evidence like the string
+ * form. `excludeKeys` skips record entries under those keys (harness metadata
+ * that must not count as evidence).
  */
 export const findStringValues = (value: unknown, excludeKeys?: ReadonlySet<string>): string[] => {
   const output: string[] = [];
   const walk = (entry: unknown): void => {
     if (typeof entry === 'string') {
       output.push(entry);
+    } else if (typeof entry === 'number' || typeof entry === 'boolean') {
+      output.push(String(entry));
     } else if (Array.isArray(entry)) {
       for (const item of entry) {
         walk(item);

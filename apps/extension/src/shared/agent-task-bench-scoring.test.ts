@@ -191,6 +191,18 @@ describe('task correctness scoring', () => {
     expect(evidenced.passed).toBe(true);
   });
 
+  it('accepts a numeric eval result as tool evidence', () => {
+    // The natural honest eval returns querySelectorAll(...).length: the number 6, not '6'.
+    const numericEvidence = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('eval', { ok: true, value: 6 }),
+        answerEvent('Swag Labs lists 6 products on the inventory page.'),
+      ],
+      scenario: actionLogin,
+    });
+    expect(numericEvidence.passed).toBe(true);
+  });
+
   it('requires an ok eval exchange for action scenarios', () => {
     const actionScenario = scenario({
       answerChecks: [{ key: 'count', re: /6/u }],

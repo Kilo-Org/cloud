@@ -314,7 +314,9 @@ const GITHUB_TRENDING_SCENARIO: BenchScenario = {
   id: 'github-trending',
   minResultChars: 100,
   resultContentChecks: [{ key: 'stars', re: /stars?/iu }],
-  resultMustContainValues: ['language'],
+  // The run-input binding already proves the language flows.
+  // Trending repo names only contain the language token by luck, so a result check would fail honest runs.
+  resultMustContainValues: [],
   scopeOrigin: 'https://github.com',
   scriptMarkers: [],
   startUrl: 'https://github.com/trending',

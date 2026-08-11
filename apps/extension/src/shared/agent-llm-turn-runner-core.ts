@@ -196,6 +196,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     nextEvents: AgentConversationEvent[]
   ): Promise<{
     completionEvents: AgentConversationEvent[];
+    finishReason: string | undefined;
     toolCallEvents: ToolCall[];
   }> => {
     const completionEvents: AgentConversationEvent[] = [];
@@ -355,7 +356,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         )
       );
 
-      return { completionEvents, toolCallEvents };
+      return { completionEvents, finishReason: completion.finishReason, toolCallEvents };
     } finally {
       if (didStartAssistantStreaming) {
         // Explicit clear: callers key collapse chrome off this id being undefined.
@@ -377,7 +378,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      const { completionEvents, toolCallEvents } = await appendCompletion(nextConversationEvents);
+      const { completionEvents, finishReason, toolCallEvents } =
+        await appendCompletion(nextConversationEvents);
 
       if (completionEvents.length === 0) {
         appendEvents([createAssistantMessage(noResponseMessage)]);
@@ -396,6 +398,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
             )?.text ?? '';
         if (
           !continueNudgeSent &&
+          // An overflowed prompt cannot fit again with a nudge appended; re-sending it would burn a second billed request on a guaranteed overflow.
+          finishReason !== 'model_context_window_exceeded' &&
           remainingRounds > 1 &&
           !isSignalAborted(signal) &&
           (endedThinkingOnly(completionEvents, lastAssistantText) ||

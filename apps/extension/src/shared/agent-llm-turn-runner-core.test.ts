@@ -843,6 +843,33 @@ describe('continue nudge', () => {
     expect(calls).toBe(2);
   });
 
+  it('does not nudge an announcement that ended on a context-window overflow', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Creating the workflow now."},"finish_reason":null}]}\n\n',
+          'data: {"choices":[{"delta":{},"finish_reason":"model_context_window_exceeded"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    // The prompt already overflowed; a nudge re-sends it plus one more message, a guaranteed second overflow.
+    expect(calls).toBe(2);
+  });
+
   it('nudges an announcement that mentions a URL query string (mid-text ?)', async () => {
     let calls = 0;
     const fetch: FetchLike = () => {

@@ -1,6 +1,11 @@
 import { describe, expect, test } from '@jest/globals';
 import { detectRequestLogErrors } from './api-request-log-errors';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayMessagesRequest,
+  GatewayRequest,
+  GatewayResponsesRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 
 const weatherParameters = {
   type: 'object',
@@ -10,40 +15,56 @@ const weatherParameters = {
   required: ['city'],
 };
 
-const chatTool = {
-  type: 'function' as const,
-  function: { name: 'get_weather', parameters: weatherParameters },
-};
-
-const responseTool = {
-  type: 'function' as const,
-  name: 'get_weather',
-  parameters: weatherParameters,
-};
-
-const messageTool = {
-  name: 'get_weather',
-  input_schema: weatherParameters,
-};
-
-function chatRequest(tools = [chatTool]): GatewayRequest {
+function chatRequest(overrides: Partial<OpenRouterChatCompletionRequest> = {}): GatewayRequest {
   return {
     kind: 'chat_completions',
-    body: { model: 'test', messages: [], tools },
+    body: {
+      model: 'test',
+      messages: [],
+      tools: [
+        {
+          type: 'function',
+          function: { name: 'get_weather', parameters: weatherParameters },
+        },
+      ],
+      ...overrides,
+    },
   };
 }
 
-function responsesRequest(tools = [responseTool]): GatewayRequest {
+function responsesRequest(overrides: Partial<GatewayResponsesRequest> = {}): GatewayRequest {
   return {
     kind: 'responses',
-    body: { model: 'test', input: [], tools },
+    body: {
+      model: 'test',
+      input: [],
+      tools: [
+        {
+          type: 'function',
+          name: 'get_weather',
+          parameters: weatherParameters,
+        },
+      ],
+      ...overrides,
+    },
   };
 }
 
-function messagesRequest(tools = [messageTool]): GatewayRequest {
+function messagesRequest(overrides: Partial<GatewayMessagesRequest> = {}): GatewayRequest {
   return {
     kind: 'messages',
-    body: { model: 'claude-test', max_tokens: 16, messages: [], tools },
+    body: {
+      model: 'claude-test',
+      max_tokens: 16,
+      messages: [],
+      tools: [
+        {
+          name: 'get_weather',
+          input_schema: weatherParameters,
+        },
+      ],
+      ...overrides,
+    },
   };
 }
 
@@ -58,7 +79,7 @@ describe('detectRequestLogErrors', () => {
     expect(
       detectRequestLogErrors(
         sse({ id: 'gen-1', choices: [{ index: 0, delta: { content: 'hi' } }] }),
-        chatRequest([])
+        chatRequest({ tools: [] })
       )
     ).toBeNull();
   });
@@ -69,7 +90,7 @@ describe('detectRequestLogErrors', () => {
         JSON.stringify({
           choices: [{ message: { content: 'hi' } }],
         }),
-        chatRequest([])
+        chatRequest({ tools: [] })
       )
     ).toBeNull();
   });

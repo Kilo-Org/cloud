@@ -63,7 +63,7 @@ export const createSafeToolDefinitions = ({
     {
       function: {
         description:
-          'Read a bounded, sanitized snapshot of the selected browser tab. Returns title, URL, visible text, headings, links, controls, and opaque element ids. Form fields carry name, formAction, and formMethod, so a GET search form can be expressed as a URL without submitting it. The visible text is a window of at most 8000 characters; textStart, textTotalChars, and textTruncated report where the window sits. When textTruncated is true, call again with textStart set to the end of the current window to keep reading — do this until you have read enough for the task.',
+          'Read a bounded, sanitized snapshot of the selected browser tab. Returns title, URL, visible text, headings, links, controls, and opaque element ids. Form fields carry name, formAction, and formMethod, so a GET search form can be expressed as a URL without submitting it. The visible text is a window of at most 24000 characters; textStart, textTotalChars, and textTruncated report where the window sits. When textTruncated is true, call again with textStart set to the end of the current window to keep reading — do this until you have read enough for the task.',
         name: 'get_page_snapshot',
         parameters: {
           additionalProperties: false,

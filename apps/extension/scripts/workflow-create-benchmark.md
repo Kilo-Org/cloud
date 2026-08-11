@@ -98,9 +98,30 @@ additionally require one ok action exchange — `eval` or a real (non-dry)
 the turn total (`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
 
 The deep-content scenarios exist because the page snapshot text is a
-bounded window (8000 chars). `summarize-article` and `qa-deep-fact` fail
+bounded window (24000 chars). `summarize-article` and `qa-deep-fact` fail
 on any harness that cannot read or search past that window; they hold the
 fix honest (snapshot `textStart` paging plus full-page `find_in_page`).
+
+## A/B results on the tools the failing scenarios use
+
+Two levers were measured with the protocol above, one variable per step.
+
+**Snapshot text window, 8000 to 24000 characters — KEPT.** Three attempts
+per cell on `summarize-article`, weak models plus `kilo-auto/efficient` as
+the cost control: passes went 7/12 to 9/12 and median LLM requests roughly
+halved (10 to 4, 14 to 6, 9 to 6). Total snapshot bytes went *down*
+(113k to 82k): reading a long article in three calls instead of nine
+avoids re-sending a growing conversation eight times. Under-reading was
+never stubbornness — nine sequential round-trips give a weak model nine
+chances to stop early.
+
+**Eval navigation recovery — REJECTED.** A click that loads a page
+destroys the JS execution context, and weak models spent 23-60 requests
+retrying it. Returning the landed page as a success instead of that error
+did not help: passes went 3/8 to 2/8 and `laguna-xs-2.1:free` got worse
+(46 to 77 requests). Removing the error appears to remove the signal that
+something went wrong, so the model keeps acting on a stale page model. The
+change was reverted; the error text stays.
 
 ## Prerequisites
 

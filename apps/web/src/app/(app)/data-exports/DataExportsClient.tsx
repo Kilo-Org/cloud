@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatBytes } from '@/lib/kiloclaw/instance-display';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
@@ -294,27 +295,69 @@ function ExportHistoryRow({ record, isPreparingThisDownload, onDownload }: Expor
         )}
       </div>
       <div className="shrink-0">
-        {displayStatus === 'ready' && (
-          <Button
-            size="sm"
-            onClick={onDownload}
-            disabled={isPreparingThisDownload}
-            aria-label={`Download export requested ${requestedLabel}`}
-          >
-            {isPreparingThisDownload ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Preparing download...
-              </>
-            ) : (
-              <>
-                <Download />
-                Download
-              </>
-            )}
-          </Button>
+        {(displayStatus === 'ready' || displayStatus === 'expired') && (
+          <DownloadExportButton
+            isExpired={displayStatus === 'expired'}
+            isPreparingThisDownload={isPreparingThisDownload}
+            requestedLabel={requestedLabel}
+            onDownload={onDownload}
+          />
         )}
       </div>
     </li>
+  );
+}
+
+type DownloadExportButtonProps = {
+  isExpired: boolean;
+  isPreparingThisDownload: boolean;
+  requestedLabel: string;
+  onDownload: () => void;
+};
+
+function DownloadExportButton({
+  isExpired,
+  isPreparingThisDownload,
+  requestedLabel,
+  onDownload,
+}: DownloadExportButtonProps) {
+  const button = (
+    <Button
+      size="sm"
+      onClick={onDownload}
+      disabled={isExpired || isPreparingThisDownload}
+      aria-label={
+        isExpired
+          ? `Download expired for export requested ${requestedLabel}`
+          : `Download export requested ${requestedLabel}`
+      }
+    >
+      {isPreparingThisDownload ? (
+        <>
+          <Loader2 className="animate-spin" />
+          Preparing download...
+        </>
+      ) : (
+        <>
+          <Download />
+          Download
+        </>
+      )}
+    </Button>
+  );
+
+  if (!isExpired) return button;
+
+  return (
+    <Tooltip>
+      {/* A disabled button emits no pointer events, so the span wrapper keeps the tooltip hoverable
+          and focusable. */}
+      <TooltipTrigger asChild>
+        <span className="inline-flex" tabIndex={0}>
+          {button}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Download expired. Request a new export.</TooltipContent>
+    </Tooltip>
   );
 }

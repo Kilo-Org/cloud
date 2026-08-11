@@ -471,6 +471,13 @@ export function localPostgresUrl(): string {
   return `postgres://postgres:postgres@localhost:${INFRA_PORTS.postgres + portOffset}/postgres`;
 }
 
+// The export warehouse is a separate database on the same local Postgres. Create it
+// with `createdb data_export` and load it from the schema repo; an absent database
+// only disables the warehouse-backed export sources.
+export function localDataExportUrl(): string {
+  return `postgres://postgres:postgres@localhost:${INFRA_PORTS.postgres + portOffset}/data_export`;
+}
+
 // Docker Compose profile that gates each infra service, if any. Services not
 // listed here are part of the default profile and start with a plain `up -d`.
 const INFRA_PROFILES: Record<string, string> = { grafana: 'grafana' };
@@ -507,7 +514,8 @@ function workerEnvPrefix(): string[] {
     vars.push(`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=${localPostgresUrl()}`);
     vars.push(
       `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_PRIMARY_STATE_DB=${localPostgresUrl()}`,
-      `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_REPLICA_DB=${localPostgresUrl()}`
+      `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_REPLICA_DB=${localPostgresUrl()}`,
+      `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_WAREHOUSE_DB=${localDataExportUrl()}`
     );
   }
   return vars.length > 0 ? ['env', ...vars] : [];

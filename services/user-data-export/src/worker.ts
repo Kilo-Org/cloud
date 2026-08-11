@@ -90,7 +90,10 @@ export async function handleGenerationFailure(input: {
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
+  /** Live primary replica. Identity only. */
   EXPORT_REPLICA_DB: HyperdriveBinding;
+  /** Export warehouse. Read only, frozen at its load cutoff. */
+  EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
   INTERNAL_API_SECRET: string;
@@ -230,8 +233,10 @@ export function exportHeader(job: ExportJob): string {
     includedSources: [
       'kilocode_users',
       'app_builder_projects',
-      'microdollar_usage_metadata',
+      'app_builder_messages',
+      'cli_sessions',
       'system_prompt_prefix',
+      'microdollar_usage_metadata',
     ],
     snapshotAt: strictIsoTimestamp(job.snapshot_at),
   })}\n`;
@@ -297,7 +302,10 @@ export async function processGenerateMessage(
       phase = 'claim';
     }
 
-    const adapters = createSourceAdapters(createReplicaQuery(env.EXPORT_REPLICA_DB));
+    const adapters = createSourceAdapters({
+      replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB),
+      warehouseQuery: createReplicaQuery(env.EXPORT_WAREHOUSE_DB),
+    });
     let adapter = resolveSourceAdapter(adapters, job.current_source);
     if (!adapter || !adapter.readPage) {
       throw new Error('Export job has an invalid current source');
@@ -361,7 +369,7 @@ export async function processGenerateMessage(
         kiloUserId: job.kilo_user_id,
         snapshotAt: job.snapshot_at,
         cursor,
-        limit: PAGE_SIZE,
+        limit: adapter.pageSize ?? PAGE_SIZE,
       });
       for (const record of page.records) {
         const recordBytes = encoder.encode(jsonLine(record));

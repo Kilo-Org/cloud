@@ -859,4 +859,133 @@ describe('coding plans router', () => {
     expect(revoked.upstream_plan_id).toBe('minimax-deprovision-plan');
     expect(revoked.encrypted_api_key).toBeNull();
   });
+
+  it('returns one queue row per inventory credential when multiple canceled subscriptions reference it', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const firstUser = await insertTestUser();
+    const secondUser = await insertTestUser();
+    const [workItem] = await db
+      .insert(coding_plan_key_inventory)
+      .values({
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        upstream_plan_id: 'minimax-deprovision-plan',
+        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: crypto.randomUUID(),
+        status: 'revocation_pending',
+        revocation_requested_at: new Date().toISOString(),
+      })
+      .returning();
+    await db.insert(coding_plan_subscriptions).values([
+      {
+        user_id: firstUser.id,
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        key_inventory_id: workItem.id,
+        status: 'canceled',
+        cost_microdollars: COST_MICRODOLLARS,
+        billing_period_days: 30,
+        current_period_start: '2026-06-10T13:55:16.000Z',
+        current_period_end: '2026-07-10T13:55:16.000Z',
+        credit_renewal_at: '2026-07-10T13:55:16.000Z',
+        canceled_at: '2026-07-10T13:55:16.000Z',
+        cancellation_reason: 'user_cancelled',
+      },
+      {
+        user_id: secondUser.id,
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        key_inventory_id: workItem.id,
+        status: 'canceled',
+        cost_microdollars: COST_MICRODOLLARS,
+        billing_period_days: 30,
+        current_period_start: '2026-07-11T02:47:07.000Z',
+        current_period_end: '2026-08-11T02:47:07.000Z',
+        credit_renewal_at: '2026-08-11T02:47:07.000Z',
+        canceled_at: '2026-08-11T02:47:07.000Z',
+        cancellation_reason: 'user_cancelled',
+      },
+    ]);
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
+      expect.objectContaining({
+        inventoryKeyId: workItem.id,
+        subscriptionExpiresAt: '2026-08-11T02:47:07.000Z',
+      }),
+    ]);
+  });
+
+  it('returns pending inventory credentials that have no subscription reference', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const [workItem] = await db
+      .insert(coding_plan_key_inventory)
+      .values({
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        upstream_plan_id: 'minimax-orphan-plan',
+        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: crypto.randomUUID(),
+        status: 'revocation_pending',
+        revocation_requested_at: new Date().toISOString(),
+      })
+      .returning();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
+      expect.objectContaining({
+        inventoryKeyId: workItem.id,
+        subscriptionExpiresAt: null,
+      }),
+    ]);
+  });
+
+  it('uses the latest subscription period end when three subscriptions reference one inventory credential', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const users = await Promise.all([insertTestUser(), insertTestUser(), insertTestUser()]);
+    const [workItem] = await db
+      .insert(coding_plan_key_inventory)
+      .values({
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        upstream_plan_id: 'minimax-three-ref-plan',
+        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: crypto.randomUUID(),
+        status: 'revocation_pending',
+        revocation_requested_at: new Date().toISOString(),
+      })
+      .returning();
+    const periodEnds = [
+      '2026-06-01T00:00:00.000Z',
+      '2026-08-15T12:00:00.000Z',
+      '2026-07-01T00:00:00.000Z',
+    ] as const;
+    await db.insert(coding_plan_subscriptions).values(
+      users.map((user, index) => {
+        const currentPeriodEnd = periodEnds[index] ?? periodEnds[0];
+        return {
+          user_id: user.id,
+          plan_id: PLAN_ID,
+          provider_id: 'minimax',
+          key_inventory_id: workItem.id,
+          status: 'canceled' as const,
+          cost_microdollars: COST_MICRODOLLARS,
+          billing_period_days: 30,
+          current_period_start: '2026-05-01T00:00:00.000Z',
+          current_period_end: currentPeriodEnd,
+          credit_renewal_at: currentPeriodEnd,
+          canceled_at: currentPeriodEnd,
+          cancellation_reason: 'user_cancelled',
+        };
+      })
+    );
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
+      expect.objectContaining({
+        inventoryKeyId: workItem.id,
+        subscriptionExpiresAt: '2026-08-15T12:00:00.000Z',
+      }),
+    ]);
+  });
 });

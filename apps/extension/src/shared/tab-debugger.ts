@@ -474,11 +474,11 @@ const runInjectedEval = (code: string): unknown =>
 // eslint-disable-next-line max-params -- the injected function is serialized into the page, so every input must arrive as a positional string argument.
 const runInjectedPageSnapshot = (
   timeoutMsText: string,
+  maxTextLengthText: string,
   textStartText?: string,
-  queryText?: string,
-  maxTextLengthText?: string
+  queryText?: string
 ): PageSnapshot => {
-  const maxTextLength = Number(maxTextLengthText ?? '24000');
+  const maxTextLength = Number(maxTextLengthText);
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
   const maxTextMatches = 20;
@@ -953,7 +953,7 @@ export const getPageSnapshotInTabWithScripting = async ({
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
-          args: [String(timeoutMs), String(textStart), query, String(MAX_SNAPSHOT_TEXT_LENGTH)],
+          args: [String(timeoutMs), String(MAX_SNAPSHOT_TEXT_LENGTH), String(textStart), query],
           func: runInjectedPageSnapshot,
           target: { tabId },
           world: 'MAIN',

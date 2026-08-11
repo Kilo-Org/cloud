@@ -43,6 +43,7 @@ function responsesRequest(overrides: Partial<GatewayResponsesRequest> = {}): Gat
           type: 'function',
           name: 'get_weather',
           parameters: weatherParameters,
+          strict: null,
         },
       ],
       ...overrides,

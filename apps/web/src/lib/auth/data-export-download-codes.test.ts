@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
+import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { db } from '@/lib/drizzle';
 import {
   consumeDataExportDownloadCode,
@@ -23,8 +24,8 @@ async function mintCode(email = testEmail, forExportId = exportId) {
 }
 
 function wrongCodeFor(code: string): string {
-  const shifted = (Number(code) + 1) % 1_000_000;
-  return String(shifted).padStart(6, '0');
+  const shifted = (Number(code) + 1) % 10 ** DOWNLOAD_CODE_LENGTH;
+  return String(shifted).padStart(DOWNLOAD_CODE_LENGTH, '0');
 }
 
 beforeEach(async () => {
@@ -32,10 +33,10 @@ beforeEach(async () => {
 });
 
 describe('data export download codes', () => {
-  it('mints a six-digit code stored only as a keyed hash', async () => {
+  it('mints an eight-digit code stored only as a keyed hash', async () => {
     const { code, challengeId } = await mintCode();
 
-    expect(code).toMatch(/^\d{6}$/);
+    expect(code).toMatch(new RegExp(`^\\d{${DOWNLOAD_CODE_LENGTH}}$`));
     const [row] = await db
       .select()
       .from(magic_link_tokens)

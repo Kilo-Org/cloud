@@ -2,6 +2,7 @@ import 'server-only';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { randomInt, randomUUID, createHmac } from 'crypto';
+import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { normalizeEmail } from '@/lib/utils';
@@ -26,7 +27,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
 /**
  * Binds the code to both the account and the specific export, so a code minted
  * for one export cannot authorize another. Keyed by the server secret so a
- * database leak does not permit offline enumeration of the six-digit space.
+ * database leak does not permit offline enumeration of the code space.
  */
 function hashDownloadCode(email: string, exportId: string, code: string): string {
   return createHmac('sha256', NEXTAUTH_SECRET)
@@ -48,7 +49,7 @@ export type CreateDownloadCodeResult =
   | { status: 'cooldown' };
 
 /**
- * Mint a 6-digit code authorizing one download of `exportId`.
+ * Mint a numeric code authorizing one download of `exportId`.
  *
  * Only one live download code exists per account at a time: prior rows for the
  * email are removed, including consumed ones, so a recycled code can never
@@ -59,7 +60,7 @@ export async function createDataExportDownloadCode(
   exportId: string
 ): Promise<CreateDownloadCodeResult> {
   const normalizedEmail = normalizeEmail(email);
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const code = String(randomInt(0, 10 ** DOWNLOAD_CODE_LENGTH)).padStart(DOWNLOAD_CODE_LENGTH, '0');
   const challengeId = randomUUID();
 
   return db.transaction(async tx => {

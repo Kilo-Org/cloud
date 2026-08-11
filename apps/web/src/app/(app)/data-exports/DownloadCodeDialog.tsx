@@ -15,8 +15,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTRPC } from '@/lib/trpc/utils';
+import { DOWNLOAD_CODE_LENGTH } from './data-export-contract';
 
-const CODE_LENGTH = 6;
 const CODE_INPUT_ID = 'data-export-download-code';
 const CODE_HINT_ID = 'data-export-download-code-hint';
 const CODE_ERROR_ID = 'data-export-download-code-error';
@@ -92,8 +92,8 @@ export function DownloadCodeDialog({
         <DialogHeader>
           <DialogTitle>Enter your download code</DialogTitle>
           <DialogDescription>
-            We emailed a {CODE_LENGTH}-digit code to your account address. It authorizes one
-            download and expires in {challenge?.expiresInMinutes ?? 10} minutes.
+            We emailed a {DOWNLOAD_CODE_LENGTH}-digit code to your account address. It authorizes
+            one download and expires in {challenge?.expiresInMinutes ?? 10} minutes.
           </DialogDescription>
         </DialogHeader>
 
@@ -101,7 +101,7 @@ export function DownloadCodeDialog({
           className="flex flex-col gap-2"
           onSubmit={event => {
             event.preventDefault();
-            if (!challenge || code.length !== CODE_LENGTH) return;
+            if (!challenge || code.length !== DOWNLOAD_CODE_LENGTH) return;
             createDownload.mutate({
               exportId: challenge.exportId,
               challengeId: challenge.challengeId,
@@ -113,11 +113,13 @@ export function DownloadCodeDialog({
           <Input
             id={CODE_INPUT_ID}
             value={code}
-            onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+            onChange={event =>
+              setCode(event.target.value.replace(/\D/g, '').slice(0, DOWNLOAD_CODE_LENGTH))
+            }
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
-            maxLength={CODE_LENGTH}
+            maxLength={DOWNLOAD_CODE_LENGTH}
             aria-describedby={errorMessage ? CODE_ERROR_ID : CODE_HINT_ID}
             aria-invalid={errorMessage !== null}
             className="font-mono tracking-[0.4em]"
@@ -145,7 +147,7 @@ export function DownloadCodeDialog({
             </Button>
             <Button
               type="submit"
-              disabled={code.length !== CODE_LENGTH || createDownload.isPending}
+              disabled={code.length !== DOWNLOAD_CODE_LENGTH || createDownload.isPending}
             >
               {createDownload.isPending ? (
                 <>

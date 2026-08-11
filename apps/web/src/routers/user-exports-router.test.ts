@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { eq, sql } from 'drizzle-orm';
+import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { db } from '@/lib/drizzle';
 import { magic_link_tokens, user_data_exports, type User } from '@kilocode/db/schema';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -228,7 +229,7 @@ describe('user exports router guards and serialization', () => {
     const result = await caller.userExports.requestDownloadCode({ exportId });
 
     expect(mockSendCode).toHaveBeenCalledWith(OWNER_EMAIL, {
-      code: expect.stringMatching(/^\d{6}$/),
+      code: expect.stringMatching(new RegExp(`^\\d{${DOWNLOAD_CODE_LENGTH}}$`)),
       expiresInMinutes: 10,
     });
     expect(JSON.stringify(result)).not.toContain(lastEmailedCode());
@@ -274,10 +275,36 @@ describe('user exports router guards and serialization', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('drops the code when the mail provider throws instead of reporting failure', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    // Mailgun rejects on an API or network failure rather than returning `sent: false`.
+    mockSendCode.mockRejectedValue(new Error('mailgun unavailable'));
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    const rows = await db
+      .select({ token_hash: magic_link_tokens.token_hash })
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, OWNER_EMAIL));
+    expect(rows).toHaveLength(0);
+
+    // No leftover row means the cooldown does not report a code that never arrived.
+    mockSendCode.mockResolvedValue({ sent: true });
+    await expect(caller.userExports.requestDownloadCode({ exportId })).resolves.toMatchObject({
+      challengeId: expect.any(String),
+    });
+  });
+
   it('refuses to sign a download without the emailed code', async () => {
     const exportId = await insertReadyExport(owner.id);
     const { caller, challengeId, code } = await requestCode(owner.id, exportId);
-    const wrongCode = String((Number(code) + 1) % 1_000_000).padStart(6, '0');
+    const wrongCode = String((Number(code) + 1) % 10 ** DOWNLOAD_CODE_LENGTH).padStart(
+      DOWNLOAD_CODE_LENGTH,
+      '0'
+    );
 
     await expect(
       caller.userExports.createDownload({ exportId, challengeId, code: wrongCode })
@@ -365,7 +392,7 @@ describe('user exports router guards and serialization', () => {
       .returning();
     const caller = await createCallerForUser(owner.id);
     // Ownership and freshness are checked before the code, so these never reach it.
-    const unusedCode = { code: '000000', challengeId: crypto.randomUUID() };
+    const unusedCode = { code: '0'.repeat(DOWNLOAD_CODE_LENGTH), challengeId: crypto.randomUUID() };
 
     await expect(
       caller.userExports.createDownload({ exportId: ready.id, ...unusedCode })

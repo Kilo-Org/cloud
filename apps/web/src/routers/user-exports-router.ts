@@ -1,8 +1,10 @@
 import 'server-only';
 
+import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
+import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
 import {
   consumeDataExportDownloadCode,
@@ -24,7 +26,7 @@ import {
 const ExportIdSchema = z.object({ exportId: z.string().uuid() });
 const DownloadInputSchema = z.object({
   exportId: z.string().uuid(),
-  code: z.string().regex(/^\d{6}$/),
+  code: z.string().regex(new RegExp(`^\\d{${DOWNLOAD_CODE_LENGTH}}$`)),
   challengeId: z.string().uuid(),
 });
 const ListInputSchema = z.object({ cursor: z.string().uuid().optional() }).optional();
@@ -105,6 +107,44 @@ function requireDownloadCodeRecipient(email: string | null): string {
     });
   }
   return email;
+}
+
+/**
+ * Email a freshly minted code, dropping the code row unless it was delivered.
+ *
+ * The mail path reports a refused address as `{ sent: false }` but throws on an
+ * API or network failure, and both mean the same thing here: nothing reached the
+ * inbox. A code left behind can only ever fail verification, and its `created_at`
+ * still trips the resend cooldown, so the immediate retry would claim a code was
+ * just sent when none was.
+ */
+async function emailDownloadCodeOrDrop(
+  email: string,
+  created: { code: string; challengeId: string }
+): Promise<void> {
+  let delivered = false;
+  try {
+    const sent = await sendDataExportDownloadCodeEmail(email, {
+      code: created.code,
+      expiresInMinutes: DOWNLOAD_CODE_EXPIRY_MINUTES,
+    });
+    delivered = sent.sent;
+  } catch (error) {
+    captureException(error);
+  }
+  if (delivered) return;
+
+  try {
+    await deleteDataExportDownloadCode(created.challengeId);
+  } catch (error) {
+    // Losing the cleanup only costs the user the cooldown, so report it and
+    // still tell the caller the truth about the email.
+    captureException(error);
+  }
+  throw new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'The download code could not be emailed. Try again shortly.',
+  });
 }
 
 function downloadCodeError(result: Exclude<ReserveDownloadCodeResult, 'ok'>): TRPCError {
@@ -242,18 +282,7 @@ export const userExportsRouter = createTRPCRouter({
       });
     }
 
-    const sent = await sendDataExportDownloadCodeEmail(email, {
-      code: created.code,
-      expiresInMinutes: DOWNLOAD_CODE_EXPIRY_MINUTES,
-    });
-    if (!sent.sent) {
-      // Leaving an unsendable code live would only ever fail verification.
-      await deleteDataExportDownloadCode(created.challengeId);
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'The download code could not be emailed. Try again shortly.',
-      });
-    }
+    await emailDownloadCodeOrDrop(email, created);
 
     return {
       challengeId: created.challengeId,

@@ -65,7 +65,7 @@ const createSnapshotId = (): string => {
 };
 const snapshotCache = new Map<string, PageSnapshot>();
 // Last snapshot served per tab, for the unchanged-page fast path. Content only — snapshotId always differs.
-const lastServedSnapshotByTab = new Map<number, { contentKey: string; snapshotId: string }>();
+type ServedSnapshotsByTab = Map<number, { contentKey: string; snapshotId: string }>;
 const getSnapshotCacheKey = (tabId: number, snapshotId: string): string => `${tabId}:${snapshotId}`;
 const cacheSnapshot = (tabId: number, snapshot: PageSnapshot): void => {
   snapshotCache.set(getSnapshotCacheKey(tabId, snapshot.snapshotId), snapshot);
@@ -206,7 +206,10 @@ const getFindResults = (snapshot: PageSnapshot, query: string) => {
   };
 };
 
-export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalTabResult> => {
+const runSafeToolCall = async (
+  lastServedSnapshotByTab: ServedSnapshotsByTab,
+  toolCall: SafeToolCall
+): Promise<EvalTabResult> => {
   if (toolCall.name === 'web_search') {
     // Web search needs the caller's auth context; the turn runners route it to executeWebSearchToolCall before this dispatch.
     return { error: 'Web search is not available in this context.', ok: false };
@@ -331,3 +334,11 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
 
   return { ok: true, value: getFindResults(snapshot, query) };
 };
+
+// One executor per turn: its unchanged-snapshot memory must not cross conversations (or a compaction), where the marker would reference a snapshot the model never saw.
+export const createSafeToolExecutor = (): ((toolCall: SafeToolCall) => Promise<EvalTabResult>) => {
+  const lastServedSnapshotByTab: ServedSnapshotsByTab = new Map();
+  return toolCall => runSafeToolCall(lastServedSnapshotByTab, toolCall);
+};
+
+export const executeSafeToolCall = createSafeToolExecutor();

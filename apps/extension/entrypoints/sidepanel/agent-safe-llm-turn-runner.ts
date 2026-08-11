@@ -14,7 +14,7 @@ import type {
   KiloGatewayToolDefinition,
 } from '@/src/shared/kilo-api-client';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
-import { executeSafeToolCall } from './agent-safe-tool-runtime';
+import { createSafeToolExecutor } from './agent-safe-tool-runtime';
 import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
@@ -69,6 +69,8 @@ export const runSafeLlmTurn = ({
   workflowTools = [],
   ...options
 }: RunSafeLlmTurnOptions): Promise<void> => {
+  // One executor per turn: a fresh unchanged-snapshot memory, so a new conversation's first snapshot is served in full.
+  const executeSafeToolCall = createSafeToolExecutor();
   // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
   const runWebSearch = createWebSearchExecutor({
     apiBaseUrl: options.apiBaseUrl,

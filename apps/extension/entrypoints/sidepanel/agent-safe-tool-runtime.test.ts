@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PAGE_SNAPSHOT_MESSAGE } from '../../src/shared/tab-debugger';
 import { createSafeToolCall } from '../../src/shared/agent-conversation';
-import { executeSafeToolCall } from './agent-safe-tool-runtime';
+import { createSafeToolExecutor, executeSafeToolCall } from './agent-safe-tool-runtime';
 
 const sendMessage = vi.hoisted(() => vi.fn());
 
@@ -36,6 +36,20 @@ describe('get_page_snapshot unchanged-page dedupe', () => {
 
     const second = await executeSafeToolCall(snapshotCall(991));
     expect(second).toMatchObject({ ok: true, value: { unchanged: true } });
+  });
+
+  it('serves the full snapshot to a new executor (conversation) on the same tab', async () => {
+    sendMessage.mockResolvedValue(snapshotResponse({ ...snapshotValue }));
+
+    const firstConversation = createSafeToolExecutor();
+    await firstConversation(snapshotCall(993));
+    const repeat = await firstConversation(snapshotCall(993));
+    expect(repeat).toMatchObject({ ok: true, value: { unchanged: true } });
+
+    // A new conversation has never seen the earlier snapshot; the unchanged marker would starve it of page content.
+    const secondConversation = createSafeToolExecutor();
+    const fresh = await secondConversation(snapshotCall(993));
+    expect(fresh).toMatchObject({ ok: true, value: { text: 'Search the site', title: 'Example' } });
   });
 
   it('serves the full snapshot again once the page content changes', async () => {

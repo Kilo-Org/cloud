@@ -10,7 +10,6 @@ const mockNotFound = jest.fn(() => {
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: mockGetUserFromAuth }));
 jest.mock('next/navigation', () => ({ notFound: mockNotFound }));
 jest.mock('./DataExportsClient', () => ({ DataExportsClient: () => null }));
-jest.mock('./RequestDataDeletionCard', () => ({ RequestDataDeletionCard: () => null }));
 
 describe('DataExportsPage', () => {
   it('requires Kilo admin authentication', async () => {

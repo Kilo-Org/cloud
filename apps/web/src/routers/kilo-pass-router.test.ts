@@ -161,6 +161,12 @@ type KiloPassCaller = {
       currentPeriodUsageUsd: number;
       currentPeriodHostingCostUsd: number;
       currentPeriodBonusCreditsUsd: number | null;
+      currentPeriodBonus: {
+        status: 'available' | 'issued';
+        kind: KiloPassIssuanceItemKind | null;
+        actualAmountUsd: number | null;
+        projectedAmountUsd: number | null;
+      };
       isBonusUnlocked: boolean;
       isBonusAvailableToUnlock: boolean;
       refillAt: string | null;
@@ -453,6 +459,7 @@ async function insertBaseCreditsIssuance(params: {
     | KiloPassIssuanceItemKind.Bonus
     | KiloPassIssuanceItemKind.PromoFirstMonth50Pct
     | KiloPassIssuanceItemKind.ReferralBonus;
+  bonusAmountUsd?: number;
 }): Promise<void> {
   const issuedMonth = new Date().toISOString().slice(0, 7);
   const issueMonth = params.issueMonth ?? `${issuedMonth}-01`;
@@ -527,7 +534,7 @@ async function insertBaseCreditsIssuance(params: {
       kilo_pass_issuance_id: issuance.id,
       kind: params.bonusKind,
       credit_transaction_id: bonusCreditTxn.id,
-      amount_usd: 5,
+      amount_usd: params.bonusAmountUsd ?? 5,
       bonus_percent_applied: 0.5,
       created_at: params.createdAt,
     });
@@ -1110,7 +1117,79 @@ describe('kiloPassRouter', () => {
       expect(result.subscription?.currentPeriodBonusCreditsUsd).toBeGreaterThan(0);
       expect(result.subscription?.isBonusUnlocked).toBe(true);
       expect(result.subscription?.isBonusAvailableToUnlock).toBe(false);
+      if (!result.subscription) {
+        throw new Error('Expected an active subscription state');
+      }
+      expect(result.subscription?.currentPeriodBonus).toEqual({
+        status: 'issued',
+        kind: KiloPassIssuanceItemKind.Bonus,
+        actualAmountUsd: 5,
+        projectedAmountUsd: result.subscription.currentPeriodBonusCreditsUsd,
+      });
     });
+
+    it.each([
+      {
+        label: 'lower',
+        amountUsd: 0.5,
+        compare: (actual: number, projected: number) => actual < projected,
+      },
+      {
+        label: 'higher',
+        amountUsd: 8,
+        compare: (actual: number, projected: number) => actual > projected,
+      },
+    ])(
+      'reports the actual referral bonus amount when it is $label than projection',
+      async ({ amountUsd, compare }) => {
+        const stripeMock = getStripeMock();
+        const currentPeriodEndSeconds = 1_700_123_456;
+        stripeMock.subscriptions.retrieve.mockResolvedValue({
+          id: `sub_test_referral_${amountUsd}`,
+          status: 'active',
+          items: {
+            data: [
+              {
+                current_period_end: currentPeriodEndSeconds,
+                current_period_start: currentPeriodEndSeconds - 2_592_000,
+              },
+            ],
+          },
+        });
+
+        const user = await insertTestUser({
+          google_user_email: `kilo-pass-get-state-referral-${amountUsd}@example.com`,
+        });
+        const { id: subscriptionId } = await insertSubscription({
+          kiloUserId: user.id,
+          stripeSubscriptionId: `sub_test_referral_${amountUsd}`,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          currentStreakMonths: 1,
+        });
+        await insertBaseCreditsIssuance({
+          subscriptionId,
+          kiloUserId: user.id,
+          bonusKind: KiloPassIssuanceItemKind.ReferralBonus,
+          bonusAmountUsd: amountUsd,
+        });
+
+        const result = await (await createCallerForUser(user.id)).kiloPass.getState();
+        const projectedAmountUsd = result.subscription?.currentPeriodBonusCreditsUsd;
+
+        expect(result.subscription?.currentPeriodBonus).toEqual({
+          status: 'issued',
+          kind: KiloPassIssuanceItemKind.ReferralBonus,
+          actualAmountUsd: amountUsd,
+          projectedAmountUsd,
+        });
+        expect(typeof projectedAmountUsd).toBe('number');
+        expect(compare(amountUsd, projectedAmountUsd ?? 0)).toBe(true);
+        expect(result.subscription?.isBonusUnlocked).toBe(true);
+        expect(result.subscription?.isBonusAvailableToUnlock).toBe(false);
+      }
+    );
 
     it('keeps first-month current bonus visible for first-time subscribers with a new card', async () => {
       const stripeMock = getStripeMock();

@@ -170,6 +170,7 @@ describe('source adapters', () => {
   it('paginates cli sessions on the journal position pair, not session_id', async () => {
     const { adapters, warehouseCalls } = harness([
       {
+        session_id: 'session-1',
         title: 'Session',
         git_url: 'git@example.com:acme/repo.git',
         git_branch: 'main',
@@ -184,10 +185,53 @@ describe('source adapters', () => {
     expect(warehouseCalls[0]?.values).toEqual(['owner-user', null, null, 1]);
     expect(page?.nextCursor).toEqual({ key: ['10', '20'] });
     expect(page?.records).toEqual([
-      { source: 'cli_sessions', field: 'title', value: 'Session' },
-      { source: 'cli_sessions', field: 'git_url', value: 'git@example.com:acme/repo.git' },
-      { source: 'cli_sessions', field: 'git_branch', value: 'main' },
+      { source: 'cli_sessions', id: '10.20', field: 'session_id', value: 'session-1' },
+      { source: 'cli_sessions', id: '10.20', field: 'title', value: 'Session' },
+      {
+        source: 'cli_sessions',
+        id: '10.20',
+        field: 'git_url',
+        value: 'git@example.com:acme/repo.git',
+      },
+      { source: 'cli_sessions', id: '10.20', field: 'git_branch', value: 'main' },
     ]);
+  });
+
+  it('keys repeated journal rows for one session by position, keeping every value', async () => {
+    // 12% of real sessions change values across their journal rows, so the rows are
+    // a timeline rather than duplication. Collapsing them would drop titles and
+    // branches the user actually had.
+    const { adapters } = harness([
+      {
+        session_id: 'session-1',
+        title: 'Session',
+        git_url: null,
+        git_branch: 'main',
+        most_significant_position: '10',
+        least_significant_position: '1',
+      },
+      {
+        session_id: 'session-1',
+        title: 'Session renamed',
+        git_url: null,
+        git_branch: 'feature/x',
+        most_significant_position: '10',
+        least_significant_position: '2',
+      },
+    ]);
+
+    const page = await requireAdapter(adapters, 'cli_sessions').readPage?.(READ_PAGE_INPUT);
+
+    const branches = page?.records.filter(record => record.field === 'git_branch');
+    expect(branches).toEqual([
+      { source: 'cli_sessions', id: '10.1', field: 'git_branch', value: 'main' },
+      { source: 'cli_sessions', id: '10.2', field: 'git_branch', value: 'feature/x' },
+    ]);
+
+    // Same session, distinguishable rows.
+    const sessionIds = page?.records.filter(record => record.field === 'session_id');
+    expect(sessionIds?.map(record => record.value)).toEqual(['session-1', 'session-1']);
+    expect(sessionIds?.map(record => record.id)).toEqual(['10.1', '10.2']);
   });
 
   it('feeds a cli session cursor back as both position bounds', async () => {
@@ -263,6 +307,7 @@ describe('source adapters', () => {
   it('rejects a non-numeric journal position rather than paging from it', async () => {
     const { adapters } = harness([
       {
+        session_id: 'session-1',
         title: 'Session',
         git_url: null,
         git_branch: null,

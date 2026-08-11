@@ -472,8 +472,9 @@ export function localPostgresUrl(): string {
 }
 
 // The export warehouse is a separate database on the same local Postgres. Create it
-// with `createdb data_export` and load it from the schema repo; an absent database
-// only disables the warehouse-backed export sources.
+// with `createdb data_export` and load it from the schema repo. There is no
+// per-source fallback: without this database the first warehouse read throws and
+// export generation fails after its retries, rather than partially succeeding.
 export function localDataExportUrl(): string {
   return `postgres://postgres:postgres@localhost:${INFRA_PORTS.postgres + portOffset}/data_export`;
 }

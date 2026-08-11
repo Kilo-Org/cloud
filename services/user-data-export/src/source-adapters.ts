@@ -82,10 +82,20 @@ const messageQuery = singleKeyPageQuery({
   columns: 'id, data',
 });
 
-// session_id repeats about eleven times per session, so the journal position pair is
-// the cursor. A cursor on session_id would skip the rest of a session whenever a page
-// boundary landed mid-session.
-const cliSessionQuery = `SELECT title, git_url, git_branch,
+/**
+ * The source is a journal, so a session appears once per recorded change rather
+ * than once overall, and session_id repeats. The journal position pair is therefore
+ * the cursor: a cursor on session_id would skip the rest of a session whenever a
+ * page boundary landed mid-session.
+ *
+ * Every journal row is exported rather than collapsed to one row per session.
+ * Measured on a real account, 12% of sessions carry values that change across their
+ * rows, so collapsing would silently drop titles and branches the user actually
+ * had. Each record is keyed by its journal position so repeated values read as a
+ * timeline instead of looking like duplication, and session_id is exported so rows
+ * belonging to one session can be grouped.
+ */
+const cliSessionQuery = `SELECT session_id, title, git_url, git_branch,
   most_significant_position::text AS most_significant_position,
   least_significant_position::text AS least_significant_position
 FROM cli_sessions
@@ -131,6 +141,7 @@ const MESSAGE_PAGE_SIZE = 200;
 type ProjectRow = { id: string; title: string | null };
 type MessageRow = { id: string; data: unknown };
 type CliSessionRow = {
+  session_id: string | null;
   title: string | null;
   git_url: string | null;
   git_branch: string | null;
@@ -348,6 +359,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           input.limit,
         ]).then(result =>
           result.map(row => ({
+            session_id: nullableString(row.session_id, 'session_id'),
             title: nullableString(row.title, 'title'),
             git_url: nullableString(row.git_url, 'git_url'),
             git_branch: nullableString(row.git_branch, 'git_branch'),
@@ -362,11 +374,17 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          records: rows.flatMap(row => [
-            { source: 'cli_sessions', field: 'title', value: row.title },
-            { source: 'cli_sessions', field: 'git_url', value: row.git_url },
-            { source: 'cli_sessions', field: 'git_branch', value: row.git_branch },
-          ]),
+          records: rows.flatMap(row => {
+            // The journal position identifies the row, so records that repeat a
+            // value are distinguishable rather than looking like duplication.
+            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            return [
+              { source: 'cli_sessions', id, field: 'session_id', value: row.session_id },
+              { source: 'cli_sessions', id, field: 'title', value: row.title },
+              { source: 'cli_sessions', id, field: 'git_url', value: row.git_url },
+              { source: 'cli_sessions', id, field: 'git_branch', value: row.git_branch },
+            ];
+          }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             row.most_significant_position,
             row.least_significant_position,

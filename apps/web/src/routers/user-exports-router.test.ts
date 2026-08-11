@@ -12,6 +12,10 @@ jest.mock('@/lib/email', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/email');
   return { ...actual, sendDataExportDownloadCodeEmail: jest.fn() };
 });
+// The firewall check needs a request scope, which the tRPC caller does not have.
+jest.mock('@/lib/auth/data-export-download-code-rate-limit', () => ({
+  isDataExportDownloadCodeRateLimited: jest.fn(),
+}));
 jest.mock('@/lib/user-data-export-worker-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/user-data-export-worker-client'
@@ -23,9 +27,11 @@ jest.mock('@/lib/user-data-export-worker-client', () => {
   };
 });
 
+import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
 import { sendDataExportDownloadCodeEmail } from '@/lib/email';
 import { requestUserDataExportDownload } from '@/lib/user-data-export-worker-client';
 
+const mockRateLimited = jest.mocked(isDataExportDownloadCodeRateLimited);
 const mockSendCode = jest.mocked(sendDataExportDownloadCodeEmail);
 const mockWorkerDownload = jest.mocked(requestUserDataExportDownload);
 
@@ -44,6 +50,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRateLimited.mockResolvedValue(false);
   mockSendCode.mockResolvedValue({ sent: true });
   mockWorkerDownload.mockResolvedValue({
     kind: 'available',
@@ -225,6 +232,19 @@ describe('user exports router guards and serialization', () => {
       expiresInMinutes: 10,
     });
     expect(JSON.stringify(result)).not.toContain(lastEmailedCode());
+  });
+
+  it('stops emailing codes to a rate-limited account', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    mockRateLimited.mockResolvedValue(true);
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+    });
+    expect(mockRateLimited).toHaveBeenCalledWith(owner.id);
+    expect(mockSendCode).not.toHaveBeenCalled();
   });
 
   it('does not email a code for an export the caller does not own', async () => {

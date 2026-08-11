@@ -3,6 +3,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
+import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
 import {
   consumeDataExportDownloadCode,
   createDataExportDownloadCode,
@@ -223,6 +224,15 @@ export const userExportsRouter = createTRPCRouter({
     requireWebSession(ctx.authViaToken);
     await requireDownloadableExport(input.exportId, ctx.user.id);
     const email = requireDownloadCodeRecipient(ctx.user.google_user_email);
+
+    // Bounds total issuance for the account: the cooldown below only spaces
+    // consecutive codes, and each new code carries a fresh attempt budget.
+    if (await isDataExportDownloadCodeRateLimited(ctx.user.id)) {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many download codes requested. Try again later.',
+      });
+    }
 
     const created = await createDataExportDownloadCode(email, input.exportId);
     if (created.status === 'cooldown') {

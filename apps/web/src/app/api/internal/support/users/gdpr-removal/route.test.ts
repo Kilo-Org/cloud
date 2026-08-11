@@ -21,7 +21,6 @@ import { defineTestUser } from '@/tests/helpers/user.helper';
 
 const mockSecrets = {
   SUPPORT_API_SECRET: 'mock-support-api-secret',
-  SUPPORT_API_SECRET_PREVIOUS: '',
 };
 
 jest.mock('@/lib/config.server', () => {
@@ -30,9 +29,6 @@ jest.mock('@/lib/config.server', () => {
     ...actual,
     get SUPPORT_API_SECRET() {
       return mockSecrets.SUPPORT_API_SECRET;
-    },
-    get SUPPORT_API_SECRET_PREVIOUS() {
-      return mockSecrets.SUPPORT_API_SECRET_PREVIOUS;
     },
   };
 });
@@ -137,7 +133,6 @@ describe('POST /api/internal/support/users/gdpr-removal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSecrets.SUPPORT_API_SECRET = SUPPORT_SECRET;
-    mockSecrets.SUPPORT_API_SECRET_PREVIOUS = '';
     events = [];
     setAdminAccessSinkForTest(event => events.push(event));
     mockedFindUserById.mockResolvedValue(targetUser());

@@ -12,7 +12,6 @@ import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 
 const mockSecrets = {
   SUPPORT_API_SECRET: 'mock-support-api-secret',
-  SUPPORT_API_SECRET_PREVIOUS: '',
 };
 
 jest.mock('@/lib/config.server', () => {
@@ -21,9 +20,6 @@ jest.mock('@/lib/config.server', () => {
     ...actual,
     get SUPPORT_API_SECRET() {
       return mockSecrets.SUPPORT_API_SECRET;
-    },
-    get SUPPORT_API_SECRET_PREVIOUS() {
-      return mockSecrets.SUPPORT_API_SECRET_PREVIOUS;
     },
   };
 });
@@ -76,7 +72,6 @@ describe('GET /api/internal/support/users', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSecrets.SUPPORT_API_SECRET = SUPPORT_SECRET;
-    mockSecrets.SUPPORT_API_SECRET_PREVIOUS = '';
     events = [];
     setAdminAccessSinkForTest(event => events.push(event));
     mockedFindUserByEmailCaseInsensitive.mockResolvedValue([]);
@@ -162,25 +157,6 @@ describe('GET /api/internal/support/users', () => {
       expect(res.status).toBe(401);
       expect(mockedFindUserByEmailCaseInsensitive).not.toHaveBeenCalled();
       expect(events).toHaveLength(0);
-    });
-
-    test('accepts SUPPORT_API_SECRET_PREVIOUS during rotation', async () => {
-      mockSecrets.SUPPORT_API_SECRET_PREVIOUS = 'previous-support-secret';
-      const user = defineTestUser({
-        id: USER_ID,
-        google_user_email: 'customer@example.com',
-        google_user_name: 'Ada',
-        created_at: '2026-04-29T01:16:12.945Z',
-        blocked_reason: null,
-      });
-      mockedFindUserByEmailCaseInsensitive.mockResolvedValue([user]);
-
-      const res = await GET(
-        lookupRequest('customer@example.com', {
-          Authorization: 'Bearer previous-support-secret',
-        })
-      );
-      expect(res.status).toBe(200);
     });
   });
 

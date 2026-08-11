@@ -48,10 +48,7 @@ export function authorizeSupportRequest(request: NextRequest): NextResponse | nu
 
   const header = request.headers.get('Authorization');
   const provided = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : null;
-  const previous = serverConfig.SUPPORT_API_SECRET_PREVIOUS.trim();
-  const matchesCurrent = secretMatches(provided, expected);
-  const matchesPrevious = previous ? secretMatches(provided, previous) : false;
-  if (!matchesCurrent && !matchesPrevious) {
+  if (!secretMatches(provided, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

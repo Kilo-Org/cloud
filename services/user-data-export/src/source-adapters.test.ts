@@ -54,6 +54,21 @@ describe('warehouse scoping guard', () => {
     expect(USER_SCOPE_PREDICATES).toContain(scope);
   });
 
+  // Membership in the closed set is not enough on its own: the two predicates are not
+  // interchangeable. `id = $1` scopes to a user only on a table whose primary key is the
+  // user id; on an owned child table it matches the row's own key rather than its owner,
+  // so an owned-row source that picked it would be filtering on the wrong column while
+  // still passing the membership and containment checks. Bind it to the table shape it is
+  // valid for, tested on the query text rather than the export's name.
+  it.each(Object.entries(sourceQueries))('%s pairs its predicate with its table', (name, query) => {
+    const predicate = sourceQueryScopes[name as keyof typeof sourceQueries];
+    if (predicate === 'id = $1') {
+      expect(query).toMatch(/FROM users\b/);
+    } else {
+      expect(predicate).toBe('kilo_user_id = $1');
+    }
+  });
+
   // Anchored on WHERE because `id = $1` is a substring of every `<table>_id = $1`:
   // an unanchored match would accept `organization_id = $1` as if it scoped to a user.
   it.each(Object.entries(sourceQueries))('%s is scoped to a single user', (name, query) => {

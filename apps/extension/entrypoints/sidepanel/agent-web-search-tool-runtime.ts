@@ -14,6 +14,7 @@ export interface WebSearchContext {
   readonly token: string;
 }
 
+const QUERY_REQUIRED_ERROR = 'Search query is required.';
 const MAX_RESULTS = 5;
 const MAX_SNIPPET_CHARS = 1200;
 /** Each search spends the account's allowance, so one turn gets a small budget. */
@@ -88,7 +89,7 @@ export const executeWebSearchToolCall = async (
   const query = toolCall.query?.trim();
 
   if (query === undefined || query === '') {
-    return { error: 'Search query is required.', ok: false };
+    return { error: QUERY_REQUIRED_ERROR, ok: false };
   }
 
   const outcome = await postSearch(query, context);
@@ -137,14 +138,18 @@ export const createWebSearchExecutor = (
 ): ((toolCall: WebSearchToolCall) => Promise<EvalTabResult>) => {
   let searchCount = 0;
 
-  return (toolCall: WebSearchToolCall): Promise<EvalTabResult> => {
+  return async (toolCall: WebSearchToolCall): Promise<EvalTabResult> => {
     if (searchCount >= MAX_SEARCHES_PER_TURN) {
-      return Promise.resolve({
+      return {
         error: `Web search limit reached for this turn (${String(MAX_SEARCHES_PER_TURN)} searches). Answer with what you have, or ask the user to continue.`,
         ok: false,
-      });
+      };
     }
-    searchCount += 1;
-    return executeWebSearchToolCall(toolCall, context);
+    const result = await executeWebSearchToolCall(toolCall, context);
+    // A rejected argument never reaches the network and bills nothing, so it must not spend the budget.
+    if (result.ok || result.error !== QUERY_REQUIRED_ERROR) {
+      searchCount += 1;
+    }
+    return result;
   };
 };

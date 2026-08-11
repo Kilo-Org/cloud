@@ -5,6 +5,7 @@ import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-co
 import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
 import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
 import {
+  MAX_SNAPSHOT_TEXT_LENGTH,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   isTabDebuggerResponse,
@@ -71,10 +72,11 @@ const cacheSnapshot = (tabId: number, snapshot: PageSnapshot): void => {
 };
 const getCachedSnapshot = (tabId: number, snapshotId: string): PageSnapshot | undefined =>
   snapshotCache.get(getSnapshotCacheKey(tabId, snapshotId));
+// A snapshot always carries its own limits; the fallback only covers a stale injected build, and reads the window size from the one shared constant so it cannot drift.
 const defaultSnapshotLimits = {
   maxNodeCount: 80,
   maxNodeTextLength: 500,
-  maxTextLength: 24_000,
+  maxTextLength: MAX_SNAPSHOT_TEXT_LENGTH,
 };
 const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnapshot => ({
   limits: snapshot.limits ?? defaultSnapshotLimits,

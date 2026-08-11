@@ -7,6 +7,15 @@ export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
 export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
+/**
+ * Characters of visible page text one snapshot returns. A/B-measured: a 24k
+ * window reads a long article in three calls instead of nine. Fewer
+ * round-trips means a weak model gets fewer chances to stop early, and the
+ * shorter conversation costs FEWER total bytes than the narrow window it
+ * replaced. The injected function cannot close over this constant, so it is
+ * passed in as an argument.
+ */
+export const MAX_SNAPSHOT_TEXT_LENGTH = 24_000;
 
 export interface ChromeDebuggerTargetInfo {
   readonly attached?: boolean;
@@ -462,13 +471,14 @@ const runInjectedEval = (code: string): unknown =>
   new Function(`return (async () => { ${code} })()`)();
 
 /* eslint-disable unicorn/consistent-function-scoping */
+// eslint-disable-next-line max-params -- the injected function is serialized into the page, so every input must arrive as a positional string argument.
 const runInjectedPageSnapshot = (
   timeoutMsText: string,
   textStartText?: string,
-  queryText?: string
+  queryText?: string,
+  maxTextLengthText?: string
 ): PageSnapshot => {
-  // A/B-measured: a 24k window reads a long article in three calls instead of nine. Fewer round-trips means a weak model gets fewer chances to stop early, and the shorter conversation costs FEWER total bytes than the narrow window it replaced.
-  const maxTextLength = 24_000;
+  const maxTextLength = Number(maxTextLengthText ?? '24000');
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
   const maxTextMatches = 20;
@@ -943,7 +953,7 @@ export const getPageSnapshotInTabWithScripting = async ({
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
-          args: [String(timeoutMs), String(textStart), query],
+          args: [String(timeoutMs), String(textStart), query, String(MAX_SNAPSHOT_TEXT_LENGTH)],
           func: runInjectedPageSnapshot,
           target: { tabId },
           world: 'MAIN',

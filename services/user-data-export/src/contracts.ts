@@ -22,16 +22,52 @@ export const DownloadRequestSchema = z
   })
   .strict();
 
-export type ExportCursor = { createdAt: string; id: string };
+/**
+ * Timestamp-keyed cursor, used by sources that carry `created_at`. Retained so a
+ * job persisted before the warehouse sources landed still parses on resume.
+ */
+export type TimestampCursor = { createdAt: string; id: string };
 
-const ExportCursorSchema = z
+/**
+ * Ordinal cursor for the warehouse sources, which have no `created_at` column.
+ * Values are the cursor columns in ORDER BY order, always as strings so bigint
+ * journal positions survive JSON without losing precision.
+ */
+export type KeyCursor = { key: string[] };
+
+export type ExportCursor = TimestampCursor | KeyCursor;
+
+const TimestampCursorSchema = z
   .object({
     createdAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/),
     id: z.string().min(1),
   })
   .strict();
 
+const KeyCursorSchema = z
+  .object({
+    key: z.array(z.string().min(1)).min(1).max(4),
+  })
+  .strict();
+
+const ExportCursorSchema = z.union([TimestampCursorSchema, KeyCursorSchema]);
+
 export function parseCursor(value: unknown): ExportCursor | null {
   const result = ExportCursorSchema.safeParse(value);
   return result.success ? result.data : null;
+}
+
+/**
+ * Cursor values for a warehouse query's bind parameters, or nulls for a first page.
+ *
+ * A cursor of the wrong arity or shape (a timestamp cursor persisted before this
+ * source existed) restarts the source rather than paging from a position that
+ * cannot be interpreted. That can repeat rows already written to the file, which is
+ * acceptable; paging from a misread position could skip the user's data, which is not.
+ */
+export function keyCursorValues(cursor: ExportCursor | null, arity: number): (string | null)[] {
+  if (!cursor || !('key' in cursor) || cursor.key.length !== arity) {
+    return new Array<string | null>(arity).fill(null);
+  }
+  return cursor.key;
 }

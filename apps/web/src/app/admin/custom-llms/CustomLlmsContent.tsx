@@ -53,6 +53,7 @@ const INITIAL_DEFINITION: CustomLlmDefinition = {
   max_completion_tokens: 0,
   base_url: '',
   organization_ids: [],
+  group_ids: [],
 };
 
 const INITIAL_CREDENTIALS: CustomLlmCredentials = {

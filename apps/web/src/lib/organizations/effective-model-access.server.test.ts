@@ -33,6 +33,7 @@ function context(
       company_domain: null,
     },
     defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
+    groupIds: [],
     groupPolicies: [],
     policyRevision: 1,
     ...overrides,

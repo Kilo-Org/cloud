@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -18,58 +18,64 @@ import type { ModelPreset, PresetConfig } from './onboarding.domain';
 
 /** Animated gradient blobs that create an ethereal neon glow inside the frontier card. */
 function FrontierGlow() {
+  const shouldReduce = useReducedMotion();
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
       {/* Base ambient glow */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,oklch(85%_0.18_160_/_0.08),transparent_70%)]" />
 
-      {/* Drifting blob 1 — teal/cyan */}
-      <motion.div
-        className="absolute h-32 w-32 rounded-full bg-[radial-gradient(circle,oklch(80%_0.2_180_/_0.25),transparent_70%)] blur-xl"
-        animate={{
-          x: ['-20%', '60%', '10%', '-20%'],
-          y: ['10%', '-30%', '50%', '10%'],
-          scale: [1, 1.3, 0.9, 1],
-        }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ top: '10%', left: '5%' }}
-      />
+      {/* Drifting blobs — decorative, skip under reduced motion */}
+      {!shouldReduce && (
+        <>
+          {/* Drifting blob 1 — teal/cyan */}
+          <motion.div
+            className="absolute h-32 w-32 rounded-full bg-[radial-gradient(circle,oklch(80%_0.2_180_/_0.25),transparent_70%)] blur-xl"
+            animate={{
+              x: ['-20%', '60%', '10%', '-20%'],
+              y: ['10%', '-30%', '50%', '10%'],
+              scale: [1, 1.3, 0.9, 1],
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ top: '10%', left: '5%' }}
+          />
 
-      {/* Drifting blob 2 — violet/purple */}
-      <motion.div
-        className="absolute h-28 w-28 rounded-full bg-[radial-gradient(circle,oklch(75%_0.2_300_/_0.2),transparent_70%)] blur-xl"
-        animate={{
-          x: ['50%', '-10%', '40%', '50%'],
-          y: ['-20%', '40%', '-10%', '-20%'],
-          scale: [1.1, 0.8, 1.2, 1.1],
-        }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ top: '20%', right: '10%' }}
-      />
+          {/* Drifting blob 2 — violet/purple */}
+          <motion.div
+            className="absolute h-28 w-28 rounded-full bg-[radial-gradient(circle,oklch(75%_0.2_300_/_0.2),transparent_70%)] blur-xl"
+            animate={{
+              x: ['50%', '-10%', '40%', '50%'],
+              y: ['-20%', '40%', '-10%', '-20%'],
+              scale: [1.1, 0.8, 1.2, 1.1],
+            }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ top: '20%', right: '10%' }}
+          />
 
-      {/* Drifting blob 3 — green/lime */}
-      <motion.div
-        className="absolute h-24 w-24 rounded-full bg-[radial-gradient(circle,oklch(90%_0.18_130_/_0.18),transparent_70%)] blur-xl"
-        animate={{
-          x: ['30%', '-30%', '50%', '30%'],
-          y: ['60%', '10%', '-20%', '60%'],
-          scale: [0.9, 1.2, 1, 0.9],
-        }}
-        transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ bottom: '5%', left: '20%' }}
-      />
+          {/* Drifting blob 3 — green/lime */}
+          <motion.div
+            className="absolute h-24 w-24 rounded-full bg-[radial-gradient(circle,oklch(90%_0.18_130_/_0.18),transparent_70%)] blur-xl"
+            animate={{
+              x: ['30%', '-30%', '50%', '30%'],
+              y: ['60%', '10%', '-20%', '60%'],
+              scale: [0.9, 1.2, 1, 0.9],
+            }}
+            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ bottom: '5%', left: '20%' }}
+          />
 
-      {/* Drifting blob 4 — pink/magenta */}
-      <motion.div
-        className="absolute h-20 w-20 rounded-full bg-[radial-gradient(circle,oklch(80%_0.2_350_/_0.15),transparent_70%)] blur-lg"
-        animate={{
-          x: ['-10%', '70%', '20%', '-10%'],
-          y: ['30%', '-20%', '60%', '30%'],
-          scale: [1, 1.4, 0.7, 1],
-        }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ top: '40%', left: '40%' }}
-      />
+          {/* Drifting blob 4 — pink/magenta */}
+          <motion.div
+            className="absolute h-20 w-20 rounded-full bg-[radial-gradient(circle,oklch(80%_0.2_350_/_0.15),transparent_70%)] blur-lg"
+            animate={{
+              x: ['-10%', '70%', '20%', '-10%'],
+              y: ['30%', '-20%', '60%', '30%'],
+              scale: [1, 1.4, 0.7, 1],
+            }}
+            transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ top: '40%', left: '40%' }}
+          />
+        </>
+      )}
 
       {/* Outer glow ring */}
       <div className="absolute inset-0 rounded-lg ring-1 ring-inset ring-white/[0.08]" />
@@ -87,6 +93,7 @@ function PresetCard({
   onSelect: () => void;
 }) {
   const isFrontier = preset.key === 'frontier';
+  const shouldReduce = useReducedMotion();
 
   return (
     <button
@@ -110,7 +117,9 @@ function PresetCard({
         <motion.div
           layoutId="preset-ring"
           className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-white/20"
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          transition={
+            shouldReduce ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }
+          }
         />
       )}
 
@@ -136,6 +145,7 @@ function PresetCard({
 }
 
 function CustomCard({ isSelected, onSelect }: { isSelected: boolean; onSelect: () => void }) {
+  const shouldReduce = useReducedMotion();
   return (
     <button
       type="button"
@@ -152,7 +162,9 @@ function CustomCard({ isSelected, onSelect }: { isSelected: boolean; onSelect: (
         <motion.div
           layoutId="preset-ring"
           className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-white/20"
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          transition={
+            shouldReduce ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }
+          }
         />
       )}
 
@@ -187,11 +199,12 @@ function ModelRolePickers({
   isLoadingModels: boolean;
   modelsError: string | undefined;
 }) {
+  const shouldReduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      transition={{ duration: 0.2 }}
+      initial={shouldReduce ? {} : { opacity: 0, height: 0 }}
+      animate={shouldReduce ? {} : { opacity: 1, height: 'auto' }}
+      transition={shouldReduce ? { duration: 0 } : { duration: 0.2 }}
       className="overflow-hidden"
     >
       <div className="mt-4 space-y-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
@@ -245,6 +258,7 @@ function CustomModelPicker({
   modelOptions: ModelOption[];
   isLoadingModels: boolean;
 }) {
+  const shouldReduce = useReducedMotion();
   const roleRows: [string, string, (v: string) => void][] = [
     ['Mayor', customMayor, setCustomMayor],
     ['Refinery', customRefinery, setCustomRefinery],
@@ -253,9 +267,9 @@ function CustomModelPicker({
 
   return (
     <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      transition={{ duration: 0.2 }}
+      initial={shouldReduce ? {} : { opacity: 0, height: 0 }}
+      animate={shouldReduce ? {} : { opacity: 1, height: 'auto' }}
+      transition={shouldReduce ? { duration: 0 } : { duration: 0.2 }}
       className="mt-4 overflow-hidden"
     >
       <div className="space-y-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">

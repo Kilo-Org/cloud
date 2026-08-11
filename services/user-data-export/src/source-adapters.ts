@@ -471,13 +471,26 @@ export const warehouseQueries = {
 export const sourceQueries = { ...warehouseQueries, userQuery };
 
 /**
+ * The only predicates that scope a query to a single user. `kilo_user_id = $1`
+ * matches rows the user owns; `id = $1` matches the user's own profile row. Both
+ * take the authenticated user id as their sole bind parameter, and neither can
+ * match SQL NULL, which is what keeps org-owned rows out.
+ *
+ * A closed set rather than a free string: a source scoped some other way cannot
+ * declare its own predicate and pass the guard below on a technicality. Widening
+ * this list is the deliberate, reviewable act that adding such a source requires.
+ */
+export const USER_SCOPE_PREDICATES = ['kilo_user_id = $1', 'id = $1'] as const;
+export type UserScopePredicate = (typeof USER_SCOPE_PREDICATES)[number];
+
+/**
  * The single-user scoping predicate each query in `sourceQueries` must contain,
  * declared beside the queries themselves rather than left to be inferred from
  * which named export a query happens to live in. A query added to `sourceQueries`
  * without an entry here fails the coverage test below, so a new source can't ship
  * unscoped simply by landing outside `warehouseQueries`.
  */
-export const sourceQueryScopes: Record<keyof typeof sourceQueries, string> = {
+export const sourceQueryScopes: Record<keyof typeof sourceQueries, UserScopePredicate> = {
   projectQuery: 'kilo_user_id = $1',
   messageQuery: 'kilo_user_id = $1',
   cliSessionQuery: 'kilo_user_id = $1',

@@ -3,6 +3,7 @@ import {
   createSourceAdapters,
   sourceQueries,
   sourceQueryScopes,
+  USER_SCOPE_PREDICATES,
   warehouseQueries,
   type ReplicaQuery,
   type SourceAdapter,
@@ -45,10 +46,19 @@ describe('warehouse scoping guard', () => {
     expect(Object.keys(sourceQueryScopes).sort()).toEqual(Object.keys(sourceQueries).sort());
   });
 
+  // A declared scope is only worth checking against if the predicate itself scopes to
+  // a user. Without this, a source could be added with any predicate its author cared
+  // to name and satisfy the assertion below by agreeing with itself.
+  it.each(Object.entries(sourceQueryScopes))('%s declares a known user scope', (_name, scope) => {
+    expect(USER_SCOPE_PREDICATES).toContain(scope);
+  });
+
+  // Anchored on WHERE because `id = $1` is a substring of every `<table>_id = $1`:
+  // an unanchored match would accept `organization_id = $1` as if it scoped to a user.
   it.each(Object.entries(sourceQueries))('%s is scoped to a single user', (name, query) => {
     const predicate = sourceQueryScopes[name as keyof typeof sourceQueries];
     expect(predicate).toBeDefined();
-    expect(query).toContain(predicate);
+    expect(query).toContain(`WHERE ${predicate}`);
   });
 
   it.each(Object.entries(warehouseQueries))('%s orders and limits its page', (_name, query) => {

@@ -34,7 +34,7 @@ import {
 import {
   correlateToolExchanges,
   computeBatchSummary,
-  selectLastValidRealRun,
+  selectLastValidRun,
   scoreWorkflowCorrectness,
 } from '../src/shared/agent-workflow-bench-scoring';
 import { BENCH_SCENARIOS } from '../src/shared/agent-workflow-bench-scenarios';
@@ -240,7 +240,6 @@ interface AgentPhaseResult {
   readonly turnEnded: boolean;
   readonly timedOut: boolean;
   readonly finalSnapshot: TurnSnapshot;
-  readonly wallClockSeconds: number;
   readonly endedAtMs: number | null;
 }
 
@@ -1401,11 +1400,9 @@ const pollAgentPhase = async (options: {
   startEventCount: number;
   deadlineMs: number;
   signal: AbortSignal;
-  mode: 'create' | 'verify';
   nowOffset: () => number;
 }): Promise<AgentPhaseResult> => {
-  const { sidePanel, collector, startEventCount, deadlineMs, signal, mode, nowOffset } = options;
-  const startedAt = Date.now();
+  const { sidePanel, collector, startEventCount, deadlineMs, signal, nowOffset } = options;
   let lastChangedAt = Date.now();
   let previous: TurnSnapshot | undefined;
   let turnEnded = false;
@@ -1458,13 +1455,9 @@ const pollAgentPhase = async (options: {
       lastChangedAt = Date.now();
     }
 
-    // A finished create turn is terminal either way: with a save the verify
-    // phase follows; without one no later poll can produce a save, so
-    // waiting for the deadline only burns the batch's time.
-    if (mode === 'create' && turnEnded) {
-      break;
-    }
-    if (mode === 'verify' && turnEnded) {
+    // A finished turn is terminal: no later poll of this phase can add
+    // anything, so waiting for the deadline only burns the batch's time.
+    if (turnEnded) {
       break;
     }
 
@@ -1481,7 +1474,6 @@ const pollAgentPhase = async (options: {
     turnEnded,
     timedOut,
     finalSnapshot: finalSnapshot ?? (await snapshotTurn(sidePanel)),
-    wallClockSeconds: Math.round((Date.now() - startedAt) / 1000),
     endedAtMs,
   };
 };
@@ -2018,7 +2010,7 @@ const buildFailedAttemptRecord = (input: {
     snapshotResultBytes = metrics.snapshotResultBytes;
     readCallsBeforeFirstSave = metrics.readCallsBeforeFirstSave;
     saveWorkflowCallCount = metrics.saveWorkflowCallCount;
-    autoRunObserved = selectLastValidRealRun(correlation.exchanges) !== undefined;
+    autoRunObserved = selectLastValidRun(correlation.exchanges) !== undefined;
     transcript = redactTranscript(bench, input.collector.offsetByEventId, correlation);
   } catch (error) {
     // A storage validation failure must surface as `storage-parse`, not as a
@@ -2118,6 +2110,30 @@ const runAttempt = async (input: {
 
   const nowOffset = (): number => Date.now() - attemptStartMs;
 
+  // The captured fields are `let`s read at call time, so every failure sees
+  // the current attempt state.
+  const fail = (failureReason: string): AttemptRunResult => ({
+    kind: 'record',
+    ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
+    record: buildFailedAttemptRecord({
+      attempt,
+      scenarioId: scenario.id,
+      mode: scenarioMode(scenario),
+      headless,
+      startedAtIso,
+      gitHead,
+      followUpDate,
+      creditAccount,
+      requests,
+      savedAtOffsetMs,
+      createSentOffsetMs,
+      attemptStartMs,
+      failureReason,
+      collector,
+      followUpSent,
+    }),
+  });
+
   try {
     const launched = await launchContext(userDataDir);
     if (launched.kind !== 'ready') {
@@ -2190,7 +2206,6 @@ const runAttempt = async (input: {
       startEventCount: preTurnCount,
       deadlineMs,
       signal: abortController.signal,
-      mode: 'create',
       nowOffset,
     });
     checkGatewayBlocker();
@@ -2206,32 +2221,12 @@ const runAttempt = async (input: {
     const createCorrelation = correlateToolExchanges(createEvents);
     const autoRunObserved =
       !isTaskScenario(scenario) &&
-      selectLastValidRealRun(createCorrelation.exchanges, {
+      selectLastValidRun(createCorrelation.exchanges, {
         requireInput: Object.keys(scenario.followUpValues).length > 0,
       }) !== undefined;
 
     if (!isTaskScenario(scenario) && !createPhase.timedOut && !collector.hasSaveSuccess()) {
-      return {
-        kind: 'record',
-        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
-        record: buildFailedAttemptRecord({
-          attempt,
-          scenarioId: scenario.id,
-          mode: scenarioMode(scenario),
-          headless,
-          startedAtIso,
-          gitHead,
-          followUpDate,
-          creditAccount,
-          requests,
-          savedAtOffsetMs,
-          createSentOffsetMs,
-          attemptStartMs,
-          failureReason: 'no-save',
-          collector,
-          followUpSent,
-        }),
-      };
+      return fail('no-save');
     }
 
     let verifyTimedOut = false;
@@ -2248,7 +2243,6 @@ const runAttempt = async (input: {
         startEventCount: verifyStartCount,
         deadlineMs,
         signal: abortController.signal,
-        mode: 'verify',
         nowOffset,
       });
       verifyTimedOut = verifyPhase.timedOut;
@@ -2257,27 +2251,7 @@ const runAttempt = async (input: {
     }
     checkGatewayBlocker();
     if (createPhase.timedOut || verifyTimedOut) {
-      return {
-        kind: 'record',
-        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
-        record: buildFailedAttemptRecord({
-          attempt,
-          scenarioId: scenario.id,
-          mode: scenarioMode(scenario),
-          headless,
-          startedAtIso,
-          gitHead,
-          followUpDate,
-          creditAccount,
-          requests,
-          savedAtOffsetMs,
-          createSentOffsetMs,
-          attemptStartMs,
-          failureReason: 'deadline',
-          collector,
-          followUpSent,
-        }),
-      };
+      return fail('deadline');
     }
 
     const finalBenchEvents = validateEvents(finalSnapshot.events);
@@ -2289,27 +2263,7 @@ const runAttempt = async (input: {
     checkGatewayBlocker();
 
     if (requests.length === 0) {
-      return {
-        kind: 'record',
-        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
-        record: buildFailedAttemptRecord({
-          attempt,
-          scenarioId: scenario.id,
-          mode: scenarioMode(scenario),
-          headless,
-          startedAtIso,
-          gitHead,
-          followUpDate,
-          creditAccount,
-          requests,
-          savedAtOffsetMs,
-          createSentOffsetMs,
-          attemptStartMs,
-          failureReason: 'no-gateway-requests',
-          collector,
-          followUpSent,
-        }),
-      };
+      return fail('no-gateway-requests');
     }
 
     const distinctOrgIdHashes = new Set(requests.map(request => request.orgIdHash));
@@ -2330,34 +2284,14 @@ const runAttempt = async (input: {
           }),
         };
       }
-      return {
-        kind: 'record',
-        ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
-        record: buildFailedAttemptRecord({
-          attempt,
-          scenarioId: scenario.id,
-          mode: scenarioMode(scenario),
-          headless,
-          startedAtIso,
-          gitHead,
-          followUpDate,
-          creditAccount,
-          requests,
-          savedAtOffsetMs,
-          createSentOffsetMs,
-          attemptStartMs,
-          failureReason: 'org-id-mismatch',
-          collector,
-          followUpSent,
-        }),
-      };
+      return fail('org-id-mismatch');
     }
 
     const correlation = correlateToolExchanges(finalBenchEvents);
     const metrics = computeMetrics(finalBenchEvents, collector.offsetByEventId, correlation);
     const correctness = isTaskScenario(scenario)
       ? scoreTaskCorrectness({ events: finalBenchEvents, scenario })
-      : scoreWorkflowCorrectness({
+      : await scoreWorkflowCorrectness({
           workflows,
           events: finalBenchEvents,
           scenario,
@@ -2430,27 +2364,7 @@ const runAttempt = async (input: {
         }),
       };
     }
-    return {
-      kind: 'record',
-      ...(writeRawArtifacts ? { raw: { events: collector.events } } : {}),
-      record: buildFailedAttemptRecord({
-        attempt,
-        scenarioId: scenario.id,
-        mode: scenarioMode(scenario),
-        headless,
-        startedAtIso,
-        gitHead,
-        followUpDate,
-        creditAccount,
-        requests,
-        savedAtOffsetMs,
-        createSentOffsetMs,
-        attemptStartMs,
-        failureReason: reason,
-        collector,
-        followUpSent,
-      }),
-    };
+    return fail(reason);
   } finally {
     if (deadlineTimer !== undefined) {
       clearTimeout(deadlineTimer);
@@ -2540,13 +2454,24 @@ const main = async (): Promise<number> => {
         );
       }
       const existingScenario = existingSummary['scenario'];
-      if (isRecord(existingScenario) && existingScenario['id'] !== parsed.scenario.id) {
+      // A missing or corrupt scenario/model must refuse, never append silently.
+      if (
+        !isRecord(existingScenario) ||
+        typeof existingScenario['id'] !== 'string' ||
+        typeof existingScenario['modelId'] !== 'string'
+      ) {
+        throw new BatchBlockerError(
+          'build',
+          '--append refused: the existing summary has no well-formed scenario/model'
+        );
+      }
+      if (existingScenario['id'] !== parsed.scenario.id) {
         throw new BatchBlockerError(
           'build',
           '--append refused: the existing summary scenario differs from --scenario'
         );
       }
-      if (isRecord(existingScenario) && existingScenario['modelId'] !== modelId) {
+      if (existingScenario['modelId'] !== modelId) {
         throw new BatchBlockerError(
           'build',
           '--append refused: the existing summary modelId differs from --model'

@@ -36,7 +36,6 @@ import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/
 import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 /**
  * Metadata about the experiment that resolved this provider, attached when
@@ -133,9 +132,6 @@ async function checkManualBYOK(
         Object.assign(body, credential.definition.extra_body ?? {});
         Object.assign(context.extraHeaders, credential.definition.extra_headers ?? {});
         context.request.body.model = credential.model.id;
-        if (credential.resolvedModel.addCacheBreakpoints) {
-          addCacheBreakpoints(context.request);
-        }
       },
     },
     userByok: [credential.byok],

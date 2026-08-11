@@ -48,7 +48,6 @@ export const INITIAL_MANUAL_BYOK_SETTINGS: ManualByokProviderDefinition = {
   model_defaults: {
     supports_image_input: true,
     supports_reasoning: true,
-    add_cache_breakpoints: false,
   },
   models: [{ id: '' }],
 };
@@ -198,13 +197,6 @@ function ModelFields({
           <InheritedBooleanSelect
             value={model.supports_reasoning}
             onChange={value => onChange({ ...model, supports_reasoning: value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Cache breakpoints</Label>
-          <InheritedBooleanSelect
-            value={model.add_cache_breakpoints}
-            onChange={value => onChange({ ...model, add_cache_breakpoints: value })}
           />
         </div>
         <div className="space-y-2">
@@ -432,7 +424,6 @@ export function ManualByokProviderFields({
           {[
             ['supports_image_input', 'Image support'],
             ['supports_reasoning', 'Reasoning'],
-            ['add_cache_breakpoints', 'Cache breakpoints'],
           ].map(([key, label]) => (
             <div
               key={key}
@@ -445,7 +436,7 @@ export function ManualByokProviderFields({
                   settings.model_defaults[
                     key as keyof Pick<
                       typeof settings.model_defaults,
-                      'supports_image_input' | 'supports_reasoning' | 'add_cache_breakpoints'
+                      'supports_image_input' | 'supports_reasoning'
                     >
                   ] as boolean
                 }

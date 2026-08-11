@@ -2131,7 +2131,6 @@ export const ManualByokModelSchema = z.object({
   name: z.string().min(1).optional(),
   supports_image_input: z.boolean().optional(),
   supports_reasoning: z.boolean().optional(),
-  add_cache_breakpoints: z.boolean().optional(),
   context_length: z.number().int().positive().optional(),
   max_completion_tokens: z.number().int().positive().optional(),
   preferred_ai_sdk_provider: ManualByokAiSdkProviderSchema.optional(),
@@ -2148,7 +2147,6 @@ export const ManualByokProviderDefinitionSchema = z.object({
   model_defaults: z.object({
     supports_image_input: z.boolean(),
     supports_reasoning: z.boolean(),
-    add_cache_breakpoints: z.boolean(),
     context_length: z.number().int().positive().optional(),
     max_completion_tokens: z.number().int().positive().optional(),
   }),

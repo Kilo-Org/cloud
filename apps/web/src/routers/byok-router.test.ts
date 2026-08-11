@@ -25,7 +25,6 @@ const manualProviderSettings = {
   model_defaults: {
     supports_image_input: true,
     supports_reasoning: true,
-    add_cache_breakpoints: false,
   },
   models: [{ id: 'Org/Model' }],
 } satisfies ManualByokProviderDefinition;

@@ -19,7 +19,6 @@ const definition = {
   model_defaults: {
     supports_image_input: true,
     supports_reasoning: true,
-    add_cache_breakpoints: false,
   },
   models: [{ id: 'Org/Model' }],
 };
@@ -98,7 +97,6 @@ describe('manual BYOK provider definitions', () => {
       name: 'Org/Model',
       supportsImageInput: true,
       supportsReasoning: true,
-      addCacheBreakpoints: false,
       contextLength: 200_000,
       maxCompletionTokens: 32_000,
       preferredAiSdkProvider: 'openai-compatible',

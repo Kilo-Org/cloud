@@ -103,8 +103,6 @@ export function resolveManualByokModel(
     supportsImageInput:
       model.supports_image_input ?? definition.model_defaults.supports_image_input,
     supportsReasoning: model.supports_reasoning ?? definition.model_defaults.supports_reasoning,
-    addCacheBreakpoints:
-      model.add_cache_breakpoints ?? definition.model_defaults.add_cache_breakpoints,
     contextLength,
     maxCompletionTokens: Math.min(
       model.max_completion_tokens ??

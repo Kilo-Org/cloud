@@ -90,9 +90,7 @@ export async function handleGenerationFailure(input: {
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
-  /** Live primary replica. Identity only. */
-  EXPORT_REPLICA_DB: HyperdriveBinding;
-  /** Export warehouse. Read only, frozen at its load cutoff. */
+  /** Export warehouse. Read only, frozen at its load cutoff. Every source, including identity. */
   EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
@@ -311,7 +309,6 @@ export async function processGenerateMessage(
     }
 
     const adapters = createSourceAdapters({
-      replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB, 'replica'),
       warehouseQuery: createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse'),
     });
     let adapter = resolveSourceAdapter(adapters, job.current_source);

@@ -24,8 +24,17 @@ export type SourceAdapter = {
 };
 
 /**
- * Identity comes from the live primary, so an export always reflects who the user is
- * right now. Everything else comes from the export warehouse, a frozen snapshot.
+ * Identity now comes from the export warehouse's own frozen copy of the user
+ * profile, not the live primary. The primary stays reserved for auth and
+ * mutation traffic; a scheduled bulk export has no reason to read it. The
+ * trade is the one already accepted for every other source: this section is
+ * as of the warehouse's load cutoff rather than current-second-accurate.
+ *
+ * The warehouse's `users` table mirrors `kilocode_users` by row id rather than
+ * by an owning `kilo_user_id` foreign key, since this is the user's own
+ * profile row and not a child row owned by the user. `id = $1` is still a
+ * single-user-scoped predicate for the same reason `kilo_user_id = $1` is
+ * everywhere else: it can only ever match the requesting user's own row.
  */
 const userQuery = `SELECT id, google_user_email, google_user_name, google_user_image_url,
   created_at, updated_at, hosted_domain, microdollars_used, total_microdollars_acquired,
@@ -33,7 +42,7 @@ const userQuery = `SELECT id, google_user_email, google_user_name, google_user_i
   linkedin_url, github_url, discord_server_membership_verified_at,
   openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier,
   vercel_downstream_safety_identifier, customer_source, signup_ip, normalized_email, email_domain
-FROM kilocode_users
+FROM users
 WHERE id = $1
 LIMIT 1`;
 
@@ -274,21 +283,19 @@ const USER_FIELD_MAPPERS = [
 ] as const;
 
 export type SourceAdapterQueries = {
-  /** Live primary replica. Identity only. */
-  replicaQuery: ReplicaQuery;
-  /** Export warehouse. Read only, frozen at its load cutoff. */
+  /** Export warehouse. Read only, frozen at its load cutoff. Every source, including identity. */
   warehouseQuery: ReplicaQuery;
 };
 
 export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapter[] {
-  const { replicaQuery, warehouseQuery } = queries;
+  const { warehouseQuery } = queries;
 
   return [
     {
       name: 'kilocode_users',
       async readPage(input): Promise<SourcePage> {
         if (input.cursor) return { records: [], nextCursor: null };
-        const rows = await replicaQuery(userQuery, [input.kiloUserId]);
+        const rows = await warehouseQuery(userQuery, [input.kiloUserId]);
         const row = rows[0];
         if (!row) throw new Error('Export user was not found');
         return {
@@ -447,7 +454,11 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
   ];
 }
 
-/** Warehouse queries only. Every one must be scoped to a single user. */
+/**
+ * Owned-row warehouse queries: every one must filter on `kilo_user_id = $1`, which
+ * excludes NULL-owned (organization) rows by construction. `userQuery` is scoped
+ * differently (`id = $1`, the user's own row) and is asserted separately below.
+ */
 export const warehouseQueries = {
   projectQuery,
   messageQuery,

@@ -10,20 +10,14 @@ import {
 type Call = { text: string; values: unknown[] };
 
 function harness(rows: Record<string, unknown>[] = []) {
-  const replicaCalls: Call[] = [];
   const warehouseCalls: Call[] = [];
-  const replicaQuery: ReplicaQuery = async (text, values) => {
-    replicaCalls.push({ text, values });
-    return rows;
-  };
   const warehouseQuery: ReplicaQuery = async (text, values) => {
     warehouseCalls.push({ text, values });
     return rows;
   };
   return {
-    replicaCalls,
     warehouseCalls,
-    adapters: createSourceAdapters({ replicaQuery, warehouseQuery }),
+    adapters: createSourceAdapters({ warehouseQuery }),
   };
 }
 
@@ -41,9 +35,9 @@ const READ_PAGE_INPUT = {
 } as const;
 
 describe('warehouse scoping guard', () => {
-  // Every warehouse query must restrict to a single user. This is the control that
-  // keeps one user's export from reaching another; it is asserted structurally so a
-  // new source cannot be added without one.
+  // Every owned-row warehouse query must restrict to a single user. This is the
+  // control that keeps one user's export from reaching another; it is asserted
+  // structurally so a new source cannot be added without one.
   it.each(Object.entries(warehouseQueries))('%s filters on kilo_user_id = $1', (_name, query) => {
     expect(query).toContain('kilo_user_id = $1');
   });
@@ -53,18 +47,15 @@ describe('warehouse scoping guard', () => {
     expect(query).toContain('LIMIT');
   });
 
-  it('never joins the warehouse to the primary or reads an unscoped table', () => {
-    for (const query of Object.values(warehouseQueries)) {
+  it('never joins the warehouse to the live primary or reads loader bookkeeping', () => {
+    for (const query of Object.values(sourceQueries)) {
       expect(query).not.toContain('kilocode_users');
       expect(query).not.toContain('load_manifest');
-      // The warehouse `users` table is excluded: profile comes from the live primary,
-      // so a frozen copy of email and name must never reach the file beside it.
-      expect(query).not.toMatch(/FROM users\b/);
     }
   });
 
-  it('reads identity from the primary and nothing else', () => {
-    expect(sourceQueries.userQuery).toContain('FROM kilocode_users');
+  it('reads identity from the warehouse, scoped to the row the user owns', () => {
+    expect(sourceQueries.userQuery).toContain('FROM users');
     expect(sourceQueries.userQuery).toContain('WHERE id = $1');
   });
 });
@@ -88,8 +79,8 @@ describe('source adapters', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('reads identity from the primary, not the warehouse', async () => {
-    const { adapters, replicaCalls, warehouseCalls } = harness([
+  it('reads identity from the warehouse, scoped by the row id', async () => {
+    const { adapters, warehouseCalls } = harness([
       {
         id: 'user-1',
         google_user_email: 'a@example.com',
@@ -119,18 +110,16 @@ describe('source adapters', () => {
 
     await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
 
-    expect(replicaCalls).toHaveLength(1);
-    expect(warehouseCalls).toHaveLength(0);
+    expect(warehouseCalls).toEqual([
+      { text: expect.stringContaining('WHERE id = $1'), values: ['owner-user'] },
+    ]);
   });
 
   it('passes the authenticated user to the warehouse and maps project titles', async () => {
-    const { adapters, warehouseCalls, replicaCalls } = harness([
-      { id: 'project-1', title: 'Owned project' },
-    ]);
+    const { adapters, warehouseCalls } = harness([{ id: 'project-1', title: 'Owned project' }]);
 
     const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
 
-    expect(replicaCalls).toHaveLength(0);
     expect(warehouseCalls).toEqual([
       {
         text: expect.stringContaining('kilo_user_id = $1'),

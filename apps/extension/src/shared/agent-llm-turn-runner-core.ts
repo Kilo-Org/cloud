@@ -174,13 +174,15 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   // A weak model can loop one byte-identical failing tool call for the whole turn (measured: 118 identical run_workflow calls). After the third identical failure the error tells it to stop; a success resets the count.
   const identicalFailureCounts = new Map<string, number>();
   const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
-    // Key on the call content, not its per-call ids: repeats must collide.
+    // Key on the call content, not its per-call ids or attached reasoning: repeats must collide.
     const {
       id: _id,
       providerToolCallId: _provider,
+      reasoningDetails: _reasoning,
       ...callContent
     } = toolCall as ToolCallEvent & {
       readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
     };
     const key = JSON.stringify(callContent);
     const result = await executeToolCall(toolCall);

@@ -632,13 +632,15 @@ describe('identical failing tool call guard', () => {
       onUsage: () => {},
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
-        toolCalls.map(toolCall =>
-          createSafeToolCall({
+        toolCalls.map(toolCall => ({
+          ...createSafeToolCall({
             name: 'get_page_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
-          })
-        ),
+          }),
+          // Varies per round, like signed reasoning on a thinking model; the guard must still see identical repeats.
+          reasoningDetails: [toolCall.id],
+        })),
       token: 'token-1',
       tooManyToolRoundsMessage: 'Too many tool rounds.',
       tools: [],

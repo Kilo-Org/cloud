@@ -248,8 +248,11 @@ const page = {
  * Build the injected page code for a single workflow page eval.
  * The script is embedded with `JSON.stringify` and compiled at run time:
  * first as a function EXPRESSION (models pass `async ({ page }) => { … }`
- * despite the body contract), and when that does not compile to a function,
- * as the documented async function body. Compiling instead of pattern
+ * despite the body contract), and when that does not compile, as the
+ * documented async function body. An expression that evaluates to a
+ * non-function (an IIFE) already ran during classification, so it reports a
+ * script-shape error instead of running a second time as a body.
+ * Compiling instead of pattern
  * matching classifies every shape correctly — a body that starts with a
  * helper function declaration is not an expression, and vice versa.
  * `input` is re-injected on every page so scripts never lose run inputs
@@ -271,11 +274,17 @@ export const buildWorkflowPageCode = (
   ';\n' +
   'const AsyncFunctionCtor = Object.getPrototypeOf(async () => {}).constructor;\n' +
   'let workflow;\n' +
+  'let evaluatedExpression = false;\n' +
   'try {\n' +
   "  const candidate = new Function('return (' + scriptText + '\\n);')();\n" +
+  '  evaluatedExpression = true;\n' +
   "  if (typeof candidate === 'function') { workflow = candidate; }\n" +
   '} catch {\n' +
   '  // Not an expression: fall through to the body form.\n' +
+  '}\n' +
+  'if (workflow === undefined && evaluatedExpression) {\n' +
+  '  // The expression already ran once (an IIFE runs its side effects); running the body form would execute it a second time.\n' +
+  "  return { ok: false, error: 'Workflow script must be a function, but evaluated to a non-function value. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions };\n" +
   '}\n' +
   'if (workflow === undefined) {\n' +
   "  workflow = new AsyncFunctionCtor('{ page, state, input }', scriptText);\n" +

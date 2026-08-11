@@ -361,6 +361,20 @@ describe('script shape classification by compilation', () => {
     expect((result.value as { result: string }).result).toBe('zig');
   });
 
+  it('executes an IIFE-shaped script at most once and reports the shape error', async () => {
+    const counted = globalThis as { iifeRuns?: number };
+    counted.iifeRuns = 0;
+
+    const result = await runPageCode(
+      '(async () => { globalThis.iifeRuns = (globalThis.iifeRuns ?? 0) + 1; return { done: true, result: 1 }; })()'
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('async ({ page, state, input })');
+    // The classification probe ran the IIFE once; the body form must never run it again.
+    expect(counted.iifeRuns).toBe(1);
+  });
+
   it('runs a plain (non-async) arrow function expression script', async () => {
     const result = await runPageCode('({ input }) => ({ done: true, result: input.topic })', {
       input: { topic: 'c' },

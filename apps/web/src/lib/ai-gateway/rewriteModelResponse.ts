@@ -1,7 +1,7 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
-import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
+import { detectRequestLogErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -118,15 +118,12 @@ async function createRequestLogCapture(
       );
     }
     try {
+      const detected =
+        responseText !== undefined ? detectRequestLogErrors(responseText, request) : null;
       const error =
-        responseText !== undefined
-          ? responseReadError !== undefined
-            ? {
-                ...(detectToolCallArgumentErrors(responseText, request) ?? {}),
-                response_body_read_error: responseReadError,
-              }
-            : detectToolCallArgumentErrors(responseText, request)
-          : { response_body_read_error: responseReadError };
+        responseReadError !== undefined
+          ? { ...(detected ?? {}), response_body_read_error: responseReadError }
+          : detected;
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({

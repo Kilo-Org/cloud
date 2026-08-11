@@ -25,12 +25,18 @@ export const toolCallArgumentErrorSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const apiRequestLogErrorSchema = z.object({
-  invalid_tool_call_arguments: z.array(toolCallArgumentErrorSchema),
+  invalid_tool_call_arguments: z.array(toolCallArgumentErrorSchema).optional(),
+  upstream_error: z.unknown().optional(),
+  response_body_read_error: z.string().optional(),
 });
 
 export type ApiRequestLogError = z.infer<typeof apiRequestLogErrorSchema>;
 
 type ToolCallError = z.infer<typeof toolCallArgumentErrorSchema>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function checkKnownTool(
   knownToolNames: Set<string>,
@@ -107,6 +113,47 @@ function parseSseDataLines(text: string): string[] {
   return payloads;
 }
 
+function parseJsonLine(line: string): unknown {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+}
+
+function extractUpstreamError(value: unknown): unknown {
+  if (!isRecord(value)) return undefined;
+  if (value.error != null) return value.error;
+  if (
+    value.type === 'response.failed' &&
+    isRecord(value.response) &&
+    value.response.error != null
+  ) {
+    return value.response.error;
+  }
+  return undefined;
+}
+
+function lastUpstreamError(values: unknown[]): unknown {
+  let found: unknown = undefined;
+  for (const value of values) {
+    const error = extractUpstreamError(value);
+    if (error !== undefined) found = error;
+  }
+  return found;
+}
+
+function buildError(
+  toolErrors: ToolCallError[],
+  upstreamError: unknown
+): ApiRequestLogError | null {
+  if (toolErrors.length === 0 && upstreamError === undefined) return null;
+  return {
+    ...(toolErrors.length > 0 ? { invalid_tool_call_arguments: toolErrors } : {}),
+    ...(upstreamError !== undefined ? { upstream_error: upstreamError } : {}),
+  };
+}
+
 type ToolAccumulator = { id: string; name: string; arguments: string };
 
 function detectChatCompletionSseErrors(
@@ -125,13 +172,20 @@ function detectChatCompletionSseErrors(
   // Accumulate tool call arguments by index across chunks (choice 0 only)
   const byIndex = new Map<number, ToolAccumulator>();
   for (const line of lines) {
-    const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = JSON.parse(line);
-    const choice = chunk.choices.find(c => c.index === 0);
-    for (const toolCall of choice?.delta.tool_calls ?? []) {
+    const chunk = parseJsonLine(line);
+    if (!isRecord(chunk) || !Array.isArray(chunk.choices)) continue;
+    const choice = chunk.choices.find(
+      (item): item is Record<string, unknown> => isRecord(item) && item.index === 0
+    );
+    const delta = isRecord(choice?.delta) ? choice.delta : undefined;
+    if (!Array.isArray(delta?.tool_calls)) continue;
+    for (const toolCall of delta.tool_calls) {
+      if (!isRecord(toolCall) || typeof toolCall.index !== 'number') continue;
+      const fn = isRecord(toolCall.function) ? toolCall.function : undefined;
       const acc = byIndex.get(toolCall.index) ?? { id: '', name: '', arguments: '' };
-      if (toolCall.id) acc.id = toolCall.id;
-      if (toolCall.function?.name) acc.name = toolCall.function.name;
-      acc.arguments += toolCall.function?.arguments ?? '';
+      if (typeof toolCall.id === 'string') acc.id = toolCall.id;
+      if (typeof fn?.name === 'string') acc.name = fn.name;
+      if (typeof fn?.arguments === 'string') acc.arguments += fn.arguments;
       byIndex.set(toolCall.index, acc);
     }
   }
@@ -170,16 +224,22 @@ function detectResponsesSseErrors(
   // response.output_item.done carries the fully assembled function_call item
   const errors: ToolCallError[] = [];
   for (const line of lines) {
-    const event = JSON.parse(line);
-    if (event.type !== 'response.output_item.done' || event.item?.type !== 'function_call')
-      continue;
-    const callId: string = event.item.call_id;
-    const name: string = event.item.name;
-    const argsStr: string = event.item.arguments;
-    if (!checkKnownTool(knownToolNames, callId, name, errors)) continue;
-    const result = parseArgsString(argsStr, callId, name, errors);
+    const event = parseJsonLine(line);
+    if (!isRecord(event) || event.type !== 'response.output_item.done') continue;
+    const item = event.item;
+    if (!isRecord(item) || item.type !== 'function_call') continue;
+    if (typeof item.call_id !== 'string' || typeof item.name !== 'string') continue;
+    const argsStr = typeof item.arguments === 'string' ? item.arguments : '';
+    if (!checkKnownTool(knownToolNames, item.call_id, item.name, errors)) continue;
+    const result = parseArgsString(argsStr, item.call_id, item.name, errors);
     if (result.ok) {
-      validateAgainstSchema(result.parsed, toolSchemaByName.get(name), callId, name, errors);
+      validateAgainstSchema(
+        result.parsed,
+        toolSchemaByName.get(item.name),
+        item.call_id,
+        item.name,
+        errors
+      );
     }
   }
   return errors;
@@ -202,14 +262,21 @@ function detectMessagesSseErrors(
   // Accumulate partial_json fragments by content block index
   const byIndex = new Map<number, ToolAccumulator>();
   for (const line of lines) {
-    const event = JSON.parse(line);
-    if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-      const id: string = event.content_block.id;
-      const name: string = event.content_block.name;
+    const event = parseJsonLine(line);
+    if (!isRecord(event)) continue;
+    if (event.type === 'content_block_start' && isRecord(event.content_block)) {
+      if (event.content_block.type !== 'tool_use') continue;
+      if (typeof event.index !== 'number') continue;
+      const id = typeof event.content_block.id === 'string' ? event.content_block.id : '';
+      const name = typeof event.content_block.name === 'string' ? event.content_block.name : '';
       byIndex.set(event.index, { id, name, arguments: '' });
-    } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+    } else if (event.type === 'content_block_delta' && isRecord(event.delta)) {
+      if (event.delta.type !== 'input_json_delta') continue;
+      if (typeof event.index !== 'number') continue;
       const acc = byIndex.get(event.index);
-      if (acc) acc.arguments += event.delta.partial_json;
+      if (acc && typeof event.delta.partial_json === 'string') {
+        acc.arguments += event.delta.partial_json;
+      }
     }
   }
 
@@ -218,7 +285,6 @@ function detectMessagesSseErrors(
     if (!checkKnownTool(knownToolNames, acc.id, acc.name, errors)) continue;
     const result = parseArgsString(acc.arguments, acc.id, acc.name, errors);
     if (result.ok) {
-      // acc.arguments is accumulated JSON — validate against tool schema
       validateAgainstSchema(
         result.parsed,
         toolSchemaByName.get(acc.name),
@@ -231,30 +297,148 @@ function detectMessagesSseErrors(
   return errors;
 }
 
-/**
- * Checks SSE-streamed response tool call arguments for JSON parse errors or schema mismatches.
- * Returns null if the response is not an SSE stream or if no errors are found.
- */
-export function detectToolCallArgumentErrors(
+function detectChatCompletionJsonErrors(
+  response: unknown,
+  tools: OpenAI.Chat.ChatCompletionTool[] | null | undefined
+): ToolCallError[] {
+  if (!isRecord(response) || !Array.isArray(response.choices)) return [];
+
+  const toolSchemaByName = new Map<string, unknown>();
+  const knownToolNames = new Set<string>();
+  for (const tool of tools ?? []) {
+    if (tool.type === 'function') {
+      knownToolNames.add(tool.function.name);
+      toolSchemaByName.set(tool.function.name, tool.function.parameters);
+    }
+  }
+
+  const errors: ToolCallError[] = [];
+  for (const choice of response.choices) {
+    if (
+      !isRecord(choice) ||
+      !isRecord(choice.message) ||
+      !Array.isArray(choice.message.tool_calls)
+    ) {
+      continue;
+    }
+    for (const toolCall of choice.message.tool_calls) {
+      if (!isRecord(toolCall) || toolCall.type !== 'function' || !isRecord(toolCall.function)) {
+        continue;
+      }
+      const id = typeof toolCall.id === 'string' ? toolCall.id : '';
+      const name = typeof toolCall.function.name === 'string' ? toolCall.function.name : '';
+      if (!name) continue;
+      if (!checkKnownTool(knownToolNames, id, name, errors)) continue;
+      const argsStr =
+        typeof toolCall.function.arguments === 'string' ? toolCall.function.arguments : '';
+      const result = parseArgsString(argsStr, id, name, errors);
+      if (result.ok) {
+        validateAgainstSchema(result.parsed, toolSchemaByName.get(name), id, name, errors);
+      }
+    }
+  }
+  return errors;
+}
+
+function detectResponsesJsonErrors(
+  response: unknown,
+  tools: OpenAI.Responses.ResponseCreateParams['tools']
+): ToolCallError[] {
+  if (!isRecord(response) || !Array.isArray(response.output)) return [];
+
+  const toolSchemaByName = new Map<string, unknown>();
+  const knownToolNames = new Set<string>();
+  for (const tool of tools ?? []) {
+    if (tool.type === 'function') {
+      knownToolNames.add(tool.name);
+      toolSchemaByName.set(tool.name, tool.parameters);
+    }
+  }
+
+  const errors: ToolCallError[] = [];
+  for (const item of response.output) {
+    if (!isRecord(item) || item.type !== 'function_call') continue;
+    const callId = typeof item.call_id === 'string' ? item.call_id : '';
+    const name = typeof item.name === 'string' ? item.name : '';
+    if (!name) continue;
+    if (!checkKnownTool(knownToolNames, callId, name, errors)) continue;
+    const argsStr = typeof item.arguments === 'string' ? item.arguments : '';
+    const result = parseArgsString(argsStr, callId, name, errors);
+    if (result.ok) {
+      validateAgainstSchema(result.parsed, toolSchemaByName.get(name), callId, name, errors);
+    }
+  }
+  return errors;
+}
+
+function detectMessagesJsonErrors(
+  response: unknown,
+  tools: Anthropic.MessageCreateParams['tools']
+): ToolCallError[] {
+  if (!isRecord(response) || !Array.isArray(response.content)) return [];
+
+  const toolSchemaByName = new Map<string, unknown>();
+  const knownToolNames = new Set<string>();
+  for (const tool of tools ?? []) {
+    knownToolNames.add(tool.name);
+    if ('input_schema' in tool) {
+      toolSchemaByName.set(tool.name, tool.input_schema);
+    }
+  }
+
+  const errors: ToolCallError[] = [];
+  for (const block of response.content) {
+    if (!isRecord(block) || block.type !== 'tool_use') continue;
+    const id = typeof block.id === 'string' ? block.id : '';
+    const name = typeof block.name === 'string' ? block.name : '';
+    if (!name) continue;
+    if (!checkKnownTool(knownToolNames, id, name, errors)) continue;
+    validateAgainstSchema(block.input, toolSchemaByName.get(name), id, name, errors);
+  }
+  return errors;
+}
+
+function detectSseErrors(lines: string[], request: GatewayRequest): ApiRequestLogError | null {
+  const events = lines.map(parseJsonLine).filter(value => value !== undefined);
+  const toolErrors =
+    request.kind === 'chat_completions'
+      ? detectChatCompletionSseErrors(lines, request.body.tools)
+      : request.kind === 'responses'
+        ? detectResponsesSseErrors(lines, request.body.tools)
+        : detectMessagesSseErrors(lines, request.body.tools);
+  return buildError(toolErrors, lastUpstreamError(events));
+}
+
+function detectJsonErrors(
   responseText: string,
   request: GatewayRequest
 ): ApiRequestLogError | null {
-  const lines = parseSseDataLines(responseText);
-  if (lines.length === 0) return null;
-
-  let errors: ToolCallError[];
+  let parsed: unknown;
   try {
-    if (request.kind === 'chat_completions') {
-      errors = detectChatCompletionSseErrors(lines, request.body.tools);
-    } else if (request.kind === 'responses') {
-      errors = detectResponsesSseErrors(lines, request.body.tools);
-    } else {
-      errors = detectMessagesSseErrors(lines, request.body.tools);
-    }
+    parsed = JSON.parse(responseText);
   } catch {
     return null;
   }
 
-  if (errors.length === 0) return null;
-  return { invalid_tool_call_arguments: errors };
+  const toolErrors =
+    request.kind === 'chat_completions'
+      ? detectChatCompletionJsonErrors(parsed, request.body.tools)
+      : request.kind === 'responses'
+        ? detectResponsesJsonErrors(parsed, request.body.tools)
+        : detectMessagesJsonErrors(parsed, request.body.tools);
+  return buildError(toolErrors, extractUpstreamError(parsed));
+}
+
+/**
+ * Extracts structured details for `api_request_log.error` from an upstream
+ * response body. Covers SSE and non-streamed JSON: invalid tool-call
+ * arguments and provider error objects.
+ */
+export function detectRequestLogErrors(
+  responseText: string,
+  request: GatewayRequest
+): ApiRequestLogError | null {
+  const lines = parseSseDataLines(responseText);
+  if (lines.length > 0) return detectSseErrors(lines, request);
+  return detectJsonErrors(responseText, request);
 }

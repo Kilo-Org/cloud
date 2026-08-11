@@ -375,6 +375,21 @@ describe('script shape classification by compilation', () => {
     expect(counted.iifeRuns).toBe(1);
   });
 
+  it('executes a throwing IIFE at most once and reports the thrown error', async () => {
+    const counted = globalThis as { throwingIifeRuns?: number };
+    counted.throwingIifeRuns = 0;
+
+    const result = await runPageCode(
+      '(() => { globalThis.throwingIifeRuns = (globalThis.throwingIifeRuns ?? 0) + 1; throw new Error("boom"); })()'
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('boom');
+    expect(result.error).toContain('async ({ page, state, input })');
+    // The throw landed after the side effect; the body form must never run it again.
+    expect(counted.throwingIifeRuns).toBe(1);
+  });
+
   it('runs a plain (non-async) arrow function expression script', async () => {
     const result = await runPageCode('({ input }) => ({ done: true, result: input.topic })', {
       input: { topic: 'c' },

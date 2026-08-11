@@ -274,17 +274,22 @@ export const buildWorkflowPageCode = (
   ';\n' +
   'const AsyncFunctionCtor = Object.getPrototypeOf(async () => {}).constructor;\n' +
   'let workflow;\n' +
-  'let evaluatedExpression = false;\n' +
+  'let compiledExpression;\n' +
   'try {\n' +
-  "  const candidate = new Function('return (' + scriptText + '\\n);')();\n" +
-  '  evaluatedExpression = true;\n' +
-  "  if (typeof candidate === 'function') { workflow = candidate; }\n" +
+  "  compiledExpression = new Function('return (' + scriptText + '\\n);');\n" +
   '} catch {\n' +
   '  // Not an expression: fall through to the body form.\n' +
   '}\n' +
-  'if (workflow === undefined && evaluatedExpression) {\n' +
-  '  // The expression already ran once (an IIFE runs its side effects); running the body form would execute it a second time.\n' +
-  "  return { ok: false, error: 'Workflow script must be a function, but evaluated to a non-function value. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions };\n" +
+  'if (compiledExpression !== undefined) {\n' +
+  '  // Invoking the probe runs an IIFE once (its side effects included); any outcome but a clean function must NOT reach the body form, which would execute it a second time.\n' +
+  '  let candidate;\n' +
+  '  try {\n' +
+  '    candidate = compiledExpression();\n' +
+  '  } catch (error) {\n' +
+  "    return { ok: false, error: 'Workflow script threw while evaluating: ' + String(error && error.message ? error.message : error) + '. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions };\n" +
+  '  }\n' +
+  "  if (typeof candidate === 'function') { workflow = candidate; }\n" +
+  "  else { return { ok: false, error: 'Workflow script must be a function, but evaluated to a non-function value. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions }; }\n" +
   '}\n' +
   'if (workflow === undefined) {\n' +
   "  workflow = new AsyncFunctionCtor('{ page, state, input }', scriptText);\n" +

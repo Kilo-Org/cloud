@@ -69,6 +69,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `STYTCH_PROJECT_SECRET` - Stytch project secret. `[SECRET]`
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
+- `SUPPORT_API_SECRET` - Dedicated shared secret for the customer-support-automation GDPR web app. Accepted only on `GET /api/internal/support/users` and `POST /api/internal/support/users/gdpr-removal` via `Authorization: Bearer`. Not a user JWT and not `INTERNAL_API_SECRET`. Leak = enumerate any email + wipe any non-staff, non-live-subscription customer. Distinct values for Development / Staging / Production. Do not put the production value on Cloud preview deployments. Rotate by updating Cloud and CSA together. `[SECRET]`
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 

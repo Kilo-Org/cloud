@@ -328,6 +328,12 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
   });
 }
 
+export async function findUserByEmailCaseInsensitive(email: string): Promise<User[]> {
+  return db.query.kilocode_users.findMany({
+    where: eq(sql`lower(${kilocode_users.google_user_email})`, email.trim().toLowerCase()),
+  });
+}
+
 export async function findUserByNormalizedEmail(email: string): Promise<User | undefined> {
   const normalizedEmail = normalizeEmail(email);
   return await db.query.kilocode_users.findFirst({

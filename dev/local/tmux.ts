@@ -80,7 +80,7 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
     .join(' ');
   const envPrefix = `${envArgs} `;
   execSync(
-    `tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot} ${buildInteractiveShellCommand(
+    `tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${escapeForShell(repoRoot)} ${buildInteractiveShellCommand(
       `cd ${escapeForShell(repoRoot)}`,
       undefined,
       repoRoot

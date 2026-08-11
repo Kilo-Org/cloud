@@ -93,7 +93,10 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
     // Export warehouse: read-only, frozen at its load cutoff. Holds the five
-    // per-user sources. Identity still comes from EXPORT_REPLICA_DB.
+    // per-user sources, plus the profile fields it actually carries — email and
+    // name — which the identity section prefers over the live primary so the
+    // whole export reads as of one moment. The remaining profile columns exist
+    // only on the primary and still come from EXPORT_REPLICA_DB.
     // kilo-supabase-snowflake-export, us-east-2. Caching is disabled on the config:
     // every query returns one user's personal data and each row is read once.
     {

@@ -6,6 +6,7 @@ import {
   type ExportJob,
   type HyperdriveBinding,
 } from './databases';
+import { TerminalExportError } from './errors';
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
@@ -15,17 +16,6 @@ const MAX_PROCESSING_MS = 13 * 60 * 1000;
 const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;
 const PAGE_SIZE = 1_000;
-
-export class TerminalExportError extends Error {
-  constructor(
-    readonly failureCode: string,
-    readonly redactedMessage: string,
-    message: string
-  ) {
-    super(message);
-    this.name = 'TerminalExportError';
-  }
-}
 
 function exportDeadlineError(): TerminalExportError {
   return new TerminalExportError(
@@ -90,7 +80,7 @@ export async function handleGenerationFailure(input: {
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
-  /** Live primary replica. Identity only. */
+  /** Live primary replica. The profile columns the warehouse does not carry. */
   EXPORT_REPLICA_DB: HyperdriveBinding;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   EXPORT_WAREHOUSE_DB: HyperdriveBinding;

@@ -127,6 +127,15 @@
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /*
   Tailwind CSS v4 defaults border color to `currentcolor`. Keep implicit
   borders on Kilo's semantic border token so legacy bare `border` utilities
@@ -435,6 +444,14 @@
 
   .animate-pulse-once {
     animation: pulse-glow 0.6s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-once {
+      animation: none;
+      transform: scale(1);
+      box-shadow: none;
+    }
   }
 
   @keyframes usage-pending-bar {

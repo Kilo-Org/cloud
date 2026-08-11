@@ -1977,7 +1977,8 @@ export const CustomLlmDefinitionSchema = z.object({
   ...CustomLlmMetadataSchema.shape,
   ...CustomLlmApiConfigSchema.shape,
   display_name: z.string(),
-  organization_ids: z.array(z.string()),
+  organization_ids: z.array(z.uuid()),
+  group_ids: z.array(z.uuid()).optional(),
   pricing: CustomLlmPricingSchema.optional(),
 });
 

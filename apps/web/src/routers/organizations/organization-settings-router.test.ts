@@ -13,7 +13,10 @@ import type {
 import {
   type User,
   type Organization,
+  custom_llm2,
   organization_audit_logs,
+  organization_group_memberships,
+  organization_groups,
   organizations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -54,6 +57,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrout
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -350,6 +354,68 @@ describe('organizations settings trpc router', () => {
         context_length: 8192,
       };
     }
+
+    it('includes group-only custom LLMs only for members of an allowed group', async () => {
+      const organization = await createTestOrganization(
+        'Custom LLM Group Access',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const [group] = await db
+        .insert(organization_groups)
+        .values({
+          organization_id: organization.id,
+          name: `Custom LLM ${randomUUID()}`,
+        })
+        .returning();
+      await db.insert(organization_group_memberships).values({
+        organization_id: organization.id,
+        group_id: group.id,
+        kilo_user_id: member.id,
+      });
+
+      const publicId = `kilo-internal/group-only-${randomUUID()}`;
+      const definition = {
+        internal_id: 'group-only-upstream',
+        display_name: 'Group-only custom LLM',
+        context_length: 128_000,
+        max_completion_tokens: 4096,
+        base_url: 'https://example.com/v1',
+        organization_ids: [],
+        group_ids: [group.id],
+      };
+      await db.insert(custom_llm2).values({
+        public_id: publicId,
+        definition,
+      });
+
+      try {
+        await expect(userHasCustomLlmAccess(definition, organization.id, member.id)).resolves.toBe(
+          true
+        );
+        await expect(userHasCustomLlmAccess(definition, organization.id, owner.id)).resolves.toBe(
+          false
+        );
+
+        const memberCaller = await createCallerForUser(member.id);
+        const memberResult = await memberCaller.organizations.settings.listAvailableModels({
+          organizationId: organization.id,
+        });
+        const ownerCaller = await createCallerForUser(owner.id);
+        const ownerResult = await ownerCaller.organizations.settings.listAvailableModels({
+          organizationId: organization.id,
+        });
+
+        expect(memberResult.data.some(model => model.id === publicId)).toBe(true);
+        expect(ownerResult.data.some(model => model.id === publicId)).toBe(false);
+      } finally {
+        await db.delete(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      }
+    });
 
     it('excludes models outside the snapshot without configured restrictions', async () => {
       const organization = await createTestOrganization(

@@ -81,10 +81,11 @@
     },
     // Export warehouse: read-only, frozen at its load cutoff. Holds the five
     // per-user sources. Identity still comes from EXPORT_REPLICA_DB.
-    // TODO: replace with the real Hyperdrive id before deploying.
+    // kilo-supabase-snowflake-export, us-east-2. Caching is disabled on the config:
+    // every query returns one user's personal data and each row is read once.
     {
       "binding": "EXPORT_WAREHOUSE_DB",
-      "id": "REPLACE_WITH_WAREHOUSE_HYPERDRIVE_ID",
+      "id": "c57c7ffa100a424398162dd502bdddce",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/data_export",
     },
   ],

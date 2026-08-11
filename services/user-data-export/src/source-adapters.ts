@@ -5,7 +5,6 @@ export type ExportRecord = {
   field: string;
   value: string | number | boolean | null;
   id?: string;
-  createdAt?: string | null;
 };
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
@@ -49,19 +48,39 @@ LIMIT 1`;
  * The warehouse has no `created_at` on any table and is itself a point-in-time
  * snapshot, so there is no `snapshot_at` bound to apply here.
  */
-const projectQuery = `SELECT id, title
-FROM app_builder_projects
+/**
+ * A single-key keyset page, defined once so a change to the predicate cannot reach
+ * some sources and miss others.
+ *
+ * `table`, `columns` and `key` are module constants below, never caller input. The
+ * user id and the cursor are always bind parameters, so nothing user-supplied is
+ * interpolated into the statement.
+ */
+function singleKeyPageQuery(input: {
+  table: string;
+  columns: string;
+  key?: string;
+  keyType?: 'text' | 'bigint';
+}): string {
+  const key = input.key ?? 'id';
+  const keyType = input.keyType ?? 'text';
+  return `SELECT ${input.columns}
+FROM ${input.table}
 WHERE kilo_user_id = $1
-  AND ($2::text IS NULL OR id > $2::text)
-ORDER BY id
+  AND ($2::${keyType} IS NULL OR ${key} > $2::${keyType})
+ORDER BY ${key}
 LIMIT $3`;
+}
 
-const messageQuery = `SELECT id, data
-FROM app_builder_messages
-WHERE kilo_user_id = $1
-  AND ($2::text IS NULL OR id > $2::text)
-ORDER BY id
-LIMIT $3`;
+const projectQuery = singleKeyPageQuery({
+  table: 'app_builder_projects',
+  columns: 'id, title',
+});
+
+const messageQuery = singleKeyPageQuery({
+  table: 'app_builder_messages',
+  columns: 'id, data',
+});
 
 // session_id repeats about eleven times per session, so the journal position pair is
 // the cursor. A cursor on session_id would skip the rest of a session whenever a page
@@ -76,20 +95,34 @@ WHERE kilo_user_id = $1
 ORDER BY most_significant_position, least_significant_position
 LIMIT $4`;
 
-const systemPromptQuery = `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
-  system_prompt_prefix
-FROM system_prompt_prefix
-WHERE kilo_user_id = $1
-  AND ($2::bigint IS NULL OR system_prompt_prefix_id > $2::bigint)
-ORDER BY system_prompt_prefix_id
-LIMIT $3`;
+/**
+ * System prompts and user prompts ship as two independent sets.
+ *
+ * The previous implementation ran one join across microdollar_usage,
+ * microdollar_usage_metadata and system_prompt_prefix, emitting each user prompt
+ * immediately followed by the system prompt in effect for it. Adjacency in the
+ * stream was the only thing expressing that pairing; neither record carried a
+ * shared key.
+ *
+ * The warehouse cannot reproduce it: microdollar_usage_metadata carries no
+ * system_prompt_prefix_id, and system_prompt_prefix is deduplicated to its distinct
+ * (prefix id, user, org) grain rather than one row per usage event. Restoring the
+ * pairing would mean re-exporting a 1.1 billion row table to add the join key.
+ *
+ * Decided deliberately: the export lists every system prompt the user used and
+ * every prompt they wrote, with no correspondence between the two.
+ */
+const systemPromptQuery = singleKeyPageQuery({
+  table: 'system_prompt_prefix',
+  columns: 'system_prompt_prefix_id::text AS system_prompt_prefix_id, system_prompt_prefix',
+  key: 'system_prompt_prefix_id',
+  keyType: 'bigint',
+});
 
-const userPromptQuery = `SELECT id, user_prompt_prefix
-FROM microdollar_usage_metadata
-WHERE kilo_user_id = $1
-  AND ($2::text IS NULL OR id > $2::text)
-ORDER BY id
-LIMIT $3`;
+const userPromptQuery = singleKeyPageQuery({
+  table: 'microdollar_usage_metadata',
+  columns: 'id, user_prompt_prefix',
+});
 
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.

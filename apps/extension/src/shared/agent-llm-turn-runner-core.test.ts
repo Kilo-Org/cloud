@@ -611,6 +611,51 @@ describe('truncated completion retry', () => {
   });
 });
 
+describe('identical failing tool call guard', () => {
+  it('escalates the third identical failure and leaves earlier ones untouched', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    const responses = createToolOnlyGatewayResponses(4);
+    const fetch: FetchLike = () => responses.next().value;
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Run the workflow')],
+      executeToolCall: () => Promise.resolve({ error: 'Workflow run failed', ok: false }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 8,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onUsage: () => {},
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall =>
+          createSafeToolCall({
+            name: 'get_page_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          })
+        ),
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    const failureTexts = appendedEvents
+      .filter(event => event.type === 'tool-result')
+      .map(event => JSON.stringify(event));
+    const escalated = failureTexts.map(text => text.includes('Do not send it again'));
+    expect(failureTexts).toHaveLength(4);
+    expect(escalated).toStrictEqual([false, false, true, true]);
+    expect(failureTexts[3]).toContain('4 times');
+  });
+});
+
 describe('continue nudge', () => {
   const nudgeOptions = (fetch: FetchLike, appended: AgentConversationEvent[]) => ({
     apiBaseUrl: 'https://app.kilo.ai',

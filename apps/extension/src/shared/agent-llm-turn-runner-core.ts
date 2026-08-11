@@ -171,6 +171,33 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   updateThinkingBlock,
   onAssistantStreaming,
 }: RunLlmTurnOptions<ToolCall>): Promise<void> => {
+  // A weak model can loop one byte-identical failing tool call for the whole turn (measured: 118 identical run_workflow calls). After the third identical failure the error tells it to stop; a success resets the count.
+  const identicalFailureCounts = new Map<string, number>();
+  const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
+    // Key on the call content, not its per-call ids: repeats must collide.
+    const {
+      id: _id,
+      providerToolCallId: _provider,
+      ...callContent
+    } = toolCall as ToolCallEvent & {
+      readonly providerToolCallId?: string;
+    };
+    const key = JSON.stringify(callContent);
+    const result = await executeToolCall(toolCall);
+    if (result.ok) {
+      identicalFailureCounts.delete(key);
+      return result;
+    }
+    const count = (identicalFailureCounts.get(key) ?? 0) + 1;
+    identicalFailureCounts.set(key, count);
+    if (count < 3) {
+      return result;
+    }
+    return {
+      error: `${result.error} — You have sent this exact ${toolCall.name} call ${count} times and it failed the same way every time. Do not send it again. Change the arguments or take a different approach.`,
+      ok: false,
+    };
+  };
   const getGatewayChatCompletion = (
     nextEvents: AgentConversationEvent[],
     onContentDelta: (delta: string) => void,
@@ -421,7 +448,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
         toolCallEvents,
-        executeToolCall,
+        guardedExecuteToolCall,
         signal
       );
 

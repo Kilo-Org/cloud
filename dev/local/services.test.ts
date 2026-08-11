@@ -203,6 +203,10 @@ test('points both user data export Hyperdrive bindings at the offset database', 
     );
     assert.match(
       command,
+      /CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_REPLICA_DB=.*localhost:6632\/postgres/
+    );
+    assert.match(
+      command,
       /CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_EXPORT_WAREHOUSE_DB=.*localhost:6632\/data_export/
     );
   } finally {

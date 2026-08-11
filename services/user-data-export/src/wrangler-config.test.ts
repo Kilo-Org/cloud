@@ -19,9 +19,9 @@ describe('wrangler config', () => {
     expect(placeholders).toEqual([]);
   });
 
-  it('binds the export warehouse and never re-adds a primary replica binding', () => {
+  it('binds both the primary replica and the export warehouse', () => {
+    expect(config).toContain('"EXPORT_REPLICA_DB"');
     expect(config).toContain('"EXPORT_WAREHOUSE_DB"');
-    expect(config).not.toContain('"EXPORT_REPLICA_DB"');
   });
 
   /**

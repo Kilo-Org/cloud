@@ -12,15 +12,23 @@ import { TerminalExportError } from './errors';
 
 type Call = { text: string; values: unknown[] };
 
-function harness(rows: Record<string, unknown>[] = []) {
+function harness(rows: Record<string, unknown>[] = [], profileRows?: Record<string, unknown>[]) {
+  const replicaCalls: Call[] = [];
   const warehouseCalls: Call[] = [];
-  const warehouseQuery: ReplicaQuery = async (text, values) => {
-    warehouseCalls.push({ text, values });
+  const replicaQuery: ReplicaQuery = async (text, values) => {
+    replicaCalls.push({ text, values });
     return rows;
   };
+  const warehouseQuery: ReplicaQuery = async (text, values) => {
+    warehouseCalls.push({ text, values });
+    // The identity source reads the warehouse for the profile fields only; every other
+    // source reads it for its own rows, which is what `rows` stands in for.
+    return profileRows ?? rows;
+  };
   return {
+    replicaCalls,
     warehouseCalls,
-    adapters: createSourceAdapters({ warehouseQuery }),
+    adapters: createSourceAdapters({ replicaQuery, warehouseQuery }),
   };
 }
 
@@ -29,6 +37,33 @@ function requireAdapter(adapters: SourceAdapter[], name: string): SourceAdapter 
   if (!adapter) throw new Error(`Missing test adapter: ${name}`);
   return adapter;
 }
+
+/** A full `kilocode_users` row, as the primary returns it. */
+const PRIMARY_USER_ROW = {
+  id: 'user-1',
+  google_user_email: 'live@example.com',
+  google_user_name: 'Live Name',
+  google_user_image_url: '',
+  created_at: '2026-02-16T19:11:40.809Z',
+  updated_at: '2026-08-07T02:25:54.919Z',
+  hosted_domain: null,
+  microdollars_used: 1,
+  total_microdollars_acquired: 2,
+  next_credit_expiration_at: null,
+  auto_top_up_enabled: false,
+  default_model: null,
+  completed_welcome_form: true,
+  linkedin_url: null,
+  github_url: null,
+  discord_server_membership_verified_at: null,
+  openrouter_upstream_safety_identifier: null,
+  openrouter_downstream_safety_identifier: null,
+  vercel_downstream_safety_identifier: null,
+  customer_source: null,
+  signup_ip: null,
+  normalized_email: null,
+  email_domain: null,
+};
 
 const READ_PAGE_INPUT = {
   kiloUserId: 'owner-user',
@@ -54,16 +89,22 @@ describe('warehouse scoping guard', () => {
     expect(USER_SCOPE_PREDICATES).toContain(scope);
   });
 
-  // Membership in the closed set is not enough on its own: the two predicates are not
-  // interchangeable. `id = $1` scopes to a user only on a table whose primary key is the
-  // user id; on an owned child table it matches the row's own key rather than its owner,
-  // so an owned-row source that picked it would be filtering on the wrong column while
-  // still passing the membership and containment checks. Bind it to the table shape it is
-  // valid for, tested on the query text rather than the export's name.
+  // Membership in the closed set is not enough on its own: the three predicates are not
+  // interchangeable, and each is valid for exactly one table shape. A profile predicate
+  // used on an owned child table would match the row's own key rather than its owner,
+  // and the two profile predicates are not swappable either — the primary calls this
+  // column `id` and the warehouse calls it `user_id`, which is the mismatch that shipped
+  // broken. Pinned on the query text rather than the export's name.
+  const TABLE_FOR_PREDICATE = {
+    'id = $1': /FROM kilocode_users\b/,
+    'user_id = $1': /FROM users\b/,
+  } as const;
+
   it.each(Object.entries(sourceQueries))('%s pairs its predicate with its table', (name, query) => {
     const predicate = sourceQueryScopes[name as keyof typeof sourceQueries];
-    if (predicate === 'id = $1') {
-      expect(query).toMatch(/FROM users\b/);
+    const expectedTable = TABLE_FOR_PREDICATE[predicate as keyof typeof TABLE_FOR_PREDICATE];
+    if (expectedTable) {
+      expect(query).toMatch(expectedTable);
     } else {
       expect(predicate).toBe('kilo_user_id = $1');
     }
@@ -83,15 +124,29 @@ describe('warehouse scoping guard', () => {
   });
 
   it('never joins the warehouse to the live primary or reads loader bookkeeping', () => {
-    for (const query of Object.values(sourceQueries)) {
+    for (const query of Object.values(warehouseQueries)) {
       expect(query).not.toContain('kilocode_users');
       expect(query).not.toContain('load_manifest');
     }
+    expect(sourceQueries.warehouseProfileQuery).not.toContain('kilocode_users');
+    expect(sourceQueries.warehouseProfileQuery).not.toContain('load_manifest');
   });
 
-  it('reads identity from the warehouse, scoped to the row the user owns', () => {
-    expect(sourceQueries.userQuery).toContain('FROM users');
+  it('reads the primary profile columns from the primary', () => {
+    expect(sourceQueries.userQuery).toContain('FROM kilocode_users');
     expect(sourceQueries.userQuery).toContain('WHERE id = $1');
+  });
+
+  // The warehouse names this column `user_id`; the primary names the same value `id`.
+  // Selecting `id` here is what shipped broken, so the column names are pinned.
+  it('reads the warehouse profile fields by the warehouse column names', () => {
+    expect(sourceQueries.warehouseProfileQuery).toMatch(/FROM users\b/);
+    expect(sourceQueries.warehouseProfileQuery).toContain('WHERE user_id = $1');
+    expect(sourceQueries.warehouseProfileQuery).toContain('SELECT user_id, email, name');
+    // Columns the warehouse does not have. Selecting any of them fails at runtime.
+    for (const absent of ['google_user_email', 'google_user_name', 'created_at', 'signup_ip']) {
+      expect(sourceQueries.warehouseProfileQuery).not.toContain(absent);
+    }
   });
 });
 
@@ -114,48 +169,47 @@ describe('source adapters', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('reads identity from the warehouse, scoped by the row id', async () => {
-    const { adapters, warehouseCalls } = harness([
-      {
-        id: 'user-1',
-        google_user_email: 'a@example.com',
-        google_user_name: 'A',
-        google_user_image_url: '',
-        created_at: '2026-02-16T19:11:40.809Z',
-        updated_at: '2026-08-07T02:25:54.919Z',
-        hosted_domain: null,
-        microdollars_used: 1,
-        total_microdollars_acquired: 2,
-        next_credit_expiration_at: null,
-        auto_top_up_enabled: false,
-        default_model: null,
-        completed_welcome_form: true,
-        linkedin_url: null,
-        github_url: null,
-        discord_server_membership_verified_at: null,
-        openrouter_upstream_safety_identifier: null,
-        openrouter_downstream_safety_identifier: null,
-        vercel_downstream_safety_identifier: null,
-        customer_source: null,
-        signup_ip: null,
-        normalized_email: null,
-        email_domain: null,
-      },
-    ]);
+  it('reads each identity field from the database that has it', async () => {
+    const { adapters, replicaCalls, warehouseCalls } = harness(
+      [PRIMARY_USER_ROW],
+      [{ user_id: 'user-1', email: 'warehouse@example.com', name: 'Warehouse Name' }]
+    );
 
     await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
 
-    expect(warehouseCalls).toEqual([
-      { text: expect.stringContaining('WHERE id = $1'), values: ['owner-user'] },
+    expect(replicaCalls).toEqual([
+      { text: expect.stringContaining('FROM kilocode_users'), values: ['owner-user'] },
     ]);
+    expect(warehouseCalls).toEqual([
+      { text: expect.stringContaining('WHERE user_id = $1'), values: ['owner-user'] },
+    ]);
+  });
+
+  // The point of the change: the two fields the warehouse carries are reported as of the
+  // snapshot, so a name or email changed after the cutoff does not appear beside five
+  // sources frozen before it.
+  it('prefers the warehouse copy of email and name over the live values', async () => {
+    const { adapters } = harness(
+      [PRIMARY_USER_ROW],
+      [{ user_id: 'user-1', email: 'warehouse@example.com', name: 'Warehouse Name' }]
+    );
+
+    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
+    const value = (field: string) => page?.records.find(record => record.field === field)?.value;
+
+    expect(value('google_user_email')).toBe('warehouse@example.com');
+    expect(value('google_user_name')).toBe('Warehouse Name');
+    // Everything the warehouse does not carry still comes from the primary row.
+    expect(value('microdollars_used')).toBe(1);
+    expect(value('created_at')).toBe('2026-02-16T19:11:40.809Z');
   });
 
   // A row absent from the warehouse is permanent for the life of a snapshot, so this
   // must fail on the first attempt rather than consume the queue's retries. Asserted on
   // the class because that is what `handleGenerationFailure` branches on to mark the
   // export failed instead of releasing it for retry.
-  it('fails terminally when the warehouse holds no identity row', async () => {
-    const { adapters } = harness([]);
+  it('fails terminally when the warehouse holds no profile row', async () => {
+    const { adapters } = harness([PRIMARY_USER_ROW], []);
 
     await expect(
       requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT)
@@ -163,7 +217,7 @@ describe('source adapters', () => {
   });
 
   it('reports a missing identity row with a code and a message fit to show the requester', async () => {
-    const { adapters } = harness([]);
+    const { adapters } = harness([PRIMARY_USER_ROW], []);
 
     const error = await requireAdapter(adapters, 'kilocode_users')
       .readPage?.(READ_PAGE_INPUT)

@@ -3,6 +3,7 @@
 interface __BaseEnv_Env {
 	EXPORT_BUCKET: R2Bucket;
 	PRIMARY_STATE_DB: Hyperdrive;
+	EXPORT_REPLICA_DB: Hyperdrive;
 	EXPORT_WAREHOUSE_DB: Hyperdrive;
 	EXPORT_QUEUE: Queue;
 	R2_ACCOUNT_ID: "e115e769bcdd4c3d66af59d3332cb394";

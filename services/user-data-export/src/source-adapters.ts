@@ -50,15 +50,28 @@ WHERE id = $1
 LIMIT 1`;
 
 /**
- * The warehouse's copy of the profile fields it carries. Keyed on `user_id`, which is
- * the warehouse's name for `kilocode_users.id` and the same value the five child tables
- * carry as `kilo_user_id`.
+ * Export field name to the warehouse column that supplies it, for the profile fields the
+ * warehouse carries. Both the SELECT list and the merge below are derived from this, so a
+ * field cannot be read from the warehouse without also being applied: adding a column to
+ * one and forgetting the other would silently keep serving the live value, which is the
+ * inconsistency this whole path exists to remove.
  *
- * Only `email` and `name` are read. The table has geo columns too, but the export has
- * never had a geo section and adding one is not what sourcing identity from the
- * warehouse means.
+ * Only email and name. The table has geo columns too, but the export has never had a geo
+ * section and adding one is not what sourcing identity from the warehouse means.
  */
-const warehouseProfileQuery = `SELECT user_id, email, name
+export const WAREHOUSE_PROFILE_FIELDS = {
+  google_user_email: 'email',
+  google_user_name: 'name',
+} as const;
+
+/**
+ * The warehouse's copy of those fields. Keyed on `user_id`, which is the warehouse's name
+ * for `kilocode_users.id` and the same value the five child tables carry as `kilo_user_id`.
+ *
+ * The interpolated column list comes from the module constant above, never from caller
+ * input, on the same basis as `singleKeyPageQuery` below. The user id is a bind parameter.
+ */
+const warehouseProfileQuery = `SELECT user_id, ${Object.values(WAREHOUSE_PROFILE_FIELDS).join(', ')}
 FROM users
 WHERE user_id = $1
 LIMIT 1`;
@@ -255,6 +268,29 @@ function jsonValue(value: unknown): string | null {
   return JSON.stringify(value);
 }
 
+/**
+ * Picks the warehouse's copy of a profile field, falling back to the primary's.
+ *
+ * The warehouse's `users.email` and `users.name` are nullable text with no constraint —
+ * the export warehouse declares no keys and its own load checks count nulls rather than
+ * forbidding them — while the primary's `google_user_email` and `google_user_name` are
+ * NOT NULL. A null or blank warehouse value is therefore a load artifact, not a fact
+ * about the user, and the primary value is the true one.
+ *
+ * Deliberately not passed straight to `requiredString`: that mapper was written for a
+ * NOT NULL primary column and throws a plain `Error`, which `handleGenerationFailure`
+ * treats as retryable. A null would then spend the queue's four retries on a value
+ * frozen in the snapshot that no retry can change — the same waste the missing-row case
+ * raises `TerminalExportError` to avoid.
+ *
+ * Blank counts as absent alongside null: empty string and NULL are not reliably
+ * distinguished across this load path, and neither is a usable email or name.
+ */
+function warehouseProfileValue(warehouseValue: unknown, primaryValue: unknown): unknown {
+  if (typeof warehouseValue !== 'string' || warehouseValue.trim() === '') return primaryValue;
+  return warehouseValue;
+}
+
 const USER_FIELD_MAPPERS = [
   ['id', (value: unknown) => requiredString(value, 'id')],
   ['google_user_email', (value: unknown) => requiredString(value, 'google_user_email')],
@@ -343,11 +379,10 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         // The warehouse copy wins for the two fields it carries, so the identity section
         // is as of the same moment as the rest of the export. Field names are unchanged,
         // so this is not a schema version change for consumers.
-        const merged: Record<string, unknown> = {
-          ...row,
-          google_user_email: profile.email,
-          google_user_name: profile.name,
-        };
+        const merged: Record<string, unknown> = { ...row };
+        for (const [exportField, warehouseColumn] of Object.entries(WAREHOUSE_PROFILE_FIELDS)) {
+          merged[exportField] = warehouseProfileValue(profile[warehouseColumn], row[exportField]);
+        }
         return {
           records: USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
             source: 'kilocode_users',

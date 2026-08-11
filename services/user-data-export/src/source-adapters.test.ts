@@ -4,6 +4,7 @@ import {
   sourceQueries,
   sourceQueryScopes,
   USER_SCOPE_PREDICATES,
+  WAREHOUSE_PROFILE_FIELDS,
   warehouseQueries,
   type ReplicaQuery,
   type SourceAdapter,
@@ -142,7 +143,13 @@ describe('warehouse scoping guard', () => {
   it('reads the warehouse profile fields by the warehouse column names', () => {
     expect(sourceQueries.warehouseProfileQuery).toMatch(/FROM users\b/);
     expect(sourceQueries.warehouseProfileQuery).toContain('WHERE user_id = $1');
-    expect(sourceQueries.warehouseProfileQuery).toContain('SELECT user_id, email, name');
+    // Exact, not toContain: a column appended to the SELECT list without a matching entry
+    // in WAREHOUSE_PROFILE_FIELDS would be read from the warehouse and then quietly
+    // discarded in favour of the live value, which is the bug this path exists to remove.
+    const selected = sourceQueries.warehouseProfileQuery
+      .slice('SELECT '.length, sourceQueries.warehouseProfileQuery.indexOf('\nFROM'))
+      .split(', ');
+    expect(selected).toEqual(['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS)]);
     // Columns the warehouse does not have. Selecting any of them fails at runtime.
     for (const absent of ['google_user_email', 'google_user_name', 'created_at', 'signup_ip']) {
       expect(sourceQueries.warehouseProfileQuery).not.toContain(absent);
@@ -202,6 +209,26 @@ describe('source adapters', () => {
     // Everything the warehouse does not carry still comes from the primary row.
     expect(value('microdollars_used')).toBe(1);
     expect(value('created_at')).toBe('2026-02-16T19:11:40.809Z');
+  });
+
+  // The warehouse columns are nullable text with no constraint, while the primary's are
+  // NOT NULL. Feeding a null into requiredString would throw a plain Error, which is
+  // retryable, so the export would burn its retries on a value the snapshot has frozen.
+  it.each([
+    ['null', null],
+    ['blank', '   '],
+    ['a non-string', 42],
+  ])('falls back to the live value when the warehouse email is %s', async (_label, bad) => {
+    const { adapters } = harness(
+      [PRIMARY_USER_ROW],
+      [{ user_id: 'user-1', email: bad, name: bad }]
+    );
+
+    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
+    const value = (field: string) => page?.records.find(record => record.field === field)?.value;
+
+    expect(value('google_user_email')).toBe('live@example.com');
+    expect(value('google_user_name')).toBe('Live Name');
   });
 
   // A row absent from the warehouse is permanent for the life of a snapshot, so this

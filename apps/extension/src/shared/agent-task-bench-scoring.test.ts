@@ -9,6 +9,12 @@ import {
   TASK_SPEED_LIMIT_SECONDS,
 } from './agent-task-bench-scoring';
 
+const actionLogin = TASK_BENCH_SCENARIOS['action-login'];
+const actionCart = TASK_BENCH_SCENARIOS['action-cart'];
+if (actionLogin === undefined || actionCart === undefined) {
+  throw new Error('task scenario registry is missing action-login or action-cart');
+}
+
 const scenario = (overrides: Partial<BenchTaskScenario> = {}): BenchTaskScenario => ({
   answerChecks: [{ key: 'fact', re: /room 3327/iu, requireToolEvidence: true }],
   id: 'test-task',
@@ -150,6 +156,39 @@ describe('task correctness scoring', () => {
       scenario: actionScenario,
     });
     expect(viaDryRun.passed).toBe(false);
+  });
+
+  it('fails a saucedemo count answered from training memory, without tool evidence', () => {
+    // The action ran, but no ok tool result ever carried the count.
+    const memoryOnlyLogin = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('eval', { log: 'clicked the login button' }),
+        answerEvent('Swag Labs lists 6 products on the inventory page.'),
+      ],
+      scenario: actionLogin,
+    });
+    expect(memoryOnlyLogin.passed).toBe(false);
+    expect(memoryOnlyLogin.predicates['toolEvidence']?.pass).toBe(false);
+
+    const memoryOnlyCart = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('eval', { log: 'added the backpack to the cart' }),
+        answerEvent('The cart badge shows 1 item: the Sauce Labs Backpack.'),
+      ],
+      scenario: actionCart,
+    });
+    expect(memoryOnlyCart.passed).toBe(false);
+    expect(memoryOnlyCart.predicates['toolEvidence']?.pass).toBe(false);
+
+    // The same attempt passes once an ok tool result carries the count.
+    const evidenced = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('eval', { text: 'Products (6 items shown)' }),
+        answerEvent('Swag Labs lists 6 products on the inventory page.'),
+      ],
+      scenario: actionLogin,
+    });
+    expect(evidenced.passed).toBe(true);
   });
 
   it('requires an ok eval exchange for action scenarios', () => {

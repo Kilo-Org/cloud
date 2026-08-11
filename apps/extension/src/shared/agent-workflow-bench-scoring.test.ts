@@ -5,10 +5,11 @@ import {
   computeBatchSummary,
   correlateToolExchanges,
   scoreWorkflowCorrectness,
-  selectLastValidRealRun,
+  selectLastValidRun,
 } from './agent-workflow-bench-scoring';
 import type { BenchAttemptStats, BenchEvent, BenchWorkflow } from './agent-workflow-bench-scoring';
 import { BENCH_SCENARIOS, isoDateVariants } from './agent-workflow-bench-scenarios';
+import { hashWorkflowScript } from './agent-workflows';
 
 const { flights } = BENCH_SCENARIOS;
 const { hn } = BENCH_SCENARIOS;
@@ -31,6 +32,12 @@ const flightsWorkflow = (overrides: Partial<BenchWorkflow> = {}): BenchWorkflow 
   scopeOrigin: 'https://www.google.com',
   script: 'const url = "?q=business class flights"; return { navigate: url, state: {} }',
   ...overrides,
+});
+
+/** The stored hash must match the stored script for the predicate to pass. */
+const approved = async (workflow: BenchWorkflow): Promise<BenchWorkflow> => ({
+  ...workflow,
+  approvedScriptHash: await hashWorkflowScript(workflow.script),
 });
 
 const toolCall = (
@@ -103,7 +110,7 @@ describe('real-run selection', () => {
       toolResult('call-b', true, { result: 'second' }),
     ];
 
-    const run = selectLastValidRealRun(correlateToolExchanges(events).exchanges);
+    const run = selectLastValidRun(correlateToolExchanges(events).exchanges);
 
     expect(run?.call.id).toBe('call-b');
   });
@@ -112,20 +119,55 @@ describe('real-run selection', () => {
 describe('stored workflow predicates', () => {
   const passingEvents = runEvents(flightsFollowUp, parisResultValue);
 
-  it('passes a fully correct flights attempt', () => {
-    const result = scoreWorkflowCorrectness({
+  it('passes a fully correct flights attempt', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows: [flightsWorkflow({ script: 'business class ?q= flights search' })],
+      workflows: [await approved(flightsWorkflow({ script: 'business class ?q= flights search' }))],
     });
 
     expect(result.passed).toBe(true);
     expect(result.resultCheck).toBe('real');
   });
 
-  it('fails when no workflow is stored', () => {
-    const result = scoreWorkflowCorrectness({
+  it('scores the workflow the verifying run targeted, not the oldest stored', async () => {
+    const decoy = flightsWorkflow({
+      id: 'wf-decoy',
+      scopeOrigin: 'https://example.com',
+      script: 'unrelated',
+    });
+    const target = await approved(flightsWorkflow({ script: 'business class ?q= flights search' }));
+    const result = await scoreWorkflowCorrectness({
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [decoy, target],
+    });
+
+    expect(result.passed).toBe(true);
+  });
+
+  it('falls back to the newest saved workflow for a dry-run-only attempt', async () => {
+    const decoy = flightsWorkflow({
+      id: 'wf-decoy',
+      scopeOrigin: 'https://example.com',
+      script: 'unrelated',
+    });
+    const newest = await approved(flightsWorkflow({ script: 'business' }));
+    const result = await scoreWorkflowCorrectness({
+      events: runEvents(flightsFollowUp, parisResultValue, true),
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [decoy, newest],
+    });
+
+    expect(result.resultCheck).toBe('dry-run');
+    expect(result.passed).toBe(true);
+  });
+
+  it('fails when no workflow is stored', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -136,8 +178,8 @@ describe('stored workflow predicates', () => {
     expect(result.predicates['storedWorkflow']?.pass).toBe(false);
   });
 
-  it('fails on a wrong scope origin', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails on a wrong scope origin', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -153,8 +195,8 @@ describe('stored workflow predicates', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('fails when the pathPrefix excludes the scenario start URL', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails when the pathPrefix excludes the scenario start URL', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -164,8 +206,8 @@ describe('stored workflow predicates', () => {
     expect(result.predicates['scopeCoversStartUrl']?.pass).toBe(false);
   });
 
-  it('accepts an omitted pathPrefix', () => {
-    const result = scoreWorkflowCorrectness({
+  it('accepts an omitted pathPrefix', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -175,8 +217,8 @@ describe('stored workflow predicates', () => {
     expect(result.predicates['scopeCoversStartUrl']?.pass).toBe(true);
   });
 
-  it('fails without an approved script hash', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails without an approved script hash', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -186,8 +228,24 @@ describe('stored workflow predicates', () => {
     expect(result.predicates['approvedScriptHash']?.pass).toBe(false);
   });
 
-  it('fails when an expected param is missing', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails when the approved hash does not match the stored script', async () => {
+    const result = await scoreWorkflowCorrectness({
+      events: passingEvents,
+      followUpValues: flightsFollowUp,
+      scenario: flights,
+      workflows: [
+        flightsWorkflow({
+          approvedScriptHash: await hashWorkflowScript('a different script'),
+          script: 'business',
+        }),
+      ],
+    });
+
+    expect(result.predicates['approvedScriptHash']?.pass).toBe(false);
+  });
+
+  it('fails when an expected param is missing', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -203,8 +261,8 @@ describe('stored workflow predicates', () => {
     expect(result.predicates['workflowParams']?.detail).toContain('date');
   });
 
-  it('fails when a script marker is missing', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails when a script marker is missing', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: passingEvents,
       followUpValues: flightsFollowUp,
       scenario: flights,
@@ -217,14 +275,14 @@ describe('stored workflow predicates', () => {
 });
 
 describe('run evidence scoring', () => {
-  const workflows = [flightsWorkflow({ script: 'business' })];
+  const workflowsReady = (async () => [await approved(flightsWorkflow({ script: 'business' }))])();
 
-  it('fails when the run input misses a follow-up value', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails when the run input misses a follow-up value', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents({ destination: 'Paris' }, parisResultValue),
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.predicates['runInputBound']?.pass).toBe(false);
@@ -232,109 +290,109 @@ describe('run evidence scoring', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('fails when the result misses a required content check', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails when the result misses a required content check', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents(flightsFollowUp, {
         result: 'Flights to Paris found many results with no numbers or airline names here',
       }),
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.predicates['resultContent']?.pass).toBe(false);
     expect(result.passed).toBe(false);
   });
 
-  it('fails when the result misses the destination value', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails when the result misses the destination value', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents(flightsFollowUp, {
         result: 'Lufthansa € 245 business class flight list without the city name',
       }),
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.predicates['resultHasValues']?.pass).toBe(false);
   });
 
-  it('fails a too-short result', () => {
-    const result = scoreWorkflowCorrectness({
+  it('fails a too-short result', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents(flightsFollowUp, { result: 'Paris €1 KL 123' }),
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.predicates['resultLength']?.pass).toBe(false);
   });
 
-  it('uses a valid dry run with real content when no real run exists', () => {
-    const result = scoreWorkflowCorrectness({
+  it('uses a valid dry run with real content when no real run exists', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents(flightsFollowUp, parisResultValue, true),
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.resultCheck).toBe('dry-run');
     expect(result.passed).toBe(true);
   });
 
-  it('prefers the real run over a dry run', () => {
-    const result = scoreWorkflowCorrectness({
+  it('prefers the real run over a dry run', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: [
         ...runEvents(flightsFollowUp, { result: 'dry note only' }, true),
         ...runEvents(flightsFollowUp, parisResultValue),
       ],
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.resultCheck).toBe('real');
     expect(result.passed).toBe(true);
   });
 
-  it('reports none without any valid run', () => {
-    const result = scoreWorkflowCorrectness({
+  it('reports none without any valid run', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: [],
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.resultCheck).toBe('none');
     expect(result.passed).toBe(false);
   });
 
-  it('reports none without follow-up values', () => {
-    const result = scoreWorkflowCorrectness({
+  it('reports none without follow-up values', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents(flightsFollowUp, parisResultValue),
       followUpValues: undefined,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     expect(result.resultCheck).toBe('none');
     expect(result.passed).toBe(false);
   });
 
-  it('matches an ISO follow-up date shown as a human date in the result', () => {
-    const result = scoreWorkflowCorrectness({
+  it('matches an ISO follow-up date shown as a human date in the result', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: runEvents(flightsFollowUp, parisResultValue),
       followUpValues: flightsFollowUp,
       scenario: flights,
-      workflows,
+      workflows: await workflowsReady,
     });
 
     // The pinned result text says "Sep 21", never "2026-09-21".
     expect(result.predicates['resultHasValues']?.pass).toBe(true);
   });
 
-  it('scores an hn attempt with topic-only params', () => {
-    const result = scoreWorkflowCorrectness({
+  it('scores an hn attempt with topic-only params', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: [
         toolCall('call-run', 'run_workflow', { input: { topic: 'rust' }, workflowId: 'wf-hn' }),
         toolResult('call-run', true, {
@@ -345,19 +403,71 @@ describe('run evidence scoring', () => {
       followUpValues: { topic: 'rust' },
       scenario: hn,
       workflows: [
-        {
-          approvedScriptHash: 'hash',
+        await approved({
+          approvedScriptHash: undefined,
           description: 'HN topic search',
           id: 'wf-hn',
           name: 'HN search',
           params: [{ description: 'The topic to search for', name: 'topic' }],
           scopeOrigin: 'https://hn.algolia.com',
           script: 'return { navigate: "https://hn.algolia.com/?query=" + input.topic, state: {} }',
-        },
+        }),
       ],
     });
 
     expect(result.passed).toBe(true);
+  });
+});
+
+describe('word-boundary value matching', () => {
+  const hnRun = (id: string, topic: string, resultText: string): BenchEvent[] => [
+    toolCall(id, 'run_workflow', { input: { topic }, workflowId: 'wf-hn' }),
+    toolResult(id, true, { result: resultText }),
+  ];
+
+  it('rejects a pinned "go" satisfied only inside "ago" and "Django"', async () => {
+    const result = await scoreWorkflowCorrectness({
+      events: hnRun(
+        'call-go',
+        'go',
+        'Django 5.2 released a few days ago — 900 points — from Hacker News search'
+      ),
+      followUpValues: { topic: 'go' },
+      scenario: hn,
+      workflows: [],
+    });
+
+    expect(result.predicates['resultHasValues']?.pass).toBe(false);
+  });
+
+  it('rejects a pinned "rust" satisfied only inside "antitrust"', async () => {
+    const result = await scoreWorkflowCorrectness({
+      events: hnRun(
+        'call-rust',
+        'rust',
+        'New antitrust ruling against Big Tech — 500 points — from Hacker News search'
+      ),
+      followUpValues: { topic: 'rust' },
+      scenario: hn,
+      workflows: [],
+    });
+
+    expect(result.predicates['resultHasValues']?.pass).toBe(false);
+  });
+
+  it('accepts the pinned value as a whole word, case-insensitively', async () => {
+    const result = await scoreWorkflowCorrectness({
+      events: hnRun(
+        'call-go-word',
+        'go',
+        'Why Go beats Java for small services — 700 points — from Hacker News search'
+      ),
+      followUpValues: { topic: 'go' },
+      scenario: hn,
+      workflows: [],
+    });
+
+    expect(result.predicates['resultHasValues']?.pass).toBe(true);
   });
 });
 
@@ -438,8 +548,8 @@ describe('zero-param scenarios', () => {
     script: 'return { done: true, result: page.readText() };',
   };
 
-  it('accepts a real run with no input when the scenario has no follow-up values', () => {
-    const result = scoreWorkflowCorrectness({
+  it('accepts a real run with no input when the scenario has no follow-up values', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: [
         toolCall('call-npr', 'run_workflow', { workflowId: 'wf-npr' }),
         toolResult('call-npr', true, {
@@ -448,15 +558,15 @@ describe('zero-param scenarios', () => {
       ],
       followUpValues: {},
       scenario: npr,
-      workflows: [nprWorkflow],
+      workflows: [await approved(nprWorkflow)],
     });
 
     expect(result.resultCheck).toBe('real');
     expect(result.passed).toBe(true);
   });
 
-  it('still fails a zero-param scenario without any run', () => {
-    const result = scoreWorkflowCorrectness({
+  it('still fails a zero-param scenario without any run', async () => {
+    const result = await scoreWorkflowCorrectness({
       events: [],
       followUpValues: {},
       scenario: npr,

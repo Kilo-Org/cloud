@@ -5,7 +5,11 @@
  * evidence for hallucination-prone facts, and — for action scenarios — at
  * least one ok eval exchange.
  */
-import { computeBatchSummary, correlateToolExchanges } from './agent-workflow-bench-scoring';
+import {
+  computeBatchSummary,
+  correlateToolExchanges,
+  findStringValues,
+} from './agent-workflow-bench-scoring';
 import type {
   BenchAttemptStats,
   BenchBatchSummary,
@@ -24,9 +28,6 @@ export interface BenchTaskCorrectnessResult {
 
 const predicate = (pass: boolean, detail: string): BenchPredicate => ({ detail, pass });
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
 /**
  * Harness metadata strings can accidentally satisfy an evidence pattern:
  * the snapshot paging note embeds character counts ("characters 16000-24000
@@ -34,24 +35,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * page-derived strings count as evidence.
  */
 const NON_EVIDENCE_KEYS = new Set(['note', 'snapshotId']);
-
-const collectStrings = (value: unknown, output: string[] = []): string[] => {
-  if (typeof value === 'string') {
-    output.push(value);
-  } else if (Array.isArray(value)) {
-    for (const entry of value) {
-      collectStrings(entry, output);
-    }
-  } else if (isRecord(value)) {
-    for (const [key, entry] of Object.entries(value)) {
-      if (!NON_EVIDENCE_KEYS.has(key)) {
-        collectStrings(entry, output);
-      }
-    }
-  }
-
-  return output;
-};
 
 /** The answer is the last non-empty assistant message of the conversation. */
 export const selectFinalAnswer = (events: readonly BenchEvent[]): string => {
@@ -81,7 +64,7 @@ export const scoreTaskCorrectness = ({
   const { exchanges } = correlateToolExchanges(events);
   const okResultStrings = exchanges
     .filter(exchange => exchange.result.ok)
-    .flatMap(exchange => collectStrings(exchange.result.value));
+    .flatMap(exchange => findStringValues(exchange.result.value, NON_EVIDENCE_KEYS));
 
   const failedChecks = scenario.answerChecks
     .filter(check => !check.re.test(answer))

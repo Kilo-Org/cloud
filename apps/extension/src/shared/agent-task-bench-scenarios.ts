@@ -161,7 +161,8 @@ const DRAFT_REPLY_SCENARIO: BenchTaskScenario = {
 /** Log in on a demo shop and report the product count (dangerous mode). */
 const ACTION_LOGIN_SCENARIO: BenchTaskScenario = {
   answerChecks: [
-    { key: 'count', re: /\b6\b|\bsix\b/iu },
+    // The saucedemo product count is a canonical tutorial fact; the count must appear in an ok tool result, not from training memory.
+    { key: 'count', re: /\b6\b|\bsix\b/iu, requireToolEvidence: true },
     { key: 'context', re: /product|inventory|item/iu },
   ],
   id: 'action-login',
@@ -180,7 +181,8 @@ const ACTION_LOGIN_SCENARIO: BenchTaskScenario = {
 /** Log in, add one item to the cart, and report the badge count (dangerous mode). */
 const ACTION_CART_SCENARIO: BenchTaskScenario = {
   answerChecks: [
-    { key: 'count', re: /\b(?:1|one)\b/iu },
+    // The badge count after one add is a canonical tutorial fact; it must appear in an ok tool result, not from training memory.
+    { key: 'count', re: /\b(?:1|one)\b/iu, requireToolEvidence: true },
     { key: 'item', re: /backpack/iu },
   ],
   id: 'action-cart',

@@ -88,7 +88,7 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  if (!(await isLoggingEnabledForUser(user, organization_id))) {
+  if (provider !== 'custom' && !(await isLoggingEnabledForUser(user, organization_id))) {
     return null;
   }
   const status = response.status;

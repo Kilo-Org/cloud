@@ -51,16 +51,19 @@ export function RequestDataDeletionCard() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete your Kilo data?</AlertDialogTitle>
-              {/* AlertDialogDescription renders a <p>, so the instruction below
-                  has to be a sibling rather than nested inside it. */}
+              {/* Both sentences live inside the description because Radix only
+                  wires aria-describedby to it — a sibling paragraph would never
+                  be announced when the dialog opens. AlertDialogDescription
+                  renders a <p>, so the second sentence is a block span rather
+                  than a nested <p>. */}
               <AlertDialogDescription>
                 Download your data export before requesting deletion. Once your data is deleted, any
                 export download will no longer be available.
+                <span className="mt-4 block">
+                  On the support form, choose the Account Deletion category.
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <p className="text-muted-foreground text-sm">
-              On the support form, choose the Account Deletion category.
-            </p>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction asChild>

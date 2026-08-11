@@ -8,9 +8,9 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 
 const weatherParameters = {
-  type: 'object',
+  type: 'object' as const,
   properties: {
-    city: { type: 'string' },
+    city: { type: 'string' as const },
   },
   required: ['city'],
 };

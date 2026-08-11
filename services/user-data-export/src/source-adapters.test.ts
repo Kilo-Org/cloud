@@ -8,6 +8,7 @@ import {
   type ReplicaQuery,
   type SourceAdapter,
 } from './source-adapters';
+import { TerminalExportError } from './errors';
 
 type Call = { text: string; values: unknown[] };
 
@@ -132,6 +133,34 @@ describe('source adapters', () => {
     expect(warehouseCalls).toEqual([
       { text: expect.stringContaining('WHERE id = $1'), values: ['owner-user'] },
     ]);
+  });
+
+  // A row absent from the warehouse is permanent for the life of a snapshot, so this
+  // must fail on the first attempt rather than consume the queue's retries. Asserted on
+  // the class because that is what `handleGenerationFailure` branches on to mark the
+  // export failed instead of releasing it for retry.
+  it('fails terminally when the warehouse holds no identity row', async () => {
+    const { adapters } = harness([]);
+
+    await expect(
+      requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT)
+    ).rejects.toBeInstanceOf(TerminalExportError);
+  });
+
+  it('reports a missing identity row with a code and a message fit to show the requester', async () => {
+    const { adapters } = harness([]);
+
+    const error = await requireAdapter(adapters, 'kilocode_users')
+      .readPage?.(READ_PAGE_INPUT)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(TerminalExportError);
+    const terminal = error as TerminalExportError;
+    expect(terminal.failureCode).toBe('export_identity_row_missing');
+    expect(terminal.redactedMessage).toContain('not found in the data snapshot');
+    // The requester's id identifies a person and is carried on the log event already.
+    expect(terminal.message).not.toContain(READ_PAGE_INPUT.kiloUserId);
+    expect(terminal.redactedMessage).not.toContain(READ_PAGE_INPUT.kiloUserId);
   });
 
   it('passes the authenticated user to the warehouse and maps project titles', async () => {

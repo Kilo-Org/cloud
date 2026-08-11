@@ -1,4 +1,5 @@
 import { keyCursorValues, type ExportCursor, type KeyCursor } from './contracts';
+import { TerminalExportError } from './errors';
 
 export type ExportRecord = {
   source: string;
@@ -297,7 +298,24 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         if (input.cursor) return { records: [], nextCursor: null };
         const rows = await warehouseQuery(userQuery, [input.kiloUserId]);
         const row = rows[0];
-        if (!row) throw new Error('Export user was not found');
+        // Terminal, not retryable. Identity used to come from the live primary, where the
+        // row always existed for an authenticated requester; read from the warehouse it can
+        // be genuinely absent, for an account created after the warehouse's load cutoff or
+        // a gap in the load. No amount of retrying makes the row appear, so failing on the
+        // first attempt reports the real reason instead of spending the queue's retries to
+        // arrive at the same place with a generic error.
+        //
+        // Deliberately not treated as an empty section: this is the requester's own profile
+        // and every other source is keyed to the same snapshot, so a tolerated miss would
+        // hand back a file that reads as a complete export of an account that has no data,
+        // rather than saying the account is not in the snapshot.
+        if (!row) {
+          throw new TerminalExportError(
+            'export_identity_row_missing',
+            'Your account was not found in the data snapshot this export reads from. This can happen when the account was created after the snapshot was taken.',
+            'Identity row was not present in the export warehouse'
+          );
+        }
         return {
           records: USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
             source: 'kilocode_users',

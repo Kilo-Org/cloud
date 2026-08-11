@@ -167,12 +167,13 @@ describe('coding plans router', () => {
       {
         planId: BYTEPLUS_PLAN_ID,
         providerName: 'BytePlus',
-        name: 'Coding Plan Lite',
+        name: 'Enterprise Coding Plan Lite',
         providerId: 'byteplus-coding',
         costKiloCredits: 20,
         billingPeriodDays: 30,
         features: expect.arrayContaining([
           'Kilo automatically configures BytePlus in your BYOK settings.',
+          'Zero Data Retention: does not retain prompts or train on your data',
         ]),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
@@ -180,11 +181,12 @@ describe('coding plans router', () => {
       {
         planId: BYTEPLUS_PRO_PLAN_ID,
         providerName: 'BytePlus',
-        name: 'Coding Plan Pro',
+        name: 'Enterprise Coding Plan Pro',
         providerId: 'byteplus-coding',
         costKiloCredits: 100,
         billingPeriodDays: 30,
         features: expect.arrayContaining([
+          'Zero Data Retention: does not retain prompts or train on your data',
           'For complex, high-intensity development use.',
           'Approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per 30-day subscription period.',
         ]),

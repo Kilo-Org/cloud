@@ -75,13 +75,14 @@ export const CODING_PLAN_CATALOG = {
   'byteplus-coding-plan-team-lite': {
     planId: 'byteplus-coding-plan-team-lite',
     providerName: 'BytePlus',
-    name: 'Coding Plan Lite',
+    name: 'Enterprise Coding Plan Lite',
     providerId: BYTEPLUS_CODING_PROVIDER_ID,
     coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
     costMicrodollars: 20_000_000,
     billingPeriodDays: 30,
     features: [
       'Kilo automatically configures BytePlus in your BYOK settings.',
+      'Zero Data Retention: does not retain prompts or train on your data',
       'For moderate-intensity development use.',
       'Approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per 30-day subscription period.',
       'Access to the approved BytePlus coding model set.',
@@ -91,13 +92,14 @@ export const CODING_PLAN_CATALOG = {
   'byteplus-coding-plan-team-pro': {
     planId: 'byteplus-coding-plan-team-pro',
     providerName: 'BytePlus',
-    name: 'Coding Plan Pro',
+    name: 'Enterprise Coding Plan Pro',
     providerId: BYTEPLUS_CODING_PROVIDER_ID,
     coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
     costMicrodollars: 100_000_000,
     billingPeriodDays: 30,
     features: [
       'Kilo automatically configures BytePlus in your BYOK settings.',
+      'Zero Data Retention: does not retain prompts or train on your data',
       'For complex, high-intensity development use.',
       'Approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per 30-day subscription period.',
       'Access to the approved BytePlus coding model set.',

@@ -118,24 +118,26 @@ describe('coding plans', () => {
     expect(CODING_PLAN_CATALOG[BYTEPLUS_PLAN_ID]).toEqual({
       planId: BYTEPLUS_PLAN_ID,
       providerName: 'BytePlus',
-      name: 'Coding Plan Lite',
+      name: 'Enterprise Coding Plan Lite',
       providerId: BYTEPLUS_PROVIDER_ID,
       coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
       costMicrodollars: COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([
         'Kilo automatically configures BytePlus in your BYOK settings.',
+        'Zero Data Retention: does not retain prompts or train on your data',
       ]),
     });
     expect(CODING_PLAN_CATALOG[BYTEPLUS_PRO_PLAN_ID]).toEqual({
       planId: BYTEPLUS_PRO_PLAN_ID,
       providerName: 'BytePlus',
-      name: 'Coding Plan Pro',
+      name: 'Enterprise Coding Plan Pro',
       providerId: BYTEPLUS_PROVIDER_ID,
       coveredModelIds: BYTEPLUS_CODING_MODEL_IDS,
       costMicrodollars: BYTEPLUS_PRO_COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([
+        'Zero Data Retention: does not retain prompts or train on your data',
         'For complex, high-intensity development use.',
         'Approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per 30-day subscription period.',
       ]),

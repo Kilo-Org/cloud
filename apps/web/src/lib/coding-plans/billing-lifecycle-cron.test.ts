@@ -154,7 +154,12 @@ describe('Coding Plan billing lifecycle cron', () => {
     const renewal = await db
       .select({ description: credit_transactions.description })
       .from(credit_transactions)
-      .where(eq(credit_transactions.description, 'Coding plan renewal: BytePlus Coding Plan Lite'));
+      .where(
+        eq(
+          credit_transactions.description,
+          'Coding plan renewal: BytePlus Enterprise Coding Plan Lite'
+        )
+      );
 
     expect(summary.renewals).toBe(1);
     expect(subscription).toMatchObject({
@@ -164,7 +169,9 @@ describe('Coding Plan billing lifecycle cron', () => {
       billing_period_days: 30,
     });
     expect(credential.status).toBe('assigned');
-    expect(renewal).toEqual([{ description: 'Coding plan renewal: BytePlus Coding Plan Lite' }]);
+    expect(renewal).toEqual([
+      { description: 'Coding plan renewal: BytePlus Enterprise Coding Plan Lite' },
+    ]);
   });
 
   it('renews BytePlus Pro for 100 credits while retaining its assigned credential', async () => {
@@ -186,7 +193,12 @@ describe('Coding Plan billing lifecycle cron', () => {
     const renewal = await db
       .select({ description: credit_transactions.description })
       .from(credit_transactions)
-      .where(eq(credit_transactions.description, 'Coding plan renewal: BytePlus Coding Plan Pro'));
+      .where(
+        eq(
+          credit_transactions.description,
+          'Coding plan renewal: BytePlus Enterprise Coding Plan Pro'
+        )
+      );
 
     expect(summary.renewals).toBe(1);
     expect(subscription).toMatchObject({
@@ -196,7 +208,9 @@ describe('Coding Plan billing lifecycle cron', () => {
       billing_period_days: 30,
     });
     expect(credential.status).toBe('assigned');
-    expect(renewal).toEqual([{ description: 'Coding plan renewal: BytePlus Coding Plan Pro' }]);
+    expect(renewal).toEqual([
+      { description: 'Coding plan renewal: BytePlus Enterprise Coding Plan Pro' },
+    ]);
   });
 
   it('renews after the subscriber deletes the installed MiniMax BYOK key', async () => {

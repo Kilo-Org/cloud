@@ -25,6 +25,7 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { getKiloUsageLimitErrorMessage } from '@/lib/ai-gateway/usage-limit-error';
 import { generateApiToken } from '@/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -164,7 +165,9 @@ async function postSessionLinkEphemeral(params: {
     const summary = await summarizePrompt(params.provider, params.modelSlug, params.prompt);
     if (summary) description = `Cloud Agent session started: ${summary}`;
   } catch (error) {
-    captureException(error, { tags: { component: 'kilo-bot', op: 'summarize-prompt' } });
+    if (!getKiloUsageLimitErrorMessage(error)) {
+      captureException(error, { tags: { component: 'kilo-bot', op: 'summarize-prompt' } });
+    }
   }
 
   params.thread

@@ -24,6 +24,7 @@ import {
 } from '@/lib/bot/request-logging';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
+import { getKiloUsageLimitErrorMessage } from '@/lib/ai-gateway/usage-limit-error';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
@@ -990,6 +991,20 @@ export async function POST(
           logCallback('Stored failure for unknown callback status', {
             botRequestId,
             status: payload.status,
+          });
+        } catch (error) {
+          const usageLimitMessage = getKiloUsageLimitErrorMessage(error);
+          if (!usageLimitMessage) {
+            throw error;
+          }
+
+          workComplete = await failBotRequestForCallbackProcessingError({
+            botRequestId,
+            platformIntegration,
+            thread,
+            startedAt,
+            errorMessage: usageLimitMessage,
+            logMessage: 'Bot continuation stopped because user credits were exhausted',
           });
         } finally {
           await stopIndicator({ handedOff: !workComplete });

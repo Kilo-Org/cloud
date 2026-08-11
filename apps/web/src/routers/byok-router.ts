@@ -29,7 +29,7 @@ import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { createGateway, generateText } from 'ai';
+import { AISDKError, createGateway, generateText } from 'ai';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
@@ -42,8 +42,7 @@ import {
   formatDirectByokModelId,
 } from '@/lib/ai-gateway/providers/direct-byok';
 
-const GENERIC_TEST_FAILURE_MESSAGE =
-  'API key test failed. Check the credential and supported models, then try again.';
+const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
@@ -453,7 +452,7 @@ export const byokRouter = createTRPCRouter({
           logByokWarning('BYOK key test returned an unsuccessful completion', {
             providerId: decryptedKey.providerId,
           });
-          return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+          return { success: false, message: `API key test failed: ${output.finishReason}` };
         }
 
         const metadata = output.providerMetadata?.gateway?.routing as
@@ -464,9 +463,16 @@ export const byokRouter = createTRPCRouter({
           success: true,
           message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}.`,
         };
-      } catch {
-        logByokWarning('BYOK key test request failed', { providerId: decryptedKey.providerId });
-        return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+      } catch (e) {
+        const message = AISDKError.isInstance(e) ? e.message : undefined;
+        logByokWarning('BYOK key test request failed', {
+          providerId: decryptedKey.providerId,
+          message,
+        });
+        return {
+          success: false,
+          message: message ? `API key test failed: ${message}` : GENERIC_TEST_FAILURE_MESSAGE,
+        };
       }
     }),
 

@@ -477,6 +477,21 @@ const executeRunWorkflow = async (
     };
   }
 
+  // A string/array/number input reaches the script as garbage (input.topic on "" is undefined) and weak models loop on the opaque downstream failure. Reject the shape with the exact object to send instead.
+  if (
+    input !== undefined &&
+    (typeof input !== 'object' || input === null || Array.isArray(input))
+  ) {
+    const params = workflow.params ?? [];
+    const example = params.length > 0 ? `{"${params[0]?.name ?? 'query'}": "<value>"}` : '{}';
+    const declared =
+      params.length > 0 ? params.map(param => param.name).join(', ') : 'none — omit input entirely';
+    return {
+      error: `run_workflow input must be a JSON object mapping declared param names to values, e.g. ${example}. Declared params: ${declared}.`,
+      ok: false,
+    };
+  }
+
   const result = await runWorkflow(
     // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
     // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.

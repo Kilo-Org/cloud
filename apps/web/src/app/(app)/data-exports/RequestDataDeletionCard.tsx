@@ -16,13 +16,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LANDING_URL } from '@/lib/constants';
-import { DATA_DELETION_COPY, DATA_DELETION_SUPPORT_PATH } from './data-deletion-request';
 
-const SUPPORT_URL = `${LANDING_URL}${DATA_DELETION_SUPPORT_PATH}`;
+const SUPPORT_URL = `${LANDING_URL}/support`;
 
 /**
  * Links out to the support form that starts a data deletion request, behind a
  * confirmation that warns the user their export download dies with their data.
+ *
+ * Deletion is support-mediated: the support form creates a Pylon issue that an
+ * agent fulfils manually. That form reads no search params and its category
+ * select is uncontrolled, so the category cannot be preselected from a link —
+ * the dialog has to name it in copy instead.
  *
  * The confirm action is a real anchor rather than a `useConfirm()` callback: a
  * new tab opened after a promise resolves is no longer attributable to the click
@@ -34,26 +38,31 @@ export function RequestDataDeletionCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{DATA_DELETION_COPY.cardTitle}</CardTitle>
-        <CardDescription>{DATA_DELETION_COPY.cardDescription}</CardDescription>
+        <CardTitle>Delete your data</CardTitle>
+        <CardDescription>
+          Data deletion is handled by our support team. Request it from the support form.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col items-start gap-3">
         <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <AlertDialogTrigger asChild>
-            <Button variant="outline">{DATA_DELETION_COPY.triggerLabel}</Button>
+            <Button variant="outline">Request data deletion</Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{DATA_DELETION_COPY.dialogTitle}</AlertDialogTitle>
+              <AlertDialogTitle>Delete your Kilo data?</AlertDialogTitle>
               {/* AlertDialogDescription renders a <p>, so the instruction below
                   has to be a sibling rather than nested inside it. */}
               <AlertDialogDescription>
-                {DATA_DELETION_COPY.dialogDescription}
+                Download your data export before requesting deletion. Once your data is deleted, any
+                export download will no longer be available.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <p className="text-muted-foreground text-sm">{DATA_DELETION_COPY.dialogInstruction}</p>
+            <p className="text-muted-foreground text-sm">
+              On the support form, choose the Account Deletion category.
+            </p>
             <AlertDialogFooter>
-              <AlertDialogCancel>{DATA_DELETION_COPY.cancelLabel}</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction asChild>
                 <a
                   href={SUPPORT_URL}
@@ -61,7 +70,7 @@ export function RequestDataDeletionCard() {
                   rel="noopener noreferrer"
                   onClick={() => setIsDialogOpen(false)}
                 >
-                  {DATA_DELETION_COPY.confirmLabel}
+                  Continue to support form
                   <ExternalLink />
                 </a>
               </AlertDialogAction>

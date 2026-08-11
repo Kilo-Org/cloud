@@ -88,6 +88,7 @@ const isRetriableStreamError = (error: unknown): boolean => {
 };
 
 // Mirrors the gateway's own error-class finish reasons. A completion cut short mid-thought (no tool calls to act on) is a provider fault the user cannot fix, so the turn retries it transparently.
+// 'model_context_window_exceeded' is deliberately absent: a prompt that overflowed the context cannot fit on a retry of the same messages, so the turn keeps the partial completion instead of burning identical billed attempts.
 const TRUNCATED_FINISH_REASONS = new Set([
   'length',
   'max_tokens',
@@ -96,7 +97,6 @@ const TRUNCATED_FINISH_REASONS = new Set([
   'error',
   'network_error',
   'failed',
-  'model_context_window_exceeded',
   'engine_overloaded',
   'incomplete',
 ]);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createSourceAdapters,
   sourceQueries,
+  sourceQueryScopes,
   warehouseQueries,
   type ReplicaQuery,
   type SourceAdapter,
@@ -35,11 +36,19 @@ const READ_PAGE_INPUT = {
 } as const;
 
 describe('warehouse scoping guard', () => {
-  // Every owned-row warehouse query must restrict to a single user. This is the
-  // control that keeps one user's export from reaching another; it is asserted
-  // structurally so a new source cannot be added without one.
-  it.each(Object.entries(warehouseQueries))('%s filters on kilo_user_id = $1', (_name, query) => {
-    expect(query).toContain('kilo_user_id = $1');
+  // Every query the export reads must restrict to a single user, and the predicate
+  // that does so is declared beside the query in `sourceQueryScopes`. This test
+  // covers every entry of `sourceQueries`, not a hand-picked subset, so a source
+  // added to `sourceQueries` without a scope in `sourceQueryScopes` fails here
+  // rather than shipping with no structural guard at all.
+  it('declares a scope for every source query and nothing extra', () => {
+    expect(Object.keys(sourceQueryScopes).sort()).toEqual(Object.keys(sourceQueries).sort());
+  });
+
+  it.each(Object.entries(sourceQueries))('%s is scoped to a single user', (name, query) => {
+    const predicate = sourceQueryScopes[name as keyof typeof sourceQueries];
+    expect(predicate).toBeDefined();
+    expect(query).toContain(predicate);
   });
 
   it.each(Object.entries(warehouseQueries))('%s orders and limits its page', (_name, query) => {

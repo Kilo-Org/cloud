@@ -455,9 +455,10 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
 }
 
 /**
- * Owned-row warehouse queries: every one must filter on `kilo_user_id = $1`, which
+ * Owned-row warehouse queries: every one filters on `kilo_user_id = $1`, which
  * excludes NULL-owned (organization) rows by construction. `userQuery` is scoped
- * differently (`id = $1`, the user's own row) and is asserted separately below.
+ * differently (`id = $1`, the user's own row rather than a row it owns) and is not
+ * part of this map.
  */
 export const warehouseQueries = {
   projectQuery,
@@ -468,3 +469,19 @@ export const warehouseQueries = {
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery };
+
+/**
+ * The single-user scoping predicate each query in `sourceQueries` must contain,
+ * declared beside the queries themselves rather than left to be inferred from
+ * which named export a query happens to live in. A query added to `sourceQueries`
+ * without an entry here fails the coverage test below, so a new source can't ship
+ * unscoped simply by landing outside `warehouseQueries`.
+ */
+export const sourceQueryScopes: Record<keyof typeof sourceQueries, string> = {
+  projectQuery: 'kilo_user_id = $1',
+  messageQuery: 'kilo_user_id = $1',
+  cliSessionQuery: 'kilo_user_id = $1',
+  systemPromptQuery: 'kilo_user_id = $1',
+  userPromptQuery: 'kilo_user_id = $1',
+  userQuery: 'id = $1',
+};

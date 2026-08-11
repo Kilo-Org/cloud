@@ -470,14 +470,19 @@ export const runWorkflow = async (
     );
   }
 
-  // 2a. Input shape gate — before any navigation.
+  // 2a. Input shape gate — before any navigation. Name the declared params: a weak model that sent a bare string loops on a generic message (measured), but corrects when told the exact object to send.
   if (
     input !== undefined &&
     (typeof input !== 'object' || input === null || Array.isArray(input))
   ) {
+    const params = workflow.params ?? [];
+    const exampleParam = params.find(param => param.required === true) ?? params[0];
+    const example = exampleParam === undefined ? '{}' : `{"${exampleParam.name}": "<value>"}`;
+    const declared =
+      params.length > 0 ? params.map(param => param.name).join(', ') : 'none — omit input entirely';
     return resultWithActions(
       {
-        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        error: `run_workflow input must be a JSON object mapping declared param names to values, e.g. ${example}. Declared params: ${declared}.`,
         ok: false,
       },
       dryRun,

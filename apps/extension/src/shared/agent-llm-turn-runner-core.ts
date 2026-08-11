@@ -196,7 +196,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       return result;
     }
     return {
-      error: `${result.error} — You have sent this exact ${toolCall.name} call ${count} times and it failed the same way every time. Do not send it again. Change the arguments or take a different approach.`,
+      error: `${result.error} — You have sent this exact ${toolCall.name} call ${count} times and it keeps failing. Do not send it again. Change the arguments or take a different approach.`,
       ok: false,
     };
   };

@@ -867,11 +867,29 @@ describe('workflow params and input', () => {
 
       const result = await runWorkflow(deps, { input: badInput, tabId: 1, workflow });
       expect(result).toStrictEqual({
-        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        error:
+          'run_workflow input must be a JSON object mapping declared param names to values, e.g. {}. Declared params: none — omit input entirely.',
         ok: false,
       });
     }
   );
+
+  it('names the declared params and a required-param example when rejecting a bad input shape', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [
+        { description: 'Cabin class', name: 'cabin' },
+        { description: 'Destination city', name: 'destination', required: true },
+      ],
+    });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, { input: '', tabId: 1, workflow });
+    expect(result).toStrictEqual({
+      error:
+        'run_workflow input must be a JSON object mapping declared param names to values, e.g. {"destination": "<value>"}. Declared params: cabin, destination.',
+      ok: false,
+    });
+  });
 
   it('re-injects input on every page across navigations', async () => {
     const evalCodes: string[] = [];

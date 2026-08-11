@@ -889,38 +889,6 @@ describe('run_workflow', () => {
     );
   });
 
-  it('rejects a non-object input with the declared params in the error', async () => {
-    const mockedRunWorkflow = runWorkflow as ReturnType<typeof vi.fn>;
-    mockedRunWorkflow.mockClear();
-
-    const ctx = createBaseCtx({ mode: 'dangerous' });
-    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
-      {
-        approvedScriptHash: 'hash',
-        createdAt: 100,
-        description: 'desc',
-        id: 'wf-1',
-        name: 'My WF',
-        params: [{ description: 'search topic', name: 'topic' }],
-        scopeOrigin: 'https://example.com',
-        script: 'return { done: true, result: 1 };',
-        updatedAt: 200,
-      },
-    ]);
-
-    const result = await executeWorkflowToolCall(
-      createToolCall('run_workflow', { input: '', workflowId: 'wf-1' }),
-      ctx
-    );
-
-    const error = result.ok ? '' : result.error;
-    expect(result.ok).toBe(false);
-    expect(error).toContain('must be a JSON object');
-    expect(error).toContain('{"topic": "<value>"}');
-    expect(error).toContain('Declared params: topic');
-    expect(mockedRunWorkflow).not.toHaveBeenCalled();
-  });
-
   it('passes input to runWorkflow', async () => {
     const mockedRunWorkflow = runWorkflow as ReturnType<typeof vi.fn>;
     mockedRunWorkflow.mockResolvedValue({ ok: true, pagesVisited: 1, result: 'success' });

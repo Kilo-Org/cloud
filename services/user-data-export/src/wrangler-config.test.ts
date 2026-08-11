@@ -24,6 +24,20 @@ describe('wrangler config', () => {
     expect(config).toContain('"EXPORT_WAREHOUSE_DB"');
   });
 
+  /**
+   * Traces reached Axiom as nothing but the destination's one-off pre-flight span
+   * because this config enabled logs only. `observability.enabled` does not turn on
+   * tracing while the feature is in beta, and a destination receives spans only from
+   * Workers that name it, so both keys have to survive future edits to this file.
+   */
+  it('enables tracing and names the traces destination', () => {
+    const observability = config.slice(config.indexOf('"observability"'));
+    const traces = observability.slice(observability.indexOf('"traces"'));
+
+    expect(traces).toMatch(/"enabled":\s*true/);
+    expect(traces).toContain('"axiom-traces"');
+  });
+
   it('points local development at the warehouse database, not the primary', () => {
     const warehouseSection = config.slice(config.indexOf('"EXPORT_WAREHOUSE_DB"'));
     const localConnection = /"localConnectionString":\s*"([^"]+)"/.exec(warehouseSection)?.[1];

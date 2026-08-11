@@ -17,6 +17,7 @@ import { normalizeProviderIconUrl } from '@/components/organizations/providers-a
 import type { ProviderPolicyFilter } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import type { OrganizationGroupPolicyEditorProps } from '@/components/organizations/groups/policies/types';
 import { PolicyEditorFooter } from '@/components/organizations/groups/policies/PolicyEditorFooter';
+import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -33,6 +34,7 @@ type Mode = OrganizationGroupModelAccessPolicy['data']['mode'];
 
 export function ModelAccessPolicyEditor({
   organizationId,
+  target,
   policy,
   isSaving,
   onSave,
@@ -45,6 +47,7 @@ export function ModelAccessPolicyEditor({
     trpc.organizations.groups.getPolicyEditorData.queryOptions({
       organizationId,
       policyType: 'model_access',
+      target,
     })
   );
   const editorData =
@@ -306,9 +309,38 @@ export function ModelAccessPolicyEditor({
             </TabsContent>
           </Tabs>
         )}
-        <p className="type-label text-muted-foreground">
-          Direct BYOK models remain available organization-wide.
-        </p>
+        {editorData.policyExemptModels.length > 0 && (
+          <section aria-labelledby="policy-exempt-models-heading" className="rounded-lg border">
+            <div className="border-b px-4 py-3">
+              <h3 id="policy-exempt-models-heading" className="text-sm font-medium">
+                Models available outside this policy
+              </h3>
+              <p className="text-muted-foreground mt-1 text-xs">
+                These separately configured models are available through this organization
+                {target.kind === 'group' ? ' or group' : ''} and aren&apos;t controlled by model
+                access policies.
+              </p>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {editorData.policyExemptModels.map(model => (
+                <div
+                  key={model.id}
+                  className="flex items-start justify-between gap-3 border-b px-4 py-3 last:border-b-0"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{model.name}</div>
+                    <div className="text-muted-foreground mt-0.5 truncate font-mono text-xs">
+                      {model.id}
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="mt-0.5">
+                    {model.source === 'direct_byok' ? 'Direct BYOK' : 'Custom LLM'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
       <PolicyEditorFooter
         isSaving={isSaving}

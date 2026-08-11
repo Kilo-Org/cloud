@@ -85,6 +85,7 @@ export function PolicyEditorPanel({
   return (
     <Editor
       organizationId={organizationId}
+      target={target}
       policy={policy}
       isSaving={groupMutation.isPending || defaultMutation.isPending}
       onCancel={helpers.pop}

@@ -3,6 +3,7 @@ import {
   OrganizationGroupInputSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
+  OrganizationGroupPolicyTargetSchema,
 } from '@/lib/organizations/group-policies/organization-group-policies';
 import { normalizeOrganizationGroupPolicy } from './organization-groups';
 
@@ -29,6 +30,20 @@ describe('organization group policies', () => {
         { type: 'model_access', data: { mode: 'all' } },
         { type: 'model_access', data: { mode: 'none' } },
       ]).success
+    ).toBe(false);
+  });
+
+  it('validates policy editor targets', () => {
+    expect(OrganizationGroupPolicyTargetSchema.safeParse({ kind: 'default' }).success).toBe(true);
+    expect(
+      OrganizationGroupPolicyTargetSchema.safeParse({
+        kind: 'group',
+        groupId: '550e8400-e29b-41d4-a716-446655440000',
+      }).success
+    ).toBe(true);
+    expect(
+      OrganizationGroupPolicyTargetSchema.safeParse({ kind: 'group', groupId: 'not-a-uuid' })
+        .success
     ).toBe(false);
   });
 

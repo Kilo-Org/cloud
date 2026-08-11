@@ -1,17 +1,17 @@
 import type {
   OrganizationGroupPolicy,
   OrganizationGroupPolicyOf,
+  OrganizationGroupPolicyTarget,
   OrganizationGroupPolicyType,
 } from '@/lib/organizations/group-policies/organization-group-policies';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentType } from 'react';
 
-export type OrganizationGroupPolicyTarget =
-  | { kind: 'group'; groupId: string }
-  | { kind: 'default' };
+export type { OrganizationGroupPolicyTarget };
 
 export type OrganizationGroupPolicyEditorProps<T extends OrganizationGroupPolicyType> = {
   organizationId: string;
+  target: OrganizationGroupPolicyTarget;
   policy: OrganizationGroupPolicyOf<T>;
   isSaving: boolean;
   onSave: (policy: OrganizationGroupPolicyOf<T>) => void;

@@ -26,6 +26,13 @@ export const OrganizationGroupPolicyTypeSchema = z.enum([
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
 ]);
 
+export const OrganizationGroupPolicyTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('group'), groupId: z.uuid() }).strict(),
+  z.object({ kind: z.literal('default') }).strict(),
+]);
+
+export type OrganizationGroupPolicyTarget = z.infer<typeof OrganizationGroupPolicyTargetSchema>;
+
 export const OrganizationGroupPolicySchema = z.discriminatedUnion('type', [
   OrganizationGroupModelAccessPolicySchema,
 ]);

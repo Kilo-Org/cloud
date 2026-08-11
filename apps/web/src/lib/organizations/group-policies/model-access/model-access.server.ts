@@ -1,10 +1,14 @@
 import 'server-only';
 
-import type { OrganizationGroupModelAccessPolicy } from '@/lib/organizations/group-policies/organization-group-policies';
-import { modelsByProvider, organizations } from '@kilocode/db/schema';
+import type {
+  OrganizationGroupModelAccessPolicy,
+  OrganizationGroupPolicyTarget,
+} from '@/lib/organizations/group-policies/organization-group-policies';
+import { modelsByProvider, organization_groups, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
+import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -16,6 +20,7 @@ import {
   getOrganizationGroupPolicyContext,
   type OrganizationGroupPolicyContext,
 } from '@/lib/organizations/organization-group-policy-context.server';
+import { buildModelAccessPolicyExemptModels } from './model-access.editor-data';
 
 export type EffectiveOrganizationModelPolicy = {
   requireModelInCurrentSnapshot: boolean;
@@ -295,8 +300,11 @@ export function normalizeModelAccessPolicy(
   };
 }
 
-export async function getModelAccessPolicyEditorData(organizationId: string) {
-  const [[organization], [catalog]] = await Promise.all([
+export async function getModelAccessPolicyEditorData(
+  organizationId: string,
+  target: OrganizationGroupPolicyTarget
+) {
+  const [[organization], [catalog], targetGroups] = await Promise.all([
     db
       .select({ plan: organizations.plan, settings: organizations.settings })
       .from(organizations)
@@ -307,6 +315,18 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
       .from(modelsByProvider)
       .orderBy(desc(modelsByProvider.id))
       .limit(1),
+    target.kind === 'group'
+      ? db
+          .select({ id: organization_groups.id })
+          .from(organization_groups)
+          .where(
+            and(
+              eq(organization_groups.id, target.groupId),
+              eq(organization_groups.organization_id, organizationId)
+            )
+          )
+          .limit(1)
+      : Promise.resolve([]),
   ]);
   if (!organization || organization.plan !== 'enterprise') {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Enterprise organization not found' });
@@ -317,10 +337,23 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
       message: 'Model and provider catalog has not been synchronized.',
     });
   }
+  if (target.kind === 'group' && targetGroups.length === 0) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found' });
+  }
+
+  const groupIds = target.kind === 'group' ? [target.groupId] : [];
+  const [directByokModels, customLlms] = await Promise.all([
+    import('@/lib/ai-gateway/providers/direct-byok').then(
+      ({ getDirectByokModelsForOrganization }) => getDirectByokModelsForOrganization(organizationId)
+    ),
+    listAvailableCustomLlms(organizationId, groupIds),
+  ]);
+
   return {
     policyType: 'model_access' as const,
     catalog: catalog.data,
     modelDenyList: organization.settings.model_deny_list ?? [],
     providerAllowList: organization.settings.provider_allow_list,
+    policyExemptModels: buildModelAccessPolicyExemptModels(directByokModels, customLlms),
   };
 }

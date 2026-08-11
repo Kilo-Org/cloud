@@ -3,6 +3,7 @@ import {
   OrganizationGroupMetadataSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
+  OrganizationGroupPolicyTargetSchema,
   OrganizationGroupPolicyTypeSchema,
 } from '@/lib/organizations/group-policies/organization-group-policies';
 import { TRPCError } from '@trpc/server';
@@ -207,12 +208,15 @@ export const organizationGroupsRouter = createTRPCRouter({
 
   getPolicyEditorData: organizationBillingProcedure
     .input(
-      OrganizationIdInputSchema.extend({ policyType: OrganizationGroupPolicyTypeSchema }).strict()
+      OrganizationIdInputSchema.extend({
+        policyType: OrganizationGroupPolicyTypeSchema,
+        target: OrganizationGroupPolicyTargetSchema,
+      }).strict()
     )
     .query(async ({ input }) => {
       switch (input.policyType) {
         case 'model_access':
-          return await getModelAccessPolicyEditorData(input.organizationId);
+          return await getModelAccessPolicyEditorData(input.organizationId, input.target);
       }
     }),
 

@@ -599,24 +599,28 @@ const runInjectedPageSnapshot = (
     };
   };
   const findTextMatches = (
-    fullTextLowered: string,
     fullText: string
   ): { matches: { excerpt: string; offset: number }[]; totalMatches: number } => {
-    const needle = normalize(queryText ?? '').toLowerCase();
+    const needle = normalize(queryText ?? '');
     const matches: { excerpt: string; offset: number }[] = [];
     let totalMatches = 0;
     if (needle === '') {
       return { matches, totalMatches };
     }
-    let offset = fullTextLowered.indexOf(needle);
-    while (offset !== -1) {
+    // Lowercasing changes the length of some characters (e.g. Turkish İ), shifting every later offset; a case-insensitive regex over the original text keeps offsets true to it.
+    const needlePattern = new RegExp(
+      needle.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`),
+      'giu'
+    );
+    let match = needlePattern.exec(fullText);
+    while (match !== null) {
       totalMatches += 1;
       if (matches.length < maxTextMatches) {
-        const start = Math.max(0, offset - excerptRadius);
-        const end = Math.min(fullText.length, offset + needle.length + excerptRadius);
-        matches.push({ excerpt: fullText.slice(start, end), offset });
+        const start = Math.max(0, match.index - excerptRadius);
+        const end = Math.min(fullText.length, match.index + needle.length + excerptRadius);
+        matches.push({ excerpt: fullText.slice(start, end), offset: match.index });
       }
-      offset = fullTextLowered.indexOf(needle, offset + needle.length);
+      match = needlePattern.exec(fullText);
     }
     return { matches, totalMatches };
   };
@@ -777,10 +781,7 @@ const runInjectedPageSnapshot = (
     .toSorted((left, right) => getPriority(left) - getPriority(right))
     .slice(0, maxNodeCount);
   const pageText = getPageText();
-  const search =
-    normalize(queryText ?? '') === ''
-      ? undefined
-      : findTextMatches(pageText.fullText.toLowerCase(), pageText.fullText);
+  const search = normalize(queryText ?? '') === '' ? undefined : findTextMatches(pageText.fullText);
 
   return {
     limits: { maxNodeCount, maxNodeTextLength, maxTextLength },

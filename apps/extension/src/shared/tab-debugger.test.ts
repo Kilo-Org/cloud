@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import {
@@ -321,6 +322,31 @@ describe('tab debugger helpers', () => {
         world: 'MAIN',
       },
     ]);
+  });
+
+  it('reports find offsets into the original text when lowercasing changes its length', async () => {
+    // Each İ lowercases to two characters, so offsets taken from the lowered text would drift.
+    document.body.innerHTML = '<p>İİİİ before the match. Kilo extension docs.</p>';
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: details => [{ result: details.func(...details.args) }],
+    };
+
+    const result = await getPageSnapshotInTabWithScripting({
+      query: 'Kilo extension',
+      scriptingApi,
+      tabId: 7,
+    });
+
+    expect(result.ok).toBe(true);
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- test-only snapshot shape
+    const snapshot = (result as { value: unknown }).value as {
+      text: string;
+      textMatches: { excerpt: string; offset: number }[];
+    };
+    const [match] = snapshot.textMatches;
+    expect(match?.excerpt).toContain('Kilo extension');
+    // The offset must index the ORIGINAL text, not its lowered (longer) form.
+    expect(match?.offset).toBe(snapshot.text.indexOf('Kilo extension'));
   });
 
   it('times out Firefox scripting snapshot requests', async () => {

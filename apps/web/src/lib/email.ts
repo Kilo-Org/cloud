@@ -62,6 +62,7 @@ export const subjects = {
   recommendationsDigest: 'Kilo: Your weekly recommendations',
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
   userDataExportReady: 'Your Kilo account export is ready',
+  dataExportDownloadCode: 'Your Kilo data export download code',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -464,6 +465,21 @@ export async function sendUserDataExportReadyEmail(
     templateVars: {
       data_exports_url: `${NEXTAUTH_URL}/data-exports`,
       expiry_date: formatDate(props.expiresAt),
+    },
+  });
+}
+
+export async function sendDataExportDownloadCodeEmail(
+  to: string,
+  props: { code: string; expiresInMinutes: number }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'dataExportDownloadCode',
+    templateVars: {
+      code: props.code,
+      email: to,
+      expires_in: `${props.expiresInMinutes} minutes`,
     },
   });
 }

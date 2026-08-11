@@ -391,13 +391,18 @@ export async function processGenerateMessage(
       activeSource = adapter.name;
       // One span per page rather than per source: the loop advances cursors and adapters
       // with continue/break, so a per-source span cannot wrap it without restructuring
-      // the control flow. Group by the source attribute to get per-source totals. The
-      // nested postgres_read_page span splits read time from compress-and-write time.
+      // the control flow. Group by export.source to get per-source totals. The nested
+      // postgres_read_page span splits read time from compress-and-write time.
+      //
+      // Every key below stays a leaf under the export.page object. Setting a scalar at
+      // export.page alongside export.page.* silently loses the nested keys, because
+      // dotted attribute names are expanded into nested objects on export and a scalar
+      // cannot also be an object.
       const pageNumber = pageCount + 1;
       const pageLimit = adapter.pageSize ?? PAGE_SIZE;
       const page = await withSpan(
         'export_source_page',
-        { source: adapter.name, 'export.page': pageNumber },
+        { 'export.source': adapter.name, 'export.page.number': pageNumber },
         async span => {
           const result = await readPage({
             kiloUserId: job.kilo_user_id,
@@ -412,7 +417,10 @@ export async function processGenerateMessage(
             pageBytes += recordBytes.byteLength;
           }
           uncompressedSize += pageBytes;
-          span.setAttribute('export.page.rows', result.records.length);
+          // Records, not database rows: an adapter can fan one row out to several
+          // records, so this deliberately differs from db.response.returned_rows on the
+          // nested read span.
+          span.setAttribute('export.page.records', result.records.length);
           span.setAttribute('export.page.uncompressed_bytes', pageBytes);
           span.setAttribute('export.page.has_more', result.nextCursor !== null);
           return result;
@@ -554,9 +562,9 @@ export async function consumeExportBatch(
       await withSpan(
         'export_generate',
         {
-          exportId: parsed.data.exportId,
-          generation: parsed.data.generation,
-          attempt: message.attempts,
+          'export.id': parsed.data.exportId,
+          'export.generation': parsed.data.generation,
+          'export.attempt': message.attempts,
         },
         () => processMessage(env, parsed.data)
       );

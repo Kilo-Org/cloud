@@ -32,7 +32,7 @@ const baseDefinition = {
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
   base_url: 'https://us-central1-aiplatform.googleapis.com/v1',
-  organization_ids: ['org-1'],
+  organization_ids: ['00000000-0000-4000-8000-000000000001'],
 };
 
 describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
@@ -48,6 +48,15 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
 
   it('validates custom LLM definition without credentials', () => {
     expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
+  });
+
+  it('rejects non-UUID organization IDs', () => {
+    expect(
+      CustomLlmDefinitionSchema.safeParse({
+        ...baseDefinition,
+        organization_ids: ['organization-1'],
+      }).success
+    ).toBe(false);
   });
 });
 

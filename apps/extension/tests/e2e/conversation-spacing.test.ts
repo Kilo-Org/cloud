@@ -199,6 +199,7 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
         'get_page_snapshot',
         'get_element_details',
         'find_in_page',
+        'web_search',
         'search_memories',
         'get_memory',
         'get_viewport_screenshot',

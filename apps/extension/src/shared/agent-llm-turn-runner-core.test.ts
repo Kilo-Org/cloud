@@ -569,6 +569,46 @@ describe('truncated completion retry', () => {
 
     expect(calls).toBe(1);
   });
+
+  it('does not retry a context-window overflow and keeps the partial text', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Partial answer before the overflow"},"finish_reason":null}]}\n\n',
+          'data: {"choices":[{"delta":{},"finish_reason":"model_context_window_exceeded"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
+      failureMessage: (error: unknown) =>
+        `failed: ${error instanceof Error ? error.message : String(error)}`,
+      fetch,
+      maxToolRounds: 4,
+      model: 'kilo-auto/efficient',
+      noResponseMessage: 'no response',
+      token: 'token',
+      tools: [],
+      tooManyToolRoundsMessage: 'too many rounds',
+      toToolCallEvents: () => [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    // A prompt that overflowed the context cannot fit on a retry of the same messages; one billed attempt, degrade immediately.
+    expect(calls).toBe(1);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts).toContain('Partial answer before the overflow');
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+  });
 });
 
 describe('continue nudge', () => {

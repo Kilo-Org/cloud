@@ -5,7 +5,8 @@ export type SafeToolName =
   | 'get_memory'
   | 'get_page_snapshot'
   | 'get_viewport_screenshot'
-  | 'search_memories';
+  | 'search_memories'
+  | 'web_search';
 export type WorkflowToolName =
   | 'delete_workflow'
   | 'get_workflow'
@@ -48,6 +49,7 @@ export type AgentConversationEvent =
       readonly reasoningDetails?: readonly unknown[];
       readonly snapshotId?: string;
       readonly tabId: number;
+      readonly textStart?: number;
       readonly type: 'tool-call';
     }
   | {
@@ -130,6 +132,7 @@ interface CreateSafeToolCallOptions {
   readonly query?: string;
   readonly snapshotId?: string;
   readonly tabId: number;
+  readonly textStart?: number;
 }
 
 interface CreateRemoteMcpToolCallOptions {
@@ -209,6 +212,7 @@ export const createSafeToolCall = ({
   query,
   snapshotId,
   tabId,
+  textStart,
 }: CreateSafeToolCallOptions): SafeToolCallEvent => ({
   id: createEventId(),
   name,
@@ -218,6 +222,7 @@ export const createSafeToolCall = ({
   ...(query === undefined ? {} : { query }),
   ...(snapshotId === undefined ? {} : { snapshotId }),
   tabId,
+  ...(textStart === undefined ? {} : { textStart }),
   type: 'tool-call',
 });
 

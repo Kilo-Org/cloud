@@ -7,6 +7,15 @@ export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
 export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
+/**
+ * Characters of visible page text one snapshot returns. A/B-measured: a 24k
+ * window reads a long article in three calls instead of nine. Fewer
+ * round-trips means a weak model gets fewer chances to stop early, and the
+ * shorter conversation costs FEWER total bytes than the narrow window it
+ * replaced. The injected function cannot close over this constant, so it is
+ * passed in as an argument.
+ */
+export const MAX_SNAPSHOT_TEXT_LENGTH = 24_000;
 
 export interface ChromeDebuggerTargetInfo {
   readonly attached?: boolean;
@@ -97,14 +106,28 @@ export interface PageSnapshotLimits {
   readonly maxTextLength: number;
 }
 
+export interface PageTextMatch {
+  readonly excerpt: string;
+  /** Character offset of the match inside the full visible page text. */
+  readonly offset: number;
+}
+
 export interface PageSnapshot {
   readonly limits: PageSnapshotLimits;
   readonly nodes: PageSnapshotNode[];
   readonly nodesTruncated: boolean;
   readonly snapshotId: string;
   readonly text: string;
+  /** Full-text search matches, present when the snapshot ran with a query. */
+  readonly textMatches?: PageTextMatch[];
+  /** Character offset of `text` inside the full visible page text. */
+  readonly textStart: number;
+  /** Length of the full visible page text this window was cut from. */
+  readonly textTotalChars: number;
   readonly textTruncated: boolean;
   readonly title: string;
+  /** Total full-text match count, present when the snapshot ran with a query. */
+  readonly totalTextMatches?: number;
   readonly url: string;
 }
 
@@ -138,7 +161,9 @@ export type TabDebuggerRequest =
       readonly type: typeof EVAL_TAB_MESSAGE;
     }
   | {
+      readonly query?: string;
       readonly tabId: number;
+      readonly textStart?: number;
       readonly timeoutMs?: number;
       readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
     }
@@ -194,7 +219,9 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(LIST_INSPECTABLE_TABS_MESSAGE),
   }),
   z.object({
+    query: z.string().optional(),
     tabId: z.number(),
+    textStart: z.number().optional(),
     timeoutMs: z.number().optional(),
     type: z.literal(PAGE_SNAPSHOT_MESSAGE),
   }),
@@ -444,10 +471,20 @@ const runInjectedEval = (code: string): unknown =>
   new Function(`return (async () => { ${code} })()`)();
 
 /* eslint-disable unicorn/consistent-function-scoping */
-const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
-  const maxTextLength = 8000;
+// eslint-disable-next-line max-params -- the injected function is serialized into the page, so every input must arrive as a positional string argument.
+const runInjectedPageSnapshot = (
+  timeoutMsText: string,
+  maxTextLengthText: string,
+  textStartText?: string,
+  queryText?: string
+): PageSnapshot => {
+  const maxTextLength = Number(maxTextLengthText);
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
+  const maxTextMatches = 20;
+  const excerptRadius = 120;
+  const textStartRaw = Number(textStartText ?? '0');
+  const textStart = Number.isFinite(textStartRaw) && textStartRaw > 0 ? textStartRaw : 0;
   const timeoutMs = Number(timeoutMsText);
   const deadline =
     Number.isFinite(timeoutMs) && timeoutMs > 0
@@ -498,44 +535,90 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
     return '';
   };
   const nonRenderedTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'TITLE']);
-  const isRenderedTextNode = (textNode: Node): boolean => {
-    // Walk ancestors so hidden/non-content text (script JSON, inline styles, display:none modals, aria-hidden subtrees) is never surfaced as "visible page text".
-    for (let element = textNode.parentElement; element !== null; element = element.parentElement) {
-      if (nonRenderedTags.has(element.tagName) || element.getAttribute('aria-hidden') === 'true') {
-        return false;
-      }
-
+  // One getComputedStyle per element instead of per text node per ancestor: hidden/non-content text (script JSON, inline styles, display:none modals, aria-hidden subtrees) is never surfaced as "visible page text".
+  const visibilityByElement = new Map<Element, boolean>();
+  const isVisibleElement = (element: Element): boolean => {
+    const cached = visibilityByElement.get(element);
+    if (cached !== undefined) {
+      return cached;
+    }
+    let visible = true;
+    if (nonRenderedTags.has(element.tagName) || element.getAttribute('aria-hidden') === 'true') {
+      visible = false;
+    } else {
       const style = getComputedStyle(element);
-
       if (style.display === 'none' || style.visibility === 'hidden') {
-        return false;
+        visible = false;
+      } else {
+        const parent = element.parentElement;
+        visible = parent === null || isVisibleElement(parent);
       }
     }
-
-    return true;
+    visibilityByElement.set(element, visible);
+    return visible;
   };
-  const getPageText = (): { text: string; truncated: boolean } => {
+  const isRenderedTextNode = (textNode: Node): boolean =>
+    textNode.parentElement === null || isVisibleElement(textNode.parentElement);
+  const getPageText = (): {
+    fullText: string;
+    text: string;
+    start: number;
+    totalChars: number;
+    cutShort: boolean;
+  } => {
+    // The full visible text is collected so a window can start at any offset and the search sees the whole page. A deadline mid-walk keeps what was collected instead of failing the snapshot.
     const root = document.body ?? document.documentElement;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const parts: string[] = [];
-    let length = 0;
     let node = walker.nextNode();
+    let cutShort = false;
 
-    while (node !== null && length < maxTextLength) {
-      checkDeadline();
+    while (node !== null) {
+      if (performance.now() > deadline) {
+        cutShort = true;
+        break;
+      }
 
       const text = normalize(node.textContent ?? '');
       if (text !== '' && isRenderedTextNode(node)) {
         parts.push(text);
-        length += text.length + 1;
       }
 
       node = walker.nextNode();
     }
 
-    const text = normalize(parts.join(' '));
+    const fullText = normalize(parts.join(' '));
+    const start = Math.min(textStart, fullText.length);
 
-    return { text: truncate(text, maxTextLength), truncated: text.length > maxTextLength };
+    return {
+      cutShort,
+      fullText,
+      start,
+      text: fullText.slice(start, start + maxTextLength),
+      totalChars: fullText.length,
+    };
+  };
+  const findTextMatches = (
+    fullTextLowered: string,
+    fullText: string
+  ): { matches: { excerpt: string; offset: number }[]; totalMatches: number } => {
+    const needle = normalize(queryText ?? '').toLowerCase();
+    const matches: { excerpt: string; offset: number }[] = [];
+    let totalMatches = 0;
+    if (needle === '') {
+      return { matches, totalMatches };
+    }
+    let offset = fullTextLowered.indexOf(needle);
+    while (offset !== -1) {
+      totalMatches += 1;
+      if (matches.length < maxTextMatches) {
+        const start = Math.max(0, offset - excerptRadius);
+        const end = Math.min(fullText.length, offset + needle.length + excerptRadius);
+        matches.push({ excerpt: fullText.slice(start, end), offset });
+      }
+      offset = fullTextLowered.indexOf(needle, offset + needle.length);
+    }
+    return { matches, totalMatches };
   };
   const getRole = (element: Element): string => {
     const explicitRole = element.getAttribute('role');
@@ -694,6 +777,10 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
     .toSorted((left, right) => getPriority(left) - getPriority(right))
     .slice(0, maxNodeCount);
   const pageText = getPageText();
+  const search =
+    normalize(queryText ?? '') === ''
+      ? undefined
+      : findTextMatches(pageText.fullText.toLowerCase(), pageText.fullText);
 
   return {
     limits: { maxNodeCount, maxNodeTextLength, maxTextLength },
@@ -701,7 +788,12 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
     nodesTruncated: candidates.length > maxNodeCount || elementNode !== null,
     snapshotId: `snapshot-${Date.now().toString(36)}`,
     text: pageText.text,
-    textTruncated: pageText.truncated,
+    ...(search === undefined
+      ? {}
+      : { textMatches: search.matches, totalTextMatches: search.totalMatches }),
+    textStart: pageText.start,
+    textTotalChars: pageText.totalChars,
+    textTruncated: pageText.cutShort || pageText.start + pageText.text.length < pageText.totalChars,
     title: document.title,
     url: sanitizeUrl(location.href),
   };
@@ -845,19 +937,23 @@ export const evalInTabWithScripting = async ({
 };
 
 export const getPageSnapshotInTabWithScripting = async ({
+  query = '',
   scriptingApi,
   tabId,
+  textStart = 0,
   timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
 }: {
+  readonly query?: string;
   readonly scriptingApi: BrowserScriptingApi;
   readonly tabId: number;
+  readonly textStart?: number;
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
-          args: [String(timeoutMs)],
+          args: [String(timeoutMs), String(MAX_SNAPSHOT_TEXT_LENGTH), String(textStart), query],
           func: runInjectedPageSnapshot,
           target: { tabId },
           world: 'MAIN',

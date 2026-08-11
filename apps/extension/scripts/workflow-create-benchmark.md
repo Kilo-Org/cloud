@@ -49,6 +49,80 @@ result carries the expected values and content (a price, points, a
 forecast, …). The verifying run is the last valid real run, or a dry run
 with real navigated content when no real run exists.
 
+## Task scenarios (use-case benchmark)
+
+The workflow scenarios cover one use case: repeatable automation. The task
+scenarios in `src/shared/agent-task-bench-scenarios.ts` cover the rest of
+the most popular browser-agent use cases. The ranking is data-driven, from
+install counts, feature-popularity reviews, and platform feature bets for
+the top AI browser extensions and agentic browsers (Sider 5M installs,
+Monica 3M, Merlin 900k, MaxAI 700k, Immersive Translate 20M+, Edge
+Copilot, Gemini in Chrome, Perplexity Comet, HARPA AI):
+
+1. Summarize the page — the lead feature of every top extension.
+2. Page Q&A — the core sidebar function (chat grounded in the open tab).
+3. Write and reply — draft text from page content.
+4. Translate — full-page translation to the user's language.
+5. AI search/research — search-grounded answers via the `web_search` tool.
+6. Multi-tab compare — read several tabs (single-tab harness today; gap).
+7. Agentic actions — fill forms, log in, operate the page.
+8. Repeatable automation — the twenty workflow scenarios above.
+
+Reading tasks (1, 2, 4) carry roughly 80% of real usage; acting tasks lead
+the marketing but trail in adoption. Use case 6 remains a documented gap:
+the harness reads only the selected tab.
+
+| Id | Use case | Site | Mode | Task |
+|---|---|---|---|---|
+| `summarize-article` | summarize | paulgraham.com | safe | summarize a ~67k-char essay end to end |
+| `qa-deep-fact` | page-qa | en.wikipedia.org | safe | a fact ~50k chars into the page |
+| `extract-table` | extract | books.toscrape.com | safe | titles and prices as a markdown table |
+| `translate-page` | translate | de.wikipedia.org | safe | English summary of a German page |
+| `draft-reply` | draft | github.com | safe | grounded reply to a closed issue |
+| `web-research` | research | example.com | safe | a fact the page cannot answer, via `web_search` |
+| `action-login` | act | saucedemo.com | dangerous | log in, count products |
+| `action-cart` | act | saucedemo.com | dangerous | log in, add to cart, read badge |
+
+A task attempt sends one pinned message and scores the final assistant
+answer: pinned content checks, a minimum length, and — for facts a model
+could know from training — the same pattern must also appear in an ok tool
+result (harness metadata strings such as the paging note and snapshotId
+never count). That evidence rule exists because the truncation-era
+baseline model answered a summarize task "from familiarity" with the essay
+while presenting it as page content. A generative scenario may set
+`minAnswerCheckPasses`: a model that provably read the whole page can
+still pick its own top themes, so the summary needs a quorum of theme
+checks, while evidence gates always stay mandatory. Action scenarios
+additionally require one ok action exchange — `eval` or a real (non-dry)
+`run_workflow`, both legitimate harness action paths. Task batches gate on
+the turn total (`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
+
+The deep-content scenarios exist because the page snapshot text is a
+bounded window (24000 chars). `summarize-article` and `qa-deep-fact` fail
+on any harness that cannot read or search past that window; they hold the
+fix honest (snapshot `textStart` paging plus full-page `find_in_page`).
+
+## A/B results on the tools the failing scenarios use
+
+Two levers were measured with the protocol above, one variable per step.
+
+**Snapshot text window, 8000 to 24000 characters — KEPT.** Three attempts
+per cell on `summarize-article`, weak models plus `kilo-auto/efficient` as
+the cost control: passes went 7/12 to 9/12 and median LLM requests roughly
+halved (10 to 4, 14 to 6, 9 to 6). Total snapshot bytes went *down*
+(113k to 82k): reading a long article in three calls instead of nine
+avoids re-sending a growing conversation eight times. Under-reading was
+never stubbornness — nine sequential round-trips give a weak model nine
+chances to stop early.
+
+**Eval navigation recovery — REJECTED.** A click that loads a page
+destroys the JS execution context, and weak models spent 23-60 requests
+retrying it. Returning the landed page as a success instead of that error
+did not help: passes went 3/8 to 2/8 and `laguna-xs-2.1:free` got worse
+(46 to 77 requests). Removing the error appears to remove the signal that
+something went wrong, so the model keeps acting on a stale page model. The
+change was reverted; the error text stays.
+
 ## Prerequisites
 
 - Repository dependencies installed (`pnpm install` at the repo root).

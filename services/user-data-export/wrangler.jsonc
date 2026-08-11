@@ -21,6 +21,19 @@
       "enabled": true,
       "head_sampling_rate": 1,
     },
+    // observability.enabled alone does not turn on tracing while Workers tracing is
+    // in beta, and a destination only receives spans from Workers that name it, so
+    // both keys below are required. "axiom-traces" must match the destination
+    // configured under Workers Observability in the Cloudflare dashboard; without it
+    // Axiom receives only the one-off pre-flight span emitted when the destination
+    // is saved. Sampling stays at 1: this Worker runs a 5-minute cron plus one queue
+    // message per export, so full-fidelity tracing is far below the free tier.
+    "traces": {
+      "enabled": true,
+      "persist": true,
+      "head_sampling_rate": 1,
+      "destinations": ["axiom-traces"],
+    },
   },
   "logpush": true,
   "routes": [

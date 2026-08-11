@@ -1,6 +1,59 @@
+import { tracing } from 'cloudflare:workers';
+
 type LogLevel = 'info' | 'warn' | 'error';
 
-type ExportLogFields = Record<string, boolean | number | string | null | undefined>;
+export type ExportFields = Record<string, boolean | number | string | null | undefined>;
+
+/**
+ * The subset of the runtime span we rely on.
+ *
+ * Declared locally rather than reusing the ambient `Span` class so call sites do not
+ * depend on a platform type whose surface is still changing during the tracing beta,
+ * and so the unit-test stub for `cloudflare:workers` stays trivially typed.
+ */
+export type ExportSpan = {
+  readonly isTraced: boolean;
+  setAttribute(key: string, value?: boolean | number | string): void;
+};
+
+/**
+ * Run `callback` inside a custom span named `name`, tagged with `fields`.
+ *
+ * Cloudflare auto-instruments fetch, R2, and queue operations, but not Hyperdrive:
+ * `pg` reaches Postgres over a raw TCP socket, so every query this service makes is
+ * invisible to tracing unless we wrap it ourselves. That covers the bulk of the work
+ * in an export, which is why the spans below exist.
+ *
+ * Spans nest automatically via async context, so a span opened here becomes a child of
+ * whichever span is already active and the parent covers any awaited work inside it.
+ *
+ * `fields` must stay free of personal data for the same reason `logExportEvent` fields
+ * do: attributes are exported to the traces destination. Identifiers that describe the
+ * job (export id, generation, source name) are fine; user ids, row contents, SQL text,
+ * and cursor values are not.
+ */
+export function withSpan<T>(
+  name: string,
+  fields: ExportFields,
+  callback: (span: ExportSpan) => T
+): T {
+  return tracing.enterSpan(name, span => {
+    setSpanFields(span, fields);
+    return callback(span);
+  });
+}
+
+/**
+ * Copy `fields` onto a span, skipping empty values.
+ *
+ * `setAttribute` treats `undefined` as a no-op but rejects `null`, which our field
+ * records use freely (for example a not-yet-resolved `source`), so both are dropped.
+ */
+export function setSpanFields(span: ExportSpan, fields: ExportFields): void {
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== null && value !== undefined) span.setAttribute(key, value);
+  }
+}
 
 export function safeError(error: unknown): { errorName: string; errorCode?: string | number } {
   if (!(error instanceof Error)) return { errorName: 'NonErrorThrow' };
@@ -48,7 +101,7 @@ export function classifyFetchFailure(error: unknown): FetchFailureReason {
   return 'unknown';
 }
 
-export function logExportEvent(level: LogLevel, event: string, fields: ExportLogFields = {}): void {
+export function logExportEvent(level: LogLevel, event: string, fields: ExportFields = {}): void {
   const value = JSON.stringify({ event, service: 'user-data-export', ...fields });
   if (level === 'error') console.error(value);
   else if (level === 'warn') console.warn(value);

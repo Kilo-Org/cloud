@@ -1,4 +1,4 @@
-import { ExportQueueMessageSchema, type ExportQueueMessage } from './contracts';
+import { ExportQueueMessageSchema, type ExportCursor, type ExportQueueMessage } from './contracts';
 import {
   createReplicaQuery,
   createStateDb,
@@ -9,7 +9,7 @@ import {
 import { createSourceAdapters, type ExportRecord } from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
-import { classifyFetchFailure, logExportEvent, safeError } from './observability';
+import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
 
 const MAX_PROCESSING_MS = 13 * 60 * 1000;
 const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
@@ -248,7 +248,11 @@ export async function processGenerateMessage(
 ): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
   const leaseToken = crypto.randomUUID();
-  const job = await state.claim(message.exportId, message.generation, leaseToken);
+  const job = await withSpan('export_claim', {}, async span => {
+    const claimed = await state.claim(message.exportId, message.generation, leaseToken);
+    span.setAttribute('export.claimed', claimed !== null);
+    return claimed;
+  });
   if (!job) {
     logExportEvent('info', 'export_generation_skipped', {
       exportId: message.exportId,
@@ -280,15 +284,19 @@ export async function processGenerateMessage(
     if (job.multipart_upload_id) {
       const multipartUploadId = job.multipart_upload_id;
       phase = 'orphan_cleanup';
-      const recovered = await recoverInterruptedMultipartUpload({
-        upload: env.EXPORT_BUCKET.resumeMultipartUpload(objectKey(job.id), multipartUploadId),
-        clear: () =>
-          state.clearClaimedMultipartUpload({
-            exportId: job.id,
-            generation: job.dispatch_generation,
-            leaseToken,
-            multipartUploadId,
-          }),
+      const recovered = await withSpan('export_orphan_cleanup', {}, async span => {
+        const cleared = await recoverInterruptedMultipartUpload({
+          upload: env.EXPORT_BUCKET.resumeMultipartUpload(objectKey(job.id), multipartUploadId),
+          clear: () =>
+            state.clearClaimedMultipartUpload({
+              exportId: job.id,
+              generation: job.dispatch_generation,
+              leaseToken,
+              multipartUploadId,
+            }),
+        });
+        span.setAttribute('export.lease_retained', cleared);
+        return cleared;
       });
       if (!recovered) {
         logExportEvent('info', 'export_generation_skipped', {
@@ -303,8 +311,8 @@ export async function processGenerateMessage(
     }
 
     const adapters = createSourceAdapters({
-      replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB),
-      warehouseQuery: createReplicaQuery(env.EXPORT_WAREHOUSE_DB),
+      replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB, 'replica'),
+      warehouseQuery: createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse'),
     });
     let adapter = resolveSourceAdapter(adapters, job.current_source);
     if (!adapter || !adapter.readPage) {
@@ -320,12 +328,22 @@ export async function processGenerateMessage(
         contentDisposition: exportArtifact.contentDisposition,
       },
     });
-    const attachResult = await attachNewMultipartUpload({
-      upload,
-      exportId: job.id,
-      generation: job.dispatch_generation,
-      leaseToken,
-      attach: input => state.attachMultipartUpload(input),
+    // Bound to a const so the closure below keeps the non-undefined narrowing, matching
+    // how activeUpload is captured for the part uploader further down.
+    const attachingUpload = upload;
+    // R2's createMultipartUpload above is auto-instrumented; the state write that binds
+    // the upload id to the job is not, and it is what decides whether this attempt owns
+    // the export or has been fenced.
+    const attachResult = await withSpan('export_multipart_attach', {}, async span => {
+      const result = await attachNewMultipartUpload({
+        upload: attachingUpload,
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        leaseToken,
+        attach: input => state.attachMultipartUpload(input),
+      });
+      span.setAttribute('export.attach_result', result);
+      return result;
     });
     if (attachResult !== 'attached') return;
     logExportEvent('info', 'export_generation_attempt_started', {
@@ -344,6 +362,10 @@ export async function processGenerateMessage(
       uploadPart: (partNumber, value) => activeUpload.uploadPart(partNumber, value),
     });
     writer = compressor.writable.getWriter();
+    // Same reason as activeUpload: the spans below are closures, where the non-undefined
+    // narrowing on the outer `writer` and `uploadParts` bindings does not survive.
+    const activeWriter = writer;
+    const activeUploadParts = uploadParts;
     deadline = setTimeout(() => {
       deadlineError = exportDeadlineError();
       void writer?.abort(deadlineError).catch(() => undefined);
@@ -353,7 +375,9 @@ export async function processGenerateMessage(
     const header = encoder.encode(exportHeader(job));
     await writer.write(header);
     uncompressedSize += header.byteLength;
-    let cursor = null;
+    // Annotated because the page span reads this inside a closure, which stops the
+    // implicit widening TypeScript would otherwise infer from the assignments below.
+    let cursor: ExportCursor | null = null;
     let recordCount = 0;
     let nextSource: string | null = adapter.name;
 
@@ -365,17 +389,35 @@ export async function processGenerateMessage(
       if (!readPage) throw new Error('Export job has an invalid current source');
       phase = 'source_read';
       activeSource = adapter.name;
-      const page = await readPage({
-        kiloUserId: job.kilo_user_id,
-        snapshotAt: job.snapshot_at,
-        cursor,
-        limit: adapter.pageSize ?? PAGE_SIZE,
-      });
-      for (const record of page.records) {
-        const recordBytes = encoder.encode(jsonLine(record));
-        await writer.write(recordBytes);
-        uncompressedSize += recordBytes.byteLength;
-      }
+      // One span per page rather than per source: the loop advances cursors and adapters
+      // with continue/break, so a per-source span cannot wrap it without restructuring
+      // the control flow. Group by the source attribute to get per-source totals. The
+      // nested postgres_read_page span splits read time from compress-and-write time.
+      const pageNumber = pageCount + 1;
+      const pageLimit = adapter.pageSize ?? PAGE_SIZE;
+      const page = await withSpan(
+        'export_source_page',
+        { source: adapter.name, 'export.page': pageNumber },
+        async span => {
+          const result = await readPage({
+            kiloUserId: job.kilo_user_id,
+            snapshotAt: job.snapshot_at,
+            cursor,
+            limit: pageLimit,
+          });
+          let pageBytes = 0;
+          for (const record of result.records) {
+            const recordBytes = encoder.encode(jsonLine(record));
+            await activeWriter.write(recordBytes);
+            pageBytes += recordBytes.byteLength;
+          }
+          uncompressedSize += pageBytes;
+          span.setAttribute('export.page.rows', result.records.length);
+          span.setAttribute('export.page.uncompressed_bytes', pageBytes);
+          span.setAttribute('export.page.has_more', result.nextCursor !== null);
+          return result;
+        }
+      );
       pageCount += 1;
       recordCount += page.records.length;
       if (page.nextCursor) {
@@ -395,8 +437,14 @@ export async function processGenerateMessage(
       nextSource = adapter.name;
     }
     phase = 'compression_finalize';
-    await writer.close();
-    const parts = await uploadParts;
+    // Draining the compressor is where any part uploads still in flight are awaited, so
+    // this span is the wait-on-R2 tail of the export rather than compression cost alone.
+    const parts = await withSpan('export_compression_finalize', {}, async span => {
+      await activeWriter.close();
+      const uploaded = await activeUploadParts;
+      span.setAttribute('export.parts', uploaded.length);
+      return uploaded;
+    });
     if (parts.length === 0) throw new Error('Compressed export produced no multipart data');
     if (deadlineError) throw deadlineError;
     if (deadline) {
@@ -409,19 +457,27 @@ export async function processGenerateMessage(
       parts.map(part => ({ partNumber: part.partNumber, etag: part.etag }))
     );
     phase = 'state_update';
-    const completion = await persistCompletedExport({
-      complete: () =>
-        state.complete({
-          exportId: job.id,
-          leaseToken,
-          rowCount: recordCount,
-          objectKey: key,
-          etag: object.etag,
-          sizeBytes: object.size,
-        }),
-      completedObjectMatches: () =>
-        state.completedObjectMatches({ exportId: job.id, objectKey: key, etag: object.etag }),
-    });
+    const completion = await withSpan(
+      'export_state_update',
+      { 'export.rows': recordCount, 'export.size_bytes': object.size },
+      async span => {
+        const result = await persistCompletedExport({
+          complete: () =>
+            state.complete({
+              exportId: job.id,
+              leaseToken,
+              rowCount: recordCount,
+              objectKey: key,
+              etag: object.etag,
+              sizeBytes: object.size,
+            }),
+          completedObjectMatches: () =>
+            state.completedObjectMatches({ exportId: job.id, objectKey: key, etag: object.etag }),
+        });
+        span.setAttribute('export.completion', result);
+        return result;
+      }
+    );
     if (completion === 'fenced') {
       await handleFencedCompletion({
         exportId: job.id,
@@ -492,7 +548,18 @@ export async function consumeExportBatch(
       continue;
     }
     try {
-      await processMessage(env, parsed.data);
+      // Wrapped here rather than inside processGenerateMessage so the span covers the
+      // whole attempt, including the retry decision below, and so every span the
+      // generator opens inherits the export id and attempt number as ancestors.
+      await withSpan(
+        'export_generate',
+        {
+          exportId: parsed.data.exportId,
+          generation: parsed.data.generation,
+          attempt: message.attempts,
+        },
+        () => processMessage(env, parsed.data)
+      );
       message.ack();
     } catch (error) {
       logExportEvent('warn', 'export_queue_retry_requested', {
@@ -528,12 +595,18 @@ export async function consumeDeadLetterBatch(
   }
 }
 
+/**
+ * The cron runs every five minutes and its four stages are sequential, so without spans
+ * per stage a slow sweep is indistinguishable from a slow lease expiry query.
+ */
 export async function reconcile(env: ExportEnv): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
-  await state.reconcile();
-  await deletePendingObjects(env.EXPORT_BUCKET, state);
-  await processScheduledExportWork(env, state);
-  await dispatchReadyNotifications(env, state);
+  await withSpan('reconcile_leases', {}, () => state.reconcile());
+  await withSpan('reconcile_object_deletions', {}, () =>
+    deletePendingObjects(env.EXPORT_BUCKET, state)
+  );
+  await withSpan('reconcile_scheduled_work', {}, () => processScheduledExportWork(env, state));
+  await withSpan('reconcile_notifications', {}, () => dispatchReadyNotifications(env, state));
 }
 
 export async function processScheduledExportWork(

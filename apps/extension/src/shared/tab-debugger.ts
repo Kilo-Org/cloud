@@ -467,7 +467,8 @@ const runInjectedPageSnapshot = (
   textStartText?: string,
   queryText?: string
 ): PageSnapshot => {
-  const maxTextLength = 8000;
+  // A/B-measured: a 24k window reads a long article in three calls instead of nine. Fewer round-trips means a weak model gets fewer chances to stop early, and the shorter conversation costs FEWER total bytes than the narrow window it replaced.
+  const maxTextLength = 24_000;
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
   const maxTextMatches = 20;

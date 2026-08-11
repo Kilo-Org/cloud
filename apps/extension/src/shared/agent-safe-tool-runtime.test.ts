@@ -77,7 +77,7 @@ describe('safe tool runtime', () => {
         limits: {
           maxNodeCount: 80,
           maxNodeTextLength: 500,
-          maxTextLength: 8000,
+          maxTextLength: 24_000,
         },
         nodes: [
           {
@@ -153,7 +153,7 @@ describe('safe tool runtime', () => {
         limits: {
           maxNodeCount: 80,
           maxNodeTextLength: 500,
-          maxTextLength: 8000,
+          maxTextLength: 24_000,
         },
         nodes: [],
         nodesTruncated: false,
@@ -179,7 +179,7 @@ describe('safe tool runtime', () => {
           limits: {
             maxNodeCount: 80,
             maxNodeTextLength: 500,
-            maxTextLength: 8000,
+            maxTextLength: 24_000,
           },
           nodes: [
             {
@@ -328,7 +328,7 @@ describe('safe tool runtime', () => {
         limits: {
           maxNodeCount: 80,
           maxNodeTextLength: 500,
-          maxTextLength: 8000,
+          maxTextLength: 24_000,
         },
         nodes: [],
         nodesTruncated: false,

@@ -74,7 +74,7 @@ const getCachedSnapshot = (tabId: number, snapshotId: string): PageSnapshot | un
 const defaultSnapshotLimits = {
   maxNodeCount: 80,
   maxNodeTextLength: 500,
-  maxTextLength: 8000,
+  maxTextLength: 24_000,
 };
 const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnapshot => ({
   limits: snapshot.limits ?? defaultSnapshotLimits,

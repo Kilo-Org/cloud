@@ -1,4 +1,4 @@
-import { keyCursorValues, type ExportCursor } from './contracts';
+import { keyCursorValues, type ExportCursor, type KeyCursor } from './contracts';
 
 export type ExportRecord = {
   source: string;
@@ -182,6 +182,25 @@ function safeNumber(value: unknown, field: string): number {
   return number;
 }
 
+/**
+ * The cursor for the next page, or null when this page ends the source.
+ *
+ * A full page is assumed to imply another page exists. That costs one extra empty
+ * read when the row count is an exact multiple of the page size, which is cheaper
+ * than the alternative failure: stopping early and silently truncating a user's
+ * export. Defined once so this trade-off cannot be changed for some sources and
+ * missed for others.
+ */
+function nextKeyCursor<Row>(
+  rows: Row[],
+  limit: number,
+  keyOf: (row: Row) => string[]
+): KeyCursor | null {
+  const lastRow = rows.at(-1);
+  if (rows.length < limit || !lastRow) return null;
+  return { key: keyOf(lastRow) };
+}
+
 /** Digits only, so a cursor value can never carry anything but a key back into a query. */
 function digitString(value: unknown, field: string): string {
   const text = requiredString(value, field);
@@ -285,14 +304,13 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             title: nullableString(row.title, 'title'),
           }))
         );
-        const lastRow = rows.at(-1);
         return {
           records: rows.map(row => ({
             source: 'app_builder_projects',
             field: 'title',
             value: row.title,
           })),
-          nextCursor: rows.length === input.limit && lastRow ? { key: [lastRow.id] } : null,
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
       },
     },
@@ -308,7 +326,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         ]).then(result =>
           result.map(row => ({ id: requiredString(row.id, 'id'), data: row.data }))
         );
-        const lastRow = rows.at(-1);
         return {
           records: rows.map(row => ({
             source: 'app_builder_messages',
@@ -316,7 +333,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             field: 'data',
             value: jsonValue(row.data),
           })),
-          nextCursor: rows.length === input.limit && lastRow ? { key: [lastRow.id] } : null,
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
       },
     },
@@ -344,17 +361,16 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             ),
           }))
         );
-        const lastRow = rows.at(-1);
         return {
           records: rows.flatMap(row => [
             { source: 'cli_sessions', field: 'title', value: row.title },
             { source: 'cli_sessions', field: 'git_url', value: row.git_url },
             { source: 'cli_sessions', field: 'git_branch', value: row.git_branch },
           ]),
-          nextCursor:
-            rows.length === input.limit && lastRow
-              ? { key: [lastRow.most_significant_position, lastRow.least_significant_position] }
-              : null,
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.most_significant_position,
+            row.least_significant_position,
+          ]),
         };
       },
     },
@@ -375,17 +391,13 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
           }))
         );
-        const lastRow = rows.at(-1);
         return {
           records: rows.map(row => ({
             source: 'system_prompt_prefix',
             field: 'system_prompt_prefix',
             value: row.system_prompt_prefix,
           })),
-          nextCursor:
-            rows.length === input.limit && lastRow
-              ? { key: [lastRow.system_prompt_prefix_id] }
-              : null,
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.system_prompt_prefix_id]),
         };
       },
     },
@@ -403,7 +415,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             user_prompt_prefix: nullableString(row.user_prompt_prefix, 'user_prompt_prefix'),
           }))
         );
-        const lastRow = rows.at(-1);
         return {
           records: rows.map(row => ({
             source: 'microdollar_usage_metadata',
@@ -411,7 +422,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             field: 'user_prompt_prefix',
             value: row.user_prompt_prefix,
           })),
-          nextCursor: rows.length === input.limit && lastRow ? { key: [lastRow.id] } : null,
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
       },
     },

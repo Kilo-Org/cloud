@@ -95,11 +95,6 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  // BYOK in the Vercel AI Gateway was not working for Laguna models.
-  if (requestedModel.includes('laguna')) {
-    return false;
-  }
-
   if (isKimiModel(requestedModel)) {
     // 2026-08-12: K3 is timing out during review, let's see if this fixes it.
     return false;

@@ -7,7 +7,12 @@ import {
   type HyperdriveBinding,
 } from './databases';
 import { TerminalExportError } from './errors';
-import { createSourceAdapters, type ExportRecord, type ExportSubject } from './source-adapters';
+import {
+  createSourceAdapters,
+  findPresentWarehouseTables,
+  type ExportRecord,
+  type ExportSubject,
+} from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
@@ -236,24 +241,41 @@ export function exportSubject(job: ExportJob): ExportSubject {
 }
 
 /**
- * Sources that produce records for a subject. An organization export has no identity
- * section — the warehouse holds no organization record — so listing `kilocode_users`
- * in its header would promise a section the file does not contain.
+ * Sources that produce records for a subject, split by whether their table exists.
+ *
+ * An organization export has no identity section — the warehouse holds no organization
+ * record — so `kilocode_users` is dropped from it entirely rather than reported missing.
+ * That is a property of the subject, not of the warehouse's load state, and conflating
+ * the two would tell an org admin their identity data was unavailable when no such
+ * section was ever going to exist.
+ *
+ * Everything else is classified by the probe. The warehouse loads table by table and the
+ * export ships ahead of it, so a source whose table has not landed is expected.
  */
-export function includedSources(subjectType: ExportJob['subject_type']): string[] {
-  const warehouseSources = [
-    'app_builder_projects',
-    'app_builder_messages',
-    'cli_sessions',
-    'system_prompt_prefix',
-    'microdollar_usage_metadata',
-  ];
-  return subjectType === 'organization'
-    ? warehouseSources
-    : ['kilocode_users', ...warehouseSources];
+export function partitionSources(
+  adapters: SourceAdapter[],
+  subjectType: ExportJob['subject_type'],
+  presentTables: Set<string>
+): { available: SourceAdapter[]; unavailable: string[] } {
+  const applicable = adapters.filter(
+    adapter => !(subjectType === 'organization' && adapter.name === 'kilocode_users')
+  );
+  const available: SourceAdapter[] = [];
+  const unavailable: string[] = [];
+  for (const adapter of applicable) {
+    if (!adapter.warehouseTable || presentTables.has(adapter.warehouseTable)) {
+      available.push(adapter);
+    } else {
+      unavailable.push(adapter.name);
+    }
+  }
+  return { available, unavailable };
 }
 
-export function exportHeader(job: ExportJob): string {
+export function exportHeader(
+  job: ExportJob,
+  sources: { available: SourceAdapter[]; unavailable: string[] }
+): string {
   return `${JSON.stringify({
     type: 'header',
     schemaVersion: 1,
@@ -265,7 +287,10 @@ export function exportHeader(job: ExportJob): string {
     // otherwise the same shape.
     subjectType: job.subject_type,
     organizationId: job.organization_id,
-    includedSources: includedSources(job.subject_type),
+    includedSources: sources.available.map(adapter => adapter.name),
+    // Named rather than silently absent, so "we hold nothing for you here" is
+    // distinguishable from "this has not been exported yet". Empty on a complete run.
+    unavailableSources: sources.unavailable,
     snapshotAt: strictIsoTimestamp(job.snapshot_at),
   })}\n`;
 }
@@ -341,10 +366,44 @@ export async function processGenerateMessage(
     // Resolved once, from persisted state, and reused for every page. Deriving it per
     // page would let a single mis-set field change scope midway through a file.
     const subject = exportSubject(job);
-    const adapters = createSourceAdapters({
+    const warehouseQuery = createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse');
+    const allAdapters = createSourceAdapters({
       replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB, 'replica'),
-      warehouseQuery: createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse'),
+      warehouseQuery,
     });
+
+    // Before anything is written, because the header names what is missing and cannot
+    // be amended once the first part has been uploaded. One query, not one per source.
+    phase = 'source_probe';
+    const sources = await withSpan('export_source_probe', {}, async span => {
+      const present = await findPresentWarehouseTables(
+        warehouseQuery,
+        allAdapters.map(candidate => candidate.warehouseTable).filter(table => table !== undefined)
+      );
+      const partitioned = partitionSources(allAdapters, job.subject_type, present);
+      span.setAttribute('export.sources.available', partitioned.available.length);
+      span.setAttribute('export.sources.unavailable', partitioned.unavailable.length);
+      return partitioned;
+    });
+    if (sources.unavailable.length > 0) {
+      // Expected while the warehouse is still loading, so info rather than warn — but
+      // recorded, because it is also how a table silently disappearing would show up.
+      logExportEvent('info', 'export_sources_unavailable', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        sources: sources.unavailable.join(','),
+        sourceCount: sources.unavailable.length,
+      });
+    }
+    const adapters = sources.available;
+    if (adapters.length === 0) {
+      throw new TerminalExportError(
+        'export_no_sources_available',
+        'Your data could not be exported right now. Please try again later.',
+        'No export source tables are present in the warehouse'
+      );
+    }
+
     let adapter = resolveSourceAdapter(adapters, job.current_source);
     if (!adapter || !adapter.readPage) {
       throw new Error('Export job has an invalid current source');
@@ -404,7 +463,7 @@ export async function processGenerateMessage(
     }, MAX_PROCESSING_MS);
     let uncompressedSize = 0;
     let pageCount = 0;
-    const header = encoder.encode(exportHeader(job));
+    const header = encoder.encode(exportHeader(job, sources));
     await writer.write(header);
     uncompressedSize += header.byteLength;
     // Annotated because the page span reads this inside a closure, which stops the

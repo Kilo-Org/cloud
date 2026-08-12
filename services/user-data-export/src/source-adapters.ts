@@ -72,6 +72,15 @@ export function subjectScopeValue(subject: ExportSubject): string {
 export type SourceAdapter = {
   name: string;
   disabledReason?: string;
+  /**
+   * The warehouse table this source reads, checked for existence before the export
+   * starts. The warehouse is loaded table by table and the export is released ahead of
+   * that, so a source can legitimately name a table that does not exist yet.
+   *
+   * Distinct from `name`, which is what the export file calls the section. They agree
+   * for most sources but not for the identity one, which reads `users`.
+   */
+  warehouseTable?: string;
   /** Overrides the caller's default page size. Set where rows are large. */
   pageSize?: number;
   readPage?: (input: {
@@ -476,6 +485,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
   return [
     {
       name: 'kilocode_users',
+      // Reads the warehouse's `users`, not a table of its own name.
+      warehouseTable: 'users',
       async readPage(input): Promise<SourcePage> {
         if (input.cursor) return { records: [], nextCursor: null };
         // Identity is a property of a person, and the warehouse holds no organization
@@ -529,6 +540,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'app_builder_projects',
+      warehouseTable: 'app_builder_projects',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
         const rows: ProjectRow[] = await warehouseQuery(projectQueries[input.subject.type], [
@@ -556,6 +568,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'app_builder_messages',
+      warehouseTable: 'app_builder_messages',
       pageSize: MESSAGE_PAGE_SIZE,
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
@@ -584,6 +597,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'cli_sessions',
+      warehouseTable: 'cli_sessions',
       async readPage(input): Promise<SourcePage> {
         const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
         const rows: CliSessionRow[] = await warehouseQuery(cliSessionQueries[input.subject.type], [
@@ -628,6 +642,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'system_prompt_prefix',
+      warehouseTable: 'system_prompt_prefix',
       async readPage(input): Promise<SourcePage> {
         const [afterId, afterSecondary] = keyCursorValues(input.cursor, 2);
         const rows: SystemPromptRow[] = await warehouseQuery(
@@ -666,6 +681,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'microdollar_usage_metadata',
+      warehouseTable: 'microdollar_usage_metadata',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
         const rows: UserPromptRow[] = await warehouseQuery(userPromptQueries[input.subject.type], [
@@ -717,6 +733,31 @@ export const warehouseQueries = {
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
+
+/**
+ * Which of the tables an export wants actually exist.
+ *
+ * The warehouse is loaded incrementally and the export ships ahead of it, so a source
+ * naming a table that has not landed yet is an expected state rather than a fault. Asked
+ * once per export, before anything is written, so the header can name what is missing
+ * instead of the file simply ending early.
+ *
+ * Reads `information_schema` rather than probing each table with a real query: a probe
+ * that fails is indistinguishable from a table that exists but is unreadable, and this
+ * has to be a fact about existence alone.
+ */
+export const warehouseTableProbeQuery = `SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public' AND table_name = ANY($1::text[])`;
+
+export async function findPresentWarehouseTables(
+  warehouseQuery: ReplicaQuery,
+  tables: string[]
+): Promise<Set<string>> {
+  if (tables.length === 0) return new Set();
+  const rows = await warehouseQuery(warehouseTableProbeQuery, [tables]);
+  return new Set(rows.map(row => requiredString(row.table_name, 'table_name')));
+}
 
 /**
  * The only predicates that scope a query to a single subject. `kilo_user_id = $1`

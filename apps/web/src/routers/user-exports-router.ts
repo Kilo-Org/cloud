@@ -325,15 +325,21 @@ async function requireDownloadableExport(ctx: TRPCContext, exportId: string): Pr
   if (record.subject_type !== 'organization') return;
   if (!record.organization_id) throw notFound;
 
-  // Collapsed to the same NOT_FOUND as a miss, deliberately. `requireExportableOrganization`
-  // distinguishes "no such organization" from "you lack the role", which is right where the
-  // caller named the organization themselves — but here they named an export id, and letting
-  // UNAUTHORIZED through would confirm that id exists. That is the enumeration this
-  // function's uniform NOT_FOUND exists to prevent.
+  // The authorization denial is collapsed to the same NOT_FOUND as a miss, deliberately.
+  // `requireExportableOrganization` distinguishes "no such organization" from "you lack
+  // the role", which is right where the caller named the organization themselves. Here
+  // they named an export id, and letting UNAUTHORIZED through would confirm that id
+  // exists. That is the enumeration this function's uniform NOT_FOUND exists to prevent.
+  //
+  // Only that denial collapses. A connection drop or statement timeout inside the check
+  // is not a verdict about this caller, and reporting it as NOT_FOUND would tell someone
+  // their export had vanished while the failure never reached Sentry. An outage would
+  // read as missing data.
   try {
     await requireExportableOrganization(ctx, record.organization_id);
-  } catch {
-    throw notFound;
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === 'UNAUTHORIZED') throw notFound;
+    throw error;
   }
 }
 

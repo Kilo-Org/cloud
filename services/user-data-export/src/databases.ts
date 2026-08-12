@@ -1,4 +1,5 @@
 import { getWorkerDb, pg } from '@kilocode/db/client';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { sql } from 'drizzle-orm';
 import { safeError, setSpanFields, withSpan } from './observability';
 import type { ReplicaQuery } from './source-adapters';
@@ -8,7 +9,11 @@ export type StateDb = ReturnType<typeof createStateDb>;
 
 export type ExportJob = {
   id: string;
+  /** The requester, for both subject types. Not necessarily whose data this contains. */
   kilo_user_id: string;
+  subject_type: 'user' | 'organization';
+  /** Set exactly when subject_type is 'organization'; a CHECK constraint enforces it. */
+  organization_id: string | null;
   status: 'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired';
   snapshot_at: string;
   requested_at: string;
@@ -27,6 +32,45 @@ type MultipartUpload = { id: string; multipart_upload_id: string };
 export type ExportCompletionResult = 'completed' | 'already_completed' | 'fenced';
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
 type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
+
+/**
+ * Roles that may reach an organization's export.
+ *
+ * The Worker still authorises independently rather than trusting a caller that has
+ * already decided the request is allowed — but it must reach the same verdict as the
+ * request path, so the role list itself is imported rather than restated. Two hand
+ * written copies would drift silently, and the direction that matters is the one where
+ * the Worker stays permissive after the router has been tightened.
+ */
+const ORGANIZATION_EXPORT_ROLES = sql.join(
+  ORGANIZATION_MANAGE_ROLES.map(role => sql`${role}`),
+  sql`, `
+);
+
+/**
+ * Whether `kiloUserId` may reach an export row, for either subject type.
+ *
+ * A personal export is reachable only by the person it belongs to. An organization's
+ * is reachable by anyone who is currently an owner or admin of that organization —
+ * evaluated against live membership in the same statement, so a revoked admin loses
+ * access immediately rather than at the next lease or cache expiry, and so the export
+ * is reachable by admins other than whoever requested it.
+ */
+function callerMayAccess(kiloUserId: string) {
+  return sql`(
+    (subject_type = 'user' AND kilo_user_id = ${kiloUserId})
+    OR (
+      subject_type = 'organization'
+      AND organization_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM organization_memberships memberships
+        WHERE memberships.organization_id = user_data_exports.organization_id
+          AND memberships.kilo_user_id = ${kiloUserId}
+          AND memberships.role IN (${ORGANIZATION_EXPORT_ROLES})
+      )
+    )
+  )`;
+}
 
 export function createStateDb(binding: HyperdriveBinding) {
   const db = getWorkerDb(binding.connectionString, { statement_timeout: 30_000 });
@@ -47,7 +91,8 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
           AND (lease_expires_at IS NULL OR lease_expires_at < now())
-        RETURNING id, kilo_user_id, status, snapshot_at, requested_at, current_source, source_cursor, multipart_upload_id,
+        RETURNING id, kilo_user_id, subject_type, organization_id, status, snapshot_at, requested_at,
+          current_source, source_cursor, multipart_upload_id,
           next_part_number, dispatch_generation, lease_token, r2_object_key
       `);
       return rows.rows[0] ?? null;
@@ -234,7 +279,8 @@ export function createStateDb(binding: HyperdriveBinding) {
     ): Promise<boolean> {
       const rows = await db.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
-        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        WHERE id = ${exportId}
+          AND ${callerMayAccess(kiloUserId)}
           AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
         LIMIT 1
@@ -245,7 +291,8 @@ export function createStateDb(binding: HyperdriveBinding) {
       const rows = await db.execute<ReadyExportObject>(sql`
         SELECT r2_object_key, expires_at
         FROM user_data_exports
-        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        WHERE id = ${exportId}
+          AND ${callerMayAccess(kiloUserId)}
           AND status = 'ready' AND expires_at > now() AND r2_object_key IS NOT NULL
         LIMIT 1
       `);
@@ -408,3 +455,5 @@ export function createReplicaQuery(binding: HyperdriveBinding, database: string)
       }
     );
 }
+
+export const __test__ = { callerMayAccess };

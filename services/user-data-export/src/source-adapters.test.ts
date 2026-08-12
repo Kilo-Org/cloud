@@ -3,7 +3,7 @@ import {
   createSourceAdapters,
   sourceQueries,
   sourceQueryScopes,
-  USER_SCOPE_PREDICATES,
+  SCOPE_PREDICATES,
   WAREHOUSE_PROFILE_FIELDS,
   warehouseQueries,
   type ReplicaQuery,
@@ -67,11 +67,18 @@ const PRIMARY_USER_ROW = {
 };
 
 const READ_PAGE_INPUT = {
-  kiloUserId: 'owner-user',
+  subject: { type: 'user', kiloUserId: 'owner-user' },
   snapshotAt: '2026-08-08T13:00:00.000Z',
   cursor: null,
   limit: 100,
-} as const;
+} as const satisfies Parameters<NonNullable<SourceAdapter['readPage']>>[0];
+
+const ORG_READ_PAGE_INPUT = {
+  subject: { type: 'organization', organizationId: 'org-1' },
+  snapshotAt: '2026-08-08T13:00:00.000Z',
+  cursor: null,
+  limit: 100,
+} as const satisfies Parameters<NonNullable<SourceAdapter['readPage']>>[0];
 
 describe('warehouse scoping guard', () => {
   // Every query the export reads must restrict to a single user, and the predicate
@@ -84,13 +91,13 @@ describe('warehouse scoping guard', () => {
   });
 
   // A declared scope is only worth checking against if the predicate itself scopes to
-  // a user. Without this, a source could be added with any predicate its author cared
+  // a subject. Without this, a source could be added with any predicate its author cared
   // to name and satisfy the assertion below by agreeing with itself.
-  it.each(Object.entries(sourceQueryScopes))('%s declares a known user scope', (_name, scope) => {
-    expect(USER_SCOPE_PREDICATES).toContain(scope);
+  it.each(Object.entries(sourceQueryScopes))('%s declares a known scope', (_name, scope) => {
+    expect(SCOPE_PREDICATES).toContain(scope);
   });
 
-  // Membership in the closed set is not enough on its own: the three predicates are not
+  // Membership in the closed set is not enough on its own: the four predicates are not
   // interchangeable, and each is valid for exactly one table shape. A profile predicate
   // used on an owned child table would match the row's own key rather than its owner,
   // and the two profile predicates are not swappable either — the primary calls this
@@ -107,17 +114,53 @@ describe('warehouse scoping guard', () => {
     if (expectedTable) {
       expect(query).toMatch(expectedTable);
     } else {
-      expect(predicate).toBe('kilo_user_id = $1');
+      expect(['kilo_user_id = $1', 'organization_id = $1']).toContain(predicate);
     }
   });
 
+  // The two subject variants of a source are the same query but for the owner column,
+  // so a copy-paste that left an org query scoped on `kilo_user_id` would still pass
+  // every assertion above: it is a known predicate, on the right table, in the WHERE
+  // clause. It would also hand an organization's admin the requester's own rows. The
+  // name of the query is the only thing that says which subject it is for, so that is
+  // what this pins it to.
+  it.each(Object.entries(sourceQueryScopes))(
+    '%s scopes on the owner column its name claims',
+    (name, scope) => {
+      if (name.endsWith('OrgQuery')) expect(scope).toBe('organization_id = $1');
+      if (name.endsWith('UserQuery')) expect(scope).toBe('kilo_user_id = $1');
+    }
+  );
+
   // Anchored on WHERE because `id = $1` is a substring of every `<table>_id = $1`:
   // an unanchored match would accept `organization_id = $1` as if it scoped to a user.
-  it.each(Object.entries(sourceQueries))('%s is scoped to a single user', (name, query) => {
+  it.each(Object.entries(sourceQueries))('%s is scoped to a single subject', (name, query) => {
     const predicate = sourceQueryScopes[name as keyof typeof sourceQueries];
     expect(predicate).toBeDefined();
     expect(query).toContain(`WHERE ${predicate}`);
   });
+
+  // Both subjects are covered for every warehouse source. A source reachable by only one
+  // of them would silently return nothing to the other rather than failing.
+  it('pairs every warehouse source with both subject variants', () => {
+    const names = Object.keys(warehouseQueries);
+    const orgNames = names.filter(name => name.endsWith('OrgQuery'));
+    const userNames = names.filter(name => name.endsWith('UserQuery'));
+    expect(orgNames.length).toBe(userNames.length);
+    expect(orgNames.map(name => name.replace(/OrgQuery$/, '')).sort()).toEqual(
+      userNames.map(name => name.replace(/UserQuery$/, '')).sort()
+    );
+  });
+
+  // An organization export must never widen to a member's personal rows, which are
+  // exactly the rows with no organization. A predicate that tolerated NULL would do so.
+  it.each(Object.entries(sourceQueries).filter(([name]) => name.endsWith('OrgQuery')))(
+    '%s never admits rows without an organization',
+    (_name, query) => {
+      expect(query).not.toMatch(/organization_id\s+IS\s+NULL/i);
+      expect(query).not.toMatch(/COALESCE\s*\(\s*organization_id/i);
+    }
+  );
 
   it.each(Object.entries(warehouseQueries))('%s orders and limits its page', (_name, query) => {
     expect(query).toContain('ORDER BY');
@@ -255,8 +298,8 @@ describe('source adapters', () => {
     expect(terminal.failureCode).toBe('export_identity_row_missing');
     expect(terminal.redactedMessage).toContain('not found in the data snapshot');
     // The requester's id identifies a person and is carried on the log event already.
-    expect(terminal.message).not.toContain(READ_PAGE_INPUT.kiloUserId);
-    expect(terminal.redactedMessage).not.toContain(READ_PAGE_INPUT.kiloUserId);
+    expect(terminal.message).not.toContain(READ_PAGE_INPUT.subject.kiloUserId);
+    expect(terminal.redactedMessage).not.toContain(READ_PAGE_INPUT.subject.kiloUserId);
   });
 
   it('passes the authenticated user to the warehouse and maps project titles', async () => {
@@ -273,6 +316,38 @@ describe('source adapters', () => {
     expect(page?.records).toEqual([
       { source: 'app_builder_projects', field: 'title', value: 'Owned project' },
     ]);
+  });
+
+  // Every warehouse source has to switch owner column with the subject. One left on
+  // `kilo_user_id` would return the requesting admin's own rows under the
+  // organization's name, which is the failure that has no visible symptom.
+  it.each([
+    'app_builder_projects',
+    'app_builder_messages',
+    'cli_sessions',
+    'system_prompt_prefix',
+    'microdollar_usage_metadata',
+  ])('scopes %s to the organization for an organization subject', async name => {
+    const { adapters, warehouseCalls } = harness([]);
+
+    await requireAdapter(adapters, name).readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls).toHaveLength(1);
+    expect(warehouseCalls[0].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[0].values[0]).toBe('org-1');
+  });
+
+  // The identity row belongs to a person. An organization export reading it would put
+  // the requesting admin's email and name in a file about the organization.
+  it('reads no identity row for an organization subject', async () => {
+    const { adapters, replicaCalls, warehouseCalls } = harness([PRIMARY_USER_ROW]);
+
+    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(page).toEqual({ records: [], nextCursor: null });
+    expect(replicaCalls).toEqual([]);
+    expect(warehouseCalls).toEqual([]);
   });
 
   it('serializes message payloads and preserves a jsonb null', async () => {

@@ -11,6 +11,7 @@
     "test:workers": "vitest run --config vitest.workers.config.ts"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",

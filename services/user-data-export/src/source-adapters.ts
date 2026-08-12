@@ -11,13 +11,35 @@ export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | n
 
 export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
 
+/**
+ * Whose data an export contains, which is not the same as who asked for it.
+ *
+ * A user subject selects the rows that individual owns. An organization subject
+ * selects the rows carrying that organization's id — which includes work its members
+ * did in the organization's context, and deliberately excludes the personal rows those
+ * same members own outside it (`organization_id IS NULL`).
+ *
+ * Membership is not part of the subject. The organization tag is on the row itself, so
+ * selection never needs a member list: rows from someone who has since left are still
+ * the organization's, and a current member's personal rows still are not. Membership
+ * decides only whether the requester may ask, which is settled before a job is created.
+ */
+export type ExportSubject =
+  | { type: 'user'; kiloUserId: string }
+  | { type: 'organization'; organizationId: string };
+
+/** The single bind value that scopes every query for a subject. */
+export function subjectScopeValue(subject: ExportSubject): string {
+  return subject.type === 'user' ? subject.kiloUserId : subject.organizationId;
+}
+
 export type SourceAdapter = {
   name: string;
   disabledReason?: string;
   /** Overrides the caller's default page size. Set where rows are large. */
   pageSize?: number;
   readPage?: (input: {
-    kiloUserId: string;
+    subject: ExportSubject;
     snapshotAt: string;
     cursor: ExportCursor | null;
     limit: number;
@@ -77,46 +99,68 @@ WHERE user_id = $1
 LIMIT 1`;
 
 /**
- * Every warehouse query below is scoped by `kilo_user_id = $1` and ordered on the
- * columns its index already covers, so a page is served without a sort step.
+ * Every warehouse query below is scoped by a single owner column — `kilo_user_id` or
+ * `organization_id` — and ordered on the columns its index already covers, so a page
+ * is served without a sort step.
  *
- * `kilo_user_id = $1` never matches SQL NULL, which is what excludes org-owned rows.
- * Those carry a NULL owner in the warehouse and belong to no individual's export.
- * Org coverage is a separate piece of work.
+ * Neither predicate matches SQL NULL, and that is what keeps the two subjects apart.
+ * `kilo_user_id = $1` skips org-owned rows, which carry a NULL owner. `organization_id
+ * = $1` skips every row with no organization, which is precisely a member's personal
+ * activity. Each subject sees its own rows and nothing else.
  *
  * The warehouse has no `created_at` on any table and is itself a point-in-time
  * snapshot, so there is no `snapshot_at` bound to apply here.
  */
+export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
+
 /**
  * A single-key keyset page, defined once so a change to the predicate cannot reach
  * some sources and miss others.
  *
- * `table`, `columns` and `key` are module constants below, never caller input. The
- * user id and the cursor are always bind parameters, so nothing user-supplied is
- * interpolated into the statement.
+ * `table`, `columns`, `key` and `scope` are module constants below, never caller input;
+ * `scope` in particular is indexed out of `SCOPE_COLUMNS` rather than passed as a
+ * string, so no call site can name a column of its own. The subject id and the cursor
+ * are always bind parameters, so nothing user-supplied is interpolated.
  */
 function singleKeyPageQuery(input: {
   table: string;
   columns: string;
   key?: string;
   keyType?: 'text' | 'bigint';
+  scope: keyof typeof SCOPE_COLUMNS;
 }): string {
   const key = input.key ?? 'id';
   const keyType = input.keyType ?? 'text';
   return `SELECT ${input.columns}
 FROM ${input.table}
-WHERE kilo_user_id = $1
+WHERE ${SCOPE_COLUMNS[input.scope]} = $1
   AND ($2::${keyType} IS NULL OR ${key} > $2::${keyType})
 ORDER BY ${key}
 LIMIT $3`;
 }
 
-const projectQuery = singleKeyPageQuery({
+/**
+ * Both subject variants of one source, so an adapter picks by subject type rather than
+ * branching on a predicate it assembles itself.
+ */
+function subjectPageQueries(input: {
+  table: string;
+  columns: string;
+  key?: string;
+  keyType?: 'text' | 'bigint';
+}): Record<ExportSubject['type'], string> {
+  return {
+    user: singleKeyPageQuery({ ...input, scope: 'user' }),
+    organization: singleKeyPageQuery({ ...input, scope: 'organization' }),
+  };
+}
+
+const projectQueries = subjectPageQueries({
   table: 'app_builder_projects',
   columns: 'id, title',
 });
 
-const messageQuery = singleKeyPageQuery({
+const messageQueries = subjectPageQueries({
   table: 'app_builder_messages',
   columns: 'id, data',
 });
@@ -134,15 +178,22 @@ const messageQuery = singleKeyPageQuery({
  * timeline instead of looking like duplication, and session_id is exported so rows
  * belonging to one session can be grouped.
  */
-const cliSessionQuery = `SELECT session_id, title, git_url, git_branch,
+function cliSessionPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT session_id, title, git_url, git_branch,
   most_significant_position::text AS most_significant_position,
   least_significant_position::text AS least_significant_position
 FROM cli_sessions
-WHERE kilo_user_id = $1
+WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
     OR (most_significant_position, least_significant_position) > ($2::bigint, $3::bigint))
 ORDER BY most_significant_position, least_significant_position
 LIMIT $4`;
+}
+
+const cliSessionQueries: Record<ExportSubject['type'], string> = {
+  user: cliSessionPageQuery('user'),
+  organization: cliSessionPageQuery('organization'),
+};
 
 /**
  * System prompts and user prompts ship as two independent sets.
@@ -161,14 +212,14 @@ LIMIT $4`;
  * Decided deliberately: the export lists every system prompt the user used and
  * every prompt they wrote, with no correspondence between the two.
  */
-const systemPromptQuery = singleKeyPageQuery({
+const systemPromptQueries = subjectPageQueries({
   table: 'system_prompt_prefix',
   columns: 'system_prompt_prefix_id::text AS system_prompt_prefix_id, system_prompt_prefix',
   key: 'system_prompt_prefix_id',
   keyType: 'bigint',
 });
 
-const userPromptQuery = singleKeyPageQuery({
+const userPromptQueries = subjectPageQueries({
   table: 'microdollar_usage_metadata',
   columns: 'id, user_prompt_prefix',
 });
@@ -350,9 +401,15 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       name: 'kilocode_users',
       async readPage(input): Promise<SourcePage> {
         if (input.cursor) return { records: [], nextCursor: null };
+        // Identity is a property of a person, and the warehouse holds no organization
+        // record at all — it has no `organizations` table, and `users` has no org
+        // column. An organization export therefore has no identity section; the
+        // organization it belongs to is named in the file header instead.
+        if (input.subject.type !== 'user') return { records: [], nextCursor: null };
+        const { kiloUserId } = input.subject;
         const [rows, profileRows] = await Promise.all([
-          replicaQuery(userQuery, [input.kiloUserId]),
-          warehouseQuery(warehouseProfileQuery, [input.kiloUserId]),
+          replicaQuery(userQuery, [kiloUserId]),
+          warehouseQuery(warehouseProfileQuery, [kiloUserId]),
         ]);
         const row = rows[0];
         if (!row) throw new Error('Export user was not found');
@@ -397,8 +454,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       name: 'app_builder_projects',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: ProjectRow[] = await warehouseQuery(projectQuery, [
-          input.kiloUserId,
+        const rows: ProjectRow[] = await warehouseQuery(projectQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           after,
           input.limit,
         ]).then(result =>
@@ -422,8 +479,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       pageSize: MESSAGE_PAGE_SIZE,
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: MessageRow[] = await warehouseQuery(messageQuery, [
-          input.kiloUserId,
+        const rows: MessageRow[] = await warehouseQuery(messageQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           after,
           input.limit,
         ]).then(result =>
@@ -444,8 +501,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       name: 'cli_sessions',
       async readPage(input): Promise<SourcePage> {
         const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
-        const rows: CliSessionRow[] = await warehouseQuery(cliSessionQuery, [
-          input.kiloUserId,
+        const rows: CliSessionRow[] = await warehouseQuery(cliSessionQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           afterMost,
           afterLeast,
           input.limit,
@@ -488,11 +545,10 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       name: 'system_prompt_prefix',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: SystemPromptRow[] = await warehouseQuery(systemPromptQuery, [
-          input.kiloUserId,
-          after,
-          input.limit,
-        ]).then(result =>
+        const rows: SystemPromptRow[] = await warehouseQuery(
+          systemPromptQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
           result.map(row => ({
             system_prompt_prefix_id: digitString(
               row.system_prompt_prefix_id,
@@ -515,8 +571,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       name: 'microdollar_usage_metadata',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: UserPromptRow[] = await warehouseQuery(userPromptQuery, [
-          input.kiloUserId,
+        const rows: UserPromptRow[] = await warehouseQuery(userPromptQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           after,
           input.limit,
         ]).then(result =>
@@ -540,48 +596,76 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
 }
 
 /**
- * Owned-row warehouse queries: every one filters on `kilo_user_id = $1`, which
- * excludes NULL-owned (organization) rows by construction. `userQuery` is scoped
- * differently (`id = $1`, the user's own row rather than a row it owns) and is not
- * part of this map.
+ * Owned-row warehouse queries, both subject variants of each.
+ *
+ * The user variant filters on `kilo_user_id = $1`, which excludes org-owned rows since
+ * those carry a NULL owner. The organization variant filters on `organization_id = $1`,
+ * which excludes every row with no organization — a member's personal activity — for
+ * the same reason: neither predicate matches SQL NULL.
+ *
+ * `userQuery` is scoped differently (`id = $1`, the user's own row rather than a row it
+ * owns) and is not part of this map.
  */
 export const warehouseQueries = {
-  projectQuery,
-  messageQuery,
-  cliSessionQuery,
-  systemPromptQuery,
-  userPromptQuery,
+  projectUserQuery: projectQueries.user,
+  projectOrgQuery: projectQueries.organization,
+  messageUserQuery: messageQueries.user,
+  messageOrgQuery: messageQueries.organization,
+  cliSessionUserQuery: cliSessionQueries.user,
+  cliSessionOrgQuery: cliSessionQueries.organization,
+  systemPromptUserQuery: systemPromptQueries.user,
+  systemPromptOrgQuery: systemPromptQueries.organization,
+  userPromptUserQuery: userPromptQueries.user,
+  userPromptOrgQuery: userPromptQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
 
 /**
- * The only predicates that scope a query to a single user. `kilo_user_id = $1` matches
- * rows the user owns; `id = $1` and `user_id = $1` match the user's own profile row on
- * the primary and in the warehouse respectively, which name the same column differently.
- * All three take the authenticated user id as their sole bind parameter, and none can
- * match SQL NULL, which is what keeps org-owned rows out.
+ * The only predicates that scope a query to a single subject. `kilo_user_id = $1`
+ * matches rows one user owns; `organization_id = $1` matches rows one organization
+ * owns; `id = $1` and `user_id = $1` match the user's own profile row on the primary
+ * and in the warehouse respectively, which name the same column differently.
+ *
+ * All four take the subject id as their sole bind parameter, and none can match SQL
+ * NULL. That is what keeps the two subjects disjoint rather than merely different:
+ * a user export cannot reach org-owned rows, and an org export cannot reach the
+ * personal rows of its members.
  *
  * A closed set rather than a free string: a source scoped some other way cannot
  * declare its own predicate and pass the guard below on a technicality. Widening
  * this list is the deliberate, reviewable act that adding such a source requires.
  */
-export const USER_SCOPE_PREDICATES = ['kilo_user_id = $1', 'id = $1', 'user_id = $1'] as const;
-export type UserScopePredicate = (typeof USER_SCOPE_PREDICATES)[number];
+export const SCOPE_PREDICATES = [
+  'kilo_user_id = $1',
+  'organization_id = $1',
+  'id = $1',
+  'user_id = $1',
+] as const;
+export type ScopePredicate = (typeof SCOPE_PREDICATES)[number];
 
 /**
- * The single-user scoping predicate each query in `sourceQueries` must contain,
+ * The single-subject scoping predicate each query in `sourceQueries` must contain,
  * declared beside the queries themselves rather than left to be inferred from
  * which named export a query happens to live in. A query added to `sourceQueries`
  * without an entry here fails the coverage test below, so a new source can't ship
  * unscoped simply by landing outside `warehouseQueries`.
+ *
+ * Each source appears twice, once per subject, and the two must not agree: a query
+ * named `*OrgQuery` scoped on `kilo_user_id` would export the wrong rows to the wrong
+ * requester, which is the failure this table is here to make visible.
  */
-export const sourceQueryScopes: Record<keyof typeof sourceQueries, UserScopePredicate> = {
-  projectQuery: 'kilo_user_id = $1',
-  messageQuery: 'kilo_user_id = $1',
-  cliSessionQuery: 'kilo_user_id = $1',
-  systemPromptQuery: 'kilo_user_id = $1',
-  userPromptQuery: 'kilo_user_id = $1',
+export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicate> = {
+  projectUserQuery: 'kilo_user_id = $1',
+  projectOrgQuery: 'organization_id = $1',
+  messageUserQuery: 'kilo_user_id = $1',
+  messageOrgQuery: 'organization_id = $1',
+  cliSessionUserQuery: 'kilo_user_id = $1',
+  cliSessionOrgQuery: 'organization_id = $1',
+  systemPromptUserQuery: 'kilo_user_id = $1',
+  systemPromptOrgQuery: 'organization_id = $1',
+  userPromptUserQuery: 'kilo_user_id = $1',
+  userPromptOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

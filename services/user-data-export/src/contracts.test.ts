@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { DownloadRequestSchema, ExportQueueMessageSchema, parseCursor } from './contracts';
+import { __test__ } from './databases';
+
+// The Worker re-authorises an organization download against live membership rather than
+// trusting the request path, so its role list has to reach the same verdict as the
+// router's. Both now read the shared constant; this pins the values so a change to the
+// shared list is a visible decision here, and catches a hand-written copy reappearing.
+describe('organization export roles', () => {
+  it('admits owners and admins only', () => {
+    expect([...ORGANIZATION_MANAGE_ROLES]).toEqual(['owner', 'admin']);
+  });
+
+  it('builds the membership predicate from the shared list', () => {
+    const predicate = __test__.callerMayAccess('user-1');
+    // Every role in the shared list reaches the SQL, and nothing else does. A stale
+    // literal would leave 'member' or 'billing_manager' able to download.
+    for (const role of ORGANIZATION_MANAGE_ROLES) {
+      expect(predicate.queryChunks.some(chunk => JSON.stringify(chunk).includes(role))).toBe(true);
+    }
+    const rendered = JSON.stringify(predicate.queryChunks);
+    expect(rendered).not.toContain('billing_manager');
+    expect(rendered).not.toContain('"member"');
+  });
+});
 
 describe('ExportQueueMessageSchema', () => {
   it('accepts only a versioned durable generation reference', () => {

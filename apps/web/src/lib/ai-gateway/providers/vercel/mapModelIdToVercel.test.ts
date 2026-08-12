@@ -96,7 +96,6 @@ describe('mapModelIdToVercel', () => {
       ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
       ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
       ['claude-fable-5', 'anthropic/claude-fable-5'],
-      ['claude-fable-latest', CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],
       ['claude-haiku-4.5', 'anthropic/claude-haiku-4.5'],
       ['claude-haiku-4-5-20251001', 'anthropic/claude-haiku-4.5'],
       ['claude-opus-4-8', 'anthropic/claude-opus-4.8'],

@@ -379,7 +379,7 @@ export async function processGenerateMessage(
     const sources = await withSpan('export_source_probe', {}, async span => {
       const present = await findPresentWarehouseTables(
         warehouseQuery,
-        warehouseRequirements(allAdapters)
+        warehouseRequirements(allAdapters, job.subject_type)
       );
       const partitioned = partitionSources(allAdapters, job.subject_type, present);
       span.setAttribute('export.sources.available', partitioned.available.length);

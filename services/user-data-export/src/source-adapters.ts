@@ -146,8 +146,12 @@ LIMIT 1`;
 
 /**
  * Every warehouse query below is scoped by a single owner column — `kilo_user_id` or
- * `organization_id` — and ordered on the columns its index already covers, so a page
- * is served without a sort step.
+ * `organization_id` — and, with one exception, ordered on the columns its index already
+ * covers, so a page is served without a sort step.
+ *
+ * The exception is `system_prompt_prefix`, whose cursor ends in a `COALESCE` expression
+ * that no plain btree index can serve. It sorts within each tie group instead. Tie
+ * groups are small, but the trade is deliberate and recorded on that query.
  *
  * Neither predicate matches SQL NULL, and that is what keeps the two subjects apart.
  * `kilo_user_id = $1` skips org-owned rows, which carry a NULL owner. `organization_id
@@ -160,28 +164,28 @@ LIMIT 1`;
 export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
 
 /**
- * A single-key keyset page, defined once so a change to the predicate cannot reach
- * some sources and miss others.
+ * A keyset page over a table whose own `id` is unique, defined once so a change to the
+ * predicate cannot reach some sources and miss others.
  *
- * `table`, `columns`, `key` and `scope` are module constants below, never caller input;
- * `scope` in particular is indexed out of `SCOPE_COLUMNS` rather than passed as a
- * string, so no call site can name a column of its own. The subject id and the cursor
- * are always bind parameters, so nothing user-supplied is interpolated.
+ * The cursor column is fixed at `id` rather than parameterised: every source that once
+ * needed a different key now has its own builder, because each turned out to need a
+ * composite cursor rather than a differently named single one.
+ *
+ * `table`, `columns` and `scope` are module constants below, never caller input; `scope`
+ * in particular is indexed out of `SCOPE_COLUMNS` rather than passed as a string, so no
+ * call site can name a column of its own. The subject id and the cursor are always bind
+ * parameters, so nothing user-supplied is interpolated.
  */
 function singleKeyPageQuery(input: {
   table: string;
   columns: string;
-  key?: string;
-  keyType?: 'text' | 'bigint';
   scope: keyof typeof SCOPE_COLUMNS;
 }): string {
-  const key = input.key ?? 'id';
-  const keyType = input.keyType ?? 'text';
   return `SELECT ${input.columns}
 FROM ${input.table}
 WHERE ${SCOPE_COLUMNS[input.scope]} = $1
-  AND ($2::${keyType} IS NULL OR ${key} > $2::${keyType})
-ORDER BY ${key}
+  AND ($2::text IS NULL OR id > $2::text)
+ORDER BY id
 LIMIT $3`;
 }
 
@@ -766,18 +770,19 @@ export type WarehouseTableRequirement = { table: string; requiredColumns: readon
  * be exact: a column omitted here is one the export will select from a table it has just
  * declared present.
  *
- * The scope columns appear on every warehouse table because both subject variants of a
- * source are built from the same declaration, and an export must not be admitted on the
- * strength of a table that can only serve one of its two scopes.
+ * The scope column is deliberately NOT listed here. It is added per subject below,
+ * because requiring both would let a table missing `organization_id` be withheld from
+ * personal exports too — dropping a section from an export that could have been served
+ * perfectly well from `kilo_user_id`.
+ *
+ * `users` is scoped by `user_id`, which is one of its own columns rather than a scope
+ * column, so it takes no addition.
  */
-const SCOPE_COLUMN_LIST = [SCOPE_COLUMNS.user, SCOPE_COLUMNS.organization] as const;
-
 export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS)],
-  app_builder_projects: [...SCOPE_COLUMN_LIST, 'id', 'title', DELETED_COLUMN],
-  app_builder_messages: [...SCOPE_COLUMN_LIST, 'id', 'data', DELETED_COLUMN],
+  app_builder_projects: ['id', 'title', DELETED_COLUMN],
+  app_builder_messages: ['id', 'data', DELETED_COLUMN],
   cli_sessions: [
-    ...SCOPE_COLUMN_LIST,
     'session_id',
     'title',
     'git_url',
@@ -785,23 +790,39 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
-  system_prompt_prefix: [
-    ...SCOPE_COLUMN_LIST,
-    'system_prompt_prefix_id',
-    'system_prompt_prefix',
-    DELETED_COLUMN,
-  ],
-  microdollar_usage_metadata: [...SCOPE_COLUMN_LIST, 'id', 'user_prompt_prefix'],
+  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix', DELETED_COLUMN],
+  microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
 };
 
-/** The probe input for a set of adapters, resolved from their declared tables. */
+/** Sources filtered by a scope column, as opposed to one of their own keys. */
+const SUBJECT_SCOPED_TABLES = new Set(
+  Object.keys(WAREHOUSE_SOURCE_COLUMNS).filter(table => table !== 'users')
+);
+
+/**
+ * The probe input for a set of adapters, for one subject.
+ *
+ * Subject-dependent because the two scopes read different owner columns, and a table
+ * that can serve one is usable for that one even if it cannot serve the other. The
+ * `system_prompt_prefix` cursor reads the opposite scope column as its second key, so
+ * that source needs both regardless of subject.
+ */
 export function warehouseRequirements(
-  adapters: Pick<SourceAdapter, 'warehouseTable'>[]
+  adapters: Pick<SourceAdapter, 'warehouseTable'>[],
+  subjectType: ExportSubject['type']
 ): WarehouseTableRequirement[] {
   return adapters
     .map(adapter => adapter.warehouseTable)
     .filter((table): table is string => table !== undefined)
-    .map(table => ({ table, requiredColumns: WAREHOUSE_SOURCE_COLUMNS[table] ?? [] }));
+    .map(table => {
+      const declared = WAREHOUSE_SOURCE_COLUMNS[table] ?? [];
+      if (!SUBJECT_SCOPED_TABLES.has(table)) return { table, requiredColumns: declared };
+      const scopeColumns =
+        table === 'system_prompt_prefix'
+          ? [SCOPE_COLUMNS.user, SCOPE_COLUMNS.organization]
+          : [SCOPE_COLUMNS[subjectType]];
+      return { table, requiredColumns: [...scopeColumns, ...declared] };
+    });
 }
 
 export async function findPresentWarehouseTables(

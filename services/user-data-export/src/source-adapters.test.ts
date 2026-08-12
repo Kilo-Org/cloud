@@ -252,11 +252,39 @@ describe('warehouse availability probe', () => {
     expect([...present]).toEqual([]);
   });
 
+  // A personal export filters on kilo_user_id and never touches organization_id, so a
+  // table whose org column has not landed yet is still perfectly serviceable to it.
+  // Requiring both would withhold a section from an export that could have been served.
+  it('requires only the scope column the subject actually filters on', () => {
+    const { adapters } = harness();
+    const requirementFor = (subject: 'user' | 'organization', table: string) =>
+      warehouseRequirements(adapters, subject).find(item => item.table === table)
+        ?.requiredColumns ?? [];
+
+    expect(requirementFor('user', 'app_builder_projects')).toContain('kilo_user_id');
+    expect(requirementFor('user', 'app_builder_projects')).not.toContain('organization_id');
+    expect(requirementFor('organization', 'app_builder_projects')).toContain('organization_id');
+    expect(requirementFor('organization', 'app_builder_projects')).not.toContain('kilo_user_id');
+  });
+
+  // The exception: this source's cursor reads the opposite scope column as its second
+  // key, so it genuinely needs both whichever subject is asking.
+  it('requires both scope columns for the source whose cursor spans them', () => {
+    const { adapters } = harness();
+    for (const subject of ['user', 'organization'] as const) {
+      const columns =
+        warehouseRequirements(adapters, subject).find(item => item.table === 'system_prompt_prefix')
+          ?.requiredColumns ?? [];
+      expect(columns).toContain('kilo_user_id');
+      expect(columns).toContain('organization_id');
+    }
+  });
+
   it('asks about every table the adapters read, in one query', async () => {
     const { calls, warehouseQuery } = probeHarness({});
     const { adapters } = harness();
 
-    await findPresentWarehouseTables(warehouseQuery, warehouseRequirements(adapters));
+    await findPresentWarehouseTables(warehouseQuery, warehouseRequirements(adapters, 'user'));
 
     expect(calls).toHaveLength(1);
     expect(calls[0].values[0]).toEqual([

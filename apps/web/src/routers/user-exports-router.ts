@@ -18,7 +18,6 @@ import {
 import { db } from '@/lib/drizzle';
 import { sendDataExportDownloadCodeEmail } from '@/lib/email';
 import { adminProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import {
   dispatchUserDataExport,
@@ -113,10 +112,9 @@ const EXPORT_COLUMNS = sql`exports.id, exports.subject_type, exports.organizatio
 /**
  * Organizations the caller may export.
  *
- * Mirrors what `ensureOrganizationAccess` will actually admit, which is not the same as
- * direct membership: an owner or admin of a parent organization inherits access to its
- * children. Listing only direct memberships would let someone request a child
- * organization's export successfully and then never see it, because the request
+ * Membership is not only direct: an owner or admin of a parent organization inherits
+ * access to its children. Listing only direct memberships would let someone request a
+ * child organization's export successfully and then never see it, because the request
  * succeeded on inherited access that the list did not know about.
  *
  * `billing_manager` inherits access to a child in general but is not an export role, so
@@ -131,39 +129,82 @@ async function exportableOrganizations(userId: string): Promise<{ id: string; na
   // than from `organizations` with correlated subqueries per row. This runs on every
   // list() call including each pagination page, so its cost has to scale with how many
   // organizations the caller belongs to, not with how many exist.
+  //
+  // UNION rather than a single join with an OR: an OR across two different join columns
+  // cannot use an index for both sides, so the planner falls back to scanning. Split,
+  // each branch is a plain indexed lookup, and UNION already removes the duplicates a
+  // DISTINCT would have had to sort for.
   const { rows } = await db.execute<{ id: string; name: string }>(sql`
-    SELECT DISTINCT orgs.id, orgs.name
-    FROM organization_memberships memberships
-    JOIN organizations orgs
-      ON orgs.id = memberships.organization_id
+    WITH exportable AS (
+      SELECT orgs.id, orgs.name
+      FROM organization_memberships memberships
+      JOIN organizations orgs ON orgs.id = memberships.organization_id
+      WHERE memberships.kilo_user_id = ${userId}
+        AND memberships.role IN (${EXPORT_ROLES_SQL})
+        AND orgs.deleted_at IS NULL
+      UNION
       -- The inherited route: a role held in a parent organization reaches its children.
-      OR orgs.parent_organization_id = memberships.organization_id
-    WHERE memberships.kilo_user_id = ${userId}
-      AND memberships.role IN (${EXPORT_ROLES_SQL})
-      AND orgs.deleted_at IS NULL
-    ORDER BY orgs.name, orgs.id
+      SELECT orgs.id, orgs.name
+      FROM organization_memberships memberships
+      JOIN organizations orgs ON orgs.parent_organization_id = memberships.organization_id
+      WHERE memberships.kilo_user_id = ${userId}
+        AND memberships.role IN (${EXPORT_ROLES_SQL})
+        AND orgs.deleted_at IS NULL
+    )
+    SELECT id, name FROM exportable ORDER BY name, id
   `);
   return rows;
 }
 
 /**
- * The organization is real, not soft-deleted, and the caller holds an export role on it.
+ * The organization is real, not soft-deleted, and the caller genuinely holds an export
+ * role on it.
  *
- * `ensureOrganizationAccess` answers the role half but says nothing about the
- * organization's own state, and membership rows outlive a soft-deleted organization. So
- * an id supplied directly — rather than picked from the list above, which filters
- * `deleted_at` — would otherwise let a former admin export something the product treats
- * as gone.
+ * Deliberately NOT `ensureOrganizationAccess`, which every other organization router
+ * uses. That helper grants `owner` to any `is_admin` caller, so on this router — where
+ * every procedure is `adminProcedure` — it would authorise on staff status rather than
+ * on membership, and nobody may export another person's or another organization's data.
+ *
+ * It also has to agree with the Worker, which re-checks independently and has no notion
+ * of elevation. When the two disagreed, an export generated, showed as ready, and then
+ * failed its download every time, because the Worker refused what the router had
+ * admitted. This is the same predicate `callerMayAccess` applies there: direct or
+ * parent-inherited owner/admin, on an organization that still exists.
+ *
+ * Membership rows outlive a soft-deleted organization, so `deleted_at` is part of the
+ * check rather than only of the listing above.
  */
 async function requireExportableOrganization(
   ctx: TRPCContext,
   organizationId: string
 ): Promise<void> {
   const { rows } = await db.execute<{ id: string }>(sql`
-    SELECT id FROM organizations WHERE id = ${organizationId}::uuid AND deleted_at IS NULL LIMIT 1
+    SELECT orgs.id
+    FROM organizations orgs
+    WHERE orgs.id = ${organizationId}::uuid
+      AND orgs.deleted_at IS NULL
+      AND (
+        EXISTS (
+          SELECT 1 FROM organization_memberships memberships
+          WHERE memberships.organization_id = orgs.id
+            AND memberships.kilo_user_id = ${ctx.user.id}
+            AND memberships.role IN (${EXPORT_ROLES_SQL})
+        )
+        OR EXISTS (
+          SELECT 1 FROM organization_memberships memberships
+          WHERE memberships.organization_id = orgs.parent_organization_id
+            AND memberships.kilo_user_id = ${ctx.user.id}
+            AND memberships.role IN (${EXPORT_ROLES_SQL})
+        )
+      )
+    LIMIT 1
   `);
-  if (!rows[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  await ensureOrganizationAccess(ctx, organizationId, [...EXPORT_ROLES]);
+  if (!rows[0]) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have permission to export this organization',
+    });
+  }
 }
 
 function requireWebSession(authViaToken: boolean | undefined): void {

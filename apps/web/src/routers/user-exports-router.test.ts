@@ -4,6 +4,7 @@ import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contr
 import { db } from '@/lib/drizzle';
 import {
   magic_link_tokens,
+  organization_memberships,
   organizations,
   user_data_exports,
   type User,
@@ -347,6 +348,33 @@ describe('user exports router guards and serialization', () => {
   // An owner of a parent organization inherits access to its children, so the request
   // path accepts a child the caller has no direct membership in. Offering only direct
   // memberships would let that request succeed and then leave the export invisible.
+  // A Kilo employee with /admin access is not a member of the customer's organization
+  // and may not export it. `ensureOrganizationAccess`, which the other organization
+  // routers use, would grant them owner here purely on is_admin — so this router checks
+  // membership itself, and this is the test that says why.
+  it('refuses a Kilo admin who is not a member of the organization', async () => {
+    const organization = await createTestOrganization('Export Org Staff', stranger.id, 0);
+    const kiloStaff = await insertTestUser({
+      google_user_email: 'data-export-staff@admin.example.com',
+      is_admin: true,
+    });
+    const caller = await createCallerForUser(kiloStaff.id);
+
+    await expect(
+      caller.userExports.requestOrganization({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    // Nor by way of an export that already exists: the download path must refuse it too.
+    const exportId = await insertReadyOrganizationExport(stranger.id, organization.id);
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    // And it is not offered to them in the first place.
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
+  });
+
   // Membership rows outlive a soft-deleted organization, so a former admin can still
   // name its id directly even though it never appears in the offered list.
   it('refuses to export a soft-deleted organization', async () => {
@@ -358,9 +386,12 @@ describe('user exports router guards and serialization', () => {
 
     const caller = await createCallerForUser(owner.id);
 
+    // UNAUTHORIZED rather than NOT_FOUND: existence and permission are settled in one
+    // query, and answering them separately would tell a non-member whether an
+    // organization id is real.
     await expect(
       caller.userExports.requestOrganization({ organizationId: organization.id })
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     const offered = await caller.userExports.exportableOrganizations();
     expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
   });
@@ -460,6 +491,13 @@ describe('user exports router guards and serialization', () => {
     const colleague = await insertTestUser({
       google_user_email: 'data-export-colleague@admin.example.com',
       is_admin: true,
+    });
+    // A real membership, not staff status. Kilo admin alone must not reach this export,
+    // which is what the test below asserts.
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: colleague.id,
+      role: 'admin',
     });
     const exportId = await insertReadyOrganizationExport(owner.id, organization.id);
 

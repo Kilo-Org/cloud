@@ -8,7 +8,7 @@ describe('unavailable models', () => {
   test('keeps exact matching for request rejection', () => {
     expect(isUnavailableModel('openai/gpt-oss-20b:free')).toBe(true);
     expect(isUnavailableModel('sakana/fugu-ultra')).toBe(false);
-    expect(isUnavailableModel('byteplus-coding/glm-4.7')).toBe(true);
+    expect(isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(isUnavailableModel('openai/gpt-oss-20b')).toBe(false);
   });
 

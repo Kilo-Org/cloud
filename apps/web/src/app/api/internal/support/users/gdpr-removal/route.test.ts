@@ -223,7 +223,7 @@ describe('POST /api/internal/support/users/gdpr-removal', () => {
   });
 
   test('accepts legacy oauth/google user ids', async () => {
-    const legacyUserId = 'oauth/google:113825116714119418413';
+    const legacyUserId = 'oauth/google:123456789012345678901';
     mockedFindUserById.mockResolvedValue(
       targetUser({ id: legacyUserId, google_user_email: CUSTOMER_EMAIL })
     );

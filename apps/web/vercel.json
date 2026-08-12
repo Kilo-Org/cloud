@@ -99,10 +99,6 @@
     {
       "path": "/api/cron/cleanup-review-memory",
       "schedule": "0 */12 * * *"
-    },
-    {
-      "path": "/api/cron/sync-byok-provider-notifications",
-      "schedule": "0 4 * * *"
     }
   ],
   "build": {

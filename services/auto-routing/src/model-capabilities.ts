@@ -299,13 +299,18 @@ async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilities
 
 // Record every id we asked for, so an id with no `model_stats` row is stored
 // as resolved-and-absent instead of looking like a cache miss forever.
+// Own-key checks throughout: pool ids come from user configuration, and a
+// name like `constructor` inherited from Object.prototype would otherwise
+// read as already-resolved.
 function withTombstones(
   requested: ReadonlyArray<string>,
   rows: Readonly<ModelCapabilitiesCacheValue>
 ): ModelCapabilitiesCacheValue {
   const out: ModelCapabilitiesCacheValue = { ...rows };
   for (const id of requested) {
-    out[id] ??= TOMBSTONE;
+    if (!Object.hasOwn(out, id)) {
+      out[id] = TOMBSTONE;
+    }
   }
   return out;
 }
@@ -366,7 +371,7 @@ export async function getModelCapabilities(
     // KV. Resolve against the union keys rather than `result` so a tombstoned
     // id counts as resolved and does not re-query.
     // `result.has` keeps the statically-supplied BytePlus default off the DB.
-    const missing = idList.filter(id => !(id in all) && !result.has(id));
+    const missing = idList.filter(id => !Object.hasOwn(all, id) && !result.has(id));
     if (missing.length > 0) {
       const fromDb = await queryModelCapabilities(env, missing);
       mergeInto(result, fromDb);

@@ -432,6 +432,27 @@ describe('getModelCapabilities', () => {
     expect(dbWhere).toHaveBeenCalledTimes(1);
   });
 
+  it('resolves a pool id that collides with an Object.prototype key', async () => {
+    // `'constructor' in all` is true on any plain object, so an inherited-key
+    // check would treat this id as already resolved and never cache it.
+    dbWhere.mockImplementation(() => Promise.resolve([]));
+    const { kv, store } = makeKv({
+      model_capabilities_v2: JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+      }),
+    });
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = kv;
+
+    const result = await getModelCapabilities(env, { additionalModelIds: ['constructor'] });
+
+    expect(result.has('constructor')).toBe(false);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(store.get('model_capabilities_v2') as string)).toMatchObject({
+      constructor: { absent: true },
+    });
+  });
+
   it('writes a pool id back to the shared union so other users read it from KV', async () => {
     dbWhere.mockImplementation(() =>
       Promise.resolve([

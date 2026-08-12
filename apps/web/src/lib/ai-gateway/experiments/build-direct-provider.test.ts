@@ -8,7 +8,12 @@ type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' 
 
 async function transformRequest(
   request: GatewayRequest,
-  options: { sanitize_ref_fields?: boolean; thought_signature_mapping?: string } = {}
+  options: {
+    sanitize_ref_fields?: boolean;
+    use_gemini_reasoning_transform?: boolean;
+    extra_body?: Record<string, unknown>;
+    remove_from_body?: string[];
+  } = {}
 ) {
   const provider = buildDirectProvider('custom', ['chat_completions'], {
     internal_id: 'upstream-model',
@@ -66,71 +71,37 @@ function makeRequest(): ChatCompletionRequest {
   return request;
 }
 
-describe('custom LLM thought signature mapping configuration', () => {
+describe('custom LLM Gemini reasoning transform configuration', () => {
   const config = {
     internal_id: 'upstream-model',
     base_url: 'https://llm.example.com/v1',
   };
 
-  it('accepts a dot-separated property path', () => {
+  it('accepts the Gemini reasoning transform flag', () => {
     expect(
       CustomLlmApiConfigSchema.safeParse({
         ...config,
-        thought_signature_mapping: 'extra_content.provider.thought_signature',
+        use_gemini_reasoning_transform: true,
       }).success
     ).toBe(true);
   });
-
-  it.each(['', 'extra_content..thought_signature', '__proto__.thought_signature'])(
-    'rejects unsafe property path %p',
-    thought_signature_mapping => {
-      expect(
-        CustomLlmApiConfigSchema.safeParse({ ...config, thought_signature_mapping }).success
-      ).toBe(false);
-    }
-  );
-});
-
-describe('custom LLM thought content mapping configuration', () => {
-  const config = {
-    internal_id: 'upstream-model',
-    base_url: 'https://llm.example.com/v1',
-  };
-
-  it('accepts a dot-separated property path', () => {
-    expect(
-      CustomLlmApiConfigSchema.safeParse({
-        ...config,
-        thought_content_mapping: 'extra_content.flags.thought',
-      }).success
-    ).toBe(true);
-  });
-
-  it.each(['', 'extra_content..thought', 'constructor.prototype.thought'])(
-    'rejects unsafe property path %p',
-    thought_content_mapping => {
-      expect(
-        CustomLlmApiConfigSchema.safeParse({ ...config, thought_content_mapping }).success
-      ).toBe(false);
-    }
-  );
 });
 
 describe('buildDirectProvider response transforms', () => {
-  it('exposes the thought content property path without other upstream configuration', () => {
+  it('exposes the Gemini thought content path when the transform is enabled', () => {
     const provider = buildDirectProvider('custom', ['chat_completions'], {
       internal_id: 'upstream-model',
       base_url: 'https://llm.example.com/v1',
       api_key: 'test-key',
-      thought_content_mapping: 'extra_content.flags.thought',
+      use_gemini_reasoning_transform: true,
     });
 
     expect(provider.responseTransforms).toEqual({
-      thoughtContentMapping: 'extra_content.flags.thought',
+      thoughtContentMapping: 'extra_content.google.thought',
     });
   });
 
-  it('sets response transforms to null when no mapping is configured', () => {
+  it('sets response transforms to null when the transform is not enabled', () => {
     const provider = buildDirectProvider('custom', ['chat_completions'], {
       internal_id: 'upstream-model',
       base_url: 'https://llm.example.com/v1',
@@ -141,12 +112,12 @@ describe('buildDirectProvider response transforms', () => {
   });
 });
 
-describe('buildDirectProvider thought signature mapping', () => {
+describe('buildDirectProvider Gemini reasoning transform', () => {
   it('maps assistant tool-call signatures and removes camel-case transport fields', async () => {
     const request = makeRequest();
 
     await transformRequest(request, {
-      thought_signature_mapping: 'extra_content.provider.thought_signature',
+      use_gemini_reasoning_transform: true,
     });
 
     expect(request.body.model).toBe('upstream-model');
@@ -161,7 +132,7 @@ describe('buildDirectProvider thought signature mapping', () => {
             function: { name: 'lookup', arguments: '{}' },
             extra_content: {
               trace_id: 'trace-1',
-              provider: { thought_signature: 'assistant-signature' },
+              google: { thought_signature: 'assistant-signature' },
             },
           },
         ],
@@ -174,7 +145,61 @@ describe('buildDirectProvider thought signature mapping', () => {
     ]);
   });
 
-  it('preserves signatures when no mapping is configured', async () => {
+  it('moves reasoning_effort into google.thinking_config and keeps extra_body', async () => {
+    const request = makeRequest();
+    request.body.reasoning_effort = 'high';
+
+    await transformRequest(request, {
+      use_gemini_reasoning_transform: true,
+      extra_body: { temperature: 0.2, google: { existing: true } },
+      remove_from_body: ['stream'],
+    });
+
+    expect(request.body).toMatchObject({
+      model: 'upstream-model',
+      temperature: 0.2,
+      google: {
+        existing: true,
+        thinking_config: {
+          thinking_level: 'high',
+          include_thoughts: true,
+        },
+      },
+    });
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+    expect(request.body).not.toHaveProperty('stream');
+  });
+
+  it('does not send an invalid Gemini thinking_level when reasoning_effort is none', async () => {
+    const request = makeRequest();
+    request.body.reasoning_effort = 'none';
+
+    await transformRequest(request, {
+      use_gemini_reasoning_transform: true,
+      extra_body: { google: { existing: true } },
+    });
+
+    const body = request.body as typeof request.body & { google?: Record<string, unknown> };
+    expect(body.google).toEqual({ existing: true });
+    expect(body).not.toHaveProperty('reasoning_effort');
+  });
+
+  it('still sets thinking_config when reasoning_effort is absent', async () => {
+    const request = makeRequest();
+
+    await transformRequest(request, { use_gemini_reasoning_transform: true });
+
+    expect(request.body).toMatchObject({
+      google: {
+        thinking_config: {
+          include_thoughts: true,
+        },
+      },
+    });
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+  });
+
+  it('preserves signatures when the transform is not enabled', async () => {
     const request = makeRequest();
 
     await transformRequest(request);

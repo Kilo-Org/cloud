@@ -658,6 +658,58 @@ describe('identical failing tool call guard', () => {
   });
 });
 
+describe('consecutive tool-failure stop', () => {
+  it('ends the turn after 25 consecutive failures of one tool', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    let fetchCount = 0;
+    const responses = createToolOnlyGatewayResponses(40);
+    const fetch: FetchLike = () => {
+      fetchCount += 1;
+      return responses.next().value;
+    };
+    let callIndex = 0;
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Run the workflow')],
+      // The error varies per call: the stop counts failures per tool name, not identical bytes.
+      executeToolCall: () => {
+        callIndex += 1;
+        return Promise.resolve({ error: `failure ${String(callIndex)}`, ok: false });
+      },
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 40,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onUsage: () => {},
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall =>
+          createSafeToolCall({
+            name: 'get_page_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          })
+        ),
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(fetchCount).toBe(25);
+    const lastEvent = appendedEvents.at(-1);
+    expect(JSON.stringify(lastEvent)).toContain(
+      'Stopped: get_page_snapshot failed 25 times in a row'
+    );
+  });
+});
+
 describe('continue nudge', () => {
   const nudgeOptions = (fetch: FetchLike, appended: AgentConversationEvent[]) => ({
     apiBaseUrl: 'https://app.kilo.ai',

@@ -173,6 +173,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 }: RunLlmTurnOptions<ToolCall>): Promise<void> => {
   // A weak model can loop one byte-identical failing tool call for the whole turn (measured: 118 identical run_workflow calls). After the third identical failure the error tells it to stop; a success resets the count.
   const identicalFailureCounts = new Map<string, number>();
+  // Some models mutate the arguments slightly each round, so byte-identity never collides and the text escalation never lands. Across 812 benchmark attempts no passing attempt exceeded 19 consecutive failures of one tool; runaway loops hit 118-119. At 25 the turn ends instead of burning billed rounds.
+  const MAX_CONSECUTIVE_TOOL_FAILURES = 25;
+  let consecutiveFailureTool: string | undefined = undefined;
+  let consecutiveFailureCount = 0;
+  let failureStreakExceeded = false;
   const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
     // Key on the call content, not its per-call ids or attached reasoning: repeats must collide.
     const {
@@ -188,7 +193,15 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     const result = await executeToolCall(toolCall);
     if (result.ok) {
       identicalFailureCounts.delete(key);
+      consecutiveFailureTool = undefined;
+      consecutiveFailureCount = 0;
       return result;
+    }
+    consecutiveFailureCount =
+      toolCall.name === consecutiveFailureTool ? consecutiveFailureCount + 1 : 1;
+    consecutiveFailureTool = toolCall.name;
+    if (consecutiveFailureCount >= MAX_CONSECUTIVE_TOOL_FAILURES) {
+      failureStreakExceeded = true;
     }
     const count = (identicalFailureCounts.get(key) ?? 0) + 1;
     identicalFailureCounts.set(key, count);
@@ -461,6 +474,15 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       appendEvents(toolResultEvents);
       nextConversationEvents.push(...toolResultEvents);
+
+      if (failureStreakExceeded) {
+        appendEvents([
+          createAssistantMessage(
+            `Stopped: ${consecutiveFailureTool ?? 'a tool'} failed ${String(consecutiveFailureCount)} times in a row. Something is blocking this approach — please adjust the request or try again.`
+          ),
+        ]);
+        return;
+      }
 
       await continueConversation(nextConversationEvents, remainingRounds - 1);
     };

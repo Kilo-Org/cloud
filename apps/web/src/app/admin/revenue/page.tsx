@@ -8,6 +8,7 @@ import type { RevenueKpiResponse } from '@/lib/revenueKpi';
 import { format, subDays } from 'date-fns';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { revenueDashboardStatus } from '@/app/admin/revenue/revenue-dashboard-status';
 
 const breadcrumbs = (
   <>
@@ -60,6 +61,7 @@ export default function RevenuePage() {
     refetchInterval: 60000,
   });
 
+  const status = revenueDashboardStatus({ isLoading, error, data });
   const multiplierCategoriesNote = data?.multiplierCategories ? (
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
       <div className="mb-1 text-sm font-medium text-blue-800">Multiplier Categories</div>
@@ -68,51 +70,6 @@ export default function RevenuePage() {
       </div>
     </div>
   ) : null;
-
-  if (isLoading) {
-    return (
-      <AdminPage breadcrumbs={breadcrumbs}>
-        <div className="flex w-full flex-col gap-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Revenue KPI Dashboard</h2>
-          </div>
-          <div className="text-muted-foreground space-y-2">
-            <p>
-              This dashboard provides insights into revenue metrics, trends, and performance
-              indicators.
-            </p>
-          </div>
-          <div>Loading...</div>
-        </div>
-      </AdminPage>
-    );
-  }
-
-  if (error || !data || !data.data.length) {
-    return (
-      <AdminPage breadcrumbs={breadcrumbs}>
-        <div className="flex w-full flex-col gap-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Revenue KPI Dashboard</h2>
-          </div>
-          <div className="text-muted-foreground space-y-2">
-            <p>
-              This dashboard provides insights into revenue metrics, trends, and performance
-              indicators.
-            </p>
-          </div>
-          <div className="text-red-500">
-            Error:{' '}
-            {error instanceof Error
-              ? error.message
-              : !data
-                ? 'Response missing'
-                : 'An error occurred'}
-          </div>
-        </div>
-      </AdminPage>
-    );
-  }
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
@@ -225,8 +182,28 @@ export default function RevenuePage() {
 
         {multiplierCategoriesNote}
 
-        <RevenueStats {...data} />
-        <RevenueDailyChart {...data} showFreeCredits={showFreeCredits} />
+        {status === 'loading' ? <div>Loading...</div> : null}
+        {status === 'error' ? (
+          <div className="text-red-500">
+            Error:{' '}
+            {error instanceof Error
+              ? error.message
+              : !data
+                ? 'Response missing'
+                : 'An error occurred'}
+          </div>
+        ) : null}
+        {status === 'empty' ? (
+          <div className="text-muted-foreground text-sm">
+            No revenue in this range. Choose Custom to include today; presets end yesterday.
+          </div>
+        ) : null}
+        {status === 'ready' && data ? (
+          <>
+            <RevenueStats {...data} />
+            <RevenueDailyChart {...data} showFreeCredits={showFreeCredits} />
+          </>
+        ) : null}
       </div>
     </AdminPage>
   );

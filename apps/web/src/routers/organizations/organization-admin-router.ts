@@ -70,6 +70,14 @@ import {
   createChildOrganization,
   validateParentOrganizationChange,
 } from '@/lib/organizations/organization-hierarchy';
+import {
+  getOrganizationServiceFeeExemption,
+  OrganizationServiceFeeExemptionError,
+  ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH,
+  ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH,
+  setOrganizationServiceFeeExemption,
+} from '@/lib/service-fees/organization-exemptions';
+import { createDefaultOrganizationServiceFeeExemptionStore } from '@/lib/service-fees/drizzle-store';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -201,6 +209,40 @@ const AdminOrganizationHierarchySchema = z.object({
   parent: OrganizationHierarchySummarySchema.nullable(),
   ancestors: z.array(OrganizationHierarchySummarySchema),
   children: z.array(OrganizationHierarchySummarySchema),
+});
+
+const SetServiceFeeExemptionInputSchema = z.object({
+  organizationId: z.uuid(),
+  isExempt: z.boolean(),
+  reason: z
+    .string()
+    .trim()
+    .min(ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH)
+    .max(ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH),
+});
+
+const AdminOrganizationServiceFeeExemptionHistorySchema = z.object({
+  id: z.uuid(),
+  organizationId: z.uuid(),
+  isExempt: z.boolean(),
+  reason: z.string(),
+  changedByKiloUserId: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+const AdminOrganizationServiceFeeExemptionCurrentSchema = z.object({
+  organizationId: z.uuid(),
+  isExempt: z.boolean(),
+  currentHistoryId: z.uuid(),
+  reason: z.string(),
+  changedByKiloUserId: z.string().nullable(),
+  changedAt: z.iso.datetime(),
+  createdAt: z.iso.datetime(),
+});
+
+const AdminOrganizationServiceFeeExemptionViewSchema = z.object({
+  current: AdminOrganizationServiceFeeExemptionCurrentSchema.nullable(),
+  history: z.array(AdminOrganizationServiceFeeExemptionHistorySchema),
 });
 
 const GrantCreditInputSchema = z
@@ -528,6 +570,47 @@ export const organizationAdminRouter = createTRPCRouter({
         reason: input.reason,
       })
     ),
+
+  getServiceFeeExemption: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(AdminOrganizationServiceFeeExemptionViewSchema)
+    .query(({ input }) =>
+      getOrganizationServiceFeeExemption({
+        store: createDefaultOrganizationServiceFeeExemptionStore(),
+        organizationId: input.organizationId,
+      })
+    ),
+
+  setServiceFeeExemption: adminProcedure
+    .input(SetServiceFeeExemptionInputSchema)
+    .output(
+      z.object({
+        current: AdminOrganizationServiceFeeExemptionCurrentSchema,
+        history: AdminOrganizationServiceFeeExemptionHistorySchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await setOrganizationServiceFeeExemption({
+          store: createDefaultOrganizationServiceFeeExemptionStore(),
+          organizationId: input.organizationId,
+          isExempt: input.isExempt,
+          reason: input.reason,
+          changedByKiloUserId: ctx.user.id,
+        });
+      } catch (error) {
+        if (
+          error instanceof OrganizationServiceFeeExemptionError &&
+          error.code === 'organization_not_found'
+        ) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Organization not found',
+          });
+        }
+        throw error;
+      }
+    }),
 
   getHierarchy: adminProcedure
     .input(OrganizationIdInputSchema)

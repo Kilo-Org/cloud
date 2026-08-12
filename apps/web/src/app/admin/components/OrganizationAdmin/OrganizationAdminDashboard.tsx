@@ -8,6 +8,7 @@ import { OrganizationAdminCreditTransactions } from './OrganizationAdminCreditTr
 import { OrganizationAdminDelete } from './OrganizationAdminDelete';
 import { OrganizationAdminCreditGrant } from './OrganizationAdminCreditGrant';
 import { OrganizationAdminCreditNullify } from './OrganizationAdminCreditNullify';
+import { OrganizationAdminServiceFeeExemption } from './OrganizationAdminServiceFeeExemption';
 import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
 import { OrganizationAdminHierarchyManagement } from './OrganizationAdminHierarchyManagement';
 import { OrganizationAdminKiloPass } from './OrganizationAdminKiloPass';
@@ -66,6 +67,7 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
                 <OrganizationAdminCreatedBy organizationId={organizationId} />
                 <OrganizationAdminCreditGrant organizationId={organizationId} />
                 <OrganizationAdminCreditNullify organizationId={organizationId} />
+                <OrganizationAdminServiceFeeExemption organizationId={organizationId} />
                 <OrganizationWorkOSCard organizationId={organizationId} />
               </div>
               <div className="space-y-8 lg:col-span-2">

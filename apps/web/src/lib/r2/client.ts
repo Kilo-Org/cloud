@@ -1,5 +1,5 @@
-import { S3Client } from '@aws-sdk/client-s3';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { createR2S3Client } from './create-r2-s3-client';
 
 // R2 configuration from environment variables
 const R2_ACCOUNT_ID = getEnvVariable('R2_ACCOUNT_ID');
@@ -39,13 +39,10 @@ if (!R2_CLI_SESSIONS_BUCKET_NAME) {
  * R2 is Cloudflare's S3-compatible object storage service.
  * The client is configured with R2-specific endpoint and credentials.
  */
-export const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
+export const r2Client = createR2S3Client({
+  accountId: R2_ACCOUNT_ID,
+  accessKeyId: R2_ACCESS_KEY_ID,
+  secretAccessKey: R2_SECRET_ACCESS_KEY,
 });
 
 export const r2CliSessionsBucketName = R2_CLI_SESSIONS_BUCKET_NAME;

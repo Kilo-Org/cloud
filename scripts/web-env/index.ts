@@ -13,6 +13,7 @@ import {
   setEnvDefault,
   setVariable,
   setVaultValue,
+  stripSurroundingQuotes,
   trackedEnvFiles,
   type Environment,
   type Values,
@@ -88,14 +89,16 @@ async function collectValues(options: Options): Promise<Values> {
   for (const environment of ENVIRONMENTS) {
     const file = options.valueFiles[environment];
     if (file) {
-      const value = normalizeFileValue(readFileSync(path.resolve(file), 'utf8'));
+      const value = stripSurroundingQuotes(
+        normalizeFileValue(readFileSync(path.resolve(file), 'utf8'))
+      );
       if (!value) throw new Error(`${environment} value file cannot be empty.`);
       values[environment] = value;
       continue;
     }
 
     while (!values[environment]) {
-      const value = await readSecret(`${environment} value: `);
+      const value = stripSurroundingQuotes(await readSecret(`${environment} value: `));
       if (value) values[environment] = value;
       else console.warn(`${environment} value cannot be empty. Please try again.`);
     }
@@ -106,8 +109,8 @@ async function collectValues(options: Options): Promise<Values> {
 async function collectDefaults(repoRoot: string, name: string): Promise<Map<string, string>> {
   const defaults = new Map<string, string>();
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
-    const value = await question(
-      `${relativeFile}: default value for ${name} (press Return to skip): `
+    const value = stripSurroundingQuotes(
+      await question(`${relativeFile}: default value for ${name} (press Return to skip): `)
     );
     if (!value) continue;
     defaults.set(relativeFile, value);

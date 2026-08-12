@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -33,12 +33,6 @@ import {
 
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
-
-afterEach(() => {
-  jest.restoreAllMocks();
-  mockedRedisGet.mockReset();
-  mockedRedisSet.mockReset();
-});
 
 const NOW = new Date('2026-08-12T12:00:00.000Z');
 const FRESH_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS + 1);

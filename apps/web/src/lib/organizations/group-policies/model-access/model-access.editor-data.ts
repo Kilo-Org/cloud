@@ -11,8 +11,16 @@ export function buildModelAccessPolicyExemptModels(
   customLlms: readonly ModelSummary[]
 ): ModelAccessPolicyExemptModel[] {
   return [
-    ...directByokModels.map(model => ({ ...model, source: 'direct_byok' as const })),
-    ...customLlms.map(model => ({ ...model, source: 'custom_llm' as const })),
+    ...directByokModels.map(model => ({
+      id: model.id,
+      name: model.name,
+      source: 'direct_byok' as const,
+    })),
+    ...customLlms.map(model => ({
+      id: model.id,
+      name: model.name,
+      source: 'custom_llm' as const,
+    })),
   ].sort(
     (a, b) =>
       Number(a.source === 'custom_llm') - Number(b.source === 'custom_llm') ||

@@ -1,4 +1,5 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
@@ -14,9 +15,16 @@ const CODING_PLAN_DEFAULT_MODEL_IDS = [
   'byteplus-coding/bytedance-seed-code',
 ] as const;
 
+export type AutoRoutingOwner = {
+  userId: string;
+  organizationId: string | null;
+};
+
 export type CollectDeniedAutoRoutingModelIdsOptions = {
   candidateModelIds?: ReadonlyArray<string>;
   loadCandidateModelIds?: () => Promise<ReadonlyArray<string>>;
+  owner?: AutoRoutingOwner;
+  loadEffectivePoolModelIds?: (owner: AutoRoutingOwner) => Promise<ReadonlyArray<string> | null>;
   decideModel?: (
     policy: EffectiveOrganizationModelPolicy,
     modelId: string
@@ -31,46 +39,95 @@ export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationMode
   );
 }
 
-export function candidateModelIdsFromRoutingTable(
-  table: { routes: Record<string, ReadonlyArray<{ model: string }>> } | null
-): string[] {
-  const fromTable = Object.values(table?.routes ?? {}).flatMap(candidates =>
-    candidates.map(candidate => candidate.model)
-  );
+export function candidateModelIdsFromSources(params: {
+  table: { routes: Record<string, ReadonlyArray<{ model: string }>> } | null;
+  poolModelIds: ReadonlyArray<string> | null;
+}): string[] {
+  const fromPoolOrTable =
+    params.poolModelIds ??
+    Object.values(params.table?.routes ?? {}).flatMap(candidates =>
+      candidates.map(candidate => candidate.model)
+    );
   return [
     ...new Set(
-      [...fromTable, ...CODING_PLAN_DEFAULT_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
+      [...fromPoolOrTable, ...CODING_PLAN_DEFAULT_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
     ),
   ];
 }
 
-export async function loadAutoRoutingCandidateModelIds(): Promise<string[]> {
-  return candidateModelIdsFromRoutingTable(await getCachedRoutingTable());
+export function candidateModelIdsFromRoutingTable(
+  table: { routes: Record<string, ReadonlyArray<{ model: string }>> } | null
+): string[] {
+  return candidateModelIdsFromSources({ table, poolModelIds: null });
+}
+
+export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promise<string[] | null> {
+  const owners = [
+    ...(owner.organizationId ? [{ ownerType: 'org' as const, ownerId: owner.organizationId }] : []),
+    { ownerType: 'user' as const, ownerId: owner.userId },
+  ];
+  const results = await Promise.all(owners.map(getAutoRoutingSettings));
+  for (const result of results) {
+    if (result.status !== 200 || !('configuredPool' in result.body)) continue;
+    const pool = result.body.configuredPool;
+    if (pool && pool.length > 0) {
+      return pool.map(entry => entry.model);
+    }
+  }
+  return null;
+}
+
+export async function loadAutoRoutingCandidateModelIds(
+  owner?: AutoRoutingOwner,
+  loadPool: (
+    owner: AutoRoutingOwner
+  ) => Promise<ReadonlyArray<string> | null> = loadEffectivePoolModelIds
+): Promise<string[]> {
+  const [table, poolModelIds] = await Promise.all([
+    getCachedRoutingTable(),
+    owner ? loadPool(owner) : Promise.resolve(null),
+  ]);
+  return candidateModelIdsFromSources({ table, poolModelIds });
 }
 
 export async function collectDeniedAutoRoutingModelIds(
   policy: EffectiveOrganizationModelPolicy,
   options: CollectDeniedAutoRoutingModelIdsOptions = {}
 ): Promise<string[]> {
-  const denied = new Set(
-    (policy.organizationModelDenyList ?? []).map(modelId => normalizeModelId(modelId))
-  );
-  if (!policyNeedsCandidateEvaluation(policy) && options.candidateModelIds === undefined) {
+  const denyList = policy.organizationModelDenyList ?? [];
+  const normalizedDeny = new Set(denyList.map(normalizeModelId));
+  const denied = new Set(normalizedDeny);
+  const shouldEvaluateCandidates =
+    policyNeedsCandidateEvaluation(policy) ||
+    options.candidateModelIds !== undefined ||
+    options.owner !== undefined;
+  if (!shouldEvaluateCandidates) {
     return [...denied];
   }
 
   const candidateIds =
     options.candidateModelIds ??
-    (await (options.loadCandidateModelIds ?? loadAutoRoutingCandidateModelIds)());
-  const decide = options.decideModel ?? getEffectiveModelDecision;
-  const decisions = await Promise.all(
-    [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))].map(async modelId => ({
-      modelId: normalizeModelId(modelId),
-      allowed: (await decide(policy, modelId)).allowed,
-    }))
-  );
-  for (const { modelId, allowed } of decisions) {
-    if (!allowed) denied.add(modelId);
+    (options.loadCandidateModelIds
+      ? await options.loadCandidateModelIds()
+      : await loadAutoRoutingCandidateModelIds(options.owner, options.loadEffectivePoolModelIds));
+  const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
+  for (const candidate of uniqueCandidates) {
+    if (normalizedDeny.has(normalizeModelId(candidate))) {
+      denied.add(candidate);
+    }
+  }
+
+  if (policyNeedsCandidateEvaluation(policy)) {
+    const decide = options.decideModel ?? getEffectiveModelDecision;
+    const decisions = await Promise.all(
+      uniqueCandidates.map(async modelId => ({
+        modelId,
+        allowed: (await decide(policy, modelId)).allowed,
+      }))
+    );
+    for (const { modelId, allowed } of decisions) {
+      if (!allowed) denied.add(modelId);
+    }
   }
   return [...denied];
 }

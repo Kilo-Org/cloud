@@ -3,6 +3,7 @@ import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effec
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
   candidateModelIdsFromRoutingTable,
+  candidateModelIdsFromSources,
   collectDeniedAutoRoutingModelIds,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
@@ -109,6 +110,83 @@ describe('collectDeniedAutoRoutingModelIds', () => {
     expect(denied).toEqual(['google/gemini-2.5-flash']);
     expect(decideModel).toHaveBeenCalledWith(expect.anything(), 'google/gemini-2.5-flash');
     expect(decideModel).toHaveBeenCalledWith(expect.anything(), 'anthropic/claude');
+  });
+
+  it('keeps the exact denied candidate id, including suffixes', async () => {
+    const decideModel = jest.fn(
+      async (_policy: EffectiveOrganizationModelPolicy, modelId: string) => ({
+        allowed: modelId !== 'deepseek/deepseek-v4-pro:discounted',
+      })
+    );
+
+    await expect(
+      collectDeniedAutoRoutingModelIds(policy({ organizationProviderCeiling: ['deepseek'] }), {
+        candidateModelIds: ['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-pro:discounted'],
+        decideModel,
+      })
+    ).resolves.toEqual(['deepseek/deepseek-v4-pro:discounted']);
+  });
+
+  it('expands a normalized deny-list entry to matching suffixed candidates', async () => {
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({ organizationModelDenyList: ['deepseek/deepseek-v4-pro'] }),
+        {
+          candidateModelIds: ['anthropic/claude', 'deepseek/deepseek-v4-pro:discounted'],
+        }
+      )
+    ).resolves.toEqual(['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-pro:discounted']);
+  });
+
+  it('denies a custom-pool-only model excluded by a selected member grant', async () => {
+    const decideModel = jest.fn(
+      async (_policy: EffectiveOrganizationModelPolicy, modelId: string) => ({
+        allowed: modelId === 'anthropic/claude',
+      })
+    );
+
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            modelAllowList: ['anthropic/claude'],
+            providerAllowList: [],
+          },
+        }),
+        {
+          candidateModelIds: ['pool/only-model', 'anthropic/claude'],
+          decideModel,
+        }
+      )
+    ).resolves.toEqual(['pool/only-model']);
+    expect(decideModel).toHaveBeenCalledWith(expect.anything(), 'pool/only-model');
+    expect(decideModel).not.toHaveBeenCalledWith(expect.anything(), 'google/gemini-2.5-flash');
+  });
+});
+
+describe('candidateModelIdsFromSources', () => {
+  it('uses the custom pool instead of the platform table when a pool is configured', () => {
+    expect(
+      candidateModelIdsFromSources({
+        table: {
+          routes: {
+            'implementation/code_generation': [{ model: 'google/gemini-2.5-flash' }],
+          },
+        },
+        poolModelIds: ['pool/only-model'],
+      })
+    ).toEqual(expect.arrayContaining(['pool/only-model', MINIMAX_CURRENT_MODEL_ID]));
+    expect(
+      candidateModelIdsFromSources({
+        table: {
+          routes: {
+            'implementation/code_generation': [{ model: 'google/gemini-2.5-flash' }],
+          },
+        },
+        poolModelIds: ['pool/only-model'],
+      })
+    ).not.toContain('google/gemini-2.5-flash');
   });
 });
 

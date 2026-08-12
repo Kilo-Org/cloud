@@ -330,7 +330,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             plan === 'enterprise' ? (settings?.model_deny_list?.map(normalizeModelId) ?? []) : [];
           const groupPolicy = await organizationGroupPolicyPromise;
           const deniedFromPolicy = groupPolicy
-            ? await collectDeniedAutoRoutingModelIds(groupPolicy)
+            ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
+                owner: { userId: user.id, organizationId: organizationId ?? null },
+              })
             : [];
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
           const result = await fetchEfficientAutoDecision({

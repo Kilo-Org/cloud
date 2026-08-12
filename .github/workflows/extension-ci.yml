@@ -103,7 +103,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter kilo-extension exec playwright install --with-deps chromium
+        # No --with-deps: the runner image already ships the Chromium system libraries, and the apt-get behind --with-deps hangs until the job timeout whenever the runner fleet's apt egress degrades (measured: four 20-minute hangs on 2026-08-12). A missing library would fail the browser launch with an explicit list instead.
+        run: pnpm --filter kilo-extension exec playwright install chromium
 
       - name: Run Chrome e2e (builds the Chrome MV3 bundle first)
         run: pnpm --filter kilo-extension e2e:chrome

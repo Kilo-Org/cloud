@@ -71,9 +71,8 @@ describe('buildWorkflowPageCode function', () => {
     const code = buildWorkflowPageCode(script, { input: { key: 1 } }, false);
 
     expect(code).toContain('const dryRun = false');
-    expect(code).toContain(
-      'const workflow = async ({ page, state, input }) => { return { done: true, result: 1 }; }'
-    );
+    expect(code).toContain(`const scriptText = ${JSON.stringify(script)};`);
+    expect(code).toContain("new AsyncFunctionCtor('{ page, state, input }', scriptText)");
     expect(code).toContain('"input":{"key":1}');
   });
 
@@ -136,6 +135,37 @@ describe('runWorkflow function', () => {
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({ ok: true, pagesVisited: 2, result: 'done' });
     expect(deps.navigateUrls).toStrictEqual(['https://shop.example.com/page2']);
+  });
+
+  it('recovers when a real click navigates mid-eval and destroys the context', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        { error: '{"code":-32000,"message":"Execution context was destroyed."}', ok: false },
+        { ok: true, value: { dryRunActions: [], ok: true, value: { done: true, result: 'ok' } } },
+      ],
+      tabUrls: ['https://shop.example.com/search', 'https://shop.example.com/results'],
+    });
+
+    const result = await runWorkflow(deps, { tabId: 1, workflow });
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 1, result: 'ok' });
+  }, 10_000);
+
+  it('does not treat a destroyed context as navigation in a dry run', async () => {
+    const workflow = await buildApprovedWorkflow();
+    const deps = createDeps({
+      evalResponses: [
+        { error: '{"code":-32000,"message":"Execution context was destroyed."}', ok: false },
+      ],
+    });
+
+    const result = await runWorkflow(deps, { dryRun: true, tabId: 1, workflow });
+    expect(result).toStrictEqual({
+      dryRunActions: [],
+      error: '{"code":-32000,"message":"Execution context was destroyed."}',
+      ok: false,
+      pageUrl: 'https://shop.example.com/page',
+    });
   });
 
   it('fails with thrown script error and page URL', async () => {
@@ -294,7 +324,8 @@ describe('runWorkflow function', () => {
 
     const result = await runWorkflow(deps, { tabId: 1, workflow });
     expect(result).toStrictEqual({
-      error: 'Workflow exceeded the page limit (20 pages). Check the script for a navigation loop.',
+      error:
+        'Workflow exceeded the page limit (20 pages). The script returned { navigate } on every page. Branch on state so the results page returns { done: true, result } — e.g. first page returns { navigate: url, state: { searched: true } }, and when state.searched is true the script reads the results and finishes.',
       ok: false,
     });
   });
@@ -836,11 +867,71 @@ describe('workflow params and input', () => {
 
       const result = await runWorkflow(deps, { input: badInput, tabId: 1, workflow });
       expect(result).toStrictEqual({
-        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        error:
+          'run_workflow input must be a JSON object mapping declared param names to values, e.g. {}. Declared params: none — omit input entirely.',
         ok: false,
       });
     }
   );
+
+  it.each([
+    ['string-encoded JSON', '{"destination": "SFO"}'],
+    ['chat-template arg pairs', '<arg_key>destination</arg_key>\n<arg_value>SFO</arg_value>'],
+    ['arg pairs missing the final closing tag', '\n<arg_key>destination</arg_key>\n<arg_value>SFO'],
+  ])('coerces %s input and runs', async (_label, stringInput) => {
+    const evalCodes: string[] = [];
+    const deps = createDeps({
+      evalResponses: [{ ok: true, value: { ok: true, value: { done: true, result: 'ok' } } }],
+    });
+    const capturingDeps = {
+      ...deps,
+      evalInTab: (tabId: number, code: string) => {
+        evalCodes.push(code);
+        return deps.evalInTab(tabId, code);
+      },
+    };
+    const workflow = await buildApprovedWorkflow({
+      params: [{ description: 'Destination city', name: 'destination', required: true }],
+    });
+
+    const result = await runWorkflow(capturingDeps, { input: stringInput, tabId: 1, workflow });
+
+    expect(result).toStrictEqual({ ok: true, pagesVisited: 1, result: 'ok' });
+    expect(evalCodes[0]).toContain('input: {"destination":"SFO"}');
+  });
+
+  it('treats a whitespace-only string input as no input', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [{ description: 'Destination city', name: 'destination', required: true }],
+    });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, { input: '\t\t\t', tabId: 1, workflow });
+
+    // No input at all on a required-param workflow: the missing-params error, not the shape error.
+    expect(result).toStrictEqual({
+      error:
+        'Missing required input: "destination" — Destination city. Call run_workflow again with input: {"destination":"<value>"}.',
+      ok: false,
+    });
+  });
+
+  it('names the declared params and a required-param example when rejecting a bad input shape', async () => {
+    const workflow = await buildApprovedWorkflow({
+      params: [
+        { description: 'Cabin class', name: 'cabin' },
+        { description: 'Destination city', name: 'destination', required: true },
+      ],
+    });
+    const deps = createDeps();
+
+    const result = await runWorkflow(deps, { input: 'SFO', tabId: 1, workflow });
+    expect(result).toStrictEqual({
+      error:
+        'run_workflow input must be a JSON object mapping declared param names to values, e.g. {"destination": "<value>"}. Declared params: cabin, destination.',
+      ok: false,
+    });
+  });
 
   it('re-injects input on every page across navigations', async () => {
     const evalCodes: string[] = [];

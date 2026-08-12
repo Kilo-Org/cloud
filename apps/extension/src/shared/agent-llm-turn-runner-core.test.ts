@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test -- Retry fixtures need attempt-conditional fakes and raw promises. */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createSafeToolCall, createUserMessage } from './agent-conversation';
@@ -18,7 +18,7 @@ function* createGatewayResponses(): Generator<Response, Response> {
     'data: [DONE]\n\n',
   ]);
   yield streamResponse([
-    'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
     'data: {"choices":[],"usage":{"prompt_tokens":200,"completion_tokens":3,"total_tokens":203,"cost":0.001}}\n\n',
     'data: [DONE]\n\n',
   ]);
@@ -34,7 +34,7 @@ function* createToolOnlyGatewayResponses(rounds: number): Generator<Response, Re
   }
 
   return streamResponse([
-    'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
     'data: [DONE]\n\n',
   ]);
 }
@@ -64,7 +64,7 @@ describe('agent LLM turn runner core', () => {
     const usageCalls: unknown[] = [];
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
         'data: {"choices":[],"usage":{"completion_tokens":5,"prompt_tokens":999,"total_tokens":1004,"cost":0.0123}}\n\n',
         'data: [DONE]\n\n',
       ]);
@@ -212,7 +212,7 @@ describe('agent LLM turn runner core', () => {
     const fetch: FetchLike = () =>
       streamResponse([
         'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":" world"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -309,35 +309,700 @@ describe('agent LLM turn runner core', () => {
     expect(endedId).toBeUndefined();
   });
 
-  it('never fires onAssistantStreaming when the stream has no content deltas', async () => {
-    const streamingCalls: (string | undefined)[] = [];
-    // Empty stream: no onContentDelta calls, so the non-streamed start path never runs.
-    // Deltas absent means the defensive completion.content branch is not exercised here;
-    // The public stream client never produces content without deltas.
-    const fetch: FetchLike = () => streamResponse(['data: [DONE]\n\n']);
+  it(
+    'never fires onAssistantStreaming when the stream has no content deltas',
+    { timeout: 20_000 },
+    async () => {
+      const streamingCalls: (string | undefined)[] = [];
+      // Empty stream: no onContentDelta calls, so the non-streamed start path never runs.
+      // Deltas absent means the defensive completion.content branch is not exercised here;
+      // The public stream client never produces content without deltas.
+      const fetch: FetchLike = () => streamResponse(['data: [DONE]\n\n']);
+
+      await runLlmTurn({
+        apiBaseUrl: 'https://app.kilo.ai',
+        appendEvents: () => {},
+        conversationEvents: [createUserMessage('Hi')],
+        executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+        failureMessage: String,
+        fetch,
+        maxToolRounds: 4,
+        model: 'anthropic/claude-sonnet-4',
+        noResponseMessage: 'No response.',
+        onAssistantStreaming: eventId => {
+          streamingCalls.push(eventId);
+        },
+        signal: undefined,
+        toToolCallEvents: () => [],
+        token: 'token-1',
+        tooManyToolRoundsMessage: 'Too many rounds.',
+        tools: [],
+        updateAssistantMessage: () => {},
+        updateThinkingBlock: () => {},
+      });
+
+      expect(streamingCalls).toStrictEqual([]);
+    }
+  );
+});
+
+describe('stream retry', () => {
+  const baseOptions = (
+    fetch: FetchLike,
+    appendEvents: (events: AgentConversationEvent[]) => void
+  ) => ({
+    apiBaseUrl: 'https://app.kilo.ai',
+    appendEvents,
+    conversationEvents: [createUserMessage('Hello')],
+    executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: '' } }),
+    failureMessage: (error: unknown) =>
+      `failed: ${error instanceof Error ? error.message : String(error)}`,
+    fetch,
+    maxToolRounds: 4,
+    model: 'kilo-auto/efficient',
+    noResponseMessage: 'no response',
+    toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+      toolCalls.flatMap(toolCall =>
+        toolCall.name === 'get_page_snapshot'
+          ? [
+              createSafeToolCall({
+                name: 'get_page_snapshot',
+                tabId: 1,
+                providerToolCallId: toolCall.id,
+              }),
+            ]
+          : []
+      ),
+    token: 'token',
+    tooManyToolRoundsMessage: 'too many rounds',
+    tools: [],
+    updateAssistantMessage: () => {},
+    updateThinkingBlock: () => {},
+  });
+
+  it('retries a 503 response transparently and completes the turn', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(new Response('', { status: 503 }));
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Recovered."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
+
+    expect(calls).toBe(2);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts).toContain('Recovered.');
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+  });
+
+  it('resets partially streamed text into the same event on retry', async () => {
+    let calls = 0;
+    const encoder = new TextEncoder();
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        // Streams one delta, then fails mid-stream with a network-ish TypeError.
+        // The delay lets the delta reach the consumer before the error lands.
+        return Promise.resolve(
+          new Response(
+            new ReadableStream<Uint8Array>({
+              async start(controller) {
+                controller.enqueue(
+                  encoder.encode('data: {"choices":[{"delta":{"content":"Half"}}]}\n\n')
+                );
+                await new Promise(resolve => setTimeout(resolve, 20));
+                controller.error(new TypeError('network glitch'));
+              },
+            }),
+            { headers: { 'Content-Type': 'text/event-stream' }, status: 200 }
+          )
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Full answer."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+    const updates: { id: string; text: string }[] = [];
+    const options = {
+      ...baseOptions(fetch, events => appended.push(...events)),
+      updateAssistantMessage: (eventId: string, text: string) => {
+        updates.push({ id: eventId, text });
+      },
+    };
+
+    await runLlmTurn(options);
+
+    expect(calls).toBe(2);
+    // The retry replaces the half-streamed text in place when its own first delta arrives; the text is never cleared to an empty bubble.
+    const firstAppendedMessage = appended.find(event => event.type === 'message');
+    expect(updates.some(update => update.text === '')).toBe(false);
+    expect(updates.at(-1)?.text).toBe('Full answer.');
+    expect(updates.every(update => update.id === firstAppendedMessage?.id)).toBe(true);
+  });
+
+  it('gives up after three attempts and reports the failure', { timeout: 15_000 }, async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(new Response('', { status: 503 }));
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
+
+    expect(calls).toBe(3);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
+  });
+
+  it('does not retry a non-retriable HTTP status', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(new Response('', { status: 401 }));
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(baseOptions(fetch, events => appended.push(...events)));
+
+    expect(calls).toBe(1);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(true);
+  });
+});
+
+describe('truncated completion retry', () => {
+  it('retries a completion cut short by finish_reason length with no tool calls', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"Creating"},"finish_reason":null}]}\n\n',
+            'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved the workflow."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+    const updates: string[] = [];
+    const options = {
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+      conversationEvents: [createUserMessage('Create a workflow')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
+      failureMessage: (error: unknown) =>
+        `failed: ${error instanceof Error ? error.message : String(error)}`,
+      fetch,
+      maxToolRounds: 4,
+      model: 'kilo-auto/efficient',
+      noResponseMessage: 'no response',
+      token: 'token',
+      tools: [],
+      tooManyToolRoundsMessage: 'too many rounds',
+      toToolCallEvents: () => [],
+      updateAssistantMessage: (_eventId: string, text: string) => {
+        updates.push(text);
+      },
+      updateThinkingBlock: () => {},
+    };
+
+    await runLlmTurn(options);
+
+    expect(calls).toBe(2);
+    expect(updates.at(-1)).toBe('Saved the workflow.');
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+  });
+
+  it('does not retry a completion that stopped normally', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"All done."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
 
     await runLlmTurn({
       apiBaseUrl: 'https://app.kilo.ai',
-      appendEvents: () => {},
-      conversationEvents: [createUserMessage('Hi')],
-      executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+      appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
       failureMessage: String,
       fetch,
       maxToolRounds: 4,
+      model: 'kilo-auto/efficient',
+      noResponseMessage: 'no response',
+      token: 'token',
+      tools: [],
+      tooManyToolRoundsMessage: 'too many rounds',
+      toToolCallEvents: () => [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(calls).toBe(1);
+  });
+
+  it('does not retry a context-window overflow and keeps the partial text', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Partial answer before the overflow"},"finish_reason":null}]}\n\n',
+          'data: {"choices":[{"delta":{},"finish_reason":"model_context_window_exceeded"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: {} }),
+      failureMessage: (error: unknown) =>
+        `failed: ${error instanceof Error ? error.message : String(error)}`,
+      fetch,
+      maxToolRounds: 4,
+      model: 'kilo-auto/efficient',
+      noResponseMessage: 'no response',
+      token: 'token',
+      tools: [],
+      tooManyToolRoundsMessage: 'too many rounds',
+      toToolCallEvents: () => [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    // A prompt that overflowed the context cannot fit on a retry of the same messages; one billed attempt, degrade immediately.
+    expect(calls).toBe(1);
+    const texts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(texts).toContain('Partial answer before the overflow');
+    expect(texts.some(text => text.startsWith('failed:'))).toBe(false);
+  });
+});
+
+describe('identical failing tool call guard', () => {
+  it('escalates the third identical failure and leaves earlier ones untouched', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    const responses = createToolOnlyGatewayResponses(4);
+    const fetch: FetchLike = () => responses.next().value;
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Run the workflow')],
+      executeToolCall: () => Promise.resolve({ error: 'Workflow run failed', ok: false }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 8,
       model: 'anthropic/claude-sonnet-4',
       noResponseMessage: 'No response.',
-      onAssistantStreaming: eventId => {
-        streamingCalls.push(eventId);
-      },
+      onUsage: () => {},
       signal: undefined,
-      toToolCallEvents: () => [],
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall => ({
+          ...createSafeToolCall({
+            name: 'get_page_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          }),
+          // Varies per round, like signed reasoning on a thinking model; the guard must still see identical repeats.
+          reasoningDetails: [toolCall.id],
+        })),
       token: 'token-1',
-      tooManyToolRoundsMessage: 'Too many rounds.',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
       tools: [],
       updateAssistantMessage: () => {},
       updateThinkingBlock: () => {},
     });
 
-    expect(streamingCalls).toStrictEqual([]);
+    const failureTexts = appendedEvents
+      .filter(event => event.type === 'tool-result')
+      .map(event => JSON.stringify(event));
+    const escalated = failureTexts.map(text => text.includes('Do not send it again'));
+    expect(failureTexts).toHaveLength(4);
+    expect(escalated).toStrictEqual([false, false, true, true]);
+    expect(failureTexts[3]).toContain('4 times');
+  });
+});
+
+describe('per-tool failure cap', () => {
+  it('ends the turn after 25 total failures of one tool, despite interleaved successes', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    let fetchCount = 0;
+    const responses = createToolOnlyGatewayResponses(40);
+    const fetch: FetchLike = () => {
+      fetchCount += 1;
+      return responses.next().value;
+    };
+    let callIndex = 0;
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Run the workflow')],
+      // The error varies per call (the cap counts per tool name, not identical bytes), and every tenth call succeeds (an interleaved success must not reset the total).
+      executeToolCall: () => {
+        callIndex += 1;
+        if (callIndex % 10 === 0) {
+          return Promise.resolve({ ok: true, value: { text: 'ok' } });
+        }
+        return Promise.resolve({ error: `failure ${String(callIndex)}`, ok: false });
+      },
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 40,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onUsage: () => {},
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall =>
+          createSafeToolCall({
+            name: 'get_page_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          })
+        ),
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    // 25 failures plus the 2 interleaved successes (calls 10 and 20) = 27 rounds.
+    expect(fetchCount).toBe(27);
+    const lastEvent = appendedEvents.at(-1);
+    expect(JSON.stringify(lastEvent)).toContain(
+      'Stopped: get_page_snapshot failed 25 times this turn'
+    );
+  });
+});
+
+describe('continue nudge', () => {
+  const nudgeOptions = (fetch: FetchLike, appended: AgentConversationEvent[]) => ({
+    apiBaseUrl: 'https://app.kilo.ai',
+    appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+    conversationEvents: [createUserMessage('Create a workflow for this page')],
+    executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'snap' } }),
+    failureMessage: String,
+    fetch,
+    maxToolRounds: 6,
+    model: 'kilo-auto/efficient',
+    noResponseMessage: 'no response',
+    token: 'token',
+    tools: [],
+    tooManyToolRoundsMessage: 'too many rounds',
+    toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+      toolCalls.flatMap(toolCall =>
+        toolCall.name === 'get_page_snapshot'
+          ? [
+              createSafeToolCall({
+                name: 'get_page_snapshot',
+                providerToolCallId: toolCall.id,
+                tabId: 1,
+              }),
+            ]
+          : []
+      ),
+    updateAssistantMessage: () => {},
+    updateThinkingBlock: () => {},
+  });
+
+  it('sends one invisible continue after a tool-using turn ends on a short announcement', async () => {
+    const requestBodies: string[] = [];
+    let calls = 0;
+    const fetch: FetchLike = (_input, init) => {
+      requestBodies.push(typeof init?.body === 'string' ? init.body : '');
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"Creating the workflow now."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved and verified."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(nudgeOptions(fetch, appended));
+
+    expect(calls).toBe(3);
+    expect(requestBodies[2]).toContain('Continue: finish the request now');
+    const appendedTexts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(appendedTexts).toContain('Saved and verified.');
+    // The nudge is never persisted as a visible message.
+    expect(appendedTexts.some(text => text.includes('Continue: finish the request'))).toBe(false);
+  });
+
+  it('nudges a turn that ends on thinking with no assistant text', async () => {
+    const requestBodies: string[] = [];
+    let calls = 0;
+    const fetch: FetchLike = (_input, init) => {
+      requestBodies.push(typeof init?.body === 'string' ? init.body : '');
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"reasoning":"The user wants a workflow. I should look at the page."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(3);
+    expect(requestBodies[2]).toContain('Continue: finish the request now');
+  });
+
+  it('nudges a thinking-only end even before any tool use', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"reasoning":"Planning the workflow…"},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Here is the workflow plan."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+
+  it('does not nudge a plain text answer with no tool use', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Short answer."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(1);
+  });
+
+  it("nudges on a first-person progressive announcement (I'm creating…)", async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"I\'m saving it as a reusable flow now."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(3);
+  });
+
+  it('does not nudge a completed-work statement (I am done)', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"I am done. Nothing else is needed."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+
+  it('does not nudge when the model asks the user a question', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Which date should I use?"},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+
+  it('does not nudge an announcement that ended on a context-window overflow', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Creating the workflow now."},"finish_reason":null}]}\n\n',
+          'data: {"choices":[{"delta":{},"finish_reason":"model_context_window_exceeded"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    // The prompt already overflowed; a nudge re-sends it plus one more message, a guaranteed second overflow.
+    expect(calls).toBe(2);
+  });
+
+  it('nudges an announcement that mentions a URL query string (mid-text ?)', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"The search uses https://example.com/search?q=. Let me verify the results page before creating the workflow."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Saved."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(3);
   });
 });

@@ -375,11 +375,69 @@ describe('workflow settings', () => {
     });
   });
 
-  it('keeps toggle enabled after settings-load failure', async () => {
+  it('keeps toggles disabled and shows a settings error after settings-load failure', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
     mockLoadWorkflowSettings.mockRejectedValue(new Error('Storage read failed'));
 
-    const { getByLabelText } = render(createElement(WorkflowSettings), {
+    const { getByLabelText, getByText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText("Couldn't load settings. Try again.")).toBeDefined();
+    });
+
+    const toggle = getByLabelText('Allow workflows in safe mode');
+    if (toggle instanceof HTMLButtonElement) {
+      expect(toggle.disabled).toBe(true);
+    }
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    expect(getByText('Retry')).toBeDefined();
+  });
+
+  it('retries the settings load and clears the error after success', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings
+      .mockRejectedValueOnce(new Error('Storage read failed'))
+      .mockResolvedValueOnce({
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+
+    const { getByLabelText, queryByText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByLabelText('Retry loading workflow settings')).toBeDefined();
+    });
+
+    const retryButton = getByLabelText('Retry loading workflow settings');
+    if (retryButton instanceof HTMLButtonElement) {
+      retryButton.click();
+    }
+
+    await waitFor(() => {
+      expect(queryByText("Couldn't load settings. Try again.")).toBeNull();
+    });
+    const toggle = getByLabelText('Allow workflows in safe mode');
+    await waitFor(() => {
+      if (toggle instanceof HTMLButtonElement) {
+        expect(toggle.disabled).toBe(false);
+      }
+    });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('shows a settings save error and keeps the prior value on write failure', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
+    mockSaveWorkflowSettings.mockRejectedValue(new Error('Storage write failed'));
+
+    const { getByLabelText, getByText } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
     });
 
@@ -389,11 +447,68 @@ describe('workflow settings', () => {
         expect(toggle.disabled).toBe(false);
       }
     });
-    toggle instanceof HTMLButtonElement &&
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(getByText("Couldn't save settings. Try again.")).toBeDefined();
+    });
+    expect(getByText('Retry')).toBeDefined();
+    // The prior value stays visible; the toggle did not silently stay flipped.
+    if (toggle instanceof HTMLButtonElement) {
       expect(toggle.getAttribute('aria-checked')).toBe('false');
+    }
   });
 
-  it('renders three switches off on a fresh store', async () => {
+  it('retries the failed settings save and clears the error after success', async () => {
+    mockUseAgentWorkflows.mockReturnValue(emptyResult);
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
+    mockSaveWorkflowSettings
+      .mockRejectedValueOnce(new Error('Storage write failed'))
+      .mockResolvedValueOnce();
+
+    const { getByLabelText, queryByText } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    const toggle = getByLabelText('Allow workflows in safe mode');
+    await waitFor(() => {
+      if (toggle instanceof HTMLButtonElement) {
+        expect(toggle.disabled).toBe(false);
+      }
+    });
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(getByLabelText('Retry saving workflow settings')).toBeDefined();
+    });
+    expect(mockSaveWorkflowSettings).toHaveBeenCalledOnce();
+
+    const retryButton = getByLabelText('Retry saving workflow settings');
+    if (retryButton instanceof HTMLButtonElement) {
+      retryButton.click();
+    }
+
+    await waitFor(() => {
+      expect(mockSaveWorkflowSettings).toHaveBeenCalledTimes(2);
+      expect(mockSaveWorkflowSettings).toHaveBeenLastCalledWith(expect.anything(), {
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+    });
+    await waitFor(() => {
+      expect(queryByText("Couldn't save settings. Try again.")).toBeNull();
+    });
+    if (toggle instanceof HTMLButtonElement) {
+      expect(toggle.getAttribute('aria-checked')).toBe('true');
+    }
+  });
+
+  it('renders three switches off on a fresh store after merge', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);
     mockLoadWorkflowSettings.mockResolvedValue({ ...DEFAULT_WORKFLOW_SETTINGS });
 

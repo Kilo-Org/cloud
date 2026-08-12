@@ -21,31 +21,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function setPropertyPath(target: Record<string, unknown>, path: string, value: string) {
-  const segments = path.split('.');
-  const finalSegment = segments.at(-1);
-  if (!finalSegment) {
-    return;
-  }
-
-  let current = target;
-
-  for (const segment of segments.slice(0, -1)) {
-    const existing = current[segment];
-    if (isRecord(existing)) {
-      current = existing;
-      continue;
-    }
-
-    const nested: Record<string, unknown> = {};
-    current[segment] = nested;
-    current = nested;
-  }
-
-  current[finalSegment] = value;
-}
-
-function mapThoughtSignatures(context: TransformRequestContext, path: string) {
+function mapGeminiThoughtSignatures(context: TransformRequestContext) {
   if (context.request.kind !== 'chat_completions') {
     return;
   }
@@ -68,11 +44,43 @@ function mapThoughtSignatures(context: TransformRequestContext, path: string) {
 
       const signature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
-      if (typeof signature === 'string') {
-        setPropertyPath(toolCall, path, signature);
+      if (typeof signature !== 'string') {
+        continue;
       }
+
+      const extraContent = isRecord(toolCall.extra_content) ? toolCall.extra_content : {};
+      const google = isRecord(extraContent.google) ? extraContent.google : {};
+      toolCall.extra_content = {
+        ...extraContent,
+        google: {
+          ...google,
+          thought_signature: signature,
+        },
+      };
     }
   }
+}
+
+function applyGeminiReasoningTransform(context: TransformRequestContext, reasoningEffort: unknown) {
+  if (context.request.kind !== 'chat_completions') {
+    return;
+  }
+
+  const extra = context.request.body as typeof context.request.body & { google?: unknown };
+  delete extra.reasoning_effort;
+
+  if (reasoningEffort !== 'none') {
+    const existingGoogle = isRecord(extra.google) ? extra.google : {};
+    extra.google = {
+      ...existingGoogle,
+      thinking_config: {
+        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
+        include_thoughts: true,
+      },
+    };
+  }
+
+  mapGeminiThoughtSignatures(context);
 }
 
 function renameJsonRefProperties(value: unknown): boolean {
@@ -151,10 +159,16 @@ export function buildDirectProvider(
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
     supportedChatApis,
-    responseTransforms: upstream.thought_content_mapping
-      ? { thoughtContentMapping: upstream.thought_content_mapping }
+    responseTransforms: upstream.use_gemini_reasoning_transform
+      ? { mapGeminiThoughtContent: true }
       : null,
     async transformRequest(context) {
+      const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);
+      const reasoningEffort =
+        useGeminiReasoning && context.request.kind === 'chat_completions'
+          ? context.request.body.reasoning_effort
+          : undefined;
+
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;
         for (const key of upstream.remove_from_body) {
@@ -169,8 +183,8 @@ export function buildDirectProvider(
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
       }
-      if (upstream.thought_signature_mapping) {
-        mapThoughtSignatures(context, upstream.thought_signature_mapping);
+      if (useGeminiReasoning) {
+        applyGeminiReasoningTransform(context, reasoningEffort);
       }
       if (upstream.sanitize_ref_fields) {
         sanitizeJsonRefToolResults(context);

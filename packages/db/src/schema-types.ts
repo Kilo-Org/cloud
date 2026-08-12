@@ -1915,20 +1915,6 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
-const CustomLlmPropertyPathSchema = z
-  .string()
-  .min(1)
-  .refine(
-    path =>
-      path
-        .split('.')
-        .every(
-          segment =>
-            segment.length > 0 && !['__proto__', 'constructor', 'prototype'].includes(segment)
-        ),
-    'Must be a dot-separated property path'
-  );
-
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
@@ -1937,8 +1923,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  thought_signature_mapping: CustomLlmPropertyPathSchema.optional(),
-  thought_content_mapping: CustomLlmPropertyPathSchema.optional(),
+  use_gemini_reasoning_transform: z.boolean().optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;

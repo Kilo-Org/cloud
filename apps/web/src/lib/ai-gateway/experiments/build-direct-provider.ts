@@ -45,7 +45,10 @@ function setPropertyPath(target: Record<string, unknown>, path: string, value: s
   current[finalSegment] = value;
 }
 
-function mapThoughtSignatures(context: TransformRequestContext, path: string) {
+const GEMINI_THOUGHT_CONTENT_MAPPING = 'extra_content.google.thought';
+const GEMINI_THOUGHT_SIGNATURE_MAPPING = 'extra_content.google.thought_signature';
+
+function mapGeminiThoughtSignatures(context: TransformRequestContext) {
   if (context.request.kind !== 'chat_completions') {
     return;
   }
@@ -69,10 +72,30 @@ function mapThoughtSignatures(context: TransformRequestContext, path: string) {
       const signature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
       if (typeof signature === 'string') {
-        setPropertyPath(toolCall, path, signature);
+        setPropertyPath(toolCall, GEMINI_THOUGHT_SIGNATURE_MAPPING, signature);
       }
     }
   }
+}
+
+function applyGeminiReasoningTransform(context: TransformRequestContext, reasoningEffort: unknown) {
+  if (context.request.kind !== 'chat_completions') {
+    return;
+  }
+
+  const body = context.request.body as Record<string, unknown>;
+  delete body.reasoning_effort;
+
+  const existingGoogle = isRecord(body.google) ? body.google : {};
+  body.google = {
+    ...existingGoogle,
+    thinking_config: {
+      ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
+      include_thoughts: true,
+    },
+  };
+
+  mapGeminiThoughtSignatures(context);
 }
 
 function renameJsonRefProperties(value: unknown): boolean {
@@ -151,10 +174,16 @@ export function buildDirectProvider(
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
     supportedChatApis,
-    responseTransforms: upstream.thought_content_mapping
-      ? { thoughtContentMapping: upstream.thought_content_mapping }
+    responseTransforms: upstream.use_gemini_reasoning_transform
+      ? { thoughtContentMapping: GEMINI_THOUGHT_CONTENT_MAPPING }
       : null,
     async transformRequest(context) {
+      const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);
+      const reasoningEffort =
+        useGeminiReasoning && context.request.kind === 'chat_completions'
+          ? context.request.body.reasoning_effort
+          : undefined;
+
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;
         for (const key of upstream.remove_from_body) {
@@ -169,8 +198,8 @@ export function buildDirectProvider(
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
       }
-      if (upstream.thought_signature_mapping) {
-        mapThoughtSignatures(context, upstream.thought_signature_mapping);
+      if (useGeminiReasoning) {
+        applyGeminiReasoningTransform(context, reasoningEffort);
       }
       if (upstream.sanitize_ref_fields) {
         sanitizeJsonRefToolResults(context);

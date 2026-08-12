@@ -109,7 +109,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
@@ -311,13 +311,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let classifierCostUsd = 0;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    const usesEfficientDecision =
+    const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
-    if (usesEfficientDecision) {
+    if (isAutoEfficientId) {
       void getCachedRoutingTable();
     }
-    const efficientDecision = usesEfficientDecision
+    const efficientDecision = isAutoEfficientId
       ? async () => {
           const { user, authFailedResponse, organizationId } = await authPromise;
           // The classifier is a paid call on Kilo's own credential. Skip it
@@ -330,18 +330,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           const { settings, plan } = await balanceAndSettingsPromise;
           const deniedFromSettings =
             plan === 'enterprise' ? (settings?.model_deny_list?.map(normalizeModelId) ?? []) : [];
-          let deniedFromPolicy: string[] = [];
-          try {
-            const groupPolicy = await organizationGroupPolicyPromise;
-            if (groupPolicy) {
-              deniedFromPolicy = await collectDeniedAutoRoutingModelIds(groupPolicy);
-            }
-          } catch (error) {
-            warnExceptInTest(
-              'Auto Efficient access-policy evaluation failed; using deny list only',
-              error
-            );
-          }
+          const groupPolicy = await organizationGroupPolicyPromise;
+          const deniedFromPolicy = groupPolicy
+            ? await collectDeniedAutoRoutingModelIds(groupPolicy)
+            : [];
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
           const result = await fetchEfficientAutoDecision({
             apiKind: requestBodyParsed.kind,

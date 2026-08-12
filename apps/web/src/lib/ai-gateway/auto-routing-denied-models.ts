@@ -1,6 +1,5 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
-import { BALANCED_QWEN_MODEL } from '@/lib/ai-gateway/auto-model';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
@@ -9,12 +8,10 @@ import {
 } from '@/lib/organizations/effective-model-access.server';
 
 // Keep in sync with services/auto-routing/src/coding-plan-preference.ts.
-const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';
-
-const ALWAYS_CONSIDERED_MODEL_IDS = [
-  BALANCED_QWEN_MODEL.model,
+// /decide can short-circuit to these without consulting the routing table.
+const CODING_PLAN_DEFAULT_MODEL_IDS = [
   MINIMAX_CURRENT_MODEL_ID,
-  BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID,
+  'byteplus-coding/bytedance-seed-code',
 ] as const;
 
 export type CollectDeniedAutoRoutingModelIdsOptions = {
@@ -42,7 +39,7 @@ export function candidateModelIdsFromRoutingTable(
   );
   return [
     ...new Set(
-      [...fromTable, ...ALWAYS_CONSIDERED_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
+      [...fromTable, ...CODING_PLAN_DEFAULT_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
     ),
   ];
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effective-model-access.server';
-import { BALANCED_QWEN_MODEL } from '@/lib/ai-gateway/auto-model';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
   candidateModelIdsFromRoutingTable,
@@ -114,7 +113,7 @@ describe('collectDeniedAutoRoutingModelIds', () => {
 });
 
 describe('candidateModelIdsFromRoutingTable', () => {
-  it('includes routing-table models plus coding-plan and balanced fallback ids', () => {
+  it('includes routing-table models plus coding-plan default ids', () => {
     expect(
       candidateModelIdsFromRoutingTable({
         routes: {
@@ -127,17 +126,16 @@ describe('candidateModelIdsFromRoutingTable', () => {
     ).toEqual(
       expect.arrayContaining([
         'google/gemini-2.5-flash',
-        BALANCED_QWEN_MODEL.model,
         MINIMAX_CURRENT_MODEL_ID,
         'byteplus-coding/bytedance-seed-code',
       ])
     );
-    expect(
-      candidateModelIdsFromRoutingTable({
-        routes: {
-          'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
-        },
-      })
-    ).not.toContain('kilo-auto/balanced');
+    const ids = candidateModelIdsFromRoutingTable({
+      routes: {
+        'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
+      },
+    });
+    expect(ids).not.toContain('kilo-auto/balanced');
+    expect(ids).not.toContain('qwen/qwen3.7-plus');
   });
 });

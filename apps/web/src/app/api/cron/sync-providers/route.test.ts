@@ -22,8 +22,8 @@ const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 describe('GET /api/cron/sync-providers', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('exports maxDuration of 8 minutes (480 seconds)', () => {
-    expect(maxDuration).toBe(480);
+  it('exports maxDuration of 4 minutes (240 seconds)', () => {
+    expect(maxDuration).toBe(240);
   });
 
   it('emits one event at the cron boundary with aggregate provider counts', async () => {

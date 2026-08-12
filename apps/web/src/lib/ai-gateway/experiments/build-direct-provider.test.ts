@@ -170,6 +170,20 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
     expect(request.body).not.toHaveProperty('stream');
   });
 
+  it('does not send an invalid Gemini thinking_level when reasoning_effort is none', async () => {
+    const request = makeRequest();
+    request.body.reasoning_effort = 'none';
+
+    await transformRequest(request, {
+      use_gemini_reasoning_transform: true,
+      extra_body: { google: { existing: true } },
+    });
+
+    const body = request.body as typeof request.body & { google?: Record<string, unknown> };
+    expect(body.google).toEqual({ existing: true });
+    expect(body).not.toHaveProperty('reasoning_effort');
+  });
+
   it('still sets thinking_config when reasoning_effort is absent', async () => {
     const request = makeRequest();
 

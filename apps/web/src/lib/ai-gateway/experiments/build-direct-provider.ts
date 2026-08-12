@@ -86,14 +86,16 @@ function applyGeminiReasoningTransform(context: TransformRequestContext, reasoni
   const extra = context.request.body as typeof context.request.body & { google?: unknown };
   delete extra.reasoning_effort;
 
-  const existingGoogle = isRecord(extra.google) ? extra.google : {};
-  extra.google = {
-    ...existingGoogle,
-    thinking_config: {
-      ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
-      include_thoughts: true,
-    },
-  };
+  if (reasoningEffort !== 'none') {
+    const existingGoogle = isRecord(extra.google) ? extra.google : {};
+    extra.google = {
+      ...existingGoogle,
+      thinking_config: {
+        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
+        include_thoughts: true,
+      },
+    };
+  }
 
   mapGeminiThoughtSignatures(context);
 }

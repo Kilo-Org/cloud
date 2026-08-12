@@ -24,3 +24,20 @@ describe('user data export ready email', () => {
     expect(html).not.toContain('signed');
   });
 });
+
+describe('data export download code email', () => {
+  it('carries the code and no link that could stand in for it', () => {
+    expect(subjects.dataExportDownloadCode).toBe('Your Kilo data export download code');
+    const html = renderTemplate('dataExportDownloadCode', {
+      code: '482913',
+      email: 'user@example.com',
+      expires_in: '10 minutes',
+      year: '2026',
+    });
+
+    expect(html).toContain('482913');
+    expect(html).toContain('10 minutes');
+    // The code must be the only way to act on this email.
+    expect(html).not.toContain('href');
+  });
+});

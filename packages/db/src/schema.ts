@@ -4762,7 +4762,10 @@ export const magic_link_tokens = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     attempts: integer().default(0).notNull(),
     reserved_until: timestamp({ withTimezone: true, mode: 'string' }),
-    purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
+    purpose: text()
+      .default('magic_link')
+      .notNull()
+      .$type<'magic_link' | 'sign_in_code' | 'data_export_download'>(),
     challenge_id: uuid(),
   },
   table => [
@@ -4773,6 +4776,13 @@ export const magic_link_tokens = pgTable(
       .concurrently()
       .where(sql`${table.challenge_id} IS NOT NULL`),
     check('check_expires_at_future', sql`${table.expires_at} > ${table.created_at}`),
+    // `purpose` decides what a token may authorize, so an unknown value must never
+    // reach a consumer that matches on the known set. The column is plain text, so
+    // without this constraint the union above is a compile-time fiction.
+    check(
+      'check_magic_link_tokens_purpose',
+      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download')`
+    ),
   ]
 );
 

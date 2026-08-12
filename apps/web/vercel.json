@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/sync-providers",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/cleanup-device-auth",
@@ -99,10 +99,6 @@
     {
       "path": "/api/cron/cleanup-review-memory",
       "schedule": "0 */12 * * *"
-    },
-    {
-      "path": "/api/cron/sync-byok-provider-notifications",
-      "schedule": "0 4 * * *"
     }
   ],
   "build": {

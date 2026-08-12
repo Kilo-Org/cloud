@@ -1,27 +1,126 @@
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { db } from '@/lib/drizzle';
-import { organizations, user_data_exports, type User } from '@kilocode/db/schema';
+import {
+  magic_link_tokens,
+  organizations,
+  user_data_exports,
+  type User,
+} from '@kilocode/db/schema';
 import { createCallerForUser } from '@/routers/test-utils';
 import { __test__ } from '@/routers/user-exports-router';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+
+// Partial mocks: `@/lib/email` also exports the template registry that sibling
+// routers read at import time, so the real module must stay intact.
+jest.mock('@/lib/email', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/email');
+  return { ...actual, sendDataExportDownloadCodeEmail: jest.fn() };
+});
+// The firewall check needs a request scope, which the tRPC caller does not have.
+jest.mock('@/lib/auth/data-export-download-code-rate-limit', () => ({
+  isDataExportDownloadCodeRateLimited: jest.fn(),
+}));
+jest.mock('@/lib/user-data-export-worker-client', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@/lib/user-data-export-worker-client'
+  );
+  return {
+    ...actual,
+    dispatchUserDataExport: jest.fn(),
+    requestUserDataExportDownload: jest.fn(),
+  };
+});
+
+import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
+import { sendDataExportDownloadCodeEmail } from '@/lib/email';
+import { requestUserDataExportDownload } from '@/lib/user-data-export-worker-client';
+
+const mockRateLimited = jest.mocked(isDataExportDownloadCodeRateLimited);
+const mockSendCode = jest.mocked(sendDataExportDownloadCodeEmail);
+const mockWorkerDownload = jest.mocked(requestUserDataExportDownload);
+
+const OWNER_EMAIL = 'data-export-owner@admin.example.com';
 
 let owner: User;
 let stranger: User;
 
 beforeAll(async () => {
   owner = await insertTestUser({
-    google_user_email: 'data-export-owner@admin.example.com',
+    google_user_email: OWNER_EMAIL,
     is_admin: true,
   });
   stranger = await insertTestUser({ google_user_email: 'data-export-stranger@example.com' });
 });
 
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockRateLimited.mockResolvedValue(false);
+  mockSendCode.mockResolvedValue({ sent: true });
+  mockWorkerDownload.mockResolvedValue({
+    kind: 'available',
+    downloadUrl: 'https://r2.example.com/signed-export',
+    expiresAt: new Date(Date.now() + 300_000).toISOString(),
+  });
+});
+
 afterEach(async () => {
   await db.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, owner.id));
   await db.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, stranger.id));
+  await db.execute(sql`DELETE FROM magic_link_tokens WHERE email = ${OWNER_EMAIL}`);
 });
+
+async function insertReadyExport(kiloUserId: string): Promise<string> {
+  const [row] = await db
+    .insert(user_data_exports)
+    .values({
+      kilo_user_id: kiloUserId,
+      snapshot_at: new Date().toISOString(),
+      status: 'ready',
+      r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
+      size_bytes: 1,
+      completed_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    })
+    .returning({ id: user_data_exports.id });
+  return row.id;
+}
+
+async function insertReadyOrganizationExport(
+  requesterId: string,
+  organizationId: string
+): Promise<string> {
+  const [row] = await db
+    .insert(user_data_exports)
+    .values({
+      kilo_user_id: requesterId,
+      subject_type: 'organization',
+      organization_id: organizationId,
+      snapshot_at: new Date().toISOString(),
+      status: 'ready',
+      r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
+      size_bytes: 1,
+      completed_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    })
+    .returning({ id: user_data_exports.id });
+  return row.id;
+}
+
+/** Reads the emailed code out of the mocked sender. */
+function lastEmailedCode(): string {
+  const call = mockSendCode.mock.calls.at(-1);
+  if (!call) throw new Error('no download code email was sent');
+  return call[1].code;
+}
+
+async function requestCode(kiloUserId: string, exportId: string) {
+  const caller = await createCallerForUser(kiloUserId);
+  const { challengeId } = await caller.userExports.requestDownloadCode({ exportId });
+  return { caller, challengeId, code: lastEmailedCode() };
+}
 
 describe('user exports router guards and serialization', () => {
   it('rejects API-token authentication for data export procedures', () => {
@@ -316,6 +415,172 @@ describe('user exports router guards and serialization', () => {
     expect(paged.exports).toHaveLength(0);
   });
 
+  // The download gate scopes personal exports on kilo_user_id. An organization's
+  // export belongs to the organization rather than to whoever pressed the button, so
+  // it has to be reachable by an authorised colleague — scoping it the same way would
+  // report it as missing to everyone but the requester.
+  it('emails a download code for an organization export to an authorized colleague', async () => {
+    const organization = await createTestOrganization('Export Org Download', owner.id, 0);
+    const colleague = await insertTestUser({
+      google_user_email: 'data-export-colleague@admin.example.com',
+      is_admin: true,
+    });
+    const exportId = await insertReadyOrganizationExport(owner.id, organization.id);
+
+    const caller = await createCallerForUser(colleague.id);
+    const result = await caller.userExports.requestDownloadCode({ exportId });
+
+    expect(result.challengeId).toBeDefined();
+    // Delivered to whoever is downloading, not to whoever requested the export.
+    expect(mockSendCode).toHaveBeenCalledWith(
+      'data-export-colleague@admin.example.com',
+      expect.anything()
+    );
+  });
+
+  it('emails a download code without ever returning it to the caller', async () => {
+    const exportId = await insertReadyExport(owner.id);
+
+    const caller = await createCallerForUser(owner.id);
+    const result = await caller.userExports.requestDownloadCode({ exportId });
+
+    expect(mockSendCode).toHaveBeenCalledWith(OWNER_EMAIL, {
+      code: expect.stringMatching(new RegExp(`^\\d{${DOWNLOAD_CODE_LENGTH}}$`)),
+      expiresInMinutes: 10,
+    });
+    expect(JSON.stringify(result)).not.toContain(lastEmailedCode());
+  });
+
+  it('stops emailing codes to a rate-limited account', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    mockRateLimited.mockResolvedValue(true);
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+    });
+    expect(mockRateLimited).toHaveBeenCalledWith(owner.id);
+    expect(mockSendCode).not.toHaveBeenCalled();
+  });
+
+  it('does not email a code for an export the caller does not own', async () => {
+    const exportId = await insertReadyExport(stranger.id);
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    expect(mockSendCode).not.toHaveBeenCalled();
+  });
+
+  it('drops the code and reports failure when the email cannot be delivered', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    mockSendCode.mockResolvedValue({ sent: false, reason: 'provider_not_configured' });
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    const rows = await db
+      .select({ token_hash: magic_link_tokens.token_hash })
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, OWNER_EMAIL));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('drops the code when the mail provider throws instead of reporting failure', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    // Mailgun rejects on an API or network failure rather than returning `sent: false`.
+    mockSendCode.mockRejectedValue(new Error('mailgun unavailable'));
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    const rows = await db
+      .select({ token_hash: magic_link_tokens.token_hash })
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, OWNER_EMAIL));
+    expect(rows).toHaveLength(0);
+
+    // No leftover row means the cooldown does not report a code that never arrived.
+    mockSendCode.mockResolvedValue({ sent: true });
+    await expect(caller.userExports.requestDownloadCode({ exportId })).resolves.toMatchObject({
+      challengeId: expect.any(String),
+    });
+  });
+
+  it('refuses to sign a download without the emailed code', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    const { caller, challengeId, code } = await requestCode(owner.id, exportId);
+    const wrongCode = String((Number(code) + 1) % 10 ** DOWNLOAD_CODE_LENGTH).padStart(
+      DOWNLOAD_CODE_LENGTH,
+      '0'
+    );
+
+    await expect(
+      caller.userExports.createDownload({ exportId, challengeId, code: wrongCode })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockWorkerDownload).not.toHaveBeenCalled();
+  });
+
+  it('signs a download once the emailed code is presented, then refuses to reuse it', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    const { caller, challengeId, code } = await requestCode(owner.id, exportId);
+
+    await expect(
+      caller.userExports.createDownload({ exportId, challengeId, code })
+    ).resolves.toMatchObject({ downloadUrl: 'https://r2.example.com/signed-export' });
+
+    // The signed URL is a bearer capability, so the code must not mint a second one.
+    await expect(
+      caller.userExports.createDownload({ exportId, challengeId, code })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockWorkerDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not accept a code minted for a different export', async () => {
+    const targetExportId = await insertReadyExport(owner.id);
+    const otherExportId = await insertReadyExport(owner.id);
+    const { caller, challengeId, code } = await requestCode(owner.id, otherExportId);
+
+    await expect(
+      caller.userExports.createDownload({ exportId: targetExportId, challengeId, code })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockWorkerDownload).not.toHaveBeenCalled();
+  });
+
+  it('keeps the code usable when signing is unavailable', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    const { caller, challengeId, code } = await requestCode(owner.id, exportId);
+    mockWorkerDownload.mockResolvedValueOnce({ kind: 'unavailable', reason: 'not_configured' });
+
+    await expect(
+      caller.userExports.createDownload({ exportId, challengeId, code })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    // No capability was handed out, so a retry must not cost the user a new code.
+    await expect(
+      caller.userExports.createDownload({ exportId, challengeId, code })
+    ).resolves.toMatchObject({ downloadUrl: 'https://r2.example.com/signed-export' });
+  });
+
+  it('throttles repeat code emails for the same account', async () => {
+    const exportId = await insertReadyExport(owner.id);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.userExports.requestDownloadCode({ exportId });
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+    });
+    expect(mockSendCode).toHaveBeenCalledTimes(1);
+  });
+
   it('does not authorize another user or an expired export for download', async () => {
     const [ready] = await db
       .insert(user_data_exports)
@@ -342,12 +607,14 @@ describe('user exports router guards and serialization', () => {
       })
       .returning();
     const caller = await createCallerForUser(owner.id);
+    // Ownership and freshness are checked before the code, so these never reach it.
+    const unusedCode = { code: '0'.repeat(DOWNLOAD_CODE_LENGTH), challengeId: crypto.randomUUID() };
 
-    await expect(caller.userExports.createDownload({ exportId: ready.id })).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
-    await expect(caller.userExports.createDownload({ exportId: expired.id })).rejects.toMatchObject(
-      { code: 'NOT_FOUND' }
-    );
+    await expect(
+      caller.userExports.createDownload({ exportId: ready.id, ...unusedCode })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(
+      caller.userExports.createDownload({ exportId: expired.id, ...unusedCode })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

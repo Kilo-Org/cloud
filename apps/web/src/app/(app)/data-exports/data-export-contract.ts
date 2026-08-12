@@ -3,6 +3,16 @@
  * router. The explicit status union keeps UI behavior easy to review.
  */
 
+/**
+ * Digits in an emailed download code.
+ *
+ * The per-code attempt budget resets whenever a new code is issued, so it caps
+ * the guess *rate*, not the total. The search space is therefore what bounds a
+ * held session's odds over time, which is why this is wider than the 6 digits a
+ * sign-in code uses: those are spent in one sitting, this one is not.
+ */
+export const DOWNLOAD_CODE_LENGTH = 8;
+
 export const USER_EXPORT_STATUSES = [
   'queued',
   'processing',

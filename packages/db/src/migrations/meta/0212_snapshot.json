@@ -1,5 +1,5 @@
 {
-  "id": "eb34226d-baed-4f13-9b3c-d3da60fe0471",
+  "id": "39af0da0-aa57-4026-b3f7-2bfeaf87d4dc",
   "prevId": "b39d704e-acae-4e84-8bc7-50bde1ea73ae",
   "version": "7",
   "dialect": "postgresql",
@@ -20759,6 +20759,10 @@
         "check_expires_at_future": {
           "name": "check_expires_at_future",
           "value": "\"magic_link_tokens\".\"expires_at\" > \"magic_link_tokens\".\"created_at\""
+        },
+        "check_magic_link_tokens_purpose": {
+          "name": "check_magic_link_tokens_purpose",
+          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download')"
         }
       },
       "isRLSEnabled": false
@@ -35697,19 +35701,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "subject_type": {
-          "name": "subject_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'user'"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -35902,23 +35893,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"user_data_exports\".\"status\" IN ('queued', 'processing', 'finalizing') AND \"user_data_exports\".\"subject_type\" = 'user'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_user_data_exports_single_active_org": {
-          "name": "UQ_user_data_exports_single_active_org",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"user_data_exports\".\"status\" IN ('queued', 'processing', 'finalizing') AND \"user_data_exports\".\"subject_type\" = 'organization'",
+          "where": "\"user_data_exports\".\"status\" IN ('queued', 'processing', 'finalizing')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -35946,34 +35921,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_user_data_exports_org_created": {
-          "name": "IDX_user_data_exports_org_created",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"user_data_exports\".\"organization_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -36080,19 +36027,6 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
-        },
-        "user_data_exports_organization_id_organizations_id_fk": {
-          "name": "user_data_exports_organization_id_organizations_id_fk",
-          "tableFrom": "user_data_exports",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -36102,14 +36036,6 @@
         "user_data_exports_status_check": {
           "name": "user_data_exports_status_check",
           "value": "\"user_data_exports\".\"status\" IN ('queued', 'processing', 'finalizing', 'ready', 'failed', 'expired')"
-        },
-        "user_data_exports_subject_type_check": {
-          "name": "user_data_exports_subject_type_check",
-          "value": "\"user_data_exports\".\"subject_type\" IN ('user', 'organization')"
-        },
-        "user_data_exports_subject_shape": {
-          "name": "user_data_exports_subject_shape",
-          "value": "(\"user_data_exports\".\"subject_type\" = 'user' AND \"user_data_exports\".\"organization_id\" IS NULL)\n        OR (\"user_data_exports\".\"subject_type\" = 'organization' AND \"user_data_exports\".\"organization_id\" IS NOT NULL)"
         },
         "user_data_exports_schema_version_positive": {
           "name": "user_data_exports_schema_version_positive",

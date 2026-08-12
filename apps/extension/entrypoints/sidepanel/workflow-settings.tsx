@@ -19,10 +19,14 @@ import {
   settingsDialogOpenAtom,
 } from './settings-dialog-state';
 
+/* eslint-disable max-lines -- Settings toggles and the workflow list share one section. */
+
 const EMPTY_MESSAGE =
   'No workflows yet. Ask Kilo to save one — for example "Create a workflow that checks the price of this item" — or repeat steps on a site and Kilo offers to save them.';
 const LOAD_ERROR_MESSAGE = "Couldn't load workflows. Try again.";
 const DELETE_ERROR_MESSAGE = "Couldn't delete the workflow. Try again.";
+const SETTINGS_LOAD_ERROR_MESSAGE = "Couldn't load settings. Try again.";
+const SETTINGS_SAVE_ERROR_MESSAGE = "Couldn't save settings. Try again.";
 
 const SETTINGS_TOGGLE_ROWS = [
   {
@@ -113,24 +117,51 @@ export const WorkflowSettings = (): JSX.Element => {
     ...DEFAULT_WORKFLOW_SETTINGS,
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsLoadError, setSettingsLoadError] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [saveErrorSettings, setSaveErrorSettings] = useState<AgentWorkflowSettings | undefined>();
   const [deleteError, setDeleteError] = useState(false);
 
   const setRunRequest = useSetAtom(workflowRunRequestAtom);
   const setIsSettingsOpen = useSetAtom(settingsDialogOpenAtom);
 
-  useEffect(() => {
-    void (async () => {
-      let loaded: AgentWorkflowSettings = { ...DEFAULT_WORKFLOW_SETTINGS };
-      try {
-        loaded = await loadWorkflowSettings(storage);
-      } catch {
-        // Use the default; toggle will be off which is the safe choice.
-      }
-      setSettings(loaded);
+  const loadSettings = useCallback(async () => {
+    setSettingsLoadError(false);
+    setSettingsLoaded(false);
+    setSaveErrorSettings(undefined);
+    try {
+      setSettings(await loadWorkflowSettings(storage));
       setSettingsLoaded(true);
-    })();
+    } catch {
+      /* Keep the toggles disabled and surface the failure instead of silently
+         presenting defaults as the loaded settings. */
+      setSettingsLoadError(true);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
+
+  const persistSettings = useCallback(
+    async (next: AgentWorkflowSettings, prior: AgentWorkflowSettings): Promise<void> => {
+      setSaveErrorSettings(undefined);
+      setSettingsSaving(true);
+      setSettings(next);
+
+      try {
+        await saveWorkflowSettings(storage, next);
+      } catch {
+        /* Keep the prior value visible and surface the failure so the user can
+           retry saving the intended value. */
+        setSettings(prior);
+        setSaveErrorSettings(next);
+      } finally {
+        setSettingsSaving(false);
+      }
+    },
+    []
+  );
 
   const onToggle = useCallback(
     (key: keyof AgentWorkflowSettings) => {
@@ -139,26 +170,22 @@ export const WorkflowSettings = (): JSX.Element => {
       }
 
       const prior = settings;
-      setSettingsSaving(true);
       const next: AgentWorkflowSettings = {
         ...prior,
         [key]: !prior[key],
       };
-      setSettings(next);
-
-      void (async () => {
-        try {
-          await saveWorkflowSettings(storage, next);
-        } catch {
-          // Roll back to the prior value on failure so UI and storage stay consistent.
-          setSettings(prior);
-        } finally {
-          setSettingsSaving(false);
-        }
-      })();
+      void persistSettings(next, prior);
     },
-    [settings, settingsSaving]
+    [persistSettings, settings, settingsSaving]
   );
+
+  const retrySaveSettings = useCallback(() => {
+    if (saveErrorSettings === undefined || settingsSaving) {
+      return;
+    }
+    // Settings still holds the value rolled back after the failed save.
+    void persistSettings(saveErrorSettings, settings);
+  }, [persistSettings, saveErrorSettings, settings, settingsSaving]);
 
   const handleDelete = useCallback((id: string) => {
     setDeleteError(false);
@@ -197,6 +224,40 @@ export const WorkflowSettings = (): JSX.Element => {
             }}
           />
         ))}
+
+        {settingsLoadError ? (
+          <div className="flex flex-col gap-2">
+            <p className="type-body text-status-red-400">{SETTINGS_LOAD_ERROR_MESSAGE}</p>
+            <div className="flex justify-end">
+              <button
+                aria-label="Retry loading workflow settings"
+                className={secondaryButtonClass}
+                onClick={() => {
+                  void loadSettings();
+                }}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {saveErrorSettings === undefined ? null : (
+          <div className="flex flex-col gap-2">
+            <p className="type-body text-status-red-400">{SETTINGS_SAVE_ERROR_MESSAGE}</p>
+            <div className="flex justify-end">
+              <button
+                aria-label="Retry saving workflow settings"
+                className={secondaryButtonClass}
+                onClick={retrySaveSettings}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <h2 className="type-label mt-3 text-foreground-muted">Saved workflows</h2>

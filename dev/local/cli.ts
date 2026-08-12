@@ -481,7 +481,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   // Grafana boots fine without the token; only dashboard queries fail. Treat
   // this as advisory so devs poking around the repo don't get blocked. Check
   // .env.local in addition to the shell so the warning doesn't fire when the
-  // token is set in the file (docker compose picks it up via --env-file).
+  // token is set in the file (docker compose picks it up via the filtered
+  // compose secrets env file built from .env.local).
   if (serviceNames.includes('grafana')) {
     const tokenFromShell = process.env.CF_AE_TOKEN;
     const tokenFromFile = envLocalExists ? readEnvValue(envLocalPath, 'CF_AE_TOKEN') : undefined;

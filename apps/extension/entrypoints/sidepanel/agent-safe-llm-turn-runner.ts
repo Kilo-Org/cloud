@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies -- The safe turn runner wires every safe-mode tool family: page tools, workflows, remote MCP, and web search. */
 import type {
   AgentConversationEvent,
   RemoteMcpToolCallEvent,
@@ -13,7 +14,8 @@ import type {
   KiloGatewayToolDefinition,
 } from '@/src/shared/kilo-api-client';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
-import { executeSafeToolCall } from './agent-safe-tool-runtime';
+import { createSafeToolExecutor } from './agent-safe-tool-runtime';
+import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
@@ -66,8 +68,19 @@ export const runSafeLlmTurn = ({
   workflowToolContext,
   workflowTools = [],
   ...options
-}: RunSafeLlmTurnOptions): Promise<void> =>
-  runLlmTurn<SafeRunToolCallEvent>({
+}: RunSafeLlmTurnOptions): Promise<void> => {
+  // One executor per turn: a fresh unchanged-snapshot memory, so a new conversation's first snapshot is served in full.
+  const executeSafeToolCall = createSafeToolExecutor();
+  // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
+  const runWebSearch = createWebSearchExecutor({
+    apiBaseUrl: options.apiBaseUrl,
+    fetch: options.fetch,
+    organizationId: options.organizationId,
+    signal: options.signal,
+    token: options.token,
+  });
+
+  return runLlmTurn<SafeRunToolCallEvent>({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
@@ -85,6 +98,10 @@ export const runSafeLlmTurn = ({
         return executeRemoteMcpToolCall === undefined
           ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
           : executeRemoteMcpToolCall(toolCall);
+      }
+
+      if (toolCall.name === 'web_search') {
+        return runWebSearch(toolCall);
       }
 
       return executeSafeToolCall(toolCall);
@@ -107,3 +124,4 @@ export const runSafeLlmTurn = ({
       'The model requested too many safe read rounds. Send another message to continue.',
     tools: [...createSafeToolDefinitions({ supportsImages }), ...workflowTools, ...remoteMcpTools],
   });
+};

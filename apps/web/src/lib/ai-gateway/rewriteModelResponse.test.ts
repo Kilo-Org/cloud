@@ -374,7 +374,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
     test('moves marked delta content to reasoning content', async () => {
       const upstream = sseResponse(
-        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"flags":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"flags":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
           'data: [DONE]\n\n'
       );
 
@@ -384,7 +384,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         capture: null,
         vercelRequestId: null,
         responseTransforms: {
-          thoughtContentMapping: 'extra_content.flags.thought',
+          mapGeminiThoughtContent: true,
         },
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -393,7 +393,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       expect(chunk.choices[0].delta).toEqual({
         reasoning_content: 'first thought',
-        extra_content: { flags: { thought: true } },
+        extra_content: { google: { thought: true } },
       });
       expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
       expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });

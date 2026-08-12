@@ -470,10 +470,42 @@ export const runWorkflow = async (
     );
   }
 
-  // 2a. Input shape gate — before any navigation. Name the declared params: a weak model that sent a bare string loops on a generic message (measured), but corrects when told the exact object to send.
+  // 2a. Tolerant string coercion, from provider artifacts measured in the model matrix.
+  // Some models send input as string-encoded JSON ('{"topic": "rust"}').
+  // The z-ai/glm-5.2 chat template emits <arg_key>K</arg_key><arg_value>V</arg_value> pairs.
+  // A whitespace-only string means "no input".
+  // Coerce what parses; the shape gate below catches the rest.
+  let coercedInput = input;
+  if (typeof coercedInput === 'string') {
+    const trimmed = coercedInput.trim();
+    if (trimmed === '') {
+      coercedInput = undefined;
+    } else if (trimmed.startsWith('{')) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          coercedInput = parsed;
+        }
+      } catch {
+        // Not JSON; the shape gate reports it.
+      }
+    } else {
+      const pairs = [
+        ...trimmed.matchAll(
+          /<arg_key>([\s\S]*?)<\/arg_key>\s*<arg_value>([\s\S]*?)<\/arg_value>/gu
+        ),
+      ];
+      if (pairs.length > 0) {
+        coercedInput = Object.fromEntries(
+          pairs.map(pair => [(pair[1] ?? '').trim(), (pair[2] ?? '').trim()])
+        );
+      }
+    }
+  }
+  // 2b. Input shape gate — before any navigation. Name the declared params: a weak model that sent a bare string loops on a generic message (measured), but corrects when told the exact object to send.
   if (
-    input !== undefined &&
-    (typeof input !== 'object' || input === null || Array.isArray(input))
+    coercedInput !== undefined &&
+    (typeof coercedInput !== 'object' || coercedInput === null || Array.isArray(coercedInput))
   ) {
     const params = workflow.params ?? [];
     const exampleParam = params.find(param => param.required === true) ?? params[0];
@@ -491,7 +523,7 @@ export const runWorkflow = async (
   }
 
   // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding check guarantees a plain object or undefined.
-  const normalizedInput = (input ?? {}) as Record<string, unknown>;
+  const normalizedInput = (coercedInput ?? {}) as Record<string, unknown>;
 
   /* Input is embedded in the injected page code on every page, so it carries
      the same bound as navigation state. */

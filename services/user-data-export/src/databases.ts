@@ -55,6 +55,16 @@ const ORGANIZATION_EXPORT_ROLES = sql.join(
  * evaluated against live membership in the same statement, so a revoked admin loses
  * access immediately rather than at the next lease or cache expiry, and so the export
  * is reachable by admins other than whoever requested it.
+ *
+ * Both routes to that role are checked, direct and inherited from a parent
+ * organization, because the request path admits both. Checking only direct membership
+ * here would let a parent-organization owner create an export the router accepts and
+ * lists as ready, then be refused its download by this Worker — an export they can see
+ * and never open.
+ *
+ * A soft-deleted organization is excluded: membership rows outlive the organization, so
+ * without this a former admin could still open an export of something the product
+ * treats as gone.
  */
 function callerMayAccess(kiloUserId: string) {
   return sql`(
@@ -63,10 +73,23 @@ function callerMayAccess(kiloUserId: string) {
       subject_type = 'organization'
       AND organization_id IS NOT NULL
       AND EXISTS (
-        SELECT 1 FROM organization_memberships memberships
-        WHERE memberships.organization_id = user_data_exports.organization_id
-          AND memberships.kilo_user_id = ${kiloUserId}
-          AND memberships.role IN (${ORGANIZATION_EXPORT_ROLES})
+        SELECT 1 FROM organizations orgs
+        WHERE orgs.id = user_data_exports.organization_id
+          AND orgs.deleted_at IS NULL
+          AND (
+            EXISTS (
+              SELECT 1 FROM organization_memberships memberships
+              WHERE memberships.organization_id = orgs.id
+                AND memberships.kilo_user_id = ${kiloUserId}
+                AND memberships.role IN (${ORGANIZATION_EXPORT_ROLES})
+            )
+            OR EXISTS (
+              SELECT 1 FROM organization_memberships memberships
+              WHERE memberships.organization_id = orgs.parent_organization_id
+                AND memberships.kilo_user_id = ${kiloUserId}
+                AND memberships.role IN (${ORGANIZATION_EXPORT_ROLES})
+            )
+          )
       )
     )
   )`;

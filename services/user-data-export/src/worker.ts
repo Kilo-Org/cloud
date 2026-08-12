@@ -10,6 +10,7 @@ import { TerminalExportError } from './errors';
 import {
   createSourceAdapters,
   findPresentWarehouseTables,
+  warehouseRequirements,
   type ExportRecord,
   type ExportSubject,
 } from './source-adapters';
@@ -378,7 +379,7 @@ export async function processGenerateMessage(
     const sources = await withSpan('export_source_probe', {}, async span => {
       const present = await findPresentWarehouseTables(
         warehouseQuery,
-        allAdapters.map(candidate => candidate.warehouseTable).filter(table => table !== undefined)
+        warehouseRequirements(allAdapters)
       );
       const partitioned = partitionSources(allAdapters, job.subject_type, present);
       span.setAttribute('export.sources.available', partitioned.available.length);

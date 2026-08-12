@@ -3,8 +3,13 @@ import {
   createSourceAdapters,
   sourceQueries,
   sourceQueryScopes,
+  findPresentWarehouseTables,
+  warehouseRequirements,
+  DELETED_COLUMN,
+  SOURCES_WITHOUT_DELETED_COLUMN,
   SCOPE_PREDICATES,
   WAREHOUSE_PROFILE_FIELDS,
+  WAREHOUSE_SOURCE_COLUMNS,
   warehouseQueries,
   type ReplicaQuery,
   type SourceAdapter,
@@ -165,6 +170,103 @@ describe('warehouse scoping guard', () => {
   it.each(Object.entries(warehouseQueries))('%s orders and limits its page', (_name, query) => {
     expect(query).toContain('ORDER BY');
     expect(query).toContain('LIMIT');
+  });
+
+  // Selecting the deletion column from a table that has none is an undefined-column
+  // error at read time, after the source has already been declared present. This keeps
+  // the list of tables without it tied to what the queries actually select.
+  it.each(Object.entries(sourceQueries))(
+    '%s selects the deletion column only where it exists',
+    (_name, query) => {
+      const readsTableWithoutColumn = SOURCES_WITHOUT_DELETED_COLUMN.some(table =>
+        new RegExp(`FROM ${table}\\b`).test(query)
+      );
+      if (readsTableWithoutColumn) expect(query).not.toContain(DELETED_COLUMN);
+    }
+  );
+
+  // The probe is only as good as what it asks about. A column selected by a query but
+  // absent from the declaration would be read from a table the probe just called ready.
+  it.each(Object.entries(WAREHOUSE_SOURCE_COLUMNS))(
+    '%s declares every column its queries select',
+    (table, declared) => {
+      const queries = Object.entries(sourceQueries)
+        .filter(([, query]) => new RegExp(`FROM ${table}\\b`).test(query))
+        .map(([, query]) => query);
+      expect(queries.length).toBeGreaterThan(0);
+      for (const query of queries) {
+        if (query.includes(DELETED_COLUMN)) expect(declared).toContain(DELETED_COLUMN);
+      }
+    }
+  );
+
+  it('requires the deletion column exactly where the source carries one', () => {
+    const withoutColumn = new Set<string>(SOURCES_WITHOUT_DELETED_COLUMN);
+    for (const [table, columns] of Object.entries(WAREHOUSE_SOURCE_COLUMNS)) {
+      expect(columns.includes(DELETED_COLUMN)).toBe(!withoutColumn.has(table));
+    }
+  });
+});
+
+describe('warehouse availability probe', () => {
+  function probeHarness(schema: Record<string, string[]>) {
+    const calls: Call[] = [];
+    const warehouseQuery: ReplicaQuery = async (text, values) => {
+      calls.push({ text, values });
+      return Object.entries(schema).flatMap(([table, columns]) =>
+        columns.map(column => ({ table_name: table, column_name: column }))
+      );
+    };
+    return { calls, warehouseQuery };
+  }
+
+  it('accepts a table carrying every column its source needs', async () => {
+    const { warehouseQuery } = probeHarness({ audiences: ['kilo_user_id', 'segment'] });
+
+    const present = await findPresentWarehouseTables(warehouseQuery, [
+      { table: 'audiences', requiredColumns: ['kilo_user_id', 'segment'] },
+    ]);
+
+    expect([...present]).toEqual(['audiences']);
+  });
+
+  // The case table-existence probing missed: loaded earlier, not yet reloaded with the
+  // column a newer query selects. Without this it fails at read time instead.
+  it('rejects a table that exists but lacks a required column', async () => {
+    const { warehouseQuery } = probeHarness({ audiences: ['kilo_user_id'] });
+
+    const present = await findPresentWarehouseTables(warehouseQuery, [
+      { table: 'audiences', requiredColumns: ['kilo_user_id', DELETED_COLUMN] },
+    ]);
+
+    expect([...present]).toEqual([]);
+  });
+
+  it('rejects a table that is not there at all', async () => {
+    const { warehouseQuery } = probeHarness({});
+
+    const present = await findPresentWarehouseTables(warehouseQuery, [
+      { table: 'audiences', requiredColumns: ['kilo_user_id'] },
+    ]);
+
+    expect([...present]).toEqual([]);
+  });
+
+  it('asks about every table the adapters read, in one query', async () => {
+    const { calls, warehouseQuery } = probeHarness({});
+    const { adapters } = harness();
+
+    await findPresentWarehouseTables(warehouseQuery, warehouseRequirements(adapters));
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].values[0]).toEqual([
+      'users',
+      'app_builder_projects',
+      'app_builder_messages',
+      'cli_sessions',
+      'system_prompt_prefix',
+      'microdollar_usage_metadata',
+    ]);
   });
 
   it('never joins the warehouse to the live primary or reads loader bookkeeping', () => {

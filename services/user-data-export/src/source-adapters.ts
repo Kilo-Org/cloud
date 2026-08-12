@@ -27,6 +27,7 @@ export type ExportRecord = {
  * `event_type` instead, and `users` has no CDC column. Naming the column on any of them
  * is a runtime error, so records from those sources are never labelled.
  */
+export const DELETED_COLUMN = '_snowflake_deleted';
 export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'microdollar_usage_metadata',
   'cli_sessions',
@@ -735,28 +736,100 @@ export const warehouseQueries = {
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
 
 /**
- * Which of the tables an export wants actually exist.
+ * Which of the tables an export wants are actually readable by it.
  *
  * The warehouse is loaded incrementally and the export ships ahead of it, so a source
  * naming a table that has not landed yet is an expected state rather than a fault. Asked
  * once per export, before anything is written, so the header can name what is missing
  * instead of the file simply ending early.
  *
- * Reads `information_schema` rather than probing each table with a real query: a probe
- * that fails is indistinguishable from a table that exists but is unreadable, and this
- * has to be a fact about existence alone.
+ * Existence of the table is not sufficient. A table can be present from an earlier load
+ * and still lack a column a newer query selects — `_snowflake_deleted` arrived table by
+ * table, and a source selecting it against a not-yet-reloaded table fails at read time
+ * with an undefined-column error rather than being classified unavailable. So this asks
+ * about columns, and a source counts as present only when every column it requires is
+ * there.
+ *
+ * Reads `information_schema` rather than probing with a real query: a probe that fails
+ * is indistinguishable from a table that exists but is momentarily unreadable, and this
+ * has to be a fact about the schema alone.
  */
-export const warehouseTableProbeQuery = `SELECT table_name
-FROM information_schema.tables
+export const warehouseColumnProbeQuery = `SELECT table_name, column_name
+FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = ANY($1::text[])`;
+
+export type WarehouseTableRequirement = { table: string; requiredColumns: readonly string[] };
+
+/**
+ * Every warehouse column each source reads, including the ones it only filters or
+ * orders on. Declared rather than parsed out of the query text, because the probe has to
+ * be exact: a column omitted here is one the export will select from a table it has just
+ * declared present.
+ *
+ * The scope columns appear on every warehouse table because both subject variants of a
+ * source are built from the same declaration, and an export must not be admitted on the
+ * strength of a table that can only serve one of its two scopes.
+ */
+const SCOPE_COLUMN_LIST = [SCOPE_COLUMNS.user, SCOPE_COLUMNS.organization] as const;
+
+export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
+  users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS)],
+  app_builder_projects: [...SCOPE_COLUMN_LIST, 'id', 'title', DELETED_COLUMN],
+  app_builder_messages: [...SCOPE_COLUMN_LIST, 'id', 'data', DELETED_COLUMN],
+  cli_sessions: [
+    ...SCOPE_COLUMN_LIST,
+    'session_id',
+    'title',
+    'git_url',
+    'git_branch',
+    'most_significant_position',
+    'least_significant_position',
+  ],
+  system_prompt_prefix: [
+    ...SCOPE_COLUMN_LIST,
+    'system_prompt_prefix_id',
+    'system_prompt_prefix',
+    DELETED_COLUMN,
+  ],
+  microdollar_usage_metadata: [...SCOPE_COLUMN_LIST, 'id', 'user_prompt_prefix'],
+};
+
+/** The probe input for a set of adapters, resolved from their declared tables. */
+export function warehouseRequirements(
+  adapters: Pick<SourceAdapter, 'warehouseTable'>[]
+): WarehouseTableRequirement[] {
+  return adapters
+    .map(adapter => adapter.warehouseTable)
+    .filter((table): table is string => table !== undefined)
+    .map(table => ({ table, requiredColumns: WAREHOUSE_SOURCE_COLUMNS[table] ?? [] }));
+}
 
 export async function findPresentWarehouseTables(
   warehouseQuery: ReplicaQuery,
-  tables: string[]
+  requirements: WarehouseTableRequirement[]
 ): Promise<Set<string>> {
-  if (tables.length === 0) return new Set();
-  const rows = await warehouseQuery(warehouseTableProbeQuery, [tables]);
-  return new Set(rows.map(row => requiredString(row.table_name, 'table_name')));
+  if (requirements.length === 0) return new Set();
+  const rows = await warehouseQuery(warehouseColumnProbeQuery, [
+    requirements.map(requirement => requirement.table),
+  ]);
+  const columnsByTable = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const table = requiredString(row.table_name, 'table_name');
+    const column = requiredString(row.column_name, 'column_name');
+    const columns = columnsByTable.get(table) ?? new Set<string>();
+    columns.add(column);
+    columnsByTable.set(table, columns);
+  }
+  return new Set(
+    requirements
+      .filter(requirement => {
+        const columns = columnsByTable.get(requirement.table);
+        // No columns at all means the table itself is absent.
+        if (!columns) return false;
+        return requirement.requiredColumns.every(column => columns.has(column));
+      })
+      .map(requirement => requirement.table)
+  );
 }
 
 /**

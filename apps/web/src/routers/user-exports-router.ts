@@ -127,27 +127,43 @@ const EXPORT_COLUMNS = sql`exports.id, exports.subject_type, exports.organizatio
  * exports immediately, including ones they requested themselves while they still held it.
  */
 async function exportableOrganizations(userId: string): Promise<{ id: string; name: string }[]> {
+  // Driven from the caller's own memberships, which are indexed on kilo_user_id, rather
+  // than from `organizations` with correlated subqueries per row. This runs on every
+  // list() call including each pagination page, so its cost has to scale with how many
+  // organizations the caller belongs to, not with how many exist.
   const { rows } = await db.execute<{ id: string; name: string }>(sql`
-    SELECT orgs.id, orgs.name
-    FROM organizations orgs
-    WHERE orgs.deleted_at IS NULL
-      AND (
-        EXISTS (
-          SELECT 1 FROM organization_memberships memberships
-          WHERE memberships.organization_id = orgs.id
-            AND memberships.kilo_user_id = ${userId}
-            AND memberships.role IN (${EXPORT_ROLES_SQL})
-        )
-        OR EXISTS (
-          SELECT 1 FROM organization_memberships memberships
-          WHERE memberships.organization_id = orgs.parent_organization_id
-            AND memberships.kilo_user_id = ${userId}
-            AND memberships.role IN (${EXPORT_ROLES_SQL})
-        )
-      )
+    SELECT DISTINCT orgs.id, orgs.name
+    FROM organization_memberships memberships
+    JOIN organizations orgs
+      ON orgs.id = memberships.organization_id
+      -- The inherited route: a role held in a parent organization reaches its children.
+      OR orgs.parent_organization_id = memberships.organization_id
+    WHERE memberships.kilo_user_id = ${userId}
+      AND memberships.role IN (${EXPORT_ROLES_SQL})
+      AND orgs.deleted_at IS NULL
     ORDER BY orgs.name, orgs.id
   `);
   return rows;
+}
+
+/**
+ * The organization is real, not soft-deleted, and the caller holds an export role on it.
+ *
+ * `ensureOrganizationAccess` answers the role half but says nothing about the
+ * organization's own state, and membership rows outlive a soft-deleted organization. So
+ * an id supplied directly — rather than picked from the list above, which filters
+ * `deleted_at` — would otherwise let a former admin export something the product treats
+ * as gone.
+ */
+async function requireExportableOrganization(
+  ctx: TRPCContext,
+  organizationId: string
+): Promise<void> {
+  const { rows } = await db.execute<{ id: string }>(sql`
+    SELECT id FROM organizations WHERE id = ${organizationId}::uuid AND deleted_at IS NULL LIMIT 1
+  `);
+  if (!rows[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  await ensureOrganizationAccess(ctx, organizationId, [...EXPORT_ROLES]);
 }
 
 function requireWebSession(authViaToken: boolean | undefined): void {
@@ -267,6 +283,7 @@ async function createExportRequest(subject: {
  * request and the redemption, so neither step can be reached on stale authority.
  */
 async function requireDownloadableExport(ctx: TRPCContext, exportId: string): Promise<void> {
+  const notFound = new TRPCError({ code: 'NOT_FOUND', message: 'Export not found' });
   const { rows } = await db.execute<{
     subject_type: 'user' | 'organization';
     organization_id: string | null;
@@ -278,12 +295,20 @@ async function requireDownloadableExport(ctx: TRPCContext, exportId: string): Pr
     LIMIT 1
   `);
   const record = rows[0];
-  if (!record) throw new TRPCError({ code: 'NOT_FOUND', message: 'Export not found' });
+  if (!record) throw notFound;
   if (record.subject_type !== 'organization') return;
-  if (!record.organization_id) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Export not found' });
+  if (!record.organization_id) throw notFound;
+
+  // Collapsed to the same NOT_FOUND as a miss, deliberately. `requireExportableOrganization`
+  // distinguishes "no such organization" from "you lack the role", which is right where the
+  // caller named the organization themselves — but here they named an export id, and letting
+  // UNAUTHORIZED through would confirm that id exists. That is the enumeration this
+  // function's uniform NOT_FOUND exists to prevent.
+  try {
+    await requireExportableOrganization(ctx, record.organization_id);
+  } catch {
+    throw notFound;
   }
-  await ensureOrganizationAccess(ctx, record.organization_id, [...EXPORT_ROLES]);
 }
 
 /**
@@ -369,9 +394,10 @@ export const userExportsRouter = createTRPCRouter({
     .input(OrganizationExportSchema)
     .mutation(async ({ ctx, input }) => {
       requireWebSession(ctx.authViaToken);
-      // Throws UNAUTHORIZED for members and billing managers. Re-checked at download,
-      // because a role can be revoked while an export is generating.
-      await ensureOrganizationAccess(ctx, input.organizationId, [...EXPORT_ROLES]);
+      // Throws UNAUTHORIZED for members and billing managers, NOT_FOUND for an
+      // organization that has been soft-deleted. Re-checked at download, because a role
+      // can be revoked, or the organization deleted, while an export is generating.
+      await requireExportableOrganization(ctx, input.organizationId);
       const row = await createExportRequest({
         kiloUserId: ctx.user.id,
         organizationId: input.organizationId,

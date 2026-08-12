@@ -347,6 +347,42 @@ describe('user exports router guards and serialization', () => {
   // An owner of a parent organization inherits access to its children, so the request
   // path accepts a child the caller has no direct membership in. Offering only direct
   // memberships would let that request succeed and then leave the export invisible.
+  // Membership rows outlive a soft-deleted organization, so a former admin can still
+  // name its id directly even though it never appears in the offered list.
+  it('refuses to export a soft-deleted organization', async () => {
+    const organization = await createTestOrganization('Export Org Deleted', owner.id, 0);
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.userExports.requestOrganization({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
+  });
+
+  // The download path answers on an export id the caller supplied, so an authorization
+  // failure must be indistinguishable from a missing export. UNAUTHORIZED would confirm
+  // the id exists.
+  it('reports an inaccessible organization export as not found, not unauthorized', async () => {
+    const organization = await createTestOrganization('Export Org Hidden', stranger.id, 0);
+    const exportId = await insertReadyOrganizationExport(stranger.id, organization.id);
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
   it('offers a child organization reached through a parent organization role', async () => {
     const parent = await createTestOrganization('Export Org Parent', owner.id, 0);
     const child = await createTestOrganization('Export Org Child', stranger.id, 0);

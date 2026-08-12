@@ -62,7 +62,7 @@ the original fee.
 Worked example, $49.00 product and $2.45 fee:
 
 | Cumulative product refund | Fee target | Incremental fee |
-| --- | ---: | ---: |
+|---|---:|---:|
 | $20.00 | $1.00 | $1.00 |
 | $49.00 | $2.45 | $1.45 |
 

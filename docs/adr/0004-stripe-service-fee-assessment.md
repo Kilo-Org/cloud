@@ -171,7 +171,7 @@ instant, not against current state at webhook delivery. Exemption history is not
     $49.00 recurring product and a $2.45 one-time fee line:
 
     | Coupon | Product net | Fee net | Result |
-    | --- | ---: | ---: | --- |
+    |---|---:|---:|---|
     | Unrestricted 20% | $39.20 | $1.96 | Both lines reduced 20% |
     | Unrestricted fixed $10 | $39.47 | $1.98 | Proportional cent allocation; effective rate within one cent |
     | Product-restricted 20% | $39.20 | $2.45 | Fee untouched; confirms the deviation signature |

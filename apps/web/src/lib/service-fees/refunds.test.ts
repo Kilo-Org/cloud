@@ -28,6 +28,7 @@ import {
   type ServiceFeeChargeRefundObservation,
   type ServiceFeeCreditNoteObservation,
   type ServiceFeeRefundAssessmentStore,
+  type ServiceFeeRefundPage,
   type ServiceFeeRefundStripeClient,
   type UnresolvedServiceFeeRefundAllocationAlertInput,
 } from '@/lib/service-fees/refunds';
@@ -275,6 +276,7 @@ function createStripeMock(
       Array<{ data: Stripe.CreditNoteLineItem[]; has_more: boolean }>
     >;
     invoiceLines?: Stripe.InvoiceLineItem[];
+    listCreditNotes?: () => Promise<ServiceFeeRefundPage<ServiceFeeCreditNoteObservation>>;
   } = {}
 ): ServiceFeeRefundStripeClient & { refunds: { list: jest.Mock; create: jest.Mock } } {
   const refundPages = options.refundPages ?? [];
@@ -287,6 +289,13 @@ function createStripeMock(
   const createRefund = jest.fn(async () => {
     throw new Error('observe helpers must not create Stripe refunds');
   });
+  const listCreditNotes = jest.fn(
+    options.listCreditNotes ??
+      (async () => ({
+        data: options.creditNotes ?? [],
+        has_more: false,
+      }))
+  );
 
   return {
     refunds: {
@@ -294,10 +303,7 @@ function createStripeMock(
       create: createRefund,
     },
     creditNotes: {
-      list: jest.fn(async () => ({
-        data: options.creditNotes ?? [],
-        has_more: false,
-      })),
+      list: listCreditNotes,
       listLineItems: jest.fn(async (id: string) => {
         const pages = options.creditNoteLinePages?.[id];
         return pages?.[0] ?? { data: [], has_more: false };
@@ -432,11 +438,14 @@ describe('observeServiceFeeChargeRefunded', () => {
   test('records unresolved metadata when credit-note lookup throws and never auto-refunds', async () => {
     const store = createMemoryRefundStore();
     await persistSettledAssessment(store);
-    const stripe = createStripeMock();
+    const stripe = createStripeMock({
+      listCreditNotes: async () => {
+        throw new Error('stripe unavailable');
+      },
+    });
     const sendAlert = jest.fn(
       async (_input: UnresolvedServiceFeeRefundAllocationAlertInput) => undefined
     );
-    (stripe.creditNotes?.list as jest.Mock).mockRejectedValueOnce(new Error('stripe unavailable'));
 
     const result = await observeServiceFeeChargeRefunded({
       store,

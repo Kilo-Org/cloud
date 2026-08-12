@@ -43,6 +43,13 @@ const invoiceItemCreate =
     (params: Stripe.InvoiceItemCreateParams) => Promise<Pick<Stripe.InvoiceItem, 'id' | 'amount'>>
   >();
 const invoiceItemDel = jest.fn<(id: string) => Promise<unknown>>();
+
+function createdInvoiceItemAssessmentKey(): string | undefined {
+  const metadata = invoiceItemCreate.mock.calls[0]?.[0]?.metadata;
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const value = metadata.serviceFeeAssessmentKey;
+  return typeof value === 'string' ? value : undefined;
+}
 const listLineItems =
   jest.fn<
     (
@@ -1587,8 +1594,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     });
     const store = createMemoryAssessmentStore();
     update.mockImplementation(async () => {
-      const assessmentKey =
-        invoiceItemCreate.mock.calls[0]?.[0]?.metadata?.serviceFeeAssessmentKey ?? 'org-checkout:x';
+      const assessmentKey = createdInvoiceItemAssessmentKey() ?? 'org-checkout:x';
       return {
         ...subscription({ customer: 'cus_1' }),
         latest_invoice: mixedDraftInvoice({
@@ -1641,7 +1647,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(invoiceItemCreate).toHaveBeenCalledTimes(1);
     expect(invoiceItemCreate.mock.calls[0]?.[0].invoice).toBeUndefined();
     expect(invoiceItemDel).not.toHaveBeenCalled();
-    const assessmentKey = invoiceItemCreate.mock.calls[0]?.[0]?.metadata?.serviceFeeAssessmentKey;
+    const assessmentKey = createdInvoiceItemAssessmentKey();
     expect(assessmentKey).toEqual(expect.stringMatching(/^org-checkout:/));
     expect(await store.findByAssessmentKey(assessmentKey ?? '')).toMatchObject({
       outcome: 'charged',
@@ -1717,11 +1723,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     });
     const createsAfterCheckout = invoiceItemCreate.mock.calls.length;
     expect(createsAfterCheckout).toBeGreaterThanOrEqual(1);
-    const createdMetadata = invoiceItemCreate.mock.calls[0]?.[0]?.metadata;
-    const assessmentKey =
-      createdMetadata && typeof createdMetadata === 'object'
-        ? createdMetadata.serviceFeeAssessmentKey
-        : undefined;
+    const assessmentKey = createdInvoiceItemAssessmentKey();
     expect(assessmentKey).toEqual(expect.stringMatching(/^org-checkout:/));
 
     const { handleKiloPassInvoiceCreated } = await import('@/lib/service-fees/invoice-created');

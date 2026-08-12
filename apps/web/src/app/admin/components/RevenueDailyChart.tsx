@@ -21,6 +21,69 @@ type ApiResponse = {
   showFreeCredits: boolean;
 };
 
+type ChartDataPoint = {
+  day: string;
+  paidRevenue: number;
+  freeCredits: number;
+  multipliedRevenue: number;
+  unmultipliedRevenue: number;
+  paidPercentage: number;
+  productRevenue: number;
+  serviceFee: number;
+  missedFees: number;
+  exemptedFees: number;
+  disputedFees: number;
+};
+
+type TooltipPayload = {
+  payload: ChartDataPoint;
+  dataKey: string;
+  value: number;
+  name: string;
+  color: string;
+};
+
+type CustomTooltipProps = {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+};
+
+function RevenueTooltip({ active, payload, label }: CustomTooltipProps) {
+  if (!active || !payload?.length) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  return (
+    <div className="bg-background rounded-lg border p-3 shadow-sm">
+      <p className="text-sm font-medium">{label}</p>
+      <div className="mt-2 space-y-1">
+        {[
+          ['Legacy Gross', data.paidRevenue],
+          ['Free Credits', data.freeCredits],
+          ['Multiplied Legacy Gross', data.multipliedRevenue],
+          ['Unmultiplied Legacy Gross', data.unmultipliedRevenue],
+          ['Product Revenue (net)', data.productRevenue],
+          ['Service Fees (net)', data.serviceFee],
+          ['Missed Fees', data.missedFees],
+          ['Exempted Fees', data.exemptedFees],
+          ['Disputed Fees', data.disputedFees],
+        ].map(([name, value]) => (
+          <p key={name} className="text-sm">
+            <span className="text-muted-foreground">{name}:</span>{' '}
+            <span className="font-medium tabular-nums">{formatDollars(value as number)}</span>
+          </p>
+        ))}
+        <p className="text-sm">
+          <span className="text-muted-foreground">Paid Credits %:</span>{' '}
+          <span className="font-medium tabular-nums">{data.paidPercentage.toFixed(1)}%</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
   const downloadData = () => {
     if (data.length === 0) return;
@@ -46,7 +109,7 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
   };
 
   // Transform data for the chart
-  const chartData = data.map(item => {
+  const chartData: ChartDataPoint[] = data.map(item => {
     const paidRevenue = item.paid_total_dollars;
     const freeCredits = item.free_total_dollars;
     const totalCredits = paidRevenue + freeCredits;
@@ -56,86 +119,32 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
       day: format(parseISO(item.transaction_day), 'MM/dd'),
       paidRevenue: paidRevenue,
       freeCredits: freeCredits,
-      multipliedRevenue: item.multiplied_total_dollars || 0,
+      multipliedRevenue: item.multiplied_total_dollars,
       unmultipliedRevenue: item.unmultiplied_total_dollars,
       paidPercentage: paidPercentage,
+      productRevenue: item.product_revenue_dollars,
+      serviceFee: item.collected_service_fee_dollars,
+      missedFees: item.missed_service_fee_dollars,
+      exemptedFees: item.exempted_service_fee_dollars,
+      disputedFees: item.disputed_service_fee_dollars,
     };
   });
 
-  // Custom tooltip with type-safe access to raw data
-  type ChartDataPoint = {
-    day: string;
-    paidRevenue: number;
-    freeCredits: number;
-    multipliedRevenue: number;
-    unmultipliedRevenue: number;
-    paidPercentage: number;
-  };
-
-  type TooltipPayload = {
-    payload: ChartDataPoint;
-    dataKey: string;
-    value: number;
-    name: string;
-    color: string;
-  };
-
-  type CustomTooltipProps = {
-    active?: boolean;
-    payload?: TooltipPayload[];
-    label?: string;
-  };
-
-  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
-    if (active && payload && payload.length > 0) {
-      // Access the raw data object directly - much more type-safe!
-      const data = payload[0]?.payload;
-
-      if (!data) return null;
-
-      return (
-        <div className="bg-background rounded-lg border p-3 shadow-sm">
-          <p className="text-sm font-medium">{label}</p>
-          <div className="mt-2 space-y-1">
-            <p className="text-sm">
-              <span className="text-muted-foreground">Paid Revenue:</span>{' '}
-              <span className="font-medium">{formatDollars(data.paidRevenue)}</span>
-            </p>
-            <p className="text-sm">
-              <span className="text-muted-foreground">Free Credits:</span>{' '}
-              <span className="font-medium">{formatDollars(data.freeCredits)}</span>
-            </p>
-            <p className="text-sm">
-              <span className="text-muted-foreground">Multiplied Revenue:</span>{' '}
-              <span className="font-medium">{formatDollars(data.multipliedRevenue)}</span>
-            </p>
-            <p className="text-sm">
-              <span className="text-muted-foreground">Unmultiplied Revenue:</span>{' '}
-              <span className="font-medium">{formatDollars(data.unmultipliedRevenue)}</span>
-            </p>
-            <p className="text-sm">
-              <span className="text-muted-foreground">Paid Credits %:</span>{' '}
-              <span className="font-medium">{data.paidPercentage.toFixed(1)}%</span>
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // Calculate dynamic Y-axis domain for better visualization
-  const maxRevenue = Math.max(
-    ...chartData.map(d =>
-      Math.max(
-        d.paidRevenue,
-        showFreeCredits ? d.freeCredits : 0,
-        d.multipliedRevenue,
-        d.unmultipliedRevenue
-      )
-    )
-  );
-  const yAxisMax = Math.ceil(maxRevenue * 1.1); // Add 10% padding
+  const maxRevenue =
+    chartData.length > 0
+      ? Math.max(
+          ...chartData.map(d =>
+            Math.max(
+              d.paidRevenue,
+              showFreeCredits ? d.freeCredits : 0,
+              d.productRevenue + d.serviceFee,
+              d.missedFees + d.exemptedFees + d.disputedFees
+            )
+          )
+        )
+      : 0;
+  const yAxisMax = Math.max(Math.ceil(maxRevenue * 1.1), 1); // Add 10% padding
 
   return (
     <Card>
@@ -143,7 +152,11 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Daily Revenue Trend</CardTitle>
-            <CardDescription>Daily breakdown of revenue metrics</CardDescription>
+            <CardDescription>
+              Legacy gross by credit-transaction date; net assessment rows by settled date (UTC),
+              including New Kilo Pass revenue. Missed, exempted, and disputed fees are expected or
+              withdrawn fee amounts, shown as subdued series.
+            </CardDescription>
           </div>
           <button
             onClick={downloadData}
@@ -168,81 +181,123 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 80, left: 20, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="day"
-                angle={-45}
-                textAnchor="end"
-                height={100}
-                className="text-xs"
-                tick={{ fontSize: 10 }}
-              />
-              <YAxis
-                yAxisId="left"
-                className="text-xs"
-                tick={{ fontSize: 10 }}
-                label={{
-                  value: 'Revenue (USD)',
-                  angle: -90,
-                  position: 'insideLeft',
-                  style: { fontSize: 12 },
-                }}
-                domain={[0, yAxisMax]}
-                tickFormatter={value => `$${value.toFixed(0)}`}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                className="text-xs"
-                tick={{ fontSize: 10 }}
-                label={{
-                  value: 'Paid Credits (%)',
-                  angle: 90,
-                  position: 'insideRight',
-                  style: { fontSize: 12 },
-                }}
-                domain={[0, 100]}
-                tickFormatter={value => `${value.toFixed(0)}%`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar
-                yAxisId="left"
-                dataKey="unmultipliedRevenue"
-                stackId="paid"
-                fill="#16a34a"
-                name="Revenue Without Multipliers"
-              />
-              <Bar
-                yAxisId="left"
-                dataKey="multipliedRevenue"
-                stackId="paid"
-                fill="#dc2626"
-                name="Revenue Due to Multipliers"
-              />
-              {showFreeCredits && (
+        {chartData.length === 0 ? (
+          <p className="text-muted-foreground py-4 text-sm">No revenue data for this range.</p>
+        ) : (
+          <div className="h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 20, right: 80, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="day"
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  className="text-xs"
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  className="text-xs"
+                  tick={{ fontSize: 10 }}
+                  label={{
+                    value: 'Revenue (USD)',
+                    angle: -90,
+                    position: 'insideLeft',
+                    style: { fontSize: 12 },
+                  }}
+                  domain={[0, yAxisMax]}
+                  tickFormatter={value => `$${value.toFixed(0)}`}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  className="text-xs"
+                  tick={{ fontSize: 10 }}
+                  label={{
+                    value: 'Paid Credits (%)',
+                    angle: 90,
+                    position: 'insideRight',
+                    style: { fontSize: 12 },
+                  }}
+                  domain={[0, 100]}
+                  tickFormatter={value => `${value.toFixed(0)}%`}
+                />
+                <Tooltip content={<RevenueTooltip />} />
+                <Legend />
                 <Bar
                   yAxisId="left"
-                  dataKey="freeCredits"
-                  fill="#f59e0b"
-                  name="Free Credits Issued"
+                  dataKey="unmultipliedRevenue"
+                  stackId="legacy"
+                  fill="#16a34a"
+                  name="Legacy Gross Without Multipliers"
                 />
-              )}
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="paidPercentage"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={{ r: 2 }}
-                name="Paid Credits %"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+                <Bar
+                  yAxisId="left"
+                  dataKey="multipliedRevenue"
+                  stackId="legacy"
+                  fill="#dc2626"
+                  name="Legacy Gross From Multipliers"
+                />
+                {showFreeCredits && (
+                  <Bar
+                    yAxisId="left"
+                    dataKey="freeCredits"
+                    fill="#f59e0b"
+                    name="Free Credits Issued"
+                  />
+                )}
+                <Bar
+                  yAxisId="left"
+                  dataKey="productRevenue"
+                  stackId="assessment"
+                  fill="#475569"
+                  name="Product Revenue (Net Assessment Rows)"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="serviceFee"
+                  stackId="assessment"
+                  fill="#94a3b8"
+                  name="Service Fees (Net)"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="missedFees"
+                  stackId="leakage"
+                  fill="#b45309"
+                  fillOpacity={0.55}
+                  name="Missed Fees (Expected)"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="exemptedFees"
+                  stackId="leakage"
+                  fill="#78716c"
+                  fillOpacity={0.55}
+                  name="Exempted Fees (Expected)"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="disputedFees"
+                  stackId="leakage"
+                  fill="#b91c1c"
+                  fillOpacity={0.55}
+                  name="Disputed Fees"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="paidPercentage"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                  name="Paid Credits %"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -112,6 +112,7 @@ describe('usage analytics scope conditions', () => {
     const { sql, params } = scopeSql({});
     expect(sql).toContain('kilo_user_id');
     expect(sql).toContain('organization_id');
+    // personal-only pins kilo_user_id to caller and organization_id IS NULL
     expect(sql).toMatch(/is null/i);
     expect(params).toEqual([CTX_USER]);
   });

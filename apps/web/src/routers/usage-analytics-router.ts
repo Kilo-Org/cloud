@@ -63,10 +63,15 @@ export type {
   UsageAnalyticsFilters,
 } from '@/routers/usage-analytics-schemas';
 
+// ---------------------------------------------------------------------------
+// Table / tier resolution
+// ---------------------------------------------------------------------------
+
 type GranularityTier = 'hourly' | 'daily' | 'monthly';
 
 type TableMeta = {
   tier: GranularityTier;
+  /** Effective granularity after auto-downgrade (may differ from requested). */
   effectiveGranularity: Granularity;
 };
 
@@ -76,12 +81,13 @@ function resolveTier(granularity: Granularity, startDate: string): TableMeta {
   const ageDays = (now - startMs) / (24 * 60 * 60 * 1000);
 
   if (granularity === 'hour') {
-    // Keep the previous 7-day hourly window so a 30d/1y "hour" request does
-    // not emit tens of thousands of buckets. periodToDateRange('7d') snaps to
-    // UTC midnight, so ageDays can be up to ~7.99.
+    // Use < 8 rather than <= 7: periodToDateRange('7d') snaps the start to
+    // UTC midnight, so ageDays can be up to ~7.99 for a genuine "past week"
+    // request. The < 8 threshold keeps all 7-day windows in the hourly tier.
     if (ageDays < 8) {
       return { tier: 'hourly', effectiveGranularity: 'hour' };
     }
+    // Auto-downgrade: hourly buckets are only used for the past 7 days.
     return { tier: 'daily', effectiveGranularity: 'day' };
   }
 
@@ -92,6 +98,14 @@ function resolveTier(granularity: Granularity, startDate: string): TableMeta {
   return { tier: 'monthly', effectiveGranularity: 'month' };
 }
 
+// ---------------------------------------------------------------------------
+// SQL WHERE clause builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Accumulates SQL WHERE clauses. Callers push conditions in any order;
+ * `toSQL()` joins them with AND.
+ */
 export class WhereBuilder {
   readonly conditions: SQL[] = [];
 
@@ -104,6 +118,11 @@ export class WhereBuilder {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Authorization
+// ---------------------------------------------------------------------------
+
+/** True when the filters target one or more organizations (vs personal usage). */
 function isOrgScope(filters: UsageAnalyticsFilters): boolean {
   return Boolean(filters.organizationId) || (filters.organizationIds?.length ?? 0) > 0;
 }
@@ -111,6 +130,12 @@ function isOrgScope(filters: UsageAnalyticsFilters): boolean {
 async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilters): Promise<void> {
   const userId = ctx.user.id;
 
+  // Multi-org aggregate ("All Organizations"): always org-wide, and the caller
+  // must be owner/billing_manager of every org in the list. A parent owner has
+  // inherited owner/billing access to children, so this passes for the parent
+  // plus all of its children while rejecting any org they cannot administer.
+  // Batched into a fixed number of queries so a large org list cannot fan out
+  // into one authorization query per id.
   if (filters.organizationIds && filters.organizationIds.length > 0) {
     await ensureOrganizationsAccess(ctx, filters.organizationIds, ORGANIZATION_BILLING_ROLES);
     return;
@@ -141,6 +166,10 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
   }
 }
 
+// ---------------------------------------------------------------------------
+// WHERE clause helpers
+// ---------------------------------------------------------------------------
+
 function buildDateConditions(where: WhereBuilder, filters: UsageAnalyticsFilters): void {
   where.add(gte(microdollar_usage.created_at, filters.startDate));
   where.add(lt(microdollar_usage.created_at, filters.endDate));
@@ -152,6 +181,8 @@ export function buildScopeConditions(
   ctxUserId: string
 ): void {
   if (filters.organizationIds && filters.organizationIds.length > 0) {
+    // Aggregate across the parent org and its children. Always org-wide, so
+    // honor any explicit user include/exclude filters but never pin to self.
     where.add(inArray(microdollar_usage.organization_id, filters.organizationIds));
     if (filters.userIds && filters.userIds.length > 0) {
       where.add(inArray(microdollar_usage.kilo_user_id, filters.userIds));
@@ -176,6 +207,7 @@ export function buildScopeConditions(
   } else {
     where.add(eq(microdollar_usage.kilo_user_id, ctxUserId));
     if (filters.personalScope === 'personal-only') {
+      // Personal usage is stored with a NULL organization_id.
       where.add(isNull(microdollar_usage.organization_id));
     }
   }
@@ -235,6 +267,10 @@ function buildWhereClause(
   return where;
 }
 
+// ---------------------------------------------------------------------------
+// Metric SQL expression
+// ---------------------------------------------------------------------------
+
 export function costColumnFor(costSource: CostSource): SQL<number> {
   switch (costSource) {
     case 'cost':
@@ -293,6 +329,19 @@ function metricExprSql(metric: Metric, costSource: CostSource): SQL<number> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Bucket expression for timeseries / table grouping
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a SQL expression that formats the time column as a string bucket,
+ * matching the granularity the caller requested.
+ *
+ * Hourly  → 'YYYY-MM-DD HH24:MI:SS'  (matches what Postgres timestamp::text returns)
+ * Day     → 'YYYY-MM-DD'
+ * Week    → 'YYYY-MM-DD' of the Monday-aligned week start
+ * Month   → 'YYYY-MM-DD' of the first of the month
+ */
 function bucketExprSql(effectiveGranularity: Granularity): SQL<string> {
   const createdAtUtc = sql`${microdollar_usage.created_at} AT TIME ZONE 'UTC'`;
   if (effectiveGranularity === 'hour') {
@@ -304,8 +353,13 @@ function bucketExprSql(effectiveGranularity: Granularity): SQL<string> {
   if (effectiveGranularity === 'month') {
     return sql<string>`TO_CHAR(DATE_TRUNC('month', ${createdAtUtc}), 'YYYY-MM-DD')`;
   }
+  // 'day'
   return sql<string>`TO_CHAR(DATE_TRUNC('day', ${createdAtUtc}), 'YYYY-MM-DD')`;
 }
+
+// ---------------------------------------------------------------------------
+// Dimension column name
+// ---------------------------------------------------------------------------
 
 function dimensionColumn(dimension: Dimension): SQL<string> {
   switch (dimension) {
@@ -328,11 +382,20 @@ const usageMetadataJoin = eq(microdollar_usage.id, microdollar_usage_metadata.id
 const usageFeatureJoin = eq(microdollar_usage_metadata.feature_id, feature.feature_id);
 const usageModeJoin = eq(microdollar_usage_metadata.mode_id, mode.mode_id);
 
+// ---------------------------------------------------------------------------
+// getSummary
+// ---------------------------------------------------------------------------
+
 function ratioSafe(numerator: number, denominator: number): number {
   if (denominator === 0) return 0;
   return numerator / denominator;
 }
 
+/**
+ * Convert an aggregate value (often returned as a string by Postgres) to a
+ * JS number. Values above `MAX_SAFE_INTEGER` are logged as a warning but still
+ * returned so the UI does not crash.
+ */
 function toSafeNumber(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -343,6 +406,10 @@ function toSafeNumber(value: unknown): number {
   }
   return n;
 }
+
+// ---------------------------------------------------------------------------
+// User list (for org context)
+// ---------------------------------------------------------------------------
 
 const MAX_USER_LABEL_LOOKUP_IDS = 1_000;
 
@@ -361,6 +428,10 @@ const UserListOutputSchema = z.object({
   ),
 });
 
+// ---------------------------------------------------------------------------
+// Scope organizations (org usage page Scope selector)
+// ---------------------------------------------------------------------------
+
 const ScopeOrganizationsInputSchema = z.object({
   organizationId: z.uuid(),
 });
@@ -373,6 +444,7 @@ const ScopeOrganizationSchema = z.object({
 const ScopeOrganizationsOutputSchema = z.object({
   organizationId: z.string(),
   organizationName: z.string(),
+  /** Direct child organizations, sorted by name. Empty when not a parent org. */
   children: z.array(ScopeOrganizationSchema),
 });
 
@@ -414,6 +486,10 @@ function queryScope(input: UsageAnalyticsFilters): 'org' | 'user' {
 function queryPeriod(input: UsageAnalyticsFilters): string {
   return `${input.startDate}/${input.endDate}`;
 }
+
+// ---------------------------------------------------------------------------
+// Router definition
+// ---------------------------------------------------------------------------
 
 export const usageAnalyticsRouter = createTRPCRouter({
   getSummary: baseProcedure
@@ -591,6 +667,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
       );
 
       const values = rows.map(row => ({ key: row.key ?? '', value: toSafeNumber(row.value) }));
+      // Percentages are relative to the *returned* rows (limited by input.limit).
+      // They will not reflect the true share when the result set is capped.
       const totalValue = values.reduce((s, r) => s + r.value, 0);
 
       return {
@@ -616,6 +694,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const where = buildWhereClause(input, ctx.user.id, true);
       const requestedDims = input.groupBy;
 
+      // For dimensions not in groupBy, emit an empty string constant so the
+      // row shape stays stable regardless of which dimensions were requested.
       const featExpr = requestedDims.includes('feature') ? featureName : sql<string>`''`;
       const modelExpr = requestedDims.includes('model') ? modelName : sql<string>`''`;
       const modeExpr = requestedDims.includes('mode') ? modeName : sql<string>`''`;
@@ -625,6 +705,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const providerExpr = requestedDims.includes('provider') ? providerName : sql<string>`''`;
       const projectExpr = requestedDims.includes('project') ? projectName : sql<string>`''`;
 
+      // GROUP BY columns: bucket + each requested dimension column
       const dimGroupBy = requestedDims.map(d => dimensionColumn(d));
       const groupByClause = [bucketExpr, ...dimGroupBy];
 
@@ -716,6 +797,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
 
+      // Exclude soft-deleted children so they never appear in the scope list or
+      // get folded into the All Organizations aggregate.
       const children = await readDb
         .select({ id: organizations.id, name: organizations.name })
         .from(organizations)
@@ -756,6 +839,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
+      // Require access to every requested org (mirrors the single-org guard).
       const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
       if (!hasAccessToAll) {
         throw new TRPCError({
@@ -764,6 +848,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         });
       }
 
+      // Only owner/billing_manager of *every* requested org may resolve other
+      // members; anyone else can resolve only their own id.
       const canSeeAllMembers = input.organizationIds.every(orgId => {
         const role = accessByOrg.get(orgId);
         return role === 'owner' || role === 'billing_manager';

@@ -592,8 +592,9 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.to).toBe(testUser.google_user_email);
     expect(topUpEmail.subject).toBe('Your Kilo org credit top-up');
     expect(topUpEmail.html).toContain('Team credits added');
-    expect(topUpEmail.html).toContain('Amount:</strong> $50.00 USD');
+    expect(topUpEmail.html).toContain('Amount:</strong>');
     expect(topUpEmail.html).toContain('Credits:</strong> $50.00 USD');
+    expect(topUpEmail.html).toContain('$50.00 USD');
     expect(topUpEmail.html).toContain(
       'A Kilo credit top-up has been processed for Test Organization. The credits are now available to the organization.'
     );
@@ -633,18 +634,51 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.subject).toBe('Kilo team auto top-up successful');
     expect(topUpEmail.html).toContain('Team auto top-up was successful');
     expect(topUpEmail.html).toContain('$25.00 USD');
+    expect(topUpEmail.html).toContain('Amount:</strong>');
+    expect(topUpEmail.html).not.toContain('Service fee (5%)');
     expect(topUpEmail.html).toContain(
       'Test Organization was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
     );
     expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
     expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/ch');
+  });
+
+  test('itemizes credits added, service fee, and gross when a positive fee is passed', async () => {
+    const amountInCents = 5000;
+    const stripePaymentId = 'pi_test_org_service_fee';
+    mockResolveStripeReceiptUrl.mockResolvedValueOnce('https://pay.stripe.test/receipts/fee');
+
+    await processTopupForOrganization(
+      testUser.id,
+      testOrganization.id,
+      amountInCents,
+      {
+        type: 'stripe',
+        stripe_payment_id: stripePaymentId,
+      },
+      {
+        serviceFeeCents: 250,
+        grossPaidCents: 5250,
+        creditsCents: 5000,
+      }
+    );
+
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [topUpEmail] = sendViaMailgunMock.mock.calls[0];
+    expect(topUpEmail.html).toContain('Credits added:</strong>');
+    expect(topUpEmail.html).toContain('$50.00 USD');
+    expect(topUpEmail.html).toContain('Service fee (5%):</strong> $2.50 USD');
+    expect(topUpEmail.html).toContain('Total paid:</strong> $52.50 USD');
+    expect(topUpEmail.html).not.toContain('Credits:</strong> $50.00 USD');
+    expect(topUpEmail.html).not.toContain('Credit principal');
+    expect(topUpEmail.html).not.toContain('Amount:</strong> $50.00 USD');
 
     const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
     expect(emailMarkers).toHaveLength(1);
     expect(emailMarkers[0]).toMatchObject({
       email_type: 'organization_credits_top_up_confirmation',
       idempotency_key: stripePaymentId,
-      user_id: null,
+      user_id: testUser.id,
       organization_id: testOrganization.id,
     });
   });

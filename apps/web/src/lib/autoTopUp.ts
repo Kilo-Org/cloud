@@ -261,8 +261,22 @@ async function performAutoTopUpForEntity(
     // Credit application is handled by the `invoice.paid` webhook.
     const invoiceMetadata: Record<string, string> =
       entity.type === 'user'
-        ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
-        : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
+        ? {
+            type: 'auto-topup',
+            kiloUserId: entity.user.id,
+            traceId,
+            amountCents: String(amountCents),
+            serviceFeePrincipalMinor: String(amountCents),
+            serviceFeeFlow: 'personal_auto_top_up',
+          }
+        : {
+            type: 'org-auto-topup',
+            organizationId: entity.organization.id,
+            traceId,
+            amountCents: String(amountCents),
+            serviceFeePrincipalMinor: String(amountCents),
+            serviceFeeFlow: 'organization_auto_top_up',
+          };
 
     const invoice = await client.invoices.create({
       customer: stripe_customer_id,

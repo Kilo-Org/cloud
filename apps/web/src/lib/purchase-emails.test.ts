@@ -24,7 +24,10 @@ import {
 import type * as creditBillingModule from '@/lib/kiloclaw/credit-billing';
 import {
   renderTemplate,
+  buildCreditsTopUpCreditsRowSection,
+  buildCreditsTopUpInfoRow,
   buildCreditsTopUpReceiptSection,
+  buildCreditsTopUpServiceFeeSection,
   subjects,
   sendCreditsTopUpEmail,
   sendKiloClawSubscriptionStartedEmail,
@@ -91,39 +94,104 @@ const stripeChargeRetrieveMock = jest.mocked(stripeClient.charges.retrieve);
 const stripeInvoiceRetrieveMock = jest.mocked(stripeClient.invoices.retrieve);
 const stripePaymentIntentRetrieveMock = jest.mocked(stripeClient.paymentIntents.retrieve);
 
+function feeFreeTopUpCents(cents: number) {
+  return {
+    principalCents: cents,
+    serviceFeeCents: 0,
+    grossPaidCents: cents,
+    creditsCents: cents,
+  };
+}
+
+function creditsTopUpTemplateVars(
+  overrides: Partial<{
+    heading: string;
+    intro: string;
+    amount_label: string;
+    amount_usd: string;
+    service_fee_section: ReturnType<typeof buildCreditsTopUpServiceFeeSection>;
+    credits_row_section: ReturnType<typeof buildCreditsTopUpCreditsRowSection>;
+    purchase_date: string;
+    credits_url: string;
+    receipt_section: ReturnType<typeof buildCreditsTopUpReceiptSection>;
+    year: string;
+  }> = {}
+) {
+  return {
+    heading: 'Thanks for your top-up',
+    intro: 'hello',
+    amount_label: 'Amount',
+    amount_usd: '15.00',
+    service_fee_section: buildCreditsTopUpServiceFeeSection({
+      serviceFeeCents: 0,
+      grossPaidCents: 1500,
+    }),
+    credits_row_section: buildCreditsTopUpCreditsRowSection({
+      creditsCents: 1500,
+      hasServiceFee: false,
+    }),
+    purchase_date: 'January 1, 2026',
+    credits_url: 'https://app.kilocode.ai/credits',
+    receipt_section: buildCreditsTopUpReceiptSection('https://stripe.test/receipt'),
+    year: '2026',
+    ...overrides,
+  };
+}
+
 describe('creditsTopUp template', () => {
   test('renders required fields', () => {
-    const html = renderTemplate('creditsTopUp', {
-      heading: 'Thanks for your top-up',
-      intro: 'hello',
-      amount_usd: '15.00',
-      credits_usd: '15.00',
-      purchase_date: 'January 1, 2026',
-      credits_url: 'https://app.kilocode.ai/credits',
-      receipt_section: buildCreditsTopUpReceiptSection('https://stripe.test/receipt'),
-      year: '2026',
-    });
+    const html = renderTemplate('creditsTopUp', creditsTopUpTemplateVars());
 
     expect(html).toContain('Thanks for your top-up');
-    expect(html).toContain('$15.00');
+    expect(html).toContain('<strong style="color: #1a1a1a">Amount:</strong>');
+    expect(html).toContain('$15.00 USD');
+    expect(html).toContain('<strong style="color: #1a1a1a">Credits:</strong> $15.00 USD');
     expect(html).toContain('January 1, 2026');
     expect(html).toContain('https://app.kilocode.ai/credits');
     expect(html).toContain('https://stripe.test/receipt');
+    expect(html).not.toContain('Service fee (5%)');
+    expect(html).not.toContain('Credit principal');
+    expect(html).not.toContain('Total paid');
   });
 
   test('omits receipt section when receipt URL is missing', () => {
-    const html = renderTemplate('creditsTopUp', {
-      heading: 'h',
-      intro: 'i',
-      amount_usd: '5.00',
-      credits_usd: '5.00',
-      purchase_date: 'January 1, 2026',
-      credits_url: 'https://app.kilocode.ai/credits',
-      receipt_section: buildCreditsTopUpReceiptSection(null),
-      year: '2026',
-    });
+    const html = renderTemplate(
+      'creditsTopUp',
+      creditsTopUpTemplateVars({
+        heading: 'h',
+        intro: 'i',
+        amount_usd: '5.00',
+        receipt_section: buildCreditsTopUpReceiptSection(null),
+      })
+    );
 
     expect(html).not.toContain('View your Stripe receipt');
+  });
+
+  test('injects escaped service-fee rows without template conditionals', () => {
+    const html = renderTemplate(
+      'creditsTopUp',
+      creditsTopUpTemplateVars({
+        amount_label: 'Credits added',
+        amount_usd: '20.00',
+        service_fee_section: buildCreditsTopUpServiceFeeSection({
+          serviceFeeCents: 100,
+          grossPaidCents: 2100,
+        }),
+        credits_row_section: buildCreditsTopUpCreditsRowSection({
+          creditsCents: 2000,
+          hasServiceFee: true,
+        }),
+      })
+    );
+
+    expect(html).toContain('<strong style="color: #1a1a1a">Credits added:</strong>');
+    expect(html).toContain('$20.00 USD');
+    expect(html).toContain('<strong style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD');
+    expect(html).toContain('<strong style="color: #1a1a1a">Total paid:</strong> $21.00 USD');
+    expect(html).not.toContain('<strong style="color: #1a1a1a">Credits:</strong>');
+    expect(html).not.toContain('Credit principal');
+    expect(html).not.toContain('Amount:');
   });
 });
 
@@ -643,8 +711,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     const result = await sendCreditsTopUpEmail({
       to: 'recipient@example.com',
       variant: 'manual',
-      amountCents: 1500,
-      creditsCents: 1500,
+      ...feeFreeTopUpCents(1500),
       purchaseDate: new Date('2026-01-15T12:00:00Z'),
       receiptUrl: 'https://pay.stripe.com/receipts/abc',
     });
@@ -654,19 +721,114 @@ describe('sendCreditsTopUpEmail payload', () => {
     const [params] = sendViaMailgunMock.mock.calls[0];
     expect(params.to).toBe('recipient@example.com');
     expect(params.subject).toBe(subjects.creditsTopUp);
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Amount:</strong>');
     expect(params.html).toContain('$15.00 USD');
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Credits:</strong> $15.00 USD');
     expect(params.html).toContain('January 15, 2026');
     expect(params.html).toContain('/credits');
     expect(params.html).toContain('https://pay.stripe.com/receipts/abc');
     expect(params.html).toContain('View your Stripe receipt');
+    expect(params.html).not.toContain('Service fee (5%)');
+    expect(params.html).not.toContain('Credit principal');
+    expect(params.html).not.toContain('Total paid');
+  });
+
+  test('positive service fee renders credits added, fee, total paid, and date', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'recipient@example.com',
+      variant: 'manual',
+      principalCents: 2000,
+      serviceFeeCents: 100,
+      grossPaidCents: 2100,
+      creditsCents: 2000,
+      purchaseDate: new Date('2026-01-15T12:00:00Z'),
+      receiptUrl: null,
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Credits added:</strong>');
+    expect(params.html).toContain(
+      '<strong style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
+    );
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Total paid:</strong> $21.00 USD');
+    expect(params.html).toContain('$20.00 USD');
+    expect(params.html).not.toContain('<strong style="color: #1a1a1a">Credits:</strong>');
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Date:</strong> January 15, 2026');
+    expect(params.html).not.toContain('Amount:');
+    expect(params.html).not.toContain('Credit principal');
+  });
+
+  test('fee-free top-ups omit the fee row without exposing an exemption reason', async () => {
+    const feeSection = buildCreditsTopUpServiceFeeSection({
+      serviceFeeCents: 0,
+      grossPaidCents: 1500,
+    });
+    expect(feeSection.html).toBe('');
+
+    await sendCreditsTopUpEmail({
+      to: 'recipient@example.com',
+      variant: 'manual',
+      ...feeFreeTopUpCents(1500),
+      purchaseDate: new Date('2026-01-15T12:00:00Z'),
+      receiptUrl: null,
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Amount:</strong>');
+    expect(params.html).toContain('$15.00 USD');
+    expect(params.html).toContain('<strong style="color: #1a1a1a">Credits:</strong> $15.00 USD');
+    expect(params.html).not.toContain('Service fee (5%)');
+    expect(params.html).not.toContain('Credit principal');
+    expect(params.html).not.toContain('Total paid');
+    expect(params.html).not.toContain('exempt');
+    expect(params.html).not.toContain('waiver');
+    expect(params.html).not.toContain('failed to apply');
+  });
+
+  test('escapes organization names, receipt URLs, and optional fee-row interpolations', async () => {
+    const injectedRow = buildCreditsTopUpInfoRow(
+      'Service fee (5%)<script>alert(1)</script>',
+      '$1.00 USD & more'
+    );
+    expect(injectedRow).toContain('Service fee (5%)&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(injectedRow).toContain('$1.00 USD &amp; more');
+    expect(injectedRow).not.toContain('<script>alert(1)</script>');
+
+    const receipt = buildCreditsTopUpReceiptSection(
+      'https://stripe.test/receipt?q="><script>alert(1)</script>'
+    );
+    expect(receipt.html).toContain('&quot;');
+    expect(receipt.html).toContain('&lt;script&gt;');
+    expect(receipt.html).not.toContain('<script>alert(1)</script>');
+
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_manual',
+      principalCents: 2000,
+      serviceFeeCents: 100,
+      grossPaidCents: 2100,
+      creditsCents: 2000,
+      purchaseDate: new Date('2026-04-01T00:00:00Z'),
+      receiptUrl: 'https://pay.stripe.com/receipts/" onclick="alert(1)',
+      organizationId: 'org_123',
+      organizationName: 'Acme <script>alert(1)</script>',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain('Acme &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(params.html).not.toContain('<script>alert(1)</script>');
+    expect(params.html).toContain('&quot;');
+    expect(params.html).not.toContain('" onclick="alert(1)');
+    expect(params.html).toContain(
+      '<strong style="color: #1a1a1a">Service fee (5%):</strong> $1.00 USD'
+    );
   });
 
   test('auto variant overrides the subject and swaps the heading copy', async () => {
     await sendCreditsTopUpEmail({
       to: 'recipient@example.com',
       variant: 'auto',
-      amountCents: 2000,
-      creditsCents: 2000,
+      ...feeFreeTopUpCents(2000),
       purchaseDate: new Date('2026-02-01T00:00:00Z'),
       receiptUrl: null,
     });
@@ -681,8 +843,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     await sendCreditsTopUpEmail({
       to: 'billing@example.com',
       variant: 'org_manual',
-      amountCents: 2500,
-      creditsCents: 2500,
+      ...feeFreeTopUpCents(2500),
       purchaseDate: new Date('2026-04-01T00:00:00Z'),
       receiptUrl: 'https://pay.stripe.com/receipts/org-manual',
       organizationId: 'org_123',
@@ -705,8 +866,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     await sendCreditsTopUpEmail({
       to: 'billing@example.com',
       variant: 'org_auto',
-      amountCents: 4000,
-      creditsCents: 4000,
+      ...feeFreeTopUpCents(4000),
       purchaseDate: new Date('2026-05-01T00:00:00Z'),
       receiptUrl: null,
       organizationId: 'org_456',
@@ -729,8 +889,7 @@ describe('sendCreditsTopUpEmail payload', () => {
   const invalidOrganizationTopUpEmailParams: Parameters<typeof sendCreditsTopUpEmail>[0] = {
     to: 'billing@example.com',
     variant: 'org_manual',
-    amountCents: 2500,
-    creditsCents: 2500,
+    ...feeFreeTopUpCents(2500),
     purchaseDate: new Date('2026-04-01T00:00:00Z'),
     receiptUrl: null,
     organizationName: 'Acme Labs',
@@ -745,8 +904,7 @@ describe('sendCreditsTopUpEmail payload', () => {
       sendCreditsTopUpEmail({
         to: 'billing@example.com',
         variant: 'org_manual',
-        amountCents: 2500,
-        creditsCents: 2500,
+        ...feeFreeTopUpCents(2500),
         purchaseDate: new Date('2026-04-01T00:00:00Z'),
         receiptUrl: null,
         organizationName: 'Acme Labs',
@@ -760,8 +918,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     await sendCreditsTopUpEmail({
       to: 'billing@example.com',
       variant: 'org_manual',
-      amountCents: 2500,
-      creditsCents: 2500,
+      ...feeFreeTopUpCents(2500),
       purchaseDate: new Date('2026-04-01T00:00:00Z'),
       receiptUrl: null,
       creditsUrl: '',
@@ -780,8 +937,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     await sendCreditsTopUpEmail({
       to: 'recipient@example.com',
       variant: 'manual',
-      amountCents: 500,
-      creditsCents: 500,
+      ...feeFreeTopUpCents(500),
       purchaseDate: new Date('2026-03-01T00:00:00Z'),
       receiptUrl: null,
     });
@@ -797,8 +953,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     const result = await sendCreditsTopUpEmail({
       to: 'bad@example.com',
       variant: 'manual',
-      amountCents: 1000,
-      creditsCents: 1000,
+      ...feeFreeTopUpCents(1000),
       purchaseDate: new Date(),
       receiptUrl: null,
     });
@@ -813,8 +968,7 @@ describe('sendCreditsTopUpEmail payload', () => {
     const result = await sendCreditsTopUpEmail({
       to: 'recipient@example.com',
       variant: 'manual',
-      amountCents: 1000,
-      creditsCents: 1000,
+      ...feeFreeTopUpCents(1000),
       purchaseDate: new Date(),
       receiptUrl: null,
     });

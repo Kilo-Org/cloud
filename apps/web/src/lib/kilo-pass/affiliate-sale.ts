@@ -139,9 +139,10 @@ export async function enqueueKiloPassAffiliateSaleForInvoice(params: {
   invoice: Stripe.Invoice;
   stripe: Stripe;
   context: KiloPassAffiliateSaleContext | null;
+  productAmountMinor: number;
 }): Promise<void> {
-  const { eventId, invoice, stripe, context } = params;
-  if (!context || invoice.amount_paid <= 0) {
+  const { eventId, invoice, stripe, context, productAmountMinor } = params;
+  if (!context || productAmountMinor <= 0) {
     return;
   }
 
@@ -164,7 +165,7 @@ export async function enqueueKiloPassAffiliateSaleForInvoice(params: {
       }),
       eventDate,
       orderId: invoice.id,
-      amount: invoice.amount_paid / 100,
+      amount: productAmountMinor / 100,
       currencyCode: invoice.currency ?? 'usd',
       ...getKiloPassAffiliateSaleReportingFields(context),
       ...(promoCode ? { promoCode } : {}),

@@ -19,6 +19,8 @@ jest.mock('@/lib/kilo-pass-org/stripe-adapter', () => ({
   handleOrganizationKiloPassInvoicePaid: jest.fn().mockResolvedValue(true),
   handleOrganizationKiloPassPaymentAdverseForInvoice: jest.fn(),
   handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
+  stagePreparedOrganizationKiloPassServiceFeeItem: jest.fn().mockResolvedValue(null),
+  discardStagedOrganizationKiloPassServiceFeeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock organization-seats to avoid DB calls

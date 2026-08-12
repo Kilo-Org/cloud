@@ -60,6 +60,24 @@ import type Stripe from 'stripe';
 import type dayjsType from 'dayjs';
 import type utcType from 'dayjs/plugin/utc';
 import type * as Sentry from '@sentry/nextjs';
+import type { CreatePersonalKiloPassCheckoutSession } from '@/routers/kilo-pass-router';
+import type {
+  ServiceFeeAssessmentRecord,
+  ServiceFeeAssessmentStore,
+} from '@/lib/service-fees/assessments';
+import {
+  SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+  SERVICE_FEE_DESCRIPTION,
+  SERVICE_FEE_METADATA_TYPE,
+  SERVICE_FEE_RATE_BASIS_POINTS,
+  SERVICE_FEE_VERSION,
+} from '@/lib/service-fees/constants';
+import {
+  SERVICE_FEE_FAILURE_APPLICATION,
+  type CheckoutSessionLike,
+  type ServiceFeeCheckoutDependencies,
+} from '@/lib/service-fees/checkout';
+import { buildInheritedInlineServiceFeeTaxInput } from '@/lib/service-fees/tax';
 
 const PROMO_OFFER_ACTIVE_TEST_TIME = '2026-05-06T12:00:00.000Z';
 const PROMO_OFFER_EXPIRED_TEST_TIME = '2026-05-07T00:00:00.000Z';
@@ -81,6 +99,8 @@ type StripeMock = {
     sessions: {
       create: ReturnType<typeof jest.fn>;
       retrieve: ReturnType<typeof jest.fn>;
+      expire: ReturnType<typeof jest.fn>;
+      listLineItems: ReturnType<typeof jest.fn>;
     };
   };
   billingPortal: {
@@ -90,6 +110,9 @@ type StripeMock = {
   };
   invoices: {
     list: ReturnType<typeof jest.fn>;
+  };
+  prices: {
+    retrieve: ReturnType<typeof jest.fn>;
   };
 };
 
@@ -324,9 +347,69 @@ type KiloPassCaller = {
 type Caller = { kiloPass: KiloPassCaller };
 
 let createCallerForUser: (userId: string) => Promise<Caller>;
+let createPersonalKiloPassCheckoutSession: CreatePersonalKiloPassCheckoutSession;
 
 function freezeKiloPassClock(nowIso: string): void {
   mockKiloPassNowIso = nowIso;
+}
+
+function createMemoryAssessmentStore(): ServiceFeeAssessmentStore {
+  const rows = new Map<string, ServiceFeeAssessmentRecord>();
+  const store: ServiceFeeAssessmentStore = {
+    async transact(fn) {
+      return fn(store);
+    },
+    async findByAssessmentKey(assessmentKey) {
+      const row = rows.get(assessmentKey);
+      return row ? { ...row, metadata: { ...row.metadata } } : null;
+    },
+    async insert(record) {
+      if (rows.has(record.assessmentKey)) {
+        throw new Error(`duplicate assessment_key ${record.assessmentKey}`);
+      }
+      const copy = { ...record, metadata: { ...record.metadata } };
+      rows.set(record.assessmentKey, copy);
+      return { ...copy };
+    },
+    async update(assessmentKey, patch) {
+      const existing = rows.get(assessmentKey);
+      if (!existing) throw new Error(`missing ${assessmentKey}`);
+      const next = {
+        ...existing,
+        ...patch,
+        metadata: { ...existing.metadata, ...(patch.metadata ?? {}) },
+      };
+      rows.set(assessmentKey, next);
+      return { ...next };
+    },
+  };
+  return store;
+}
+
+type PersonalKiloPassCheckoutTestDeps = ServiceFeeCheckoutDependencies & {
+  createSession?: (params: Stripe.Checkout.SessionCreateParams) => Promise<CheckoutSessionLike>;
+};
+
+function kiloPassCheckoutDeps(
+  store: ServiceFeeAssessmentStore,
+  overrides: Partial<PersonalKiloPassCheckoutTestDeps> = {}
+): PersonalKiloPassCheckoutTestDeps {
+  return {
+    store,
+    now: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+    sendAlert: jest.fn(async () => undefined),
+    stripe: {
+      prices: {
+        retrieve: async () => ({
+          id: 'price_test_kilo_pass',
+          currency: 'usd',
+          unit_amount: 4900,
+          tax_behavior: 'unspecified',
+        }),
+      },
+    },
+    ...overrides,
+  };
 }
 
 jest.mock('@/lib/kilo-pass/dayjs', () => {
@@ -363,6 +446,8 @@ jest.mock('@/lib/stripe-client', () => {
       sessions: {
         create: jest.fn(),
         retrieve: jest.fn(),
+        expire: jest.fn(),
+        listLineItems: jest.fn(),
       },
     },
     billingPortal: {
@@ -372,6 +457,9 @@ jest.mock('@/lib/stripe-client', () => {
     },
     invoices: {
       list: jest.fn(),
+    },
+    prices: {
+      retrieve: jest.fn(),
     },
   };
 
@@ -668,6 +756,7 @@ describe('kiloPassRouter', () => {
     // Delay importing the tRPC caller factory until after mocks are registered,
     // otherwise router imports will capture the real Stripe client.
     ({ createCallerForUser } = await import('@/routers/test-utils'));
+    ({ createPersonalKiloPassCheckoutSession } = await import('@/routers/kilo-pass-router'));
   });
 
   beforeEach(() => {
@@ -680,8 +769,21 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.retrieve.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
     stripeMock.checkout.sessions.retrieve.mockReset();
+    stripeMock.checkout.sessions.expire.mockReset();
+    stripeMock.checkout.sessions.listLineItems.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
+    stripeMock.prices.retrieve.mockReset();
+    stripeMock.prices.retrieve.mockResolvedValue({
+      id: 'price_test_kilo_pass',
+      currency: 'usd',
+      unit_amount: 4900,
+      tax_behavior: 'unspecified',
+    });
+    stripeMock.checkout.sessions.listLineItems.mockResolvedValue({
+      data: [],
+      has_more: false,
+    });
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
     getStoreCompletionMock().completeStoreKiloPassPurchase.mockReset();
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockReset();
@@ -5112,6 +5214,8 @@ describe('kiloPassRouter', () => {
     it('creates a checkout session with empty affiliate metadata when attribution is absent', async () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_test_ok',
+        created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
         url: 'https://stripe.example.test/checkout',
       });
 
@@ -5133,28 +5237,36 @@ describe('kiloPassRouter', () => {
       });
 
       expect(result).toEqual({ url: 'https://stripe.example.test/checkout' });
+      expect(stripeMock.prices.retrieve).toHaveBeenCalledWith('price_test_kilo_pass');
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
         expect.objectContaining({
           mode: 'subscription',
           customer: user.stripe_customer_id,
+          allow_promotion_codes: true,
           line_items: [{ price: 'price_test_kilo_pass', quantity: 1 }],
           success_url: expect.stringContaining('/payments/kilo-pass/awarding'),
           subscription_data: {
-            metadata: {
+            metadata: expect.objectContaining({
               type: 'kilo-pass',
               kiloUserId: user.id,
               tier: 'tier_49',
               cadence: 'yearly',
               affiliateTrackingId: '',
-            },
+              serviceFeeFlow: 'personal_kilo_pass',
+              serviceFeePrincipalMinor: '4900',
+              serviceFeeVersion: SERVICE_FEE_VERSION,
+            }),
           },
-          metadata: {
+          metadata: expect.objectContaining({
             type: 'kilo-pass',
             kiloUserId: user.id,
             tier: 'tier_49',
             cadence: 'yearly',
             affiliateTrackingId: '',
-          },
+            serviceFeeFlow: 'personal_kilo_pass',
+            serviceFeePrincipalMinor: '4900',
+            serviceFeeVersion: SERVICE_FEE_VERSION,
+          }),
         })
       );
     });
@@ -5162,6 +5274,8 @@ describe('kiloPassRouter', () => {
     it('includes affiliateTrackingId in checkout metadata when attribution exists', async () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_test_attributed',
+        created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
         url: 'https://stripe.example.test/checkout',
       });
 
@@ -5182,22 +5296,25 @@ describe('kiloPassRouter', () => {
 
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          allow_promotion_codes: true,
           subscription_data: {
-            metadata: {
+            metadata: expect.objectContaining({
               type: 'kilo-pass',
               kiloUserId: user.id,
               tier: 'tier_49',
               cadence: 'yearly',
               affiliateTrackingId: 'impact-click-123',
-            },
+              serviceFeeFlow: 'personal_kilo_pass',
+            }),
           },
-          metadata: {
+          metadata: expect.objectContaining({
             type: 'kilo-pass',
             kiloUserId: user.id,
             tier: 'tier_49',
             cadence: 'yearly',
             affiliateTrackingId: 'impact-click-123',
-          },
+            serviceFeeFlow: 'personal_kilo_pass',
+          }),
         })
       );
     });
@@ -5216,6 +5333,248 @@ describe('kiloPassRouter', () => {
           ...input,
         })
       ).rejects.toThrow('commerce_not_available');
+    });
+
+    it('fails open to a product-only session when fee tax resolution fails', async () => {
+      const store = createMemoryAssessmentStore();
+      const sendAlert = jest.fn(async () => undefined);
+      const createSession = jest.fn(
+        async (_params: Stripe.Checkout.SessionCreateParams): Promise<CheckoutSessionLike> => ({
+          id: 'cs_missed_tax',
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+          url: 'https://stripe.example.test/missed',
+          line_items: { data: [], has_more: false },
+        })
+      );
+
+      const session = await createPersonalKiloPassCheckoutSession({
+        kiloUserId: 'user_kilo_pass',
+        stripeCustomerId: 'cus_kilo_pass',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        affiliateTrackingId: '',
+        priceId: 'price_test_kilo_pass',
+        deps: kiloPassCheckoutDeps(store, {
+          sendAlert,
+          createSession,
+          resolveTaxInput: async () => {
+            throw new Error(SERVICE_FEE_FAILURE_APPLICATION);
+          },
+        }),
+      });
+
+      expect(session.id).toBe('cs_missed_tax');
+      expect(createSession).toHaveBeenCalledTimes(1);
+      const createParams = createSession.mock.calls[0]?.[0];
+      expect(createParams?.allow_promotion_codes).toBe(true);
+      expect(createParams?.line_items).toEqual([{ price: 'price_test_kilo_pass', quantity: 1 }]);
+      expect(createParams?.metadata).toEqual(
+        expect.objectContaining({
+          type: 'kilo-pass',
+          kiloUserId: 'user_kilo_pass',
+          serviceFeeFlow: 'personal_kilo_pass',
+          serviceFeePrincipalMinor: '4900',
+        })
+      );
+      const record = await store.findByAssessmentKey(
+        String(createParams?.metadata?.serviceFeeAssessmentKey)
+      );
+      expect(record).toMatchObject({
+        flow: 'personal_kilo_pass',
+        outcome: 'missed',
+        failureCode: SERVICE_FEE_FAILURE_APPLICATION,
+        stripeCheckoutSessionId: 'cs_missed_tax',
+        eligibleSubtotalMinor: 4900,
+        expectedFeeMinor: 245,
+        chargedFeeMinor: 0,
+        kiloUserId: 'user_kilo_pass',
+        stripeCustomerId: 'cus_kilo_pass',
+      });
+      expect(sendAlert).toHaveBeenCalled();
+    });
+
+    it('adds a separate discountable one-time 5% fee line when tax input is injected', async () => {
+      const store = createMemoryAssessmentStore();
+      const assessmentKey = 'checkout:11111111-1111-4111-8111-111111111111';
+      const feeLine = {
+        id: 'li_kilo_pass_fee',
+        price: {
+          id: 'price_kilo_pass_fee',
+          product: {
+            id: 'prod_kilo_pass_fee',
+            metadata: {
+              type: SERVICE_FEE_METADATA_TYPE,
+              serviceFeeVersion: SERVICE_FEE_VERSION,
+              serviceFeeAssessmentKey: assessmentKey,
+              serviceFeeRateBasisPoints: String(SERVICE_FEE_RATE_BASIS_POINTS),
+            },
+          },
+        },
+      } as unknown as Stripe.LineItem;
+      const createSession = jest.fn(
+        async (_params: Stripe.Checkout.SessionCreateParams): Promise<CheckoutSessionLike> => ({
+          id: 'cs_with_fee',
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+          url: 'https://stripe.example.test/fee',
+          line_items: { data: [feeLine], has_more: false },
+        })
+      );
+
+      const session = await createPersonalKiloPassCheckoutSession({
+        kiloUserId: 'user_kilo_pass',
+        stripeCustomerId: 'cus_kilo_pass',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        affiliateTrackingId: 'impact-click-123',
+        priceId: 'price_test_kilo_pass',
+        deps: kiloPassCheckoutDeps(store, {
+          createAssessmentKey: () => assessmentKey,
+          resolveTaxInput: async () => buildInheritedInlineServiceFeeTaxInput(),
+          createSession,
+        }),
+      });
+
+      expect(session.id).toBe('cs_with_fee');
+      expect(createSession).toHaveBeenCalledTimes(1);
+      const createParams = createSession.mock.calls[0]?.[0];
+      expect(createParams?.allow_promotion_codes).toBe(true);
+      expect(createParams?.line_items).toHaveLength(2);
+      expect(createParams?.line_items?.[0]).toEqual({
+        price: 'price_test_kilo_pass',
+        quantity: 1,
+      });
+      expect(createParams?.line_items?.[1]).toEqual({
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: 245,
+          product_data: {
+            name: SERVICE_FEE_DESCRIPTION,
+            metadata: {
+              type: SERVICE_FEE_METADATA_TYPE,
+              serviceFeeVersion: SERVICE_FEE_VERSION,
+              serviceFeeAssessmentKey: assessmentKey,
+              serviceFeeRateBasisPoints: String(SERVICE_FEE_RATE_BASIS_POINTS),
+            },
+          },
+        },
+      });
+      expect(createParams?.line_items?.[1]?.price_data?.recurring).toBeUndefined();
+      expect(createParams?.metadata).toEqual(
+        expect.objectContaining({
+          type: 'kilo-pass',
+          kiloUserId: 'user_kilo_pass',
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+          affiliateTrackingId: 'impact-click-123',
+          serviceFeeAssessmentKey: assessmentKey,
+          serviceFeeFlow: 'personal_kilo_pass',
+          serviceFeePrincipalMinor: '4900',
+        })
+      );
+      expect(createParams?.subscription_data?.metadata).toEqual(
+        expect.objectContaining({
+          type: 'kilo-pass',
+          kiloUserId: 'user_kilo_pass',
+          affiliateTrackingId: 'impact-click-123',
+          serviceFeeAssessmentKey: assessmentKey,
+          serviceFeeFlow: 'personal_kilo_pass',
+        })
+      );
+
+      const record = await store.findByAssessmentKey(assessmentKey);
+      expect(record).toMatchObject({
+        flow: 'personal_kilo_pass',
+        stripeCheckoutSessionId: 'cs_with_fee',
+        stripeCheckoutFeeLineItemId: 'li_kilo_pass_fee',
+        stripeFeePriceId: 'price_kilo_pass_fee',
+        eligibleSubtotalMinor: 4900,
+        expectedFeeMinor: 245,
+      });
+    });
+
+    it('expires and replaces once near the activation boundary and does not replace outside it', async () => {
+      const nearStore = createMemoryAssessmentStore();
+      const expire = jest.fn(async (_sessionId: string) => undefined);
+      const nearCreate = jest
+        .fn<(params: Stripe.Checkout.SessionCreateParams) => Promise<CheckoutSessionLike>>()
+        .mockResolvedValueOnce({
+          id: 'cs_early',
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+          url: 'https://stripe.example.test/early',
+        })
+        .mockResolvedValueOnce({
+          id: 'cs_replaced',
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+          url: 'https://stripe.example.test/replaced',
+          line_items: {
+            data: [
+              {
+                id: 'li_replaced_fee',
+                price: {
+                  id: 'price_replaced_fee',
+                  product: {
+                    metadata: {
+                      type: SERVICE_FEE_METADATA_TYPE,
+                      serviceFeeVersion: SERVICE_FEE_VERSION,
+                    },
+                  },
+                },
+              } as unknown as Stripe.LineItem,
+            ],
+            has_more: false,
+          },
+        });
+
+      const replaced = await createPersonalKiloPassCheckoutSession({
+        kiloUserId: 'user_kilo_pass',
+        stripeCustomerId: 'cus_kilo_pass',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        affiliateTrackingId: '',
+        priceId: 'price_test_kilo_pass',
+        deps: kiloPassCheckoutDeps(nearStore, {
+          now: new Date((SERVICE_FEE_ACTIVATION_UNIX_SECONDS - 30) * 1000),
+          resolveTaxInput: async () => buildInheritedInlineServiceFeeTaxInput(),
+          expireCheckoutSession: expire,
+          createSession: nearCreate,
+        }),
+      });
+
+      expect(expire).toHaveBeenCalledWith('cs_early');
+      expect(nearCreate).toHaveBeenCalledTimes(2);
+      expect(replaced.id).toBe('cs_replaced');
+      expect(nearCreate.mock.calls[0]?.[0]?.line_items).toHaveLength(1);
+      expect(nearCreate.mock.calls[1]?.[0]?.line_items).toHaveLength(2);
+      expect(nearCreate.mock.calls[1]?.[0]?.allow_promotion_codes).toBe(true);
+
+      const farStore = createMemoryAssessmentStore();
+      const farExpire = jest.fn(async () => undefined);
+      const farCreate = jest.fn(async () => ({
+        id: 'cs_far',
+        created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS + 90,
+        url: 'https://stripe.example.test/far',
+        line_items: { data: [], has_more: false },
+      }));
+
+      const farSession = await createPersonalKiloPassCheckoutSession({
+        kiloUserId: 'user_kilo_pass',
+        stripeCustomerId: 'cus_kilo_pass',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        affiliateTrackingId: '',
+        priceId: 'price_test_kilo_pass',
+        deps: kiloPassCheckoutDeps(farStore, {
+          now: new Date((SERVICE_FEE_ACTIVATION_UNIX_SECONDS + 120) * 1000),
+          resolveTaxInput: async () => buildInheritedInlineServiceFeeTaxInput(),
+          expireCheckoutSession: farExpire,
+          createSession: farCreate,
+        }),
+      });
+
+      expect(farSession.id).toBe('cs_far');
+      expect(farCreate).toHaveBeenCalledTimes(1);
+      expect(farExpire).not.toHaveBeenCalled();
     });
   });
 });

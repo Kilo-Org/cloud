@@ -1,4 +1,3 @@
-// Mock the AI SDK to avoid requiring OpenAI API keys in tests
 // Generate simple deterministic fake embeddings based on text content
 // This creates embeddings where similar texts (sharing words) have higher cosine similarity
 export function generateFakeEmbedding(text: string): number[] {
@@ -59,12 +58,5 @@ export function setupEmbeddingMocks() {
     embedMany: jest.fn(async ({ values }: { values: string[] }) => ({
       embeddings: values.map((text: string) => generateFakeEmbedding(text)),
     })),
-  }));
-
-  // Mock OpenAI SDK to return a fake model
-  jest.mock('@ai-sdk/openai', () => ({
-    openai: {
-      textEmbeddingModel: jest.fn(() => 'fake-model'),
-    },
   }));
 }

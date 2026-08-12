@@ -80,6 +80,9 @@ export async function getOrCreateStripeCustomerIdForOrganization(
 type Config = StripeConfig;
 type ProcessTopupForOrganizationOptions = {
   isAutoTopUp?: boolean;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
 };
 const ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE =
   'organization_credits_top_up_confirmation';
@@ -110,6 +113,9 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
   userId: User['id'];
   organization: Organization;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate?: Date;
@@ -118,6 +124,9 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     userId,
     organization,
     amountInCents,
+    serviceFeeCents = 0,
+    grossPaidCents = amountInCents,
+    creditsCents = amountInCents,
     stripeChargeOrInvoiceId,
     isAutoTopUp,
     purchaseDate,
@@ -223,8 +232,10 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
       const sendResult = await sendCreditsTopUpEmail({
         to: recipient.email,
         variant: isAutoTopUp ? 'org_auto' : 'org_manual',
-        amountCents: amountInCents,
-        creditsCents: amountInCents,
+        principalCents: amountInCents,
+        serviceFeeCents,
+        grossPaidCents,
+        creditsCents,
         purchaseDate: purchaseDate ?? new Date(),
         receiptUrl,
         organizationId: organization.id,
@@ -345,7 +356,12 @@ export async function processTopupForOrganization(
   config: Config,
   options: ProcessTopupForOrganizationOptions = {}
 ) {
-  const { isAutoTopUp = false } = options;
+  const {
+    isAutoTopUp = false,
+    serviceFeeCents = 0,
+    grossPaidCents = amountInCents,
+    creditsCents = amountInCents,
+  } = options;
   const organization = await getOrganizationById(organizationId);
   if (!organization) throw new Error('Organization not found: ' + organizationId);
 
@@ -422,6 +438,9 @@ export async function processTopupForOrganization(
       userId: kiloUserId,
       organization,
       amountInCents,
+      serviceFeeCents,
+      grossPaidCents,
+      creditsCents,
       stripeChargeOrInvoiceId: config.stripe_payment_id,
       isAutoTopUp,
       purchaseDate: new Date(existingCreditTransaction.createdAt),
@@ -443,6 +462,9 @@ export async function processTopupForOrganization(
     userId: kiloUserId,
     organization,
     amountInCents,
+    serviceFeeCents,
+    grossPaidCents,
+    creditsCents,
     stripeChargeOrInvoiceId: config.stripe_payment_id,
     isAutoTopUp,
   });
@@ -452,6 +474,9 @@ async function recoverOrganizationTopUpConfirmationEmailIfMissing(params: {
   userId: User['id'];
   organization: Organization;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate: Date;
@@ -500,6 +525,9 @@ async function scheduleOrganizationTopUpConfirmationEmail(params: {
   userId: User['id'];
   organization: Organization;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate?: Date;

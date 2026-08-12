@@ -32,6 +32,7 @@ import {
   TimeseriesInputSchema,
   TimeseriesOutputSchema,
   UsageAnalyticsFiltersSchema,
+  type BreakdownDimension,
   type CostSource,
   type Dimension,
   type Granularity,
@@ -42,6 +43,7 @@ import {
 
 export {
   BreakdownInputSchema,
+  BreakdownDimensionSchema,
   BreakdownOutputSchema,
   CostSourceSchema,
   DimensionSchema,
@@ -56,6 +58,7 @@ export {
   UsageAnalyticsFiltersSchema,
 } from '@/routers/usage-analytics-schemas';
 export type {
+  BreakdownDimension,
   CostSource,
   Dimension,
   Granularity,
@@ -447,7 +450,7 @@ function bucketExprSql(effectiveGranularity: Granularity, tier: GranularityTier)
 // Dimension column name
 // ---------------------------------------------------------------------------
 
-function dimensionColumn(dimension: Dimension): string {
+export function dimensionColumn(dimension: BreakdownDimension): string {
   switch (dimension) {
     case 'feature':
       return 'feature';
@@ -461,6 +464,8 @@ function dimensionColumn(dimension: Dimension): string {
       return 'provider';
     case 'project':
       return 'project_id';
+    case 'organization':
+      return 'organization_id';
   }
 }
 
@@ -870,7 +875,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
       `;
 
       // SAFETY: LIMIT value is interpolated directly into SQL but is
-      // validated by Zod above: `z.number().int().min(1).max(10_000)`.
+      // validated by Zod above: organization breakdowns allow at most
+      // MAX_SCOPE_ORGANIZATION_IDS rows, while other dimensions allow 100.
       // Snowflake's SQL API v2 does not support parameter binding for LIMIT.
 
       const rows = await timedSnowflakeQuery(

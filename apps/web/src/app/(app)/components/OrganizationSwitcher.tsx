@@ -9,12 +9,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
+import { Fragment } from 'react';
 
 type OrganizationSwitcherProps = {
   organizationId?: string | null;
@@ -23,8 +26,14 @@ type OrganizationSwitcherProps = {
 export type OrganizationSwitcherOrganization = {
   organizationId: string;
   organizationName: string;
-  role: string;
+  role: OrganizationRole;
+  inheritedChildren?: OrganizationSwitcherChildOrganization[];
 };
+
+export type OrganizationSwitcherChildOrganization = Omit<
+  OrganizationSwitcherOrganization,
+  'inheritedChildren'
+>;
 
 type OrganizationSwitcherViewProps = {
   organizationId?: string | null;
@@ -108,7 +117,14 @@ export function OrganizationSwitcherView({
     }
   };
 
-  const currentOrg = organizations.find(org => org.organizationId === organizationId);
+  const inheritedChildren = organizations.flatMap(org => org.inheritedChildren ?? []);
+  const inheritedChildIds = new Set(inheritedChildren.map(child => child.organizationId));
+  const visibleOrganizations = organizations.filter(
+    organization => !inheritedChildIds.has(organization.organizationId)
+  );
+  const currentOrg =
+    inheritedChildren.find(org => org.organizationId === organizationId) ??
+    visibleOrganizations.find(org => org.organizationId === organizationId);
   const hasOrganizations = organizations.length > 0;
 
   // Show loading skeleton on initial load (before any data is available)
@@ -153,25 +169,52 @@ export function OrganizationSwitcherView({
           sideOffset={4}
         >
           {/* Organizations */}
-          {organizations.map(org => (
-            <DropdownMenuItem
-              key={org.organizationId}
-              onClick={() => onOrganizationSwitch(org.organizationId)}
-              className={cn(
-                menuItemClassName,
-                organizationId === org.organizationId && selectedMenuItemClassName
-              )}
-            >
-              <div className={switcherRowClassName}>
-                <div className={switcherTextClassName}>
-                  <div className={switcherTitleClassName}>{org.organizationName}</div>
-                  <div className={switcherSubtitleClassName}>{getRoleLabel(org.role)}</div>
-                </div>
-                {organizationId === org.organizationId && (
-                  <Check className={selectedIconClassName} />
+          {visibleOrganizations.map(org => (
+            <Fragment key={org.organizationId}>
+              <DropdownMenuItem
+                onClick={() => onOrganizationSwitch(org.organizationId)}
+                className={cn(
+                  menuItemClassName,
+                  organizationId === org.organizationId && selectedMenuItemClassName
                 )}
-              </div>
-            </DropdownMenuItem>
+              >
+                <div className={switcherRowClassName}>
+                  <div className={switcherTextClassName}>
+                    <div className={switcherTitleClassName}>{org.organizationName}</div>
+                    <div className={switcherSubtitleClassName}>{getRoleLabel(org.role)}</div>
+                  </div>
+                  {organizationId === org.organizationId && (
+                    <Check className={selectedIconClassName} />
+                  )}
+                </div>
+              </DropdownMenuItem>
+              {org.inheritedChildren?.map(child => (
+                <DropdownMenuItem
+                  key={child.organizationId}
+                  onClick={() => onOrganizationSwitch(child.organizationId)}
+                  className={cn(
+                    menuItemClassName,
+                    'pl-6',
+                    organizationId === child.organizationId && selectedMenuItemClassName
+                  )}
+                >
+                  <div className={switcherRowClassName}>
+                    <div className={switcherTextClassName}>
+                      <div className="flex max-w-full min-w-0 items-center gap-1.5">
+                        <div className={switcherTitleClassName}>{child.organizationName}</div>
+                        <Badge variant="beta" className="px-1.5 py-0 text-[10px]">
+                          Sub-org
+                        </Badge>
+                      </div>
+                      <div className={switcherSubtitleClassName}>{getRoleLabel(child.role)}</div>
+                    </div>
+                    {organizationId === child.organizationId && (
+                      <Check className={selectedIconClassName} />
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </Fragment>
           ))}
 
           {showPersonalOption && (

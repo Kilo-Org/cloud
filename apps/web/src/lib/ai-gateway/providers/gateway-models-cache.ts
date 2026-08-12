@@ -41,13 +41,13 @@ export const getOpenRouterModelsMetadataFromDatabase = createStoredModelsFromDat
 );
 
 /**
- * The ids of language models that have at least one endpoint. This is the list
- * mirrored to the lightweight `*-model-ids` Redis keys so existence checks can
- * avoid loading the full model catalog.
+ * The ids of language models, including those with no endpoints. This is the
+ * list mirrored to the lightweight `*-model-ids` Redis keys so existence checks
+ * can avoid loading the full model catalog.
  */
 export function getLanguageModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
-    .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
+    .filter(model => (model.type ?? 'language') === 'language')
     .map(model => model.id);
 }
 

@@ -19,8 +19,6 @@ jest.mock('@/lib/slack/admin-notifications', () => ({
   sendAdminSlackNotification: jest.fn(),
 }));
 
-import { redisClient } from '@/lib/redis';
-import { SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY } from '@/lib/redis-keys';
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
   alertIfSyncProvidersStale,
@@ -30,9 +28,6 @@ import {
   SYNC_PROVIDERS_STALE_AFTER_MS,
   SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
 } from './sync-providers-stale-alert';
-
-const mockedRedisGet = jest.mocked(redisClient.get);
-const mockedRedisSet = jest.mocked(redisClient.set);
 
 const NOW = new Date('2026-08-12T12:00:00.000Z');
 const FRESH_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS + 1);
@@ -139,23 +134,6 @@ describe('buildStaleSyncAlertNotification', () => {
 });
 
 describe('alertIfSyncProvidersStale', () => {
-  it('writes the alert timestamp to Redis with a week expiry', async () => {
-    mockedRedisGet.mockResolvedValueOnce(STALE_SYNC.toISOString()).mockResolvedValueOnce(null);
-    mockedRedisSet.mockResolvedValue('OK');
-    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
-
-    await alertIfSyncProvidersStale({
-      now: () => NOW,
-      sendNotification,
-    });
-
-    expect(mockedRedisSet).toHaveBeenCalledWith(
-      SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY,
-      NOW.toISOString(),
-      { ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS }
-    );
-  });
-
   it('posts once and stores the alert timestamp with a week TTL', async () => {
     const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
     const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');

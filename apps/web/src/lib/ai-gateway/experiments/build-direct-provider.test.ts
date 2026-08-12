@@ -88,7 +88,7 @@ describe('custom LLM Gemini reasoning transform configuration', () => {
 });
 
 describe('buildDirectProvider response transforms', () => {
-  it('exposes the Gemini thought content path when the transform is enabled', () => {
+  it('enables Gemini thought content rewriting when the transform is enabled', () => {
     const provider = buildDirectProvider('custom', ['chat_completions'], {
       internal_id: 'upstream-model',
       base_url: 'https://llm.example.com/v1',
@@ -97,7 +97,7 @@ describe('buildDirectProvider response transforms', () => {
     });
 
     expect(provider.responseTransforms).toEqual({
-      thoughtContentMapping: 'extra_content.google.thought',
+      mapGeminiThoughtContent: true,
     });
   });
 

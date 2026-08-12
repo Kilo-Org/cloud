@@ -658,8 +658,8 @@ describe('identical failing tool call guard', () => {
   });
 });
 
-describe('consecutive tool-failure stop', () => {
-  it('ends the turn after 25 consecutive failures of one tool', async () => {
+describe('per-tool failure cap', () => {
+  it('ends the turn after 25 total failures of one tool, despite interleaved successes', async () => {
     const appendedEvents: AgentConversationEvent[] = [];
     let fetchCount = 0;
     const responses = createToolOnlyGatewayResponses(40);
@@ -675,9 +675,12 @@ describe('consecutive tool-failure stop', () => {
         appendedEvents.push(...events);
       },
       conversationEvents: [createUserMessage('Run the workflow')],
-      // The error varies per call: the stop counts failures per tool name, not identical bytes.
+      // The error varies per call (the cap counts per tool name, not identical bytes), and every tenth call succeeds (an interleaved success must not reset the total).
       executeToolCall: () => {
         callIndex += 1;
+        if (callIndex % 10 === 0) {
+          return Promise.resolve({ ok: true, value: { text: 'ok' } });
+        }
         return Promise.resolve({ error: `failure ${String(callIndex)}`, ok: false });
       },
       failureMessage: String,
@@ -702,10 +705,11 @@ describe('consecutive tool-failure stop', () => {
       updateThinkingBlock: () => {},
     });
 
-    expect(fetchCount).toBe(25);
+    // 25 failures plus the 2 interleaved successes (calls 10 and 20) = 27 rounds.
+    expect(fetchCount).toBe(27);
     const lastEvent = appendedEvents.at(-1);
     expect(JSON.stringify(lastEvent)).toContain(
-      'Stopped: get_page_snapshot failed 25 times in a row'
+      'Stopped: get_page_snapshot failed 25 times this turn'
     );
   });
 });

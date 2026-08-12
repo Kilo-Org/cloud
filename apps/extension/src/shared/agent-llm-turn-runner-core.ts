@@ -173,11 +173,10 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 }: RunLlmTurnOptions<ToolCall>): Promise<void> => {
   // A weak model can loop one byte-identical failing tool call for the whole turn (measured: 118 identical run_workflow calls). After the third identical failure the error tells it to stop; a success resets the count.
   const identicalFailureCounts = new Map<string, number>();
-  // Some models mutate the arguments slightly each round, so byte-identity never collides and the text escalation never lands. Across 812 benchmark attempts no passing attempt exceeded 19 consecutive failures of one tool; runaway loops hit 118-119. At 25 the turn ends instead of burning billed rounds.
-  const MAX_CONSECUTIVE_TOOL_FAILURES = 25;
-  let consecutiveFailureTool: string | undefined = undefined;
-  let consecutiveFailureCount = 0;
-  // Snapshot the message when the streak trips: a later success in the same round resets the counters before the turn loop reads them.
+  // Some models mutate the arguments slightly each round, so byte-identity never collides and the text escalation never lands; interleaved successes of other tools also defeat a consecutive counter (measured: 50 failing run_workflow calls between healthy snapshots). Count TOTAL failures per tool for the turn: across 812 benchmark attempts no passing attempt exceeded 19; runaway loops hit 118-119. At 25 the turn ends instead of burning billed rounds.
+  const MAX_TOOL_FAILURES_PER_TURN = 25;
+  const failureTotals = new Map<string, number>();
+  // Snapshot the message when the cap trips so later results cannot change it.
   let streakStopMessage: string | undefined = undefined;
   const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
     // Key on the call content, not its per-call ids or attached reasoning: repeats must collide.
@@ -194,15 +193,12 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     const result = await executeToolCall(toolCall);
     if (result.ok) {
       identicalFailureCounts.delete(key);
-      consecutiveFailureTool = undefined;
-      consecutiveFailureCount = 0;
       return result;
     }
-    consecutiveFailureCount =
-      toolCall.name === consecutiveFailureTool ? consecutiveFailureCount + 1 : 1;
-    consecutiveFailureTool = toolCall.name;
-    if (consecutiveFailureCount >= MAX_CONSECUTIVE_TOOL_FAILURES) {
-      streakStopMessage = `Stopped: ${toolCall.name} failed ${String(consecutiveFailureCount)} times in a row. Something is blocking this approach — please adjust the request or try again.`;
+    const totalFailures = (failureTotals.get(toolCall.name) ?? 0) + 1;
+    failureTotals.set(toolCall.name, totalFailures);
+    if (totalFailures >= MAX_TOOL_FAILURES_PER_TURN) {
+      streakStopMessage = `Stopped: ${toolCall.name} failed ${String(totalFailures)} times this turn. Something is blocking this approach — please adjust the request or try again.`;
     }
     const count = (identicalFailureCounts.get(key) ?? 0) + 1;
     identicalFailureCounts.set(key, count);

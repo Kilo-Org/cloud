@@ -30,9 +30,7 @@ export class MilvusIndexStorage {
     collectionName: string = DEFAULT_COLLECTION_NAME
   ) {
     this.collectionName = collectionName;
-    // Set score threshold based on embedding provider
-    // OpenAI embeddings have different score distribution than Mistral
-    this.scoreThreshold = embeddingService.getProvider() === 'openai' ? 0.3 : 0.6;
+    this.scoreThreshold = 0.6;
   }
 
   async deleteByFilePath(params: DeleteByFilePathParams): Promise<void> {

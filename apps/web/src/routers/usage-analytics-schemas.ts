@@ -18,6 +18,9 @@ export type CostSource = z.infer<typeof CostSourceSchema>;
 export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
 export type Dimension = z.infer<typeof DimensionSchema>;
 
+export const BreakdownDimensionSchema = z.enum([...DimensionSchema.options, 'organization']);
+export type BreakdownDimension = z.infer<typeof BreakdownDimensionSchema>;
+
 export const MetricSchema = z.enum([
   'cost',
   'requests',
@@ -111,9 +114,12 @@ export const TimeseriesOutputSchema = z.object({
 });
 
 export const BreakdownInputSchema = UsageAnalyticsFiltersSchema.extend({
-  dimension: DimensionSchema,
+  dimension: BreakdownDimensionSchema,
   metric: z.enum(['cost', 'requests', 'tokens']),
-  limit: z.number().int().min(1).max(100).default(15),
+  limit: z.number().int().min(1).max(MAX_SCOPE_ORGANIZATION_IDS).default(15),
+}).refine(input => input.dimension === 'organization' || input.limit <= 100, {
+  message: 'Limit cannot exceed 100 for this breakdown dimension',
+  path: ['limit'],
 });
 
 const BreakdownItemSchema = z.object({

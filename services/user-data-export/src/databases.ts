@@ -1,5 +1,5 @@
 import { getWorkerDb, pg } from '@kilocode/db/client';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { organizationExportAccess } from '@kilocode/db/organization-export-access';
 import { sql } from 'drizzle-orm';
 import { safeError, setSpanFields, withSpan } from './observability';
 import type { ReplicaQuery } from './source-adapters';
@@ -34,37 +34,17 @@ type ReadyExportObject = { r2_object_key: string; expires_at: string };
 type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
 
 /**
- * Roles that may reach an organization's export.
- *
- * The Worker still authorises independently rather than trusting a caller that has
- * already decided the request is allowed — but it must reach the same verdict as the
- * request path, so the role list itself is imported rather than restated. Two hand
- * written copies would drift silently, and the direction that matters is the one where
- * the Worker stays permissive after the router has been tightened.
- */
-const ORGANIZATION_EXPORT_ROLES = sql.join(
-  ORGANIZATION_MANAGE_ROLES.map(role => sql`${role}`),
-  sql`, `
-);
-
-/**
  * Whether `kiloUserId` may reach an export row, for either subject type.
  *
  * A personal export is reachable only by the person it belongs to. An organization's
- * is reachable by anyone who is currently an owner or admin of that organization —
- * evaluated against live membership in the same statement, so a revoked admin loses
- * access immediately rather than at the next lease or cache expiry, and so the export
- * is reachable by admins other than whoever requested it.
+ * goes through the predicate shared with the web router, so this Worker and the request
+ * path cannot disagree — which they once did, producing an export that generated,
+ * showed as ready, and refused every download.
  *
- * Both routes to that role are checked, direct and inherited from a parent
- * organization, because the request path admits both. Checking only direct membership
- * here would let a parent-organization owner create an export the router accepts and
- * lists as ready, then be refused its download by this Worker — an export they can see
- * and never open.
- *
- * A soft-deleted organization is excluded: membership rows outlive the organization, so
- * without this a former admin could still open an export of something the product
- * treats as gone.
+ * Still evaluated here rather than trusted from the caller: this runs on the download
+ * path, and a Worker that took the router's word for it would have no check at all. It
+ * is also evaluated in the same statement as the row lookup, so a revoked admin loses
+ * access immediately rather than at the next lease or cache expiry.
  */
 function callerMayAccess(kiloUserId: string) {
   return sql`(
@@ -72,25 +52,10 @@ function callerMayAccess(kiloUserId: string) {
     OR (
       subject_type = 'organization'
       AND organization_id IS NOT NULL
-      AND EXISTS (
-        SELECT 1 FROM organizations orgs
-        WHERE orgs.id = user_data_exports.organization_id
-          AND orgs.deleted_at IS NULL
-          AND (
-            EXISTS (
-              SELECT 1 FROM organization_memberships memberships
-              WHERE memberships.organization_id = orgs.id
-                AND memberships.kilo_user_id = ${kiloUserId}
-                AND memberships.role IN (${ORGANIZATION_EXPORT_ROLES})
-            )
-            OR EXISTS (
-              SELECT 1 FROM organization_memberships memberships
-              WHERE memberships.organization_id = orgs.parent_organization_id
-                AND memberships.kilo_user_id = ${kiloUserId}
-                AND memberships.role IN (${ORGANIZATION_EXPORT_ROLES})
-            )
-          )
-      )
+      AND ${organizationExportAccess({
+        kiloUserId,
+        organizationId: sql`user_data_exports.organization_id`,
+      })}
     )
   )`;
 }

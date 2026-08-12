@@ -196,8 +196,6 @@ LIMIT $3`;
 function subjectPageQueries(input: {
   table: string;
   columns: string;
-  key?: string;
-  keyType?: 'text' | 'bigint';
 }): Record<ExportSubject['type'], string> {
   return {
     user: singleKeyPageQuery({ ...input, scope: 'user' }),
@@ -803,9 +801,18 @@ const SUBJECT_SCOPED_TABLES = new Set(
  * The probe input for a set of adapters, for one subject.
  *
  * Subject-dependent because the two scopes read different owner columns, and a table
- * that can serve one is usable for that one even if it cannot serve the other. The
- * `system_prompt_prefix` cursor reads the opposite scope column as its second key, so
- * that source needs both regardless of subject.
+ * that can serve one is usable for that one even if it cannot serve the other.
+ *
+ * `system_prompt_prefix` is the exception: its cursor reads the opposite scope column
+ * as its second key, so it needs both whichever subject is asking. That does couple the
+ * personal export to a column only the organization export filters on — deliberately.
+ * The alternative, falling back to a single-column cursor when `organization_id` is
+ * absent, would page on a key that repeats and silently skip rows at page boundaries,
+ * which is the defect the composite cursor exists to fix. A source correctly reported
+ * as unavailable beats a section that quietly omits prompts.
+ *
+ * Both columns were confirmed present on the warehouse table on 2026-08-12, so this is
+ * a guard against regression rather than a live constraint.
  */
 export function warehouseRequirements(
   adapters: Pick<SourceAdapter, 'warehouseTable'>[],

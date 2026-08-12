@@ -18,7 +18,10 @@ import {
 import { db } from '@/lib/drizzle';
 import { sendDataExportDownloadCodeEmail } from '@/lib/email';
 import { adminProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_EXPORT_ROLES,
+  organizationExportAccess,
+} from '@kilocode/db/organization-export-access';
 import {
   dispatchUserDataExport,
   requestUserDataExportDownload,
@@ -45,7 +48,7 @@ const EXPORT_DATA_CUTOFF = '2026-08-02T08:40:00.000Z';
  * authority is defined as organization-management authority; if it ever needs to
  * diverge, that is a new constant here, not an edit to the shared one.
  */
-const EXPORT_ROLES = ORGANIZATION_MANAGE_ROLES;
+const EXPORT_ROLES = ORGANIZATION_EXPORT_ROLES;
 
 /**
  * The same role list for the discovery query below, derived rather than repeated: a
@@ -160,44 +163,26 @@ async function exportableOrganizations(userId: string): Promise<{ id: string; na
  * The organization is real, not soft-deleted, and the caller genuinely holds an export
  * role on it.
  *
- * Deliberately NOT `ensureOrganizationAccess`, which every other organization router
- * uses. That helper grants `owner` to any `is_admin` caller, so on this router — where
- * every procedure is `adminProcedure` — it would authorise on staff status rather than
- * on membership, and nobody may export another person's or another organization's data.
+ * The shared predicate, not `ensureOrganizationAccess`, which every other organization
+ * router uses. That helper grants `owner` to any `is_admin` caller, so on this router —
+ * where every procedure is `adminProcedure` — it would authorise on staff status rather
+ * than on membership, and nobody may export another person's or another organization's
+ * data.
  *
- * It also has to agree with the Worker, which re-checks independently and has no notion
- * of elevation. When the two disagreed, an export generated, showed as ready, and then
- * failed its download every time, because the Worker refused what the router had
- * admitted. This is the same predicate `callerMayAccess` applies there: direct or
- * parent-inherited owner/admin, on an organization that still exists.
- *
- * Membership rows outlive a soft-deleted organization, so `deleted_at` is part of the
- * check rather than only of the listing above.
+ * Shared with the Worker, which re-checks independently, because the two must reach the
+ * same verdict. They once did not, and an export generated, showed as ready, and then
+ * failed its download every time.
  */
 async function requireExportableOrganization(
   ctx: TRPCContext,
   organizationId: string
 ): Promise<void> {
-  const { rows } = await db.execute<{ id: string }>(sql`
-    SELECT orgs.id
-    FROM organizations orgs
-    WHERE orgs.id = ${organizationId}::uuid
-      AND orgs.deleted_at IS NULL
-      AND (
-        EXISTS (
-          SELECT 1 FROM organization_memberships memberships
-          WHERE memberships.organization_id = orgs.id
-            AND memberships.kilo_user_id = ${ctx.user.id}
-            AND memberships.role IN (${EXPORT_ROLES_SQL})
-        )
-        OR EXISTS (
-          SELECT 1 FROM organization_memberships memberships
-          WHERE memberships.organization_id = orgs.parent_organization_id
-            AND memberships.kilo_user_id = ${ctx.user.id}
-            AND memberships.role IN (${EXPORT_ROLES_SQL})
-        )
-      )
-    LIMIT 1
+  const { rows } = await db.execute<{ allowed: number }>(sql`
+    SELECT 1 AS allowed
+    WHERE ${organizationExportAccess({
+      kiloUserId: ctx.user.id,
+      organizationId: sql`${organizationId}::uuid`,
+    })}
   `);
   if (!rows[0]) {
     throw new TRPCError({

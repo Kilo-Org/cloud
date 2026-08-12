@@ -348,6 +348,111 @@ describe('user exports router guards and serialization', () => {
   // An owner of a parent organization inherits access to its children, so the request
   // path accepts a child the caller has no direct membership in. Offering only direct
   // memberships would let that request succeed and then leave the export invisible.
+  // The listing query and the enforcement predicate are written differently — a UNION
+  // for the list, the shared EXISTS fragment for the check — because the listing is
+  // driven from the caller's memberships for cost. Different shapes can drift, and the
+  // failure that produces is silent: an organization offered but refused, or refused but
+  // offered. This walks the whole role and inheritance matrix and asserts they agree.
+  it.each([
+    ['owner', true],
+    ['admin', true],
+    ['member', false],
+    ['billing_manager', false],
+  ] as const)('offers and admits a direct %s consistently', async (role, allowed) => {
+    const organization = await createTestOrganization(`Export Org Role ${role}`, stranger.id, 0);
+    const actor = await insertTestUser({
+      google_user_email: `data-export-role-${role}@admin.example.com`,
+      is_admin: true,
+    });
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: actor.id,
+      role,
+    });
+    const caller = await createCallerForUser(actor.id);
+
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id).includes(organization.id)).toBe(allowed);
+
+    const request = caller.userExports.requestOrganization({ organizationId: organization.id });
+    if (allowed) await expect(request).resolves.toMatchObject({ subjectType: 'organization' });
+    else await expect(request).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it.each([
+    ['owner', true],
+    ['admin', true],
+    ['member', false],
+  ] as const)('offers and admits a parent-organization %s consistently', async (role, allowed) => {
+    const parent = await createTestOrganization(`Export Parent ${role}`, stranger.id, 0);
+    const child = await createTestOrganization(`Export Child ${role}`, stranger.id, 0);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    const actor = await insertTestUser({
+      google_user_email: `data-export-parent-${role}@admin.example.com`,
+      is_admin: true,
+    });
+    await db.insert(organization_memberships).values({
+      organization_id: parent.id,
+      kilo_user_id: actor.id,
+      role,
+    });
+    const caller = await createCallerForUser(actor.id);
+
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id).includes(child.id)).toBe(allowed);
+
+    const request = caller.userExports.requestOrganization({ organizationId: child.id });
+    if (allowed) await expect(request).resolves.toMatchObject({ subjectType: 'organization' });
+    else await expect(request).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  // A regular member of the organization exports their own data and nothing else. They
+  // are not an owner or admin, so the organization's export is not theirs to request,
+  // and an admin colleague's export is not theirs to see.
+  it('gives a regular organization member no reach beyond their own data', async () => {
+    const organization = await createTestOrganization('Export Org Member', owner.id, 0);
+    const member = await insertTestUser({
+      google_user_email: 'data-export-member@admin.example.com',
+      is_admin: true,
+    });
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: member.id,
+      role: 'member',
+    });
+    const caller = await createCallerForUser(member.id);
+
+    // No organization offered, so no button to press.
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
+
+    // And naming it directly does not work either.
+    await expect(
+      caller.userExports.requestOrganization({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    // The organization's export and an admin's personal export are both invisible, and
+    // neither is downloadable.
+    const organizationExportId = await insertReadyOrganizationExport(owner.id, organization.id);
+    const adminPersonalExportId = await insertReadyExport(owner.id);
+    const listed = await caller.userExports.list();
+    expect(listed.exports.map(record => record.id)).not.toContain(organizationExportId);
+    expect(listed.exports.map(record => record.id)).not.toContain(adminPersonalExportId);
+
+    for (const exportId of [organizationExportId, adminPersonalExportId]) {
+      await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    }
+
+    // Their own export still works.
+    const own = await caller.userExports.request();
+    expect(own.subjectType).toBe('user');
+  });
+
   // A Kilo employee with /admin access is not a member of the customer's organization
   // and may not export it. `ensureOrganizationAccess`, which the other organization
   // routers use, would grant them owner here purely on is_admin — so this router checks

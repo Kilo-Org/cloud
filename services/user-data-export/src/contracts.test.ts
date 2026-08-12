@@ -1,27 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { ORGANIZATION_EXPORT_ROLES } from '@kilocode/db/organization-export-access';
 import { DownloadRequestSchema, ExportQueueMessageSchema, parseCursor } from './contracts';
 import { __test__ } from './databases';
 
 // The Worker re-authorises an organization download against live membership rather than
-// trusting the request path, so its role list has to reach the same verdict as the
-// router's. Both now read the shared constant; this pins the values so a change to the
-// shared list is a visible decision here, and catches a hand-written copy reappearing.
+// trusting the request path, so it must reach the same verdict as the router. Both now
+// build from one shared predicate; this pins the values so a change is a visible
+// decision here, and catches a hand-written copy reappearing on this side.
 describe('organization export roles', () => {
   it('admits owners and admins only', () => {
-    expect([...ORGANIZATION_MANAGE_ROLES]).toEqual(['owner', 'admin']);
+    expect([...ORGANIZATION_EXPORT_ROLES]).toEqual(['owner', 'admin']);
   });
 
   it('builds the membership predicate from the shared list', () => {
     const predicate = __test__.callerMayAccess('user-1');
     // Every role in the shared list reaches the SQL, and nothing else does. A stale
     // literal would leave 'member' or 'billing_manager' able to download.
-    for (const role of ORGANIZATION_MANAGE_ROLES) {
+    for (const role of ORGANIZATION_EXPORT_ROLES) {
       expect(predicate.queryChunks.some(chunk => JSON.stringify(chunk).includes(role))).toBe(true);
     }
     const rendered = JSON.stringify(predicate.queryChunks);
     expect(rendered).not.toContain('billing_manager');
     expect(rendered).not.toContain('"member"');
+  });
+
+  // The inheritance branch is what the Worker's own copy was missing, which is how an
+  // export came to generate, show as ready, and refuse every download.
+  it('carries the parent-organization branch', () => {
+    const rendered = JSON.stringify(__test__.callerMayAccess('user-1').queryChunks);
+    expect(rendered).toContain('parent_organization_id');
+    expect(rendered).toContain('deleted_at IS NULL');
   });
 });
 

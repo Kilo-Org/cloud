@@ -100,7 +100,7 @@ export async function collectDeniedAutoRoutingModelIds(
   const shouldEvaluateCandidates =
     policyNeedsCandidateEvaluation(policy) ||
     options.candidateModelIds !== undefined ||
-    options.owner !== undefined;
+    (options.owner !== undefined && normalizedDeny.size > 0);
   if (!shouldEvaluateCandidates) {
     return [...denied];
   }

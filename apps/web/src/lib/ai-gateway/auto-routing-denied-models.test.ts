@@ -69,6 +69,21 @@ describe('collectDeniedAutoRoutingModelIds', () => {
     expect(decideModel).not.toHaveBeenCalled();
   });
 
+  it('does not load candidates when owner is set but the policy cannot deny anything', async () => {
+    const loadCandidateModelIds = jest.fn(async () => ['google/gemini-2.5-flash']);
+    const loadEffectivePoolModelIds = jest.fn(async () => ['pool/only-model']);
+
+    await expect(
+      collectDeniedAutoRoutingModelIds(policy(), {
+        owner: { userId: 'user-1', organizationId: 'org-1' },
+        loadCandidateModelIds,
+        loadEffectivePoolModelIds,
+      })
+    ).resolves.toEqual([]);
+    expect(loadCandidateModelIds).not.toHaveBeenCalled();
+    expect(loadEffectivePoolModelIds).not.toHaveBeenCalled();
+  });
+
   it('adds models that fail the effective access policy', async () => {
     const decideModel = jest.fn(
       async (_policy: EffectiveOrganizationModelPolicy, modelId: string) => ({

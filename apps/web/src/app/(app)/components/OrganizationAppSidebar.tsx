@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UsersRound,
+  Network,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -40,6 +41,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -63,14 +65,11 @@ export default function OrganizationAppSidebar({
 
   // Get current organization role and data
   const currentOrg = organizationData;
-  const actualRole =
-    currentOrg?.members.find(member => {
-      if (member.status !== 'active') return false;
-      return member.id === user?.id;
-    })?.role || 'member';
+  const actualRole = currentOrg?.callerRole;
 
   // Use assumed role if available, otherwise use actual role
-  const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || actualRole;
+  const currentRole =
+    assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || actualRole || 'member';
 
   // Show welcome if organization was created less than a week ago OR if currently on welcome page
   const showWelcome = useMemo(() => {
@@ -100,7 +99,7 @@ export default function OrganizationAppSidebar({
     }
   }, [actualRole, user?.is_admin, setOriginalRole, setAssumedRole]);
 
-  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
+  const hasOwnerLevelAccess = canManageOrganizationBilling(currentRole);
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -128,6 +127,15 @@ export default function OrganizationAppSidebar({
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
     },
+    ...(hasOwnerLevelAccess && (currentOrg?.childOrganizations.length ?? 0) > 0
+      ? [
+          {
+            title: 'Sub-organizations',
+            icon: Network,
+            url: `/organizations/${organizationId}/sub-organizations`,
+          },
+        ]
+      : []),
   ];
 
   // KiloClaw group

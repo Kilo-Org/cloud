@@ -5,7 +5,6 @@ import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { LockableContainer } from '@/components/organizations/LockableContainer';
-import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -94,12 +93,6 @@ export function DistributeFundsPage({ organizationId }: Props) {
 
   return (
     <div className="flex w-full flex-col gap-y-6">
-      <OrganizationPageHeader
-        organizationId={organizationId}
-        title="Distribute funds"
-        showBackButton
-      />
-
       {error ? (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />

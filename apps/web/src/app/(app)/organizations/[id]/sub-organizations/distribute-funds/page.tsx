@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { SubOrganizationsPage } from '../SubOrganizationsPage';
 
 export default async function OrganizationDistributeFundsPage({
   params,
@@ -6,5 +6,5 @@ export default async function OrganizationDistributeFundsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/organizations/${encodeURIComponent(id)}/sub-organizations/distribute-funds`);
+  return <SubOrganizationsPage organizationId={id} activeSection="distribute-funds" />;
 }

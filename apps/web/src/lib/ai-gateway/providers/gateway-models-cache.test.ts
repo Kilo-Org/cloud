@@ -1,4 +1,9 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
+
+jest.mock('@/lib/redis', () => ({
+  redisClient: { get: jest.fn() },
+}));
+
 import {
   extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
@@ -45,5 +50,46 @@ describe('extractVercelInferenceProviderIdsFromModel', () => {
     };
 
     expect(extractVercelInferenceProviderIdsFromModel(model)).toEqual(['anthropic', 'bedrock']);
+  });
+});
+
+describe('isValidOpenRouterModelId', () => {
+  async function loadValidator() {
+    jest.resetModules();
+    const { isValidOpenRouterModelId } =
+      await import('@/lib/ai-gateway/providers/gateway-models-cache');
+    const { redisClient: freshRedisClient } = await import('@/lib/redis');
+    return {
+      isValidOpenRouterModelId,
+      redisGet: jest.mocked(freshRedisClient.get),
+    };
+  }
+
+  it('accepts known legacy aliases without consulting Redis', async () => {
+    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
+
+    await expect(isValidOpenRouterModelId('gpt-4o')).resolves.toBe(true);
+    expect(redisGet).not.toHaveBeenCalled();
+  });
+
+  it('accepts ids present in the Redis catalog', async () => {
+    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
+    redisGet.mockResolvedValue(JSON.stringify(['openai/gpt-4o']));
+
+    await expect(isValidOpenRouterModelId('openai/gpt-4o')).resolves.toBe(true);
+  });
+
+  it('rejects ids missing from a non-empty Redis catalog', async () => {
+    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
+    redisGet.mockResolvedValue(JSON.stringify(['openai/gpt-4o']));
+
+    await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(false);
+  });
+
+  it('fails open when Redis has no model ids', async () => {
+    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
+    redisGet.mockResolvedValue(null);
+
+    await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(true);
   });
 });

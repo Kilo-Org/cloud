@@ -432,26 +432,36 @@ describe('getModelCapabilities', () => {
     expect(dbWhere).toHaveBeenCalledTimes(1);
   });
 
-  it('resolves a pool id that collides with an Object.prototype key', async () => {
-    // `'constructor' in all` is true on any plain object, so an inherited-key
-    // check would treat this id as already resolved and never cache it.
-    dbWhere.mockImplementation(() => Promise.resolve([]));
-    const { kv, store } = makeKv({
-      model_capabilities_v2: JSON.stringify({
-        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
-      }),
-    });
-    const env = makeEnv(null);
-    env.AUTO_ROUTING_CONFIG = kv;
+  // `constructor` is inherited from Object.prototype, so a plain object reads
+  // it as already present; `__proto__` assigns through the setter instead of
+  // creating a key. Either way the id would be re-queried on every request.
+  it.each(['constructor', '__proto__'])(
+    'resolves and caches a pool id named %s',
+    async (poolId: string) => {
+      dbWhere.mockImplementation(() => Promise.resolve([]));
+      const { kv, store } = makeKv({
+        model_capabilities_v2: JSON.stringify({
+          'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        }),
+      });
+      const env = makeEnv(null);
+      env.AUTO_ROUTING_CONFIG = kv;
 
-    const result = await getModelCapabilities(env, { additionalModelIds: ['constructor'] });
+      const first = await getModelCapabilities(env, { additionalModelIds: [poolId] });
+      expect(first.has(poolId)).toBe(false);
+      expect(dbWhere).toHaveBeenCalledTimes(1);
 
-    expect(result.has('constructor')).toBe(false);
-    expect(dbWhere).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(store.get('model_capabilities_v2') as string)).toMatchObject({
-      constructor: { absent: true },
-    });
-  });
+      const written: unknown = JSON.parse(store.get('model_capabilities_v2') as string);
+      expect(Object.hasOwn(written as object, poolId)).toBe(true);
+
+      // The round trip back through KV must keep the tombstone, or the id is
+      // re-queried on every request forever.
+      clearModelCapabilitiesCache();
+      const second = await getModelCapabilities(env, { additionalModelIds: [poolId] });
+      expect(second.has(poolId)).toBe(false);
+      expect(dbWhere).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('writes a pool id back to the shared union so other users read it from KV', async () => {
     dbWhere.mockImplementation(() =>

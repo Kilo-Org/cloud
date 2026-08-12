@@ -103,6 +103,14 @@ type ModelCapabilitiesCacheRow = {
 
 type ModelCapabilitiesCacheValue = Record<string, ModelCapabilitiesCacheRow>;
 
+// Model ids come from user-configured pools, so every id-keyed accumulator is
+// null-prototype. On a plain object `constructor` reads as already present and
+// `__proto__` assigns through the setter instead of creating a key; either way
+// the id is never tombstoned and is re-queried on every request forever.
+function emptyUnion(): ModelCapabilitiesCacheValue {
+  return Object.create(null) as ModelCapabilitiesCacheValue;
+}
+
 const TOMBSTONE: ModelCapabilitiesCacheRow = {
   inputModalities: [],
   contextLength: null,
@@ -207,7 +215,10 @@ async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCach
           return null;
         }
         // Normalize absent isActive → null so mergeInto is consistent.
-        const normalized: ModelCapabilitiesCacheValue = {};
+        // Null-prototype for the same reason as `withTombstones`: this is the
+        // read half of the round trip, and a `__proto__` key parsed out of KV
+        // would otherwise be dropped on the way back in.
+        const normalized = emptyUnion();
         for (const [id, row] of Object.entries(parsed)) {
           normalized[id] = {
             inputModalities: row.inputModalities,
@@ -299,14 +310,11 @@ async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilities
 
 // Record every id we asked for, so an id with no `model_stats` row is stored
 // as resolved-and-absent instead of looking like a cache miss forever.
-// Own-key checks throughout: pool ids come from user configuration, and a
-// name like `constructor` inherited from Object.prototype would otherwise
-// read as already-resolved.
 function withTombstones(
   requested: ReadonlyArray<string>,
   rows: Readonly<ModelCapabilitiesCacheValue>
 ): ModelCapabilitiesCacheValue {
-  const out: ModelCapabilitiesCacheValue = { ...rows };
+  const out = Object.assign(emptyUnion(), rows);
   for (const id of requested) {
     if (!Object.hasOwn(out, id)) {
       out[id] = TOMBSTONE;

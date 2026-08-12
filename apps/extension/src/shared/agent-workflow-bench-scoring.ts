@@ -8,6 +8,7 @@
  */
 import { ISO_DATE_RE, isoDateVariants } from './agent-workflow-bench-scenarios';
 import type { BenchScenario } from './agent-workflow-bench-scenarios';
+import { coerceWorkflowRunInput } from './agent-workflow-runner';
 import { hashWorkflowScript, matchesWorkflowScope } from './agent-workflows';
 
 export const BENCH_SPEED_LIMIT_SECONDS = 180;
@@ -186,8 +187,11 @@ export const correlateToolExchanges = (events: readonly BenchEvent[]): BenchTool
   return { exchanges };
 };
 
-const hasNonEmptyInput = (input: unknown): boolean =>
-  isRecord(input) && Object.keys(input).length > 0;
+// The runner coerces string inputs (string-encoded JSON, chat-template arg pairs) before running; the scorer must read the input the run actually used, not the raw argument.
+const hasNonEmptyInput = (input: unknown): boolean => {
+  const coerced = coerceWorkflowRunInput(input);
+  return isRecord(coerced) && Object.keys(coerced).length > 0;
+};
 
 /**
  * The verifying run must carry an input when the scenario pins follow-up
@@ -319,7 +323,7 @@ const scoreEvidenceRun = ({
   readonly resultCheck: Exclude<BenchResultCheck, 'none'>;
   readonly scenario: BenchScenario;
 }): RunOutcome => {
-  const inputStrings = findStringValues(evidence.call.arguments['input']);
+  const inputStrings = findStringValues(coerceWorkflowRunInput(evidence.call.arguments['input']));
   const missingInput = Object.entries(followUpValues)
     .filter(([, value]) =>
       ISO_DATE_RE.test(value)

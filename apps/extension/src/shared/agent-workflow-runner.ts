@@ -46,6 +46,49 @@ const isNavigationDestroyedEval = (error: string): boolean =>
   error.includes('Cannot find context with specified id') ||
   error.includes('Inspected target navigated or closed');
 
+/**
+ * Tolerant coercion of a string run_workflow input, from provider artifacts
+ * measured in the 29-model matrix. Some models send string-encoded JSON
+ * ('{"topic": "rust"}'). The z-ai/glm-5.2 chat template emits
+ * <arg_key>K</arg_key><arg_value>V</arg_value> pairs and often drops the final
+ * closing tag, so a value runs to the next key or the end of the string.
+ * A whitespace-only string means "no input". Anything else stays as-is for the
+ * shape gate. The benchmark scorer applies the same coercion when it binds a
+ * verifying run's input, so a coerced run scores like a well-formed one.
+ */
+export const coerceWorkflowRunInput = (input: unknown): unknown => {
+  if (typeof input !== 'string') {
+    return input;
+  }
+  const trimmed = input.trim();
+  if (trimmed === '') {
+    return undefined;
+  }
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Not JSON; the shape gate reports it.
+    }
+    return input;
+  }
+  const pairs = [
+    ...trimmed.matchAll(/<arg_key>([\s\S]*?)<\/arg_key>\s*<arg_value>([\s\S]*?)(?=<arg_key>|$)/gu),
+  ];
+  if (pairs.length > 0) {
+    return Object.fromEntries(
+      pairs.map(pair => [
+        (pair[1] ?? '').trim(),
+        (pair[2] ?? '').replace(/<\/arg_value>\s*$/u, '').trim(),
+      ])
+    );
+  }
+  return input;
+};
+
 const scriptEnvelopeSchema = z.object({
   dryRunActions: z
     .array(z.object({ action: z.string(), selector: z.string() }))
@@ -470,38 +513,8 @@ export const runWorkflow = async (
     );
   }
 
-  // 2a. Tolerant string coercion, from provider artifacts measured in the model matrix.
-  // Some models send input as string-encoded JSON ('{"topic": "rust"}').
-  // The z-ai/glm-5.2 chat template emits <arg_key>K</arg_key><arg_value>V</arg_value> pairs.
-  // A whitespace-only string means "no input".
-  // Coerce what parses; the shape gate below catches the rest.
-  let coercedInput = input;
-  if (typeof coercedInput === 'string') {
-    const trimmed = coercedInput.trim();
-    if (trimmed === '') {
-      coercedInput = undefined;
-    } else if (trimmed.startsWith('{')) {
-      try {
-        const parsed: unknown = JSON.parse(trimmed);
-        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-          coercedInput = parsed;
-        }
-      } catch {
-        // Not JSON; the shape gate reports it.
-      }
-    } else {
-      const pairs = [
-        ...trimmed.matchAll(
-          /<arg_key>([\s\S]*?)<\/arg_key>\s*<arg_value>([\s\S]*?)<\/arg_value>/gu
-        ),
-      ];
-      if (pairs.length > 0) {
-        coercedInput = Object.fromEntries(
-          pairs.map(pair => [(pair[1] ?? '').trim(), (pair[2] ?? '').trim()])
-        );
-      }
-    }
-  }
+  // 2a. Tolerant string coercion; the shape gate below catches what does not parse.
+  const coercedInput = coerceWorkflowRunInput(input);
   // 2b. Input shape gate — before any navigation. Name the declared params: a weak model that sent a bare string loops on a generic message (measured), but corrects when told the exact object to send.
   if (
     coercedInput !== undefined &&

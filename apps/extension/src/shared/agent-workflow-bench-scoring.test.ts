@@ -114,6 +114,19 @@ describe('real-run selection', () => {
 
     expect(run?.call.id).toBe('call-b');
   });
+
+  it('accepts a run whose input is a coercible string, like the runner does', () => {
+    // The z-ai/glm-5.2 chat template emits arg pairs and drops the final closing tag.
+    const stringInput = '\n<arg_key>destination</arg_key>\n<arg_value>Paris';
+    const events: BenchEvent[] = [
+      toolCall('call-s', 'run_workflow', { input: stringInput, workflowId: 'wf' }),
+      toolResult('call-s', true, { result: 'flights to Paris found' }),
+    ];
+
+    const run = selectLastValidRun(correlateToolExchanges(events).exchanges);
+
+    expect(run?.call.id).toBe('call-s');
+  });
 });
 
 describe('stored workflow predicates', () => {

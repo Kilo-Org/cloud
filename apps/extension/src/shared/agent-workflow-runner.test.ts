@@ -877,6 +877,7 @@ describe('workflow params and input', () => {
   it.each([
     ['string-encoded JSON', '{"destination": "SFO"}'],
     ['chat-template arg pairs', '<arg_key>destination</arg_key>\n<arg_value>SFO</arg_value>'],
+    ['arg pairs missing the final closing tag', '\n<arg_key>destination</arg_key>\n<arg_value>SFO'],
   ])('coerces %s input and runs', async (_label, stringInput) => {
     const evalCodes: string[] = [];
     const deps = createDeps({

@@ -53,6 +53,7 @@ describe('kvReadThrough', () => {
     expect(fetchOrigin).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith('corrupt-key', JSON.stringify(origin), {
       expirationTtl: 3600,
+      metadata: { writtenAt: expect.any(Number) },
     });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
@@ -75,6 +76,7 @@ describe('kvReadThrough', () => {
     expect(fetchOrigin).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith('missing-key', JSON.stringify(origin), {
       expirationTtl: 3600,
+      metadata: { writtenAt: expect.any(Number) },
     });
   });
 

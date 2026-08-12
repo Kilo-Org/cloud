@@ -1,7 +1,7 @@
 import { formatError, ttlCached } from '@kilocode/worker-utils';
 import { getWorkerDb, modelStats } from '@kilocode/db';
 import { inArray } from 'drizzle-orm';
-import { kvReadThrough } from './kv-read-through';
+import { kvReadThrough, type KvReadThroughMetadata } from './kv-read-through';
 import { getRoutingTable } from './routing-table';
 
 // Capability snapshot for a single model. `inputModalities` is the synonym-
@@ -234,9 +234,17 @@ async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCach
 // table within the hour.
 const MODEL_CAPABILITIES_MAX_ENTRIES = 5_000;
 
+// KV rejects a TTL under 60s. Below that the union is about to expire and be
+// rebuilt from the routing table anyway, so the write is simply skipped.
+const KV_MINIMUM_TTL_SECONDS = 60;
+
 // Publish the filled union so every other isolate, user, and pool reads the
 // id from KV instead of Postgres. Concurrent writers are last-write-wins: a
 // lost id is re-queried once and written again, so the union converges.
+//
+// The rewrite holds the ORIGINAL expiry. Resetting the TTL on every fill
+// would let a steady trickle of new pool ids keep the blob alive forever,
+// and stale rows and tombstones would then never be rebuilt.
 async function writeBack(
   env: ModelCapabilitiesEnv,
   merged: ModelCapabilitiesCacheValue
@@ -246,8 +254,20 @@ async function writeBack(
     return;
   }
   try {
+    const { metadata } =
+      await env.AUTO_ROUTING_CONFIG.getWithMetadata<KvReadThroughMetadata>(
+        MODEL_CAPABILITIES_KV_KEY
+      );
+    const writtenAt = typeof metadata?.writtenAt === 'number' ? metadata.writtenAt : Date.now();
+    const remainingSeconds = Math.floor(
+      (writtenAt + MODEL_CAPABILITIES_KV_TTL_SECONDS * 1_000 - Date.now()) / 1_000
+    );
+    if (remainingSeconds < KV_MINIMUM_TTL_SECONDS) {
+      return;
+    }
     await env.AUTO_ROUTING_CONFIG.put(MODEL_CAPABILITIES_KV_KEY, JSON.stringify(merged), {
-      expirationTtl: MODEL_CAPABILITIES_KV_TTL_SECONDS,
+      expirationTtl: remainingSeconds,
+      metadata: { writtenAt } satisfies KvReadThroughMetadata,
     });
     // Drop the in-memory union so this isolate reloads the filled one from KV
     // rather than re-querying the DB for the same ids until its TTL expires.

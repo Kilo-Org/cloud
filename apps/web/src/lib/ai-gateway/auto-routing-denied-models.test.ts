@@ -4,12 +4,12 @@ import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effec
 jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
-  getEffectiveModelDecision: jest.fn(),
-}));
 
-import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
-import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
+const { getCachedRoutingTable } = jest.requireMock<{
+  getCachedRoutingTable: jest.Mock;
+}>('@/lib/ai-gateway/auto-routing-table-cache');
+const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
+
 import { BALANCED_QWEN_MODEL } from '@/lib/ai-gateway/auto-model';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
@@ -17,9 +17,6 @@ import {
   loadAutoRoutingCandidateModelIds,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
-
-const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
-const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}
@@ -68,18 +65,18 @@ describe('policyNeedsCandidateEvaluation', () => {
 });
 
 describe('collectDeniedAutoRoutingModelIds', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('returns the organization deny list without loading candidates', async () => {
+    const loadCandidateModelIds = jest.fn(async () => ['google/gemini-2.5-flash']);
+    const decideModel = jest.fn(async () => ({ allowed: false }));
+
     await expect(
       collectDeniedAutoRoutingModelIds(
-        policy({ organizationModelDenyList: ['openai/gpt-4o:free'] })
+        policy({ organizationModelDenyList: ['openai/gpt-4o:free'] }),
+        { loadCandidateModelIds, decideModel }
       )
     ).resolves.toEqual(['openai/gpt-4o']);
-    expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
-    expect(mockedGetEffectiveModelDecision).not.toHaveBeenCalled();
+    expect(loadCandidateModelIds).not.toHaveBeenCalled();
+    expect(decideModel).not.toHaveBeenCalled();
   });
 
   it('adds models that fail the effective access policy', async () => {
@@ -106,34 +103,29 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   });
 
   it('loads routing-table and fallback candidates when a provider ceiling is set', async () => {
-    mockedGetCachedRoutingTable.mockResolvedValue({
-      routes: {
-        'implementation/code_generation': [
-          { model: 'google/gemini-2.5-flash' },
-          { model: 'anthropic/claude' },
-        ],
-      },
-    } as never);
-    mockedGetEffectiveModelDecision.mockImplementation(async (_policy, modelId) => ({
-      allowed: modelId !== 'google/gemini-2.5-flash',
-    }));
+    const decideModel = jest.fn(
+      async (_policy: EffectiveOrganizationModelPolicy, modelId: string) => ({
+        allowed: modelId !== 'google/gemini-2.5-flash',
+      })
+    );
 
     const denied = await collectDeniedAutoRoutingModelIds(
-      policy({ organizationProviderCeiling: ['anthropic'] })
+      policy({ organizationProviderCeiling: ['anthropic'] }),
+      {
+        loadCandidateModelIds: async () => ['google/gemini-2.5-flash', 'anthropic/claude'],
+        decideModel,
+      }
     );
 
-    expect(denied).toContain('google/gemini-2.5-flash');
-    expect(denied).not.toContain('anthropic/claude');
-    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
-      expect.anything(),
-      'google/gemini-2.5-flash'
-    );
+    expect(denied).toEqual(['google/gemini-2.5-flash']);
+    expect(decideModel).toHaveBeenCalledWith(expect.anything(), 'google/gemini-2.5-flash');
+    expect(decideModel).toHaveBeenCalledWith(expect.anything(), 'anthropic/claude');
   });
 });
 
 describe('loadAutoRoutingCandidateModelIds', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockedGetCachedRoutingTable.mockReset();
   });
 
   it('includes routing-table models plus coding-plan and balanced fallback ids', async () => {

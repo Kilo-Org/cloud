@@ -911,6 +911,47 @@ describe('kilo-auto/efficient classifier billing', () => {
     );
   });
 
+  it('still routes when access-policy evaluation fails', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        model_deny_list: ['openai/gpt-4o:free'],
+      },
+      plan: 'enterprise',
+    });
+    mockedCollectDeniedAutoRoutingModelIds.mockRejectedValue(new Error('policy db down'));
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.003,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deniedModelIds: ['openai/gpt-4o'],
+      })
+    );
+  });
+
   it('bills classifier cost even when decision is null but cost > 0', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: null,

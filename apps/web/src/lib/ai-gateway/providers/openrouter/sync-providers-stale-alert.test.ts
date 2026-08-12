@@ -21,6 +21,7 @@ jest.mock('@/lib/slack/admin-notifications', () => ({
 
 import { redisClient } from '@/lib/redis';
 import { SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY } from '@/lib/redis-keys';
+import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
   alertIfSyncProvidersStale,
   buildStaleSyncAlertNotification,
@@ -147,7 +148,7 @@ describe('alertIfSyncProvidersStale', () => {
   it('writes the alert timestamp to Redis with a week expiry', async () => {
     mockedRedisGet.mockResolvedValueOnce(STALE_SYNC.toISOString()).mockResolvedValueOnce(null);
     mockedRedisSet.mockResolvedValue('OK');
-    const sendNotification = jest.fn(async () => undefined);
+    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
 
     await alertIfSyncProvidersStale({
       now: () => NOW,
@@ -162,8 +163,8 @@ describe('alertIfSyncProvidersStale', () => {
   });
 
   it('posts once and stores the alert timestamp with a week TTL', async () => {
-    const sendNotification = jest.fn(async () => undefined);
-    const setLastAlertAt = jest.fn(async () => 'OK');
+    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+    const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
     await alertIfSyncProvidersStale({
       now: () => NOW,
@@ -182,8 +183,8 @@ describe('alertIfSyncProvidersStale', () => {
   });
 
   it('does not post when a later alert already exists', async () => {
-    const sendNotification = jest.fn(async () => undefined);
-    const setLastAlertAt = jest.fn(async () => 'OK');
+    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+    const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
     await alertIfSyncProvidersStale({
       now: () => NOW,
@@ -199,7 +200,7 @@ describe('alertIfSyncProvidersStale', () => {
 
   it('swallows Redis failures so the cron can continue', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const sendNotification = jest.fn(async () => undefined);
+    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
 
     await expect(
       alertIfSyncProvidersStale({
@@ -216,7 +217,7 @@ describe('alertIfSyncProvidersStale', () => {
 
   it('does not store an alert timestamp when Slack fails', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const setLastAlertAt = jest.fn(async () => 'OK');
+    const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
     await expect(
       alertIfSyncProvidersStale({

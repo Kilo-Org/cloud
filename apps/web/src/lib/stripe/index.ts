@@ -83,6 +83,9 @@ import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
 import {
+  createTopUpCheckoutSession,
+  mergeServiceFeeCommercialMetadata,
+  prepareTopUpCheckoutFee,
   resolveFixedUsdPriceUnitAmount,
   settleTrustedAutoTopUpInvoice,
   settleTrustedTopUpCharge,
@@ -90,6 +93,14 @@ import {
 } from '@/lib/service-fees/checkout';
 import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+import {
+  observeServiceFeeChargeRefunded,
+  observeServiceFeeCreditNote,
+} from '@/lib/service-fees/refunds';
+import {
+  observeServiceFeeDisputeClosed,
+  observeServiceFeeDisputeFundsWithdrawn,
+} from '@/lib/service-fees/disputes';
 
 type KiloClawChargeContext = {
   chargeId: string;
@@ -1195,6 +1206,12 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
     case 'charge.dispute.updated':
     case 'charge.dispute.closed': {
       const dispute = event.data.object;
+      if (event.type === 'charge.dispute.closed') {
+        await observeServiceFeeDisputeClosed({
+          store: createServiceFeeStores().assessments,
+          dispute,
+        });
+      }
       await syncStripeDisputeCaseFromWebhook({
         eventId: event.id,
         eventCreated: event.created,
@@ -1209,6 +1226,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      await observeServiceFeeChargeRefunded({
+        store: createServiceFeeStores().assessments,
+        charge,
+        stripe: client,
+      });
       await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {
@@ -1230,6 +1252,16 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           occurredAt: new Date(charge.created * 1000),
         });
       }
+      break;
+    }
+
+    case 'credit_note.created':
+    case 'credit_note.updated': {
+      await observeServiceFeeCreditNote({
+        store: createServiceFeeStores().assessments,
+        creditNote: event.data.object,
+        stripe: client,
+      });
       break;
     }
 
@@ -1480,6 +1512,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.dispute.funds_withdrawn': {
       const dispute = event.data.object;
+      await observeServiceFeeDisputeFundsWithdrawn({
+        store: createServiceFeeStores().assessments,
+        dispute,
+      });
       void reportChargeBackedStripeAbuseEvent({
         abuseEventType: 'stripe.charge.dispute.funds_withdrawn',
         eventId: event.id,
@@ -1572,46 +1608,69 @@ export async function createAutoTopUpSetupCheckoutSession(
   amountCents: number = 5000
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const feeDeps = createStripeTopUpFeeDeps();
+  const prepared = await prepareTopUpCheckoutFee({
+    flow: 'personal_auto_top_up_setup',
+    principalMinor: amountCents,
+    kiloUserId,
+    stripeCustomerId,
+    taxPrincipal: { kind: 'inline' },
+    deps: feeDeps,
+  });
 
-  const checkoutSession = await client.checkout.sessions.create({
-    mode: 'payment',
-    customer: stripeCustomerId,
-    billing_address_collection: 'required',
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Credit Top-Up with Auto-Refill Setup',
-            description: `Initial $${amountDollars} top-up. Your card will be saved for automatic $${amountDollars} top ups when balance drops below $${AUTO_TOP_UP_THRESHOLD_DOLLARS}.`,
+  const checkoutSession = await createTopUpCheckoutSession({
+    prepared,
+    buildSessionParams: feeLine => ({
+      mode: 'payment',
+      customer: stripeCustomerId,
+      billing_address_collection: 'required',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Credit Top-Up with Auto-Refill Setup',
+              description: `Initial $${amountDollars} top-up. Your card will be saved for automatic $${amountDollars} top ups when balance drops below $${AUTO_TOP_UP_THRESHOLD_DOLLARS}.`,
+            },
+            unit_amount: amountCents,
           },
-          unit_amount: amountCents,
+          quantity: 1,
         },
-        quantity: 1,
+        ...(feeLine ? [feeLine] : []),
+      ],
+      invoice_creation: {
+        enabled: true,
       },
-    ],
-    invoice_creation: {
-      enabled: true,
-    },
-    customer_update: {
-      name: 'auto',
-      address: 'auto',
-    },
-    tax_id_collection: {
-      enabled: true,
-      required: 'never',
-    },
-    success_url: `${APP_URL}/payments/auto-topup/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${APP_URL}/profile?auto_topup_setup=cancelled`,
-    payment_intent_data: {
-      metadata: {
-        type: 'auto-topup-setup',
-        kiloUserId,
-        amountCents: String(amountCents),
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
       },
-      // KEY CONFIGURATION: This saves the payment method for future off-session charges
-      setup_future_usage: 'off_session',
-    },
+      tax_id_collection: {
+        enabled: true,
+        required: 'never',
+      },
+      success_url: `${APP_URL}/payments/auto-topup/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${APP_URL}/profile?auto_topup_setup=cancelled`,
+      metadata: mergeServiceFeeCommercialMetadata(
+        { type: 'auto-topup-setup', kiloUserId },
+        prepared.commercialMetadata
+      ),
+      payment_intent_data: {
+        metadata: mergeServiceFeeCommercialMetadata(
+          {
+            type: 'auto-topup-setup',
+            kiloUserId,
+            amountCents: String(amountCents),
+          },
+          prepared.commercialMetadata
+        ),
+        // KEY CONFIGURATION: This saves the payment method for future off-session charges
+        setup_future_usage: 'off_session',
+      },
+      expand: ['line_items.data.price.product'],
+    }),
+    createSession: params => client.checkout.sessions.create(params),
+    deps: feeDeps,
   });
 
   return typeof checkoutSession.url === 'string' ? checkoutSession.url : null;
@@ -1663,36 +1722,64 @@ export async function getStripeTopUpCheckoutUrl(
     cancelUrl = `${APP_URL}/profile?payment_status=topup_cancelled&origin=${origin}`;
   }
 
-  const checkoutSession = await client.checkout.sessions.create({
-    mode: 'payment',
-    customer: stripeCustomerId,
-    billing_address_collection: 'required',
-    line_items: line_items,
-    invoice_creation: {
-      enabled: true,
-    },
-    customer_update: {
-      name: 'auto',
-      address: 'auto',
-    },
-    tax_id_collection: {
-      enabled: true,
-      required: 'never',
-    },
-    success_url: `${APP_URL}/payments/topup/success?session_id={CHECKOUT_SESSION_ID}&origin=${origin}`,
-    cancel_url: cancelUrl,
-    payment_intent_data: {
-      metadata: {
-        type: 'stripe-checkout-topup',
-        kiloUserId,
-        organizationId: organizationId ?? null,
-        amountCents: String(principalMinor),
-        serviceFeePrincipalMinor: String(principalMinor),
-      } satisfies StripeTopupMetadata,
-    },
-    saved_payment_method_options: {
-      payment_method_save: 'enabled',
-    },
+  const feeDeps = createStripeTopUpFeeDeps();
+  const prepared = await prepareTopUpCheckoutFee({
+    flow: isOrganizationTopUp ? 'organization_top_up' : 'personal_top_up',
+    principalMinor,
+    kiloUserId,
+    organizationId: organizationId ?? undefined,
+    stripeCustomerId: stripeCustomerId ?? undefined,
+    taxPrincipal: defaultPriceId ? { kind: 'price', priceId: defaultPriceId } : { kind: 'inline' },
+    deps: feeDeps,
+  });
+  const principalLine = line_items[0];
+
+  const checkoutSession = await createTopUpCheckoutSession({
+    prepared,
+    buildSessionParams: feeLine => ({
+      mode: 'payment',
+      customer: stripeCustomerId,
+      billing_address_collection: 'required',
+      line_items: feeLine ? [principalLine, feeLine] : [principalLine],
+      invoice_creation: {
+        enabled: true,
+      },
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
+      },
+      tax_id_collection: {
+        enabled: true,
+        required: 'never',
+      },
+      success_url: `${APP_URL}/payments/topup/success?session_id={CHECKOUT_SESSION_ID}&origin=${origin}`,
+      cancel_url: cancelUrl,
+      metadata: mergeServiceFeeCommercialMetadata(
+        {
+          type: 'stripe-checkout-topup',
+          kiloUserId,
+          ...(organizationId ? { organizationId } : {}),
+        },
+        prepared.commercialMetadata
+      ),
+      payment_intent_data: {
+        metadata: mergeServiceFeeCommercialMetadata(
+          {
+            type: 'stripe-checkout-topup',
+            kiloUserId,
+            organizationId: organizationId ?? null,
+            amountCents: String(principalMinor),
+          } satisfies StripeTopupMetadata,
+          prepared.commercialMetadata
+        ),
+      },
+      saved_payment_method_options: {
+        payment_method_save: 'enabled',
+      },
+      expand: ['line_items.data.price.product'],
+    }),
+    createSession: params => client.checkout.sessions.create(params),
+    deps: feeDeps,
   });
 
   const url: string | null = typeof checkoutSession.url === 'string' ? checkoutSession.url : null;

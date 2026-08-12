@@ -246,10 +246,13 @@ describe('handleUpdateSeatCount with 3DS', () => {
       expect.objectContaining({ success: true })
     );
 
-    expect(mockHandleOrganizationKiloPassInvoicePaid).toHaveBeenCalledWith({
-      invoice: paidInvoice,
-      paidSeatCount: 10,
-    });
+    expect(mockHandleOrganizationKiloPassInvoicePaid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoice: paidInvoice,
+        paidSeatCount: 10,
+        serviceFee: expect.any(Object),
+      })
+    );
   });
 
   it('does not eagerly reconcile an organization Kilo Pass seat decrease', async () => {

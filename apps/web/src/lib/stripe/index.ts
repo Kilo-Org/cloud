@@ -6,7 +6,9 @@ import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
 import {
+  kilo_pass_org_agreements,
   kilo_pass_scheduled_changes,
+  kilo_pass_subscriptions,
   payment_methods,
   kilocode_users,
   auto_top_up_configs,
@@ -52,10 +54,18 @@ import {
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import { invoiceLooksLikeOrganizationKiloPass } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import {
+  attachPreparedOrganizationKiloPassServiceFee,
+  discardStagedOrganizationKiloPassServiceFeeItem,
   endPendingOrganizationKiloPassForTerminalInvoice,
   handleOrganizationKiloPassPaymentAdverseForInvoice,
   handleOrganizationKiloPassInvoicePaid,
   handleOrganizationKiloPassSubscriptionEvent,
+  prepareOrganizationKiloPassSeatCapacityFee,
+  resolveOrganizationKiloPassSubscriptionItem,
+  stagePreparedOrganizationKiloPassServiceFeeItem,
+  type OrganizationKiloPassSeatCapacityFeeDependencies,
+  type OrganizationKiloPassSeatCapacityStripe,
+  type PreparedOrganizationKiloPassSeatCapacityFee,
 } from '@/lib/kilo-pass-org/stripe-adapter';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
@@ -68,7 +78,12 @@ import {
 import { enqueueImpactSaleReversalForCharge } from '@/lib/impact/affiliate-events';
 import { markPersonalKiloClawReferralPaymentAdverse } from '@/lib/impact/kiloclaw-referrals';
 import { markPersonalKiloPassReferralPaymentAdverse } from '@/lib/impact/kilo-pass-referrals';
-import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
+import {
+  ImpactReferralPaymentProvider,
+  KiloPassOrgAgreementState,
+  KiloPassOrgPurchaseChannel,
+  KiloPassPaymentProvider,
+} from '@kilocode/db/schema-types';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
@@ -82,6 +97,28 @@ import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
+import {
+  createTopUpCheckoutSession,
+  isKiloOwnedAutoTopUpInvoice,
+  mergeServiceFeeCommercialMetadata,
+  prepareTopUpCheckoutFee,
+  resolveFixedUsdPriceUnitAmount,
+  settleTrustedAutoTopUpInvoice,
+  settleTrustedTopUpCharge,
+  type ServiceFeeCheckoutDependencies,
+} from '@/lib/service-fees/checkout';
+import type { ServiceFeeAssessmentStore } from '@/lib/service-fees/assessments';
+import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+import { handleKiloPassInvoiceCreated } from '@/lib/service-fees/invoice-created';
+import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+import {
+  observeServiceFeeChargeRefunded,
+  observeServiceFeeCreditNote,
+} from '@/lib/service-fees/refunds';
+import {
+  observeServiceFeeDisputeClosed,
+  observeServiceFeeDisputeFundsWithdrawn,
+} from '@/lib/service-fees/disputes';
 
 type KiloClawChargeContext = {
   chargeId: string;
@@ -237,7 +274,97 @@ export type StripeTopupMetadata = {
   type?: string;
   kiloUserId?: User['id'];
   organizationId?: Organization['id'] | null;
+  amountCents?: string;
+  serviceFeeAssessmentKey?: string;
+  serviceFeeVersion?: string;
+  serviceFeeFlow?: string;
+  serviceFeePrincipalMinor?: string;
+  serviceFeeOrganizationId?: string;
 };
+
+function createStripeTopUpFeeDeps(): ServiceFeeCheckoutDependencies {
+  const stores = createServiceFeeStores();
+  return {
+    store: stores.assessments,
+    findEffectiveExemption: async (organizationId, at) =>
+      getEffectiveOrganizationServiceFeeExemption({
+        store: stores.exemptions,
+        organizationId,
+        at,
+      }),
+    stripe: client,
+    listCheckoutLineItems: (sessionId, params) =>
+      client.checkout.sessions.listLineItems(sessionId, params),
+    expireCheckoutSession: sessionId => client.checkout.sessions.expire(sessionId),
+    createInvoiceItem: itemParams => client.invoiceItems.create(itemParams),
+    retrieveCheckoutSessionCreated: async paymentIntentId => {
+      try {
+        const listed = await client.checkout.sessions.list({
+          payment_intent: paymentIntentId,
+          limit: 1,
+        });
+        return listed.data[0]?.created ?? null;
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+async function lookupOrganizationKiloPassPurchaseChannel(
+  organizationId: string
+): Promise<'self_serve' | 'manual' | null> {
+  const agreement = await db.query.kilo_pass_org_agreements.findFirst({
+    columns: { purchase_channel: true },
+    where: and(
+      eq(kilo_pass_org_agreements.parent_organization_id, organizationId),
+      ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+    ),
+  });
+  if (
+    agreement?.purchase_channel === KiloPassOrgPurchaseChannel.SelfServe ||
+    agreement?.purchase_channel === KiloPassOrgPurchaseChannel.Manual
+  ) {
+    return agreement.purchase_channel;
+  }
+  return null;
+}
+
+function metadataLooksStoreManaged(metadata: Stripe.Metadata | null | undefined): boolean {
+  const provider = metadata?.paymentProvider ?? metadata?.payment_provider;
+  return (
+    provider === KiloPassPaymentProvider.AppStore || provider === KiloPassPaymentProvider.GooglePlay
+  );
+}
+
+async function isKiloPassInvoiceStoreManaged(input: {
+  invoice: Stripe.Invoice;
+  subscription: Stripe.Subscription | null;
+}): Promise<boolean> {
+  if (
+    metadataLooksStoreManaged(input.invoice.metadata) ||
+    metadataLooksStoreManaged(input.invoice.parent?.subscription_details?.metadata) ||
+    metadataLooksStoreManaged(input.subscription?.metadata)
+  ) {
+    return true;
+  }
+
+  const subscriptionId =
+    input.subscription?.id ??
+    stripeReferenceId(input.invoice.parent?.subscription_details?.subscription);
+  if (!subscriptionId) {
+    return false;
+  }
+
+  const row = await db.query.kilo_pass_subscriptions.findFirst({
+    columns: { payment_provider: true },
+    where: or(
+      eq(kilo_pass_subscriptions.stripe_subscription_id, subscriptionId),
+      eq(kilo_pass_subscriptions.provider_subscription_id, subscriptionId)
+    ),
+  });
+  return Boolean(row && row.payment_provider !== KiloPassPaymentProvider.Stripe);
+}
 
 export async function detachAllPaymentMethods(user: User) {
   const paymentMethods = await client.paymentMethods.list({
@@ -394,7 +521,8 @@ async function handleAutoTopUpSetup(
   user: User,
   paymentIntent: Stripe.PaymentIntent,
   creditAmountInCents: number,
-  config: StripeConfig
+  config: StripeConfig,
+  emailAmounts: { serviceFeeCents?: number; grossPaidCents?: number } = {}
 ) {
   logExceptInTest(
     `Processing auto-topup-setup for user ${user.id} from payment intent ${paymentIntent.id}`
@@ -451,7 +579,10 @@ async function handleAutoTopUpSetup(
     .where(eq(kilocode_users.id, user.id));
 
   // Credit the initial payment to the user's balance
-  const setupTopUpOk = await processTopUp(user, creditAmountInCents, config);
+  const setupTopUpOk = await processTopUp(user, creditAmountInCents, config, {
+    serviceFeeCents: emailAmounts.serviceFeeCents,
+    grossPaidCents: emailAmounts.grossPaidCents,
+  });
   if (!setupTopUpOk) {
     sentryLogger('stripe', 'info')('Auto-topup-setup already registered or failed to insert', {
       kilo_user_id: user.id,
@@ -536,7 +667,7 @@ export async function handleSuccessfulChargeWithPayment(
   // NOTE: (bmc) PLEASE NOTE this is called for ALL successful charges, including subscriptions and org purchases
   // the user topup flow and credit application stuff should only apply the charge is not from an organization
   const config: StripeConfig = { type: 'stripe', stripe_payment_id: charge.id };
-  const creditAmountInCents = charge.amount;
+  const feeDeps = createStripeTopUpFeeDeps();
 
   const organizationId = paymentIntent.metadata.organizationId;
   const kiloUserId = paymentIntent.metadata.kiloUserId;
@@ -555,9 +686,31 @@ export async function handleSuccessfulChargeWithPayment(
       `Processing top-up for organization ${organizationId} from charge ${charge.id}`
     );
     config.stripe_payment_id = paymentIntent.id;
-    await processTopupForOrganization(kiloUserId, organizationId, creditAmountInCents, config, {
-      isAutoTopUp: paymentIntent.metadata.type === 'org-auto-topup-setup',
+    const settlement = await settleTrustedTopUpCharge({
+      charge,
+      paymentIntent,
+      kiloUserId,
+      organizationId,
+      flowHint:
+        paymentIntent.metadata.type === 'org-auto-topup-setup'
+          ? 'organization_auto_top_up_setup'
+          : 'organization_top_up',
+      deps: feeDeps,
     });
+    if (!settlement.shouldCredit) {
+      return;
+    }
+    await processTopupForOrganization(
+      kiloUserId,
+      organizationId,
+      settlement.principalMinor,
+      config,
+      {
+        isAutoTopUp: paymentIntent.metadata.type === 'org-auto-topup-setup',
+        serviceFeeCents: settlement.chargedFeeMinor,
+        grossPaidCents: settlement.grossPaidMinor,
+      }
+    );
 
     if (paymentIntent.metadata.type === 'org-auto-topup-setup') {
       await handleOrgAutoTopUpSetup(organizationId, kiloUserId, paymentIntent, config);
@@ -611,7 +764,20 @@ export async function handleSuccessfulChargeWithPayment(
         `Skipping invoice-based charge ${charge.id} in charge.succeeded - will be handled by invoice.payment_succeeded`
       );
     } else if (isAutoTopUpSetup) {
-      await handleAutoTopUpSetup(user, paymentIntent, creditAmountInCents, config);
+      const settlement = await settleTrustedTopUpCharge({
+        charge,
+        paymentIntent,
+        kiloUserId: user.id,
+        flowHint: 'personal_auto_top_up_setup',
+        deps: feeDeps,
+      });
+      if (!settlement.shouldCredit) {
+        return;
+      }
+      await handleAutoTopUpSetup(user, paymentIntent, settlement.principalMinor, config, {
+        serviceFeeCents: settlement.chargedFeeMinor,
+        grossPaidCents: settlement.grossPaidMinor,
+      });
     } else if (isKiloclawEarlybird) {
       await recordKiloclawEarlybirdPurchase(user, charge);
     } else {
@@ -626,7 +792,20 @@ export async function handleSuccessfulChargeWithPayment(
     return;
   }
 
-  const topUpOk = await processTopUp(user, creditAmountInCents, config);
+  const settlement = await settleTrustedTopUpCharge({
+    charge,
+    paymentIntent,
+    kiloUserId: user.id,
+    flowHint: 'personal_top_up',
+    deps: feeDeps,
+  });
+  if (!settlement.shouldCredit) {
+    return;
+  }
+  const topUpOk = await processTopUp(user, settlement.principalMinor, config, {
+    serviceFeeCents: settlement.chargedFeeMinor,
+    grossPaidCents: settlement.grossPaidMinor,
+  });
   if (!topUpOk) {
     sentryLogger('stripe', 'warning')('Ignoring already registered top-up', {
       kilo_user_id: user.id,
@@ -832,6 +1011,42 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       await handleSuccessfulCharge(event);
       break;
 
+    case 'invoice.created': {
+      const invoice = event.data.object;
+      // Kilo-owned auto-top-up invoices attach their own fee before pay.
+      // Skip without creating an assessment or attaching a second fee.
+      if (isKiloOwnedAutoTopUpInvoice(invoice)) {
+        break;
+      }
+      try {
+        const stores = createServiceFeeStores();
+        await handleKiloPassInvoiceCreated({
+          invoice,
+          stripe: client,
+          store: stores.assessments,
+          deps: {
+            findEffectiveExemption: async (organizationId, at) =>
+              getEffectiveOrganizationServiceFeeExemption({
+                store: stores.exemptions,
+                organizationId,
+                at,
+              }),
+            getOrganizationPurchaseChannel: lookupOrganizationKiloPassPurchaseChannel,
+            isStoreManaged: isKiloPassInvoiceStoreManaged,
+          },
+        });
+      } catch (error) {
+        captureException(error, {
+          tags: { source: 'kilo_pass_invoice_created_service_fee' },
+          extra: {
+            stripe_event_id: event.id,
+            stripe_invoice_id: invoice.id,
+          },
+        });
+      }
+      break;
+    }
+
     // Handle auto-topups via invoice.paid - this has direct access to invoice metadata.
     // invoice.paid is a superset of invoice.payment_succeeded per Stripe docs.
     case 'invoice.voided':
@@ -900,8 +1115,21 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               traceId,
             });
 
-            const autoTopUpOk = await processTopUp(user, invoice.amount_paid, config, {
+            const settlement = await settleTrustedAutoTopUpInvoice({
+              invoice,
+              chargeId,
+              kiloUserId: user.id,
+              flow: 'personal_auto_top_up',
+              deps: createStripeTopUpFeeDeps(),
+            });
+            if (!settlement.shouldCredit) {
+              break;
+            }
+
+            const autoTopUpOk = await processTopUp(user, settlement.principalMinor, config, {
               isAutoTopUp: true,
+              serviceFeeCents: settlement.chargedFeeMinor,
+              grossPaidCents: settlement.grossPaidMinor,
             });
 
             if (!autoTopUpOk) {
@@ -954,13 +1182,31 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
               columns: { created_by_user_id: true },
             });
+            const initiatingUserId =
+              autoTopUpConfig?.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID;
+            const settlement = await settleTrustedAutoTopUpInvoice({
+              invoice,
+              chargeId,
+              kiloUserId:
+                initiatingUserId === SYSTEM_AUTO_TOP_UP_USER_ID ? undefined : initiatingUserId,
+              organizationId,
+              flow: 'organization_auto_top_up',
+              deps: createStripeTopUpFeeDeps(),
+            });
+            if (!settlement.shouldCredit) {
+              break;
+            }
 
             await processTopupForOrganization(
-              autoTopUpConfig?.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID,
+              initiatingUserId,
               organizationId,
-              invoice.amount_paid,
+              settlement.principalMinor,
               config,
-              { isAutoTopUp: true }
+              {
+                isAutoTopUp: true,
+                serviceFeeCents: settlement.chargedFeeMinor,
+                grossPaidCents: settlement.grossPaidMinor,
+              }
             );
 
             processedSuccessfully = true;
@@ -1068,6 +1314,12 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
     case 'charge.dispute.updated':
     case 'charge.dispute.closed': {
       const dispute = event.data.object;
+      if (event.type === 'charge.dispute.closed') {
+        await observeServiceFeeDisputeClosed({
+          store: createServiceFeeStores().assessments,
+          dispute,
+        });
+      }
       await syncStripeDisputeCaseFromWebhook({
         eventId: event.id,
         eventCreated: event.created,
@@ -1082,6 +1334,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      await observeServiceFeeChargeRefunded({
+        store: createServiceFeeStores().assessments,
+        charge,
+        stripe: client,
+      });
       await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {
@@ -1103,6 +1360,16 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           occurredAt: new Date(charge.created * 1000),
         });
       }
+      break;
+    }
+
+    case 'credit_note.created':
+    case 'credit_note.updated': {
+      await observeServiceFeeCreditNote({
+        store: createServiceFeeStores().assessments,
+        creditNote: event.data.object,
+        stripe: client,
+      });
       break;
     }
 
@@ -1353,6 +1620,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.dispute.funds_withdrawn': {
       const dispute = event.data.object;
+      await observeServiceFeeDisputeFundsWithdrawn({
+        store: createServiceFeeStores().assessments,
+        dispute,
+      });
       void reportChargeBackedStripeAbuseEvent({
         abuseEventType: 'stripe.charge.dispute.funds_withdrawn',
         eventId: event.id,
@@ -1445,46 +1716,69 @@ export async function createAutoTopUpSetupCheckoutSession(
   amountCents: number = 5000
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const feeDeps = createStripeTopUpFeeDeps();
+  const prepared = await prepareTopUpCheckoutFee({
+    flow: 'personal_auto_top_up_setup',
+    principalMinor: amountCents,
+    kiloUserId,
+    stripeCustomerId,
+    taxPrincipal: { kind: 'inline' },
+    deps: feeDeps,
+  });
 
-  const checkoutSession = await client.checkout.sessions.create({
-    mode: 'payment',
-    customer: stripeCustomerId,
-    billing_address_collection: 'required',
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Credit Top-Up with Auto-Refill Setup',
-            description: `Initial $${amountDollars} top-up. Your card will be saved for automatic $${amountDollars} top ups when balance drops below $${AUTO_TOP_UP_THRESHOLD_DOLLARS}.`,
+  const checkoutSession = await createTopUpCheckoutSession({
+    prepared,
+    buildSessionParams: feeLine => ({
+      mode: 'payment',
+      customer: stripeCustomerId,
+      billing_address_collection: 'required',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Credit Top-Up with Auto-Refill Setup',
+              description: `Initial $${amountDollars} top-up. Your card will be saved for automatic $${amountDollars} top ups when balance drops below $${AUTO_TOP_UP_THRESHOLD_DOLLARS}.`,
+            },
+            unit_amount: amountCents,
           },
-          unit_amount: amountCents,
+          quantity: 1,
         },
-        quantity: 1,
+        ...(feeLine ? [feeLine] : []),
+      ],
+      invoice_creation: {
+        enabled: true,
       },
-    ],
-    invoice_creation: {
-      enabled: true,
-    },
-    customer_update: {
-      name: 'auto',
-      address: 'auto',
-    },
-    tax_id_collection: {
-      enabled: true,
-      required: 'never',
-    },
-    success_url: `${APP_URL}/payments/auto-topup/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${APP_URL}/profile?auto_topup_setup=cancelled`,
-    payment_intent_data: {
-      metadata: {
-        type: 'auto-topup-setup',
-        kiloUserId,
-        amountCents: String(amountCents),
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
       },
-      // KEY CONFIGURATION: This saves the payment method for future off-session charges
-      setup_future_usage: 'off_session',
-    },
+      tax_id_collection: {
+        enabled: true,
+        required: 'never',
+      },
+      success_url: `${APP_URL}/payments/auto-topup/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${APP_URL}/profile?auto_topup_setup=cancelled`,
+      metadata: mergeServiceFeeCommercialMetadata(
+        { type: 'auto-topup-setup', kiloUserId },
+        prepared.commercialMetadata
+      ),
+      payment_intent_data: {
+        metadata: mergeServiceFeeCommercialMetadata(
+          {
+            type: 'auto-topup-setup',
+            kiloUserId,
+            amountCents: String(amountCents),
+          },
+          prepared.commercialMetadata
+        ),
+        // KEY CONFIGURATION: This saves the payment method for future off-session charges
+        setup_future_usage: 'off_session',
+      },
+      expand: ['line_items.data.price.product'],
+    }),
+    createSession: params => client.checkout.sessions.create(params),
+    deps: feeDeps,
   });
 
   return typeof checkoutSession.url === 'string' ? checkoutSession.url : null;
@@ -1499,25 +1793,29 @@ export async function getStripeTopUpCheckoutUrl(
   /** Optional internal path to redirect to when the user cancels checkout. */
   cancelPath?: string | null
 ): Promise<string | null> {
-  const line_items = amount
-    ? [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Kilo Balance Top Up',
-            },
-            unit_amount: Math.round(amount * 100), // Convert dollars to cents
+  const feeDeps = createStripeTopUpFeeDeps();
+  const defaultPriceId = amount ? null : getEnvVariable('STRIPE_TOP_UP_PRICE_ID');
+  const principalMinor = amount
+    ? Math.round(amount * 100)
+    : await resolveFixedUsdPriceUnitAmount({
+        stripe: client,
+        priceId: defaultPriceId as string,
+      });
+  const principalLine = amount
+    ? {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Kilo Balance Top Up',
           },
-          quantity: 1,
+          unit_amount: principalMinor,
         },
-      ]
-    : [
-        {
-          price: getEnvVariable('STRIPE_TOP_UP_PRICE_ID'),
-          quantity: 1,
-        },
-      ];
+        quantity: 1,
+      }
+    : {
+        price: defaultPriceId as string,
+        quantity: 1,
+      };
 
   const isOrganizationTopUp = Boolean(organizationId);
   let cancelUrl: string;
@@ -1529,34 +1827,62 @@ export async function getStripeTopUpCheckoutUrl(
     cancelUrl = `${APP_URL}/profile?payment_status=topup_cancelled&origin=${origin}`;
   }
 
-  const checkoutSession = await client.checkout.sessions.create({
-    mode: 'payment',
-    customer: stripeCustomerId,
-    billing_address_collection: 'required',
-    line_items: line_items,
-    invoice_creation: {
-      enabled: true,
-    },
-    customer_update: {
-      name: 'auto',
-      address: 'auto',
-    },
-    tax_id_collection: {
-      enabled: true,
-      required: 'never',
-    },
-    success_url: `${APP_URL}/payments/topup/success?session_id={CHECKOUT_SESSION_ID}&origin=${origin}`,
-    cancel_url: cancelUrl,
-    payment_intent_data: {
-      metadata: {
-        type: 'stripe-checkout-topup',
-        kiloUserId,
-        organizationId: organizationId ?? null,
-      } satisfies StripeTopupMetadata,
-    },
-    saved_payment_method_options: {
-      payment_method_save: 'enabled',
-    },
+  const prepared = await prepareTopUpCheckoutFee({
+    flow: isOrganizationTopUp ? 'organization_top_up' : 'personal_top_up',
+    principalMinor,
+    kiloUserId,
+    organizationId: organizationId ?? undefined,
+    stripeCustomerId: stripeCustomerId ?? undefined,
+    taxPrincipal: defaultPriceId ? { kind: 'price', priceId: defaultPriceId } : { kind: 'inline' },
+    deps: feeDeps,
+  });
+
+  const checkoutSession = await createTopUpCheckoutSession({
+    prepared,
+    buildSessionParams: feeLine => ({
+      mode: 'payment',
+      customer: stripeCustomerId,
+      billing_address_collection: 'required',
+      line_items: feeLine ? [principalLine, feeLine] : [principalLine],
+      invoice_creation: {
+        enabled: true,
+      },
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
+      },
+      tax_id_collection: {
+        enabled: true,
+        required: 'never',
+      },
+      success_url: `${APP_URL}/payments/topup/success?session_id={CHECKOUT_SESSION_ID}&origin=${origin}`,
+      cancel_url: cancelUrl,
+      metadata: mergeServiceFeeCommercialMetadata(
+        {
+          type: 'stripe-checkout-topup',
+          kiloUserId,
+          ...(organizationId ? { organizationId } : {}),
+        },
+        prepared.commercialMetadata
+      ),
+      payment_intent_data: {
+        metadata: mergeServiceFeeCommercialMetadata(
+          {
+            type: 'stripe-checkout-topup',
+            kiloUserId,
+            organizationId: organizationId ?? null,
+            amountCents: String(principalMinor),
+          } satisfies StripeTopupMetadata,
+          prepared.commercialMetadata
+        ),
+      },
+      saved_payment_method_options: {
+        payment_method_save: 'enabled',
+      },
+      expand: ['line_items.data.price.product'],
+    }),
+    createSession: params => client.checkout.sessions.create(params),
+    deps: feeDeps,
   });
 
   const url: string | null = typeof checkoutSession.url === 'string' ? checkoutSession.url : null;
@@ -1786,57 +2112,127 @@ export type UpdateSeatCountResult = {
   paymentIntentClientSecret?: string;
 };
 
+export type UpdateSeatCountServiceFeeDependencies =
+  OrganizationKiloPassSeatCapacityFeeDependencies & {
+    store?: ServiceFeeAssessmentStore;
+    stripe?: OrganizationKiloPassSeatCapacityStripe;
+  };
+
+function resolveSeatUpdateOrganizationPassItem(
+  subscription: Stripe.Subscription
+): Stripe.SubscriptionItem | undefined {
+  if (subscription.metadata?.type !== 'kilo-pass-org') {
+    return undefined;
+  }
+  if (typeof resolveOrganizationKiloPassSubscriptionItem === 'function') {
+    return resolveOrganizationKiloPassSubscriptionItem({ subscription });
+  }
+  // Adapter test doubles omit the resolver. Keep the bound non-seat add-on so
+  // the base capacity update still runs.
+  return subscription.items.data.find(
+    item => !isSeatLineItem(item) && !KNOWN_SEAT_PRICE_IDS.has(item.price.id)
+  );
+}
+
 export async function handleUpdateSeatCount(
   subscriptionStripeId: string,
   newSeatCount: number,
-  currentSeatCount: number
+  currentSeatCount: number,
+  feeDeps: UpdateSeatCountServiceFeeDependencies = {}
 ): Promise<UpdateSeatCountResult> {
-  // Serialize concurrent seat modifications for the same subscription (Seat Count Modification 8).
-  // Uses pg_advisory_xact_lock inside a transaction to guarantee the lock and all operations
-  // share the same pooled connection. The lock auto-releases on commit/rollback.
-  return await db.transaction(async tx => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
+  const isIncreasingSeats = currentSeatCount < newSeatCount;
+  const idempotencyKey = `sub-update-${randomUUID()}`;
+  const now = feeDeps.now ?? new Date();
+  const prorationDate = Math.floor(now.getTime() / 1000);
+  const subscription = await client.subscriptions.retrieve(subscriptionStripeId);
 
-    const isIncreasingSeats = currentSeatCount < newSeatCount;
-    const idempotencyKey = `sub-update-${randomUUID()}`;
-    const subscription = await client.subscriptions.retrieve(subscriptionStripeId);
+  // Find the paid seat item by known price ID, not blindly using items[0]
+  // which could be a free-seat line item (Finding #5).
+  const paidSeatItem = subscription.items.data.find(item =>
+    KNOWN_SEAT_PRICE_IDS.has(item.price.id)
+  );
+  if (!paidSeatItem) {
+    throw new Error(`No recognized paid seat item found in subscription ${subscriptionStripeId}`);
+  }
 
-    // Find the paid seat item by known price ID, not blindly using items[0]
-    // which could be a free-seat line item (Finding #5).
-    const paidSeatItem = subscription.items.data.find(item =>
-      KNOWN_SEAT_PRICE_IDS.has(item.price.id)
+  // Calculate the free seat count from non-paid seat-product items to preserve them.
+  // Non-seat add-ons can share the subscription but must not reduce the paid seat quantity.
+  const freeSeatCount = subscription.items.data
+    .filter(item => isSeatLineItem(item) && !KNOWN_SEAT_PRICE_IDS.has(item.price.id))
+    .reduce((total, item) => total + (item.quantity ?? 0), 0);
+
+  // The requested newSeatCount is the desired total. Deduct free seats to get paid quantity.
+  // The Stripe subscription must retain at least 1 paid seat (Stripe does not allow 0-quantity
+  // line items). Reducing to 0 paid seats requires cancelling the subscription instead.
+  const rawPaidQuantity = newSeatCount - freeSeatCount;
+  if (rawPaidQuantity < 1) {
+    throw new Error(
+      `Cannot reduce paid seats below 1 (requested total: ${newSeatCount}, free seats: ${freeSeatCount}). Cancel the subscription to remove all paid seats.`
     );
-    if (!paidSeatItem) {
-      throw new Error(`No recognized paid seat item found in subscription ${subscriptionStripeId}`);
-    }
+  }
+  const paidSeatQuantity = rawPaidQuantity;
+  const organizationPassItem = resolveSeatUpdateOrganizationPassItem(subscription);
 
-    // Calculate the free seat count from non-paid seat-product items to preserve them.
-    // Non-seat add-ons can share the subscription but must not reduce the paid seat quantity.
-    const freeSeatCount = subscription.items.data
-      .filter(item => isSeatLineItem(item) && !KNOWN_SEAT_PRICE_IDS.has(item.price.id))
-      .reduce((total, item) => total + (item.quantity ?? 0), 0);
-
-    // The requested newSeatCount is the desired total. Deduct free seats to get paid quantity.
-    // The Stripe subscription must retain at least 1 paid seat (Stripe does not allow 0-quantity
-    // line items). Reducing to 0 paid seats requires cancelling the subscription instead.
-    const rawPaidQuantity = newSeatCount - freeSeatCount;
-    if (rawPaidQuantity < 1) {
-      throw new Error(
-        `Cannot reduce paid seats below 1 (requested total: ${newSeatCount}, free seats: ${freeSeatCount}). Cancel the subscription to remove all paid seats.`
-      );
-    }
-    const paidSeatQuantity = rawPaidQuantity;
-    const organizationPassItem =
-      subscription.metadata?.type === 'kilo-pass-org'
-        ? subscription.items.data.find(item => !isSeatLineItem(item))
-        : undefined;
-
+  let prepared: PreparedOrganizationKiloPassSeatCapacityFee = {
+    prorationDate,
+    organizationPassItemId: organizationPassItem?.id ?? null,
+    shouldAttach: false,
+    assessmentKey: null,
+    assessment: null,
+    feeInvoiceItem: null,
+    expectedFeeMinor: 0,
+    commercialMetadata: null,
+  };
+  if (
+    organizationPassItem &&
+    isIncreasingSeats &&
+    typeof prepareOrganizationKiloPassSeatCapacityFee === 'function'
+  ) {
     try {
-      const updatedSubscription = await client.subscriptions.update(
+      prepared = await prepareOrganizationKiloPassSeatCapacityFee({
+        subscription,
+        paidSeatItemId: paidSeatItem.id,
+        paidSeatQuantity,
+        isIncreasingSeats,
+        prorationDate,
+        stripe: feeDeps.stripe,
+        store: feeDeps.store,
+        deps: {
+          now,
+          findEffectiveExemption: feeDeps.findEffectiveExemption,
+          resolveTaxInput: feeDeps.resolveTaxInput,
+          getOrganizationPurchaseChannel:
+            feeDeps.getOrganizationPurchaseChannel ?? lookupOrganizationKiloPassPurchaseChannel,
+          sendAlert: feeDeps.sendAlert,
+        },
+      });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'seat_capacity_service_fee_prepare' },
+        extra: { subscriptionStripeId },
+      });
+    }
+  }
+
+  // Serialize concurrent seat quantity updates for the same subscription.
+  // The advisory lock covers only the Stripe subscription update. Fee preview,
+  // assessment writes, invoiceItems.create, finalize, and pay stay outside it
+  // so the lock does not hold a pooled connection across extra Stripe IO.
+  const pendingFeeItemId = await stagePreparedOrganizationKiloPassServiceFeeItem({
+    prepared,
+    stripe: feeDeps.stripe,
+  });
+  let updatedSubscription: Stripe.Subscription;
+  let invoiceObj: Stripe.Invoice | null;
+  try {
+    const locked = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
+      const updated = await client.subscriptions.update(
         subscriptionStripeId,
         {
           proration_behavior: isIncreasingSeats ? 'always_invoice' : 'none',
           payment_behavior: isIncreasingSeats ? 'allow_incomplete' : undefined,
+          ...(isIncreasingSeats ? { proration_date: prepared.prorationDate } : {}),
           // Only modify the paid seat item; free-seat items remain untouched.
           items: [
             {
@@ -1847,248 +2243,275 @@ export async function handleUpdateSeatCount(
               ? [{ id: organizationPassItem.id, quantity: paidSeatQuantity }]
               : []),
           ],
+          ...(prepared.commercialMetadata
+            ? {
+                metadata: mergeServiceFeeCommercialMetadata(
+                  subscription.metadata,
+                  prepared.commercialMetadata
+                ),
+              }
+            : {}),
           expand: ['latest_invoice'],
         },
         {
           idempotencyKey,
         }
       );
-
-      // Get the latest invoice
-      const latestInvoice = updatedSubscription.latest_invoice;
-      let invoiceObj: Stripe.Invoice | null =
-        typeof latestInvoice === 'object' ? latestInvoice : null;
-
-      let paymentIntent: Stripe.PaymentIntent | null = null;
-
-      // If the invoice is open or draft, attempt to pay it to trigger PaymentIntent creation
-      if (invoiceObj && (invoiceObj.status === 'open' || invoiceObj.status === 'draft')) {
-        try {
-          // Finalize if draft
-          if (invoiceObj.status === 'draft') {
-            invoiceObj = await client.invoices.finalizeInvoice(invoiceObj.id);
-          }
-
-          // Attempt to pay the invoice - this will create a PaymentIntent and attempt charge
-          const paidInvoice = (await client.invoices.pay(invoiceObj.id, {
-            expand: ['payment_intent'],
-          })) as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null };
-          invoiceObj = paidInvoice;
-
-          if (typeof paidInvoice.payment_intent === 'object' && paidInvoice.payment_intent) {
-            paymentIntent = paidInvoice.payment_intent;
-          } else if (typeof paidInvoice.payment_intent === 'string') {
-            paymentIntent = await client.paymentIntents.retrieve(paidInvoice.payment_intent);
-          }
-        } catch (payError) {
-          // Invoice.pay() throws when payment fails (e.g., needs 3DS/SCA)
-          // When this happens with subscriptions, Stripe may void the original invoice
-          // and create a NEW invoice with the PaymentIntent that requires action.
-          // We need to list recent invoices for the subscription and find the one
-          // with a payment_intent in requires_action status.
-
-          // List recent invoices for this subscription to find one with requires_action
-          const recentInvoices = await client.invoices.list({
-            subscription: subscriptionStripeId,
-            limit: 5,
-            expand: ['data.payment_intent'],
-          });
-
-          type InvoiceWithPaymentIntent = Stripe.Invoice & {
-            payment_intent?: Stripe.PaymentIntent | string | null;
-          };
-
-          // Find an invoice with a payment_intent that requires action
-          for (const inv of recentInvoices.data) {
-            const invWithPi = inv as InvoiceWithPaymentIntent;
-            const pi = invWithPi.payment_intent;
-            if (typeof pi === 'object' && pi && pi.status === 'requires_action') {
-              paymentIntent = pi;
-              break;
-            }
-          }
-
-          // If still not found, try listing PaymentIntents directly for the customer
-          if (!paymentIntent) {
-            // subscription.customer can be a string ID, expanded Customer object, or DeletedCustomer.
-            // Extract the customer ID string regardless of the shape.
-            const customerId =
-              typeof subscription.customer === 'string'
-                ? subscription.customer
-                : subscription.customer?.id;
-
-            if (customerId) {
-              const paymentIntents = await client.paymentIntents.list({
-                customer: customerId,
-                limit: 5,
-              });
-
-              for (const pi of paymentIntents.data) {
-                if (pi.status === 'requires_action') {
-                  paymentIntent = pi;
-                  break;
-                }
-              }
-            }
-          }
-
-          // If we couldn't identify a requires_action payment intent, the invoice payment
-          // failed for another reason (e.g., card declined, insufficient funds).
-          // Re-throw to avoid falsely treating the seat update as successful.
-          if (!paymentIntent || paymentIntent.status !== 'requires_action') {
-            throw payError;
-          }
-        }
-      }
-
-      if (paymentIntent && paymentIntent.status === 'requires_action') {
-        // 3DS authentication is required - return the client secret for frontend handling
-        return {
-          success: false,
-          message:
-            'Payment requires additional authentication. Please complete the verification process.',
-          requiresAction: true,
-          paymentIntentClientSecret: paymentIntent.client_secret ?? undefined,
-        };
-      }
-
-      if (
-        paymentIntent &&
-        (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'canceled')
-      ) {
-        // Payment failed for another reason
-        throw new Error('Payment failed. Please update your payment method and try again.');
-      }
-
-      if (isIncreasingSeats && organizationPassItem && invoiceObj?.status === 'paid') {
-        const reconciled = await handleOrganizationKiloPassInvoicePaid({
-          invoice: invoiceObj,
-          paidSeatCount: paidSeatQuantity,
-        });
-        if (!reconciled) {
-          warnExceptInTest('Could not eagerly reconcile organization Kilo Pass seat increase', {
-            subscriptionStripeId,
-            invoiceId: invoiceObj.id,
-          });
-        }
-      }
-
-      // immediately update our seats purchases - it will usually be updated again by the webhook
-      // but this allows us to be immediately consistent
-      await handleSubscriptionEvent(updatedSubscription, idempotencyKey);
-
+      const latestInvoice = updated.latest_invoice;
       return {
-        success: true,
-        message: `Subscription updated to ${newSeatCount} seats successfully.`,
+        updatedSubscription: updated,
+        invoiceObj: typeof latestInvoice === 'object' ? latestInvoice : null,
       };
+    });
+    updatedSubscription = locked.updatedSubscription;
+    invoiceObj = locked.invoiceObj;
+  } catch (error) {
+    if (pendingFeeItemId) {
+      await discardStagedOrganizationKiloPassServiceFeeItem({
+        invoiceItemId: pendingFeeItemId,
+        stripe: feeDeps.stripe,
+      });
+    }
+    return handleUpdateSeatCountRequiresActionError(error, subscriptionStripeId);
+  }
+
+  let paymentIntent: Stripe.PaymentIntent | null = null;
+
+  if (
+    invoiceObj &&
+    prepared.shouldAttach &&
+    typeof attachPreparedOrganizationKiloPassServiceFee === 'function'
+  ) {
+    try {
+      const charged = await attachPreparedOrganizationKiloPassServiceFee({
+        prepared,
+        invoice: invoiceObj,
+        stripe: feeDeps.stripe,
+        store: feeDeps.store,
+        deps: {
+          now,
+          sendAlert: feeDeps.sendAlert,
+        },
+        pendingInvoiceItemId: pendingFeeItemId,
+      });
+      if (charged) {
+        prepared = { ...prepared, assessment: charged, shouldAttach: false };
+      }
     } catch (error) {
-      // Handle 3DS authentication required errors
-      // When a payment requires 3DS, Stripe throws an error with code
-      // 'subscription_payment_intent_requires_action' or 'invoice_payment_intent_requires_action'
+      captureException(error, {
+        tags: { source: 'seat_capacity_service_fee_attach' },
+        extra: { subscriptionStripeId, invoiceId: invoiceObj.id },
+      });
+    }
+  }
 
-      // Check if this is a Stripe error that requires payment action
-      const isStripeError = error instanceof Stripe.errors.StripeError;
-      const stripeError = error as Stripe.errors.StripeError & {
-        payment_intent?: Stripe.PaymentIntent;
-        raw?: {
-          payment_intent?: Stripe.PaymentIntent;
-        };
+  // If the invoice is open or draft, attempt to pay it to trigger PaymentIntent creation
+  if (invoiceObj && (invoiceObj.status === 'open' || invoiceObj.status === 'draft')) {
+    try {
+      // Finalize if draft
+      if (invoiceObj.status === 'draft') {
+        invoiceObj = await client.invoices.finalizeInvoice(invoiceObj.id);
+      }
+
+      // Attempt to pay the invoice - this will create a PaymentIntent and attempt charge
+      const paidInvoice = (await client.invoices.pay(invoiceObj.id, {
+        expand: ['payment_intent'],
+      })) as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null };
+      invoiceObj = paidInvoice;
+
+      if (typeof paidInvoice.payment_intent === 'object' && paidInvoice.payment_intent) {
+        paymentIntent = paidInvoice.payment_intent;
+      } else if (typeof paidInvoice.payment_intent === 'string') {
+        paymentIntent = await client.paymentIntents.retrieve(paidInvoice.payment_intent);
+      }
+    } catch (payError) {
+      // Invoice.pay() throws when payment fails (e.g., needs 3DS/SCA)
+      // When this happens with subscriptions, Stripe may void the original invoice
+      // and create a NEW invoice with the PaymentIntent that requires action.
+      // We need to list recent invoices for the subscription and find the one
+      // with a payment_intent in requires_action status.
+
+      // List recent invoices for this subscription to find one with requires_action
+      const recentInvoices = await client.invoices.list({
+        subscription: subscriptionStripeId,
+        limit: 5,
+        expand: ['data.payment_intent'],
+      });
+
+      type InvoiceWithPaymentIntent = Stripe.Invoice & {
+        payment_intent?: Stripe.PaymentIntent | string | null;
       };
-      const errorCode = isStripeError ? stripeError.code : undefined;
 
-      // Check for either subscription or invoice requires_action errors
-      const requires3DS =
-        errorCode === 'subscription_payment_intent_requires_action' ||
-        errorCode === 'invoice_payment_intent_requires_action';
-
-      if (isStripeError && requires3DS) {
-        // First, check if the error itself contains the PaymentIntent
-        // Stripe may attach it directly to the error object
-        if (stripeError.payment_intent && stripeError.payment_intent.status === 'requires_action') {
-          return {
-            success: false,
-            message:
-              'Payment requires additional authentication. Please complete the verification process.',
-            requiresAction: true,
-            paymentIntentClientSecret: stripeError.payment_intent.client_secret ?? undefined,
-          };
+      // Find an invoice with a payment_intent that requires action
+      for (const inv of recentInvoices.data) {
+        const invWithPi = inv as InvoiceWithPaymentIntent;
+        const pi = invWithPi.payment_intent;
+        if (typeof pi === 'object' && pi && pi.status === 'requires_action') {
+          paymentIntent = pi;
+          break;
         }
+      }
 
-        // When the subscription update fails due to 3DS, Stripe creates a new invoice
-        // but then rolls back the subscription. We need to find the pending/draft invoice
-        // or the most recent invoice with a payment_intent that requires_action.
+      // If still not found, try listing PaymentIntents directly for the customer
+      if (!paymentIntent) {
+        // subscription.customer can be a string ID, expanded Customer object, or DeletedCustomer.
+        // Extract the customer ID string regardless of the shape.
+        const customerId =
+          typeof subscription.customer === 'string'
+            ? subscription.customer
+            : subscription.customer?.id;
 
-        // Re-retrieve the subscription to get the latest invoice info
-        const updatedSubscription = await client.subscriptions.retrieve(subscriptionStripeId, {
-          expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
-        });
-
-        // The latest_invoice is expanded to include payment_intent
-        // Use type assertion for the expanded invoice structure
-        const latestInvoice = updatedSubscription.latest_invoice as
-          | (Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null })
-          | null;
-
-        let paymentIntent: Stripe.PaymentIntent | null = null;
-
-        // First, try to get payment_intent from the expanded latest_invoice
-        if (
-          latestInvoice &&
-          typeof latestInvoice.payment_intent === 'object' &&
-          latestInvoice.payment_intent !== null
-        ) {
-          paymentIntent = latestInvoice.payment_intent;
-        }
-
-        // If not expanded or not found, check if the invoice has a payment_intent ID
-        // and retrieve it directly. When subscription update fails, the invoice may be
-        // in 'open' status with a payment_intent that requires action.
-        if (!paymentIntent && latestInvoice) {
-          const paymentIntentId =
-            typeof latestInvoice.payment_intent === 'string'
-              ? latestInvoice.payment_intent
-              : undefined;
-
-          if (paymentIntentId) {
-            paymentIntent = await client.paymentIntents.retrieve(paymentIntentId);
-          }
-        }
-
-        // If still no payment intent, list recent invoices for this subscription
-        // and find one with an open payment intent requiring action
-        if (!paymentIntent) {
-          const recentInvoices = await client.invoices.list({
-            subscription: subscriptionStripeId,
-            limit: 10,
-            expand: ['data.payment_intent'],
+        if (customerId) {
+          const paymentIntents = await client.paymentIntents.list({
+            customer: customerId,
+            limit: 5,
           });
 
-          for (const inv of recentInvoices.data) {
-            // Cast to include the expanded payment_intent field
-            const invoiceWithPi = inv as Stripe.Invoice & {
-              payment_intent?: Stripe.PaymentIntent | null;
-            };
-            const pi = invoiceWithPi.payment_intent;
-            if (pi && pi.status === 'requires_action') {
+          for (const pi of paymentIntents.data) {
+            if (pi.status === 'requires_action') {
               paymentIntent = pi;
               break;
             }
           }
         }
-
-        if (paymentIntent && paymentIntent.status === 'requires_action') {
-          return {
-            success: false,
-            message:
-              'Payment requires additional authentication. Please complete the verification process.',
-            requiresAction: true,
-            paymentIntentClientSecret: paymentIntent.client_secret ?? undefined,
-          };
-        }
       }
 
-      // Re-throw other errors
-      throw error;
+      // If we couldn't identify a requires_action payment intent, the invoice payment
+      // failed for another reason (e.g., card declined, insufficient funds).
+      // Re-throw to avoid falsely treating the seat update as successful.
+      if (!paymentIntent || paymentIntent.status !== 'requires_action') {
+        throw payError;
+      }
     }
-  });
+  }
+
+  if (paymentIntent && paymentIntent.status === 'requires_action') {
+    // 3DS authentication is required - return the client secret for frontend handling
+    return {
+      success: false,
+      message:
+        'Payment requires additional authentication. Please complete the verification process.',
+      requiresAction: true,
+      paymentIntentClientSecret: paymentIntent.client_secret ?? undefined,
+    };
+  }
+
+  if (
+    paymentIntent &&
+    (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'canceled')
+  ) {
+    // Payment failed for another reason
+    throw new Error('Payment failed. Please update your payment method and try again.');
+  }
+
+  if (isIncreasingSeats && organizationPassItem && invoiceObj?.status === 'paid') {
+    const reconciled = await handleOrganizationKiloPassInvoicePaid({
+      invoice: invoiceObj,
+      paidSeatCount: paidSeatQuantity,
+      serviceFee: {
+        store: feeDeps.store,
+        stripe: feeDeps.stripe,
+        deps: {
+          now,
+          sendAlert: feeDeps.sendAlert,
+        },
+      },
+    });
+    if (!reconciled) {
+      warnExceptInTest('Could not eagerly reconcile organization Kilo Pass seat increase', {
+        subscriptionStripeId,
+        invoiceId: invoiceObj.id,
+      });
+    }
+  }
+
+  // immediately update our seats purchases - it will usually be updated again by the webhook
+  // but this allows us to be immediately consistent
+  await handleSubscriptionEvent(updatedSubscription, idempotencyKey);
+
+  return {
+    success: true,
+    message: `Subscription updated to ${newSeatCount} seats successfully.`,
+  };
+}
+
+async function handleUpdateSeatCountRequiresActionError(
+  error: unknown,
+  subscriptionStripeId: string
+): Promise<UpdateSeatCountResult> {
+  const isStripeError = error instanceof Stripe.errors.StripeError;
+  const stripeError = error as Stripe.errors.StripeError & {
+    payment_intent?: Stripe.PaymentIntent;
+    raw?: {
+      payment_intent?: Stripe.PaymentIntent;
+    };
+  };
+  const errorCode = isStripeError ? stripeError.code : undefined;
+  const requires3DS =
+    errorCode === 'subscription_payment_intent_requires_action' ||
+    errorCode === 'invoice_payment_intent_requires_action';
+
+  if (isStripeError && requires3DS) {
+    if (stripeError.payment_intent && stripeError.payment_intent.status === 'requires_action') {
+      return {
+        success: false,
+        message:
+          'Payment requires additional authentication. Please complete the verification process.',
+        requiresAction: true,
+        paymentIntentClientSecret: stripeError.payment_intent.client_secret ?? undefined,
+      };
+    }
+
+    const updatedSubscription = await client.subscriptions.retrieve(subscriptionStripeId, {
+      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+    });
+    const latestInvoice = updatedSubscription.latest_invoice as
+      | (Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null })
+      | null;
+
+    let paymentIntent: Stripe.PaymentIntent | null = null;
+    if (
+      latestInvoice &&
+      typeof latestInvoice.payment_intent === 'object' &&
+      latestInvoice.payment_intent !== null
+    ) {
+      paymentIntent = latestInvoice.payment_intent;
+    }
+    if (!paymentIntent && latestInvoice) {
+      const paymentIntentId =
+        typeof latestInvoice.payment_intent === 'string' ? latestInvoice.payment_intent : undefined;
+      if (paymentIntentId) {
+        paymentIntent = await client.paymentIntents.retrieve(paymentIntentId);
+      }
+    }
+    if (!paymentIntent) {
+      const recentInvoices = await client.invoices.list({
+        subscription: subscriptionStripeId,
+        limit: 10,
+        expand: ['data.payment_intent'],
+      });
+      for (const inv of recentInvoices.data) {
+        const invoiceWithPi = inv as Stripe.Invoice & {
+          payment_intent?: Stripe.PaymentIntent | null;
+        };
+        const pi = invoiceWithPi.payment_intent;
+        if (pi && pi.status === 'requires_action') {
+          paymentIntent = pi;
+          break;
+        }
+      }
+    }
+
+    if (paymentIntent && paymentIntent.status === 'requires_action') {
+      return {
+        success: false,
+        message:
+          'Payment requires additional authentication. Please complete the verification process.',
+        requiresAction: true,
+        paymentIntentClientSecret: paymentIntent.client_secret ?? undefined,
+      };
+    }
+  }
+
+  throw error;
 }

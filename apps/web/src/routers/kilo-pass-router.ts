@@ -16,6 +16,17 @@ import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/k
 import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import {
+  createTopUpCheckoutSession,
+  mergeServiceFeeCommercialMetadata,
+  prepareTopUpCheckoutFee,
+  resolveFixedUsdPriceUnitAmount,
+  type CheckoutSessionCreateFn,
+  type CheckoutSessionLike,
+  type ServiceFeeCheckoutDependencies,
+  type TopUpPriceReader,
+} from '@/lib/service-fees/checkout';
+import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { APP_URL } from '@/lib/constants';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
@@ -1115,6 +1126,109 @@ async function getSettledKiloPassCheckoutSubscription(params: {
     welcomePromoEligibilityReason: issuedBaseCredits?.welcomePromoEligibilityReason ?? null,
   };
 }
+
+const PERSONAL_KILO_PASS_CHECKOUT_FLOW = 'personal_kilo_pass' as const;
+
+export type PersonalKiloPassCheckoutDependencies = ServiceFeeCheckoutDependencies & {
+  createSession?: CheckoutSessionCreateFn;
+  retrievePriceUnitAmount?: typeof resolveFixedUsdPriceUnitAmount;
+};
+
+function createDefaultPersonalKiloPassCheckoutDependencies(): PersonalKiloPassCheckoutDependencies {
+  const stores = createServiceFeeStores();
+  return {
+    store: stores.assessments,
+    stripe: stripe,
+    listCheckoutLineItems: (sessionId, listParams) =>
+      stripe.checkout.sessions.listLineItems(sessionId, listParams),
+    expireCheckoutSession: sessionId => stripe.checkout.sessions.expire(sessionId),
+    createSession: sessionParams => stripe.checkout.sessions.create(sessionParams),
+  };
+}
+
+function requireTopUpPriceReader(
+  stripeReader: PersonalKiloPassCheckoutDependencies['stripe']
+): TopUpPriceReader {
+  if (!stripeReader || !('prices' in stripeReader) || !stripeReader.prices) {
+    throw new Error('Stripe price reader is required to create a Kilo Pass checkout session');
+  }
+  return stripeReader as TopUpPriceReader;
+}
+
+export async function createPersonalKiloPassCheckoutSession(params: {
+  kiloUserId: string;
+  stripeCustomerId: string;
+  tier: KiloPassTier;
+  cadence: KiloPassCadence;
+  affiliateTrackingId: string;
+  priceId: string;
+  deps?: PersonalKiloPassCheckoutDependencies;
+}): Promise<CheckoutSessionLike> {
+  const deps = {
+    ...createDefaultPersonalKiloPassCheckoutDependencies(),
+    ...params.deps,
+  };
+  const retrievePrice = deps.retrievePriceUnitAmount ?? resolveFixedUsdPriceUnitAmount;
+  const principalMinor = await retrievePrice({
+    stripe: requireTopUpPriceReader(deps.stripe),
+    priceId: params.priceId,
+  });
+
+  const prepared = await prepareTopUpCheckoutFee({
+    flow: PERSONAL_KILO_PASS_CHECKOUT_FLOW,
+    principalMinor,
+    kiloUserId: params.kiloUserId,
+    stripeCustomerId: params.stripeCustomerId,
+    taxPrincipal: { kind: 'price', priceId: params.priceId },
+    deps,
+  });
+
+  const productMetadata = {
+    type: 'kilo-pass',
+    kiloUserId: params.kiloUserId,
+    tier: params.tier,
+    cadence: params.cadence,
+    affiliateTrackingId: params.affiliateTrackingId,
+  };
+  const sessionMetadata = mergeServiceFeeCommercialMetadata(
+    productMetadata,
+    prepared.commercialMetadata
+  );
+  const createSession =
+    deps.createSession ?? (sessionParams => stripe.checkout.sessions.create(sessionParams));
+
+  return createTopUpCheckoutSession({
+    prepared,
+    buildSessionParams: feeLine => ({
+      mode: 'subscription',
+      customer: params.stripeCustomerId,
+      allow_promotion_codes: true,
+      billing_address_collection: 'required',
+      line_items: feeLine
+        ? [{ price: params.priceId, quantity: 1 }, feeLine]
+        : [{ price: params.priceId, quantity: 1 }],
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
+      },
+      tax_id_collection: {
+        enabled: true,
+        required: 'never',
+      },
+      success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
+      subscription_data: {
+        metadata: sessionMetadata,
+      },
+      metadata: sessionMetadata,
+      expand: ['line_items.data.price.product'],
+    }),
+    createSession,
+    deps,
+  });
+}
+
+export type CreatePersonalKiloPassCheckoutSession = typeof createPersonalKiloPassCheckoutSession;
 
 export const kiloPassRouter = createTRPCRouter({
   getMobileStoreProducts: baseProcedure.query(({ ctx }) => ({
@@ -2474,34 +2588,13 @@ export const kiloPassRouter = createTRPCRouter({
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
-      const sessionMetadata = {
-        type: 'kilo-pass',
+      const session = await createPersonalKiloPassCheckoutSession({
         kiloUserId: ctx.user.id,
+        stripeCustomerId,
         tier,
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
-      };
-
-      const session = await stripe.checkout.sessions.create({
-        mode: 'subscription',
-        customer: stripeCustomerId,
-        allow_promotion_codes: true,
-        billing_address_collection: 'required',
-        line_items: [{ price: priceId, quantity: 1 }],
-        customer_update: {
-          name: 'auto',
-          address: 'auto',
-        },
-        tax_id_collection: {
-          enabled: true,
-          required: 'never',
-        },
-        success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
-        subscription_data: {
-          metadata: sessionMetadata,
-        },
-        metadata: sessionMetadata,
+        priceId,
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };

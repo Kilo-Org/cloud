@@ -528,7 +528,9 @@ export type CreditsTopUpVariant = keyof typeof CREDITS_TOPUP_COPY;
 
 type BaseSendCreditsTopUpEmailProps = {
   to: string;
-  amountCents: number;
+  principalCents: number;
+  serviceFeeCents: number;
+  grossPaidCents: number;
   creditsCents: number;
   purchaseDate: Date;
   receiptUrl?: string | null;
@@ -567,6 +569,42 @@ function formatUsd(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+const TOP_UP_INFO_ROW_STYLE =
+  "margin: 0 0 8px; font-size: 13px; line-height: 20px; color: #555; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+export function buildCreditsTopUpInfoRow(label: string, value: string): string {
+  return `<p style="${TOP_UP_INFO_ROW_STYLE}"><strong style="color: #1a1a1a">${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`;
+}
+
+// Optional fee + total-paid rows. Fee-free callers get empty HTML so the
+// template can keep the Amount/Credits summary with no exemption copy.
+export function buildCreditsTopUpServiceFeeSection(params: {
+  serviceFeeCents: number;
+  grossPaidCents: number;
+}): RawHtml {
+  if (params.serviceFeeCents <= 0) {
+    return new RawHtml('');
+  }
+
+  return new RawHtml(
+    buildCreditsTopUpInfoRow('Service fee (5%)', `$${formatUsd(params.serviceFeeCents)} USD`) +
+      buildCreditsTopUpInfoRow('Total paid', `$${formatUsd(params.grossPaidCents)} USD`)
+  );
+}
+
+// Fee itemization already labels the granted amount as Credits added, so this
+// row is omitted when a fee is charged. Fee-free callers keep Credits.
+export function buildCreditsTopUpCreditsRowSection(params: {
+  creditsCents: number;
+  hasServiceFee: boolean;
+}): RawHtml {
+  if (params.hasServiceFee) {
+    return new RawHtml('');
+  }
+
+  return new RawHtml(buildCreditsTopUpInfoRow('Credits', `$${formatUsd(params.creditsCents)} USD`));
+}
+
 function formatDate(date: Date): string {
   // Dates surfaced to end-users; the server locale is stable (UTC in prod) so
   // explicit en-US formatting avoids surprise month-name changes in tests.
@@ -592,6 +630,7 @@ export async function sendCreditsTopUpEmail(
   const credits_url = isOrgVariant
     ? props.creditsUrl || `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
     : `${NEXTAUTH_URL}/credits`;
+  const hasServiceFee = props.serviceFeeCents > 0;
   return send({
     to: props.to,
     templateName: 'creditsTopUp',
@@ -599,8 +638,16 @@ export async function sendCreditsTopUpEmail(
     templateVars: {
       heading: copy.heading,
       intro: copy.intro(organizationName),
-      amount_usd: formatUsd(props.amountCents),
-      credits_usd: formatUsd(props.creditsCents),
+      amount_label: hasServiceFee ? 'Credits added' : 'Amount',
+      amount_usd: formatUsd(props.principalCents),
+      service_fee_section: buildCreditsTopUpServiceFeeSection({
+        serviceFeeCents: props.serviceFeeCents,
+        grossPaidCents: props.grossPaidCents,
+      }),
+      credits_row_section: buildCreditsTopUpCreditsRowSection({
+        creditsCents: props.creditsCents,
+        hasServiceFee,
+      }),
       purchase_date: formatDate(props.purchaseDate),
       credits_url,
       receipt_section: buildCreditsTopUpReceiptSection(props.receiptUrl),

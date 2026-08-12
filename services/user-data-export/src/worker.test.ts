@@ -12,9 +12,9 @@ import {
   persistCompletedExport,
   recoverInterruptedMultipartUpload,
   resolveSourceAdapter,
-  TerminalExportError,
   type ExportEnv,
 } from './worker';
+import { TerminalExportError } from './errors';
 import type { ExportJob } from './databases';
 
 afterEach(() => vi.restoreAllMocks());

@@ -88,7 +88,7 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  if (!(await isLoggingEnabledForUser(user, organization_id))) {
+  if (provider !== 'custom' && !(await isLoggingEnabledForUser(user, organization_id))) {
     return null;
   }
   const status = response.status;
@@ -382,23 +382,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getPropertyPath(target: unknown, path: string): unknown {
-  let current = target;
-  for (const segment of path.split('.')) {
-    if (!isRecord(current)) {
-      return undefined;
-    }
-    current = current[segment];
+function isGeminiThoughtDelta(delta: Record<string, unknown>) {
+  const extraContent = delta.extra_content;
+  if (!isRecord(extraContent)) {
+    return false;
   }
-  return current;
+  const google = extraContent.google;
+  return isRecord(google) && google.thought === true;
 }
 
-function rewriteThoughtContent(delta: unknown, path: string) {
-  if (
-    !isRecord(delta) ||
-    typeof delta.content !== 'string' ||
-    getPropertyPath(delta, path) !== true
-  ) {
+function rewriteGeminiThoughtContent(delta: unknown) {
+  if (!isRecord(delta) || typeof delta.content !== 'string' || !isGeminiThoughtDelta(delta)) {
     return;
   }
 
@@ -495,8 +489,8 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.role === null) {
               delete delta.role;
             }
-            if (responseTransforms?.thoughtContentMapping) {
-              rewriteThoughtContent(delta, responseTransforms.thoughtContentMapping);
+            if (responseTransforms?.mapGeminiThoughtContent) {
+              rewriteGeminiThoughtContent(delta);
             }
           }
 

@@ -1,9 +1,22 @@
 import 'server-only';
 
+import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
+import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
+import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
+import {
+  consumeDataExportDownloadCode,
+  createDataExportDownloadCode,
+  deleteDataExportDownloadCode,
+  DOWNLOAD_CODE_EXPIRY_MINUTES,
+  releaseDataExportDownloadCode,
+  reserveDataExportDownloadCode,
+  type ReserveDownloadCodeResult,
+} from '@/lib/auth/data-export-download-codes';
 import { db } from '@/lib/drizzle';
+import { sendDataExportDownloadCodeEmail } from '@/lib/email';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   dispatchUserDataExport,
@@ -11,6 +24,11 @@ import {
 } from '@/lib/user-data-export-worker-client';
 
 const ExportIdSchema = z.object({ exportId: z.string().uuid() });
+const DownloadInputSchema = z.object({
+  exportId: z.string().uuid(),
+  code: z.string().regex(new RegExp(`^\\d{${DOWNLOAD_CODE_LENGTH}}$`)),
+  challengeId: z.string().uuid(),
+});
 const ListInputSchema = z.object({ cursor: z.string().uuid().optional() }).optional();
 const PAGE_SIZE = 20;
 const EXPORT_DATA_CUTOFF = '2026-08-02T08:40:00.000Z';
@@ -60,6 +78,92 @@ function requireWebSession(authViaToken: boolean | undefined): void {
       code: 'FORBIDDEN',
       message: 'A web session is required for data exports',
     });
+  }
+}
+
+/**
+ * Ownership and freshness gate shared by both download steps. A miss is reported
+ * as NOT_FOUND so another user's export is indistinguishable from a missing one.
+ */
+async function requireDownloadableExport(exportId: string, kiloUserId: string): Promise<void> {
+  const { rows } = await db.execute<{ id: string }>(sql`
+    SELECT id FROM user_data_exports
+    WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+      AND status = 'ready' AND expires_at > now()
+    LIMIT 1
+  `);
+  if (!rows[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Export not found' });
+}
+
+/**
+ * The download code is emailed to the account address, so an account without one
+ * cannot complete the step-up.
+ */
+function requireDownloadCodeRecipient(email: string | null): string {
+  if (!email) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Your account has no email address to send a download code to',
+    });
+  }
+  return email;
+}
+
+/**
+ * Email a freshly minted code, dropping the code row unless it was delivered.
+ *
+ * The mail path reports a refused address as `{ sent: false }` but throws on an
+ * API or network failure, and both mean the same thing here: nothing reached the
+ * inbox. A code left behind can only ever fail verification, and its `created_at`
+ * still trips the resend cooldown, so the immediate retry would claim a code was
+ * just sent when none was.
+ */
+async function emailDownloadCodeOrDrop(
+  email: string,
+  created: { code: string; challengeId: string }
+): Promise<void> {
+  let delivered = false;
+  try {
+    const sent = await sendDataExportDownloadCodeEmail(email, {
+      code: created.code,
+      expiresInMinutes: DOWNLOAD_CODE_EXPIRY_MINUTES,
+    });
+    delivered = sent.sent;
+  } catch (error) {
+    captureException(error);
+  }
+  if (delivered) return;
+
+  try {
+    await deleteDataExportDownloadCode(created.challengeId);
+  } catch (error) {
+    // Losing the cleanup only costs the user the cooldown, so report it and
+    // still tell the caller the truth about the email.
+    captureException(error);
+  }
+  throw new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'The download code could not be emailed. Try again shortly.',
+  });
+}
+
+function downloadCodeError(result: Exclude<ReserveDownloadCodeResult, 'ok'>): TRPCError {
+  switch (result) {
+    case 'too_many_attempts':
+      return new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many incorrect codes. Request a new code to try again.',
+      });
+    case 'in_progress':
+      return new TRPCError({
+        code: 'CONFLICT',
+        message: 'This code is already being used. Try again in a moment.',
+      });
+    case 'invalid':
+      return new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'That code is incorrect or has expired.',
+      });
   }
 }
 
@@ -151,27 +255,73 @@ export const userExportsRouter = createTRPCRouter({
     };
   }),
 
-  createDownload: adminProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
+  /**
+   * Step 1 of the download: email a single-use code to the account address. A
+   * held web session alone cannot reach the artifact without also reaching the
+   * inbox.
+   */
+  requestDownloadCode: adminProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
     requireWebSession(ctx.authViaToken);
-    const { rows } = await db.execute<{ id: string }>(sql`
-      SELECT id FROM user_data_exports
-      WHERE id = ${input.exportId} AND kilo_user_id = ${ctx.user.id}
-        AND status = 'ready' AND expires_at > now()
-      LIMIT 1
-    `);
-    if (!rows[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Export not found' });
+    await requireDownloadableExport(input.exportId, ctx.user.id);
+    const email = requireDownloadCodeRecipient(ctx.user.google_user_email);
+
+    // Bounds total issuance for the account: the cooldown below only spaces
+    // consecutive codes, and each new code carries a fresh attempt budget.
+    if (await isDataExportDownloadCodeRateLimited(ctx.user.id)) {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many download codes requested. Try again later.',
+      });
+    }
+
+    const created = await createDataExportDownloadCode(email, input.exportId);
+    if (created.status === 'cooldown') {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'A code was just sent. Check your email, or wait a minute to request another.',
+      });
+    }
+
+    await emailDownloadCodeOrDrop(email, created);
+
+    return {
+      challengeId: created.challengeId,
+      expiresInMinutes: DOWNLOAD_CODE_EXPIRY_MINUTES,
+    };
+  }),
+
+  /** Step 2 of the download: redeem the emailed code for one signed URL. */
+  createDownload: adminProcedure.input(DownloadInputSchema).mutation(async ({ ctx, input }) => {
+    requireWebSession(ctx.authViaToken);
+    await requireDownloadableExport(input.exportId, ctx.user.id);
+    const email = requireDownloadCodeRecipient(ctx.user.google_user_email);
+
+    const reservation = await reserveDataExportDownloadCode(
+      email,
+      input.exportId,
+      input.code,
+      input.challengeId
+    );
+    if (reservation !== 'ok') throw downloadCodeError(reservation);
+
     const result = await requestUserDataExportDownload({
       exportId: input.exportId,
       kiloUserId: ctx.user.id,
     });
     if (result.kind === 'unavailable') {
+      // Signing failed, so no capability was handed out and the code stays usable.
+      await releaseDataExportDownloadCode(input.challengeId);
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
         message: 'Downloads are not available yet',
       });
     }
+
+    // The signed URL is a bearer capability from here on, so the code must not
+    // survive to mint a second one.
+    await consumeDataExportDownloadCode(input.challengeId);
     return { downloadUrl: result.downloadUrl, expiresAt: result.expiresAt };
   }),
 });
 
-export const __test__ = { requireWebSession, serialize };
+export const __test__ = { requireWebSession, serialize, downloadCodeError };

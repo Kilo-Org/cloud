@@ -403,7 +403,7 @@ describe('workflow navigateTab', () => {
     // Advance time past the navigation timeout.
     await vi.advanceTimersByTimeAsync(WORKFLOW_NAVIGATION_TIMEOUT_MS + 100);
 
-    await expect(navPromise).rejects.toThrow('Navigation timed out.');
+    await expect(navPromise).rejects.toThrow('timed out: the page never finished loading.');
     expect(mocks.removeListener).toHaveBeenCalledTimes(1);
 
     vi.useRealTimers();
@@ -585,5 +585,46 @@ describe('workflow navigateTab', () => {
     mocks._fireOnUpdated(7, { status: 'complete' });
 
     await expect(navPromise).resolves.toBeUndefined();
+  });
+});
+
+describe('workflow navigateTab redirects', () => {
+  it('resolves when the tab completes on a redirect target instead of the requested URL', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.tabsGet.mockReset();
+    mocks.tabsUpdate.mockReset();
+    mocks.addListener.mockClear();
+    mocks.removeListener.mockClear();
+    mocks._resetOnUpdated();
+
+    // Pre-navigation read: the tab sits on the form page.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'complete',
+      url: 'https://example.com/form-page',
+    });
+    mocks.tabsUpdate.mockResolvedValueOnce({ id: 7 });
+    // Post-update re-read: still loading.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'loading',
+      url: 'https://example.com/search?q=x',
+    });
+    // Listener read: the server redirected to a different results URL.
+    mocks.tabsGet.mockResolvedValueOnce({
+      id: 7,
+      status: 'complete',
+      url: 'https://example.com/results/42',
+    });
+
+    const navPromise = navigateTab(7, 'https://example.com/search?q=x');
+
+    await vi.waitFor(() => {
+      expect(mocks.addListener).toHaveBeenCalledTimes(1);
+    });
+    mocks._fireOnUpdated(7, { status: 'complete' });
+
+    await expect(navPromise).resolves.toBeUndefined();
+    expect(mocks.removeListener).toHaveBeenCalledTimes(1);
   });
 });

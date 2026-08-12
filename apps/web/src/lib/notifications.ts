@@ -5,10 +5,6 @@ import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
-import {
-  getByokProviderNotificationLabel,
-  getByokProvidersForUser,
-} from '@/lib/notifications/byok-provider-cache';
 
 import { fromMicrodollars } from '@/lib/utils';
 
@@ -176,7 +172,6 @@ export async function generateUserNotifications(
     generateLowCreditNotification,
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
-    generateByokProvidersNotification,
     generateKiloPassNotification,
     generateKiloPassPromoMay29Notification,
   ];
@@ -297,51 +292,6 @@ async function generateTeamsTrialNotification(
       showIn: ['cli', 'extension'],
     },
   ];
-}
-
-async function generateByokProvidersNotification(
-  user: User,
-  _ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  try {
-    // Per-user provider ids are written daily to Redis by the
-    // `sync-byok-provider-notifications` cron, so this read is tiny.
-    const providers = await getByokProvidersForUser(user.id);
-    if (providers.length === 0) {
-      console.debug('[generateByokProvidersNotification] not using a BYOK supported provider');
-      return [];
-    }
-
-    // A user may have used several providers; show the first one we have a label for.
-    const providerName = providers
-      .map(provider => getByokProviderNotificationLabel(provider))
-      .find(name => Boolean(name));
-    if (!providerName) {
-      console.debug(
-        `[generateByokProvidersNotification] no BYOK supported provider among ${providers.join(', ')}`
-      );
-      return [];
-    }
-
-    console.debug(
-      `[generateByokProvidersNotification] has used BYOK supported provider(s) ${providers.join(', ')}`
-    );
-    return [
-      {
-        id: 'byok-providers-jan-19',
-        title: 'Try BYOK for Kilo Gateway',
-        message: `BYOK now supported for your ${providerName}, allowing faster model support, Kilo platform features, and more!`,
-        action: {
-          actionText: 'Learn more',
-          actionURL: 'https://kilo.ai/docs/basic-usage/byok',
-        },
-        showIn: ['cli', 'extension'],
-      },
-    ];
-  } catch (e) {
-    console.error('[generateByokProvidersNotification]', e);
-    return [];
-  }
 }
 
 async function generateKiloPassPromoMay29Notification(

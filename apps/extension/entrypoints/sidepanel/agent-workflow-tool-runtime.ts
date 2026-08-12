@@ -51,9 +51,14 @@ const saveWorkflowArgsSchema = z.object({
   params: z.array(agentWorkflowParamSchema).max(MAX_WORKFLOW_PARAM_COUNT).optional(),
   pathPrefix: z.string().optional(),
   scopeOrigin: z.string(),
-  script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
+  // Optional so an update (workflowId set) can keep the stored script.
+  script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH).optional(),
   startUrl: z.string().optional(),
-  workflowId: z.string().optional(),
+  // A model often sends workflowId: "" for a create; a blank id means "no id", so coerce it to undefined instead of failing the update lookup.
+  workflowId: z
+    .string()
+    .optional()
+    .transform(value => (value === undefined || value.trim() === '' ? undefined : value)),
 });
 
 const searchWorkflowsArgsSchema = z.object({
@@ -82,6 +87,7 @@ const saveMemoryArgsSchema = z.object({
 // ---------- run guidance ----------
 
 // The runs toggle is a permission the model reads through the save result's nextStep.
+// The setting is read when the save completes, so a change during a pending card is reflected.
 // It is never a runtime refusal. The exact strings are pinned by the runtime tests.
 const NEXT_STEP_RUNS_AUTO_APPROVED =
   'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.';
@@ -90,13 +96,23 @@ const NEXT_STEP_RUNS_ASK_USER =
 
 // ---------- helpers ----------
 
+// Zod's generic "Invalid input" gives a model nothing to act on for the one field it most often garbles. Field-specific guidance replaces it.
+const ARGS_FIELD_GUIDANCE: Record<string, string> = {
+  script:
+    'script must be a non-empty string: the workflow function body (or a full async function) using the page.* helpers',
+};
+
 /**
  * Format a zod failure into a field-level message the model can act on.
  */
 const formatArgsError = (toolName: string, error: z.ZodError): string => {
   const details = error.issues
     .slice(0, 5)
-    .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .map(issue => {
+      const path = issue.path.join('.') || '(root)';
+      const guidance = ARGS_FIELD_GUIDANCE[path];
+      return `${path}: ${guidance ?? issue.message}`;
+    })
     .join('; ');
 
   return `Invalid arguments for ${toolName} — ${details}.`;
@@ -143,7 +159,7 @@ export const formatEmptySearchMessage = (savedCount: number, query: string | und
 };
 
 const validateWorkflowInput = (
-  args: z.infer<typeof saveWorkflowArgsSchema>
+  args: Omit<z.infer<typeof saveWorkflowArgsSchema>, 'script'> & { readonly script: string }
 ): string | undefined => {
   if (args.script.length === 0) {
     return 'Workflow body must not be empty.';
@@ -330,9 +346,45 @@ const executeSaveWorkflow = async (
     rawParsed.data.startUrl,
     rawParsed.data.scopeOrigin
   );
+
+  const workflows = await loadAgentWorkflows(ctx.storage);
+  const existing =
+    rawParsed.data.workflowId === undefined
+      ? undefined
+      : workflows.find(item => item.id === rawParsed.data.workflowId);
+
+  // For a Create (no workflowId), check store fullness first.
+  if (rawParsed.data.workflowId === undefined) {
+    if (workflows.length >= MAX_WORKFLOW_COUNT) {
+      return {
+        ok: true,
+        value: {
+          reason: 'Workflow store is full. Delete a workflow first.',
+          saved: false,
+        },
+      };
+    }
+    if (rawParsed.data.script === undefined) {
+      return {
+        error:
+          'save_workflow requires script when creating a workflow: pass the workflow function body (or a full async function) as a string.',
+        ok: false,
+      };
+    }
+  } else if (existing === undefined) {
+    // For an Update, verify the workflow exists.
+    return {
+      error:
+        'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
+      ok: false,
+    };
+  }
+
+  // An update may omit script to keep the stored version.
   const parsed = {
     data: {
       ...rawParsed.data,
+      script: rawParsed.data.script ?? existing?.script ?? '',
       ...(resolvedStartUrl === undefined ? {} : { startUrl: resolvedStartUrl }),
     },
   };
@@ -344,30 +396,6 @@ const executeSaveWorkflow = async (
 
   const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId, params } =
     parsed.data;
-
-  // For a Create (no workflowId), check store fullness first.
-  if (workflowId === undefined) {
-    const workflows = await loadAgentWorkflows(ctx.storage);
-    if (workflows.length >= MAX_WORKFLOW_COUNT) {
-      return {
-        ok: true,
-        value: {
-          reason: 'Workflow store is full. Delete a workflow first.',
-          saved: false,
-        },
-      };
-    }
-  } else {
-    // For an Update, verify the workflow exists.
-    const workflows = await loadAgentWorkflows(ctx.storage);
-    if (!workflows.some(item => item.id === workflowId)) {
-      return {
-        error:
-          'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
-        ok: false,
-      };
-    }
-  }
 
   const draft = {
     createdAt: Date.now(),
@@ -394,17 +422,21 @@ const executeSaveWorkflow = async (
   };
 
   // The runs toggle is a permission the model reads through the save result's nextStep.
-  // Read the setting before requesting approval.
+  // Request approval first, then read the setting when the save completes.
+  // A change made while the card was pending is reflected in the guidance.
+  const outcome = await ctx.requestApproval('workflow', draft);
+
   // A failed settings read still permits the save and falls back to the cautious ask-the-user guidance.
   let runsAutoApproved = false;
-  try {
-    const settings = await loadWorkflowSettings(ctx.storage);
-    runsAutoApproved = settings.autoApproveWorkflowRuns;
-  } catch {
-    // The nextStep is guidance only. An unreadable setting falls back to the cautious text.
+  if (outcome.status === 'approved') {
+    try {
+      const settings = await loadWorkflowSettings(ctx.storage);
+      runsAutoApproved = settings.autoApproveWorkflowRuns;
+    } catch {
+      // The nextStep is guidance only. An unreadable setting falls back to the cautious text.
+    }
   }
 
-  const outcome = await ctx.requestApproval('workflow', draft);
   const extra: Record<string, unknown> =
     outcome.status === 'approved'
       ? {

@@ -3,6 +3,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { AlertCircle, Download, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,7 @@ import {
   type UserExport,
   type UserExportDisplayStatus,
 } from './data-export-contract';
+import { DownloadCodeDialog, type DownloadCodeChallenge } from './DownloadCodeDialog';
 
 type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
 
@@ -115,16 +117,23 @@ export function DataExportsClient() {
     })
   );
 
-  const downloadMutation = useMutation(
-    trpc.userExports.createDownload.mutationOptions({
-      onSuccess: result => {
-        triggerBrowserDownload(result.downloadUrl);
+  // Downloading is a two-step step-up: mail a single-use code, then redeem it for
+  // one signed URL. A held session alone cannot reach the artifact.
+  const [challenge, setChallenge] = useState<DownloadCodeChallenge | null>(null);
+  const requestCodeMutation = useMutation(
+    trpc.userExports.requestDownloadCode.mutationOptions({
+      onSuccess: (result, variables) => {
+        setChallenge({
+          exportId: variables.exportId,
+          challengeId: result.challengeId,
+          expiresInMinutes: result.expiresInMinutes,
+        });
       },
       onError: error => {
-        toast.error('Download could not be started', {
+        toast.error('Download code could not be sent', {
           description:
-            error.data?.code === 'PRECONDITION_FAILED'
-              ? 'Download signing is temporarily unavailable. Try again later.'
+            error.data?.code === 'TOO_MANY_REQUESTS' || error.data?.code === 'PRECONDITION_FAILED'
+              ? error.message
               : 'Try again. If the export has expired, request a new one.',
         });
       },
@@ -151,7 +160,8 @@ export function DataExportsClient() {
           <CardDescription>
             The export includes your App Builder project titles and the prompt prefixes recorded
             with your usage history. Large accounts can take a while to generate. We&apos;ll email
-            you when it&apos;s ready, and downloads expire 24 hours after that.
+            you when it&apos;s ready, and downloads expire 24 hours after that. Each download needs
+            a confirmation code we email you.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-3">
@@ -236,9 +246,10 @@ export function DataExportsClient() {
                   key={record.id}
                   record={record}
                   isPreparingThisDownload={
-                    downloadMutation.isPending && downloadMutation.variables?.exportId === record.id
+                    requestCodeMutation.isPending &&
+                    requestCodeMutation.variables?.exportId === record.id
                   }
-                  onDownload={() => downloadMutation.mutate({ exportId: record.id })}
+                  onDownload={() => requestCodeMutation.mutate({ exportId: record.id })}
                 />
               ))}
             </ul>
@@ -263,6 +274,16 @@ export function DataExportsClient() {
           )}
         </CardContent>
       </Card>
+
+      <DownloadCodeDialog
+        challenge={challenge}
+        isResending={requestCodeMutation.isPending}
+        onResend={() => {
+          if (challenge) requestCodeMutation.mutate({ exportId: challenge.exportId });
+        }}
+        onClose={() => setChallenge(null)}
+        onVerified={triggerBrowserDownload}
+      />
     </div>
   );
 }
@@ -335,7 +356,7 @@ function DownloadExportButton({
       {isPreparingThisDownload ? (
         <>
           <Loader2 className="animate-spin" />
-          Preparing download...
+          Sending code...
         </>
       ) : (
         <>

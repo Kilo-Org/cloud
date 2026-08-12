@@ -40,6 +40,55 @@ interface WorkflowRunnerDeps {
   navigateTab(tabId: number, url: string): Promise<void>;
 }
 
+// CDP surfaces a mid-eval page navigation as one of these context errors.
+const isNavigationDestroyedEval = (error: string): boolean =>
+  error.includes('Execution context was destroyed') ||
+  error.includes('Cannot find context with specified id') ||
+  error.includes('Inspected target navigated or closed');
+
+/**
+ * Tolerant coercion of a string run_workflow input, from provider artifacts
+ * measured in the 29-model matrix. Some models send string-encoded JSON
+ * ('{"topic": "rust"}'). The z-ai/glm-5.2 chat template emits
+ * <arg_key>K</arg_key><arg_value>V</arg_value> pairs and often drops the final
+ * closing tag, so a value runs to the next key or the end of the string.
+ * A whitespace-only string means "no input". Anything else stays as-is for the
+ * shape gate. The benchmark scorer applies the same coercion when it binds a
+ * verifying run's input, so a coerced run scores like a well-formed one.
+ */
+export const coerceWorkflowRunInput = (input: unknown): unknown => {
+  if (typeof input !== 'string') {
+    return input;
+  }
+  const trimmed = input.trim();
+  if (trimmed === '') {
+    return undefined;
+  }
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Not JSON; the shape gate reports it.
+    }
+    return input;
+  }
+  const pairs = [
+    ...trimmed.matchAll(/<arg_key>([\s\S]*?)<\/arg_key>\s*<arg_value>([\s\S]*?)(?=<arg_key>|$)/gu),
+  ];
+  if (pairs.length > 0) {
+    return Object.fromEntries(
+      pairs.map(pair => [
+        (pair[1] ?? '').trim(),
+        (pair[2] ?? '').replace(/<\/arg_value>\s*$/u, '').trim(),
+      ])
+    );
+  }
+  return input;
+};
+
 const scriptEnvelopeSchema = z.object({
   dryRunActions: z
     .array(z.object({ action: z.string(), selector: z.string() }))
@@ -52,14 +101,207 @@ const scriptEnvelopeSchema = z.object({
 });
 
 /**
+ * The static page-helper preamble injected before every workflow script.
+ *
+ * Helper design: text-based helpers (clickText, fillLabel, waitForText,
+ * readText) mirror the safe-mode snapshot vocabulary — visible text, labels,
+ * placeholders — so scripts written from a snapshot need no CSS selectors.
+ * Selector helpers stay for pages where text targeting is ambiguous.
+ *
+ * Dry-run rules: mutations (click, fill, clickText, fillLabel) are recorded,
+ * not performed. Waits stay REAL until the first recorded mutation — up to
+ * that point the page is in its true state — and are recorded after it,
+ * because a skipped click can never produce the awaited content. Reads are
+ * always real.
+ */
+const PAGE_HELPERS_CODE = `
+const dryRunActions = [];
+const pageIsReal = () => !dryRun || dryRunActions.length === 0;
+const isVisible = (el) => {
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+};
+const normText = (value) => (value ?? '').replace(/\\s+/gu, ' ').trim().toLowerCase();
+const unreachable = (message) => {
+  if (dryRun && dryRunActions.length > 0) {
+    const skipped = new Error(message + ' (not reachable in a dry run)');
+    skipped.kiloDryRunUnverified = true;
+    return skipped;
+  }
+  return new Error(message);
+};
+const findByText = (roots, target) => {
+  const wanted = normText(target);
+  if (wanted === '') { return null; }
+  let partial = null;
+  for (const el of roots) {
+    if (!isVisible(el)) continue;
+    const candidates = [
+      el.getAttribute('aria-label'),
+      el.textContent,
+      el instanceof HTMLInputElement ? el.value : '',
+      el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el.placeholder : '',
+    ];
+    for (const candidate of candidates) {
+      const have = normText(candidate);
+      if (have === '') continue;
+      if (have === wanted) return el;
+      if (have.includes(wanted) && (partial === null || have.length < normText(partial.__kiloMatch).length)) {
+        el.__kiloMatch = candidate;
+        partial = el;
+      }
+    }
+  }
+  return partial;
+};
+const fillElement = (el, value) => {
+  if (el instanceof HTMLSelectElement) {
+    const option = [...el.options].find(
+      (opt) => normText(opt.value) === normText(value) || normText(opt.textContent) === normText(value)
+    );
+    if (!option) {
+      const labels = [...el.options].slice(0, 20).map((opt) => (opt.textContent ?? '').trim()).filter(Boolean);
+      throw new Error('No option matches "' + value + '". Options: ' + labels.join(', ').slice(0, 300));
+    }
+    el.value = option.value;
+  } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) { setter.call(el, value); } else { el.value = value; }
+  } else if (el.isContentEditable) {
+    el.textContent = value;
+  } else {
+    throw new Error('The matched element is not a fillable input. Target the inner input element, or use page.clickText to open it first.');
+  }
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+};
+const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const waitLimit = (timeoutMs) =>
+  typeof timeoutMs === 'number' && timeoutMs > 0 ? Math.min(timeoutMs, 25000) : 15000;
+const AUTO_WAIT_MS = 3000;
+const autoWait = async (resolveTarget) => {
+  const start = Date.now();
+  let found = resolveTarget();
+  while ((found === null || found === undefined) && pageIsReal() && Date.now() - start < AUTO_WAIT_MS) {
+    await sleepMs(100);
+    found = resolveTarget();
+  }
+  return found;
+};
+const CLICKABLE = 'a, button, [role="button"], [role="option"], [role="tab"], [role="menuitem"], [role="link"], [role="checkbox"], [role="radio"], input[type="submit"], input[type="button"], label, summary';
+const FILLABLE = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select, [contenteditable="true"], [role="combobox"], [role="textbox"], [role="searchbox"]';
+const page = {
+  __q(selector) {
+    const el = document.querySelector(selector);
+    if (el === null) { throw unreachable('No element matches selector: ' + selector); }
+    return el;
+  },
+  async click(selector) {
+    const el = await autoWait(() => document.querySelector(selector));
+    if (el === null) { throw unreachable('No element matches selector: ' + selector); }
+    if (dryRun) { dryRunActions.push({ action: 'click', selector }); return; }
+    el.click();
+  },
+  async clickText(text) {
+    const el = await autoWait(() => findByText(document.querySelectorAll(CLICKABLE), text));
+    if (el === null) { throw unreachable('No clickable element with text: ' + text); }
+    if (dryRun) { dryRunActions.push({ action: 'clickText', selector: text }); return; }
+    el.click();
+  },
+  async fill(selector, value) {
+    const el = await autoWait(() => document.querySelector(selector));
+    if (el === null) { throw unreachable('No element matches selector: ' + selector); }
+    if (dryRun) { dryRunActions.push({ action: 'fill', selector }); return; }
+    fillElement(el, value);
+  },
+  async fillLabel(labelText, value) {
+    const resolveField = () => {
+      let el = findByText(document.querySelectorAll(FILLABLE), labelText);
+      if (el === null) {
+        const label = findByText(document.querySelectorAll('label'), labelText);
+        if (label !== null) {
+          el = label.control ?? (label.htmlFor ? document.getElementById(label.htmlFor) : null) ?? label.querySelector(FILLABLE);
+        }
+      }
+      return el;
+    };
+    const el = await autoWait(resolveField);
+    if (el === null || el === undefined) { throw unreachable('No input with label, placeholder, or aria-label: ' + labelText); }
+    if (dryRun) { dryRunActions.push({ action: 'fillLabel', selector: labelText }); return; }
+    fillElement(el, value);
+  },
+  text(selector) { return (page.__q(selector).textContent ?? '').trim(); },
+  textAll(selector) {
+    return Array.from(document.querySelectorAll(selector))
+      .map((el) => (el.textContent ?? '').trim());
+  },
+  readText(maxChars) {
+    const limit = typeof maxChars === 'number' && maxChars > 0 ? Math.min(maxChars, 20000) : 6000;
+    const text = (document.body?.innerText ?? '').replace(/\\n{3,}/gu, '\\n\\n').trim();
+    return text.length > limit ? text.slice(0, limit) + '…' : text;
+  },
+  attr(selector, name) { return page.__q(selector).getAttribute(name); },
+  exists(selector) { return document.querySelector(selector) !== null; },
+  hasText(text) { return normText(document.body?.innerText).includes(normText(text)); },
+  sleep(ms) {
+    const capped = typeof ms === 'number' && ms > 0 ? Math.min(ms, 5000) : 0;
+    return sleepMs(capped);
+  },
+  navigate() {
+    throw new Error('page.navigate does not exist. To open another page, return { navigate: "<url>", state: { … } } from the script; the runner navigates and re-runs the script on the new page.');
+  },
+  goto() {
+    throw new Error('page.goto does not exist. To open another page, return { navigate: "<url>", state: { … } } from the script; the runner navigates and re-runs the script on the new page.');
+  },
+  async waitFor(selector, timeoutMs) {
+    if (typeof selector === 'number') { return page.sleep(selector); }
+    if (!pageIsReal()) { dryRunActions.push({ action: 'waitFor', selector }); return; }
+    const limit = waitLimit(timeoutMs);
+    const start = Date.now();
+    while (document.querySelector(selector) === null) {
+      if (Date.now() - start >= limit) {
+        throw new Error('Timed out waiting for selector: ' + selector + ' (' + limit + 'ms). The element never appeared; check the selector or wait for a different one.');
+      }
+      await sleepMs(100);
+    }
+  },
+  async waitForText(text, timeoutMs) {
+    if (!pageIsReal()) { dryRunActions.push({ action: 'waitForText', selector: text }); return; }
+    const limit = waitLimit(timeoutMs);
+    const start = Date.now();
+    while (!page.hasText(text)) {
+      if (Date.now() - start >= limit) {
+        throw new Error('Timed out waiting for text: ' + text + ' (' + limit + 'ms). The text never appeared on the page.');
+      }
+      await sleepMs(100);
+    }
+  },
+};
+`;
+
+/**
+ * Models pass the script either as a bare function body (the documented
+ * contract) or as a complete function expression like
+ * `async ({ page, state, input }) => { … }`. Wrapping an expression in a
+ * body would define a function and return undefined, so expression-shaped
+ * scripts are used directly instead.
+ */
+/**
  * Build the injected page code for a single workflow page eval.
- * Uses plain string CONCATENATION, never a template literal — a workflow script
- * containing a backtick or `${` would otherwise break or corrupt the composed code.
- * `state`, `dryRun`, and `input` are embedded with `JSON.stringify`.
+ * The script is embedded with `JSON.stringify` and compiled at run time:
+ * first as a function EXPRESSION (models pass `async ({ page }) => { … }`
+ * despite the body contract), and when that does not compile, as the
+ * documented async function body. An expression that evaluates to a
+ * non-function (an IIFE) already ran during classification, so it reports a
+ * script-shape error instead of running a second time as a body.
+ * Compiling instead of pattern
+ * matching classifies every shape correctly — a body that starts with a
+ * helper function declaration is not an expression, and vice versa.
  * `input` is re-injected on every page so scripts never lose run inputs
  * across navigations; `state` carries only what the script returns.
  */
-/* eslint-disable prefer-template, max-params -- Concatenation avoids template-literal injection from untrusted workflow scripts; the page code needs all four values. */
+/* eslint-disable prefer-template, max-params -- Concatenation with JSON.stringify avoids template-literal injection from untrusted workflow scripts; the page code needs all four values. */
 export const buildWorkflowPageCode = (
   script: string,
   state: unknown,
@@ -69,57 +311,32 @@ export const buildWorkflowPageCode = (
   'const dryRun = ' +
   JSON.stringify(dryRun) +
   ';\n' +
-  'const dryRunActions = [];\n' +
-  'const page = {\n' +
-  '  __q(selector) {\n' +
-  '    const el = document.querySelector(selector);\n' +
-  '    if (el === null) {\n' +
-  '      if (dryRun && dryRunActions.length > 0) {\n' +
-  "        const skipped = new Error('Selector not reachable in a dry run: ' + selector);\n" +
-  '        skipped.kiloDryRunUnverified = true;\n' +
-  '        throw skipped;\n' +
-  '      }\n' +
-  "      throw new Error('No element matches selector: ' + selector);\n" +
-  '    }\n' +
-  '    return el;\n' +
-  '  },\n' +
-  '  click(selector) {\n' +
-  '    const el = page.__q(selector);\n' +
-  "    if (dryRun) { dryRunActions.push({ action: 'click', selector }); return; }\n" +
-  '    el.click();\n' +
-  '  },\n' +
-  '  fill(selector, value) {\n' +
-  '    const el = page.__q(selector);\n' +
-  "    if (dryRun) { dryRunActions.push({ action: 'fill', selector }); return; }\n" +
-  '    const proto = el instanceof HTMLTextAreaElement\n' +
-  '      ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;\n' +
-  "    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;\n" +
-  '    if (setter) { setter.call(el, value); } else { el.value = value; }\n' +
-  "    el.dispatchEvent(new Event('input', { bubbles: true }));\n" +
-  "    el.dispatchEvent(new Event('change', { bubbles: true }));\n" +
-  '  },\n' +
-  "  text(selector) { return (page.__q(selector).textContent ?? '').trim(); },\n" +
-  '  textAll(selector) {\n' +
-  '    return Array.from(document.querySelectorAll(selector))\n' +
-  "      .map((el) => (el.textContent ?? '').trim());\n" +
-  '  },\n' +
-  '  attr(selector, name) { return page.__q(selector).getAttribute(name); },\n' +
-  '  exists(selector) { return document.querySelector(selector) !== null; },\n' +
-  '  async waitFor(selector, timeoutMs) {\n' +
-  "    if (dryRun) { dryRunActions.push({ action: 'waitFor', selector }); return; }\n" +
-  '    const limit = typeof timeoutMs === "number" && timeoutMs > 0 ? Math.min(timeoutMs, 25000) : 10000;\n' +
-  '    const start = Date.now();\n' +
-  '    while (document.querySelector(selector) === null) {\n' +
-  '      if (Date.now() - start >= limit) {\n' +
-  "        throw new Error('Timed out waiting for selector: ' + selector + ' (' + limit + 'ms). The element never appeared; check the selector or wait for a different one.');\n" +
-  '      }\n' +
-  '      await new Promise((resolve) => setTimeout(resolve, 100));\n' +
-  '    }\n' +
-  '  },\n' +
-  '};\n' +
-  'const workflow = async ({ page, state, input }) => { ' +
-  script +
-  ' };\n' +
+  PAGE_HELPERS_CODE +
+  'const scriptText = ' +
+  JSON.stringify(script) +
+  ';\n' +
+  'const AsyncFunctionCtor = Object.getPrototypeOf(async () => {}).constructor;\n' +
+  'let workflow;\n' +
+  'let compiledExpression;\n' +
+  'try {\n' +
+  "  compiledExpression = new Function('return (' + scriptText + '\\n);');\n" +
+  '} catch {\n' +
+  '  // Not an expression: fall through to the body form.\n' +
+  '}\n' +
+  'if (compiledExpression !== undefined) {\n' +
+  '  // Invoking the probe runs an IIFE once (its side effects included); any outcome but a clean function must NOT reach the body form, which would execute it a second time.\n' +
+  '  let candidate;\n' +
+  '  try {\n' +
+  '    candidate = compiledExpression();\n' +
+  '  } catch (error) {\n' +
+  "    return { ok: false, error: 'Workflow script threw while evaluating: ' + String(error && error.message ? error.message : error) + '. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions };\n" +
+  '  }\n' +
+  "  if (typeof candidate === 'function') { workflow = candidate; }\n" +
+  "  else { return { ok: false, error: 'Workflow script must be a function, but evaluated to a non-function value. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions }; }\n" +
+  '}\n' +
+  'if (workflow === undefined) {\n' +
+  "  workflow = new AsyncFunctionCtor('{ page, state, input }', scriptText);\n" +
+  '}\n' +
   'try {\n' +
   '  const value = await workflow({ page, state: ' +
   JSON.stringify(state) +
@@ -296,14 +513,21 @@ export const runWorkflow = async (
     );
   }
 
-  // 2a. Input shape gate — before any navigation.
+  // 2a. Tolerant string coercion; the shape gate below catches what does not parse.
+  const coercedInput = coerceWorkflowRunInput(input);
+  // 2b. Input shape gate — before any navigation. Name the declared params: a weak model that sent a bare string loops on a generic message (measured), but corrects when told the exact object to send.
   if (
-    input !== undefined &&
-    (typeof input !== 'object' || input === null || Array.isArray(input))
+    coercedInput !== undefined &&
+    (typeof coercedInput !== 'object' || coercedInput === null || Array.isArray(coercedInput))
   ) {
+    const params = workflow.params ?? [];
+    const exampleParam = params.find(param => param.required === true) ?? params[0];
+    const example = exampleParam === undefined ? '{}' : `{"${exampleParam.name}": "<value>"}`;
+    const declared =
+      params.length > 0 ? params.map(param => param.name).join(', ') : 'none — omit input entirely';
     return resultWithActions(
       {
-        error: 'run_workflow input must be a JSON object like { "name": "value" }.',
+        error: `run_workflow input must be a JSON object mapping declared param names to values, e.g. ${example}. Declared params: ${declared}.`,
         ok: false,
       },
       dryRun,
@@ -312,7 +536,7 @@ export const runWorkflow = async (
   }
 
   // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding check guarantees a plain object or undefined.
-  const normalizedInput = (input ?? {}) as Record<string, unknown>;
+  const normalizedInput = (coercedInput ?? {}) as Record<string, unknown>;
 
   /* Input is embedded in the injected page code on every page, so it carries
      the same bound as navigation state. */
@@ -337,7 +561,7 @@ export const runWorkflow = async (
     );
   }
 
-  // 2b. Declared-params gate — actionable message listing every missing value.
+  // 2c. Declared-params gate — actionable message listing every missing value.
   const missingParams = findMissingRequiredParams(workflow, normalizedInput);
   if (missingParams.length > 0) {
     return resultWithActions(
@@ -359,7 +583,18 @@ export const runWorkflow = async (
         []
       );
     }
-    await deps.navigateTab(tabId, workflow.startUrl);
+    try {
+      await deps.navigateTab(tabId, workflow.startUrl);
+    } catch (error) {
+      return resultWithActions(
+        {
+          error: `Navigation to the startUrl failed: ${error instanceof Error ? error.message : String(error)}`,
+          ok: false,
+        },
+        dryRun,
+        []
+      );
+    }
     if (isRunStopped(signal)) {
       return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, []);
     }
@@ -369,6 +604,7 @@ export const runWorkflow = async (
   // Page for scripts written against the old contract.
   let state: unknown = { input: normalizedInput };
   let pagesVisited = 0;
+  let navigationRecoveries = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
 
   // 4. Loop, at most MAX_WORKFLOW_PAGES_PER_RUN iterations.
@@ -379,8 +615,20 @@ export const runWorkflow = async (
     }
 
     // B. Scope check on current tab URL.
-    // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
-    const url = await deps.getTabUrl(tabId);
+    let url = '';
+    try {
+      // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
+      url = await deps.getTabUrl(tabId);
+    } catch (error) {
+      return resultWithActions(
+        {
+          error: `Could not read the tab URL: ${error instanceof Error ? error.message : String(error)}`,
+          ok: false,
+        },
+        dryRun,
+        dryRunActions
+      );
+    }
     if (isRunStopped(signal)) {
       return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
     }
@@ -406,6 +654,16 @@ export const runWorkflow = async (
       return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
     }
     if (!evalResult.ok) {
+      // A real click can navigate the page mid-eval; the destroyed execution context IS the navigation the script wanted. Re-run the script on the landed page with the same state, exactly like the { navigate } path. Fixed 1.5 s settle and a 3-recovery cap; add a load-complete dep if flaky pages surface.
+      if (!dryRun && isNavigationDestroyedEval(evalResult.error) && navigationRecoveries < 3) {
+        navigationRecoveries += 1;
+        // eslint-disable-next-line no-await-in-loop, promise/avoid-new -- Sequential workflow execution by design; a plain settle delay has no promise-returning primitive to defer to.
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 1500);
+        });
+        // eslint-disable-next-line no-continue -- Mirrors the { navigate } path: same state, next page iteration.
+        continue;
+      }
       return resultWithActions(
         { error: evalResult.error, ok: false, pageUrl: url },
         dryRun,
@@ -502,8 +760,20 @@ export const runWorkflow = async (
       }
 
       state = validationResult.nextState;
-      // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
-      await deps.navigateTab(tabId, validationResult.navigateUrl);
+      try {
+        // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
+        await deps.navigateTab(tabId, validationResult.navigateUrl);
+      } catch (error) {
+        return resultWithActions(
+          {
+            error: `Navigation to ${validationResult.navigateUrl} failed: ${error instanceof Error ? error.message : String(error)}`,
+            ok: false,
+            pageUrl: url,
+          },
+          dryRun,
+          dryRunActions
+        );
+      }
       // eslint-disable-next-line no-continue -- Clearer than deep nesting for this state machine.
       continue;
     }
@@ -519,7 +789,7 @@ export const runWorkflow = async (
   // 5. Loop exhausted.
   return resultWithActions(
     {
-      error: `Workflow exceeded the page limit (${String(MAX_WORKFLOW_PAGES_PER_RUN)} pages). Check the script for a navigation loop.`,
+      error: `Workflow exceeded the page limit (${String(MAX_WORKFLOW_PAGES_PER_RUN)} pages). The script returned { navigate } on every page. Branch on state so the results page returns { done: true, result } — e.g. first page returns { navigate: url, state: { searched: true } }, and when state.searched is true the script reads the results and finishes.`,
       ok: false,
     },
     dryRun,

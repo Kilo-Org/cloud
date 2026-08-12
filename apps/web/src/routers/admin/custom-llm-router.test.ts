@@ -17,7 +17,7 @@ const validDefinition: CustomLlmDefinition = {
   context_length: 128000,
   max_completion_tokens: 4096,
   base_url: 'https://api.openai.com/v1',
-  organization_ids: ['org_test_123'],
+  organization_ids: ['00000000-0000-4000-8000-000000000100'],
   group_ids: ['00000000-0000-4000-8000-000000000123'],
 };
 

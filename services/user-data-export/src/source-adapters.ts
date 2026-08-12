@@ -1,4 +1,5 @@
 import { keyCursorValues, type ExportCursor, type KeyCursor } from './contracts';
+import { TerminalExportError } from './errors';
 
 export type ExportRecord = {
   source: string;
@@ -24,8 +25,19 @@ export type SourceAdapter = {
 };
 
 /**
- * Identity comes from the live primary, so an export always reflects who the user is
- * right now. Everything else comes from the export warehouse, a frozen snapshot.
+ * The identity section is assembled from both databases, because the profile fields
+ * are split across them.
+ *
+ * `email` and `name` are the fields the export presents as the user's identity, and
+ * the warehouse carries its own copy of both. Those are read from the warehouse
+ * (`warehouseProfileQuery`) so they are as of the same moment as the other five
+ * sources, rather than showing a name the user changed after the snapshot beside
+ * data that predates the change.
+ *
+ * The remaining columns below have no warehouse equivalent — most were never exported
+ * from the source model, and the monetization ones were deliberately dropped from it —
+ * so they still come from the live primary. This is a single indexed lookup by primary
+ * key, once per export, not the bulk traffic the warehouse exists to absorb.
  */
 const userQuery = `SELECT id, google_user_email, google_user_name, google_user_image_url,
   created_at, updated_at, hosted_domain, microdollars_used, total_microdollars_acquired,
@@ -35,6 +47,33 @@ const userQuery = `SELECT id, google_user_email, google_user_name, google_user_i
   vercel_downstream_safety_identifier, customer_source, signup_ip, normalized_email, email_domain
 FROM kilocode_users
 WHERE id = $1
+LIMIT 1`;
+
+/**
+ * Export field name to the warehouse column that supplies it, for the profile fields the
+ * warehouse carries. Both the SELECT list and the merge below are derived from this, so a
+ * field cannot be read from the warehouse without also being applied: adding a column to
+ * one and forgetting the other would silently keep serving the live value, which is the
+ * inconsistency this whole path exists to remove.
+ *
+ * Only email and name. The table has geo columns too, but the export has never had a geo
+ * section and adding one is not what sourcing identity from the warehouse means.
+ */
+export const WAREHOUSE_PROFILE_FIELDS = {
+  google_user_email: 'email',
+  google_user_name: 'name',
+} as const;
+
+/**
+ * The warehouse's copy of those fields. Keyed on `user_id`, which is the warehouse's name
+ * for `kilocode_users.id` and the same value the five child tables carry as `kilo_user_id`.
+ *
+ * The interpolated column list comes from the module constant above, never from caller
+ * input, on the same basis as `singleKeyPageQuery` below. The user id is a bind parameter.
+ */
+const warehouseProfileQuery = `SELECT user_id, ${Object.values(WAREHOUSE_PROFILE_FIELDS).join(', ')}
+FROM users
+WHERE user_id = $1
 LIMIT 1`;
 
 /**
@@ -229,6 +268,29 @@ function jsonValue(value: unknown): string | null {
   return JSON.stringify(value);
 }
 
+/**
+ * Picks the warehouse's copy of a profile field, falling back to the primary's.
+ *
+ * The warehouse's `users.email` and `users.name` are nullable text with no constraint —
+ * the export warehouse declares no keys and its own load checks count nulls rather than
+ * forbidding them — while the primary's `google_user_email` and `google_user_name` are
+ * NOT NULL. A null or blank warehouse value is therefore a load artifact, not a fact
+ * about the user, and the primary value is the true one.
+ *
+ * Deliberately not passed straight to `requiredString`: that mapper was written for a
+ * NOT NULL primary column and throws a plain `Error`, which `handleGenerationFailure`
+ * treats as retryable. A null would then spend the queue's four retries on a value
+ * frozen in the snapshot that no retry can change — the same waste the missing-row case
+ * raises `TerminalExportError` to avoid.
+ *
+ * Blank counts as absent alongside null: empty string and NULL are not reliably
+ * distinguished across this load path, and neither is a usable email or name.
+ */
+function warehouseProfileValue(warehouseValue: unknown, primaryValue: unknown): unknown {
+  if (typeof warehouseValue !== 'string' || warehouseValue.trim() === '') return primaryValue;
+  return warehouseValue;
+}
+
 const USER_FIELD_MAPPERS = [
   ['id', (value: unknown) => requiredString(value, 'id')],
   ['google_user_email', (value: unknown) => requiredString(value, 'google_user_email')],
@@ -274,7 +336,7 @@ const USER_FIELD_MAPPERS = [
 ] as const;
 
 export type SourceAdapterQueries = {
-  /** Live primary replica. Identity only. */
+  /** Live primary replica. The profile columns the warehouse does not carry. */
   replicaQuery: ReplicaQuery;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   warehouseQuery: ReplicaQuery;
@@ -288,14 +350,44 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       name: 'kilocode_users',
       async readPage(input): Promise<SourcePage> {
         if (input.cursor) return { records: [], nextCursor: null };
-        const rows = await replicaQuery(userQuery, [input.kiloUserId]);
+        const [rows, profileRows] = await Promise.all([
+          replicaQuery(userQuery, [input.kiloUserId]),
+          warehouseQuery(warehouseProfileQuery, [input.kiloUserId]),
+        ]);
         const row = rows[0];
         if (!row) throw new Error('Export user was not found');
+
+        // Terminal, not retryable. The primary row above always exists for an
+        // authenticated requester, but the warehouse copy can be genuinely absent — an
+        // account created after the load cutoff, or a gap in the load. No retry makes it
+        // appear, so this fails on the first attempt with the real reason instead of
+        // spending the queue's retries to arrive at the same place with a generic error.
+        //
+        // Not silently falling back to the primary values: that would put a
+        // current-second name and email beside five sources frozen at the cutoff, which
+        // is the inconsistency reading them from the warehouse exists to remove. A user
+        // absent from the snapshot has nothing to export from it.
+        const profile = profileRows[0];
+        if (!profile) {
+          throw new TerminalExportError(
+            'export_identity_row_missing',
+            'Your account was not found in the data snapshot this export reads from. This can happen when the account was created after the snapshot was taken.',
+            'Identity row was not present in the export warehouse'
+          );
+        }
+
+        // The warehouse copy wins for the two fields it carries, so the identity section
+        // is as of the same moment as the rest of the export. Field names are unchanged,
+        // so this is not a schema version change for consumers.
+        const merged: Record<string, unknown> = { ...row };
+        for (const [exportField, warehouseColumn] of Object.entries(WAREHOUSE_PROFILE_FIELDS)) {
+          merged[exportField] = warehouseProfileValue(profile[warehouseColumn], row[exportField]);
+        }
         return {
           records: USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
             source: 'kilocode_users',
             field,
-            value: mapValue(row[field]),
+            value: mapValue(merged[field]),
           })),
           nextCursor: null,
         };
@@ -447,7 +539,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
   ];
 }
 
-/** Warehouse queries only. Every one must be scoped to a single user. */
+/**
+ * Owned-row warehouse queries: every one filters on `kilo_user_id = $1`, which
+ * excludes NULL-owned (organization) rows by construction. `userQuery` is scoped
+ * differently (`id = $1`, the user's own row rather than a row it owns) and is not
+ * part of this map.
+ */
 export const warehouseQueries = {
   projectQuery,
   messageQuery,
@@ -456,4 +553,35 @@ export const warehouseQueries = {
   userPromptQuery,
 };
 
-export const sourceQueries = { ...warehouseQueries, userQuery };
+export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
+
+/**
+ * The only predicates that scope a query to a single user. `kilo_user_id = $1` matches
+ * rows the user owns; `id = $1` and `user_id = $1` match the user's own profile row on
+ * the primary and in the warehouse respectively, which name the same column differently.
+ * All three take the authenticated user id as their sole bind parameter, and none can
+ * match SQL NULL, which is what keeps org-owned rows out.
+ *
+ * A closed set rather than a free string: a source scoped some other way cannot
+ * declare its own predicate and pass the guard below on a technicality. Widening
+ * this list is the deliberate, reviewable act that adding such a source requires.
+ */
+export const USER_SCOPE_PREDICATES = ['kilo_user_id = $1', 'id = $1', 'user_id = $1'] as const;
+export type UserScopePredicate = (typeof USER_SCOPE_PREDICATES)[number];
+
+/**
+ * The single-user scoping predicate each query in `sourceQueries` must contain,
+ * declared beside the queries themselves rather than left to be inferred from
+ * which named export a query happens to live in. A query added to `sourceQueries`
+ * without an entry here fails the coverage test below, so a new source can't ship
+ * unscoped simply by landing outside `warehouseQueries`.
+ */
+export const sourceQueryScopes: Record<keyof typeof sourceQueries, UserScopePredicate> = {
+  projectQuery: 'kilo_user_id = $1',
+  messageQuery: 'kilo_user_id = $1',
+  cliSessionQuery: 'kilo_user_id = $1',
+  systemPromptQuery: 'kilo_user_id = $1',
+  userPromptQuery: 'kilo_user_id = $1',
+  userQuery: 'id = $1',
+  warehouseProfileQuery: 'user_id = $1',
+};

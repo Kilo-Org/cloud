@@ -1,9 +1,11 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
+import { after } from 'next/server';
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
   rewriteModelResponse,
+  logUnrewrittenResponse,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -27,10 +29,12 @@ jest.mock('@/lib/utils.server', () => ({
 
 const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
 const mockedLog = jest.mocked(logExceptInTest);
+const mockedAfter = jest.mocked(after);
 
 beforeEach(() => {
   mockedOptIn.mockClear();
   mockedLog.mockClear();
+  mockedAfter.mockClear();
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -370,7 +374,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
     test('moves marked delta content to reasoning content', async () => {
       const upstream = sseResponse(
-        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"flags":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"flags":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
           'data: [DONE]\n\n'
       );
 
@@ -380,7 +384,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         capture: null,
         vercelRequestId: null,
         responseTransforms: {
-          thoughtContentMapping: 'extra_content.flags.thought',
+          mapGeminiThoughtContent: true,
         },
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -389,7 +393,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       expect(chunk.choices[0].delta).toEqual({
         reasoning_content: 'first thought',
-        extra_content: { flags: { thought: true } },
+        extra_content: { google: { thought: true } },
       });
       expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
       expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });
@@ -1013,6 +1017,46 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(result).not.toBeNull();
+  });
+
+  test('does not schedule a log insert for non-custom models without opt-in', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'openai/gpt-5' }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalled();
+  });
+
+  test('always schedules a log insert for custom models', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'kilo-internal/my-model' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    expect(mockedOptIn).not.toHaveBeenCalled();
+  });
+
+  test('always logs unrewritten custom model responses', async () => {
+    await logUnrewrittenResponse({
+      response: jsonResponse({ error: 'upstream error' }, 400),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    expect(mockedOptIn).not.toHaveBeenCalled();
   });
 });
 

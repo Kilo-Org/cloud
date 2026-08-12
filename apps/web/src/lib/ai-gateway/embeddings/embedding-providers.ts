@@ -1,16 +1,12 @@
-import { createOpenAI } from '@ai-sdk/openai';
-import { embed, embedMany } from 'ai';
-import { MISTRAL_API_KEY, OPENAI_API_KEY } from '@/lib/config.server';
+import { MISTRAL_API_KEY } from '@/lib/config.server';
 import { Mistral } from '@mistralai/mistralai';
 
-export type EmbeddingProvider = 'openai' | 'mistral' | 'mistral-text';
+export type EmbeddingProvider = 'mistral' | 'mistral-text';
 export const DEFAULT_EMBEDDING_PROVIDER: EmbeddingProvider = 'mistral';
 
 const mistral = new Mistral({
   apiKey: MISTRAL_API_KEY,
 });
-
-const openai = createOpenAI({ apiKey: OPENAI_API_KEY });
 
 async function callMistralEmbeddings(
   model: string,
@@ -60,12 +56,6 @@ type EmbeddingConfig = {
 };
 
 export const EMBEDDING_CONFIGS: Record<EmbeddingProvider, EmbeddingConfig> = {
-  openai: {
-    provider: 'openai',
-    model: 'text-embedding-3-small',
-    dimensions: 1536,
-    apiKey: OPENAI_API_KEY,
-  },
   mistral: {
     provider: 'mistral',
     model: 'codestral-embed-2505',
@@ -91,7 +81,7 @@ type EmbedManyResult = {
 export class EmbeddingService {
   private config: EmbeddingConfig;
 
-  constructor(provider: EmbeddingProvider = 'openai') {
+  constructor(provider: EmbeddingProvider = DEFAULT_EMBEDDING_PROVIDER) {
     this.config = EMBEDDING_CONFIGS[provider];
   }
 
@@ -108,54 +98,30 @@ export class EmbeddingService {
   }
 
   async embedSingle(text: string): Promise<EmbedSingleResult> {
-    if (this.config.provider.includes('mistral')) {
-      const response = await callMistralEmbeddings(this.getModel(), this.getDimensions(), text);
-      const embedding = [];
-      for (const data of response.data) {
-        if (data.embedding == null) {
-          throw new Error('No embedding returned from Mistral');
-        }
-        embedding.push(...data.embedding);
+    const response = await callMistralEmbeddings(this.getModel(), this.getDimensions(), text);
+    const embedding = [];
+    for (const data of response.data) {
+      if (data.embedding == null) {
+        throw new Error('No embedding returned from Mistral');
       }
-      return { embedding };
+      embedding.push(...data.embedding);
     }
-    const model = this.getModelInstance();
-    return await embed({
-      model,
-      value: text,
-    });
+    return { embedding };
   }
 
   async embedMany(texts: string[]): Promise<EmbedManyResult> {
-    if (this.config.provider.includes('mistral')) {
-      const response = await callMistralEmbeddings(this.getModel(), this.getDimensions(), texts);
-      const embeddings: number[][] = [];
-      for (const data of response.data) {
-        if (data.embedding == null) {
-          throw new Error('No embedding returned from Mistral');
-        }
-        embeddings.push(data.embedding);
+    const response = await callMistralEmbeddings(this.getModel(), this.getDimensions(), texts);
+    const embeddings: number[][] = [];
+    for (const data of response.data) {
+      if (data.embedding == null) {
+        throw new Error('No embedding returned from Mistral');
       }
-      return { embeddings: embeddings };
+      embeddings.push(data.embedding);
     }
-    const model = this.getModelInstance();
-    return await embedMany({
-      model,
-      values: texts,
-    });
-  }
-
-  private getModelInstance() {
-    switch (this.config.provider) {
-      case 'openai':
-        return openai.textEmbeddingModel(this.config.model);
-      default:
-        throw new Error(`Unsupported embedding provider: ${this.config.provider}`);
-    }
+    return { embeddings: embeddings };
   }
 }
 
-// Factory function to create embedding service with environment-based configuration
 export function createEmbeddingService(
   provider: EmbeddingProvider = DEFAULT_EMBEDDING_PROVIDER
 ): EmbeddingService {

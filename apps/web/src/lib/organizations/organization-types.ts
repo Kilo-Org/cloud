@@ -95,6 +95,15 @@ export type UserOrganizationWithSeats = {
   };
 };
 
+export type InheritedChildOrganization = Pick<
+  UserOrganizationWithSeats,
+  'organizationId' | 'organizationName' | 'role'
+>;
+
+export type UserOrganizationWithInheritedChildren = UserOrganizationWithSeats & {
+  inheritedChildren: InheritedChildOrganization[];
+};
+
 export const InvitedOrganizationMemberSchema = z.object({
   email: z.string(),
   role: OrganizationRoleSchema,
@@ -190,6 +199,7 @@ export type OrganizationSsoPolicyView = {
 };
 
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
+  callerRole: OrganizationRole;
   members: OrganizationMember[];
   childOrganizations: ChildOrganizationSummary[];
   effectiveSsoPolicy: OrganizationSsoPolicyView;

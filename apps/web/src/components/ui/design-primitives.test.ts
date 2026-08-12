@@ -53,6 +53,14 @@ describe('design primitive defaults', () => {
     expect(cardDescriptionClassName).toBe('type-body text-muted-foreground');
   });
 
+  it('defines the CardLinkFooter ripple and reduced-motion fallback', () => {
+    const globalsCss = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
+
+    expect(globalsCss).toContain('@keyframes liquidRipple');
+    expect(globalsCss).toContain('.card-link-footer-ripple-active');
+    expect(globalsCss).toContain('@media (prefers-reduced-motion: reduce)');
+  });
+
   it('uses canonical field fill, border, and focus treatment', () => {
     expectClasses(inputClassName, [
       'bg-input-background',

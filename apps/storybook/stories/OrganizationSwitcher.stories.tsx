@@ -15,6 +15,13 @@ const organizations: OrganizationSwitcherOrganization[] = [
     organizationId: 'org-kilo',
     organizationName: 'Kilo Code',
     role: 'owner',
+    inheritedChildren: [
+      {
+        organizationId: 'org-enterprise',
+        organizationName: 'Enterprise Operations',
+        role: 'owner',
+      },
+    ],
   },
   {
     organizationId: 'org-design',
@@ -73,6 +80,12 @@ export const PersonalSelected: Story = {
 export const OrganizationSelected: Story = {
   args: {
     organizationId: 'org-kilo',
+  },
+};
+
+export const InheritedChildSelected: Story = {
+  args: {
+    organizationId: 'org-enterprise',
   },
 };
 

@@ -342,12 +342,264 @@ export async function closeOutExpiringOrganizationCredits(
   return expirationResult.newTransactions.reduce((sum, t) => sum + (t.amount_microdollars ?? 0), 0);
 }
 
-type OrganizationForExpiration = {
+export type OrganizationForExpiration = {
   id: string;
   microdollars_used: number;
   next_credit_expiration_at: string | null;
   total_microdollars_acquired: number;
 };
+
+export type OrganizationExpirationState = Pick<
+  OrganizationForExpiration,
+  'microdollars_used' | 'total_microdollars_acquired' | 'next_credit_expiration_at'
+>;
+
+type ExpiringOrganizationTransaction = ExpiringTransaction & {
+  organization_id: string;
+};
+
+async function fetchExpiringTransactionsForOrganizations(
+  organizationIds: string[],
+  fromDb: DbOrTx
+): Promise<ExpiringOrganizationTransaction[]> {
+  if (organizationIds.length === 0) return [];
+
+  const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
+  return await fromDb
+    .select({
+      id: creditTransactionsTable.id,
+      amount_microdollars: creditTransactionsTable.amount_microdollars,
+      expiration_baseline_microdollars_used:
+        creditTransactionsTable.expiration_baseline_microdollars_used,
+      expiry_date: creditTransactionsTable.expiry_date,
+      description: creditTransactionsTable.description,
+      is_free: creditTransactionsTable.is_free,
+      organization_id: sql<string>`${creditTransactionsTable.organization_id}`,
+    })
+    .from(creditTransactionsTable)
+    .leftJoin(
+      expiredCredits,
+      and(
+        eq(expiredCredits.organization_id, creditTransactionsTable.organization_id),
+        eq(expiredCredits.credit_category, 'credits_expired'),
+        eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
+      )
+    )
+    .where(
+      and(
+        inArray(creditTransactionsTable.organization_id, organizationIds),
+        isNotNull(creditTransactionsTable.expiry_date),
+        isNull(expiredCredits.id)
+      )
+    );
+}
+
+/**
+ * Processes expiration snapshots for many organizations with set-based database writes.
+ * The returned map contains current persisted state for every requested organization that
+ * still exists, including organizations that had nothing due or lost an optimistic race.
+ */
+export async function processOrganizationExpirationsBatch(
+  organizationSnapshots: OrganizationForExpiration[],
+  now: Date,
+  remainingConflictRetries = 2
+): Promise<Map<string, OrganizationExpirationState>> {
+  const organizationsById = new Map(organizationSnapshots.map(org => [org.id, org]));
+  const organizationIds = [...organizationsById.keys()];
+  if (organizationIds.length === 0) return new Map();
+
+  const openTransactions = await fetchExpiringTransactionsForOrganizations(organizationIds, db);
+  const transactionsByOrganizationId = Map.groupBy(
+    openTransactions,
+    transaction => transaction.organization_id
+  );
+  const prepared = organizationIds.flatMap(organizationId => {
+    const org = organizationsById.get(organizationId);
+    if (!org) return [];
+
+    const transactions = transactionsByOrganizationId.get(organizationId) ?? [];
+    const expirationResult = computeExpiration(transactions, org, now, 'system');
+    const expiredTransactionIds = new Set(
+      expirationResult.newTransactions.map(transaction => transaction.original_transaction_id)
+    );
+    const nextExpirationAt =
+      transactions
+        .filter(transaction => !expiredTransactionIds.has(transaction.id))
+        .map(transaction => transaction.expiry_date)
+        .filter(expiryDate => expiryDate !== null)
+        .sort()[0] ?? null;
+    const nextExpirationChanged =
+      nextExpirationAt === null
+        ? org.next_credit_expiration_at !== null
+        : org.next_credit_expiration_at === null ||
+          new Date(nextExpirationAt).getTime() !==
+            new Date(org.next_credit_expiration_at).getTime();
+    if (expirationResult.newTransactions.length === 0 && !nextExpirationChanged) return [];
+
+    const totalExpired = expirationResult.newTransactions.reduce(
+      (sum, transaction) => sum + (transaction.amount_microdollars ?? 0),
+      0
+    );
+
+    return [
+      {
+        org,
+        expirationResult,
+        nextExpirationAt,
+        totalExpired,
+        totalMicrodollarsAcquired: org.total_microdollars_acquired + totalExpired,
+      },
+    ];
+  });
+
+  const currentStates = await db.transaction(async tx => {
+    let updatedOrganizationIds = new Set<string>();
+    if (prepared.length > 0) {
+      const organizationUpdates = prepared.map(item => ({
+        id: item.org.id,
+        expected_total_microdollars_acquired: item.org.total_microdollars_acquired,
+        expected_microdollars_used: item.org.microdollars_used,
+        expected_next_credit_expiration_at: item.org.next_credit_expiration_at,
+        total_microdollars_acquired: item.totalMicrodollarsAcquired,
+        next_credit_expiration_at: item.nextExpirationAt,
+        total_expired: item.totalExpired,
+      }));
+      const updatedOrganizations = await tx.execute<{ id: string }>(sql`
+        UPDATE ${organizations} AS organization
+        SET
+          total_microdollars_acquired = update_values.total_microdollars_acquired,
+          next_credit_expiration_at = update_values.next_credit_expiration_at,
+          microdollars_balance = organization.microdollars_balance + update_values.total_expired
+        FROM jsonb_to_recordset(${JSON.stringify(organizationUpdates)}::jsonb) AS update_values(
+          id uuid,
+          expected_total_microdollars_acquired bigint,
+          expected_microdollars_used bigint,
+          expected_next_credit_expiration_at timestamptz,
+          total_microdollars_acquired bigint,
+          next_credit_expiration_at timestamptz,
+          total_expired bigint
+        )
+        WHERE organization.id = update_values.id
+          AND organization.total_microdollars_acquired = update_values.expected_total_microdollars_acquired
+          AND organization.microdollars_used = update_values.expected_microdollars_used
+          AND organization.next_credit_expiration_at IS NOT DISTINCT FROM update_values.expected_next_credit_expiration_at
+        RETURNING organization.id
+      `);
+      updatedOrganizationIds = new Set(updatedOrganizations.rows.map(row => row.id));
+
+      const expirationTransactions = prepared.flatMap(item =>
+        updatedOrganizationIds.has(item.org.id)
+          ? item.expirationResult.newTransactions.map(transaction => ({
+              ...transaction,
+              organization_id: item.org.id,
+            }))
+          : []
+      );
+      if (expirationTransactions.length > 0) {
+        await tx.execute(sql`
+          INSERT INTO ${creditTransactionsTable} (
+            kilo_user_id,
+            amount_microdollars,
+            credit_category,
+            original_transaction_id,
+            description,
+            is_free,
+            created_at,
+            original_baseline_microdollars_used,
+            organization_id
+          )
+          SELECT
+            expiration.kilo_user_id,
+            expiration.amount_microdollars,
+            expiration.credit_category,
+            expiration.original_transaction_id,
+            expiration.description,
+            expiration.is_free,
+            expiration.created_at,
+            expiration.original_baseline_microdollars_used,
+            expiration.organization_id
+          FROM jsonb_to_recordset(${JSON.stringify(expirationTransactions)}::jsonb) AS expiration(
+            kilo_user_id text,
+            amount_microdollars bigint,
+            credit_category text,
+            original_transaction_id uuid,
+            description text,
+            is_free boolean,
+            created_at timestamptz,
+            original_baseline_microdollars_used bigint,
+            organization_id uuid
+          )
+        `);
+      }
+
+      const baselineUpdates = prepared.flatMap(item =>
+        updatedOrganizationIds.has(item.org.id)
+          ? [...item.expirationResult.newBaselines].map(([id, baseline]) => ({ id, baseline }))
+          : []
+      );
+      if (baselineUpdates.length > 0) {
+        await tx.execute(sql`
+          UPDATE ${creditTransactionsTable} AS credit_transaction
+          SET expiration_baseline_microdollars_used = update_values.baseline
+          FROM jsonb_to_recordset(${JSON.stringify(baselineUpdates)}::jsonb) AS update_values(
+            id uuid,
+            baseline bigint
+          )
+          WHERE credit_transaction.id = update_values.id
+        `);
+      }
+    }
+
+    const currentOrganizations = await tx
+      .select({
+        id: organizations.id,
+        microdollars_used: organizations.microdollars_used,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        next_credit_expiration_at: organizations.next_credit_expiration_at,
+      })
+      .from(organizations)
+      .where(inArray(organizations.id, organizationIds));
+
+    return new Map(
+      currentOrganizations.map(org => [
+        org.id,
+        {
+          microdollars_used: org.microdollars_used,
+          total_microdollars_acquired: org.total_microdollars_acquired,
+          next_credit_expiration_at: org.next_credit_expiration_at,
+        },
+      ])
+    );
+  });
+
+  const retrySnapshots = prepared.flatMap(item => {
+    const current = currentStates.get(item.org.id);
+    if (
+      !current ||
+      !current.next_credit_expiration_at ||
+      new Date(current.next_credit_expiration_at) > now
+    ) {
+      return [];
+    }
+    return [{ id: item.org.id, ...current }];
+  });
+  if (retrySnapshots.length === 0) return currentStates;
+  if (remainingConflictRetries === 0) {
+    sentryLogger('processOrganizationExpirationsBatch', 'error')(
+      'optimistic concurrency retries exhausted',
+      { organization_ids: retrySnapshots.map(org => org.id) }
+    );
+    return currentStates;
+  }
+
+  const retriedStates = await processOrganizationExpirationsBatch(
+    retrySnapshots,
+    now,
+    remainingConflictRetries - 1
+  );
+  for (const [organizationId, state] of retriedStates) currentStates.set(organizationId, state);
+  return currentStates;
+}
 
 export async function processOrganizationExpirations(
   org: OrganizationForExpiration,

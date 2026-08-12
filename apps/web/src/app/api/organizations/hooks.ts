@@ -39,6 +39,78 @@ export function useOrganizationChildren(id: string) {
   );
 }
 
+export function useSubOrganizationOverview(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subOrganizations.overview.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
+type SubOrganizationPeopleFilters = {
+  search?: string;
+  subOrganizationId?: string;
+  role?: 'owner' | 'admin' | 'billing_manager' | 'member';
+  status?: 'accepted' | 'pending';
+  assignment?: 'assigned' | 'unassigned';
+  sortBy?: 'identity' | 'parentRole' | 'membershipCount';
+  sortDirection?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+};
+
+export function useSubOrganizationPeople(
+  id: string,
+  filters: SubOrganizationPeopleFilters,
+  options?: { enabled?: boolean }
+) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subOrganizations.people.queryOptions(
+      { organizationId: id, ...filters },
+      { ...options, trpc: { context: { skipBatch: true } } }
+    )
+  );
+}
+
+export function useSubOrganizationCredits(id: string, options?: { enabled?: boolean }) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subOrganizations.credits.queryOptions(
+      { organizationId: id },
+      { ...options, trpc: { context: { skipBatch: true } } }
+    )
+  );
+}
+
+export function useSubOrganizationModelPolicy(id: string, options?: { enabled?: boolean }) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subOrganizations.modelPolicy.queryOptions(
+      { organizationId: id },
+      { ...options, trpc: { context: { skipBatch: true } } }
+    )
+  );
+}
+
+export function useSubOrganizationPermissions(id: string, options?: { enabled?: boolean }) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subOrganizations.permissions.queryOptions(
+      { organizationId: id },
+      { ...options, trpc: { context: { skipBatch: true } } }
+    )
+  );
+}
+
 export function useOrganizationChildBalances(id: string) {
   const trpc = useTRPC();
   return useQuery(
@@ -374,6 +446,19 @@ export function useCreateOrganization() {
 
   return useMutation(
     trpc.organizations.create.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
+export function useCreateChildOrganization() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.organizations.createChild.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
       },

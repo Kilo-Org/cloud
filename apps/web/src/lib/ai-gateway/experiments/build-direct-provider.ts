@@ -83,11 +83,11 @@ function applyGeminiReasoningTransform(context: TransformRequestContext, reasoni
     return;
   }
 
-  const body = context.request.body as Record<string, unknown>;
-  delete body.reasoning_effort;
+  const extra = context.request.body as typeof context.request.body & { google?: unknown };
+  delete extra.reasoning_effort;
 
-  const existingGoogle = isRecord(body.google) ? body.google : {};
-  body.google = {
+  const existingGoogle = isRecord(extra.google) ? extra.google : {};
+  extra.google = {
     ...existingGoogle,
     thinking_config: {
       ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),

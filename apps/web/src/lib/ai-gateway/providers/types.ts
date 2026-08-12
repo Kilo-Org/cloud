@@ -36,7 +36,7 @@ export type TransformRequestContext = {
 export type GatewayChatApiKind = GatewayRequest['kind'];
 
 export type ProviderResponseTransforms = {
-  thoughtContentMapping: string | null;
+  mapGeminiThoughtContent: boolean;
 };
 
 export type Provider = {

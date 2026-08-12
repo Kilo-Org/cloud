@@ -112,7 +112,7 @@ describe('usage analytics scope conditions', () => {
     const { sql, params } = scopeSql({});
     expect(sql).toContain('kilo_user_id');
     expect(sql).toContain('organization_id');
-    expect(sql).toContain('IS NULL');
+    expect(sql).toMatch(/is null/i);
     expect(params).toEqual([CTX_USER]);
   });
 

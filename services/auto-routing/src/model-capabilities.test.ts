@@ -377,6 +377,132 @@ describe('getModelCapabilities', () => {
     expect(dbWhere).not.toHaveBeenCalled();
   });
 
+  it('queries an id absent from model_stats once, then serves it from the tombstoned union', async () => {
+    // A direct BYOK id has no model_stats row, so the DB answers with nothing.
+    dbWhere.mockImplementation(() => Promise.resolve([]));
+    const store = new Map<string, string>([
+      [
+        'model_capabilities_v2',
+        JSON.stringify({
+          'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+          'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+        }),
+      ],
+    ]);
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = {
+      get: vi.fn(async (key: string) => store.get(key) ?? null),
+      put: vi.fn(async (key: string, value: string) => {
+        store.set(key, value);
+      }),
+    } as unknown as KVNamespace;
+
+    const first = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
+    expect(first.has('byok/private-model')).toBe(false);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+
+    // The union now records the id as resolved-and-absent, so a later isolate
+    // must not pay another Postgres round trip for it.
+    expect(JSON.parse(store.get('model_capabilities_v2') as string)).toMatchObject({
+      'byok/private-model': { absent: true },
+    });
+
+    clearModelCapabilitiesCache();
+    const second = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
+    expect(second.has('byok/private-model')).toBe(false);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes a pool id back to the shared union so other users read it from KV', async () => {
+    dbWhere.mockImplementation(() =>
+      Promise.resolve([
+        { openrouterId: 'pool/vision', inputModalities: ['image'], contextLength: 65536 },
+      ])
+    );
+    const store = new Map<string, string>([
+      [
+        'model_capabilities_v2',
+        JSON.stringify({
+          'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+          'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+        }),
+      ],
+    ]);
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = {
+      get: vi.fn(async (key: string) => store.get(key) ?? null),
+      put: vi.fn(async (key: string, value: string) => {
+        store.set(key, value);
+      }),
+    } as unknown as KVNamespace;
+
+    // First user configures the pool; the id is resolved from Postgres.
+    const first = await getModelCapabilities(env, { additionalModelIds: ['pool/vision'] });
+    expect(first.get('pool/vision')?.inputModalities.has('image')).toBe(true);
+
+    // A different user with the same model in their pool reads it from KV.
+    clearModelCapabilitiesCache();
+    const second = await getModelCapabilities(env, { additionalModelIds: ['pool/vision'] });
+    expect(second.get('pool/vision')?.contextLength).toBe(65536);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+    // The pre-existing union entries survive the write-back.
+    expect(second.get('a/chat')?.contextLength).toBe(8192);
+  });
+
+  it('hands the write-back to waitUntil when the caller supplies an execution context', async () => {
+    dbWhere.mockImplementation(() =>
+      Promise.resolve([
+        { openrouterId: 'pool/vision', inputModalities: ['image'], contextLength: 65536 },
+      ])
+    );
+    const put = vi.fn(async () => undefined);
+    const env = makeEnv(
+      JSON.stringify({ 'a/chat': { inputModalities: ['text'], contextLength: 8192 } })
+    );
+    env.AUTO_ROUTING_CONFIG = {
+      get: vi.fn(async () =>
+        JSON.stringify({ 'a/chat': { inputModalities: ['text'], contextLength: 8192 } })
+      ),
+      put,
+    } as unknown as KVNamespace;
+    const pending: Promise<unknown>[] = [];
+
+    await getModelCapabilities(env, {
+      additionalModelIds: ['pool/vision'],
+      waitUntil: promise => pending.push(promise),
+    });
+
+    expect(pending).toHaveLength(1);
+    await Promise.all(pending);
+    expect(put).toHaveBeenCalledWith(
+      'model_capabilities_v2',
+      expect.stringContaining('"pool/vision"'),
+      { expirationTtl: 3600 }
+    );
+  });
+
+  it('treats a tombstoned id as unknown capability data, not as an empty capability set', async () => {
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+        'byok/private-model': {
+          inputModalities: [],
+          contextLength: null,
+          isActive: null,
+          absent: true,
+        },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      additionalModelIds: ['byok/private-model'],
+    });
+    // Absent from the map, so satisfiesRequiredModalities fails it closed and
+    // contextProvablyTooSmall leaves its rank alone.
+    expect(result.has('byok/private-model')).toBe(false);
+    expect(dbWhere).not.toHaveBeenCalled();
+  });
+
   it('does not synthesize capabilities when BytePlus is not the coding-plan model', async () => {
     const env = makeEnv(
       JSON.stringify({
@@ -431,8 +557,13 @@ describe('getModelCapabilities', () => {
     const capabilityPutsEmpty = (put.mock.calls as unknown[][]).filter(
       call => call[0] === 'model_capabilities_v2'
     );
-    expect(capabilityPutsEmpty).toHaveLength(1);
+    // Two writes: the empty union from the read-through, then the partial
+    // fill recording that the coding-plan id has no model_stats row.
+    expect(capabilityPutsEmpty).toHaveLength(2);
     expect(JSON.parse(capabilityPutsEmpty[0][1] as unknown as string)).toEqual({});
+    expect(JSON.parse(capabilityPutsEmpty[1][1] as unknown as string)).toMatchObject({
+      'coding-plan/chat': { absent: true },
+    });
   });
 
   it('returns an empty map when the routing table is missing entirely', async () => {

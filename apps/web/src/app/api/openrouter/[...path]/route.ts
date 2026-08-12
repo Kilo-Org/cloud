@@ -331,7 +331,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           const groupPolicy = await organizationGroupPolicyPromise;
           const deniedFromPolicy = groupPolicy
             ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
-                owner: { userId: user.id, organizationId: organizationId ?? null },
+                userId: user.id,
+                organizationId: organizationId ?? null,
               })
             : [];
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];

@@ -68,21 +68,48 @@ export function selectReplicaUrl({
 /**
  * Get the read replica URL based on deployment region.
  * - US deployments use the US replica (POSTGRES_REPLICA_US_URL) for lower latency
- * - EU deployments randomly select one of two EU replicas to split read traffic
- *   across ~2,200 concurrent Vercel instances (~50/50 statistical distribution)
+ * - EU deployments use POSTGRES_REPLICA_EU_URL. POSTGRES_REPLICA_EU_URL_2 is
+ *   reserved for usage-analytics scans so those queries stay off this pool.
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
   if (NODE_ENV === 'development') return postgresUrl;
+  const euReplicaUrl = getEnvVariable('POSTGRES_REPLICA_EU_URL');
   return selectReplicaUrl({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,
     vercelRegion: VERCEL_REGION,
     usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
-    euReplicaUrls: [
-      getEnvVariable('POSTGRES_REPLICA_EU_URL'),
-      getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean) as string[],
+    euReplicaUrls: euReplicaUrl ? [euReplicaUrl] : [],
+  });
+}
+
+/**
+ * Replica used by /usage analytics. Always POSTGRES_REPLICA_EU_URL_2 in
+ * production so heavy microdollar_usage scans do not compete with ordinary
+ * readDb traffic. Falls back to the standard replica, then primary.
+ */
+export function selectUsageReplicaUrl({
+  primaryUrl,
+  nodeEnv,
+  usageReplicaUrl,
+  fallbackReplicaUrl,
+}: {
+  primaryUrl: string;
+  nodeEnv: string | undefined;
+  usageReplicaUrl: string | undefined;
+  fallbackReplicaUrl: string;
+}): string {
+  if (nodeEnv === 'development') return primaryUrl;
+  return usageReplicaUrl || fallbackReplicaUrl;
+}
+
+function getUsageReplicaUrl(): string {
+  return selectUsageReplicaUrl({
+    primaryUrl: postgresUrl,
+    nodeEnv: NODE_ENV,
+    usageReplicaUrl: getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
+    fallbackReplicaUrl: getReplicaUrl(),
   });
 }
 
@@ -121,12 +148,34 @@ const replica = usesSeparateReplica
   : primary;
 const replicaPool = replica.pool;
 
+const usageReplicaUrl = getUsageReplicaUrl();
+export const usesDedicatedUsageReplica =
+  usageReplicaUrl !== postgresUrl && usageReplicaUrl !== replicaUrl;
+
+const usageReplica = usesDedicatedUsageReplica
+  ? createDrizzleClient({
+      connectionString: usageReplicaUrl,
+      poolConfig: {
+        ...sharedPoolConfig,
+        max: 2,
+        application_name: `${appName}-usage-replica`,
+      },
+      logger: !!DEBUG_QUERY_LOGGING,
+    })
+  : usageReplicaUrl === replicaUrl
+    ? replica
+    : primary;
+const usageReplicaPool = usageReplica.pool;
+
 // Attach pools to ensure idle connections close before suspension
 // Skip in test environment as it interferes with Jest's cleanup
 if (process.env.NODE_ENV !== 'test') {
   attachDatabasePool(pool);
   if (usesSeparateReplica) {
     attachDatabasePool(replicaPool);
+  }
+  if (usesDedicatedUsageReplica) {
+    attachDatabasePool(usageReplicaPool);
   }
 }
 
@@ -145,6 +194,15 @@ pool.on('error', (err: Error) => {
 if (usesSeparateReplica) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(-1);
+    }
+  });
+}
+
+if (usesDedicatedUsageReplica) {
+  usageReplicaPool.on('error', (err: Error) => {
+    console.error('Unexpected error on idle client (usage-replica)', err);
     if (process.env.NODE_ENV !== 'test') {
       process.exit(-1);
     }
@@ -174,6 +232,13 @@ const primaryDb = primary.db;
 export const readDb = replica.db;
 
 /**
+ * Read replica reserved for /usage analytics scans.
+ * Points at POSTGRES_REPLICA_EU_URL_2 in production so those queries do not
+ * share the standard readDb pool. Falls back to readDb, then primary.
+ */
+export const usageReadDb = usageReplica.db;
+
+/**
  * Default database instance - connects to the primary database.
  * Use this for writes and for reads that need strong consistency.
  *
@@ -201,6 +266,9 @@ export async function closeAllDrizzleConnections(): Promise<void> {
   await pool.end();
   if (usesSeparateReplica) {
     await replicaPool.end();
+  }
+  if (usesDedicatedUsageReplica) {
+    await usageReplicaPool.end();
   }
 }
 

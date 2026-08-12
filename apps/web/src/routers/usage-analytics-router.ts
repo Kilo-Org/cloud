@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { and, asc, eq, gte, inArray, isNull, lt, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { readDb } from '@/lib/drizzle';
+import { readDb, usageReadDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   feature,
@@ -503,7 +503,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
 
       const rows = await timedUsageQuery(
         {
-          db: readDb,
+          db: usageReadDb,
           route: 'usageAnalytics.getSummary',
           queryLabel: `summary_${meta.tier}`,
           scope: queryScope(input),
@@ -596,7 +596,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
 
       const rows = await timedUsageQuery(
         {
-          db: readDb,
+          db: usageReadDb,
           route: 'usageAnalytics.getTimeseries',
           queryLabel: `timeseries_${meta.tier}${input.splitBy ? `_split_${input.splitBy}` : ''}`,
           scope: queryScope(input),
@@ -644,7 +644,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
 
       const rows = await timedUsageQuery(
         {
-          db: readDb,
+          db: usageReadDb,
           route: 'usageAnalytics.getBreakdown',
           queryLabel: `breakdown_${meta.tier}_by_${input.dimension}`,
           scope: queryScope(input),
@@ -711,7 +711,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
 
       const rows = await timedUsageQuery(
         {
-          db: readDb,
+          db: usageReadDb,
           route: 'usageAnalytics.getTable',
           queryLabel: `table_${meta.tier}_groupby_${requestedDims.join('+') || 'none'}`,
           scope: queryScope(input),

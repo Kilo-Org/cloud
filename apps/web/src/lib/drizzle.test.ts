@@ -1,4 +1,4 @@
-import { pool, db, selectReplicaUrl } from '@/lib/drizzle';
+import { pool, db, selectReplicaUrl, selectUsageReplicaUrl } from '@/lib/drizzle';
 
 describe('drizzle', () => {
   describe('pool', () => {
@@ -86,6 +86,39 @@ describe('drizzle', () => {
           random: () => 0.75,
         })
       ).toBe('postgres://eu-2');
+    });
+
+    it('uses the dedicated usage replica when configured', () => {
+      expect(
+        selectUsageReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'production',
+          usageReplicaUrl: 'postgres://eu-2',
+          fallbackReplicaUrl: 'postgres://eu-1',
+        })
+      ).toBe('postgres://eu-2');
+    });
+
+    it('falls back to the standard replica when the usage replica is unset', () => {
+      expect(
+        selectUsageReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'production',
+          usageReplicaUrl: undefined,
+          fallbackReplicaUrl: 'postgres://eu-1',
+        })
+      ).toBe('postgres://eu-1');
+    });
+
+    it('uses the primary for usage reads in local development', () => {
+      expect(
+        selectUsageReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'development',
+          usageReplicaUrl: 'postgres://eu-2',
+          fallbackReplicaUrl: 'postgres://eu-1',
+        })
+      ).toBe(primaryUrl);
     });
 
     it('falls back to the primary when the regional replica is unavailable', () => {

@@ -68,7 +68,7 @@ describe('usage analytics scope conditions', () => {
     const { sql, params } = scopeSql({ organizationId: PARENT_ORG, viewAs: 'self' });
     expect(sql).toContain('organization_id');
     expect(sql).toContain('kilo_user_id');
-    expect(sql).not.toContain('IS NULL');
+    expect(sql).not.toMatch(/is null/i);
     expect(params).toEqual([PARENT_ORG, CTX_USER]);
   });
 

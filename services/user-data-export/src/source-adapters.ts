@@ -6,7 +6,43 @@ export type ExportRecord = {
   field: string;
   value: string | number | boolean | null;
   id?: string;
+  /**
+   * Present, and always `true`, on a row prod has deleted since the snapshot.
+   *
+   * The export returns deleted rows rather than hiding them — it is a truthful copy of
+   * what the warehouse holds about someone, not a view of what prod still serves — so
+   * this labels them instead of filtering them. Only a positive deletion says anything:
+   * a live row and a row whose state is unknown both carry no property at all, because
+   * the warehouse cannot tell those two apart. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+   */
+  softDeleted?: true;
 };
+
+/**
+ * The warehouse is a CDC copy and keeps rows prod has deleted. Tables reloaded after
+ * 2026-08-12 carry `_snowflake_deleted` to mark them; the rest cannot say.
+ *
+ * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
+ * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
+ * `event_type` instead, and `users` has no CDC column. Naming the column on any of them
+ * is a runtime error, so records from those sources are never labelled.
+ */
+export const SOURCES_WITHOUT_DELETED_COLUMN = [
+  'microdollar_usage_metadata',
+  'cli_sessions',
+  'users',
+] as const;
+
+/**
+ * `softDeleted: true`, or nothing at all.
+ *
+ * Only `true` is meaningful. The column is NULL throughout on a table whose reload has
+ * not run yet, and NULL means unknown rather than live, so an absent property covers
+ * both "not deleted" and "cannot say" — which is the honest reading of the data.
+ */
+function deletionMark(value: unknown): { softDeleted: true } | Record<string, never> {
+  return value === true ? { softDeleted: true } : {};
+}
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
 export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
@@ -157,12 +193,12 @@ function subjectPageQueries(input: {
 
 const projectQueries = subjectPageQueries({
   table: 'app_builder_projects',
-  columns: 'id, title',
+  columns: 'id, title, _snowflake_deleted',
 });
 
 const messageQueries = subjectPageQueries({
   table: 'app_builder_messages',
-  columns: 'id, data',
+  columns: 'id, data, _snowflake_deleted',
 });
 
 /**
@@ -212,12 +248,48 @@ const cliSessionQueries: Record<ExportSubject['type'], string> = {
  * Decided deliberately: the export lists every system prompt the user used and
  * every prompt they wrote, with no correspondence between the two.
  */
-const systemPromptQueries = subjectPageQueries({
-  table: 'system_prompt_prefix',
-  columns: 'system_prompt_prefix_id::text AS system_prompt_prefix_id, system_prompt_prefix',
-  key: 'system_prompt_prefix_id',
-  keyType: 'bigint',
-});
+/**
+ * The grain of this table is the triple `(prefix id, user, org)`, not the prefix, so
+ * `system_prompt_prefix_id` alone repeats and cannot be the cursor.
+ *
+ * Measured 2026-08-12: user `05d920e4` carries prefix id 2 twice, once with an
+ * organization and once without, and one organization carries prefix id 1 nine times.
+ * A single-column cursor pages with `id > $cursor`, so every duplicate that landed on a
+ * page boundary was silently dropped — the same defect found in `cli_sessions.session_id`.
+ *
+ * The remaining dimension of the triple therefore joins the cursor, and which one that
+ * is depends on the scope: a user's export varies by organization, an organization's
+ * export varies by user.
+ *
+ * The COALESCE is required, not cosmetic: a user's personal rows carry a NULL
+ * organization, and a NULL inside a tuple comparison yields NULL rather than false, so
+ * an uncoalesced cursor would drop exactly the rows this exists to keep.
+ *
+ * `-` rather than `''` as the substitute. Both sort before any id, and the dbt export
+ * normalises '' to NULL so neither collides with a real value — but `KeyCursorSchema`
+ * requires non-empty strings, and an empty cursor value would be rejected on resume and
+ * silently restart the source.
+ */
+const NULL_CURSOR_SENTINEL = '-';
+function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  // The dimension the scope does not already pin: scoping by user leaves org varying,
+  // and scoping by org leaves user varying.
+  const cursorColumn = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  return `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
+  COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}') AS cursor_secondary,
+  system_prompt_prefix, _snowflake_deleted
+FROM system_prompt_prefix
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::bigint IS NULL
+    OR (system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')) > ($2::bigint, $3::text))
+ORDER BY system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')
+LIMIT $4`;
+}
+
+const systemPromptQueries: Record<ExportSubject['type'], string> = {
+  user: systemPromptPageQuery('user'),
+  organization: systemPromptPageQuery('organization'),
+};
 
 const userPromptQueries = subjectPageQueries({
   table: 'microdollar_usage_metadata',
@@ -228,8 +300,8 @@ const userPromptQueries = subjectPageQueries({
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
 
-type ProjectRow = { id: string; title: string | null };
-type MessageRow = { id: string; data: unknown };
+type ProjectRow = { id: string; title: string | null; deleted: unknown };
+type MessageRow = { id: string; data: unknown; deleted: unknown };
 type CliSessionRow = {
   session_id: string | null;
   title: string | null;
@@ -238,7 +310,12 @@ type CliSessionRow = {
   most_significant_position: string;
   least_significant_position: string;
 };
-type SystemPromptRow = { system_prompt_prefix_id: string; system_prompt_prefix: string | null };
+type SystemPromptRow = {
+  system_prompt_prefix_id: string;
+  cursor_secondary: string;
+  system_prompt_prefix: string | null;
+  deleted: unknown;
+};
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
 
 function requiredString(value: unknown, field: string): string {
@@ -462,13 +539,16 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           result.map(row => ({
             id: requiredString(row.id, 'id'),
             title: nullableString(row.title, 'title'),
+            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.map(row => ({
             source: 'app_builder_projects',
+            id: row.id,
             field: 'title',
             value: row.title,
+            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
@@ -484,7 +564,11 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           after,
           input.limit,
         ]).then(result =>
-          result.map(row => ({ id: requiredString(row.id, 'id'), data: row.data }))
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            data: row.data,
+            deleted: row._snowflake_deleted,
+          }))
         );
         return {
           records: rows.map(row => ({
@@ -492,6 +576,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             id: row.id,
             field: 'data',
             value: jsonValue(row.data),
+            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
@@ -544,26 +629,38 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     {
       name: 'system_prompt_prefix',
       async readPage(input): Promise<SourcePage> {
-        const [after] = keyCursorValues(input.cursor, 1);
+        const [afterId, afterSecondary] = keyCursorValues(input.cursor, 2);
         const rows: SystemPromptRow[] = await warehouseQuery(
           systemPromptQueries[input.subject.type],
-          [subjectScopeValue(input.subject), after, input.limit]
+          [subjectScopeValue(input.subject), afterId, afterSecondary, input.limit]
         ).then(result =>
           result.map(row => ({
             system_prompt_prefix_id: digitString(
               row.system_prompt_prefix_id,
               'system_prompt_prefix_id'
             ),
+            // COALESCE in the query means this is '' rather than null on a personal row,
+            // so the cursor always has a comparable value to carry forward.
+            cursor_secondary: requiredString(row.cursor_secondary, 'cursor_secondary'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
+            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.map(row => ({
             source: 'system_prompt_prefix',
+            // The prefix id repeats across the triple, so it cannot identify a row on
+            // its own. The pair that orders the page does, and it is what a deletion
+            // mark has to hang off to mean anything.
+            id: `${row.system_prompt_prefix_id}.${row.cursor_secondary}`,
             field: 'system_prompt_prefix',
             value: row.system_prompt_prefix,
+            ...deletionMark(row.deleted),
           })),
-          nextCursor: nextKeyCursor(rows, input.limit, row => [row.system_prompt_prefix_id]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.system_prompt_prefix_id,
+            row.cursor_secondary,
+          ]),
         };
       },
     },

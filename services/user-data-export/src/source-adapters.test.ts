@@ -314,7 +314,7 @@ describe('source adapters', () => {
       },
     ]);
     expect(page?.records).toEqual([
-      { source: 'app_builder_projects', field: 'title', value: 'Owned project' },
+      { source: 'app_builder_projects', id: 'project-1', field: 'title', value: 'Owned project' },
     ]);
   });
 
@@ -334,7 +334,10 @@ describe('source adapters', () => {
 
     expect(warehouseCalls).toHaveLength(1);
     expect(warehouseCalls[0].text).toContain('WHERE organization_id = $1');
-    expect(warehouseCalls[0].text).not.toContain('kilo_user_id');
+    // Anchored on WHERE rather than the bare column name: `system_prompt_prefix` reads
+    // `kilo_user_id` legitimately, as the second half of its cursor. What must not
+    // appear is the user column as the row filter.
+    expect(warehouseCalls[0].text).not.toContain('WHERE kilo_user_id');
     expect(warehouseCalls[0].values[0]).toBe('org-1');
   });
 
@@ -466,9 +469,15 @@ describe('source adapters', () => {
     expect(warehouseCalls[0]?.values).toEqual(['owner-user', null, null, 100]);
   });
 
-  it('emits system prompts as their own set, keyed by prefix id', async () => {
+  // The prefix id repeats across the triple, so both the record key and the cursor carry
+  // the second dimension alongside it.
+  it('emits system prompts keyed by the pair that orders them', async () => {
     const { adapters } = harness([
-      { system_prompt_prefix_id: '42', system_prompt_prefix: 'System prompt' },
+      {
+        system_prompt_prefix_id: '42',
+        cursor_secondary: 'org-9',
+        system_prompt_prefix: 'System prompt',
+      },
     ]);
 
     const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.({
@@ -477,9 +486,75 @@ describe('source adapters', () => {
     });
 
     expect(page?.records).toEqual([
-      { source: 'system_prompt_prefix', field: 'system_prompt_prefix', value: 'System prompt' },
+      {
+        source: 'system_prompt_prefix',
+        id: '42.org-9',
+        field: 'system_prompt_prefix',
+        value: 'System prompt',
+      },
     ]);
-    expect(page?.nextCursor).toEqual({ key: ['42'] });
+    expect(page?.nextCursor).toEqual({ key: ['42', 'org-9'] });
+  });
+
+  // A personal row has no organization, and the query coalesces it to a sentinel so the
+  // tuple comparison stays non-NULL. Without it the row is dropped at a page boundary,
+  // which is the defect this cursor was widened to fix.
+  it('carries a personal system prompt row through the cursor', async () => {
+    const { adapters, warehouseCalls } = harness([
+      {
+        system_prompt_prefix_id: '7',
+        cursor_secondary: '-',
+        system_prompt_prefix: 'Personal prompt',
+      },
+    ]);
+
+    const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(warehouseCalls[0].text).toContain("COALESCE(organization_id, '-')");
+    expect(page?.nextCursor).toEqual({ key: ['7', '-'] });
+    // Non-empty, so the cursor survives KeyCursorSchema on resume.
+    expect(page?.nextCursor).toEqual({
+      key: expect.arrayContaining([expect.stringMatching(/.+/)]),
+    });
+  });
+
+  it('marks a deleted row and leaves a live one unmarked', async () => {
+    const { adapters } = harness([
+      { id: 'project-live', title: 'Live', _snowflake_deleted: false },
+      { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
+      // Unknown state: the table's reload has not run. Not deleted as far as we can say.
+      { id: 'project-unknown', title: 'Unknown', _snowflake_deleted: null },
+    ]);
+
+    const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toEqual([
+      { source: 'app_builder_projects', id: 'project-live', field: 'title', value: 'Live' },
+      {
+        source: 'app_builder_projects',
+        id: 'project-gone',
+        field: 'title',
+        value: 'Deleted',
+        softDeleted: true,
+      },
+      { source: 'app_builder_projects', id: 'project-unknown', field: 'title', value: 'Unknown' },
+    ]);
+  });
+
+  // Deleted rows are returned, not filtered. The export is a truthful copy of what the
+  // warehouse holds, so a deleted project still reaches the person it belonged to.
+  it('returns deleted rows rather than dropping them', async () => {
+    const { adapters, warehouseCalls } = harness([
+      { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
+    ]);
+
+    const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(1);
+    expect(warehouseCalls[0].text).not.toContain('_snowflake_deleted IS NOT TRUE');
   });
 
   it('emits user prompts as their own set, unpaired from system prompts', async () => {

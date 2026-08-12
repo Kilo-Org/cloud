@@ -98,7 +98,6 @@ import {
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
-import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -314,9 +313,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
-    if (isAutoEfficientId) {
-      void getCachedRoutingTable();
-    }
     const efficientDecision = isAutoEfficientId
       ? async () => {
           const { user, authFailedResponse, organizationId } = await authPromise;

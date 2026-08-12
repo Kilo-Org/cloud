@@ -50,6 +50,7 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
+  modelDoesNotExistOnOpenRouterResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -114,6 +115,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export const maxDuration = 800;
 
@@ -902,6 +904,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.session_id,
     taskId ?? null
   );
+
+  if (
+    effectiveProviderContext.provider.id === 'openrouter' &&
+    !(await isValidOpenRouterModelId(requestBodyParsed.body.model))
+  ) {
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);

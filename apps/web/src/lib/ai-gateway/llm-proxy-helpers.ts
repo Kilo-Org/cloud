@@ -322,6 +322,22 @@ export function modelDoesNotExistResponse() {
   );
 }
 
+export function modelDoesNotExistOnOpenRouterResponse(model: string) {
+  const error =
+    `The requested model '${model}' does not exist. ` +
+    `Please use an exact model id as listed on /api/gateway/models. ` +
+    `If this is a newly released model, please try again in a few minutes.`;
+  errorExceptInTest(`[modelDoesNotExistOnOpenRouterResponse] ${error}`);
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_found,
+      message: error,
+    },
+    { status: 404 }
+  );
+}
+
 export function noFreeModelsAvailableResponse() {
   const error = `No free models are currently available for ${KILO_AUTO_FREE_MODEL.id}. Please try again later, or switch to ${KILO_AUTO_BALANCED_MODEL.id} for affordable paid inference.`;
   return NextResponse.json(

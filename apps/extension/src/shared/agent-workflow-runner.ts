@@ -548,7 +548,7 @@ export const runWorkflow = async (
     );
   }
 
-  // 2b. Declared-params gate — actionable message listing every missing value.
+  // 2c. Declared-params gate — actionable message listing every missing value.
   const missingParams = findMissingRequiredParams(workflow, normalizedInput);
   if (missingParams.length > 0) {
     return resultWithActions(

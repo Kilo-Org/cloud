@@ -177,7 +177,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   const MAX_CONSECUTIVE_TOOL_FAILURES = 25;
   let consecutiveFailureTool: string | undefined = undefined;
   let consecutiveFailureCount = 0;
-  let failureStreakExceeded = false;
+  // Snapshot the message when the streak trips: a later success in the same round resets the counters before the turn loop reads them.
+  let streakStopMessage: string | undefined = undefined;
   const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
     // Key on the call content, not its per-call ids or attached reasoning: repeats must collide.
     const {
@@ -201,7 +202,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       toolCall.name === consecutiveFailureTool ? consecutiveFailureCount + 1 : 1;
     consecutiveFailureTool = toolCall.name;
     if (consecutiveFailureCount >= MAX_CONSECUTIVE_TOOL_FAILURES) {
-      failureStreakExceeded = true;
+      streakStopMessage = `Stopped: ${toolCall.name} failed ${String(consecutiveFailureCount)} times in a row. Something is blocking this approach — please adjust the request or try again.`;
     }
     const count = (identicalFailureCounts.get(key) ?? 0) + 1;
     identicalFailureCounts.set(key, count);
@@ -475,12 +476,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       appendEvents(toolResultEvents);
       nextConversationEvents.push(...toolResultEvents);
 
-      if (failureStreakExceeded) {
-        appendEvents([
-          createAssistantMessage(
-            `Stopped: ${consecutiveFailureTool ?? 'a tool'} failed ${String(consecutiveFailureCount)} times in a row. Something is blocking this approach — please adjust the request or try again.`
-          ),
-        ]);
+      if (streakStopMessage !== undefined) {
+        appendEvents([createAssistantMessage(streakStopMessage)]);
         return;
       }
 

@@ -1,13 +1,17 @@
 jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 
 import {
+  BreakdownInputSchema,
   CostSourceSchema,
   MAX_SCOPE_ORGANIZATION_IDS,
+  TableInputSchema,
+  TimeseriesInputSchema,
   UsageAnalyticsFiltersSchema,
   WhereBuilder,
   buildScopeConditions,
   costColumnFor,
   costSumExprSql,
+  dimensionColumn,
 } from './usage-analytics-router';
 
 const baseFilters = {
@@ -116,5 +120,58 @@ describe('usage analytics scope conditions', () => {
         organizationIds: makeIds(MAX_SCOPE_ORGANIZATION_IDS + 1),
       }).success
     ).toBe(false);
+  });
+});
+
+describe('usage analytics organization breakdown', () => {
+  const breakdownInput = {
+    ...baseFilters,
+    dimension: 'organization',
+    metric: 'cost',
+  };
+
+  it('allows organization only as a breakdown dimension', () => {
+    expect(BreakdownInputSchema.safeParse(breakdownInput).success).toBe(true);
+    expect(
+      TimeseriesInputSchema.safeParse({
+        ...baseFilters,
+        metric: 'cost',
+        splitBy: 'organization',
+      }).success
+    ).toBe(false);
+    expect(
+      TableInputSchema.safeParse({
+        ...baseFilters,
+        groupBy: ['organization'],
+      }).success
+    ).toBe(false);
+  });
+
+  it('allows organization breakdown limits up to the organization scope cap', () => {
+    expect(
+      BreakdownInputSchema.safeParse({
+        ...breakdownInput,
+        limit: MAX_SCOPE_ORGANIZATION_IDS,
+      }).success
+    ).toBe(true);
+    expect(
+      BreakdownInputSchema.safeParse({
+        ...breakdownInput,
+        limit: MAX_SCOPE_ORGANIZATION_IDS + 1,
+      }).success
+    ).toBe(false);
+  });
+
+  it('keeps other breakdown dimensions capped at 100', () => {
+    expect(
+      BreakdownInputSchema.safeParse({ ...breakdownInput, dimension: 'model', limit: 100 }).success
+    ).toBe(true);
+    expect(
+      BreakdownInputSchema.safeParse({ ...breakdownInput, dimension: 'model', limit: 101 }).success
+    ).toBe(false);
+  });
+
+  it('maps the organization dimension to the Snowflake organization column', () => {
+    expect(dimensionColumn('organization')).toBe('organization_id');
   });
 });

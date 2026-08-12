@@ -34,8 +34,9 @@ export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationMode
   );
 }
 
-export async function loadAutoRoutingCandidateModelIds(): Promise<string[]> {
-  const table = await getCachedRoutingTable();
+export function candidateModelIdsFromRoutingTable(
+  table: { routes: Record<string, ReadonlyArray<{ model: string }>> } | null
+): string[] {
   const fromTable = Object.values(table?.routes ?? {}).flatMap(candidates =>
     candidates.map(candidate => candidate.model)
   );
@@ -44,6 +45,10 @@ export async function loadAutoRoutingCandidateModelIds(): Promise<string[]> {
       [...fromTable, ...ALWAYS_CONSIDERED_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
     ),
   ];
+}
+
+export async function loadAutoRoutingCandidateModelIds(): Promise<string[]> {
+  return candidateModelIdsFromRoutingTable(await getCachedRoutingTable());
 }
 
 export async function collectDeniedAutoRoutingModelIds(

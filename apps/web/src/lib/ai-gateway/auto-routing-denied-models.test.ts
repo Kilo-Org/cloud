@@ -1,20 +1,10 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effective-model-access.server';
-
-jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
-  getCachedRoutingTable: jest.fn(),
-}));
-
-const { getCachedRoutingTable } = jest.requireMock<{
-  getCachedRoutingTable: jest.Mock;
-}>('@/lib/ai-gateway/auto-routing-table-cache');
-const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
-
 import { BALANCED_QWEN_MODEL } from '@/lib/ai-gateway/auto-model';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
+  candidateModelIdsFromRoutingTable,
   collectDeniedAutoRoutingModelIds,
-  loadAutoRoutingCandidateModelIds,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
 
@@ -123,22 +113,18 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   });
 });
 
-describe('loadAutoRoutingCandidateModelIds', () => {
-  beforeEach(() => {
-    mockedGetCachedRoutingTable.mockReset();
-  });
-
-  it('includes routing-table models plus coding-plan and balanced fallback ids', async () => {
-    mockedGetCachedRoutingTable.mockResolvedValue({
-      routes: {
-        'implementation/code_generation': [
-          { model: 'google/gemini-2.5-flash' },
-          { model: 'kilo-auto/balanced' },
-        ],
-      },
-    } as never);
-
-    await expect(loadAutoRoutingCandidateModelIds()).resolves.toEqual(
+describe('candidateModelIdsFromRoutingTable', () => {
+  it('includes routing-table models plus coding-plan and balanced fallback ids', () => {
+    expect(
+      candidateModelIdsFromRoutingTable({
+        routes: {
+          'implementation/code_generation': [
+            { model: 'google/gemini-2.5-flash' },
+            { model: 'kilo-auto/balanced' },
+          ],
+        },
+      })
+    ).toEqual(
       expect.arrayContaining([
         'google/gemini-2.5-flash',
         BALANCED_QWEN_MODEL.model,
@@ -146,6 +132,12 @@ describe('loadAutoRoutingCandidateModelIds', () => {
         'byteplus-coding/bytedance-seed-code',
       ])
     );
-    await expect(loadAutoRoutingCandidateModelIds()).resolves.not.toContain('kilo-auto/balanced');
+    expect(
+      candidateModelIdsFromRoutingTable({
+        routes: {
+          'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
+        },
+      })
+    ).not.toContain('kilo-auto/balanced');
   });
 });

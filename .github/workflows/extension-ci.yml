@@ -102,6 +102,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Bound apt mirror timeouts
+        # A dead runner mirror otherwise stalls the --with-deps apt-get until the job timeout (measured: three 20-minute hangs on 2026-08-12). Fail the bad mirror fast; healthy sources proceed.
+        run: echo 'Acquire::http::Timeout "10"; Acquire::Retries "1";' | sudo tee /etc/apt/apt.conf.d/99-ci-timeouts
+
       - name: Install Playwright Chromium
         run: pnpm --filter kilo-extension exec playwright install --with-deps chromium
 

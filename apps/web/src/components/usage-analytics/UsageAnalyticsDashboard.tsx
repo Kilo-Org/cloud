@@ -26,7 +26,9 @@ import { BreakdownPieChart } from './BreakdownPieChart';
 import { BreakdownBarChart } from './BreakdownBarChart';
 import { AIAdoptionScoreCard } from './AIAdoptionScoreCard';
 import { ActiveKiloclawsTable } from './ActiveKiloclawsTable';
+import { UsageDataErrorState } from './UsageDataErrorState';
 import { UsageDataPendingState } from './UsageDataPendingState';
+import { resolveUsageDashboardState, usageQueryOutcome } from './usageDataState';
 import {
   PERSONAL_VIEW_ALL_USAGE,
   PERSONAL_VIEW_PERSONAL_ONLY,
@@ -353,41 +355,71 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     ]
   );
 
-  const { data: summary, isLoading: summaryLoading } = useUsageSummary({
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isError: summaryError,
+    refetch: refetchSummary,
+  } = useUsageSummary({
     ...commonArgs,
     enabled: showDetailedUsage,
   });
 
   const splitByDimension = groupBy !== 'none' ? groupBy : undefined;
-  const { data: timeseries, isLoading: timeseriesLoading } = useUsageTimeseries({
+  const {
+    data: timeseries,
+    isLoading: timeseriesLoading,
+    isError: timeseriesError,
+    refetch: refetchTimeseries,
+  } = useUsageTimeseries({
     ...commonArgs,
     metric: chartMetric,
     splitBy: splitByDimension,
     enabled: showDetailedUsage,
   });
 
-  const { data: featureBreakdown, isLoading: featureBreakdownLoading } = useUsageBreakdown({
+  const {
+    data: featureBreakdown,
+    isLoading: featureBreakdownLoading,
+    isError: featureBreakdownError,
+    refetch: refetchFeatureBreakdown,
+  } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'feature',
     metric: 'cost',
     limit: 20,
     enabled: showDetailedUsage,
   });
-  const { data: modelBreakdown, isLoading: modelBreakdownLoading } = useUsageBreakdown({
+  const {
+    data: modelBreakdown,
+    isLoading: modelBreakdownLoading,
+    isError: modelBreakdownError,
+    refetch: refetchModelBreakdown,
+  } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'model',
     metric: 'cost',
     limit: 10,
     enabled: showDetailedUsage,
   });
-  const { data: projectBreakdown, isLoading: projectBreakdownLoading } = useUsageBreakdown({
+  const {
+    data: projectBreakdown,
+    isLoading: projectBreakdownLoading,
+    isError: projectBreakdownError,
+    refetch: refetchProjectBreakdown,
+  } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'project',
     metric: 'cost',
     limit: 10,
     enabled: showDetailedUsage,
   });
-  const { data: userBreakdown, isLoading: userBreakdownLoading } = useUsageBreakdown({
+  const {
+    data: userBreakdown,
+    isLoading: userBreakdownLoading,
+    isError: userBreakdownError,
+    refetch: refetchUserBreakdown,
+  } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'user',
     metric: 'cost',
@@ -397,7 +429,12 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
 
   const tableGroupBy = useMemo<Dimension[]>(() => (groupBy === 'none' ? [] : [groupBy]), [groupBy]);
 
-  const { data: tableData, isLoading: tableLoading } = useUsageTable({
+  const {
+    data: tableData,
+    isLoading: tableLoading,
+    isError: tableError,
+    refetch: refetchTable,
+  } = useUsageTable({
     ...commonArgs,
     groupBy: tableGroupBy,
     limit: 500,
@@ -465,13 +502,72 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     return list;
   }, [filters]);
 
-  const usageDataPending =
-    period === 'today' &&
-    summary !== undefined &&
-    tableData !== undefined &&
-    summary.requestCount === 0 &&
-    tableData.rows.length === 0 &&
-    activeFilters.length === 0;
+  const usageDashboardState = resolveUsageDashboardState({
+    period,
+    hasActiveFilters: activeFilters.length > 0,
+    summary,
+    tableRowCount: tableData?.rows.length,
+    queries: [
+      usageQueryOutcome({
+        isLoading: summaryLoading,
+        isError: summaryError,
+        hasData: summary !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: tableLoading,
+        isError: tableError,
+        hasData: tableData !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: timeseriesLoading,
+        isError: timeseriesError,
+        hasData: timeseries !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: featureBreakdownLoading,
+        isError: featureBreakdownError,
+        hasData: featureBreakdown !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: modelBreakdownLoading,
+        isError: modelBreakdownError,
+        hasData: modelBreakdown !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: projectBreakdownLoading,
+        isError: projectBreakdownError,
+        hasData: projectBreakdown !== undefined,
+      }),
+      ...(isOrgWideView
+        ? [
+            usageQueryOutcome({
+              isLoading: userBreakdownLoading,
+              isError: userBreakdownError,
+              hasData: userBreakdown !== undefined,
+            }),
+          ]
+        : []),
+    ],
+  });
+
+  const retryUsageQueries = useCallback(() => {
+    void refetchSummary();
+    void refetchTimeseries();
+    void refetchFeatureBreakdown();
+    void refetchModelBreakdown();
+    void refetchProjectBreakdown();
+    void refetchTable();
+    if (isOrgWideView) void refetchUserBreakdown();
+  }, [
+    isOrgWideView,
+    refetchFeatureBreakdown,
+    refetchModelBreakdown,
+    refetchProjectBreakdown,
+    refetchSummary,
+    refetchTable,
+    refetchTimeseries,
+    refetchUserBreakdown,
+  ]);
 
   const addFilter = useCallback(
     (dimension: Dimension, direction: FilterDirection, value: string): void => {
@@ -728,7 +824,9 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
               <>
                 <UsageWarning />
 
-                {usageDataPending ? (
+                {usageDashboardState === 'error' ? (
+                  <UsageDataErrorState onRetry={retryUsageQueries} />
+                ) : usageDashboardState === 'pending' ? (
                   <UsageDataPendingState />
                 ) : (
                   <>

@@ -57,7 +57,7 @@ export function createAllowPredicateFromProviderAllowList(
     }
     const providerSlugs =
       getKiloExclusiveInferenceProviderRestriction(modelId) ??
-      (await providerLookup(normalizedModelId));
+      (await providerLookup(modelId.trim().toLowerCase()));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

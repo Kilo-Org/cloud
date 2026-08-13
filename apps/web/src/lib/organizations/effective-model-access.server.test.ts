@@ -166,6 +166,35 @@ describe('effective organization model access', () => {
     expect((await getEffectiveModelDecision(policy, 'openai/o3:free')).allowed).toBe(false);
   });
 
+  it('uses the suffixed endpoint providers for the organization provider ceiling', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['coreweave'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const providerLookup = async (modelId: string) =>
+      new Set(
+        {
+          'nvidia/nemotron-3.5-lightning': ['coreweave', 'nvidia'],
+          'nvidia/nemotron-3.5-lightning:free': ['nvidia'],
+        }[modelId] ?? []
+      );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron-3.5-lightning', providerLookup)
+    ).resolves.toEqual({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['coreweave']),
+    });
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron-3.5-lightning:free', providerLookup)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
   it('requires an explicit none policy to grant no models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(context());
     expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(false);

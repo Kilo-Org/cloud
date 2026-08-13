@@ -1,6 +1,8 @@
 import { modelsByProvider } from '@kilocode/db/schema';
+import type { StoredModel } from '@kilocode/db/schema-types';
 import { readDb } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { desc } from 'drizzle-orm';
 
@@ -11,7 +13,12 @@ type ProviderIndexCacheState = {
   index: ModelIdToProviderSlugsIndex;
 };
 
-export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
+type ProviderIndexSnapshot = {
+  data: NormalizedOpenRouterResponse;
+  openrouter: Record<string, StoredModel> | null;
+};
+
+export type FetchModelsByProviderSnapshot = () => Promise<ProviderIndexSnapshot | undefined>;
 
 type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
@@ -20,21 +27,50 @@ type ProviderIndexLoaderOptions = {
 };
 
 export function buildModelIdToProviderSlugsIndex(
-  snapshot: NormalizedOpenRouterResponse
+  snapshot: NormalizedOpenRouterResponse,
+  openRouterModels: Record<string, StoredModel> | null = null
 ): Map<string, Set<string>> {
   const index = new Map<string, Set<string>>();
 
+  function addProvider(modelId: string, providerSlug: string): void {
+    const existing = index.get(modelId);
+    if (existing) {
+      existing.add(providerSlug);
+    } else {
+      index.set(modelId, new Set([providerSlug]));
+    }
+  }
+
   for (const provider of snapshot.providers) {
     for (const model of provider.models) {
-      const normalizedModelId = normalizeModelId(model.slug);
-      const existing = index.get(normalizedModelId);
-
-      if (existing) {
-        existing.add(provider.slug);
-        continue;
+      const normalizedModelId = normalizeModelId(model.slug).trim().toLowerCase();
+      addProvider(normalizedModelId, provider.slug);
+      if (model.endpoint?.is_free) {
+        addProvider(`${normalizedModelId}:free`, provider.slug);
       }
+    }
+  }
 
-      index.set(normalizedModelId, new Set([provider.slug]));
+  const providerSlugsByName = new Map<string, string>();
+  for (const provider of snapshot.providers) {
+    providerSlugsByName.set(provider.slug.toLowerCase(), provider.slug);
+    providerSlugsByName.set(provider.name.toLowerCase(), provider.slug);
+    providerSlugsByName.set(provider.displayName.toLowerCase(), provider.slug);
+  }
+
+  for (const model of Object.values(openRouterModels ?? {})) {
+    const modelId = model.id.trim().toLowerCase();
+    if (!modelId.includes(':')) continue;
+
+    for (const endpoint of model.endpoints) {
+      const providerSlug = endpoint.tag
+        ? normalizeInferenceProviderId(endpoint.tag)
+        : endpoint.provider_name
+          ? providerSlugsByName.get(endpoint.provider_name.toLowerCase())
+          : undefined;
+      if (providerSlug) {
+        addProvider(modelId, providerSlug);
+      }
     }
   }
 
@@ -59,7 +95,9 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     inFlight = (async (): Promise<ProviderIndexCacheState> => {
       try {
         const snapshot = await options.fetchSnapshot().catch(() => undefined);
-        const index = snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map();
+        const index = snapshot
+          ? buildModelIdToProviderSlugsIndex(snapshot.data, snapshot.openrouter)
+          : new Map();
 
         return {
           expiresAtMs: options.nowMs() + options.ttlMs,
@@ -86,15 +124,15 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
 }
 
 export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
-  NormalizedOpenRouterResponse | undefined
+  ProviderIndexSnapshot | undefined
 > {
   const result = await readDb
-    .select({ data: modelsByProvider.data })
+    .select({ data: modelsByProvider.data, openrouter: modelsByProvider.openrouter })
     .from(modelsByProvider)
     .orderBy(desc(modelsByProvider.id))
     .limit(1);
 
-  return result[0]?.data;
+  return result[0];
 }
 
 const DEFAULT_TTL_MS = 30_000;

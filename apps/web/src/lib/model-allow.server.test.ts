@@ -58,6 +58,23 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
   });
 
+  test('provider allow list evaluates suffixed endpoints separately from the base model', async () => {
+    const providers = lookup({
+      'nvidia/nemotron-3.5-lightning': ['coreweave', 'nvidia'],
+      'nvidia/nemotron-3.5-lightning:free': ['nvidia'],
+    });
+    const coreWeaveOnly = createAllowPredicateFromProviderAllowList(
+      undefined,
+      ['coreweave'],
+      providers
+    );
+    const nvidiaOnly = createAllowPredicateFromProviderAllowList(undefined, ['nvidia'], providers);
+
+    await expect(coreWeaveOnly('nvidia/nemotron-3.5-lightning')).resolves.toBe(true);
+    await expect(coreWeaveOnly('nvidia/nemotron-3.5-lightning:free')).resolves.toBe(false);
+    await expect(nvidiaOnly('nvidia/nemotron-3.5-lightning:free')).resolves.toBe(true);
+  });
+
   test('provider allow list denies models missing from the current snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
 

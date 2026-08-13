@@ -120,10 +120,11 @@ export async function getEffectiveModelDecision(
     return { allowed: false, denialSource: 'organization_model' };
   }
   const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
+  const providerLookupModelId = modelId.trim().toLowerCase();
   const currentModelProviders =
     exclusiveProviders ??
     (policy.requireModelInCurrentSnapshot && !latestAlias
-      ? await providerLookup(normalizedModelId)
+      ? await providerLookup(providerLookupModelId)
       : undefined);
   if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
@@ -140,7 +141,7 @@ export async function getEffectiveModelDecision(
         ? { allowed: true, eligibleProviderRoutes: organizationRoutes }
         : { allowed: false, denialSource: 'organization_provider' };
     }
-    const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
+    const modelProviders = currentModelProviders ?? (await providerLookup(providerLookupModelId));
     if (modelProviders.size === 0) {
       return { allowed: false, denialSource: 'organization_model' };
     }

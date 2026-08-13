@@ -15,7 +15,7 @@ describe('LongCat provider', () => {
   test.each([
     [undefined, 'enabled'],
     [{ enabled: true as const }, 'enabled'],
-    [{ enabled: false as const }, 'disabled'],
+    [{ enabled: false as const, effort: 'none' as const }, 'disabled'],
   ])('maps reasoning %p to Anthropic-style thinking %s', async (reasoning, expectedType) => {
     const request: GatewayRequest = {
       kind: 'chat_completions',

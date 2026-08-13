@@ -508,14 +508,44 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     summary,
     tableRowCount: tableData?.rows.length,
     queries: [
-      usageQueryOutcome({ isLoading: summaryLoading, isError: summaryError }),
-      usageQueryOutcome({ isLoading: tableLoading, isError: tableError }),
-      usageQueryOutcome({ isLoading: timeseriesLoading, isError: timeseriesError }),
-      usageQueryOutcome({ isLoading: featureBreakdownLoading, isError: featureBreakdownError }),
-      usageQueryOutcome({ isLoading: modelBreakdownLoading, isError: modelBreakdownError }),
-      usageQueryOutcome({ isLoading: projectBreakdownLoading, isError: projectBreakdownError }),
+      usageQueryOutcome({
+        isLoading: summaryLoading,
+        isError: summaryError,
+        hasData: summary !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: tableLoading,
+        isError: tableError,
+        hasData: tableData !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: timeseriesLoading,
+        isError: timeseriesError,
+        hasData: timeseries !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: featureBreakdownLoading,
+        isError: featureBreakdownError,
+        hasData: featureBreakdown !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: modelBreakdownLoading,
+        isError: modelBreakdownError,
+        hasData: modelBreakdown !== undefined,
+      }),
+      usageQueryOutcome({
+        isLoading: projectBreakdownLoading,
+        isError: projectBreakdownError,
+        hasData: projectBreakdown !== undefined,
+      }),
       ...(isOrgWideView
-        ? [usageQueryOutcome({ isLoading: userBreakdownLoading, isError: userBreakdownError })]
+        ? [
+            usageQueryOutcome({
+              isLoading: userBreakdownLoading,
+              isError: userBreakdownError,
+              hasData: userBreakdown !== undefined,
+            }),
+          ]
         : []),
     ],
   });

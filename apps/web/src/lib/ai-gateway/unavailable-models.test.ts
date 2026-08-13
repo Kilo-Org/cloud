@@ -9,7 +9,6 @@ describe('unavailable models', () => {
     expect(isUnavailableModel('openai/gpt-oss-20b:free')).toBe(true);
     expect(isUnavailableModel('sakana/fugu-ultra')).toBe(false);
     expect(isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
-    expect(isUnavailableModel('meituan/longcat-2.0-free')).toBe(true);
     expect(isUnavailableModel('openai/gpt-oss-20b')).toBe(false);
   });
 

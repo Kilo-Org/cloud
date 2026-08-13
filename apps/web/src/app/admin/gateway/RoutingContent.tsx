@@ -250,7 +250,7 @@ export function RoutingContent() {
               </p>
             )}
             {data?.note && (
-              <p className="mt-2">
+              <p className="mt-2 whitespace-pre-wrap">
                 <span className="font-medium">Previous note:</span> {data.note}
               </p>
             )}

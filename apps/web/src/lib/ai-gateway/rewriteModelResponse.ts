@@ -81,6 +81,28 @@ async function isLoggingEnabledForUser(
   });
 }
 
+export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
+  const gateway = request.body.providerOptions?.gateway;
+  if (!gateway?.byok) {
+    return sanitizeJsonbValue(request.body);
+  }
+
+  const redactedByok = Object.fromEntries(
+    Object.entries(gateway.byok).map(([provider, credentials]) => [
+      provider,
+      credentials.map(() => ({ apiKey: '[redacted]' })),
+    ])
+  );
+
+  return sanitizeJsonbValue({
+    ...request.body,
+    providerOptions: {
+      ...request.body.providerOptions,
+      gateway: { ...gateway, byok: redactedByok },
+    },
+  });
+}
+
 async function createRequestLogCapture(
   response: Response,
   model: string,
@@ -137,7 +159,7 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: sanitizeJsonbValue(request.body),
+          request: sanitizeApiRequestLogRequest(request),
           response: responseText,
           error: sanitizeJsonbValue(error),
         })

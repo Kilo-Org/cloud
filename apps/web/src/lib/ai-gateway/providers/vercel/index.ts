@@ -27,6 +27,7 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { getEnvVariable } from '@/lib/dotenvx';
 
 type VercelRoutingConfig = {
   paid: number;
@@ -305,6 +306,14 @@ export async function applyVercelSettings(
       requestToMutate,
       vercelInferenceProviders
     );
+
+    const friendliApiKey = getEnvVariable('FRIENDLI_API_KEY');
+    if (friendliApiKey && requestToMutate.body.providerOptions.gateway) {
+      requestToMutate.body.providerOptions.gateway.byok = {
+        ...requestToMutate.body.providerOptions.gateway.byok,
+        friendli: [{ apiKey: friendliApiKey }],
+      };
+    }
   }
 
   if (requestToMutate.body.providerOptions) {

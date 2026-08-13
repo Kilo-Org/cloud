@@ -96,6 +96,7 @@ describe('organizations settings trpc router', () => {
         'gpt-3.5-turbo': 'openai',
         'gpt-4': 'openai',
         'openai/gpt-4o': 'openai',
+        'openai/gpt-4o:free': 'openai',
       }[modelId];
       return provider ? new Set([provider]) : new Set();
     });

@@ -33,7 +33,7 @@ export function RoutingContent() {
       setInputValue(data.vercel_routing_percentage?.toString() ?? '');
       setFreeInputValue(data.vercel_routing_percentage_free?.toString() ?? '');
       setOptOutModelsValue(data.vercel_routing_opt_out_models.join('\n'));
-      setNoteValue('');
+      setNoteValue(data.note ?? '');
       setHasChanges(false);
     }
   }, [data]);

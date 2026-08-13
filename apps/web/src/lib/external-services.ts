@@ -54,7 +54,7 @@ async function deleteUserFromCustomerIO(email: string): Promise<string | null> {
 }
 
 /**
- * Delete CLI session blobs from R2 storage and scrub sensitive metadata from database rows
+ * Delete CLI session blobs from R2 storage and delete database rows
  */
 async function deleteCliSessionBlobs(userId: string): Promise<string | null> {
   try {
@@ -114,35 +114,12 @@ async function deleteCliSessionBlobs(userId: string): Promise<string | null> {
       }
     }
 
-    // Scrub sensitive metadata and blob URLs from database rows
-    await db
-      .update(sharedCliSessions)
-      .set({
-        api_conversation_history_blob_url: null,
-        task_metadata_blob_url: null,
-        ui_messages_blob_url: null,
-        git_state_blob_url: null,
-      })
-      .where(eq(sharedCliSessions.kilo_user_id, userId));
-
-    await db
-      .update(cliSessions)
-      .set({
-        title: 'Deleted Session',
-        git_url: null,
-        cloud_agent_session_id: null,
-        organization_id: null,
-        last_mode: null,
-        last_model: null,
-        api_conversation_history_blob_url: null,
-        task_metadata_blob_url: null,
-        ui_messages_blob_url: null,
-        git_state_blob_url: null,
-      })
-      .where(eq(cliSessions.kilo_user_id, userId));
+    // Delete database rows for shared sessions and sessions
+    await db.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, userId));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, userId));
 
     logExceptInTest(
-      `Successfully scrubbed CLI sessions and deleted blobs for user: ${userId} (${userCliSessions.length} sessions, ${userSharedSessions.length} shared sessions)`
+      `Successfully deleted CLI sessions and blobs for user: ${userId} (${userCliSessions.length} sessions, ${userSharedSessions.length} shared sessions)`
     );
     return null;
   } catch (error) {

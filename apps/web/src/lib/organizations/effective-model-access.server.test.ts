@@ -195,6 +195,33 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
+  it('uses the suffixed endpoint providers for member provider grants', async () => {
+    const policy = {
+      requireModelInCurrentSnapshot: false,
+      organizationModelDenyList: [],
+      memberGrant: {
+        mode: 'selected',
+        modelAllowList: [],
+        providerAllowList: ['nvidia'],
+      },
+      policyRevision: 1,
+    } as const;
+    const providerLookup = async (modelId: string) =>
+      new Set(
+        {
+          'nvidia/nemotron-3.5-lightning': ['coreweave'],
+          'nvidia/nemotron-3.5-lightning:free': ['nvidia'],
+        }[modelId] ?? []
+      );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron-3.5-lightning:free', providerLookup)
+    ).resolves.toEqual({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['nvidia']),
+    });
+  });
+
   it('requires an explicit none policy to grant no models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(context());
     expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(false);

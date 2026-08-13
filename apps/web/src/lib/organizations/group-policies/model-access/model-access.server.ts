@@ -164,7 +164,7 @@ export async function getEffectiveModelDecision(
   }
   const modelProviders = latestAlias
     ? new Set(policy.memberGrant.providerAllowList)
-    : (currentModelProviders ?? (await providerLookup(normalizedModelId)));
+    : (currentModelProviders ?? (await providerLookup(providerLookupModelId)));
   if (modelProviders.size === 0) {
     return { allowed: false, denialSource: 'group_provider' };
   }

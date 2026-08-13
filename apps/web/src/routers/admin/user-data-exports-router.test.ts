@@ -1,11 +1,13 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
+import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import {
   setDataExportRecoveryAuditSinkForTest,
   type DataExportRecoveryAuditEvent,
 } from './user-data-export-recovery-audit';
 import { createCallerForUser } from '@/routers/test-utils';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kilocode_users,
@@ -637,6 +639,41 @@ describe('adminUserDataExportsRouter', () => {
     ).toBeDefined();
   });
 
+  // The replacement inherits the column defaults for anything the insert does not name.
+  // Those defaults are 'user' and NULL, so an organization export retried here came back
+  // as a personal export for whoever originally requested it, regenerating one person's
+  // data under a recovery action meant to reproduce the organization's.
+  it('keeps an organization export an organization export when retried', async () => {
+    const organization = await createTestOrganization('Recovery Org', recoveryOwner.id, 0);
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        subject_type: 'organization',
+        organization_id: organization.id,
+        status: 'failed',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+        requested_at: new Date(Date.now() - 3_600_000).toISOString(),
+        failure_code: 'queue_delivery_exhausted',
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+
+    const result = await (
+      await createCallerForUser(admin.id)
+    ).admin.userDataExports.cancelAndRetry({ exportId: target.id, expectedGeneration: 0 });
+    exportIds.push(result.replacementExportId);
+
+    const replacement = await db.query.user_data_exports.findFirst({
+      where: eq(user_data_exports.id, result.replacementExportId),
+    });
+    expect(replacement).toMatchObject({
+      subject_type: 'organization',
+      organization_id: organization.id,
+      kilo_user_id: recoveryOwner.id,
+    });
+  });
+
   it('creates a pristine replacement from the same logical snapshot and durable outbox', async () => {
     const requestedAt = new Date(Date.now() - 7_200_000).toISOString();
     const [target] = await db
@@ -681,7 +718,9 @@ describe('adminUserDataExportsRouter', () => {
     expect(replacement).toMatchObject({
       kilo_user_id: recoveryOwner.id,
       status: 'queued',
-      schema_version: 1,
+      // The replacement records the format the Worker will write now, not the
+      // original's: a retry regenerates the file with today's code.
+      schema_version: EXPORT_FILE_SCHEMA_VERSION,
       snapshot_at: expect.any(String),
       requested_at: expect.any(String),
       current_source: null,

@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
+import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
@@ -101,6 +102,8 @@ type OutboxRow = {
 type RecoveryTarget = {
   id: string;
   kilo_user_id: string;
+  subject_type: 'user' | 'organization';
+  organization_id: string | null;
   status: ExportStatus;
   schema_version: number;
   snapshot_at: string;
@@ -158,7 +161,8 @@ async function lockRecoveryTarget(
   }
 
   const target = await tx.execute<RecoveryTarget>(sql`
-    SELECT id, kilo_user_id, status, schema_version, snapshot_at, requested_at,
+    SELECT id, kilo_user_id, subject_type, organization_id, status, schema_version,
+      snapshot_at, requested_at,
       dispatch_generation, lease_expires_at, multipart_upload_id, r2_object_key
     FROM user_data_exports
     WHERE id = ${input.exportId}
@@ -692,9 +696,19 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         kilo_user_id: string;
         dispatch_generation: number;
       }>(sql`
-        INSERT INTO user_data_exports (kilo_user_id, schema_version, snapshot_at, requested_at)
+        INSERT INTO user_data_exports (
+          kilo_user_id, subject_type, organization_id, schema_version, snapshot_at, requested_at
+        )
         VALUES (
-          ${target.kilo_user_id}, ${target.schema_version},
+          ${target.kilo_user_id},
+          -- Carried, not defaulted. Without these an organization export retried here came
+          -- back as a personal export for whoever originally requested it, because the
+          -- column defaults are 'user' and NULL.
+          ${target.subject_type},
+          ${target.organization_id}::uuid,
+          -- The current format, not the original's: a retry regenerates the file with
+          -- today's code, so copying the old value would describe a file that never existed.
+          ${EXPORT_FILE_SCHEMA_VERSION},
           ${target.snapshot_at}::timestamptz, ${target.requested_at}::timestamptz
         )
         RETURNING id, kilo_user_id, dispatch_generation

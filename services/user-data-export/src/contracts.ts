@@ -9,18 +9,11 @@ import * as z from 'zod';
 export const EXPORT_SCHEMA_VERSION = 1;
 
 /**
- * The format of the export file itself, reported as `schemaVersion` in its header.
- *
- * Deliberately separate from the message contract above: the two version different
- * things and previously happened to agree at 1, which made it look as though one
- * constant governed both.
- *
- * 2 adds the warehouse profile columns to the identity section: location, historic and
- * current, plus the analytics copies of name, email and hosted domain. Additive for a
- * reader that ignores unknown fields, breaking for one that does not, and an export file
- * is the kind of artifact people write strict parsers against.
+ * Re-exported from `@kilocode/db` so the Worker and the web router cannot disagree about
+ * the format of a file one writes and the other records. See that module for what the
+ * versions mean and why this one is safe to raise while `EXPORT_SCHEMA_VERSION` is not.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 2;
+export { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 
 export const ExportQueueMessageSchema = z
   .object({

@@ -11,7 +11,7 @@ export const longcat_2_free_model: KiloExclusiveModel = {
     'LongCat 2.0 is a sparse mixture-of-experts language model from Meituan, with 48B active parameters out of 1.6T total. It is suited for coding, repository-level changes, long-horizon problem solving, and agentic workflows. Available free in Kilo for a limited time.',
   context_length: 1_048_756,
   max_completion_tokens: 131_072,
-  status: 'public',
+  status: 'disabled',
   flags: ['reasoning'],
   gateway: 'longcat',
   internal_id: 'LongCat-2.0',

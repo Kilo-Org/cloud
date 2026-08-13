@@ -5,6 +5,7 @@ import {
   getKiloExclusiveInferenceProviderRestriction,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
+  preferredModels,
   selectAutoFreeCandidate,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
@@ -89,18 +90,21 @@ describe('isFreeModel', () => {
       );
     });
 
-    test('registers LongCat 2.0 as a free exclusive model without adding it to Auto Free', async () => {
-      expect(findKiloExclusiveModel('meituan/longcat-2.0-free')).toBe(longcat_2_free_model);
-      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(true);
+    test('retains the disabled LongCat 2.0 configuration for later enablement', async () => {
+      expect(kiloExclusiveModels).toContain(longcat_2_free_model);
+      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBeNull();
+      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(false);
       expect(longcat_2_free_model).toMatchObject({
         internal_id: 'LongCat-2.0',
         gateway: 'longcat',
         context_length: 1_048_756,
         max_completion_tokens: 131_072,
+        status: 'disabled',
       });
       expect(autoFreeModels.map(({ model }) => model)).not.toContain(
         longcat_2_free_model.public_id
       );
+      expect(preferredModels).not.toContain(longcat_2_free_model.public_id);
       expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBe('openai-compatible');
     });
 

@@ -507,9 +507,17 @@ export const user_data_exports = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    // Always the requester, for both subject types. An organization export is still
+    // asked for by a person, and this is the column the download path authorises on,
+    // so it stays NOT NULL rather than becoming user-or-org.
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    // Whose data the export contains, as distinct from who asked for it. A 'user'
+    // export carries the requester's own rows; an 'organization' export carries the
+    // rows owned by organization_id, and never a member's personal rows.
+    subject_type: text().$type<'user' | 'organization'>().notNull().default('user'),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
     status: text()
       .$type<'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired'>()
       .notNull()
@@ -549,10 +557,27 @@ export const user_data_exports = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
+    // One active personal export per user. Scoped to subject_type so requesting an
+    // organization export does not collide with the requester's own in-flight export.
     uniqueIndex('UQ_user_data_exports_single_active')
       .on(table.kilo_user_id)
-      .where(sql`${table.status} IN ('queued', 'processing', 'finalizing')`),
+      .where(
+        sql`${table.status} IN ('queued', 'processing', 'finalizing') AND ${table.subject_type} = 'user'`
+      ),
+    // One active export per organization, keyed on the org rather than the requester:
+    // two admins of the same org must not each generate a copy of the same data.
+    uniqueIndex('UQ_user_data_exports_single_active_org')
+      .on(table.organization_id)
+      .where(
+        sql`${table.status} IN ('queued', 'processing', 'finalizing') AND ${table.subject_type} = 'organization'`
+      ),
     index('IDX_user_data_exports_user_created').on(table.kilo_user_id, table.created_at, table.id),
+    // The organization branch of the history list, mirroring the personal index above.
+    // The single-active index covers only in-flight statuses, so without this an
+    // organization's completed exports accumulate with nothing to page them by.
+    index('IDX_user_data_exports_org_created')
+      .on(table.organization_id, table.created_at, table.id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
     index('IDX_user_data_exports_lease_expiry')
       .on(table.lease_expires_at, table.id)
       .where(sql`${table.status} IN ('processing', 'finalizing')`),
@@ -568,6 +593,18 @@ export const user_data_exports = pgTable(
     check(
       'user_data_exports_status_check',
       sql`${table.status} IN ('queued', 'processing', 'finalizing', 'ready', 'failed', 'expired')`
+    ),
+    check(
+      'user_data_exports_subject_type_check',
+      sql`${table.subject_type} IN ('user', 'organization')`
+    ),
+    // organization_id is present exactly when the subject is an organization, so a job
+    // can never reach the generator with a subject it has no id to scope on, and a
+    // personal export can never carry a stray org id that a query might pick up.
+    check(
+      'user_data_exports_subject_shape',
+      sql`(${table.subject_type} = 'user' AND ${table.organization_id} IS NULL)
+        OR (${table.subject_type} = 'organization' AND ${table.organization_id} IS NOT NULL)`
     ),
     check('user_data_exports_schema_version_positive', sql`${table.schema_version} > 0`),
     check('user_data_exports_next_part_number_positive', sql`${table.next_part_number} > 0`),

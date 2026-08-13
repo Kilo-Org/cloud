@@ -3,8 +3,13 @@ import {
   createSourceAdapters,
   sourceQueries,
   sourceQueryScopes,
-  USER_SCOPE_PREDICATES,
+  findPresentWarehouseTables,
+  warehouseRequirements,
+  DELETED_COLUMN,
+  SOURCES_WITHOUT_DELETED_COLUMN,
+  SCOPE_PREDICATES,
   WAREHOUSE_PROFILE_FIELDS,
+  WAREHOUSE_SOURCE_COLUMNS,
   warehouseQueries,
   type ReplicaQuery,
   type SourceAdapter,
@@ -67,11 +72,18 @@ const PRIMARY_USER_ROW = {
 };
 
 const READ_PAGE_INPUT = {
-  kiloUserId: 'owner-user',
+  subject: { type: 'user', kiloUserId: 'owner-user' },
   snapshotAt: '2026-08-08T13:00:00.000Z',
   cursor: null,
   limit: 100,
-} as const;
+} as const satisfies Parameters<NonNullable<SourceAdapter['readPage']>>[0];
+
+const ORG_READ_PAGE_INPUT = {
+  subject: { type: 'organization', organizationId: 'org-1' },
+  snapshotAt: '2026-08-08T13:00:00.000Z',
+  cursor: null,
+  limit: 100,
+} as const satisfies Parameters<NonNullable<SourceAdapter['readPage']>>[0];
 
 describe('warehouse scoping guard', () => {
   // Every query the export reads must restrict to a single user, and the predicate
@@ -84,13 +96,13 @@ describe('warehouse scoping guard', () => {
   });
 
   // A declared scope is only worth checking against if the predicate itself scopes to
-  // a user. Without this, a source could be added with any predicate its author cared
+  // a subject. Without this, a source could be added with any predicate its author cared
   // to name and satisfy the assertion below by agreeing with itself.
-  it.each(Object.entries(sourceQueryScopes))('%s declares a known user scope', (_name, scope) => {
-    expect(USER_SCOPE_PREDICATES).toContain(scope);
+  it.each(Object.entries(sourceQueryScopes))('%s declares a known scope', (_name, scope) => {
+    expect(SCOPE_PREDICATES).toContain(scope);
   });
 
-  // Membership in the closed set is not enough on its own: the three predicates are not
+  // Membership in the closed set is not enough on its own: the four predicates are not
   // interchangeable, and each is valid for exactly one table shape. A profile predicate
   // used on an owned child table would match the row's own key rather than its owner,
   // and the two profile predicates are not swappable either — the primary calls this
@@ -107,21 +119,207 @@ describe('warehouse scoping guard', () => {
     if (expectedTable) {
       expect(query).toMatch(expectedTable);
     } else {
-      expect(predicate).toBe('kilo_user_id = $1');
+      expect(['kilo_user_id = $1', 'organization_id = $1']).toContain(predicate);
     }
   });
 
+  // The two subject variants of a source are the same query but for the owner column,
+  // so a copy-paste that left an org query scoped on `kilo_user_id` would still pass
+  // every assertion above: it is a known predicate, on the right table, in the WHERE
+  // clause. It would also hand an organization's admin the requester's own rows. The
+  // name of the query is the only thing that says which subject it is for, so that is
+  // what this pins it to.
+  it.each(Object.entries(sourceQueryScopes))(
+    '%s scopes on the owner column its name claims',
+    (name, scope) => {
+      if (name.endsWith('OrgQuery')) expect(scope).toBe('organization_id = $1');
+      if (name.endsWith('UserQuery')) expect(scope).toBe('kilo_user_id = $1');
+    }
+  );
+
   // Anchored on WHERE because `id = $1` is a substring of every `<table>_id = $1`:
   // an unanchored match would accept `organization_id = $1` as if it scoped to a user.
-  it.each(Object.entries(sourceQueries))('%s is scoped to a single user', (name, query) => {
+  it.each(Object.entries(sourceQueries))('%s is scoped to a single subject', (name, query) => {
     const predicate = sourceQueryScopes[name as keyof typeof sourceQueries];
     expect(predicate).toBeDefined();
     expect(query).toContain(`WHERE ${predicate}`);
   });
 
+  // Both subjects are covered for every warehouse source. A source reachable by only one
+  // of them would silently return nothing to the other rather than failing.
+  it('pairs every warehouse source with both subject variants', () => {
+    const names = Object.keys(warehouseQueries);
+    const orgNames = names.filter(name => name.endsWith('OrgQuery'));
+    const userNames = names.filter(name => name.endsWith('UserQuery'));
+    expect(orgNames.length).toBe(userNames.length);
+    expect(orgNames.map(name => name.replace(/OrgQuery$/, '')).sort()).toEqual(
+      userNames.map(name => name.replace(/UserQuery$/, '')).sort()
+    );
+  });
+
+  // An organization export must never widen to a member's personal rows, which are
+  // exactly the rows with no organization. A predicate that tolerated NULL would do so.
+  it.each(Object.entries(sourceQueries).filter(([name]) => name.endsWith('OrgQuery')))(
+    '%s never admits rows without an organization',
+    (_name, query) => {
+      expect(query).not.toMatch(/organization_id\s+IS\s+NULL/i);
+      expect(query).not.toMatch(/COALESCE\s*\(\s*organization_id/i);
+    }
+  );
+
   it.each(Object.entries(warehouseQueries))('%s orders and limits its page', (_name, query) => {
     expect(query).toContain('ORDER BY');
     expect(query).toContain('LIMIT');
+  });
+
+  // A cursor column selected through a cast under its own name shadows the column it
+  // came from: a bare name in ORDER BY resolves to the output column first, so the page
+  // is ordered by the cast while the cursor in the WHERE clause — which cannot see output
+  // aliases — still compares the underlying column. The page's last row is then not its
+  // cursor maximum and the next page skips rows, and no index can serve the ordering, so
+  // every page sorts the whole owner's rowset instead of reading one page from the index.
+  //
+  // Neither failure raises anything: the export is short some rows and slow. Nothing else
+  // in this file can catch it, because the query text is valid and the scope is correct,
+  // so it is pinned here as a rule about the whole set rather than about the two queries
+  // that had it. Qualifying the name, or ordering on an expression, resolves to the input
+  // column and satisfies this.
+  it.each(Object.entries(sourceQueries))(
+    '%s never orders on a name a cast has shadowed',
+    (_name, query) => {
+      const shadowed = [...query.matchAll(/(\w+)::\w+\s+AS\s+\1\b/gi)].map(match => match[1]);
+      const orderBy = /ORDER BY([\s\S]*?)(?:\nLIMIT|$)/i.exec(query)?.[1] ?? '';
+      for (const column of shadowed) {
+        // Not preceded by a dot: `cli_sessions.most_significant_position` is an input
+        // reference, the bare name is the shadowing output column.
+        expect(orderBy).not.toMatch(new RegExp(`(^|[\\s,(])${column}\\b`));
+      }
+    }
+  );
+
+  // Selecting the deletion column from a table that has none is an undefined-column
+  // error at read time, after the source has already been declared present. This keeps
+  // the list of tables without it tied to what the queries actually select.
+  it.each(Object.entries(sourceQueries))(
+    '%s selects the deletion column only where it exists',
+    (_name, query) => {
+      const readsTableWithoutColumn = SOURCES_WITHOUT_DELETED_COLUMN.some(table =>
+        new RegExp(`FROM ${table}\\b`).test(query)
+      );
+      if (readsTableWithoutColumn) expect(query).not.toContain(DELETED_COLUMN);
+    }
+  );
+
+  // The probe is only as good as what it asks about. A column selected by a query but
+  // absent from the declaration would be read from a table the probe just called ready.
+  it.each(Object.entries(WAREHOUSE_SOURCE_COLUMNS))(
+    '%s declares every column its queries select',
+    (table, declared) => {
+      const queries = Object.entries(sourceQueries)
+        .filter(([, query]) => new RegExp(`FROM ${table}\\b`).test(query))
+        .map(([, query]) => query);
+      expect(queries.length).toBeGreaterThan(0);
+      for (const query of queries) {
+        if (query.includes(DELETED_COLUMN)) expect(declared).toContain(DELETED_COLUMN);
+      }
+    }
+  );
+
+  it('requires the deletion column exactly where the source carries one', () => {
+    const withoutColumn = new Set<string>(SOURCES_WITHOUT_DELETED_COLUMN);
+    for (const [table, columns] of Object.entries(WAREHOUSE_SOURCE_COLUMNS)) {
+      expect(columns.includes(DELETED_COLUMN)).toBe(!withoutColumn.has(table));
+    }
+  });
+});
+
+describe('warehouse availability probe', () => {
+  function probeHarness(schema: Record<string, string[]>) {
+    const calls: Call[] = [];
+    const warehouseQuery: ReplicaQuery = async (text, values) => {
+      calls.push({ text, values });
+      return Object.entries(schema).flatMap(([table, columns]) =>
+        columns.map(column => ({ table_name: table, column_name: column }))
+      );
+    };
+    return { calls, warehouseQuery };
+  }
+
+  it('accepts a table carrying every column its source needs', async () => {
+    const { warehouseQuery } = probeHarness({ audiences: ['kilo_user_id', 'segment'] });
+
+    const present = await findPresentWarehouseTables(warehouseQuery, [
+      { table: 'audiences', requiredColumns: ['kilo_user_id', 'segment'] },
+    ]);
+
+    expect([...present]).toEqual(['audiences']);
+  });
+
+  // The case table-existence probing missed: loaded earlier, not yet reloaded with the
+  // column a newer query selects. Without this it fails at read time instead.
+  it('rejects a table that exists but lacks a required column', async () => {
+    const { warehouseQuery } = probeHarness({ audiences: ['kilo_user_id'] });
+
+    const present = await findPresentWarehouseTables(warehouseQuery, [
+      { table: 'audiences', requiredColumns: ['kilo_user_id', DELETED_COLUMN] },
+    ]);
+
+    expect([...present]).toEqual([]);
+  });
+
+  it('rejects a table that is not there at all', async () => {
+    const { warehouseQuery } = probeHarness({});
+
+    const present = await findPresentWarehouseTables(warehouseQuery, [
+      { table: 'audiences', requiredColumns: ['kilo_user_id'] },
+    ]);
+
+    expect([...present]).toEqual([]);
+  });
+
+  // A personal export filters on kilo_user_id and never touches organization_id, so a
+  // table whose org column has not landed yet is still perfectly serviceable to it.
+  // Requiring both would withhold a section from an export that could have been served.
+  it('requires only the scope column the subject actually filters on', () => {
+    const { adapters } = harness();
+    const requirementFor = (subject: 'user' | 'organization', table: string) =>
+      warehouseRequirements(adapters, subject).find(item => item.table === table)
+        ?.requiredColumns ?? [];
+
+    expect(requirementFor('user', 'app_builder_projects')).toContain('kilo_user_id');
+    expect(requirementFor('user', 'app_builder_projects')).not.toContain('organization_id');
+    expect(requirementFor('organization', 'app_builder_projects')).toContain('organization_id');
+    expect(requirementFor('organization', 'app_builder_projects')).not.toContain('kilo_user_id');
+  });
+
+  // The exception: this source's cursor reads the opposite scope column as its second
+  // key, so it genuinely needs both whichever subject is asking.
+  it('requires both scope columns for the source whose cursor spans them', () => {
+    const { adapters } = harness();
+    for (const subject of ['user', 'organization'] as const) {
+      const columns =
+        warehouseRequirements(adapters, subject).find(item => item.table === 'system_prompt_prefix')
+          ?.requiredColumns ?? [];
+      expect(columns).toContain('kilo_user_id');
+      expect(columns).toContain('organization_id');
+    }
+  });
+
+  it('asks about every table the adapters read, in one query', async () => {
+    const { calls, warehouseQuery } = probeHarness({});
+    const { adapters } = harness();
+
+    await findPresentWarehouseTables(warehouseQuery, warehouseRequirements(adapters, 'user'));
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].values[0]).toEqual([
+      'users',
+      'app_builder_projects',
+      'app_builder_messages',
+      'cli_sessions',
+      'system_prompt_prefix',
+      'microdollar_usage_metadata',
+    ]);
   });
 
   it('never joins the warehouse to the live primary or reads loader bookkeeping', () => {
@@ -255,8 +453,8 @@ describe('source adapters', () => {
     expect(terminal.failureCode).toBe('export_identity_row_missing');
     expect(terminal.redactedMessage).toContain('not found in the data snapshot');
     // The requester's id identifies a person and is carried on the log event already.
-    expect(terminal.message).not.toContain(READ_PAGE_INPUT.kiloUserId);
-    expect(terminal.redactedMessage).not.toContain(READ_PAGE_INPUT.kiloUserId);
+    expect(terminal.message).not.toContain(READ_PAGE_INPUT.subject.kiloUserId);
+    expect(terminal.redactedMessage).not.toContain(READ_PAGE_INPUT.subject.kiloUserId);
   });
 
   it('passes the authenticated user to the warehouse and maps project titles', async () => {
@@ -271,8 +469,43 @@ describe('source adapters', () => {
       },
     ]);
     expect(page?.records).toEqual([
-      { source: 'app_builder_projects', field: 'title', value: 'Owned project' },
+      { source: 'app_builder_projects', id: 'project-1', field: 'title', value: 'Owned project' },
     ]);
+  });
+
+  // Every warehouse source has to switch owner column with the subject. One left on
+  // `kilo_user_id` would return the requesting admin's own rows under the
+  // organization's name, which is the failure that has no visible symptom.
+  it.each([
+    'app_builder_projects',
+    'app_builder_messages',
+    'cli_sessions',
+    'system_prompt_prefix',
+    'microdollar_usage_metadata',
+  ])('scopes %s to the organization for an organization subject', async name => {
+    const { adapters, warehouseCalls } = harness([]);
+
+    await requireAdapter(adapters, name).readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls).toHaveLength(1);
+    expect(warehouseCalls[0].text).toContain('WHERE organization_id = $1');
+    // Anchored on WHERE rather than the bare column name: `system_prompt_prefix` reads
+    // `kilo_user_id` legitimately, as the second half of its cursor. What must not
+    // appear is the user column as the row filter.
+    expect(warehouseCalls[0].text).not.toContain('WHERE kilo_user_id');
+    expect(warehouseCalls[0].values[0]).toBe('org-1');
+  });
+
+  // The identity row belongs to a person. An organization export reading it would put
+  // the requesting admin's email and name in a file about the organization.
+  it('reads no identity row for an organization subject', async () => {
+    const { adapters, replicaCalls, warehouseCalls } = harness([PRIMARY_USER_ROW]);
+
+    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(page).toEqual({ records: [], nextCursor: null });
+    expect(replicaCalls).toEqual([]);
+    expect(warehouseCalls).toEqual([]);
   });
 
   it('serializes message payloads and preserves a jsonb null', async () => {
@@ -391,9 +624,15 @@ describe('source adapters', () => {
     expect(warehouseCalls[0]?.values).toEqual(['owner-user', null, null, 100]);
   });
 
-  it('emits system prompts as their own set, keyed by prefix id', async () => {
+  // The prefix id repeats across the triple, so both the record key and the cursor carry
+  // the second dimension alongside it.
+  it('emits system prompts keyed by the pair that orders them', async () => {
     const { adapters } = harness([
-      { system_prompt_prefix_id: '42', system_prompt_prefix: 'System prompt' },
+      {
+        system_prompt_prefix_id: '42',
+        cursor_secondary: 'org-9',
+        system_prompt_prefix: 'System prompt',
+      },
     ]);
 
     const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.({
@@ -402,9 +641,75 @@ describe('source adapters', () => {
     });
 
     expect(page?.records).toEqual([
-      { source: 'system_prompt_prefix', field: 'system_prompt_prefix', value: 'System prompt' },
+      {
+        source: 'system_prompt_prefix',
+        id: '42.org-9',
+        field: 'system_prompt_prefix',
+        value: 'System prompt',
+      },
     ]);
-    expect(page?.nextCursor).toEqual({ key: ['42'] });
+    expect(page?.nextCursor).toEqual({ key: ['42', 'org-9'] });
+  });
+
+  // A personal row has no organization, and the query coalesces it to a sentinel so the
+  // tuple comparison stays non-NULL. Without it the row is dropped at a page boundary,
+  // which is the defect this cursor was widened to fix.
+  it('carries a personal system prompt row through the cursor', async () => {
+    const { adapters, warehouseCalls } = harness([
+      {
+        system_prompt_prefix_id: '7',
+        cursor_secondary: '-',
+        system_prompt_prefix: 'Personal prompt',
+      },
+    ]);
+
+    const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(warehouseCalls[0].text).toContain("COALESCE(organization_id, '-')");
+    expect(page?.nextCursor).toEqual({ key: ['7', '-'] });
+    // Non-empty, so the cursor survives KeyCursorSchema on resume.
+    expect(page?.nextCursor).toEqual({
+      key: expect.arrayContaining([expect.stringMatching(/.+/)]),
+    });
+  });
+
+  it('marks a deleted row and leaves a live one unmarked', async () => {
+    const { adapters } = harness([
+      { id: 'project-live', title: 'Live', _snowflake_deleted: false },
+      { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
+      // Unknown state: the table's reload has not run. Not deleted as far as we can say.
+      { id: 'project-unknown', title: 'Unknown', _snowflake_deleted: null },
+    ]);
+
+    const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toEqual([
+      { source: 'app_builder_projects', id: 'project-live', field: 'title', value: 'Live' },
+      {
+        source: 'app_builder_projects',
+        id: 'project-gone',
+        field: 'title',
+        value: 'Deleted',
+        softDeleted: true,
+      },
+      { source: 'app_builder_projects', id: 'project-unknown', field: 'title', value: 'Unknown' },
+    ]);
+  });
+
+  // Deleted rows are returned, not filtered. The export is a truthful copy of what the
+  // warehouse holds, so a deleted project still reaches the person it belonged to.
+  it('returns deleted rows rather than dropping them', async () => {
+    const { adapters, warehouseCalls } = harness([
+      { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
+    ]);
+
+    const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(1);
+    expect(warehouseCalls[0].text).not.toContain('_snowflake_deleted IS NOT TRUE');
   });
 
   it('emits user prompts as their own set, unpaired from system prompts', async () => {

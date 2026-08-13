@@ -197,7 +197,7 @@ discounts are private preview. Rejected as a schedule dependency on an external 
 before session creation, keep the expected-equals-charged invariant everywhere, and make
 product-restricted coupons structurally harmless. Rejected for this release in favor of preserving
 the existing hosted-Checkout conversion path. It remains the preferred fallback if the coupon
-allocation proof in Invariant 10 fails.
+allocation proof in Invariant 11 fails.
 
 **Charge the fee on undiscounted list price and let it stand.** Rejected. It would collect more than
 5% of the amount the customer actually paid.

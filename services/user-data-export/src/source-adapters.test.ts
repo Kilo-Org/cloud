@@ -9,6 +9,7 @@ import {
   SOURCES_WITHOUT_DELETED_COLUMN,
   SCOPE_PREDICATES,
   WAREHOUSE_PROFILE_FIELDS,
+  WAREHOUSE_ONLY_FIELDS,
   WAREHOUSE_SOURCE_COLUMNS,
   warehouseQueries,
   type ReplicaQuery,
@@ -70,6 +71,22 @@ const PRIMARY_USER_ROW = {
   normalized_email: null,
   email_domain: null,
 };
+
+/**
+ * A warehouse `users` row. The warehouse-only columns default to null, which is what the
+ * real table holds for most people, and the mapper is strict about their presence: the
+ * probe guarantees the SELECT can name them, so an absent key is a fixture error rather
+ * than a state production can reach.
+ */
+function warehouseUserRow(overrides: Record<string, unknown> = {}) {
+  return {
+    user_id: 'user-1',
+    email: 'warehouse@example.com',
+    name: 'Warehouse Name',
+    ...Object.fromEntries(WAREHOUSE_ONLY_FIELDS.map(field => [field, null])),
+    ...overrides,
+  };
+}
 
 const READ_PAGE_INPUT = {
   subject: { type: 'user', kiloUserId: 'owner-user' },
@@ -347,7 +364,11 @@ describe('warehouse availability probe', () => {
     const selected = sourceQueries.warehouseProfileQuery
       .slice('SELECT '.length, sourceQueries.warehouseProfileQuery.indexOf('\nFROM'))
       .split(', ');
-    expect(selected).toEqual(['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS)]);
+    expect(selected).toEqual([
+      'user_id',
+      ...Object.values(WAREHOUSE_PROFILE_FIELDS),
+      ...WAREHOUSE_ONLY_FIELDS,
+    ]);
     // Columns the warehouse does not have. Selecting any of them fails at runtime.
     for (const absent of ['google_user_email', 'google_user_name', 'created_at', 'signup_ip']) {
       expect(sourceQueries.warehouseProfileQuery).not.toContain(absent);
@@ -377,7 +398,7 @@ describe('source adapters', () => {
   it('reads each identity field from the database that has it', async () => {
     const { adapters, replicaCalls, warehouseCalls } = harness(
       [PRIMARY_USER_ROW],
-      [{ user_id: 'user-1', email: 'warehouse@example.com', name: 'Warehouse Name' }]
+      [warehouseUserRow()]
     );
 
     await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
@@ -390,14 +411,45 @@ describe('source adapters', () => {
     ]);
   });
 
+  // The warehouse holds location and analytics-identity columns with no counterpart on
+  // the primary. They were absent only because they arrived after the identity section
+  // shipped, which left the export returning someone's signup IP while withholding the
+  // country derived from it.
+  it('returns the warehouse columns the primary does not hold', async () => {
+    const { adapters } = harness(
+      [PRIMARY_USER_ROW],
+      [
+        warehouseUserRow({
+          posthog_city: 'Amsterdam',
+          posthog_country_name: 'Netherlands',
+          current_posthog_city: 'Rotterdam',
+          posthog_email: 'analytics@example.com',
+        }),
+      ]
+    );
+
+    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    // Every declared column reaches the file, not just the ones this fixture populates.
+    for (const field of WAREHOUSE_ONLY_FIELDS) expect(byField.has(field)).toBe(true);
+    expect(byField.get('posthog_city')).toBe('Amsterdam');
+    expect(byField.get('current_posthog_city')).toBe('Rotterdam');
+    // Both generations are kept: where someone was and where they are are different facts.
+    expect(byField.get('posthog_country_name')).toBe('Netherlands');
+    // The analytics copy of identity is distinct from the account's own and is not
+    // collapsed into it.
+    expect(byField.get('posthog_email')).toBe('analytics@example.com');
+    expect(byField.get('google_user_email')).toBe('warehouse@example.com');
+    // A blank stays a blank rather than failing the export.
+    expect(byField.get('vercel_country')).toBeNull();
+  });
+
   // The point of the change: the two fields the warehouse carries are reported as of the
   // snapshot, so a name or email changed after the cutoff does not appear beside five
   // sources frozen before it.
   it('prefers the warehouse copy of email and name over the live values', async () => {
-    const { adapters } = harness(
-      [PRIMARY_USER_ROW],
-      [{ user_id: 'user-1', email: 'warehouse@example.com', name: 'Warehouse Name' }]
-    );
+    const { adapters } = harness([PRIMARY_USER_ROW], [warehouseUserRow()]);
 
     const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
     const value = (field: string) => page?.records.find(record => record.field === field)?.value;
@@ -417,10 +469,7 @@ describe('source adapters', () => {
     ['blank', '   '],
     ['a non-string', 42],
   ])('falls back to the live value when the warehouse email is %s', async (_label, bad) => {
-    const { adapters } = harness(
-      [PRIMARY_USER_ROW],
-      [{ user_id: 'user-1', email: bad, name: bad }]
-    );
+    const { adapters } = harness([PRIMARY_USER_ROW], [warehouseUserRow({ email: bad, name: bad })]);
 
     const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
     const value = (field: string) => page?.records.find(record => record.field === field)?.value;

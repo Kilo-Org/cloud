@@ -19,6 +19,7 @@ import {
   REASONING_VARIANTS_BINARY,
 } from '@/lib/ai-gateway/providers/variants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { isLongCatModel } from '@/lib/ai-gateway/providers/longcat';
 
 export async function getOpenRouterDerivedModelVariants(
   model: string
@@ -62,6 +63,9 @@ export function getAiSdkProvider(
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (directProviderId === 'morph-byok') {
+    return 'openai-compatible';
+  }
+  if (isLongCatModel(model)) {
     return 'openai-compatible';
   }
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {

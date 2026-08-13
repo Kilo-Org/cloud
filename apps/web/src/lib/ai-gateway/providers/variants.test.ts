@@ -7,12 +7,13 @@ import {
 } from '@/lib/ai-gateway/providers/variants';
 
 describe('getFallbackModelVariants', () => {
-  test.each(['google/gemma-4-26b-a4b-it', 'poolside/laguna-s-2.1:free'])(
-    'returns binary variants for %s',
-    model => {
-      expect(getFallbackModelVariants(model)).toBe(REASONING_VARIANTS_BINARY);
-    }
-  );
+  test.each([
+    'google/gemma-4-26b-a4b-it',
+    'meituan/longcat-2.0-free',
+    'poolside/laguna-s-2.1:free',
+  ])('returns binary variants for %s', model => {
+    expect(getFallbackModelVariants(model)).toBe(REASONING_VARIANTS_BINARY);
+  });
 
   test('returns the latest Nemotron family variants', () => {
     expect(getFallbackModelVariants('nvidia/nemotron-3-super-120b-a12b:free')).toBe(

@@ -47,6 +47,19 @@ export default {
       }
     },
   },
+  LONGCAT: {
+    id: 'longcat',
+    apiUrl: 'https://api.longcat.ai/openai/v1',
+    apiKey: getEnvVariable('LONGCAT_API_KEY'),
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
+    async transformRequest(context) {
+      context.request.body.thinking = {
+        type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
+      };
+      delete context.request.body.provider;
+    },
+  },
   MARTIAN: {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',

@@ -21,6 +21,7 @@ import { deepseek_v4_pro_discounted_model } from './providers/deepseek';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+import { longcat_2_free_model } from './providers/longcat';
 import { getRandomNumber } from './getRandomNumber';
 
 describe('rate-limited Kilo-exclusive models', () => {
@@ -86,6 +87,21 @@ describe('isFreeModel', () => {
       expect(autoFreeModels.map(({ model }) => model)).not.toContain(
         tencent_hy3_free_model.public_id
       );
+    });
+
+    test('registers LongCat 2.0 as a free exclusive model without adding it to Auto Free', async () => {
+      expect(findKiloExclusiveModel('meituan/longcat-2.0-free')).toBe(longcat_2_free_model);
+      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(true);
+      expect(longcat_2_free_model).toMatchObject({
+        internal_id: 'LongCat-2.0',
+        gateway: 'longcat',
+        context_length: 1_048_756,
+        max_completion_tokens: 131_072,
+      });
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
+        longcat_2_free_model.public_id
+      );
+      expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBe('openai-compatible');
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {

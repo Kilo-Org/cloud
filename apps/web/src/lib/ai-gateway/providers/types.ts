@@ -8,6 +8,7 @@ export type ProviderId =
   | 'seed'
   | 'direct-byok'
   | 'inception'
+  | 'longcat'
   | 'martian'
   | 'mistral'
   | 'streamlake'

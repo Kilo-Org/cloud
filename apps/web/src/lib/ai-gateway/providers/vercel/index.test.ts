@@ -191,7 +191,7 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
   });
 
-  it('does not merge the managed Friendli key into user BYOK settings', async () => {
+  it('does not add managed Friendli credentials to user BYOK settings', async () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
     const request = byokRequest([]);
 
@@ -205,7 +205,7 @@ describe('applyVercelSettings BYOK pinning', () => {
   });
 });
 
-describe('applyVercelSettings managed BYOK', () => {
+describe('applyVercelSettings managed requests', () => {
   function managedRequest(): GatewayRequest {
     return {
       kind: 'chat_completions',
@@ -216,19 +216,8 @@ describe('applyVercelSettings managed BYOK', () => {
     };
   }
 
-  it('merges the configured Friendli key into the gateway BYOK settings', async () => {
+  it('does not add managed Friendli credentials from the environment', async () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
-    const request = managedRequest();
-
-    await applyVercelSettings('moonshotai/kimi-k3', request, null);
-
-    expect(request.body.providerOptions?.gateway?.byok).toEqual({
-      friendli: [{ apiKey: 'friendli-managed-key' }],
-    });
-  });
-
-  it('does not add Friendli BYOK settings when the key is not configured', async () => {
-    delete process.env.FRIENDLI_API_KEY;
     const request = managedRequest();
 
     await applyVercelSettings('moonshotai/kimi-k3', request, null);

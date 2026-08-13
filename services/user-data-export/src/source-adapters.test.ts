@@ -172,6 +172,31 @@ describe('warehouse scoping guard', () => {
     expect(query).toContain('LIMIT');
   });
 
+  // `ORDER BY <bare identifier>` resolves to an output column in preference to a table
+  // column, so `col::text AS col` silently reorders the page by the cast. The WHERE
+  // clause cannot see output names and keeps comparing the raw column, and keyset paging
+  // requires those two to agree. When they disagreed on `cli_sessions`, the cursor came
+  // from a row that was not the largest, so later pages repeated some rows and skipped
+  // others for good. Measured 2026-08-13 on a real plan:
+  // `Sort Key: ((most_significant_position)::text)`.
+  //
+  // The rule that prevents it: an output alias must never reuse the name of a column
+  // that the ORDER BY mentions.
+  it.each(Object.entries(warehouseQueries))(
+    '%s never shadows an ordering column',
+    (_name, query) => {
+      const aliases = [...query.matchAll(/\bAS\s+(\w+)/gi)].map(match => match[1]);
+      const orderBy = query.slice(
+        query.indexOf('ORDER BY') + 'ORDER BY'.length,
+        query.indexOf('LIMIT')
+      );
+      const ordered = [...orderBy.matchAll(/\b([a-z_][a-z0-9_]*)\b/gi)]
+        .map(match => match[1])
+        .filter(word => word.toUpperCase() !== 'COALESCE');
+      for (const alias of aliases) expect(ordered).not.toContain(alias);
+    }
+  );
+
   // Selecting the deletion column from a table that has none is an undefined-column
   // error at read time, after the source has already been declared present. This keeps
   // the list of tables without it tied to what the queries actually select.
@@ -515,8 +540,8 @@ describe('source adapters', () => {
         title: 'Session',
         git_url: 'git@example.com:acme/repo.git',
         git_branch: 'main',
-        most_significant_position: '10',
-        least_significant_position: '20',
+        cursor_most: '10',
+        cursor_least: '20',
       },
     ]);
 
@@ -548,16 +573,16 @@ describe('source adapters', () => {
         title: 'Session',
         git_url: null,
         git_branch: 'main',
-        most_significant_position: '10',
-        least_significant_position: '1',
+        cursor_most: '10',
+        cursor_least: '1',
       },
       {
         session_id: 'session-1',
         title: 'Session renamed',
         git_url: null,
         git_branch: 'feature/x',
-        most_significant_position: '10',
-        least_significant_position: '2',
+        cursor_most: '10',
+        cursor_least: '2',
       },
     ]);
 
@@ -604,7 +629,7 @@ describe('source adapters', () => {
   it('emits system prompts keyed by the pair that orders them', async () => {
     const { adapters } = harness([
       {
-        system_prompt_prefix_id: '42',
+        cursor_id: '42',
         cursor_secondary: 'org-9',
         system_prompt_prefix: 'System prompt',
       },
@@ -632,7 +657,7 @@ describe('source adapters', () => {
   it('carries a personal system prompt row through the cursor', async () => {
     const { adapters, warehouseCalls } = harness([
       {
-        system_prompt_prefix_id: '7',
+        cursor_id: '7',
         cursor_secondary: '-',
         system_prompt_prefix: 'Personal prompt',
       },
@@ -724,13 +749,13 @@ describe('source adapters', () => {
         title: 'Session',
         git_url: null,
         git_branch: null,
-        most_significant_position: '10; DROP TABLE cli_sessions',
-        least_significant_position: '20',
+        cursor_most: '10; DROP TABLE cli_sessions',
+        cursor_least: '20',
       },
     ]);
 
     await expect(
       requireAdapter(adapters, 'cli_sessions').readPage?.(READ_PAGE_INPUT)
-    ).rejects.toThrow('most_significant_position');
+    ).rejects.toThrow('cursor_most');
   });
 });

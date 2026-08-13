@@ -226,10 +226,26 @@ const messageQueries = subjectPageQueries({
  * timeline instead of looking like duplication, and session_id is exported so rows
  * belonging to one session can be grouped.
  */
+/**
+ * The journal positions are cast to text so bigint precision survives JSON, but the
+ * output columns are named `cursor_*` rather than reusing the column names.
+ *
+ * That naming is load-bearing. `ORDER BY <bare identifier>` resolves to an output column
+ * in preference to a table column, so aliasing the cast back to `most_significant_position`
+ * silently ordered the page lexicographically while the WHERE clause, which cannot see
+ * output names, kept comparing the raw bigints. Keyset paging requires those two to
+ * agree; when they disagreed the cursor was taken from a row that was not the numerically
+ * largest, so later pages both repeated rows and skipped others permanently. Text order
+ * diverges wherever digit counts differ, and `least_significant_position` counts up from
+ * small numbers.
+ *
+ * Confirmed on 2026-08-13: the plan showed `Sort Key: ((most_significant_position)::text)`
+ * and a Sort node above an index that already covers this ordering exactly.
+ */
 function cliSessionPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT session_id, title, git_url, git_branch,
-  most_significant_position::text AS most_significant_position,
-  least_significant_position::text AS least_significant_position
+  most_significant_position::text AS cursor_most,
+  least_significant_position::text AS cursor_least
 FROM cli_sessions
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
@@ -287,7 +303,7 @@ function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   // The dimension the scope does not already pin: scoping by user leaves org varying,
   // and scoping by org leaves user varying.
   const cursorColumn = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
-  return `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
+  return `SELECT system_prompt_prefix_id::text AS cursor_id,
   COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}') AS cursor_secondary,
   system_prompt_prefix, _snowflake_deleted
 FROM system_prompt_prefix
@@ -319,11 +335,11 @@ type CliSessionRow = {
   title: string | null;
   git_url: string | null;
   git_branch: string | null;
-  most_significant_position: string;
-  least_significant_position: string;
+  cursor_most: string;
+  cursor_least: string;
 };
 type SystemPromptRow = {
-  system_prompt_prefix_id: string;
+  cursor_id: string;
   cursor_secondary: string;
   system_prompt_prefix: string | null;
   deleted: unknown;
@@ -614,21 +630,15 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             title: nullableString(row.title, 'title'),
             git_url: nullableString(row.git_url, 'git_url'),
             git_branch: nullableString(row.git_branch, 'git_branch'),
-            most_significant_position: digitString(
-              row.most_significant_position,
-              'most_significant_position'
-            ),
-            least_significant_position: digitString(
-              row.least_significant_position,
-              'least_significant_position'
-            ),
+            cursor_most: digitString(row.cursor_most, 'cursor_most'),
+            cursor_least: digitString(row.cursor_least, 'cursor_least'),
           }))
         );
         return {
           records: rows.flatMap(row => {
             // The journal position identifies the row, so records that repeat a
             // value are distinguishable rather than looking like duplication.
-            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            const id = `${row.cursor_most}.${row.cursor_least}`;
             return [
               { source: 'cli_sessions', id, field: 'session_id', value: row.session_id },
               { source: 'cli_sessions', id, field: 'title', value: row.title },
@@ -636,10 +646,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               { source: 'cli_sessions', id, field: 'git_branch', value: row.git_branch },
             ];
           }),
-          nextCursor: nextKeyCursor(rows, input.limit, row => [
-            row.most_significant_position,
-            row.least_significant_position,
-          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.cursor_most, row.cursor_least]),
         };
       },
     },
@@ -653,10 +660,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           [subjectScopeValue(input.subject), afterId, afterSecondary, input.limit]
         ).then(result =>
           result.map(row => ({
-            system_prompt_prefix_id: digitString(
-              row.system_prompt_prefix_id,
-              'system_prompt_prefix_id'
-            ),
+            cursor_id: digitString(row.cursor_id, 'cursor_id'),
             // COALESCE in the query means this is '' rather than null on a personal row,
             // so the cursor always has a comparable value to carry forward.
             cursor_secondary: requiredString(row.cursor_secondary, 'cursor_secondary'),
@@ -670,13 +674,13 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // The prefix id repeats across the triple, so it cannot identify a row on
             // its own. The pair that orders the page does, and it is what a deletion
             // mark has to hang off to mean anything.
-            id: `${row.system_prompt_prefix_id}.${row.cursor_secondary}`,
+            id: `${row.cursor_id}.${row.cursor_secondary}`,
             field: 'system_prompt_prefix',
             value: row.system_prompt_prefix,
             ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
-            row.system_prompt_prefix_id,
+            row.cursor_id,
             row.cursor_secondary,
           ]),
         };

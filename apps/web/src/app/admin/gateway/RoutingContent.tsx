@@ -24,6 +24,7 @@ export function RoutingContent() {
 
   const [inputValue, setInputValue] = useState('');
   const [freeInputValue, setFreeInputValue] = useState('');
+  const [optOutModelsValue, setOptOutModelsValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -31,6 +32,7 @@ export function RoutingContent() {
     if (data) {
       setInputValue(data.vercel_routing_percentage?.toString() ?? '');
       setFreeInputValue(data.vercel_routing_percentage_free?.toString() ?? '');
+      setOptOutModelsValue(data.vercel_routing_opt_out_models.join('\n'));
       setNoteValue('');
       setHasChanges(false);
     }
@@ -42,7 +44,7 @@ export function RoutingContent() {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.gatewayConfig.get.queryKey(),
         });
-        toast.success('Vercel routing percentage updated');
+        toast.success('Vercel routing configuration updated');
       },
       onError: error => {
         toast.error(error.message || 'Failed to update');
@@ -63,6 +65,17 @@ export function RoutingContent() {
     return num;
   }
 
+  function optOutModels() {
+    return [
+      ...new Set(
+        optOutModelsValue
+          .split('\n')
+          .map(model => model.trim())
+          .filter(Boolean)
+      ),
+    ];
+  }
+
   function handleSave() {
     const note = noteInput();
     const paid = parsePercentage(inputValue);
@@ -76,6 +89,7 @@ export function RoutingContent() {
     mutation.mutate({
       vercel_routing_percentage: paid,
       vercel_routing_percentage_free: free,
+      vercel_routing_opt_out_models: optOutModels(),
       note,
     });
   }
@@ -84,6 +98,7 @@ export function RoutingContent() {
     mutation.mutate({
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: optOutModels(),
       note: noteInput(),
     });
   }
@@ -102,7 +117,7 @@ export function RoutingContent() {
     <div className="flex w-full flex-col gap-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Vercel Routing Percentage</CardTitle>
+          <CardTitle>Vercel Routing</CardTitle>
           <CardDescription>
             For models available on the Vercel AI Gateway, controls the percentage of traffic routed
             to Vercel (vs OpenRouter). Models not available on Vercel always go to OpenRouter, so
@@ -157,6 +172,26 @@ export function RoutingContent() {
               className="w-48"
             />
             <span className="text-muted-foreground text-sm">%</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="routing-opt-out-models">Opt-out models</Label>
+            <Textarea
+              id="routing-opt-out-models"
+              aria-describedby="routing-opt-out-models-description"
+              placeholder={'moonshotai/kimi-k3\nprovider/another-model'}
+              value={optOutModelsValue}
+              onChange={e => {
+                setOptOutModelsValue(e.target.value);
+                setHasChanges(true);
+              }}
+              rows={6}
+              className="font-mono text-sm"
+            />
+            <p id="routing-opt-out-models-description" className="text-muted-foreground text-xs">
+              One model ID per line. Matching is exact after entries are lowercased; matching models
+              are excluded from percentage-based Vercel routing. Changes take effect within one
+              minute on warm instances.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">

@@ -3,6 +3,7 @@ import type { OrganizationGroupPolicyContext } from './organization-group-policy
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  type EffectiveOrganizationModelPolicy,
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
@@ -205,7 +206,7 @@ describe('effective organization model access', () => {
         providerAllowList: ['nvidia'],
       },
       policyRevision: 1,
-    } as const;
+    } satisfies EffectiveOrganizationModelPolicy;
     const providerLookup = async (modelId: string) =>
       new Set(
         {

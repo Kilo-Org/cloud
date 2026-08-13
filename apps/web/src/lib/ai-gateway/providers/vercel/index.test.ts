@@ -5,6 +5,7 @@ import {
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
+  isVercelRoutingOptOut,
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -205,5 +206,14 @@ describe('passesVercelRoutingPercentage', () => {
 
     expect(seedsInFinalBucket.some(seed => passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
     expect(seedsInFinalBucket.some(seed => !passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
+  });
+});
+
+describe('isVercelRoutingOptOut', () => {
+  it('only opts out exact model ID matches', () => {
+    const optOutModels = new Set(['moonshotai/kimi-k3']);
+
+    expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
+    expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
   });
 });

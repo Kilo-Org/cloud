@@ -31,6 +31,7 @@ import {
   TimeseriesInputSchema,
   TimeseriesOutputSchema,
   UsageAnalyticsFiltersSchema,
+  type BreakdownDimension,
   type CostSource,
   type Dimension,
   type Granularity,
@@ -41,6 +42,7 @@ import {
 
 export {
   BreakdownInputSchema,
+  BreakdownDimensionSchema,
   BreakdownOutputSchema,
   CostSourceSchema,
   DimensionSchema,
@@ -55,6 +57,7 @@ export {
   UsageAnalyticsFiltersSchema,
 } from '@/routers/usage-analytics-schemas';
 export type {
+  BreakdownDimension,
   CostSource,
   Dimension,
   Granularity,
@@ -361,7 +364,7 @@ function bucketExprSql(effectiveGranularity: Granularity): SQL<string> {
 // Dimension column name
 // ---------------------------------------------------------------------------
 
-function dimensionColumn(dimension: Dimension): SQL<string> {
+export function dimensionColumn(dimension: BreakdownDimension): SQL<string> {
   switch (dimension) {
     case 'feature':
       return featureName;
@@ -375,6 +378,8 @@ function dimensionColumn(dimension: Dimension): SQL<string> {
       return providerName;
     case 'project':
       return projectName;
+    case 'organization':
+      return sql<string>`COALESCE(${microdollar_usage.organization_id}::text, '')`;
   }
 }
 

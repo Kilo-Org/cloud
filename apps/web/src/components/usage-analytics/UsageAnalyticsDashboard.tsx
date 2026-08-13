@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { UsageTableBase, type UsageTableColumn } from '@/components/usage/UsageTableBase';
+import { UsageAvailabilityBanner } from '@/components/usage/UsageAvailabilityBanner';
 import { UsageWarning } from '@/components/usage/UsageWarning';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import {
@@ -682,6 +683,8 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
 
         <div className="flex-1 overflow-y-auto">
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
+            <UsageAvailabilityBanner />
+
             {hasEnterpriseUsageViews && (
               <div className="space-y-4">
                 <div>

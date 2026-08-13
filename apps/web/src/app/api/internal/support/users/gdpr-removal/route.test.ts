@@ -205,9 +205,10 @@ describe('POST /api/internal/support/users/gdpr-removal', () => {
   });
 
   describe('validation', () => {
-    test('returns 400 for an invalid body', async () => {
-      const res = await POST(request({ userId: 'not-a-uuid' }));
+    test('returns 400 for an empty userId', async () => {
+      const res = await POST(request({ userId: '   ' }));
       expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'Invalid body' });
       expect(mockedFindUserById).not.toHaveBeenCalled();
       expect(destroy).not.toHaveBeenCalled();
       expect(events).toHaveLength(0);
@@ -218,6 +219,32 @@ describe('POST /api/internal/support/users/gdpr-removal', () => {
       expect(res.status).toBe(400);
       expect(destroy).not.toHaveBeenCalled();
       expect(events).toHaveLength(0);
+    });
+  });
+
+  test('accepts legacy oauth/google user ids', async () => {
+    const legacyUserId = 'oauth/google:123456789012345678901';
+    mockedFindUserById.mockResolvedValue(
+      targetUser({ id: legacyUserId, google_user_email: CUSTOMER_EMAIL })
+    );
+    mockedListAllActiveInstanceRows.mockResolvedValue([]);
+    mockedAssertUserCanBeSoftDeleted.mockResolvedValue(undefined);
+    mockedSoftDeleteUser.mockResolvedValue(undefined as never);
+    mockedSoftDeleteUserExternalServices.mockResolvedValue([]);
+
+    const res = await POST(request({ userId: legacyUserId }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      message: expect.stringContaining(legacyUserId),
+    });
+    expect(mockedFindUserById).toHaveBeenCalledWith(legacyUserId);
+    expect(mockedSoftDeleteUser).toHaveBeenCalledWith(legacyUserId);
+    expect(events[0]).toMatchObject({
+      outcome: 'deleted',
+      claimedActorEmail: ACTOR_EMAIL,
+      correlationId: REQUEST_ID,
+      target: `user:${legacyUserId}`,
     });
   });
 

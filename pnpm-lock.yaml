@@ -675,9 +675,6 @@ importers:
       '@ai-sdk/mistral':
         specifier: 4.0.12
         version: 4.0.12(zod@4.4.3)
-      '@ai-sdk/openai':
-        specifier: 4.0.15
-        version: 4.0.15(zod@4.4.3)
       '@ai-sdk/openai-compatible':
         specifier: 3.0.11
         version: 3.0.11(zod@4.4.3)
@@ -3263,12 +3260,6 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@4.0.15':
-    resolution: {integrity: sha512-JpTLQp5RUbRcs5nOyPEu5NRdxZLUnD/uCyT3qzy26D+iunCeL7KJV58ER9kwisAKnTjWravfNblaQNiWr20M9A==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
   '@ai-sdk/provider-utils@5.0.10':
     resolution: {integrity: sha512-uPyec0+85dwxZYXtb8qe8gCjhjDfxP4LCDo/uRQS/iG+FIgYbHPRhr/ys281udG90bTaE18+5cxWraYaf8oHCw==}
     engines: {node: '>=22'}
@@ -4714,11 +4705,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild/aix-ppc64@0.28.1':
     resolution: {integrity: sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==}
@@ -18695,12 +18686,6 @@ snapshots:
       zod: 4.4.3
 
   '@ai-sdk/openai-compatible@3.0.11(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
-      zod: 4.4.3
-
-  '@ai-sdk/openai@4.0.15(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)

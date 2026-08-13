@@ -179,14 +179,37 @@ if (process.env.NODE_ENV !== 'test') {
   }
 }
 
-// Pool error handlers: idle client errors trigger process exit in production
-// because a failed connection pool means the process cannot serve traffic.
-// In test mode, pool.end() during cleanup triggers idle client errors.
-// Attach a non-exiting listener in test mode to prevent Node from throwing
-// on an emitted error with zero listeners (same contract as replication-health.ts).
+/**
+ * Whether an idle-client pool error should terminate the process. Pure and
+ * exported so it can be unit-tested without a database, like `selectReplicaUrl`
+ * above and `classifyReplicaRow` in replication-health.ts.
+ *
+ * A dead *primary* pool means the process cannot serve traffic, so it exits and
+ * lets the platform replace the instance.
+ *
+ * A dead *replica* pool does not, so it only logs. The replica is a read-path
+ * optimisation and `selectReplicaUrl` already treats a missing replica as "use
+ * the primary". Exiting here escalated a replica-only outage into whole-instance
+ * termination: when both EU replicas refused connections on 2026-08-12 this
+ * handler fired 107 times in under an hour, killing instances whose primary was
+ * healthy the entire time and taking writes and primary reads down with them.
+ * Reads aimed at a broken replica now fail per-request instead.
+ *
+ * In test mode neither exits: `pool.end()` during cleanup emits idle-client
+ * errors, and a listener must stay attached so Node does not treat the emit as
+ * an unhandled throw.
+ */
+export function shouldExitOnPoolError(
+  poolKind: 'primary' | 'replica',
+  nodeEnv = process.env.NODE_ENV
+): boolean {
+  if (nodeEnv === 'test') return false;
+  return poolKind === 'primary';
+}
+
 pool.on('error', (err: Error) => {
   console.error('Unexpected error on idle client (primary)', err);
-  if (process.env.NODE_ENV !== 'test') {
+  if (shouldExitOnPoolError('primary')) {
     process.exit(-1);
   }
 });
@@ -194,7 +217,7 @@ pool.on('error', (err: Error) => {
 if (usesSeparateReplica) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
-    if (process.env.NODE_ENV !== 'test') {
+    if (shouldExitOnPoolError('replica')) {
       process.exit(-1);
     }
   });
@@ -203,7 +226,7 @@ if (usesSeparateReplica) {
 if (usesDedicatedUsageReplica) {
   usageReplicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (usage-replica)', err);
-    if (process.env.NODE_ENV !== 'test') {
+    if (shouldExitOnPoolError('replica')) {
       process.exit(-1);
     }
   });

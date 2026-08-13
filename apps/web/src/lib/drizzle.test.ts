@@ -1,4 +1,10 @@
-import { pool, db, selectReplicaUrl, selectUsageReplicaUrl } from '@/lib/drizzle';
+import {
+  pool,
+  db,
+  selectReplicaUrl,
+  selectUsageReplicaUrl,
+  shouldExitOnPoolError,
+} from '@/lib/drizzle';
 
 describe('drizzle', () => {
   describe('pool', () => {
@@ -32,6 +38,24 @@ describe('drizzle', () => {
       } finally {
         consoleSpy.mockRestore();
       }
+    });
+
+    it('exits on a primary pool error outside test mode', () => {
+      // A dead primary pool means the process cannot serve traffic at all.
+      expect(shouldExitOnPoolError('primary', 'production')).toBe(true);
+    });
+
+    it('does not exit on a replica pool error outside test mode', () => {
+      // Regression guard: exiting here escalated a replica-only outage into 107
+      // instance terminations on 2026-08-12 while the primary was healthy.
+      // The replica is a read-path optimisation with a primary fallback, so a
+      // broken replica must degrade reads rather than kill the process.
+      expect(shouldExitOnPoolError('replica', 'production')).toBe(false);
+    });
+
+    it('never exits in test mode, so pool.end() cleanup cannot kill the runner', () => {
+      expect(shouldExitOnPoolError('primary', 'test')).toBe(false);
+      expect(shouldExitOnPoolError('replica', 'test')).toBe(false);
     });
   });
 

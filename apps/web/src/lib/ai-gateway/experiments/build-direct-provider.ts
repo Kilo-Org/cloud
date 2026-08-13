@@ -21,33 +21,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function setPropertyPath(target: Record<string, unknown>, path: string, value: string) {
-  const segments = path.split('.');
-  const finalSegment = segments.at(-1);
-  if (!finalSegment) {
-    return;
-  }
-
-  let current = target;
-
-  for (const segment of segments.slice(0, -1)) {
-    const existing = current[segment];
-    if (isRecord(existing)) {
-      current = existing;
-      continue;
-    }
-
-    const nested: Record<string, unknown> = {};
-    current[segment] = nested;
-    current = nested;
-  }
-
-  current[finalSegment] = value;
-}
-
-const GEMINI_THOUGHT_CONTENT_MAPPING = 'extra_content.google.thought';
-const GEMINI_THOUGHT_SIGNATURE_MAPPING = 'extra_content.google.thought_signature';
-
 function mapGeminiThoughtSignatures(context: TransformRequestContext) {
   if (context.request.kind !== 'chat_completions') {
     return;
@@ -71,9 +44,19 @@ function mapGeminiThoughtSignatures(context: TransformRequestContext) {
 
       const signature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
-      if (typeof signature === 'string') {
-        setPropertyPath(toolCall, GEMINI_THOUGHT_SIGNATURE_MAPPING, signature);
+      if (typeof signature !== 'string') {
+        continue;
       }
+
+      const extraContent = isRecord(toolCall.extra_content) ? toolCall.extra_content : {};
+      const google = isRecord(extraContent.google) ? extraContent.google : {};
+      toolCall.extra_content = {
+        ...extraContent,
+        google: {
+          ...google,
+          thought_signature: signature,
+        },
+      };
     }
   }
 }
@@ -177,7 +160,7 @@ export function buildDirectProvider(
     apiKey: upstream.api_key,
     supportedChatApis,
     responseTransforms: upstream.use_gemini_reasoning_transform
-      ? { thoughtContentMapping: GEMINI_THOUGHT_CONTENT_MAPPING }
+      ? { mapGeminiThoughtContent: true }
       : null,
     async transformRequest(context) {
       const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);

@@ -1594,7 +1594,7 @@ describe('auto routing worker', () => {
         providerId: 'minimax',
         modelId: 'minimax/minimax-m3',
       }),
-      { expirationTtl: 60 }
+      { expirationTtl: 60, metadata: { writtenAt: expect.any(Number) } }
     );
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
@@ -1621,7 +1621,7 @@ describe('auto routing worker', () => {
         providerId: 'byteplus-coding',
         modelId: 'byteplus-coding/bytedance-seed-code',
       }),
-      { expirationTtl: 60 }
+      { expirationTtl: 60, metadata: { writtenAt: expect.any(Number) } }
     );
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
@@ -1648,7 +1648,7 @@ describe('auto routing worker', () => {
         providerId: 'byteplus-coding',
         modelId: 'byteplus-coding/bytedance-seed-code',
       }),
-      { expirationTtl: 60 }
+      { expirationTtl: 60, metadata: { writtenAt: expect.any(Number) } }
     );
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });

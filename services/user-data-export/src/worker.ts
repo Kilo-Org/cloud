@@ -7,7 +7,13 @@ import {
   type HyperdriveBinding,
 } from './databases';
 import { TerminalExportError } from './errors';
-import { createSourceAdapters, type ExportRecord } from './source-adapters';
+import {
+  createSourceAdapters,
+  findPresentWarehouseTables,
+  warehouseRequirements,
+  type ExportRecord,
+  type ExportSubject,
+} from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
@@ -213,21 +219,79 @@ function strictIsoTimestamp(value: string): string {
   return new Date(value).toISOString();
 }
 
-export function exportHeader(job: ExportJob): string {
+/**
+ * The subject a job reads for, derived from persisted state rather than passed in.
+ *
+ * A row that says 'organization' without an id cannot be scoped to anything, and
+ * falling back to the requester would silently hand them a personal export they did
+ * not ask for. The database CHECK makes this unreachable; this raises terminally if it
+ * ever is, because no retry can add the missing id.
+ */
+export function exportSubject(job: ExportJob): ExportSubject {
+  if (job.subject_type === 'organization') {
+    if (!job.organization_id) {
+      throw new TerminalExportError(
+        'export_subject_incomplete',
+        'This export could not be prepared. Please request it again.',
+        'Organization export job has no organization_id'
+      );
+    }
+    return { type: 'organization', organizationId: job.organization_id };
+  }
+  return { type: 'user', kiloUserId: job.kilo_user_id };
+}
+
+/**
+ * Sources that produce records for a subject, split by whether their table exists.
+ *
+ * An organization export has no identity section — the warehouse holds no organization
+ * record — so `kilocode_users` is dropped from it entirely rather than reported missing.
+ * That is a property of the subject, not of the warehouse's load state, and conflating
+ * the two would tell an org admin their identity data was unavailable when no such
+ * section was ever going to exist.
+ *
+ * Everything else is classified by the probe. The warehouse loads table by table and the
+ * export ships ahead of it, so a source whose table has not landed is expected.
+ */
+export function partitionSources(
+  adapters: SourceAdapter[],
+  subjectType: ExportJob['subject_type'],
+  presentTables: Set<string>
+): { available: SourceAdapter[]; unavailable: string[] } {
+  const applicable = adapters.filter(
+    adapter => !(subjectType === 'organization' && adapter.name === 'kilocode_users')
+  );
+  const available: SourceAdapter[] = [];
+  const unavailable: string[] = [];
+  for (const adapter of applicable) {
+    if (!adapter.warehouseTable || presentTables.has(adapter.warehouseTable)) {
+      available.push(adapter);
+    } else {
+      unavailable.push(adapter.name);
+    }
+  }
+  return { available, unavailable };
+}
+
+export function exportHeader(
+  job: ExportJob,
+  sources: { available: SourceAdapter[]; unavailable: string[] }
+): string {
   return `${JSON.stringify({
     type: 'header',
     schemaVersion: 1,
     exportId: job.id,
     requestedAt: strictIsoTimestamp(job.requested_at),
     generatedAt: new Date().toISOString(),
-    includedSources: [
-      'kilocode_users',
-      'app_builder_projects',
-      'app_builder_messages',
-      'cli_sessions',
-      'system_prompt_prefix',
-      'microdollar_usage_metadata',
-    ],
+    // Names the subject explicitly rather than leaving a consumer to infer it from
+    // which sections are present. An organization export and a personal one are
+    // otherwise the same shape.
+    subjectType: job.subject_type,
+    organizationId: job.organization_id,
+    includedSources: sources.available.map(adapter => adapter.name),
+    // Named rather than silently absent, so "we hold nothing for you here" is
+    // distinguishable from "this has not been exported yet". Empty on a complete run.
+    unavailableSources: sources.unavailable,
     snapshotAt: strictIsoTimestamp(job.snapshot_at),
   })}\n`;
 }
@@ -300,10 +364,47 @@ export async function processGenerateMessage(
       phase = 'claim';
     }
 
-    const adapters = createSourceAdapters({
+    // Resolved once, from persisted state, and reused for every page. Deriving it per
+    // page would let a single mis-set field change scope midway through a file.
+    const subject = exportSubject(job);
+    const warehouseQuery = createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse');
+    const allAdapters = createSourceAdapters({
       replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB, 'replica'),
-      warehouseQuery: createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse'),
+      warehouseQuery,
     });
+
+    // Before anything is written, because the header names what is missing and cannot
+    // be amended once the first part has been uploaded. One query, not one per source.
+    phase = 'source_probe';
+    const sources = await withSpan('export_source_probe', {}, async span => {
+      const present = await findPresentWarehouseTables(
+        warehouseQuery,
+        warehouseRequirements(allAdapters, job.subject_type)
+      );
+      const partitioned = partitionSources(allAdapters, job.subject_type, present);
+      span.setAttribute('export.sources.available', partitioned.available.length);
+      span.setAttribute('export.sources.unavailable', partitioned.unavailable.length);
+      return partitioned;
+    });
+    if (sources.unavailable.length > 0) {
+      // Expected while the warehouse is still loading, so info rather than warn — but
+      // recorded, because it is also how a table silently disappearing would show up.
+      logExportEvent('info', 'export_sources_unavailable', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        sources: sources.unavailable.join(','),
+        sourceCount: sources.unavailable.length,
+      });
+    }
+    const adapters = sources.available;
+    if (adapters.length === 0) {
+      throw new TerminalExportError(
+        'export_no_sources_available',
+        'Your data could not be exported right now. Please try again later.',
+        'No export source tables are present in the warehouse'
+      );
+    }
+
     let adapter = resolveSourceAdapter(adapters, job.current_source);
     if (!adapter || !adapter.readPage) {
       throw new Error('Export job has an invalid current source');
@@ -340,6 +441,7 @@ export async function processGenerateMessage(
       exportId: job.id,
       generation: job.dispatch_generation,
       source: adapter.name,
+      subjectType: job.subject_type,
       uploadMode: 'single_invocation_multipart',
     });
     const encoder = new TextEncoder();
@@ -362,7 +464,7 @@ export async function processGenerateMessage(
     }, MAX_PROCESSING_MS);
     let uncompressedSize = 0;
     let pageCount = 0;
-    const header = encoder.encode(exportHeader(job));
+    const header = encoder.encode(exportHeader(job, sources));
     await writer.write(header);
     uncompressedSize += header.byteLength;
     // Annotated because the page span reads this inside a closure, which stops the
@@ -395,7 +497,7 @@ export async function processGenerateMessage(
         { 'export.source': adapter.name, 'export.page.number': pageNumber },
         async span => {
           const result = await readPage({
-            kiloUserId: job.kilo_user_id,
+            subject,
             snapshotAt: job.snapshot_at,
             cursor,
             limit: pageLimit,

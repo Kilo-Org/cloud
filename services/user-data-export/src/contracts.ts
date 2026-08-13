@@ -1,6 +1,26 @@
 import * as z from 'zod';
 
+/**
+ * The queue and download message contract, not the export file's format.
+ *
+ * Pinned with `z.literal` below, so raising it makes every in-flight message fail
+ * validation and dead-letter mid-deploy. It changes only when the message shape does.
+ */
 export const EXPORT_SCHEMA_VERSION = 1;
+
+/**
+ * The format of the export file itself, reported as `schemaVersion` in its header.
+ *
+ * Deliberately separate from the message contract above: the two version different
+ * things and previously happened to agree at 1, which made it look as though one
+ * constant governed both.
+ *
+ * 2 adds the warehouse profile columns to the identity section: location, historic and
+ * current, plus the analytics copies of name, email and hosted domain. Additive for a
+ * reader that ignores unknown fields, breaking for one that does not, and an export file
+ * is the kind of artifact people write strict parsers against.
+ */
+export const EXPORT_FILE_SCHEMA_VERSION = 2;
 
 export const ExportQueueMessageSchema = z
   .object({

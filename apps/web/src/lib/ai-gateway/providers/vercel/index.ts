@@ -15,7 +15,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import { redisClient } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import {
-  GatewayPercentageSchema,
+  GatewayRoutingConfigSchema,
   DEFAULT_VERCEL_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE_FREE,
 } from '@/lib/ai-gateway/gateway-config';
@@ -27,31 +27,36 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 
-type VercelRoutingPercentages = {
+type VercelRoutingConfig = {
   paid: number;
   free: number;
+  optOutModels: ReadonlySet<string>;
 };
 
-const DEFAULT_VERCEL_ROUTING_PERCENTAGES: VercelRoutingPercentages = {
+const DEFAULT_VERCEL_ROUTING_CONFIG: VercelRoutingConfig = {
   paid: DEFAULT_VERCEL_PERCENTAGE,
   free: DEFAULT_VERCEL_PERCENTAGE_FREE,
+  optOutModels: new Set(),
 };
 
-const getVercelRoutingPercentages = createCachedFetch<VercelRoutingPercentages>(
+const getVercelRoutingConfig = createCachedFetch<VercelRoutingConfig>(
   async () => {
     const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
-    if (!raw) return DEFAULT_VERCEL_ROUTING_PERCENTAGES;
-    const { vercel_routing_percentage, vercel_routing_percentage_free } =
-      GatewayPercentageSchema.parse(JSON.parse(raw));
+    if (!raw) return DEFAULT_VERCEL_ROUTING_CONFIG;
+    const {
+      vercel_routing_percentage,
+      vercel_routing_percentage_free,
+      vercel_routing_opt_out_models,
+    } = GatewayRoutingConfigSchema.parse(JSON.parse(raw));
     return {
       paid: vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE,
       free: vercel_routing_percentage_free ?? DEFAULT_VERCEL_PERCENTAGE_FREE,
+      optOutModels: new Set(vercel_routing_opt_out_models),
     };
   },
-  600_000,
-  DEFAULT_VERCEL_ROUTING_PERCENTAGES
+  60_000,
+  DEFAULT_VERCEL_ROUTING_CONFIG
 );
 
 export function hasCompatibleVercelInferenceProvider(
@@ -95,16 +100,15 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  if (isKimiModel(requestedModel)) {
-    // 2026-08-12: K3 is timing out during review, let's see if this fixes it.
+  const routingConfig = await getVercelRoutingConfig();
+  if (routingConfig.optOutModels.has(requestedModel)) {
     return false;
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const percentages = await getVercelRoutingPercentages();
   const routingPercentage = (await isFreeModel(requestedModel))
-    ? percentages.free
-    : percentages.paid;
+    ? routingConfig.free
+    : routingConfig.paid;
 
   const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
 

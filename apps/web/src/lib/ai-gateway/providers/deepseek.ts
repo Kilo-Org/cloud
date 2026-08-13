@@ -6,7 +6,7 @@ export function isDeepseekModel(model: string) {
 
 export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-pro:discounted',
-  internal_id: 'deepseek/deepseek-v4-pro',
+  internal_id: 'deepseek/deepseek-v4-pro-0813',
   display_name: 'DeepSeek: DeepSeek V4 Pro (lowest price)',
   description:
     'This DeepSeek V4 Pro endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
@@ -31,7 +31,7 @@ export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
 
 const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-flash:discounted',
-  internal_id: 'deepseek/deepseek-v4-flash',
+  internal_id: 'deepseek/deepseek-v4-flash-0731',
   display_name: 'DeepSeek: DeepSeek V4 Flash (lowest price)',
   description:
     'This DeepSeek V4 Flash endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',

@@ -944,14 +944,8 @@ describe('sanitizeApiRequestLogRequest', () => {
         gateway: {
           order: ['friendli', 'novita'],
           byok: {
-            friendli: [{ apiKey: '[redacted]', baseURL: 'https://api.friendli.ai' }],
-            bedrock: [
-              {
-                accessKeyId: '[redacted]',
-                secretAccessKey: '[redacted]',
-                region: 'us-east-1',
-              },
-            ],
+            friendli: [{ apiKey: '[redacted]' }],
+            bedrock: [{ apiKey: '[redacted]' }],
           },
         },
         anthropic: { effort: 'high' },

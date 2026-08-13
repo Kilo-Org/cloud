@@ -90,15 +90,7 @@ export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
   const redactedByok = Object.fromEntries(
     Object.entries(gateway.byok).map(([provider, credentials]) => [
       provider,
-      credentials.map(credential =>
-        'apiKey' in credential
-          ? { ...credential, apiKey: '[redacted]' }
-          : {
-              ...credential,
-              accessKeyId: '[redacted]',
-              secretAccessKey: '[redacted]',
-            }
-      ),
+      credentials.map(() => ({ apiKey: '[redacted]' })),
     ])
   );
 

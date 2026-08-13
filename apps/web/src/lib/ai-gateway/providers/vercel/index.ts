@@ -106,6 +106,7 @@ export async function shouldRouteToVercel(
 ) {
   const routingConfig = await getVercelRoutingConfig();
   if (isVercelRoutingOptOut(requestedModel, routingConfig.optOutModels)) {
+    console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
     return false;
   }
 

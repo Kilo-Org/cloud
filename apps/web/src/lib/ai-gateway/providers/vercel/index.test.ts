@@ -11,6 +11,16 @@ import {
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
+const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
+
+afterEach(() => {
+  if (originalFriendliApiKey === undefined) {
+    delete process.env.FRIENDLI_API_KEY;
+  } else {
+    process.env.FRIENDLI_API_KEY = originalFriendliApiKey;
+  }
+});
+
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
     const request: GatewayRequest = {
@@ -179,6 +189,51 @@ describe('applyVercelSettings BYOK pinning', () => {
       anthropic: [{ apiKey: 'sk-anthropic' }],
     });
     expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
+  });
+
+  it('does not merge the managed Friendli key into user BYOK settings', async () => {
+    process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
+    const request = byokRequest([]);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      anthropic: [{ apiKey: 'sk-anthropic' }],
+    });
+  });
+});
+
+describe('applyVercelSettings managed BYOK', () => {
+  function managedRequest(): GatewayRequest {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'moonshotai/kimi-k3',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+  }
+
+  it('merges the configured Friendli key into the gateway BYOK settings', async () => {
+    process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
+    const request = managedRequest();
+
+    await applyVercelSettings('moonshotai/kimi-k3', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      friendli: [{ apiKey: 'friendli-managed-key' }],
+    });
+  });
+
+  it('does not add Friendli BYOK settings when the key is not configured', async () => {
+    delete process.env.FRIENDLI_API_KEY;
+    const request = managedRequest();
+
+    await applyVercelSettings('moonshotai/kimi-k3', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
   });
 });
 

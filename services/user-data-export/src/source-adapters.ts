@@ -51,14 +51,18 @@ export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<s
 /**
  * Whose data an export contains, which is not the same as who asked for it.
  *
- * A user subject selects the rows that individual owns. An organization subject
- * selects the rows carrying that organization's id — which includes work its members
- * did in the organization's context, and deliberately excludes the personal rows those
- * same members own outside it (`organization_id IS NULL`).
+ * A user subject selects everything that individual owns, across their personal
+ * workspace and any organization workspace they worked in. An organization subject
+ * selects the rows carrying that organization's id, which is its workspace: work its
+ * members did there, and never what those same members did in their own personal
+ * workspace (`organization_id IS NULL`).
+ *
+ * The two overlap on work done inside an organization, deliberately. That work is both
+ * the organization's and the person's.
  *
  * Membership is not part of the subject. The organization tag is on the row itself, so
  * selection never needs a member list: rows from someone who has since left are still
- * the organization's, and a current member's personal rows still are not. Membership
+ * the organization's, and a current member's personal workspace still is not. Membership
  * decides only whether the requester may ask, which is settled before a job is created.
  */
 export type ExportSubject =
@@ -170,10 +174,31 @@ LIMIT 1`;
  * A qualified name, or any expression such as the `COALESCE` below, is read as an input
  * reference, which is what both the index and the cursor comparison are built on.
  *
- * Neither predicate matches SQL NULL, and that is what keeps the two subjects apart.
- * `kilo_user_id = $1` skips org-owned rows, which carry a NULL owner. `organization_id
- * = $1` skips every row with no organization, which is precisely a member's personal
- * activity. Each subject sees its own rows and nothing else.
+ * Neither predicate matches SQL NULL. That bounds each query to one subject, but the two
+ * subjects are deliberately NOT disjoint, and a comment claiming otherwise was wrong.
+ *
+ * A person works in their personal workspace (`organization_id IS NULL`) and in the
+ * workspace of any organization they belong to. `kilo_user_id = $1` returns everything
+ * they own across both, which is the intent: their export is their work, wherever they
+ * did it. `organization_id = $1` returns the organization's workspace only, so a
+ * member's personal workspace never appears in it.
+ *
+ * A row someone created in an organization's workspace therefore belongs to both
+ * exports. That overlap is correct rather than a leak.
+ *
+ * The warehouse expresses this two ways, and only one of them is exclusive. Measured
+ * 2026-08-13, counting rows carrying an organization but no user:
+ *
+ *     app_builder_projects          2,143    user XOR org
+ *     app_builder_messages        266,095    user XOR org
+ *     cli_sessions                      0    both columns set
+ *     system_prompt_prefix              0    both columns set
+ *     microdollar_usage_metadata        0    both columns set
+ *
+ * On the first two, an organization can own a row outright with no user attached, so
+ * `kilo_user_id = $1` genuinely skips those. On the other three every row names a user,
+ * so an organization-workspace row matches both predicates. Both outcomes are intended;
+ * the difference is in what the source model records, not in the export's rules.
  *
  * The warehouse has no `created_at` on any table and is itself a point-in-time
  * snapshot, so there is no `snapshot_at` bound to apply here.
@@ -741,10 +766,17 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
 /**
  * Owned-row warehouse queries, both subject variants of each.
  *
- * The user variant filters on `kilo_user_id = $1`, which excludes org-owned rows since
- * those carry a NULL owner. The organization variant filters on `organization_id = $1`,
- * which excludes every row with no organization — a member's personal activity — for
- * the same reason: neither predicate matches SQL NULL.
+ * The user variant filters on `kilo_user_id = $1` and returns everything that person
+ * owns, in their personal workspace and in any organization workspace they worked in.
+ * It skips rows an organization owns outright with no user attached, which exist only on
+ * `app_builder_projects` and `app_builder_messages`.
+ *
+ * The organization variant filters on `organization_id = $1`, which returns that
+ * organization's workspace and never a member's personal workspace, since the predicate
+ * cannot match SQL NULL.
+ *
+ * The two therefore overlap on work done inside an organization, by design. See the note
+ * on `SCOPE_COLUMNS` for the measured counts.
  *
  * `userQuery` is scoped differently (`id = $1`, the user's own row rather than a row it
  * owns) and is not part of this map.
@@ -894,9 +926,11 @@ export async function findPresentWarehouseTables(
  * and in the warehouse respectively, which name the same column differently.
  *
  * All four take the subject id as their sole bind parameter, and none can match SQL
- * NULL. That is what keeps the two subjects disjoint rather than merely different:
- * a user export cannot reach org-owned rows, and an org export cannot reach the
- * personal rows of its members.
+ * NULL. That bounds each query to one subject. It does not make the subjects disjoint,
+ * and is not meant to: work done in an organization's workspace belongs to both that
+ * organization and the person who did it. What the predicates do guarantee is the one
+ * direction that matters, that an organization export can never reach a member's
+ * personal workspace, since those rows carry no organization. See `SCOPE_COLUMNS`.
  *
  * A closed set rather than a free string: a source scoped some other way cannot
  * declare its own predicate and pass the guard below on a technicality. Widening

@@ -5,7 +5,7 @@ import { captureException } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { cliSessions, sharedCliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
 import { errorExceptInTest, logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
@@ -64,6 +64,8 @@ async function deleteCliSessionBlobs(userId: string): Promise<string | null> {
       .from(cliSessions)
       .where(eq(cliSessions.kilo_user_id, userId));
 
+    const userCliSessionIds = userCliSessions.map(session => session.session_id);
+
     // Delete blobs for each CLI session
     for (const session of userCliSessions) {
       const blobsToDelete: Array<{ folderName: 'sessions'; filename: FileName }> = [];
@@ -86,14 +88,20 @@ async function deleteCliSessionBlobs(userId: string): Promise<string | null> {
       }
     }
 
-    // Fetch all shared CLI sessions owned by the user
-    const userSharedSessions = await db
-      .select()
-      .from(sharedCliSessions)
-      .where(eq(sharedCliSessions.kilo_user_id, userId));
+    // Fetch all shared CLI sessions owned by the user OR referencing the user's CLI sessions
+    // (e.g. cross-user shares created via webhook triggers by other org members)
+    const sharedCondition =
+      userCliSessionIds.length > 0
+        ? or(
+            eq(sharedCliSessions.kilo_user_id, userId),
+            inArray(sharedCliSessions.session_id, userCliSessionIds)
+          )
+        : eq(sharedCliSessions.kilo_user_id, userId);
+
+    const sharedSessionsToDelete = await db.select().from(sharedCliSessions).where(sharedCondition);
 
     // Delete blobs for each shared session
-    for (const sharedSession of userSharedSessions) {
+    for (const sharedSession of sharedSessionsToDelete) {
       const blobsToDelete: Array<{ folderName: 'shared-sessions'; filename: FileName }> = [];
 
       if (sharedSession.api_conversation_history_blob_url) {
@@ -115,11 +123,16 @@ async function deleteCliSessionBlobs(userId: string): Promise<string | null> {
     }
 
     // Delete database rows for shared sessions and sessions
-    await db.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, userId));
+    if (sharedSessionsToDelete.length > 0) {
+      const shareIdsToDelete = sharedSessionsToDelete.map(s => s.share_id);
+      await db
+        .delete(sharedCliSessions)
+        .where(inArray(sharedCliSessions.share_id, shareIdsToDelete));
+    }
     await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, userId));
 
     logExceptInTest(
-      `Successfully deleted CLI sessions and blobs for user: ${userId} (${userCliSessions.length} sessions, ${userSharedSessions.length} shared sessions)`
+      `Successfully deleted CLI sessions and blobs for user: ${userId} (${userCliSessions.length} sessions, ${sharedSessionsToDelete.length} shared sessions)`
     );
     return null;
   } catch (error) {

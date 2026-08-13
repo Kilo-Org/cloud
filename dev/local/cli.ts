@@ -1116,6 +1116,7 @@ async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
 
 async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   const check = args.includes('--check') || args.includes('check');
+  const missingSecretsOnly = args.includes('--missing-secrets-only');
 
   // Runs before the sync: worker and Next.js env values are derived from this
   // worktree's ports, and a fresh worktree has published none yet.
@@ -1129,6 +1130,7 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   const result = await syncEnvVars({
     repoRoot,
     check,
+    missingSecretsOnly,
     yes,
     targets: targets.length > 0 ? targets : undefined,
   });
@@ -1160,6 +1162,8 @@ Usage:
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
+  dev:env --missing-secrets-only
+                          Create missing Secrets Store entries without refreshing existing ones
 
 Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);

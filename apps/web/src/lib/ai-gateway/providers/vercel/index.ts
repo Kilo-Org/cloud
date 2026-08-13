@@ -95,13 +95,17 @@ export function passesVercelRoutingPercentage(randomSeed: string, routingPercent
   return wholePercentageBucket + fractionalPercentageBucket / 1_000 < routingPercentage;
 }
 
+export function isVercelRoutingOptOut(requestedModel: string, optOutModels: ReadonlySet<string>) {
+  return optOutModels.has(requestedModel);
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
   randomSeed: string
 ) {
   const routingConfig = await getVercelRoutingConfig();
-  if (routingConfig.optOutModels.has(requestedModel)) {
+  if (isVercelRoutingOptOut(requestedModel, routingConfig.optOutModels)) {
     return false;
   }
 

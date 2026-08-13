@@ -1,33 +1,15 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import {
   applyVercelSettings,
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
+  isVercelRoutingOptOut,
   passesVercelRoutingPercentage,
-  shouldRouteToVercel,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { redisClient } from '@/lib/redis';
-import { getVercelModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-
-jest.mock('@/lib/redis', () => ({
-  redisClient: { get: jest.fn() },
-}));
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
-  getVercelModelsFromRedis: jest.fn(),
-}));
-jest.mock('@/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: jest.fn(),
-}));
-
-const mockedRedisGet = jest.mocked(redisClient.get);
-const mockedGetVercelModels = jest.mocked(getVercelModelsFromRedis);
-const mockedIsFreeModel = jest.mocked(isFreeModel);
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
@@ -227,30 +209,11 @@ describe('passesVercelRoutingPercentage', () => {
   });
 });
 
-describe('shouldRouteToVercel', () => {
-  it('only opts out exact model ID matches', async () => {
-    mockedRedisGet.mockResolvedValue(
-      JSON.stringify({
-        vercel_routing_percentage: 100,
-        vercel_routing_percentage_free: 100,
-        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-      })
-    );
-    mockedGetVercelModels.mockResolvedValue(
-      new Set(['moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast'])
-    );
-    mockedIsFreeModel.mockResolvedValue(false);
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: 'moonshotai/kimi-k3',
-        messages: [{ role: 'user', content: 'hello' }],
-      },
-    };
+describe('isVercelRoutingOptOut', () => {
+  it('only opts out exact model ID matches', () => {
+    const optOutModels = new Set(['moonshotai/kimi-k3']);
 
-    await expect(shouldRouteToVercel('moonshotai/kimi-k3', request, 'user-1')).resolves.toBe(false);
-    await expect(shouldRouteToVercel('moonshotai/kimi-k3-fast', request, 'user-1')).resolves.toBe(
-      true
-    );
+    expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
+    expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
   });
 });

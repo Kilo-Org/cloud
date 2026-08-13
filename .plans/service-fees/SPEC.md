@@ -1041,7 +1041,7 @@ Exit condition: settled fees and leakage reconcile, refunds and disputes reduce 
 3. Verify historical exemptions are entered.
 4. Validate the confirmed mirrored `tax_behavior` in Stripe test mode and retain the decision record in ADR 0004.
 5. Audit live Stripe coupons for `applies_to` restrictions covering fee-bearing products.
-5. Deploy before activation and monitor assessment outcomes.
+6. Deploy before activation and monitor assessment outcomes.
 6. At activation, verify one example of each eligible flow and one excluded seat/KiloClaw flow.
 7. Keep rollback artifact/commit ready; do not add a runtime switch.
 

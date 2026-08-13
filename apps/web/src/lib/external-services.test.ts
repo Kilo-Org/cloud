@@ -66,6 +66,8 @@ describe('external-services', () => {
           kilo_user_id: testUser.id,
           title: 'Test Session 1',
           created_on_platform: 'vscode',
+          last_mode: 'code',
+          last_model: 'anthropic/claude-3-5-sonnet',
           api_conversation_history_blob_url: 'sessions/test1/api_conversation_history.json',
           task_metadata_blob_url: 'sessions/test1/task_metadata.json',
         })
@@ -77,6 +79,8 @@ describe('external-services', () => {
           kilo_user_id: testUser.id,
           title: 'Test Session 2',
           created_on_platform: 'vscode',
+          last_mode: 'ask',
+          last_model: 'openai/gpt-4o',
           ui_messages_blob_url: 'sessions/test2/ui_messages.json',
           git_state_blob_url: 'sessions/test2/git_state.json',
         })
@@ -98,6 +102,24 @@ describe('external-services', () => {
         { folderName: 'sessions', filename: 'ui_messages' },
         { folderName: 'sessions', filename: 'git_state' },
       ]);
+
+      const remainingSessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.kilo_user_id, testUser.id));
+      expect(remainingSessions).toHaveLength(2);
+      for (const session of remainingSessions) {
+        expect(session.title).toBe('Deleted Session');
+        expect(session.git_url).toBeNull();
+        expect(session.cloud_agent_session_id).toBeNull();
+        expect(session.organization_id).toBeNull();
+        expect(session.last_mode).toBeNull();
+        expect(session.last_model).toBeNull();
+        expect(session.api_conversation_history_blob_url).toBeNull();
+        expect(session.task_metadata_blob_url).toBeNull();
+        expect(session.ui_messages_blob_url).toBeNull();
+        expect(session.git_state_blob_url).toBeNull();
+      }
     });
 
     it('should delete shared CLI session blobs when user has shared sessions', async () => {
@@ -146,6 +168,25 @@ describe('external-services', () => {
       expect(deleteBlobs).toHaveBeenCalledWith(sharedSession2.share_id, [
         { folderName: 'shared-sessions', filename: 'ui_messages' },
       ]);
+
+      const remainingSharedSessions = await db
+        .select()
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.kilo_user_id, testUser.id));
+      expect(remainingSharedSessions).toHaveLength(2);
+      for (const shared of remainingSharedSessions) {
+        expect(shared.api_conversation_history_blob_url).toBeNull();
+        expect(shared.task_metadata_blob_url).toBeNull();
+        expect(shared.ui_messages_blob_url).toBeNull();
+        expect(shared.git_state_blob_url).toBeNull();
+      }
+
+      const remainingSessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.kilo_user_id, testUser.id));
+      expect(remainingSessions).toHaveLength(1);
+      expect(remainingSessions[0].title).toBe('Deleted Session');
     });
 
     it('should handle sessions with no blob URLs', async () => {
@@ -162,6 +203,13 @@ describe('external-services', () => {
 
       // deleteBlobs should not be called for sessions without blobs
       expect(deleteBlobs).not.toHaveBeenCalled();
+
+      const remainingSessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.kilo_user_id, testUser.id));
+      expect(remainingSessions).toHaveLength(1);
+      expect(remainingSessions[0].title).toBe('Deleted Session');
     });
 
     it('should handle sessions with partial blob URLs', async () => {

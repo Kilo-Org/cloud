@@ -146,12 +146,29 @@ LIMIT 1`;
 
 /**
  * Every warehouse query below is scoped by a single owner column — `kilo_user_id` or
- * `organization_id` — and, with one exception, ordered on the columns its index already
- * covers, so a page is served without a sort step.
+ * `organization_id` — and ordered on the columns its index already covers, so a page is
+ * served from the index with no sort step.
  *
- * The exception is `system_prompt_prefix`, whose cursor ends in a `COALESCE` expression
- * that no plain btree index can serve. It sorts within each tie group instead. Tie
- * groups are small, but the trade is deliberate and recorded on that query.
+ * Where a cursor column is selected through a cast, the ORDER BY names it
+ * TABLE-QUALIFIED. That is load-bearing, not style. A bare name in ORDER BY resolves to a
+ * matching SELECT-list output column before it resolves to an input column, so
+ * `ORDER BY most_significant_position` binds to `most_significant_position::text AS
+ * most_significant_position` — the text cast — and not to the bigint column. Two things
+ * broke as a result, and both are silent:
+ *
+ *   - The page was ordered lexicographically while the cursor tuple in the WHERE clause
+ *     compared numerically (WHERE cannot see output aliases). A page's last row was
+ *     therefore not its numeric maximum, and the next page's `>` skipped whatever the
+ *     text order had deferred — the same row loss the composite cursors below exist to
+ *     prevent. Verified live: on `system_prompt_prefix`, 263 org-scoped rows sort
+ *     differently under the two orderings.
+ *   - No btree can serve a text ordering of a bigint column, so every page bitmap-scanned
+ *     and sorted the whole owner's rowset. Measured on a 115k-row organization:
+ *     116,522 startup cost per page against 0.42 for the qualified form, because nothing
+ *     could be returned until all of that owner's rows had been scanned and sorted.
+ *
+ * A qualified name, or any expression such as the `COALESCE` below, is read as an input
+ * reference, which is what both the index and the cursor comparison are built on.
  *
  * Neither predicate matches SQL NULL, and that is what keeps the two subjects apart.
  * `kilo_user_id = $1` skips org-owned rows, which carry a NULL owner. `organization_id
@@ -225,6 +242,10 @@ const messageQueries = subjectPageQueries({
  * had. Each record is keyed by its journal position so repeated values read as a
  * timeline instead of looking like duplication, and session_id is exported so rows
  * belonging to one session can be grouped.
+ *
+ * The ORDER BY must stay table-qualified: both position columns are selected through a
+ * `::text` cast under their own names, so a bare name there sorts the page as text while
+ * the cursor above compares as bigint. See the note on `SCOPE_COLUMNS`.
  */
 function cliSessionPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT session_id, title, git_url, git_branch,
@@ -234,7 +255,7 @@ FROM cli_sessions
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
     OR (most_significant_position, least_significant_position) > ($2::bigint, $3::bigint))
-ORDER BY most_significant_position, least_significant_position
+ORDER BY cli_sessions.most_significant_position, cli_sessions.least_significant_position
 LIMIT $4`;
 }
 
@@ -281,6 +302,12 @@ const cliSessionQueries: Record<ExportSubject['type'], string> = {
  * normalises '' to NULL so neither collides with a real value — but `KeyCursorSchema`
  * requires non-empty strings, and an empty cursor value would be rejected on resume and
  * silently restart the source.
+ *
+ * `system_prompt_prefix_id` is table-qualified in the ORDER BY for the reason recorded on
+ * `SCOPE_COLUMNS`: it is selected through a `::text` cast under its own name, and this is
+ * the table where the two orderings provably disagree on live data. The `COALESCE` needs
+ * no qualifier — an expression is already read as an input reference — and it matches the
+ * expression index the warehouse carries for this ordering.
  */
 const NULL_CURSOR_SENTINEL = '-';
 function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
@@ -294,7 +321,7 @@ FROM system_prompt_prefix
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
     OR (system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')) > ($2::bigint, $3::text))
-ORDER BY system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')
+ORDER BY system_prompt_prefix.system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')
 LIMIT $4`;
 }
 

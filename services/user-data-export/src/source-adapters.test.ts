@@ -172,6 +172,31 @@ describe('warehouse scoping guard', () => {
     expect(query).toContain('LIMIT');
   });
 
+  // A cursor column selected through a cast under its own name shadows the column it
+  // came from: a bare name in ORDER BY resolves to the output column first, so the page
+  // is ordered by the cast while the cursor in the WHERE clause — which cannot see output
+  // aliases — still compares the underlying column. The page's last row is then not its
+  // cursor maximum and the next page skips rows, and no index can serve the ordering, so
+  // every page sorts the whole owner's rowset instead of reading one page from the index.
+  //
+  // Neither failure raises anything: the export is short some rows and slow. Nothing else
+  // in this file can catch it, because the query text is valid and the scope is correct,
+  // so it is pinned here as a rule about the whole set rather than about the two queries
+  // that had it. Qualifying the name, or ordering on an expression, resolves to the input
+  // column and satisfies this.
+  it.each(Object.entries(sourceQueries))(
+    '%s never orders on a name a cast has shadowed',
+    (_name, query) => {
+      const shadowed = [...query.matchAll(/(\w+)::\w+\s+AS\s+\1\b/gi)].map(match => match[1]);
+      const orderBy = /ORDER BY([\s\S]*?)(?:\nLIMIT|$)/i.exec(query)?.[1] ?? '';
+      for (const column of shadowed) {
+        // Not preceded by a dot: `cli_sessions.most_significant_position` is an input
+        // reference, the bare name is the shadowing output column.
+        expect(orderBy).not.toMatch(new RegExp(`(^|[\\s,(])${column}\\b`));
+      }
+    }
+  );
+
   // Selecting the deletion column from a table that has none is an undefined-column
   // error at read time, after the source has already been declared present. This keeps
   // the list of tables without it tied to what the queries actually select.

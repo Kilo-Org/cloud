@@ -1,7 +1,7 @@
 import { formatError, ttlCached } from '@kilocode/worker-utils';
 import { getWorkerDb, modelStats } from '@kilocode/db';
 import { inArray } from 'drizzle-orm';
-import { kvReadThrough } from './kv-read-through';
+import { kvReadThrough, type KvReadThroughMetadata } from './kv-read-through';
 import { getRoutingTable } from './routing-table';
 
 // Capability snapshot for a single model. `inputModalities` is the synonym-
@@ -57,6 +57,16 @@ function foldModalities(raw: ReadonlyArray<string> | null | undefined): Set<stri
 // this is accepted as safe because the gateway's balanced fallback remains
 // image-capable. The 60s in-memory TTL bounds the same fetch across
 // requests within a warm isolate.
+//
+// The object is the union of every id we have ever resolved, shared by all
+// users and all custom pools — capabilities are a property of the model id
+// alone (`model_stats.openrouter_id` is unique, and the row is populated from
+// OpenRouter's model-level `architecture`), so nothing is user-specific.
+// A row with `absent: true` is a tombstone: the id has no `model_stats` row
+// (direct BYOK ids never appear in the OpenRouter sync). Without it, such an
+// id is missing from the union forever and every request pays a Postgres
+// round trip inside the 500ms budget. Tombstones expire with the KV TTL, so
+// an id that later gains a row is picked up within the hour.
 const MODEL_CAPABILITIES_KV_KEY = 'model_capabilities_v2';
 const MODEL_CAPABILITIES_IN_MEMORY_TTL_MS = 60_000;
 const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
@@ -84,10 +94,29 @@ type ModelCapabilitiesEnv = Pick<
   'AUTO_ROUTING_CONFIG' | 'HYPERDRIVE' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
 >;
 
-type ModelCapabilitiesCacheValue = Record<
-  string,
-  { inputModalities: string[]; contextLength: number | null; isActive: boolean | null }
->;
+type ModelCapabilitiesCacheRow = {
+  inputModalities: string[];
+  contextLength: number | null;
+  isActive: boolean | null;
+  absent?: boolean;
+};
+
+type ModelCapabilitiesCacheValue = Record<string, ModelCapabilitiesCacheRow>;
+
+// Model ids come from user-configured pools, so every id-keyed accumulator is
+// null-prototype. On a plain object `constructor` reads as already present and
+// `__proto__` assigns through the setter instead of creating a key; either way
+// the id is never tombstoned and is re-queried on every request forever.
+function emptyUnion(): ModelCapabilitiesCacheValue {
+  return Object.create(null) as ModelCapabilitiesCacheValue;
+}
+
+const TOMBSTONE: ModelCapabilitiesCacheRow = {
+  inputModalities: [],
+  contextLength: null,
+  isActive: null,
+  absent: true,
+};
 
 function isCacheValue(value: unknown): value is ModelCapabilitiesCacheValue {
   if (typeof value !== 'object' || value === null) return false;
@@ -98,6 +127,7 @@ function isCacheValue(value: unknown): value is ModelCapabilitiesCacheValue {
       inputModalities?: unknown;
       contextLength?: unknown;
       isActive?: unknown;
+      absent?: unknown;
     };
     if (!Array.isArray(row.inputModalities)) return false;
     if (row.contextLength !== null && typeof row.contextLength !== 'number') return false;
@@ -105,6 +135,7 @@ function isCacheValue(value: unknown): value is ModelCapabilitiesCacheValue {
     if (row.isActive !== undefined && row.isActive !== null && typeof row.isActive !== 'boolean') {
       return false;
     }
+    if (row.absent !== undefined && typeof row.absent !== 'boolean') return false;
   }
   return true;
 }
@@ -141,11 +172,15 @@ const cache = ttlCached<ModelCapabilitiesEnv, ModelCapabilitiesCacheValue>(
   async env => loadAll(env)
 );
 
+// Tombstones are deliberately NOT merged: callers must see a tombstoned id
+// exactly as they see an unknown one (`caps === undefined`), which fails
+// required modalities closed and leaves context length unproven.
 function mergeInto(
   target: Map<string, ModelCapabilities>,
   source: Readonly<ModelCapabilitiesCacheValue>
 ): void {
   for (const [modelId, row] of Object.entries(source)) {
+    if (row.absent === true) continue;
     target.set(modelId, {
       inputModalities: foldModalities(row.inputModalities),
       contextLength: row.contextLength,
@@ -180,12 +215,16 @@ async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCach
           return null;
         }
         // Normalize absent isActive → null so mergeInto is consistent.
-        const normalized: ModelCapabilitiesCacheValue = {};
+        // Null-prototype for the same reason as `withTombstones`: this is the
+        // read half of the round trip, and a `__proto__` key parsed out of KV
+        // would otherwise be dropped on the way back in.
+        const normalized = emptyUnion();
         for (const [id, row] of Object.entries(parsed)) {
           normalized[id] = {
             inputModalities: row.inputModalities,
             contextLength: row.contextLength,
             isActive: row.isActive ?? null,
+            ...(row.absent === true ? { absent: true } : {}),
           };
         }
         return normalized;
@@ -200,6 +239,60 @@ async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCach
   return fromKv ?? {};
 }
 
+// Ceiling on union size. Pool ids come from user configuration, so without a
+// cap a bad config could grow the blob without bound. Past the cap we keep
+// serving and stop writing; the KV TTL rebuilds the union from the routing
+// table within the hour.
+const MODEL_CAPABILITIES_MAX_ENTRIES = 5_000;
+
+// KV rejects a TTL under 60s. Below that the union is about to expire and be
+// rebuilt from the routing table anyway, so the write is simply skipped.
+const KV_MINIMUM_TTL_SECONDS = 60;
+
+// Publish the filled union so every other isolate, user, and pool reads the
+// id from KV instead of Postgres. Concurrent writers are last-write-wins: a
+// lost id is re-queried once and written again, so the union converges.
+//
+// The rewrite holds the ORIGINAL expiry. Resetting the TTL on every fill
+// would let a steady trickle of new pool ids keep the blob alive forever,
+// and stale rows and tombstones would then never be rebuilt.
+async function writeBack(
+  env: ModelCapabilitiesEnv,
+  merged: ModelCapabilitiesCacheValue
+): Promise<void> {
+  if (Object.keys(merged).length > MODEL_CAPABILITIES_MAX_ENTRIES) {
+    console.warn(JSON.stringify({ event: 'auto_routing_capabilities_union_too_large' }));
+    return;
+  }
+  try {
+    const { metadata } =
+      await env.AUTO_ROUTING_CONFIG.getWithMetadata<KvReadThroughMetadata>(
+        MODEL_CAPABILITIES_KV_KEY
+      );
+    const writtenAt = typeof metadata?.writtenAt === 'number' ? metadata.writtenAt : Date.now();
+    const remainingSeconds = Math.floor(
+      (writtenAt + MODEL_CAPABILITIES_KV_TTL_SECONDS * 1_000 - Date.now()) / 1_000
+    );
+    if (remainingSeconds < KV_MINIMUM_TTL_SECONDS) {
+      return;
+    }
+    await env.AUTO_ROUTING_CONFIG.put(MODEL_CAPABILITIES_KV_KEY, JSON.stringify(merged), {
+      expirationTtl: remainingSeconds,
+      metadata: { writtenAt } satisfies KvReadThroughMetadata,
+    });
+    // Drop the in-memory union so this isolate reloads the filled one from KV
+    // rather than re-querying the DB for the same ids until its TTL expires.
+    cache.clear();
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_capabilities_write_back_failed',
+        ...formatError(error),
+      })
+    );
+  }
+}
+
 async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCacheValue | null> {
   const routingTable = await getRoutingTable(env);
   if (!routingTable) {
@@ -211,7 +304,23 @@ async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilities
       ids.add(candidate.model);
     }
   }
-  return queryModelCapabilities(env, Array.from(ids));
+  const idList = Array.from(ids);
+  return withTombstones(idList, await queryModelCapabilities(env, idList));
+}
+
+// Record every id we asked for, so an id with no `model_stats` row is stored
+// as resolved-and-absent instead of looking like a cache miss forever.
+function withTombstones(
+  requested: ReadonlyArray<string>,
+  rows: Readonly<ModelCapabilitiesCacheValue>
+): ModelCapabilitiesCacheValue {
+  const out = Object.assign(emptyUnion(), rows);
+  for (const id of requested) {
+    if (!Object.hasOwn(out, id)) {
+      out[id] = TOMBSTONE;
+    }
+  }
+  return out;
 }
 
 // Look up capability rows for the union of: every model in the published
@@ -224,6 +333,7 @@ export async function getModelCapabilities(
   options: {
     codingPlanModelId?: string | null;
     additionalModelIds?: ReadonlyArray<string>;
+    waitUntil?: (promise: Promise<unknown>) => void;
   } = {}
 ): Promise<ModelCapabilitiesMap> {
   const load = async (): Promise<Map<string, ModelCapabilities>> => {
@@ -264,14 +374,31 @@ export async function getModelCapabilities(
     ) {
       result.set(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID, BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES);
     }
-    // The cache stores the union of all ids ever requested; fill the
-    // remainder from the DB. We don't write the partial-fill back to KV —
-    // a true cache miss above already wrote the full union, and a partial
-    // hit is rare enough that the extra round-trip is acceptable.
-    const missing = idList.filter(id => !result.has(id));
+    // The cache stores the union of all ids ever resolved; fill the remainder
+    // from the DB and write it back so the next request serves the id from
+    // KV. Resolve against the union keys rather than `result` so a tombstoned
+    // id counts as resolved and does not re-query.
+    // `result.has` keeps the statically-supplied BytePlus default off the DB.
+    const missing = idList.filter(id => !Object.hasOwn(all, id) && !result.has(id));
     if (missing.length > 0) {
       const fromDb = await queryModelCapabilities(env, missing);
       mergeInto(result, fromDb);
+      // Only publish when the routing table was available. Without it the id
+      // set is not the real one, and caching that union would hide the
+      // table's own ids for a full KV TTL.
+      if (routingTable) {
+        const merged: ModelCapabilitiesCacheValue = { ...all, ...withTombstones(missing, fromDb) };
+        // Hand the put to waitUntil so it survives the 500ms budget firing
+        // and stays off the request's critical path. Without a context
+        // (tests) it is awaited, because an unawaited put can be cancelled
+        // at request end.
+        const written = writeBack(env, merged);
+        if (options.waitUntil) {
+          options.waitUntil(written);
+        } else {
+          await written;
+        }
+      }
     }
     return result;
   };

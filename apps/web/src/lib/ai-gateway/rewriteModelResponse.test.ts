@@ -912,7 +912,7 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
 }
 
 describe('sanitizeApiRequestLogRequest', () => {
-  test('removes gateway BYOK credentials without mutating the upstream request', () => {
+  test('replaces gateway BYOK credentials without mutating the upstream request', () => {
     const request = {
       kind: 'chat_completions',
       body: {
@@ -921,7 +921,16 @@ describe('sanitizeApiRequestLogRequest', () => {
         providerOptions: {
           gateway: {
             order: ['friendli', 'novita'],
-            byok: { friendli: [{ apiKey: 'friendli-managed-key' }] },
+            byok: {
+              friendli: [{ apiKey: 'friendli-managed-key', baseURL: 'https://api.friendli.ai' }],
+              bedrock: [
+                {
+                  accessKeyId: 'AKIAEXAMPLE',
+                  secretAccessKey: 'bedrock-secret',
+                  region: 'us-east-1',
+                },
+              ],
+            },
           },
           anthropic: { effort: 'high' },
         },
@@ -932,12 +941,28 @@ describe('sanitizeApiRequestLogRequest', () => {
       model: 'zai/glm-5.2',
       messages: [{ role: 'user', content: 'hello' }],
       providerOptions: {
-        gateway: { order: ['friendli', 'novita'] },
+        gateway: {
+          order: ['friendli', 'novita'],
+          byok: {
+            friendli: [{ apiKey: '[redacted]', baseURL: 'https://api.friendli.ai' }],
+            bedrock: [
+              {
+                accessKeyId: '[redacted]',
+                secretAccessKey: '[redacted]',
+                region: 'us-east-1',
+              },
+            ],
+          },
+        },
         anthropic: { effort: 'high' },
       },
     });
-    expect(request.body.providerOptions.gateway.byok).toEqual({
-      friendli: [{ apiKey: 'friendli-managed-key' }],
+    expect(request.body.providerOptions.gateway.byok.friendli[0].apiKey).toBe(
+      'friendli-managed-key'
+    );
+    expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'bedrock-secret',
     });
   });
 });

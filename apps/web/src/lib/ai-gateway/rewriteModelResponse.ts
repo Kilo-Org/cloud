@@ -83,18 +83,30 @@ async function isLoggingEnabledForUser(
 
 export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
   const gateway = request.body.providerOptions?.gateway;
-  if (!gateway || !('byok' in gateway)) {
+  if (!gateway?.byok) {
     return sanitizeJsonbValue(request.body);
   }
 
-  const gatewayWithoutByok = { ...gateway };
-  delete gatewayWithoutByok.byok;
+  const redactedByok = Object.fromEntries(
+    Object.entries(gateway.byok).map(([provider, credentials]) => [
+      provider,
+      credentials.map(credential =>
+        'apiKey' in credential
+          ? { ...credential, apiKey: '[redacted]' }
+          : {
+              ...credential,
+              accessKeyId: '[redacted]',
+              secretAccessKey: '[redacted]',
+            }
+      ),
+    ])
+  );
 
   return sanitizeJsonbValue({
     ...request.body,
     providerOptions: {
       ...request.body.providerOptions,
-      gateway: gatewayWithoutByok,
+      gateway: { ...gateway, byok: redactedByok },
     },
   });
 }

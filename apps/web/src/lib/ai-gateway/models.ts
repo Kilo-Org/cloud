@@ -21,7 +21,7 @@ import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
-import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
@@ -29,10 +29,7 @@ import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import {
-  deepseek_v4_pro_discounted_model,
-  deepseekDiscountedModels,
-} from '@/lib/ai-gateway/providers/deepseek';
+import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -91,13 +88,9 @@ export const preferredModels = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
   ...(gpt_5_6_sol_stealth_model.status === 'public' ? [gpt_5_6_sol_stealth_model.public_id] : []),
-  deepseek_v4_pro_discounted_model.status === 'public'
-    ? deepseek_v4_pro_discounted_model.public_id
-    : 'deepseek/deepseek-v4-pro',
   GLM_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
-  QWEN37_PLUS_MODEL_ID,
 ];
 
 export function isPdfSupportingModel(model: string): boolean {

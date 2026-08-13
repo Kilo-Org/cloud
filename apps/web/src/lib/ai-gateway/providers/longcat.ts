@@ -1,7 +1,7 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export function isLongCatModel(requestedModel: string) {
-  return requestedModel.startsWith('meituan/longcat-');
+  return requestedModel.includes('longcat');
 }
 
 export const longcat_2_free_model: KiloExclusiveModel = {

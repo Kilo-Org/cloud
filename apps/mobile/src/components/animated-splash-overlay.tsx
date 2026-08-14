@@ -1,6 +1,6 @@
 import * as SplashScreen from 'expo-splash-screen';
 import { TimeToFullDisplay } from '@sentry/react-native';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -25,6 +25,7 @@ export function AnimatedSplashOverlay() {
   const [dismissed, setDismissed] = useState(() => isStartupComplete());
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoWaived, setLogoWaived] = useState(false);
+  const exitStartedRef = useRef(false);
   const reducedMotion = useReducedMotion();
   const bgOpacity = useSharedValue(1);
   const logoScale = useSharedValue(1);
@@ -40,10 +41,9 @@ export function AnimatedSplashOverlay() {
   }, []);
 
   useEffect(() => {
-    if (!complete || dismissed || !(logoLoaded || logoWaived)) {
-      return undefined;
+    if (!complete || dismissed || !(logoLoaded || logoWaived) || exitStartedRef.current) {
+      return;
     }
-    let cancelled = false;
     const finish = () => {
       setDismissed(true);
     };
@@ -61,9 +61,6 @@ export function AnimatedSplashOverlay() {
       } catch {
         // Ignore — parity with today's behavior.
       }
-      if (cancelled) {
-        return;
-      }
       if (reducedMotion) {
         finish();
         return;
@@ -77,10 +74,8 @@ export function AnimatedSplashOverlay() {
       });
     }
 
+    exitStartedRef.current = true;
     void hideAndExit();
-    return () => {
-      cancelled = true;
-    };
   }, [
     complete,
     dismissed,

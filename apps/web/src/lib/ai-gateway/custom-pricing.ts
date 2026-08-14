@@ -2,6 +2,8 @@ import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 import {
   calculateCost_mUsd,
   type Pricing,
@@ -59,7 +61,7 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
-  'moonshotai/kimi-k3': {
+  [PERPLEXITY_KIMI_PUBLIC_ID]: {
     fallbackOnly: true,
     pricing: [
       {
@@ -73,7 +75,7 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
-  'z-ai/glm-5.2': {
+  [FRIENDLI_GLM_PUBLIC_ID]: {
     fallbackOnly: true,
     pricing: [
       {

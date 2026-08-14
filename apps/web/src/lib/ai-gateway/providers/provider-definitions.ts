@@ -84,6 +84,32 @@ export default {
     responseTransforms: null,
     async transformRequest() {},
   },
+  FRIENDLI_GLM: {
+    id: 'friendli',
+    apiUrl: 'https://api.friendli.ai/serverless/v1',
+    apiUrlOverrides: {},
+    apiKey: getEnvVariable('FRIENDLI_API_KEY'),
+    // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
+    supportedChatApis: ['messages'],
+    responseTransforms: null,
+    async transformRequest(context) {
+      context.request.body.model = 'zai-org/GLM-5.2';
+      delete context.request.body.provider;
+    },
+  },
+  PERPLEXITY_KIMI: {
+    id: 'perplexity',
+    apiUrl: 'https://api.perplexity.ai/router/v1',
+    apiUrlOverrides: {},
+    apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
+    // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
+    supportedChatApis: ['messages'],
+    responseTransforms: null,
+    async transformRequest(context) {
+      context.request.body.model = 'perplexity/kimi-k3';
+      delete context.request.body.provider;
+    },
+  },
   STREAMLAKE: {
     id: 'streamlake',
     apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',

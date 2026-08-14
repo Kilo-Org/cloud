@@ -59,6 +59,7 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -638,8 +639,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
-
   // Start classification early, but do not await it unless the last cached
   // rules-engine result says this identity is already under enforcement.
   const classifyPromise = classifyAbuse(request, requestBodyParsed, {
@@ -773,42 +772,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Extract properties for usage context
-  const promptInfo = extractPromptInfo(requestBodyParsed);
-
-  const usageContext: MicrodollarUsageContext = {
-    api_kind: requestBodyParsed.kind,
-    kiloUserId: user.id,
-    provider: effectiveProviderContext.provider.id,
-    requested_model: effectiveModelIdLowerCased,
-    promptInfo,
-    max_tokens: getMaxTokens(requestBodyParsed),
-    has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
-    fraudHeaders,
-    isStreaming: requestBodyParsed.body.stream === true,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: machineIdHeader,
-    user_byok: !!effectiveProviderContext.userByok,
-    has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
-    botId,
-    tokenSource,
-    feature,
-    session_id: taskId ?? sessionHeader ?? null,
-    mode: modeHeader,
-    auto_model: autoModel,
-    ttfb_ms: null,
-    abuse_delay: rulesEngineDecision.delayMs > 0 ? rulesEngineDecision.delayMs : null,
-    abuse_downgraded_from: abuseDowngradedFrom,
-    clientRequestId,
-  };
-
-  setTag('ui.ai_model', requestBodyParsed.body.model);
-
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
@@ -874,6 +837,59 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
   }
+
+  const partnerProvider = await getPercentageRoutedPartnerProvider({
+    requestedModel: effectiveModelIdLowerCased,
+    request: requestBodyParsed,
+    randomSeed: taskId || user.id,
+    sourceProviderId: effectiveProviderContext.provider.id,
+    hasUserByok: effectiveProviderContext.userByok !== null,
+  });
+  if (partnerProvider) {
+    effectiveProviderContext = {
+      kind: 'provider',
+      provider: partnerProvider,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
+  }
+
+  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
+
+  // Extract properties for usage context after final provider selection.
+  const promptInfo = extractPromptInfo(requestBodyParsed);
+  const usageContext: MicrodollarUsageContext = {
+    api_kind: requestBodyParsed.kind,
+    kiloUserId: user.id,
+    provider: effectiveProviderContext.provider.id,
+    requested_model: effectiveModelIdLowerCased,
+    promptInfo,
+    max_tokens: getMaxTokens(requestBodyParsed),
+    has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
+    fraudHeaders,
+    isStreaming: requestBodyParsed.body.stream === true,
+    organizationId,
+    prior_microdollar_usage: user.microdollars_used,
+    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
+    project_id: projectId,
+    status_code: null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: machineIdHeader,
+    user_byok: !!effectiveProviderContext.userByok,
+    has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
+    botId,
+    tokenSource,
+    feature,
+    session_id: taskId ?? sessionHeader ?? null,
+    mode: modeHeader,
+    auto_model: autoModel,
+    ttfb_ms: null,
+    abuse_delay: rulesEngineDecision.delayMs > 0 ? rulesEngineDecision.delayMs : null,
+    abuse_downgraded_from: abuseDowngradedFrom,
+    clientRequestId,
+  };
+
+  setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
     (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&

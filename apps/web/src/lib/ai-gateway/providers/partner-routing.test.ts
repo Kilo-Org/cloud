@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -9,6 +9,31 @@ import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { RuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+
+const originalFriendliApiKey = PROVIDERS.FRIENDLI_GLM.apiKey;
+const originalPerplexityApiKey = PROVIDERS.PERPLEXITY_KIMI.apiKey;
+
+function setApiKey(
+  provider: typeof PROVIDERS.FRIENDLI_GLM | typeof PROVIDERS.PERPLEXITY_KIMI,
+  value: string
+) {
+  Object.defineProperty(provider, 'apiKey', {
+    value,
+    configurable: true,
+    enumerable: true,
+    writable: true,
+  });
+}
+
+beforeEach(() => {
+  setApiKey(PROVIDERS.FRIENDLI_GLM, 'test-friendli-key');
+  setApiKey(PROVIDERS.PERPLEXITY_KIMI, 'test-perplexity-key');
+});
+
+afterAll(() => {
+  setApiKey(PROVIDERS.FRIENDLI_GLM, originalFriendliApiKey);
+  setApiKey(PROVIDERS.PERPLEXITY_KIMI, originalPerplexityApiKey);
+});
 
 function request(
   kind: GatewayRequest['kind'] = 'messages',
@@ -94,6 +119,12 @@ describe('getPercentageRoutedPartnerProvider', () => {
 
   it('does not override user BYOK', () => {
     expect(selectPartner({ sourceProviderId: 'vercel', hasUserByok: true })).toBeNull();
+  });
+
+  it('does not route without a non-empty partner API key', () => {
+    setApiKey(PROVIDERS.FRIENDLI_GLM, '  ');
+
+    expect(selectPartner()).toBeNull();
   });
 
   it.each([`${FRIENDLI_GLM_PUBLIC_ID}-fast`, `${PERPLEXITY_KIMI_PUBLIC_ID}-fast`, 'zai/glm-5.2'])(

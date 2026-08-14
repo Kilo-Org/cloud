@@ -65,6 +65,17 @@ describe('applyAnthropicThinkingDefault', () => {
 
     expect(request.body.thinking).toBeUndefined();
   });
+
+  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3-fast'])(
+    'does not apply the partner thinking default to %s',
+    model => {
+      const request = makeMessagesRequest(model);
+
+      applyAnthropicThinkingDefault(model, request);
+
+      expect(request.body.thinking).toBeUndefined();
+    }
+  );
 });
 
 describe('applyGatewayModelsFallback', () => {

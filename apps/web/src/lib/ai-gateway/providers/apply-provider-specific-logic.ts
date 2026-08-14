@@ -16,8 +16,12 @@ import {
   isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
-import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
+import {
+  applyMoonshotModelSettings,
+  isKimiModel,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID, isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
@@ -124,8 +128,8 @@ export function applyAnthropicThinkingDefault(
 ) {
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    isGlmModel(requestedModel) ||
-    isKimiModel(requestedModel);
+    requestedModel === FRIENDLI_GLM_PUBLIC_ID ||
+    requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&

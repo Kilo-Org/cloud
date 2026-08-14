@@ -45,6 +45,7 @@ function getEligiblePartnerRoute(input: PercentageRoutedPartnerInput): PartnerRo
   const route = PARTNER_ROUTES[requestedModel];
   if (
     !route ||
+    route.provider.apiKey.trim().length === 0 ||
     hasUserByok ||
     (sourceProviderId !== 'vercel' && sourceProviderId !== 'openrouter') ||
     hasCustomizedProviderOptions(request) ||

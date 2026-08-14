@@ -192,7 +192,7 @@ export function DataExportsClient() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Request a new export</CardTitle>
+          <CardTitle>Request a new data export</CardTitle>
           <CardDescription>
             For a limited time, you can use this feature to request an export of your App Builder
             project titles and prompt prefixes recorded with your usage history from your account

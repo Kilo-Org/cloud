@@ -22,6 +22,7 @@ import {
   parseIsoTimestamp,
   postTestStaleSyncAlert,
   sendStaleSyncAlertNotification,
+  sendTestStaleSyncAlertNotification,
   shouldPostStaleSyncAlert,
   SYNC_PROVIDERS_STALE_AFTER_MS,
   SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
@@ -131,7 +132,7 @@ describe('buildStaleSyncAlertNotification', () => {
     expect(notification.text).toContain('within the past hour');
     expect(notification.text).toContain('existing catalog data remains available');
     expect(notification.text).toContain('Important, not urgent');
-    expect(notification.text).toContain('A few hours of delay is acceptable');
+    expect(notification.text).toContain('Some delay is acceptable');
     expect(notification.text).toContain('During normal operations');
     expect(notification.text).toContain('Sentry');
     expect(notification.text).toContain('Vercel logs');
@@ -177,7 +178,7 @@ describe('sendStaleSyncAlertNotification', () => {
         undefined
     );
 
-    await expect(sendStaleSyncAlertNotification(notification, sendNotification)).resolves.toBe(
+    await expect(sendStaleSyncAlertNotification(notification, { sendNotification })).resolves.toBe(
       'simulated'
     );
 
@@ -195,7 +196,26 @@ describe('sendStaleSyncAlertNotification', () => {
         undefined
     );
 
-    await expect(sendStaleSyncAlertNotification(notification, sendNotification)).resolves.toBe(
+    await expect(sendStaleSyncAlertNotification(notification, { sendNotification })).resolves.toBe(
+      'posted'
+    );
+
+    expect(sendNotification).toHaveBeenCalledWith(notification, {
+      requireConfigured: true,
+    });
+  });
+});
+
+describe('sendTestStaleSyncAlertNotification', () => {
+  it('posts to the required Cloud alert webhook outside production Vercel', async () => {
+    process.env.VERCEL_ENV = 'development';
+    const notification = { text: 'Test stale-sync alert' };
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification, _options?: { requireConfigured?: boolean }) =>
+        undefined
+    );
+
+    await expect(sendTestStaleSyncAlertNotification(notification, sendNotification)).resolves.toBe(
       'posted'
     );
 
@@ -206,7 +226,7 @@ describe('sendStaleSyncAlertNotification', () => {
 });
 
 describe('alertIfSyncProvidersStale', () => {
-  it('posts once and stores the alert timestamp with a week TTL', async () => {
+  it('posts once and stores the alert timestamp with a three-day TTL', async () => {
     const sendNotification = jest.fn(
       async (_notification: AdminSlackNotification) => 'posted' as const
     );

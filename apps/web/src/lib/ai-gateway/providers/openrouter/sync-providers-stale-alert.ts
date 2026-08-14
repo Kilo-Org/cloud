@@ -19,7 +19,7 @@ const STALE_WINDOW_LABEL = 'hour';
 const STATUS_COPY = `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`;
 const IMPACT_COPY =
   'New providers and models may take longer to appear; existing catalog data remains available.';
-const URGENCY_COPY = 'Important, not urgent. A few hours of delay is acceptable.';
+const URGENCY_COPY = 'Important, not urgent. Some delay is acceptable.';
 const INVESTIGATION_COPY =
   'During normal operations, check Sentry for `web.sync_providers` and Vercel logs for `[sync-providers]` errors.';
 const TEST_COPY = 'This verifies alert delivery only; it does not indicate an active issue.';
@@ -121,11 +121,19 @@ type SendStaleAlertNotification = (
   notification: AdminSlackNotification
 ) => Promise<StaleAlertDelivery>;
 
+type StaleAlertDeliveryOptions = {
+  deliverOutsideProduction?: boolean;
+  sendNotification?: typeof sendAdminSlackNotification;
+};
+
 export async function sendStaleSyncAlertNotification(
   notification: AdminSlackNotification,
-  sendNotification = sendAdminSlackNotification
+  {
+    deliverOutsideProduction = false,
+    sendNotification = sendAdminSlackNotification,
+  }: StaleAlertDeliveryOptions = {}
 ): Promise<StaleAlertDelivery> {
-  if (process.env.VERCEL_ENV !== 'production') {
+  if (process.env.VERCEL_ENV !== 'production' && !deliverOutsideProduction) {
     console.info(
       '[sync-providers] Simulated Cloud alert; Slack delivery is enabled only on production Vercel',
       notification
@@ -134,6 +142,17 @@ export async function sendStaleSyncAlertNotification(
   }
 
   await sendNotification(notification, { requireConfigured: true });
+  return 'posted';
+}
+
+export async function sendTestStaleSyncAlertNotification(
+  notification: AdminSlackNotification,
+  sendNotification = sendAdminSlackNotification
+): Promise<'posted'> {
+  await sendStaleSyncAlertNotification(notification, {
+    deliverOutsideProduction: true,
+    sendNotification,
+  });
   return 'posted';
 }
 
@@ -179,7 +198,7 @@ export async function postStaleSyncAlert(input: {
 export async function postTestStaleSyncAlert({
   now: nowFn = () => new Date(),
   getLastCompletedAt = defaultGetLastCompletedAt,
-  sendNotification = sendStaleSyncAlertNotification,
+  sendNotification = sendTestStaleSyncAlertNotification,
 }: Pick<
   StaleAlertDependencies,
   'now' | 'getLastCompletedAt' | 'sendNotification'

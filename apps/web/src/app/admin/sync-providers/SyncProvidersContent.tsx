@@ -27,12 +27,8 @@ export function SyncProvidersContent() {
 
   const testAlertMutation = useMutation(
     trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
-      onSuccess: result => {
-        toast.success(
-          result.delivery === 'posted'
-            ? 'Posted a test stale-sync alert to the Cloud alerts channel'
-            : 'Simulated the test alert in the local server logs'
-        );
+      onSuccess: () => {
+        toast.success('Posted a test stale-sync alert to the Cloud alerts channel');
       },
       onError: error => {
         toast.error(error.message || 'Could not post the test alert');
@@ -153,9 +149,9 @@ export function SyncProvidersContent() {
             Test stale-sync alert
           </CardTitle>
           <CardDescription>
-            Production Vercel posts a clearly labeled test message to the Cloud alerts channel.
-            Local and preview environments log the same payload without contacting Slack. Tests do
-            not suppress later real alerts.
+            Posts a clearly labeled test message to the Cloud alerts channel in every environment.
+            Automatic stale-sync alerts still post only from production Vercel. Tests do not
+            suppress later automatic alerts.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -173,7 +173,9 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 
-export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
+// This is a registry of provider IDs referenced explicitly in our mappings, not
+// an exhaustive schema for the open-ended provider IDs returned by Vercel.
+export const KnownVercelNonUserByokInferenceProviderIdSchema = z.enum([
   'alibaba',
   'arcee-ai',
   'azure',
@@ -210,30 +212,30 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'wafer',
 ]);
 
-export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
-  VercelNonUserByokInferenceProviderIdSchema
+export const KnownVercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
+  KnownVercelNonUserByokInferenceProviderIdSchema
 );
 
 export type OpenRouterInferenceProviderId = z.infer<typeof OpenRouterInferenceProviderIdSchema>;
 
-export type VercelInferenceProviderId = z.infer<typeof VercelInferenceProviderIdSchema>;
+export type KnownVercelInferenceProviderId = z.infer<typeof KnownVercelInferenceProviderIdSchema>;
 
 const openRouterToVercelInferenceProviderMapping = {
   [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']]:
     VercelUserByokInferenceProviderIdSchema.enum.bedrock,
   [OpenRouterInferenceProviderIdSchema.enum['claude-on-aws']]:
-    VercelNonUserByokInferenceProviderIdSchema.enum.claudeaws,
+    KnownVercelNonUserByokInferenceProviderIdSchema.enum.claudeaws,
   [OpenRouterInferenceProviderIdSchema.enum['google-ai-studio']]:
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
     VercelUserByokInferenceProviderIdSchema.enum.vertex,
   [OpenRouterInferenceProviderIdSchema.enum.seed]:
-    VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
+    KnownVercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:
     VercelUserByokInferenceProviderIdSchema.enum.zai,
   [OpenRouterInferenceProviderIdSchema.enum.together]:
-    VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
-} as Record<string, VercelInferenceProviderId | undefined>;
+    KnownVercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
+} as Record<string, KnownVercelInferenceProviderId | undefined>;
 
 export function normalizeInferenceProviderId(providerId: string): string;
 export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
@@ -243,7 +245,7 @@ export function normalizeInferenceProviderId(providerId: string | undefined) {
   return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
 }
 
-export function openRouterToVercelInferenceProviderId(providerId: string) {
+export function openRouterToVercelInferenceProviderId(providerId: string): string {
   const normalizedProviderId = normalizeInferenceProviderId(providerId);
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
@@ -261,7 +263,7 @@ export function normalizeVercelInferenceProviderIdForRouting(
   providerId: string | undefined
 ): string | undefined;
 export function normalizeVercelInferenceProviderIdForRouting(providerId: string | undefined) {
-  return providerId === VercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
+  return providerId === KnownVercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
     ? VercelUserByokInferenceProviderIdSchema.enum.vertex
     : providerId;
 }
@@ -272,14 +274,14 @@ const modelPrefixToVercelInferenceProviderMapping = {
   openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
   minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
   mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
-  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
+  qwen: KnownVercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
   'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
   'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
-} as Record<string, VercelInferenceProviderId | undefined>;
+} as Record<string, KnownVercelInferenceProviderId | undefined>;
 
 export function inferVercelFirstPartyInferenceProviderForModel(
   model: string
-): VercelInferenceProviderId | null {
+): KnownVercelInferenceProviderId | null {
   return isGptOssModel(model)
     ? null
     : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);

@@ -71,12 +71,9 @@ export function hasCompatibleVercelInferenceProvider(
 
   return openRouterInferenceProviders.some(provider => {
     const vercelProviderId = openRouterToVercelInferenceProviderId(provider);
-    return (
-      vercelProviderId !== undefined &&
-      vercelInferenceProviders
-        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
-        .includes(vercelProviderId)
-    );
+    return vercelInferenceProviders
+      .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+      .includes(vercelProviderId);
   });
 }
 
@@ -85,17 +82,9 @@ export function getVercelInferenceProvidersExcludingIgnored(
   onlyProviders: string[] | undefined,
   vercelInferenceProviders: string[]
 ) {
-  const ignored = new Set<string>(
-    ignoredProviders
-      .map(openRouterToVercelInferenceProviderId)
-      .filter(providerId => providerId !== undefined)
-  );
+  const ignored = new Set(ignoredProviders.map(openRouterToVercelInferenceProviderId));
   const only = onlyProviders
-    ? new Set<string>(
-        onlyProviders
-          .map(openRouterToVercelInferenceProviderId)
-          .filter(providerId => providerId !== undefined)
-      )
+    ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
     : null;
 
   return [
@@ -191,9 +180,7 @@ export function convertProviderOptions(
   const provider = requestToMutate.body.provider;
   const only = (() => {
     if (!provider?.ignore?.length) {
-      return provider?.only
-        ?.map(openRouterToVercelInferenceProviderId)
-        .filter(providerId => providerId !== undefined);
+      return provider?.only?.map(openRouterToVercelInferenceProviderId);
     }
     if (!vercelInferenceProviders) {
       throw new Error('Vercel inference provider data became unavailable during request transform');
@@ -208,9 +195,7 @@ export function convertProviderOptions(
   return {
     gateway: {
       only,
-      order: provider?.order
-        ?.map(openRouterToVercelInferenceProviderId)
-        .filter(providerId => providerId !== undefined),
+      order: provider?.order?.map(openRouterToVercelInferenceProviderId),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,

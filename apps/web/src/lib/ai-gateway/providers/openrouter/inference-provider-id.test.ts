@@ -1,11 +1,11 @@
 import {
   DirectUserByokInferenceProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  KnownVercelInferenceProviderIdSchema,
+  KnownVercelNonUserByokInferenceProviderIdSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
-  VercelInferenceProviderIdSchema,
-  VercelNonUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from './inference-provider-id';
 
@@ -18,9 +18,9 @@ describe('inference provider ids', () => {
     expect(overlappingProviderIds).toEqual([]);
   });
 
-  test('direct BYOK provider ids do not overlap with Vercel provider ids', () => {
+  test('direct BYOK provider ids do not overlap with known Vercel provider ids', () => {
     const overlappingProviderIds = DirectUserByokInferenceProviderIdSchema.options.filter(
-      providerId => VercelInferenceProviderIdSchema.safeParse(providerId).success
+      providerId => KnownVercelInferenceProviderIdSchema.safeParse(providerId).success
     );
 
     expect(overlappingProviderIds).toEqual([]);
@@ -30,9 +30,14 @@ describe('inference provider ids', () => {
     expect(openRouterToVercelInferenceProviderId('claude-on-aws')).toBe('claudeaws');
   });
 
+  test('preserves provider ids that are not in the known provider registry', () => {
+    expect(openRouterToVercelInferenceProviderId('future-provider')).toBe('future-provider');
+    expect(normalizeVercelInferenceProviderIdForRouting('future-provider')).toBe('future-provider');
+  });
+
   test('promotes Vertex to a user BYOK provider', () => {
     expect(VercelUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(true);
-    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(false);
+    expect(KnownVercelNonUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(false);
     expect(openRouterToVercelInferenceProviderId('google-vertex')).toBe('vertex');
   });
 

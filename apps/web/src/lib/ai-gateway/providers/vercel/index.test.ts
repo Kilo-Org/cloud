@@ -76,6 +76,12 @@ describe('hasCompatibleVercelInferenceProvider', () => {
     expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['vertexAnthropic'])).toBe(true);
   });
 
+  it('accepts providers outside the known provider registry', () => {
+    expect(hasCompatibleVercelInferenceProvider(['future-provider'], ['future-provider'])).toBe(
+      true
+    );
+  });
+
   it('rejects when none of the requested providers are available on Vercel', () => {
     expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['anthropic', 'bedrock'])).toBe(
       false
@@ -129,6 +135,16 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
       ])
     ).toEqual([]);
   });
+
+  it('preserves and filters providers outside the known provider registry', () => {
+    expect(
+      getVercelInferenceProvidersExcludingIgnored(['future-provider'], undefined, [
+        'anthropic',
+        'future-provider',
+        'another-future-provider',
+      ])
+    ).toEqual(['anthropic', 'another-future-provider']);
+  });
 });
 
 describe('convertProviderOptions', () => {
@@ -150,6 +166,25 @@ describe('convertProviderOptions', () => {
 
     expect(providerOptions.gateway?.only).toEqual(['anthropic']);
     expect(provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
+  });
+
+  it('passes providers outside the known provider registry through unchanged', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'future/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: {
+          only: ['future-provider'],
+          order: ['another-future-provider'],
+        },
+      },
+    };
+
+    expect(convertProviderOptions(request, null).gateway).toMatchObject({
+      only: ['future-provider'],
+      order: ['another-future-provider'],
+    });
   });
 });
 

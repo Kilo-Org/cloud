@@ -2,7 +2,6 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import {
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
-  VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   OpenRouterModel,
@@ -26,26 +25,20 @@ export function injectExtraProviderModels(
 
     const vercelInferenceProviders = new Set(
       vercelModel.endpoints
-        .map(
-          endpoint =>
-            VercelInferenceProviderIdSchema.safeParse(
-              normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
-            ).data
+        .map(endpoint =>
+          normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
         )
         .filter(p => p !== undefined)
     );
 
     for (const providerData of providerModelData) {
-      const vercelProviderId = VercelInferenceProviderIdSchema.safeParse(
-        openRouterToVercelInferenceProviderId(providerData.provider.slug)
-      ).data;
+      const vercelProviderId = openRouterToVercelInferenceProviderId(providerData.provider.slug);
       const endpoint = vercelModel.endpoints.find(
         endpoint =>
           normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag) ===
           vercelProviderId
       );
       if (
-        vercelProviderId &&
         endpoint &&
         vercelInferenceProviders.has(vercelProviderId) &&
         !providerData.models.some(m => m.slug === model.slug)

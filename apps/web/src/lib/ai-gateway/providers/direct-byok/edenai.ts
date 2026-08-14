@@ -2,9 +2,9 @@ import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/di
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
-  id: 'orcarouter',
-  base_url: 'https://api.orcarouter.ai/v1',
-  base_url_overrides: {},
+  id: 'edenai',
+  base_url: 'https://api.edenai.run/v3',
+  base_url_overrides: { messages: 'https://api.edenai.run/v3/v1' },
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
@@ -12,17 +12,20 @@ export default {
     if (request.kind !== 'chat_completions') {
       return;
     }
-    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
+    request.body.reasoning_effort ??=
+      request.body.reasoning?.effort ??
+      (request.body.reasoning?.enabled === false ? 'none' : undefined);
+    delete request.body.reasoning;
   },
   models: cachedEnhancedDirectByokModelList({
-    providerId: 'orcarouter',
+    providerId: 'edenai',
     recommendedModels: [
       {
-        id: 'kimi/kimi-k2.6',
-        name: 'kimi-k2.6',
+        id: 'openai/gpt-5.6-luna',
+        name: 'GPT-5.6 Luna',
         flags: ['vision', 'reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 65535,
+        context_length: 1_050_000,
+        max_completion_tokens: 128_000,
       },
     ],
   }),

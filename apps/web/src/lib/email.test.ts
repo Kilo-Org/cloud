@@ -14,7 +14,7 @@ describe('email rendering helpers', () => {
 
 describe('user data export ready email', () => {
   it('uses the required subject and only links to the authenticated export page', () => {
-    expect(subjects.userDataExportReady).toBe('Your Kilo account export is ready');
+    expect(subjects.userDataExportReady).toBe('Your Kilo data export is ready');
     const html = renderTemplate('userDataExportReady', {
       data_exports_url: 'https://app.kilocode.ai/data-exports',
       expiry_date: 'August 15, 2026',

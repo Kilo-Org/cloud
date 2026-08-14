@@ -1,11 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
+  applyAnthropicThinkingDefault,
   applyGatewayModelsFallback,
   applyPreferredProvider,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -17,6 +20,63 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
     },
   };
 }
+
+type MessagesThinking = Extract<GatewayRequest, { kind: 'messages' }>['body']['thinking'];
+
+function makeMessagesRequest(model: string, thinking?: MessagesThinking): GatewayRequest {
+  return {
+    kind: 'messages',
+    body: {
+      model,
+      max_tokens: 2_048,
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking,
+    },
+  };
+}
+
+describe('applyAnthropicThinkingDefault', () => {
+  it.each([FRIENDLI_GLM_PUBLIC_ID, PERPLEXITY_KIMI_PUBLIC_ID, 'minimax/minimax-m3'])(
+    'disables implicit thinking for %s',
+    model => {
+      const request = makeMessagesRequest(model);
+
+      applyAnthropicThinkingDefault(model, request);
+
+      expect(request.body.thinking).toEqual({ type: 'disabled' });
+    }
+  );
+
+  it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
+    'preserves explicitly enabled thinking %p',
+    thinking => {
+      const request = makeMessagesRequest(FRIENDLI_GLM_PUBLIC_ID, thinking);
+
+      applyAnthropicThinkingDefault(FRIENDLI_GLM_PUBLIC_ID, request);
+
+      expect(request.body.thinking).toEqual(thinking);
+    }
+  );
+
+  it('does not add thinking to unrelated models', () => {
+    const request = makeMessagesRequest('vendor/unrelated-model');
+
+    applyAnthropicThinkingDefault('vendor/unrelated-model', request);
+
+    expect(request.body.thinking).toBeUndefined();
+  });
+
+  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3-fast'])(
+    'does not apply the partner thinking default to %s',
+    model => {
+      const request = makeMessagesRequest(model);
+
+      applyAnthropicThinkingDefault(model, request);
+
+      expect(request.body.thinking).toBeUndefined();
+    }
+  );
+});
 
 describe('applyGatewayModelsFallback', () => {
   it.each([

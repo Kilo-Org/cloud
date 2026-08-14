@@ -81,6 +81,7 @@ async function checkDirectBYOK(
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
+      apiUrlOverrides: directByok.base_url_overrides,
       apiKey: userByok[0].decryptedAPIKey,
       supportedChatApis: directByok.supported_chat_apis,
       responseTransforms: null,

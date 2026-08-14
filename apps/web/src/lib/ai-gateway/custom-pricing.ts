@@ -2,7 +2,6 @@ import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import {
   calculateCost_mUsd,
   type Pricing,
@@ -17,14 +16,14 @@ const TOKENS_256K = 256 * 1024;
 export type CustomPricing = {
   pricing: PricingTiers;
   /** Human-readable discount shown in the model name; never used in calculations. */
-  percentage?: number;
+  discountPercentage?: number;
   /** Only use this pricing when the upstream response does not report a market cost. */
   fallbackOnly?: boolean;
 };
 
 export const customPricingByModelId: Record<string, CustomPricing> = {
   [QWEN37_MAX_MODEL_ID]: {
-    percentage: 50,
+    discountPercentage: 50,
     pricing: [
       {
         start_context_length: 0,
@@ -38,7 +37,7 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
     ],
   },
   [QWEN37_PLUS_MODEL_ID]: {
-    percentage: 20,
+    discountPercentage: 20,
     pricing: [
       {
         start_context_length: 0,
@@ -60,7 +59,7 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
-  [KIMI_CURRENT_MODEL_ID]: {
+  'moonshotai/kimi-k3': {
     fallbackOnly: true,
     pricing: [
       {
@@ -116,7 +115,9 @@ export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterMod
   if (!customPricing || customPricing.fallbackOnly) return model;
 
   const discountSuffix =
-    customPricing.percentage === undefined ? '' : ` (${customPricing.percentage}% off)`;
+    customPricing.discountPercentage === undefined
+      ? ''
+      : ` (${customPricing.discountPercentage}% off)`;
 
   return {
     ...model,

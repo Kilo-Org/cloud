@@ -8,7 +8,6 @@ import {
   QWEN37_MAX_MODEL_ID,
   QWEN37_PLUS_MODEL_ID,
 } from './custom-pricing';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
@@ -81,6 +80,7 @@ describe('custom model pricing', () => {
           outputTokens: 10_000,
           cacheHitTokens: 20_000,
           cacheWriteTokens: 30_000,
+          cost_mUsd: 999,
         })
       )
     ).toBe(Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625));
@@ -103,16 +103,16 @@ describe('custom model pricing', () => {
       cacheWriteTokens: 30,
     });
 
-    expect(calculateCustomCost_mUsd(KIMI_CURRENT_MODEL_ID, usage)).toBe(
+    expect(calculateCustomCost_mUsd('moonshotai/kimi-k3', usage)).toBe(
       Math.round(50 * 3 + 10 * 15 + 20 * 0.3 + 30 * 3)
     );
     expect(
-      calculateCustomCost_mUsd(KIMI_CURRENT_MODEL_ID, { ...usage, cost_mUsd: 123 })
+      calculateCustomCost_mUsd('moonshotai/kimi-k3', { ...usage, cost_mUsd: 123 })
     ).toBeUndefined();
   });
 
   test('does not replace displayed pricing for fallback-only custom pricing', () => {
-    const model = makeModel(KIMI_CURRENT_MODEL_ID);
+    const model = makeModel('moonshotai/kimi-k3');
 
     expect(applyCustomPricingToModel(model)).toBe(model);
     expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);

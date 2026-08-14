@@ -18,6 +18,7 @@ describe('Eden AI direct BYOK provider', () => {
 
   test.each([
     [{ reasoning: { effort: 'high' } }, 'high'],
+    [{ reasoning: { enabled: false } }, 'none'],
     [{ reasoning: { effort: 'low' }, reasoning_effort: 'medium' }, 'medium'],
   ] as const)('translates reasoning settings for Chat Completions', (body, expectedEffort) => {
     const request: GatewayRequest = {

@@ -11,7 +11,9 @@ export default {
     if (request.kind !== 'chat_completions') {
       return;
     }
-    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
+    request.body.reasoning_effort ??=
+      request.body.reasoning?.effort ??
+      (request.body.reasoning?.enabled === false ? 'none' : undefined);
     delete request.body.reasoning;
   },
   models: cachedEnhancedDirectByokModelList({

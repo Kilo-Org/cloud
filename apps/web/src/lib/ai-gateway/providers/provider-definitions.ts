@@ -87,6 +87,7 @@ export default {
   FRIENDLI_GLM: {
     id: 'friendli',
     apiUrl: 'https://api.friendli.ai/serverless/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('FRIENDLI_API_KEY'),
     supportedChatApis: ['messages'],
     responseTransforms: null,
@@ -98,6 +99,7 @@ export default {
   PERPLEXITY_KIMI: {
     id: 'perplexity',
     apiUrl: 'https://api.perplexity.ai/router/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
     supportedChatApis: ['messages'],
     responseTransforms: null,

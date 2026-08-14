@@ -1367,7 +1367,14 @@ describe('coding plans router', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Credential is not eligible for replacement.',
     });
-    expect(duplicate.status).toBe('available');
+    const [unchangedDuplicate] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, duplicate.id));
+    expect(unchangedDuplicate).toMatchObject({
+      status: 'available',
+      credential_fingerprint: codingPlanCredentialFingerprint('already-present-key'),
+    });
   });
 
   it('rejects inventory replacement after the stored credential identity changes', async () => {

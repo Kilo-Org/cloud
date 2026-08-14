@@ -4,7 +4,8 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 export default {
   id: 'edenai',
   base_url: 'https://api.edenai.run/v3',
-  supported_chat_apis: ['chat_completions'],
+  base_url_overrides: { messages: 'https://api.edenai.run/v3/v1' },
+  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
     const { request } = context;

@@ -4,17 +4,20 @@ import type { TransformRequestContext } from '../types';
 import edenai from './edenai';
 
 describe('Eden AI direct BYOK provider', () => {
-  test('uses the Eden AI v3 Chat Completions API', () => {
+  test('supports all chat APIs with the nested Anthropic Messages base URL', () => {
     expect(edenai.base_url).toBe('https://api.edenai.run/v3');
-    expect(edenai.supported_chat_apis).toEqual(['chat_completions']);
+    expect(edenai.base_url_overrides).toEqual({ messages: 'https://api.edenai.run/v3/v1' });
+    expect(edenai.supported_chat_apis).toEqual(['chat_completions', 'messages', 'responses']);
   });
 
-  test.each(['edenai/openai/gpt-5.6-luna', 'edenai/anthropic/claude-sonnet-5'])(
-    'uses OpenAI-compatible Chat Completions for %s',
-    model => {
-      expect(getAiSdkProvider(model, 'edenai')).toBe('openai-compatible');
-    }
-  );
+  test.each([
+    ['edenai/openai/gpt-5.6-luna', 'openai'],
+    ['edenai/anthropic/claude-sonnet-5', 'anthropic'],
+    ['edenai/xai/grok-4.6', 'openai'],
+    ['edenai/google/gemini-flash-latest', undefined],
+  ] as const)('selects the model-family API for %s', (model, expectedProvider) => {
+    expect(getAiSdkProvider(model, 'edenai')).toBe(expectedProvider);
+  });
 
   test.each([
     [{ reasoning: { effort: 'high' } }, 'high'],

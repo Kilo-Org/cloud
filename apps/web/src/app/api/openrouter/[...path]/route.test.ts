@@ -143,6 +143,7 @@ const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const provider = {
   id: 'openrouter',
   apiUrl: 'https://openrouter.ai/api/v1',
+  apiUrlOverrides: {},
   apiKey: 'test-key',
   supportedChatApis: ['chat_completions', 'responses', 'messages'],
   responseTransforms: null,

@@ -4,6 +4,7 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 export default {
   id: 'alibaba-token-plan',
   base_url: 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest() {},

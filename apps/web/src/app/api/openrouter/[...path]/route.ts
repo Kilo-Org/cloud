@@ -59,6 +59,7 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
+import { isPartnerProviderAllowed } from '@/lib/ai-gateway/providers/partner-routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -887,6 +888,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.body.provider
   );
   if (providerNotAllowedError) return providerNotAllowedError;
+
+  if (
+    effectiveProviderContext.percentageRoutedPartner &&
+    !isPartnerProviderAllowed(effectiveProviderContext.provider, requestBodyParsed.body.provider)
+  ) {
+    return modelNotAllowedResponse();
+  }
 
   if (effectiveProviderContext.experiment) {
     usageContext.modelExperimentVariantVersionId =

@@ -31,3 +31,24 @@ describe('getOpenRouterDerivedModelVariants', () => {
     expect(supportedEfforts).toEqual(['max', 'high', 'medium', 'low', 'minimal']);
   });
 });
+
+describe('getAiSdkProvider', () => {
+  test.each(['moonshotai/kimi-k3', 'z-ai/glm-5.2'])(
+    'uses the Anthropic provider for gateway model %s',
+    async model => {
+      const { getAiSdkProvider } = await import('@/lib/ai-gateway/providers/model-settings');
+
+      expect(getAiSdkProvider(model, null)).toBe('anthropic');
+      expect(getAiSdkProvider(model, 'zai-coding')).toBeUndefined();
+    }
+  );
+
+  test.each(['moonshotai/kimi-k3-fast', 'z-ai/glm-5.1'])(
+    'does not use exact-model settings for %s',
+    async model => {
+      const { getAiSdkProvider } = await import('@/lib/ai-gateway/providers/model-settings');
+
+      expect(getAiSdkProvider(model, null)).toBeUndefined();
+    }
+  );
+});

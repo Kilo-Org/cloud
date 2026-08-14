@@ -33,3 +33,42 @@ describe('LongCat provider', () => {
     expect(request.body.provider).toBeUndefined();
   });
 });
+
+describe.each([
+  {
+    name: 'Friendli GLM',
+    provider: PROVIDERS.FRIENDLI_GLM,
+    expectedUrl: 'https://api.friendli.ai/serverless/v1/messages',
+    requestedModel: 'z-ai/glm-5.2',
+    upstreamModel: 'zai-org/GLM-5.2',
+  },
+  {
+    name: 'Perplexity Kimi',
+    provider: PROVIDERS.PERPLEXITY_KIMI,
+    expectedUrl: 'https://api.perplexity.ai/router/v1/messages',
+    requestedModel: 'moonshotai/kimi-k3',
+    upstreamModel: 'perplexity/kimi-k3',
+  },
+])('$name provider', ({ provider, expectedUrl, requestedModel, upstreamModel }) => {
+  test('supports chat completions and Messages', () => {
+    expect(`${provider.apiUrl}/messages`).toBe(expectedUrl);
+    expect(provider.supportedChatApis).toEqual(['chat_completions', 'messages']);
+  });
+
+  test('hardwires the upstream model and removes provider settings', async () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: requestedModel,
+        max_tokens: 1_024,
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { order: ['friendli'] },
+      },
+    };
+
+    await provider.transformRequest({ request } as TransformRequestContext);
+
+    expect(request.body.model).toBe(upstreamModel);
+    expect(request.body.provider).toBeUndefined();
+  });
+});

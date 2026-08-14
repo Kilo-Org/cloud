@@ -1,4 +1,4 @@
-import { Search, Terminal } from 'lucide-react-native';
+import { Search, Terminal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
 import { FlatList, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

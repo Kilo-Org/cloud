@@ -1,4 +1,4 @@
-import { Plus, Server } from 'lucide-react-native';
+import { Plus, Server } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import {

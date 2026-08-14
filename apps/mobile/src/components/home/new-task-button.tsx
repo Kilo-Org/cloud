@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';

@@ -1,5 +1,5 @@
 import { type AgentStatus, type ResolvedSession } from '@kilocode/cloud-agent-sdk';
-import { WifiOff } from 'lucide-react-native';
+import { WifiOff } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 

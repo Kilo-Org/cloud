@@ -1,5 +1,5 @@
 import { type ReactElement } from 'react';
-import { Cloud, Code, Terminal } from 'lucide-react-native';
+import { Cloud, Code, Terminal } from '@/components/ui/icons';
 
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { SlackIcon } from '@/components/icons/slack-icon';

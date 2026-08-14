@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
-import { Bot, ChevronRight, Loader2 } from 'lucide-react-native';
+import { Bot, ChevronRight, Loader2 } from '@/components/ui/icons';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   type KiloSessionId,

@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { SearchX } from 'lucide-react-native';
+import { SearchX } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';

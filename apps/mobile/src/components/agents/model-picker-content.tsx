@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertCircle, Info, Search, SearchX } from 'lucide-react-native';
+import { AlertCircle, Info, Search, SearchX } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

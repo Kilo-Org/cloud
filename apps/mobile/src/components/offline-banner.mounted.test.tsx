@@ -21,7 +21,7 @@ vi.mock('react-native-reanimated', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   WifiOff: 'WifiOff',
 }));
 vi.mock('@/components/ui/text', () => ({

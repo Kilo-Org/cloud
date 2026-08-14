@@ -5,7 +5,7 @@ import { type TodoTask } from '../tool-list-model';
 import { TodoTaskRows } from './todo-task-rows';
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Circle: 'Circle',
   CircleCheck: 'CircleCheck',
   CircleDot: 'CircleDot',

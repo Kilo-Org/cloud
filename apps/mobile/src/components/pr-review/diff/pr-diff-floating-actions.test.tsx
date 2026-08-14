@@ -29,7 +29,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   MessageCirclePlus: () => null,
 }));
 

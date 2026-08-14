@@ -1,5 +1,5 @@
 import { useFocusEffect, useScrollToTop } from 'expo-router';
-import { Bot, Plus } from 'lucide-react-native';
+import { Bot, Plus } from '@/components/ui/icons';
 import {
   type ReactElement,
   type ReactNode,

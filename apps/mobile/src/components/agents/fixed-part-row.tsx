@@ -1,4 +1,4 @@
-import { ChevronRight, type LucideIcon, XCircle } from 'lucide-react-native';
+import { ChevronRight, type LucideIcon, XCircle } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Eyebrow } from '@/components/ui/eyebrow';

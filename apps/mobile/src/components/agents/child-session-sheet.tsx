@@ -6,7 +6,7 @@ import { type ChildSessionHydrationState, type StoredMessage } from '@kilocode/c
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
-import { Bot } from 'lucide-react-native';
+import { Bot } from '@/components/ui/icons';
 
 import {
   ChildSessionMessage,

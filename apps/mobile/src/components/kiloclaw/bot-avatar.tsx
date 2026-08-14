@@ -21,7 +21,7 @@ import {
   WandSparkles,
   Workflow,
   Zap,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 
 import { botAvatarFallbackIndex } from '@/components/kiloclaw/bot-avatar-options';
 

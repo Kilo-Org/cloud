@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { Plug } from 'lucide-react-native';
+import { Plug } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { SelectableText } from '@/components/ui/selectable-text';

@@ -8,7 +8,7 @@ import {
   Pin,
   Shield,
   Sparkles,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { ConfigureRow } from '@/components/ui/configure-row';

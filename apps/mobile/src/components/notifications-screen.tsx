@@ -17,7 +17,7 @@ import {
   ShieldAlert,
   Sparkles,
   Wallet,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';

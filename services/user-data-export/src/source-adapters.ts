@@ -546,7 +546,7 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * across builds. A cursor on `event_id` alone would skip whole builds.
  *
  * The ORDER BY is table-qualified for the reason recorded on `SCOPE_COLUMNS`, and this is
- * the second table where it matters: `event_id` is a bigint selected through a `::text`
+ * the third table where it matters: `event_id` is a bigint selected through a `::text`
  * cast under its own name, so a bare name there would sort the page as text while the
  * cursor below compares as bigint, and no index could serve it.
  *
@@ -612,7 +612,7 @@ const enrichmentQuery = singleKeyPageQuery({
  * The position pair is unique by construction, so that is the cursor. `payload_id` is
  * exported as a field instead, where its uniqueness does not have to hold.
  *
- * The ORDER BY is table-qualified, the third table where that matters and the second where
+ * The ORDER BY is table-qualified, the fourth table where that matters and the second where
  * the columns are this exact pair. Both positions are bigints selected through a `::text`
  * cast under their own names, so a bare name there binds to the text output column: the
  * page would sort lexicographically while the cursor compares numerically, and no index

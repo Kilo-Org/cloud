@@ -1288,7 +1288,7 @@ describe('source adapters', () => {
 
   // Both positions are bigints selected through a text cast under their own names, so a
   // bare name in the ORDER BY would sort the page as text while the cursor compares
-  // numerically. Third table where this applies, and the failure is silent every time.
+  // numerically. Fourth table where this applies, and the failure is silent every time.
   it('orders the usage journal on the qualified position columns', async () => {
     const { adapters, warehouseCalls } = harness([JOURNAL_ROW]);
 

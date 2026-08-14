@@ -24,10 +24,9 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 }));
 
 const originalFetch = global.fetch;
-const { isValidOpenRouterModelId } = jest.requireMock(
-  '@/lib/ai-gateway/providers/gateway-models-cache'
-) as typeof import('@/lib/ai-gateway/providers/gateway-models-cache');
-const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
+const { isValidOpenRouterModelId: mockedIsValidOpenRouterModelId } = jest.requireMock<{
+  isValidOpenRouterModelId: jest.Mock<(modelId: string) => Promise<boolean>>;
+}>('@/lib/ai-gateway/providers/gateway-models-cache');
 
 const disabledPaidModel = {
   ...qwen36_plus_stealth_model,

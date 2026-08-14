@@ -62,7 +62,7 @@ export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (directProviderId === 'morph-byok') {
+  if (directProviderId === 'edenai' || directProviderId === 'morph-byok') {
     return 'openai-compatible';
   }
   if (model === longcat_2_free_model.public_id) {

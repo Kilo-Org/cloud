@@ -128,7 +128,7 @@ export function applyCustomPricingToPricing(
 
 export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
   const customPricing = getCustomPricing(model.id);
-  if (!customPricing || customPricing.fallbackOnly) return model;
+  if (!customPricing) return model;
 
   const discountSuffix =
     customPricing.discountPercentage === undefined

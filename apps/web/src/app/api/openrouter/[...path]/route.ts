@@ -15,14 +15,12 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import {
   getProvider,
   type GetProviderProviderResult,
 } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
+import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -86,11 +84,7 @@ import {
   resolveAbuseClassificationCacheIdentityKey,
   sleepForRulesEngineAction,
 } from '@/lib/ai-gateway/abuse-service';
-import {
-  emitApiMetricsForResponse,
-  getToolsAvailable,
-  getToolsUsed,
-} from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
@@ -120,7 +114,6 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export const maxDuration = 800;
 
@@ -933,75 +926,29 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     op: 'http.client',
   });
 
-  const sendUpstreamAttempt = async (
-    providerContext: GetProviderProviderResult,
-    parsedRequest: GatewayRequest,
-    delayMs: number
-  ) => {
-    const extraHeaders: Record<string, string> = {};
-    await applyProviderSpecificLogic(
-      providerContext.provider,
-      effectiveModelIdLowerCased,
-      parsedRequest,
-      extraHeaders,
-      providerContext.userByok,
-      fraudHeaders,
-      user.id,
-      organizationId ?? null,
-      usageContext.session_id,
-      taskId ?? null
-    );
-
-    if (
-      providerContext.provider.id === 'openrouter' &&
-      !(await isValidOpenRouterModelId(parsedRequest.body.model ?? effectiveModelIdLowerCased))
-    ) {
-      return {
-        type: 'local-response' as const,
-        response: modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased),
-      };
-    }
-
-    // Capture the bounded prompt for experimented requests AFTER provider
-    // transforms have produced the canonical upstream body. Stored on the
-    // usage context so the async `after()` hook can persist it without
-    // retaining a reference to the full uncapped body.
-    if (providerContext.experiment) {
-      usageContext.experimentPromptCapture = buildExperimentPromptCapture(parsedRequest);
-    }
-
-    if (delayMs > 0) {
-      await sleepForRulesEngineAction(delayMs);
-    }
-
-    const upstreamResult = await upstreamRequest({
-      chatApi: parsedRequest.kind,
-      path,
-      search: url.search,
-      method: request.method,
-      body: parsedRequest.body,
-      extraHeaders,
-      provider: providerContext.provider,
-      signal: request.signal,
-      vercelRequestId,
-    });
-    if (upstreamResult.type === 'error') {
-      return { type: 'local-response' as const, response: upstreamResult.response };
-    }
-    return {
-      type: 'upstream-response' as const,
-      response: upstreamResult.response,
-      toolsAvailable: getToolsAvailable(parsedRequest),
-      toolsUsed: getToolsUsed(parsedRequest),
-    };
+  const upstreamAttemptOptions = {
+    requestedModel: effectiveModelIdLowerCased,
+    fraudHeaders,
+    userId: user.id,
+    organizationId: organizationId ?? null,
+    sessionId: usageContext.session_id,
+    taskId: taskId ?? null,
+    path,
+    search: url.search,
+    method: request.method,
+    signal: request.signal,
+    vercelRequestId,
   };
-
-  let attempt = await sendUpstreamAttempt(
-    effectiveProviderContext,
-    requestBodyParsed,
-    rulesEngineDecision.delayMs
-  );
-  if (attempt.type === 'local-response') return attempt.response;
+  let attempt = await sendUpstreamAttempt({
+    ...upstreamAttemptOptions,
+    providerContext: effectiveProviderContext,
+    request: requestBodyParsed,
+    delayMs: rulesEngineDecision.delayMs,
+  });
+  if (attempt.type === 'invalid-openrouter-model') {
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
+  if (attempt.type === 'error') return attempt.response;
 
   if (partnerFallback && attempt.response.status >= 400) {
     console.warn('Partner request failed; retrying initial managed provider', {
@@ -1020,11 +967,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.provider = effectiveProviderContext.provider.id;
     usageContext.user_byok = !!effectiveProviderContext.userByok;
 
-    attempt = await sendUpstreamAttempt(effectiveProviderContext, requestBodyParsed, 0);
-    if (attempt.type === 'local-response') return attempt.response;
+    attempt = await sendUpstreamAttempt({
+      ...upstreamAttemptOptions,
+      providerContext: effectiveProviderContext,
+      request: requestBodyParsed,
+      delayMs: 0,
+    });
+    if (attempt.type === 'invalid-openrouter-model') {
+      return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+    }
+    if (attempt.type === 'error') return attempt.response;
   }
 
-  const { response, toolsAvailable, toolsUsed } = attempt;
+  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
+  if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',

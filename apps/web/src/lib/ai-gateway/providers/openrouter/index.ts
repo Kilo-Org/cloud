@@ -117,24 +117,22 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
   const summaries = await getTerminalBenchSummaries();
-  const validatedModels = await Promise.all(
-    models.map(async model => ({
-      model,
-      isValid: await isValidOpenRouterModelId(model.id),
-    }))
-  );
+  const validModels: OpenRouterModel[] = [];
+  for (const model of models) {
+    if (await isValidOpenRouterModelId(model.id)) {
+      validModels.push(model);
+    }
+  }
   const enhancedModels = await Promise.all(
-    validatedModels
+    validModels
       .filter(
-        ({ model, isValid }) =>
-          isValid &&
+        model =>
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isUnavailableModel(model.id) &&
           !model.id.endsWith(':batch')
       )
-      .map(({ model }) => model)
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];

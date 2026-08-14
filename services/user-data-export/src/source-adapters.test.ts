@@ -338,6 +338,7 @@ describe('warehouse availability probe', () => {
       'microdollar_usage_metadata',
       'code_indexing_manifest',
       'code_indexing_search',
+      'deployment_events',
     ]);
   });
 
@@ -391,6 +392,7 @@ describe('source adapters', () => {
       'microdollar_usage_metadata',
       'code_indexing_manifest',
       'code_indexing_search',
+      'deployment_events',
     ]);
   });
 
@@ -1023,5 +1025,120 @@ describe('source adapters', () => {
 
     expect(byField.get('query')).toBeNull();
     expect(byField.get('project_id')).toBe('project-a');
+  });
+
+  const DEPLOYMENT_EVENT_ROW = {
+    build_id: 'build-a',
+    event_id: '7',
+    deployment_id: 'deploy-a',
+    created_by_user_id: 'creator-user',
+    event_type: 'build.succeeded',
+    event_timestamp: '2026-07-04T09:15:00.000Z',
+    payload: { status: 'ok' },
+  };
+
+  it('keys every deployment event field on the build and event pair', async () => {
+    const { adapters } = harness([DEPLOYMENT_EVENT_ROW]);
+
+    const page = await requireAdapter(adapters, 'deployment_events').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    // `event_id` repeats across builds, so the pair is what identifies one event.
+    expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['build-a.7']));
+    expect(byField.get('build_id')).toBe('build-a');
+    expect(byField.get('deployment_id')).toBe('deploy-a');
+    expect(byField.get('event_type')).toBe('build.succeeded');
+    expect(byField.get('event_timestamp')).toBe('2026-07-04T09:15:00.000Z');
+    expect(byField.get('payload')).toBe(JSON.stringify({ status: 'ok' }));
+    expect(page?.nextCursor).toEqual({ key: ['build-a', '7'] });
+  });
+
+  // The one source with a third user column. `created_by_user_id` is provenance, and on
+  // an org-owned deployment it names a member rather than the owner. Scoping a user read
+  // on it would hand that member the organization's deployment history as their own, so
+  // it must appear in the SELECT list and never in the WHERE clause.
+  it('exports the deployment creator without ever scoping on it', async () => {
+    const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
+    const adapter = requireAdapter(adapters, 'deployment_events');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    for (const call of warehouseCalls) {
+      expect(call.text).not.toContain('WHERE created_by_user_id');
+      expect(call.text).not.toContain('created_by_user_id = $');
+    }
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    const page = await adapter.readPage?.(READ_PAGE_INPUT);
+    expect(page?.records.find(record => record.field === 'created_by_user_id')?.value).toBe(
+      'creator-user'
+    );
+  });
+
+  it('scopes each deployment event read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
+    const adapter = requireAdapter(adapters, 'deployment_events');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, 100]);
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, null, 100]);
+  });
+
+  // A bare `event_id` in the ORDER BY would bind to the `::text` output column rather than
+  // the bigint input, sorting the page as text while the cursor compares numerically. That
+  // is the defect `cli_sessions` and `system_prompt_prefix` were both fixed for, and it is
+  // silent, so the qualified form is pinned here rather than left to review.
+  it('orders deployment events on the qualified bigint column', async () => {
+    const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
+
+    await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain(
+      'ORDER BY deployment_events.build_id, deployment_events.event_id'
+    );
+    expect(warehouseCalls[0].text).toContain('(build_id, event_id) > ($2::text, $3::bigint)');
+  });
+
+  it('carries the deployment event cursor pair back into the next page', async () => {
+    const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
+
+    await requireAdapter(adapters, 'deployment_events').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['build-a', '7'] },
+    });
+
+    expect(warehouseCalls[0].values).toEqual(['owner-user', 'build-a', '7', 100]);
+  });
+
+  it('marks every field of a deployment event prod has since deleted', async () => {
+    const { adapters } = harness([{ ...DEPLOYMENT_EVENT_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(6);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  // The joined columns come from a LEFT JOIN through deployment_builds to deployments, so
+  // an absent parent row is a null field rather than a failed export.
+  it('reads an unjoined deployment event as absent rather than failing the export', async () => {
+    const { adapters } = harness([
+      { ...DEPLOYMENT_EVENT_ROW, deployment_id: null, event_type: null },
+    ]);
+
+    const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('deployment_id')).toBeNull();
+    expect(byField.get('event_type')).toBeNull();
+    expect(byField.get('build_id')).toBe('build-a');
   });
 });

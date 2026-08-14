@@ -234,12 +234,13 @@ LIMIT 1`;
  *     app_builder_projects          2,143    user XOR org
  *     app_builder_messages        266,095    user XOR org
  *     code_indexing_manifest   20,170,449    user XOR org
+ *     deployment_events           513,069    user XOR org
  *     cli_sessions                      0    both columns set
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
  *     code_indexing_search              0    both columns set
  *
- * On the first three, an organization can own a row outright with no user attached, so
+ * On the first four, an organization can own a row outright with no user attached, so
  * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
@@ -471,6 +472,57 @@ const codeIndexingSearchQueries = subjectPageQueries({
   columns: 'id, project_id, query, metadata, created_at, _snowflake_deleted',
 });
 
+/**
+ * Ownership on this source is resolved upstream, through `deployment_builds` to
+ * `deployments`, so the two scope columns are that deployment's owner rather than
+ * anything the event itself records. `kilo_user_id` is `deployments.owned_by_user_id`.
+ *
+ * `created_by_user_id` is a THIRD user column, and it deliberately does not scope
+ * anything. It carries provenance only: who pressed the button, as against who owns the
+ * result. The warehouse settled that split on two pieces of evidence, both checked
+ * 2026-08-11 — `schema.ts` gives `owned_by_user_id` a foreign key to `kilocode_users`
+ * while `created_by_user_id` is bare text with none, and `deployments-service.ts` gates
+ * every access path on the owner columns and none on the creator.
+ *
+ * The distinction only bites on organization-owned deployments, which is exactly where
+ * the two disagree: 513,069 rows carry an organization and no user, and their creator is
+ * a member. Scoping a user export on the creator would hand that member an
+ * organization's deployment history as their own personal data. `kilo_user_id = $1`
+ * therefore stays the only user predicate, and the creator is exported as a field so the
+ * provenance is still visible without ever selecting on it.
+ *
+ * A further 99,210 rows have neither owner. Both predicates skip them, as with any other
+ * unowned row, so they reach nobody.
+ *
+ * The cursor is the composite `(build_id, event_id)`, prod's primary key, because
+ * `event_id` is a per-build sequence number rather than a row identifier and repeats
+ * across builds. A cursor on `event_id` alone would skip whole builds.
+ *
+ * The ORDER BY is table-qualified for the reason recorded on `SCOPE_COLUMNS`, and this is
+ * the second table where it matters: `event_id` is a bigint selected through a `::text`
+ * cast under its own name, so a bare name there would sort the page as text while the
+ * cursor below compares as bigint, and no index could serve it.
+ *
+ * One known cost, accepted upstream when the load was designed. The warehouse holds 1,255
+ * byte-identical duplicate `(build_id, event_id)` pairs among 9,049,083 rows. A keyset
+ * cursor can drop one copy of a pair if a page boundary falls exactly between the twins.
+ * They carry no information the surviving copy does not.
+ */
+function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
+  event_type, event_timestamp, payload, _snowflake_deleted
+FROM deployment_events
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
+ORDER BY deployment_events.build_id, deployment_events.event_id
+LIMIT $4`;
+}
+
+const deploymentEventQueries: Record<ExportSubject['type'], string> = {
+  user: deploymentEventPageQuery('user'),
+  organization: deploymentEventPageQuery('organization'),
+};
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
@@ -480,6 +532,9 @@ const MESSAGE_PAGE_SIZE = 200;
  * are large in the same way message payloads are and the page is cut for the same reason.
  */
 const SEARCH_PAGE_SIZE = 200;
+
+/** Deployment events carry a payload per event, so the page is cut for the same reason. */
+const DEPLOYMENT_EVENT_PAGE_SIZE = 200;
 
 type ProjectRow = { id: string; title: string | null; deleted: unknown };
 type MessageRow = { id: string; data: unknown; deleted: unknown };
@@ -498,6 +553,16 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type DeploymentEventRow = {
+  build_id: string;
+  event_id: string;
+  deployment_id: string | null;
+  created_by_user_id: string | null;
+  event_type: string | null;
+  event_timestamp: string | null;
+  payload: string | null;
+  deleted: unknown;
+};
 type CodeIndexingSearchRow = {
   id: string;
   project_id: string | null;
@@ -1042,6 +1107,75 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'deployment_events',
+      warehouseTable: 'deployment_events',
+      pageSize: DEPLOYMENT_EVENT_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [afterBuild, afterEvent] = keyCursorValues(input.cursor, 2);
+        const rows: DeploymentEventRow[] = await warehouseQuery(
+          deploymentEventQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterBuild, afterEvent, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            // The cursor pair, so both are read strictly: a page that could not say where
+            // it ended would silently restart the source rather than continue it.
+            build_id: requiredString(row.build_id, 'build_id'),
+            event_id: digitString(row.event_id, 'event_id'),
+            // Everything below is a LEFT JOIN result or an unconstrained warehouse
+            // column, so each is read leniently. See the note on `warehouseText`.
+            deployment_id: warehouseText(row.deployment_id),
+            created_by_user_id: warehouseText(row.created_by_user_id),
+            event_type: warehouseText(row.event_type),
+            event_timestamp: nullableTimestamp(row.event_timestamp, 'event_timestamp'),
+            payload: jsonValue(row.payload),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row => {
+            // `event_id` is unique only within a build, so the pair identifies the event.
+            // The same shape `cli_sessions` uses for its journal positions.
+            const id = `${row.build_id}.${row.event_id}`;
+            const mark = deletionMark(row.deleted);
+            return [
+              { source: 'deployment_events', id, field: 'build_id', value: row.build_id, ...mark },
+              {
+                source: 'deployment_events',
+                id,
+                field: 'deployment_id',
+                value: row.deployment_id,
+                ...mark,
+              },
+              // Provenance, never a scope. See the note on `deploymentEventPageQuery`.
+              {
+                source: 'deployment_events',
+                id,
+                field: 'created_by_user_id',
+                value: row.created_by_user_id,
+                ...mark,
+              },
+              {
+                source: 'deployment_events',
+                id,
+                field: 'event_type',
+                value: row.event_type,
+                ...mark,
+              },
+              {
+                source: 'deployment_events',
+                id,
+                field: 'event_timestamp',
+                value: row.event_timestamp,
+                ...mark,
+              },
+              { source: 'deployment_events', id, field: 'payload', value: row.payload, ...mark },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.build_id, row.event_id]),
+        };
+      },
+    },
   ];
 }
 
@@ -1080,6 +1214,8 @@ export const warehouseQueries = {
   codeIndexingOrgQuery: codeIndexingQueries.organization,
   codeIndexingSearchUserQuery: codeIndexingSearchQueries.user,
   codeIndexingSearchOrgQuery: codeIndexingSearchQueries.organization,
+  deploymentEventUserQuery: deploymentEventQueries.user,
+  deploymentEventOrgQuery: deploymentEventQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1141,6 +1277,18 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
   code_indexing_search: ['id', 'project_id', 'query', 'metadata', 'created_at', DELETED_COLUMN],
+  // `created_by_user_id` is probed because the query selects it as a field, not because
+  // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
+  deployment_events: [
+    'build_id',
+    'event_id',
+    'deployment_id',
+    'created_by_user_id',
+    'event_type',
+    'event_timestamp',
+    'payload',
+    DELETED_COLUMN,
+  ],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1262,6 +1410,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   codeIndexingOrgQuery: 'organization_id = $1',
   codeIndexingSearchUserQuery: 'kilo_user_id = $1',
   codeIndexingSearchOrgQuery: 'organization_id = $1',
+  deploymentEventUserQuery: 'kilo_user_id = $1',
+  deploymentEventOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

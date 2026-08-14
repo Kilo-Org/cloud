@@ -65,6 +65,13 @@ export function createSecureStorePreference<T>(options: {
   };
 
   return {
+    /** Start the disk read without registering a listener (module-scope warm-up). */
+    preload: () => {
+      if (!loadStarted) {
+        loadStarted = true;
+        void load();
+      }
+    },
     subscribe: (listener: () => void) => {
       if (!loadStarted) {
         loadStarted = true;

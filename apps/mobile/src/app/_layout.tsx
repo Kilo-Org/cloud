@@ -12,7 +12,7 @@ import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Me
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
-import { useFonts } from 'expo-font';
+import { loadAsync, useFonts } from 'expo-font';
 import {
   type Href,
   Slot,
@@ -41,12 +41,17 @@ import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
 import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
-import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
+import {
+  applyThemePreference,
+  preloadThemePreference,
+  useThemePreference,
+} from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
 import {
@@ -115,10 +120,27 @@ function initSentry(optionalConsented: boolean) {
 
 initSentry(false);
 
+// Kick the font load off at module scope so it overlaps JS bootstrap; the
+// same family names make `loadAsync` dedupe with the `useFonts` call in
+// RootLayoutNav. A failure here is ignored — `useFonts` stays the owner of
+// `fontsError`.
+function preloadStartupFonts(): void {
+  void (async () => {
+    try {
+      await loadAsync({ JetBrainsMono_500Medium, JetBrainsMono_600SemiBold });
+    } catch {
+      // useFonts stays the owner of fontsError.
+    }
+  })();
+}
+
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+prefetchCurrentUser();
+preloadThemePreference();
+preloadStartupFonts();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();

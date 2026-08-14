@@ -17,7 +17,6 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -25,6 +24,9 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 }));
 
 const originalFetch = global.fetch;
+const { isValidOpenRouterModelId } = jest.requireMock(
+  '@/lib/ai-gateway/providers/gateway-models-cache'
+) as typeof import('@/lib/ai-gateway/providers/gateway-models-cache');
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 
 const disabledPaidModel = {

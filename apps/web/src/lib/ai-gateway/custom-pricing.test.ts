@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
+  applyCustomPricingToPricing,
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
   QWEN37_MAX_MODEL_ID,
@@ -79,6 +80,7 @@ describe('custom model pricing', () => {
           outputTokens: 10_000,
           cacheHitTokens: 20_000,
           cacheWriteTokens: 30_000,
+          cost_mUsd: 999,
         })
       )
     ).toBe(Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625));
@@ -91,6 +93,43 @@ describe('custom model pricing', () => {
     expect(
       calculateCustomCost_mUsd(QWEN37_PLUS_MODEL_ID, makeUsage({ inputTokens: 262_144 }))
     ).toBe(Math.round(262_144 * 0.96));
+  });
+
+  test('uses Kimi K3 custom pricing only when market cost is missing', () => {
+    const usage = makeUsage({
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheHitTokens: 20,
+      cacheWriteTokens: 30,
+    });
+
+    expect(calculateCustomCost_mUsd('moonshotai/kimi-k3', usage)).toBe(
+      Math.round(50 * 3 + 10 * 15 + 20 * 0.3 + 30 * 3)
+    );
+    expect(
+      calculateCustomCost_mUsd('moonshotai/kimi-k3', { ...usage, cost_mUsd: 123 })
+    ).toBeUndefined();
+  });
+
+  test('uses GLM 5.2 Friendli pricing only when market cost is missing', () => {
+    const usage = makeUsage({
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheHitTokens: 20,
+      cacheWriteTokens: 30,
+    });
+
+    expect(calculateCustomCost_mUsd('z-ai/glm-5.2', usage)).toBe(
+      Math.round(50 * 1.4 + 10 * 4.4 + 20 * 0.26 + 30 * 1.4)
+    );
+    expect(calculateCustomCost_mUsd('z-ai/glm-5.2', { ...usage, cost_mUsd: 123 })).toBeUndefined();
+  });
+
+  test('does not replace displayed pricing for fallback-only custom pricing', () => {
+    const model = makeModel('moonshotai/kimi-k3');
+
+    expect(applyCustomPricingToModel(model)).toBe(model);
+    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
   });
 
   test('reports invalid negative uncached token counts', () => {

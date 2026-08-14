@@ -16,12 +16,14 @@ const TOKENS_256K = 256 * 1024;
 export type CustomPricing = {
   pricing: PricingTiers;
   /** Human-readable discount shown in the model name; never used in calculations. */
-  percentage?: number;
+  discountPercentage?: number;
+  /** Only use this pricing when the upstream response does not report a market cost. */
+  fallbackOnly?: boolean;
 };
 
 export const customPricingByModelId: Record<string, CustomPricing> = {
   [QWEN37_MAX_MODEL_ID]: {
-    percentage: 50,
+    discountPercentage: 50,
     pricing: [
       {
         start_context_length: 0,
@@ -35,7 +37,7 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
     ],
   },
   [QWEN37_PLUS_MODEL_ID]: {
-    percentage: 20,
+    discountPercentage: 20,
     pricing: [
       {
         start_context_length: 0,
@@ -53,6 +55,34 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
           completion_per_million: 3.84,
           input_cache_read_per_million: 0.096,
           input_cache_write_per_million: 1.2,
+        },
+      },
+    ],
+  },
+  'moonshotai/kimi-k3': {
+    fallbackOnly: true,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 3,
+          completion_per_million: 15,
+          input_cache_read_per_million: 0.3,
+          input_cache_write_per_million: null,
+        },
+      },
+    ],
+  },
+  'z-ai/glm-5.2': {
+    fallbackOnly: true,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 1.4,
+          completion_per_million: 4.4,
+          input_cache_read_per_million: 0.26,
+          input_cache_write_per_million: null,
         },
       },
     ],
@@ -89,15 +119,19 @@ export function applyCustomPricingToPricing(
   pricing: OpenRouterModel['pricing']
 ): OpenRouterModel['pricing'] {
   const customPricing = getCustomPricing(modelId);
-  return customPricing ? applyPricing(pricing, customPricing.pricing[0].pricing) : pricing;
+  return customPricing && !customPricing.fallbackOnly
+    ? applyPricing(pricing, customPricing.pricing[0].pricing)
+    : pricing;
 }
 
 export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
   const customPricing = getCustomPricing(model.id);
-  if (!customPricing) return model;
+  if (!customPricing || customPricing.fallbackOnly) return model;
 
   const discountSuffix =
-    customPricing.percentage === undefined ? '' : ` (${customPricing.percentage}% off)`;
+    customPricing.discountPercentage === undefined
+      ? ''
+      : ` (${customPricing.discountPercentage}% off)`;
 
   return {
     ...model,
@@ -111,7 +145,7 @@ export function calculateCustomCost_mUsd(
   usage: JustTheCostsUsageStats
 ): number | undefined {
   const customPricing = getCustomPricing(modelId);
-  if (!customPricing) return undefined;
+  if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
   if (uncachedInputTokens < 0) {

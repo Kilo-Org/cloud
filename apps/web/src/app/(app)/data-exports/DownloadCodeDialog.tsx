@@ -130,7 +130,7 @@ export function DownloadCodeDialog({
             </p>
           ) : (
             <p id={CODE_HINT_ID} className="text-muted-foreground text-sm">
-              Do not share this code. It unlocks a copy of your account data.
+              Do not share this code. It unlocks a copy of your data export.
             </p>
           )}
 

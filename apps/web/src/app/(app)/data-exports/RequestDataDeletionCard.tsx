@@ -38,8 +38,11 @@ export function RequestDataDeletionCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Delete your data</CardTitle>
+        <CardTitle>Request deletion of your data</CardTitle>
         <CardDescription>
+          As always, Anaconda offers a process for any user to request deletion of their Kilo
+          account and its data.
+          <br />
           Data deletion is handled by our support team. Request it from the support form.
         </CardDescription>
       </CardHeader>
@@ -58,7 +61,7 @@ export function RequestDataDeletionCard() {
                   than a nested <p>. */}
               <AlertDialogDescription>
                 Download your data export before requesting deletion. Once your data is deleted, any
-                export download will no longer be available.
+                export download will no longer be available or recoverable.
                 <span className="mt-4 block">
                   On the support form, choose the Account Deletion category.
                 </span>

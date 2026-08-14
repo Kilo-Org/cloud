@@ -61,7 +61,7 @@ export const subjects = {
   securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
   recommendationsDigest: 'Kilo: Your weekly recommendations',
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
-  userDataExportReady: 'Your Kilo account export is ready',
+  userDataExportReady: 'Your Kilo data export is ready',
   dataExportDownloadCode: 'Your Kilo data export download code',
 } as const;
 

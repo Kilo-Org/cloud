@@ -129,10 +129,23 @@ describe('custom model pricing', () => {
     ).toBeUndefined();
   });
 
-  test('does not replace displayed pricing for fallback-only custom pricing', () => {
+  test('uses fallback-only custom pricing in the model list', () => {
     const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
 
-    expect(applyCustomPricingToModel(model)).toBe(model);
+    expect(applyCustomPricingToModel(model)).toEqual({
+      ...model,
+      pricing: {
+        prompt: '0.000003000000',
+        completion: '0.000015000000',
+        input_cache_read: '0.000000300000',
+        input_cache_write: undefined,
+      },
+    });
+  });
+
+  test('preserves endpoint pricing for fallback-only custom pricing', () => {
+    const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
+
     expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
   });
 

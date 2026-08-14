@@ -705,31 +705,6 @@ describe('parseEmbeddingUsageFromResponse', () => {
     expect(result.cost_mUsd).toBe(50);
   });
 
-  it('should extract Vercel system credential fallback', () => {
-    const response = makeResponse({
-      providerMetadata: {
-        gateway: {
-          cost: '0.00005',
-          marketCost: '0.00004',
-          routing: {
-            modelAttempts: [
-              {
-                success: true,
-                providerAttempts: [{ provider: 'vertex', credentialType: 'system', success: true }],
-              },
-            ],
-          },
-        },
-      },
-    });
-
-    const result = parseEmbeddingUsageFromResponse(response, 200);
-
-    expect(result.is_byok).toBe(false);
-    expect(result.cost_mUsd).toBe(50);
-    expect(result.market_cost).toBe(40);
-  });
-
   it('should default to 0 cost when upstream cost field is absent', () => {
     const response = makeResponse({
       usage: { prompt_tokens: 1000, total_tokens: 1000 },

@@ -4,7 +4,6 @@ import {
   extractPromptInfo,
   extractUsageContextInfo,
   countAndStoreUsage,
-  didUseUserByok,
   parseMicrodollarUsageFromStream,
   parseMicrodollarUsageFromString,
   mapToUsageStats,
@@ -43,32 +42,6 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 
 // Note: Legacy banned_ja4/whitelist_ja4 tests removed - abuse classification
 // is now handled by the external abuse detection service (src/lib/abuse-service.ts)
-
-describe('didUseUserByok', () => {
-  const usageStats = { is_byok: true } as MicrodollarUsageStats;
-  const usageContext = {
-    provider: 'vercel',
-    user_byok: true,
-  } as MicrodollarUsageContext;
-
-  test('accepts confirmed Vercel BYOK usage', () => {
-    expect(didUseUserByok(usageStats, usageContext)).toBe(true);
-  });
-
-  test('rejects confirmed Vercel system credential fallback', () => {
-    expect(didUseUserByok({ ...usageStats, is_byok: false }, usageContext)).toBe(false);
-  });
-
-  test('preserves BYOK when Vercel omits credential evidence', () => {
-    expect(didUseUserByok({ ...usageStats, is_byok: null }, usageContext)).toBe(true);
-  });
-
-  test('preserves non-Vercel user BYOK behavior', () => {
-    expect(
-      didUseUserByok({ ...usageStats, is_byok: false }, { ...usageContext, provider: 'openrouter' })
-    ).toBe(true);
-  });
-});
 
 describe('processOpenRouterUsage', () => {
   const coreProps = {

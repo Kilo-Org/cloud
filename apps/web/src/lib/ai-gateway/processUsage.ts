@@ -1304,27 +1304,12 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  const usedUserByok = didUseUserByok(usageStats, usageContext);
-  if ((await isFreeModel(usageContext.requested_model)) || usedUserByok) {
+  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  return logMicrodollarUsage(
-    usageStats,
-    usedUserByok === usageContext.user_byok
-      ? usageContext
-      : { ...usageContext, user_byok: usedUserByok }
-  );
-}
-
-export function didUseUserByok(
-  usageStats: MicrodollarUsageStats,
-  usageContext: MicrodollarUsageContext
-): boolean {
-  return (
-    usageContext.user_byok && (usageContext.provider !== 'vercel' || usageStats.is_byok !== false)
-  );
+  return logMicrodollarUsage(usageStats, usageContext);
 }
 
 async function useGenerationLookup(

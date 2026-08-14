@@ -69,11 +69,15 @@ export function hasCompatibleVercelInferenceProvider(
     return true;
   }
 
-  return openRouterInferenceProviders.some(provider =>
-    vercelInferenceProviders
-      .map(normalizeVercelInferenceProviderIdForRouting)
-      .includes(openRouterToVercelInferenceProviderId(provider))
-  );
+  return openRouterInferenceProviders.some(provider => {
+    const vercelProviderId = openRouterToVercelInferenceProviderId(provider);
+    return (
+      vercelProviderId !== undefined &&
+      vercelInferenceProviders
+        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+        .includes(vercelProviderId)
+    );
+  });
 }
 
 export function getVercelInferenceProvidersExcludingIgnored(
@@ -81,15 +85,23 @@ export function getVercelInferenceProvidersExcludingIgnored(
   onlyProviders: string[] | undefined,
   vercelInferenceProviders: string[]
 ) {
-  const ignored = new Set(ignoredProviders.map(openRouterToVercelInferenceProviderId));
+  const ignored = new Set<string>(
+    ignoredProviders
+      .map(openRouterToVercelInferenceProviderId)
+      .filter(providerId => providerId !== undefined)
+  );
   const only = onlyProviders
-    ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
+    ? new Set<string>(
+        onlyProviders
+          .map(openRouterToVercelInferenceProviderId)
+          .filter(providerId => providerId !== undefined)
+      )
     : null;
 
   return [
     ...new Set(
       vercelInferenceProviders
-        .map(normalizeVercelInferenceProviderIdForRouting)
+        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
         .filter(provider => !ignored.has(provider) && (!only || only.has(provider)))
     ),
   ];
@@ -179,7 +191,9 @@ export function convertProviderOptions(
   const provider = requestToMutate.body.provider;
   const only = (() => {
     if (!provider?.ignore?.length) {
-      return provider?.only?.map(openRouterToVercelInferenceProviderId);
+      return provider?.only
+        ?.map(openRouterToVercelInferenceProviderId)
+        .filter(providerId => providerId !== undefined);
     }
     if (!vercelInferenceProviders) {
       throw new Error('Vercel inference provider data became unavailable during request transform');
@@ -194,7 +208,9 @@ export function convertProviderOptions(
   return {
     gateway: {
       only,
-      order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
+      order: provider?.order
+        ?.map(openRouterToVercelInferenceProviderId)
+        .filter(providerId => providerId !== undefined),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
@@ -306,9 +322,7 @@ export async function applyVercelSettings(
     const byokProviders =
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
-    // Vercel tries these request-scoped credentials first. If they fail, Vercel may
-    // use system credentials; usage processing checks the successful credentialType
-    // so system fallback is billed rather than treated as user-funded BYOK.
+    // Pass request-scoped credentials and restrict routing to the corresponding providers.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),

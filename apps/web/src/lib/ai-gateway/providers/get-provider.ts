@@ -26,7 +26,6 @@ import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/
 import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
 
 /**
  * Metadata about the experiment that resolved this provider, attached when
@@ -50,8 +49,6 @@ export type GetProviderProviderResult = {
   bypassAccessCheck: boolean;
   /** Present when this provider was resolved through a model experiment. */
   experiment?: ExperimentRouting;
-  /** Present when percentage routing selected a direct partner upstream. */
-  percentageRoutedPartner?: true;
 };
 
 /**
@@ -261,21 +258,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (customLlmResult) {
       return customLlmResult;
     }
-  }
-
-  const percentageRoutedPartnerProvider = await getPercentageRoutedPartnerProvider(
-    requestedModel,
-    request,
-    taskId || user.id
-  );
-  if (percentageRoutedPartnerProvider) {
-    return {
-      kind: 'provider',
-      provider: percentageRoutedPartnerProvider,
-      userByok: null,
-      bypassAccessCheck: false,
-      percentageRoutedPartner: true,
-    };
   }
 
   const eligibleForVercelRouting =

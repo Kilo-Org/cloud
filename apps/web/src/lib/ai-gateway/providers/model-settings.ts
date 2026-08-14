@@ -20,8 +20,8 @@ import {
 } from '@/lib/ai-gateway/providers/variants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
-import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
-import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 export async function getOpenRouterDerivedModelVariants(
   model: string
@@ -81,9 +81,12 @@ export function getAiSdkProvider(
     // On Vercel AI Gateway, this is necessary for reasoning to show.
     return 'anthropic';
   }
-  if (!directProviderId && (isGlmModel(model) || isKimiModel(model))) {
+  if (
+    !directProviderId &&
+    (model === FRIENDLI_GLM_PUBLIC_ID || model === PERPLEXITY_KIMI_PUBLIC_ID)
+  ) {
     // Messages is more cross-compatible than Chat Completions across the four managed providers
-    // used for GLM and Kimi: OpenRouter, Vercel, Friendli, and Perplexity.
+    // used for these pinned models: OpenRouter, Vercel, Friendli, and Perplexity.
     return 'anthropic';
   }
   if (isOpenAiModel(model) || isGrokModel(model) || isMuseModel(model)) {

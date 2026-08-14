@@ -445,6 +445,28 @@ describe('source adapters', () => {
     expect(byField.get('vercel_country')).toBeNull();
   });
 
+  // These columns are unconstrained nullable text and the warehouse's load checks count
+  // nulls rather than forbidding shapes, which is why the email and name path already
+  // tolerates non-strings. A strict mapper here throws a plain Error, which the queue
+  // treats as retryable, so one odd cell would burn four retries on a value frozen in the
+  // snapshot and then fail the whole export.
+  it.each([42, true, {}, [], undefined])(
+    'reads a non-string warehouse value as absent rather than failing the export (%p)',
+    async bad => {
+      const { adapters } = harness(
+        [PRIMARY_USER_ROW],
+        [warehouseUserRow({ posthog_city: bad, posthog_country: 'NL' })]
+      );
+
+      const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
+      const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+      expect(byField.get('posthog_city')).toBeNull();
+      // The rest of the row still comes through.
+      expect(byField.get('posthog_country')).toBe('NL');
+    }
+  );
+
   // The point of the change: the two fields the warehouse carries are reported as of the
   // snapshot, so a name or email changed after the cutoff does not appear beside five
   // sources frozen before it.

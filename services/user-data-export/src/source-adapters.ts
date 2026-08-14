@@ -434,6 +434,25 @@ function nullableString(value: unknown, field: string): string | null {
   return requiredString(value, field);
 }
 
+/**
+ * A warehouse text column, where anything that is not a string reads as absent.
+ *
+ * Deliberately more tolerant than `nullableString`, and for the same reason
+ * `warehouseProfileValue` is: these columns are unconstrained nullable text, and the
+ * warehouse's own load checks count nulls rather than forbidding shapes. A strict mapper
+ * throws a plain `Error`, which `handleGenerationFailure` treats as retryable, so a single
+ * odd cell would spend the queue's four retries on a value frozen in the snapshot that no
+ * retry can change, and then fail the whole export.
+ *
+ * The strictness is worth keeping on the primary, where the columns are NOT NULL and a
+ * type mismatch means the query named the wrong one. Here it protects nothing: the probe
+ * already guarantees the column exists, so the only thing left to be strict about is the
+ * value, and one unusable value is not worth an export.
+ */
+function warehouseText(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
 function isoTimestamp(value: unknown, field: string): string {
   if (!(typeof value === 'string' || value instanceof Date)) {
     throw new Error(`Replica row has invalid ${field}`);
@@ -640,7 +659,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             ...WAREHOUSE_ONLY_FIELDS.map(field => ({
               source: 'kilocode_users',
               field,
-              value: nullableString(profile[field], field),
+              value: warehouseText(profile[field]),
             })),
           ],
           nextCursor: null,

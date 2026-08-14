@@ -111,6 +111,20 @@ describe('custom model pricing', () => {
     ).toBeUndefined();
   });
 
+  test('uses GLM 5.2 Friendli pricing only when market cost is missing', () => {
+    const usage = makeUsage({
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheHitTokens: 20,
+      cacheWriteTokens: 30,
+    });
+
+    expect(calculateCustomCost_mUsd('z-ai/glm-5.2', usage)).toBe(
+      Math.round(50 * 1.4 + 10 * 4.4 + 20 * 0.26 + 30 * 1.4)
+    );
+    expect(calculateCustomCost_mUsd('z-ai/glm-5.2', { ...usage, cost_mUsd: 123 })).toBeUndefined();
+  });
+
   test('does not replace displayed pricing for fallback-only custom pricing', () => {
     const model = makeModel('moonshotai/kimi-k3');
 

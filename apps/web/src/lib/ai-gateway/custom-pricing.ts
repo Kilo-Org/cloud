@@ -73,6 +73,20 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
+  'z-ai/glm-5.2': {
+    fallbackOnly: true,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 1.4,
+          completion_per_million: 4.4,
+          input_cache_read_per_million: 0.26,
+          input_cache_write_per_million: null,
+        },
+      },
+    ],
+  },
 };
 
 export function getCustomPricing(modelId: string): CustomPricing | undefined {

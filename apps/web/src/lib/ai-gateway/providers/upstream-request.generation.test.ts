@@ -18,6 +18,7 @@ jest.mock('../../fetchWithBackoff', () => ({
 const provider: Provider = {
   id: 'openrouter',
   apiUrl: 'https://openrouter.example/api/v1',
+  apiUrlOverrides: {},
   apiKey: 'test-api-key',
   supportedChatApis: [],
   responseTransforms: null,

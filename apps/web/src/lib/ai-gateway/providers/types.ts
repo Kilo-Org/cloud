@@ -38,6 +38,8 @@ export type TransformRequestContext = {
 
 export type GatewayChatApiKind = GatewayRequest['kind'];
 
+export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind, string>>>;
+
 export type ProviderResponseTransforms = {
   mapGeminiThoughtContent: boolean;
 };
@@ -45,6 +47,7 @@ export type ProviderResponseTransforms = {
 export type Provider = {
   id: ProviderId;
   apiUrl: string;
+  apiUrlOverrides: ProviderApiUrlOverrides;
   apiKey: string;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;

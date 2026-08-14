@@ -7,6 +7,7 @@ export default {
   OPENROUTER: {
     id: 'openrouter',
     apiUrl: 'https://openrouter.ai/api/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('OPENROUTER_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: null,
@@ -15,6 +16,7 @@ export default {
   ALIBABA: {
     id: 'alibaba',
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
     // Prompt caching is not supported on the responses API for Alibaba; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
@@ -26,6 +28,7 @@ export default {
   SEED: {
     id: 'seed',
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
     // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
@@ -50,6 +53,7 @@ export default {
   LONGCAT: {
     id: 'longcat',
     apiUrl: 'https://api.longcat.ai/openai/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('LONGCAT_API_KEY'),
     supportedChatApis: ['chat_completions'],
     responseTransforms: null,
@@ -63,6 +67,7 @@ export default {
   MARTIAN: {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
     supportedChatApis: ['chat_completions', 'responses', 'messages'],
     responseTransforms: null,
@@ -73,6 +78,7 @@ export default {
   MISTRAL: {
     id: 'mistral',
     apiUrl: 'https://api.mistral.ai/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     supportedChatApis: [],
     responseTransforms: null,
@@ -103,6 +109,7 @@ export default {
   STREAMLAKE: {
     id: 'streamlake',
     apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
     supportedChatApis: ['chat_completions'],
     responseTransforms: null,
@@ -113,6 +120,7 @@ export default {
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
+    apiUrlOverrides: {},
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: null,

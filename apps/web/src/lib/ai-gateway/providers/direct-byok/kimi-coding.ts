@@ -8,6 +8,7 @@ import { isRooCodeBasedClient } from '@/lib/utils';
 export default {
   id: 'kimi-coding',
   base_url: 'https://api.kimi.com/coding/v1',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

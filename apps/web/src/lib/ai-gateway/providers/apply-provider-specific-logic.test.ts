@@ -107,6 +107,14 @@ describe('applyPreferredProvider', () => {
     expect(request.body.provider).toEqual({ order: ['novita'] });
   });
 
+  it('prefers Friendli then Novita for GLM models', () => {
+    const request = makeRequest('z-ai/glm-5.2');
+
+    applyPreferredProvider('z-ai/glm-5.2', request.body);
+
+    expect(request.body.provider).toEqual({ order: ['friendli', 'novita'] });
+  });
+
   it('overwrites a malformed provider value', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     Object.assign(request.body, { provider: 'lmstudio' });

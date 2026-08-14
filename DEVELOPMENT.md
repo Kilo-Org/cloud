@@ -244,6 +244,7 @@ should pass against the local PostgreSQL database.
 | `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
+| `pnpm dev:env --missing-secrets-only` | Sync env files and create missing local Secrets Store entries without refreshing existing secrets |
 | `pnpm test` | Run web, web environment, and local development-tool tests |
 | `pnpm typecheck` | Run the TypeScript type checker |
 | `pnpm lint` | Lint all source files |
@@ -405,7 +406,9 @@ Most workers require a `.dev.vars` file with secrets like `NEXTAUTH_SECRET` and 
 pnpm dev:env
 ```
 
-The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo and `apps/web/.env.development.local.example`, resolves each variable's value, and writes (or patches) the corresponding generated local env file. Before applying, it shows a diff of what will change and asks for confirmation.
+The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo and `apps/web/.env.development.local.example`, resolves each variable's value, and writes (or patches) the corresponding generated local env file. Before applying, it shows a diff of what will change and asks for confirmation. Local Secrets Store checks and writes run across four independent Worker persistence directories at a time; set `KILO_ENV_SYNC_CONCURRENCY` to an integer from 1 through 32 to override that limit.
+
+For fast worktree setup, pass `--missing-secrets-only`. It creates bindings that are absent from the local Secrets Store while preserving existing source-backed values; a normal `pnpm dev:env` continues to refresh those values from their configured sources.
 
 Values are resolved using annotations in example env file comment lines:
 

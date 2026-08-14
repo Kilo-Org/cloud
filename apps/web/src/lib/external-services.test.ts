@@ -66,6 +66,8 @@ describe('external-services', () => {
           kilo_user_id: testUser.id,
           title: 'Test Session 1',
           created_on_platform: 'vscode',
+          last_mode: 'code',
+          last_model: 'anthropic/claude-3-5-sonnet',
           api_conversation_history_blob_url: 'sessions/test1/api_conversation_history.json',
           task_metadata_blob_url: 'sessions/test1/task_metadata.json',
         })
@@ -77,6 +79,8 @@ describe('external-services', () => {
           kilo_user_id: testUser.id,
           title: 'Test Session 2',
           created_on_platform: 'vscode',
+          last_mode: 'ask',
+          last_model: 'openai/gpt-4o',
           ui_messages_blob_url: 'sessions/test2/ui_messages.json',
           git_state_blob_url: 'sessions/test2/git_state.json',
         })
@@ -98,6 +102,12 @@ describe('external-services', () => {
         { folderName: 'sessions', filename: 'ui_messages' },
         { folderName: 'sessions', filename: 'git_state' },
       ]);
+
+      const remainingSessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.kilo_user_id, testUser.id));
+      expect(remainingSessions).toHaveLength(0);
     });
 
     it('should delete shared CLI session blobs when user has shared sessions', async () => {
@@ -146,6 +156,78 @@ describe('external-services', () => {
       expect(deleteBlobs).toHaveBeenCalledWith(sharedSession2.share_id, [
         { folderName: 'shared-sessions', filename: 'ui_messages' },
       ]);
+
+      const remainingSharedSessions = await db
+        .select()
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.kilo_user_id, testUser.id));
+      expect(remainingSharedSessions).toHaveLength(0);
+
+      const remainingSessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.kilo_user_id, testUser.id));
+      expect(remainingSessions).toHaveLength(0);
+    });
+
+    it('should delete cross-user shared CLI session blobs and rows referencing user sessions', async () => {
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+
+      const otherUser = await insertTestUser({
+        google_user_email: 'test-cross-user-shared@example.com',
+        google_user_name: 'Other Shared User',
+      });
+
+      try {
+        // Create session owned by testUser
+        const [session] = await db
+          .insert(cliSessions)
+          .values({
+            kilo_user_id: testUser.id,
+            title: 'Session to be shared by another user',
+            created_on_platform: 'vscode',
+          })
+          .returning();
+
+        // Create shared session owned by otherUser pointing to testUser's session
+        const [crossUserShared] = await db
+          .insert(sharedCliSessions)
+          .values({
+            session_id: session.session_id,
+            kilo_user_id: otherUser.id,
+            shared_state: 'public',
+            api_conversation_history_blob_url:
+              'shared-sessions/cross-share/api_conversation_history.json',
+            ui_messages_blob_url: 'shared-sessions/cross-share/ui_messages.json',
+          })
+          .returning();
+
+        await softDeleteUserExternalServices(testUser);
+
+        // Verify deleteBlobs was called for otherUser's shared session copy
+        expect(deleteBlobs).toHaveBeenCalledWith(crossUserShared.share_id, [
+          { folderName: 'shared-sessions', filename: 'api_conversation_history' },
+          { folderName: 'shared-sessions', filename: 'ui_messages' },
+        ]);
+
+        // Verify cross-user shared session row is deleted
+        const remainingSharedSessions = await db
+          .select()
+          .from(sharedCliSessions)
+          .where(eq(sharedCliSessions.share_id, crossUserShared.share_id));
+        expect(remainingSharedSessions).toHaveLength(0);
+
+        // Verify session is deleted
+        const remainingSessions = await db
+          .select()
+          .from(cliSessions)
+          .where(eq(cliSessions.kilo_user_id, testUser.id));
+        expect(remainingSessions).toHaveLength(0);
+      } finally {
+        await db.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, otherUser.id));
+        await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, otherUser.id));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
+      }
     });
 
     it('should handle sessions with no blob URLs', async () => {
@@ -162,6 +244,12 @@ describe('external-services', () => {
 
       // deleteBlobs should not be called for sessions without blobs
       expect(deleteBlobs).not.toHaveBeenCalled();
+
+      const remainingSessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.kilo_user_id, testUser.id));
+      expect(remainingSessions).toHaveLength(0);
     });
 
     it('should handle sessions with partial blob URLs', async () => {

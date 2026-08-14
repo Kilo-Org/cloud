@@ -838,7 +838,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (!effectiveProviderContext.userByok && !effectiveProviderContext.experiment) {
+  if (
+    !effectiveProviderContext.userByok &&
+    (effectiveProviderContext.provider.id === 'vercel' ||
+      effectiveProviderContext.provider.id === 'openrouter')
+  ) {
     const partnerProvider = await getPercentageRoutedPartnerProvider(
       effectiveModelIdLowerCased,
       requestBodyParsed,

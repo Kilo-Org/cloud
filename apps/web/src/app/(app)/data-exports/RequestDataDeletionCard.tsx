@@ -61,12 +61,9 @@ export function RequestDataDeletionCard() {
                   than a nested <p>. */}
               <AlertDialogDescription>
                 Download your data export before requesting deletion. Once your data is deleted, any
-                export download will no longer be available.
+                export download will no longer be available or recoverable.
                 <span className="mt-4 block">
                   On the support form, choose the Account Deletion category.
-                </span>
-                <span className="mt-4 block">
-                  Any export download will no longer be available or recoverable.
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>

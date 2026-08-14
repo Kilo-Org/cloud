@@ -4,6 +4,7 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 export default {
   id: 'inceptron-byok',
   base_url: 'https://api.inceptron.io/v1',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

@@ -1,6 +1,19 @@
 import * as z from 'zod';
 
+/**
+ * The queue and download message contract, not the export file's format.
+ *
+ * Pinned with `z.literal` below, so raising it makes every in-flight message fail
+ * validation and dead-letter mid-deploy. It changes only when the message shape does.
+ */
 export const EXPORT_SCHEMA_VERSION = 1;
+
+/**
+ * Re-exported from `@kilocode/db` so the Worker and the web router cannot disagree about
+ * the format of a file one writes and the other records. See that module for what the
+ * versions mean and why this one is safe to raise while `EXPORT_SCHEMA_VERSION` is not.
+ */
+export { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 
 export const ExportQueueMessageSchema = z
   .object({

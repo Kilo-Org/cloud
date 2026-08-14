@@ -3,6 +3,7 @@ import alibabaTokenPlan from './alibaba-token-plan';
 import byteplusCoding from './byteplus-coding';
 import chutesByok from './chutes-byok';
 import crofai from './crofai';
+import edenai from './edenai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
 import martian from './martian';
@@ -22,6 +23,7 @@ export default [
   byteplusCoding,
   chutesByok,
   crofai,
+  edenai,
   inceptronByok,
   kimiCoding,
   martian,

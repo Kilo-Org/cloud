@@ -4,6 +4,7 @@ import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/di
 export default {
   id: 'xiaomi-token-plan-ams',
   base_url: 'https://token-plan-ams.xiaomimimo.com/v1',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest() {},

@@ -89,7 +89,7 @@ export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooter
             {user.is_admin && (
               <DropdownMenuItem onClick={() => router.push('/data-exports')}>
                 <FileDown className="h-4 w-4" />
-                Data exports
+                Request data export
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={() => router.push('/install')}>

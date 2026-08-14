@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { AlertCircle, Download, Loader2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
@@ -14,10 +14,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatBytes } from '@/lib/kiloclaw/instance-display';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
+  findActiveExport,
+  findReadyExport,
   getDisplayStatus,
   getRefetchInterval,
-  isActiveUserExportStatus,
   USER_EXPORT_STATUS_COPY,
+  type ExportableOrganization,
   type UserExport,
   type UserExportDisplayStatus,
 } from './data-export-contract';
@@ -94,6 +96,10 @@ export function DataExportsClient() {
     },
   });
 
+  // Empty for anyone who is not an owner or admin somewhere, which is what hides the
+  // organization section entirely rather than showing a control that always fails.
+  const organizationsQuery = useQuery(trpc.userExports.exportableOrganizations.queryOptions());
+
   const requestMutation = useMutation(
     trpc.userExports.request.mutationOptions({
       onSuccess: async result => {
@@ -110,6 +116,29 @@ export function DataExportsClient() {
         toast.error('Export request failed', {
           description:
             error.data?.code === 'TOO_MANY_REQUESTS'
+              ? error.message
+              : 'The export could not be requested. Wait a moment and try again.',
+        });
+      },
+    })
+  );
+
+  const requestOrganizationMutation = useMutation(
+    trpc.userExports.requestOrganization.mutationOptions({
+      onSuccess: async result => {
+        if (result.status === 'ready') {
+          toast.info('This organization export is already ready to download.');
+        } else {
+          toast.success('Organization export requested', {
+            description: "We'll email you when it's ready to download.",
+          });
+        }
+        await queryClient.resetQueries({ queryKey: listQueryKey });
+      },
+      onError: error => {
+        toast.error('Export request failed', {
+          description:
+            error.data?.code === 'TOO_MANY_REQUESTS' || error.data?.code === 'UNAUTHORIZED'
               ? error.message
               : 'The export could not be requested. Wait a moment and try again.',
         });
@@ -141,16 +170,17 @@ export function DataExportsClient() {
   );
 
   const exports = listQuery.data?.pages.flatMap(page => page.exports);
-  const activeExport = exports?.find(record => isActiveUserExportStatus(record.status));
-  const readyExport = exports?.find(record => getDisplayStatus(record) === 'ready');
-  const activeExportCopy = activeExport
-    ? USER_EXPORT_STATUS_COPY[getDisplayStatus(activeExport)]
+  const organizations: ExportableOrganization[] = organizationsQuery.data?.organizations ?? [];
+  const personalActiveExport = findActiveExport(exports, null);
+  const personalReadyExport = findReadyExport(exports, null);
+  const personalActiveCopy = personalActiveExport
+    ? USER_EXPORT_STATUS_COPY[getDisplayStatus(personalActiveExport)]
     : null;
   // A ready/downloadable export must not block requesting a new one — only disable
   // while a request is in flight, the list is refetching, or an export is actively
   // generating. The re-request throttle is enforced server-side.
   const requestDisabled =
-    requestMutation.isPending || listQuery.isRefetching || Boolean(activeExport);
+    requestMutation.isPending || listQuery.isRefetching || Boolean(personalActiveExport);
 
   return (
     <div className="flex flex-col gap-6">
@@ -168,7 +198,7 @@ export function DataExportsClient() {
           <Button
             onClick={() => requestMutation.mutate()}
             disabled={requestDisabled}
-            aria-describedby={activeExportCopy ? 'data-exports-active-hint' : undefined}
+            aria-describedby={personalActiveCopy ? 'data-exports-active-hint' : undefined}
           >
             {requestMutation.isPending ? (
               <>
@@ -179,19 +209,50 @@ export function DataExportsClient() {
               'Request export'
             )}
           </Button>
-          {activeExportCopy && (
+          {personalActiveCopy && (
             <p id="data-exports-active-hint" className="text-muted-foreground text-sm">
-              An export is already {activeExportCopy.label.toLowerCase()}. You can request another
+              An export is already {personalActiveCopy.label.toLowerCase()}. You can request another
               export when it finishes.
             </p>
           )}
-          {!activeExportCopy && readyExport && (
+          {!personalActiveCopy && personalReadyExport && (
             <p className="text-muted-foreground text-sm">
               Your latest export is ready. Download it from Export history below.
             </p>
           )}
         </CardContent>
       </Card>
+
+      {organizations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Organization exports</CardTitle>
+            <CardDescription>
+              An organization export covers the work its members did in the organization. It does
+              not include their personal activity outside it. Only owners and admins can request
+              one, and each organization can have one export at a time.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {organizations.map(organization => (
+              <OrganizationExportRow
+                key={organization.id}
+                organization={organization}
+                activeExport={findActiveExport(exports, organization.id)}
+                readyExport={findReadyExport(exports, organization.id)}
+                isPending={
+                  requestOrganizationMutation.isPending &&
+                  requestOrganizationMutation.variables?.organizationId === organization.id
+                }
+                isBusy={requestOrganizationMutation.isPending || listQuery.isRefetching}
+                onRequest={() =>
+                  requestOrganizationMutation.mutate({ organizationId: organization.id })
+                }
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -288,6 +349,61 @@ export function DataExportsClient() {
   );
 }
 
+type OrganizationExportRowProps = {
+  organization: ExportableOrganization;
+  activeExport: UserExport | undefined;
+  readyExport: UserExport | undefined;
+  isPending: boolean;
+  isBusy: boolean;
+  onRequest: () => void;
+};
+
+function OrganizationExportRow({
+  organization,
+  activeExport,
+  readyExport,
+  isPending,
+  isBusy,
+  onRequest,
+}: OrganizationExportRowProps) {
+  const activeCopy = activeExport ? USER_EXPORT_STATUS_COPY[getDisplayStatus(activeExport)] : null;
+  const hintId = `data-exports-org-hint-${organization.id}`;
+  const hint = activeCopy
+    ? `An export is already ${activeCopy.label.toLowerCase()}. Another can be requested when it finishes.`
+    : readyExport
+      ? 'The latest export is ready. Download it from Export history below.'
+      : null;
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="truncate text-sm font-medium">{organization.name}</p>
+        {hint && (
+          <p id={hintId} className="text-muted-foreground text-sm">
+            {hint}
+          </p>
+        )}
+      </div>
+      <Button
+        className="shrink-0"
+        onClick={onRequest}
+        disabled={isBusy || Boolean(activeExport)}
+        aria-describedby={hint ? hintId : undefined}
+        aria-label={`Request organization export for ${organization.name}`}
+      >
+        {isPending ? (
+          <>
+            <Loader2 className="animate-spin" />
+            Requesting export...
+          </>
+        ) : (
+          'Request export'
+        )}
+      </Button>
+    </div>
+  );
+}
+
 type ExportHistoryRowProps = {
   record: UserExport;
   isPreparingThisDownload: boolean;
@@ -305,6 +421,14 @@ function ExportHistoryRow({ record, isPreparingThisDownload, onDownload }: Expor
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={STATUS_BADGE_VARIANT[displayStatus]}>{copy.label}</Badge>
+          {/* Personal and organization exports share one history list, so each row has
+              to say which it is. The name can be null if the organization was deleted
+              after the export was requested. */}
+          <Badge variant="outline">
+            {record.subjectType === 'organization'
+              ? (record.organizationName ?? 'Organization')
+              : 'Personal'}
+          </Badge>
           <span className="text-muted-foreground text-sm">Requested {requestedLabel}</span>
         </div>
         <p role="status" aria-live="polite" className="text-sm">

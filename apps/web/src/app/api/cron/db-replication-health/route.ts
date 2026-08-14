@@ -2,7 +2,7 @@ import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 
 import { CRON_SECRET } from '@/lib/config.server';
-import { collectReplicationHealth } from '@/lib/replication-health';
+import { collectReplicationHealth, isReplicationSlotMonitored } from '@/lib/replication-health';
 
 /**
  * Emits replication health to Axiom (via the Vercel log drain) and alerts Sentry
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     }
   }
   for (const slot of report.slots) {
-    if (slot.at_risk) {
+    if (slot.at_risk && isReplicationSlotMonitored(slot.slot_name)) {
       problems.push(`slot ${slot.slot_name}: wal_status=${slot.wal_status}, active=${slot.active}`);
     }
   }

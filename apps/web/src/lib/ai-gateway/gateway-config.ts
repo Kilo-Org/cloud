@@ -12,6 +12,7 @@ const note = z.string().max(NOTE_MAX_LENGTH);
 export const GatewayConfigSchema = z.object({
   vercel_routing_percentage: VercelRoutingPercentageSchema.nullable(),
   vercel_routing_percentage_free: VercelRoutingPercentageSchema.nullable().default(null),
+  vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
@@ -23,6 +24,7 @@ export type GatewayConfig = z.infer<typeof GatewayConfigSchema>;
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   vercel_routing_percentage: null,
   vercel_routing_percentage_free: null,
+  vercel_routing_opt_out_models: [],
   updated_at: null,
   updated_by: null,
   updated_by_email: null,
@@ -30,7 +32,7 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
 };
 
 /**
- * Schema for parsing just the percentage from Redis (used on the hot path).
+ * Schema for parsing the routing settings from Redis (used on the hot path).
  *
  * `vercel_routing_percentage` is nullable because clearing the override in
  * the admin UI persists an explicit `null`. Callers should treat `null` as
@@ -41,14 +43,16 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
  * parse cleanly. Callers should treat `null` as "no override, use
  * DEFAULT_VERCEL_PERCENTAGE_FREE".
  */
-export const GatewayPercentageSchema = z.object({
+export const GatewayRoutingConfigSchema = z.object({
   vercel_routing_percentage: VercelRoutingPercentageSchema.nullable(),
   vercel_routing_percentage_free: VercelRoutingPercentageSchema.nullable().default(null),
+  vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
 });
 
 /** Schema for the admin set-mutation input. */
 export const GatewayConfigInputSchema = z.object({
   vercel_routing_percentage: VercelRoutingPercentageSchema.nullable(),
   vercel_routing_percentage_free: VercelRoutingPercentageSchema.nullable(),
+  vercel_routing_opt_out_models: z.array(z.string()),
   note: note.nullable(),
 });

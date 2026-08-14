@@ -36,6 +36,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'inceptron',
   'io-net',
   'ionstream',
+  'longcat',
   'mancer',
   'mara',
   'meta',

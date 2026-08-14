@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import {
-  GatewayPercentageSchema,
+  GatewayRoutingConfigSchema,
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   NOTE_MAX_LENGTH,
@@ -17,42 +17,62 @@ describe('VercelRoutingPercentageSchema', () => {
   });
 });
 
-describe('GatewayPercentageSchema', () => {
+describe('GatewayRoutingConfigSchema', () => {
   test('accepts a numeric percentage', () => {
-    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
     });
   });
 
   test('accepts null (written when an admin clears the override)', () => {
-    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: null })).toEqual({
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: null })).toEqual({
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
     });
   });
 
   test('defaults the free percentage to null for pre-existing entries', () => {
-    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
     });
   });
 
   test('accepts a separate free percentage', () => {
     expect(
-      GatewayPercentageSchema.parse({
+      GatewayRoutingConfigSchema.parse({
         vercel_routing_percentage: 25,
         vercel_routing_percentage_free: 80,
       })
-    ).toEqual({ vercel_routing_percentage: 25, vercel_routing_percentage_free: 80 });
+    ).toEqual({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: 80,
+      vercel_routing_opt_out_models: [],
+    });
+  });
+
+  test('accepts model opt-outs', () => {
+    expect(
+      GatewayRoutingConfigSchema.parse({
+        vercel_routing_percentage: 25,
+        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+      })
+    ).toEqual({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+    });
   });
 
   test('rejects out-of-range values', () => {
-    expect(() => GatewayPercentageSchema.parse({ vercel_routing_percentage: 101 })).toThrow();
-    expect(() => GatewayPercentageSchema.parse({ vercel_routing_percentage: -1 })).toThrow();
+    expect(() => GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: 101 })).toThrow();
+    expect(() => GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: -1 })).toThrow();
     expect(() =>
-      GatewayPercentageSchema.parse({
+      GatewayRoutingConfigSchema.parse({
         vercel_routing_percentage: 25,
         vercel_routing_percentage_free: 101,
       })
@@ -69,6 +89,7 @@ describe('GatewayConfigSchema', () => {
       updated_by_email: 'a@example.com',
     });
     expect(parsed.note).toBeNull();
+    expect(parsed.vercel_routing_opt_out_models).toEqual([]);
   });
 
   test('round-trips a note', () => {
@@ -89,11 +110,13 @@ describe('GatewayConfigInputSchema', () => {
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: 75,
         vercel_routing_percentage_free: 60,
+        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
         note: 'Rollout stable',
       })
     ).toEqual({
       vercel_routing_percentage: 75,
       vercel_routing_percentage_free: 60,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
       note: 'Rollout stable',
     });
   });
@@ -103,11 +126,13 @@ describe('GatewayConfigInputSchema', () => {
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: null,
         vercel_routing_percentage_free: null,
+        vercel_routing_opt_out_models: [],
         note: null,
       })
     ).toEqual({
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
       note: null,
     });
   });
@@ -117,6 +142,7 @@ describe('GatewayConfigInputSchema', () => {
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: 50,
         vercel_routing_percentage_free: 50,
+        vercel_routing_opt_out_models: [],
         note: 'x'.repeat(NOTE_MAX_LENGTH + 1),
       })
     ).toThrow();

@@ -1,9 +1,11 @@
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { promisify } from 'node:util';
 import { detectLanIp } from '../lan-ip';
 import { services } from '../services';
+import { mapWithConcurrency, resolveEnvSyncConcurrency } from './concurrency';
 import type {
   Annotation,
   DevVarsFileChange,
@@ -374,6 +376,20 @@ function extractSecretsStoreBindings(repoRoot: string, workerDir: string): Secre
 // Local secrets store check (via wrangler CLI)
 // ---------------------------------------------------------------------------
 
+const execFileAsync = promisify(execFile);
+
+type SecretsStoreQuery = {
+  cacheKey: string;
+  persistenceDir: string;
+  storeId: string;
+  workerDir: string;
+};
+
+type AsyncPlanOptions = {
+  concurrency?: number;
+  listSecrets?: (repoRoot: string, workerDir: string, storeId: string) => Promise<string>;
+};
+
 function listLocalStoreSecrets(repoRoot: string, workerDir: string, storeId: string): string {
   const result = spawnSync('pnpm', ['wrangler', 'secrets-store', 'secret', 'list', storeId], {
     cwd: path.join(repoRoot, workerDir),
@@ -381,6 +397,85 @@ function listLocalStoreSecrets(repoRoot: string, workerDir: string, storeId: str
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   return result.status === 0 ? result.stdout : '';
+}
+
+async function listLocalStoreSecretsAsync(
+  repoRoot: string,
+  workerDir: string,
+  storeId: string
+): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(
+      'pnpm',
+      ['wrangler', 'secrets-store', 'secret', 'list', storeId],
+      {
+        cwd: path.join(repoRoot, workerDir),
+        encoding: 'utf-8',
+      }
+    );
+    return stdout;
+  } catch {
+    return '';
+  }
+}
+
+function getSecretsStoreQueries(
+  repoRoot: string,
+  serviceFilter?: Set<string>
+): SecretsStoreQuery[] {
+  const queries = new Map<string, SecretsStoreQuery>();
+  for (const [name, svc] of services) {
+    if (svc.type !== 'worker') continue;
+    if (serviceFilter && !serviceFilter.has(name)) continue;
+
+    const bindings = extractSecretsStoreBindings(repoRoot, svc.dir);
+    for (const binding of bindings) {
+      const cacheKey = `${svc.dir}:${binding.store_id}`;
+      if (queries.has(cacheKey)) continue;
+      const wranglerDir = path.join(repoRoot, svc.dir, '.wrangler');
+      let persistenceDir = wranglerDir;
+      try {
+        persistenceDir = fs.realpathSync(wranglerDir);
+      } catch {
+        // Wrangler will create this service-local persistence directory on demand.
+      }
+      queries.set(cacheKey, {
+        cacheKey,
+        persistenceDir,
+        storeId: binding.store_id,
+        workerDir: svc.dir,
+      });
+    }
+  }
+  return [...queries.values()];
+}
+
+async function loadLocalStoreSecrets(
+  repoRoot: string,
+  serviceFilter?: Set<string>,
+  options: AsyncPlanOptions = {}
+): Promise<Map<string, string>> {
+  const groups = new Map<string, SecretsStoreQuery[]>();
+  for (const query of getSecretsStoreQueries(repoRoot, serviceFilter)) {
+    const group = groups.get(query.persistenceDir) ?? [];
+    group.push(query);
+    groups.set(query.persistenceDir, group);
+  }
+
+  const listSecrets = options.listSecrets ?? listLocalStoreSecretsAsync;
+  const groupedResults = await mapWithConcurrency(
+    [...groups.values()],
+    options.concurrency ?? resolveEnvSyncConcurrency(),
+    async queries => {
+      const results: [string, string][] = [];
+      // Store IDs sharing one Wrangler persistence directory use the same local SQLite state.
+      for (const query of queries) {
+        results.push([query.cacheKey, await listSecrets(repoRoot, query.workerDir, query.storeId)]);
+      }
+      return results;
+    }
+  );
+  return new Map(groupedResults.flat());
 }
 
 function resolveSecretStoreSource(
@@ -463,7 +558,8 @@ function collectLocalSecretSources(
 function computePlan(
   repoRoot: string,
   serviceFilter?: Set<string>,
-  refreshSourceBackedSecrets = true
+  refreshSourceBackedSecrets = true,
+  prefetchedStoreOutputs?: ReadonlyMap<string, string>
 ): EnvSyncPlan {
   const envLocalPath = path.join(repoRoot, '.env.local');
   if (!fs.existsSync(envLocalPath)) {
@@ -703,7 +799,7 @@ function computePlan(
   const secretStoreWarnings: SecretStoreWarning[] = [];
   const secretStoreAutoCreates: SecretStoreAutoCreate[] = [];
   // Cache keyed by workerDir+storeId — wrangler scopes secret visibility per worker locally
-  const storeOutputCache = new Map<string, string>();
+  const storeOutputCache = new Map(prefetchedStoreOutputs);
 
   for (const [name, svc] of services) {
     if (svc.type !== 'worker') continue;
@@ -793,4 +889,17 @@ function computePlan(
   };
 }
 
-export { computePlan, findDevVarsExamples };
+async function computePlanAsync(
+  repoRoot: string,
+  serviceFilter?: Set<string>,
+  refreshSourceBackedSecrets = true,
+  options: AsyncPlanOptions = {}
+): Promise<EnvSyncPlan> {
+  if (!fs.existsSync(path.join(repoRoot, '.env.local'))) {
+    return computePlan(repoRoot, serviceFilter, refreshSourceBackedSecrets);
+  }
+  const storeOutputs = await loadLocalStoreSecrets(repoRoot, serviceFilter, options);
+  return computePlan(repoRoot, serviceFilter, refreshSourceBackedSecrets, storeOutputs);
+}
+
+export { computePlan, computePlanAsync, findDevVarsExamples };

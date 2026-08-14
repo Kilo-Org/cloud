@@ -36,10 +36,36 @@ const SAMPLE_ROUTING_TABLE: RoutingTable = {
   },
 };
 
+// Stateful KV double: `getWithMetadata` is what writeBack reads to recover
+// the union's original expiry, so every double must implement it.
+function makeKv(initial?: Record<string, string>): {
+  kv: KVNamespace;
+  store: Map<string, string>;
+  metadata: Map<string, unknown>;
+  put: ReturnType<typeof vi.fn>;
+} {
+  const store = new Map<string, string>(Object.entries(initial ?? {}));
+  const metadata = new Map<string, unknown>();
+  const put = vi.fn(async (key: string, value: string, options?: KVNamespacePutOptions) => {
+    store.set(key, value);
+    metadata.set(key, options?.metadata ?? null);
+  });
+  const kv = {
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    getWithMetadata: vi.fn(async (key: string) => ({
+      value: store.get(key) ?? null,
+      metadata: metadata.get(key) ?? null,
+    })),
+    put,
+  } as unknown as KVNamespace;
+  return { kv, store, metadata, put };
+}
+
 function makeEnv(kvValue: string | null): Env {
   return {
     AUTO_ROUTING_CONFIG: {
       get: vi.fn(async () => kvValue),
+      getWithMetadata: vi.fn(async () => ({ value: kvValue, metadata: null })),
       put: vi.fn(async () => undefined),
     } as unknown as KVNamespace,
     HYPERDRIVE: { connectionString: 'postgres://worker' } as Hyperdrive,
@@ -170,6 +196,7 @@ describe('getModelCapabilities', () => {
 
     expect(put).toHaveBeenCalledWith('model_capabilities_v2', expect.stringContaining('"a/chat"'), {
       expirationTtl: 3600,
+      metadata: { writtenAt: expect.any(Number) },
     });
   });
 
@@ -377,6 +404,209 @@ describe('getModelCapabilities', () => {
     expect(dbWhere).not.toHaveBeenCalled();
   });
 
+  it('queries an id absent from model_stats once, then serves it from the tombstoned union', async () => {
+    // A direct BYOK id has no model_stats row, so the DB answers with nothing.
+    dbWhere.mockImplementation(() => Promise.resolve([]));
+    const { kv, store } = makeKv({
+      model_capabilities_v2: JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      }),
+    });
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = kv;
+
+    const first = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
+    expect(first.has('byok/private-model')).toBe(false);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+
+    // The union now records the id as resolved-and-absent, so a later isolate
+    // must not pay another Postgres round trip for it.
+    expect(JSON.parse(store.get('model_capabilities_v2') as string)).toMatchObject({
+      'byok/private-model': { absent: true },
+    });
+
+    clearModelCapabilitiesCache();
+    const second = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
+    expect(second.has('byok/private-model')).toBe(false);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+  });
+
+  // `constructor` is inherited from Object.prototype, so a plain object reads
+  // it as already present; `__proto__` assigns through the setter instead of
+  // creating a key. Either way the id would be re-queried on every request.
+  it.each(['constructor', '__proto__'])(
+    'resolves and caches a pool id named %s',
+    async (poolId: string) => {
+      dbWhere.mockImplementation(() => Promise.resolve([]));
+      const { kv, store } = makeKv({
+        model_capabilities_v2: JSON.stringify({
+          'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        }),
+      });
+      const env = makeEnv(null);
+      env.AUTO_ROUTING_CONFIG = kv;
+
+      const first = await getModelCapabilities(env, { additionalModelIds: [poolId] });
+      expect(first.has(poolId)).toBe(false);
+      expect(dbWhere).toHaveBeenCalledTimes(1);
+
+      const written: unknown = JSON.parse(store.get('model_capabilities_v2') as string);
+      expect(Object.hasOwn(written as object, poolId)).toBe(true);
+
+      // The round trip back through KV must keep the tombstone, or the id is
+      // re-queried on every request forever.
+      clearModelCapabilitiesCache();
+      const second = await getModelCapabilities(env, { additionalModelIds: [poolId] });
+      expect(second.has(poolId)).toBe(false);
+      expect(dbWhere).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('writes a pool id back to the shared union so other users read it from KV', async () => {
+    dbWhere.mockImplementation(() =>
+      Promise.resolve([
+        { openrouterId: 'pool/vision', inputModalities: ['image'], contextLength: 65536 },
+      ])
+    );
+    const { kv } = makeKv({
+      model_capabilities_v2: JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+      }),
+    });
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = kv;
+
+    // First user configures the pool; the id is resolved from Postgres.
+    const first = await getModelCapabilities(env, { additionalModelIds: ['pool/vision'] });
+    expect(first.get('pool/vision')?.inputModalities.has('image')).toBe(true);
+
+    // A different user with the same model in their pool reads it from KV.
+    clearModelCapabilitiesCache();
+    const second = await getModelCapabilities(env, { additionalModelIds: ['pool/vision'] });
+    expect(second.get('pool/vision')?.contextLength).toBe(65536);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+    // The pre-existing union entries survive the write-back.
+    expect(second.get('a/chat')?.contextLength).toBe(8192);
+  });
+
+  it('hands the write-back to waitUntil when the caller supplies an execution context', async () => {
+    dbWhere.mockImplementation(() =>
+      Promise.resolve([
+        { openrouterId: 'pool/vision', inputModalities: ['image'], contextLength: 65536 },
+      ])
+    );
+    const { kv, put } = makeKv({
+      model_capabilities_v2: JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192 },
+      }),
+    });
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = kv;
+    const pending: Promise<unknown>[] = [];
+
+    await getModelCapabilities(env, {
+      additionalModelIds: ['pool/vision'],
+      waitUntil: promise => pending.push(promise),
+    });
+
+    expect(pending).toHaveLength(1);
+    await Promise.all(pending);
+    expect(put).toHaveBeenCalledWith(
+      'model_capabilities_v2',
+      expect.stringContaining('"pool/vision"'),
+      { expirationTtl: expect.any(Number), metadata: { writtenAt: expect.any(Number) } }
+    );
+  });
+
+  it('holds the original expiry on write-back instead of restarting the TTL', async () => {
+    vi.useFakeTimers();
+    try {
+      const writtenAt = new Date('2026-08-12T00:00:00.000Z').getTime();
+      vi.setSystemTime(writtenAt);
+      const { kv, put, metadata } = makeKv({
+        model_capabilities_v2: JSON.stringify({
+          'a/chat': { inputModalities: ['text'], contextLength: 8192 },
+        }),
+      });
+      metadata.set('model_capabilities_v2', { writtenAt });
+      const env = makeEnv(null);
+      env.AUTO_ROUTING_CONFIG = kv;
+      dbWhere.mockImplementation(() =>
+        Promise.resolve([
+          { openrouterId: 'pool/vision', inputModalities: ['image'], contextLength: 65536 },
+        ])
+      );
+
+      // Half an hour into the union's 1-hour life.
+      vi.setSystemTime(writtenAt + 1_800_000);
+      await getModelCapabilities(env, { additionalModelIds: ['pool/vision'] });
+
+      const options = put.mock.calls.at(-1)?.[2] as KVNamespacePutOptions;
+      // Roughly the remaining half hour, NOT a fresh 3600.
+      expect(options.expirationTtl).toBe(1800);
+      // The original stamp is carried forward, so the next fill shrinks again.
+      expect(options.metadata).toEqual({ writtenAt });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips the write-back when the union is about to expire', async () => {
+    vi.useFakeTimers();
+    try {
+      const writtenAt = new Date('2026-08-12T00:00:00.000Z').getTime();
+      vi.setSystemTime(writtenAt);
+      const { kv, put, metadata } = makeKv({
+        model_capabilities_v2: JSON.stringify({
+          'a/chat': { inputModalities: ['text'], contextLength: 8192 },
+        }),
+      });
+      metadata.set('model_capabilities_v2', { writtenAt });
+      const env = makeEnv(null);
+      env.AUTO_ROUTING_CONFIG = kv;
+      dbWhere.mockImplementation(() =>
+        Promise.resolve([
+          { openrouterId: 'pool/vision', inputModalities: ['image'], contextLength: 65536 },
+        ])
+      );
+
+      // 10s of life left: under the 60s KV minimum, so no write is attempted.
+      vi.setSystemTime(writtenAt + 3_590_000);
+      const result = await getModelCapabilities(env, { additionalModelIds: ['pool/vision'] });
+
+      // The caller still gets the freshly queried row.
+      expect(result.get('pool/vision')?.contextLength).toBe(65536);
+      const capabilityPuts = put.mock.calls.filter(call => call[0] === 'model_capabilities_v2');
+      expect(capabilityPuts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('treats a tombstoned id as unknown capability data, not as an empty capability set', async () => {
+    const env = makeEnv(
+      JSON.stringify({
+        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
+        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
+        'byok/private-model': {
+          inputModalities: [],
+          contextLength: null,
+          isActive: null,
+          absent: true,
+        },
+      })
+    );
+    const result = await getModelCapabilities(env, {
+      additionalModelIds: ['byok/private-model'],
+    });
+    // Absent from the map, so satisfiesRequiredModalities fails it closed and
+    // contextProvablyTooSmall leaves its rank alone.
+    expect(result.has('byok/private-model')).toBe(false);
+    expect(dbWhere).not.toHaveBeenCalled();
+  });
+
   it('does not synthesize capabilities when BytePlus is not the coding-plan model', async () => {
     const env = makeEnv(
       JSON.stringify({
@@ -393,8 +623,9 @@ describe('getModelCapabilities', () => {
   it('distinguishes an unavailable routing table from a genuinely empty one when caching capabilities', async () => {
     const put = vi.fn(async () => undefined);
     const get = vi.fn(async () => null);
+    const getWithMetadata = vi.fn(async () => ({ value: null, metadata: null }));
     const env = makeEnv(null);
-    env.AUTO_ROUTING_CONFIG = { get, put } as unknown as KVNamespace;
+    env.AUTO_ROUTING_CONFIG = { get, getWithMetadata, put } as unknown as KVNamespace;
 
     // (a) Routing table is unavailable: queryAllIds returns null, so the origin
     // value for kvReadThrough is null and the model_capabilities_v2 key is NOT
@@ -431,8 +662,13 @@ describe('getModelCapabilities', () => {
     const capabilityPutsEmpty = (put.mock.calls as unknown[][]).filter(
       call => call[0] === 'model_capabilities_v2'
     );
-    expect(capabilityPutsEmpty).toHaveLength(1);
+    // Two writes: the empty union from the read-through, then the partial
+    // fill recording that the coding-plan id has no model_stats row.
+    expect(capabilityPutsEmpty).toHaveLength(2);
     expect(JSON.parse(capabilityPutsEmpty[0][1] as unknown as string)).toEqual({});
+    expect(JSON.parse(capabilityPutsEmpty[1][1] as unknown as string)).toMatchObject({
+      'coding-plan/chat': { absent: true },
+    });
   });
 
   it('returns an empty map when the routing table is missing entirely', async () => {

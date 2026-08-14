@@ -70,8 +70,8 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isGlmModel(requestedModel)) {
     return [
+      OpenRouterInferenceProviderIdSchema.enum.friendli,
       OpenRouterInferenceProviderIdSchema.enum.novita,
-      OpenRouterInferenceProviderIdSchema.enum['z-ai'],
     ];
   }
   if (isQwenModel(requestedModel)) {

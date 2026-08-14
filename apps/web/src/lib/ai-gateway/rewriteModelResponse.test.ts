@@ -6,6 +6,7 @@ import {
   rewriteModelResponse_Responses,
   rewriteModelResponse,
   logUnrewrittenResponse,
+  sanitizeApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -909,6 +910,56 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
     ...overrides,
   };
 }
+
+describe('sanitizeApiRequestLogRequest', () => {
+  test('replaces gateway BYOK credentials without mutating the upstream request', () => {
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'zai/glm-5.2',
+        messages: [{ role: 'user', content: 'hello' }],
+        providerOptions: {
+          gateway: {
+            order: ['friendli', 'novita'],
+            byok: {
+              friendli: [{ apiKey: 'friendli-managed-key', baseURL: 'https://api.friendli.ai' }],
+              bedrock: [
+                {
+                  accessKeyId: 'AKIAEXAMPLE',
+                  secretAccessKey: 'bedrock-secret',
+                  region: 'us-east-1',
+                },
+              ],
+            },
+          },
+          anthropic: { effort: 'high' },
+        },
+      },
+    } satisfies RequestLoggingParams['request'];
+
+    expect(sanitizeApiRequestLogRequest(request)).toEqual({
+      model: 'zai/glm-5.2',
+      messages: [{ role: 'user', content: 'hello' }],
+      providerOptions: {
+        gateway: {
+          order: ['friendli', 'novita'],
+          byok: {
+            friendli: [{ apiKey: '[redacted]' }],
+            bedrock: [{ apiKey: '[redacted]' }],
+          },
+        },
+        anthropic: { effort: 'high' },
+      },
+    });
+    expect(request.body.providerOptions.gateway.byok.friendli[0].apiKey).toBe(
+      'friendli-managed-key'
+    );
+    expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'bedrock-secret',
+    });
+  });
+});
 
 describe('rewriteModelResponse', () => {
   test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {

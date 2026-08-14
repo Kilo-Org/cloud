@@ -10,6 +10,9 @@ import {
 function makeUserExport(overrides: Partial<UserExport> = {}): UserExport {
   return {
     id: 'export-1',
+    subjectType: 'user',
+    organizationId: null,
+    organizationName: null,
     status: 'queued',
     requestedAt: '2026-08-01T12:00:00.000Z',
     startedAt: null,

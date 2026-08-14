@@ -249,6 +249,22 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     jest.useRealTimers();
   });
 
+  it('rejects providerOptions and directs clients to provider', async () => {
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({ ...makeBody(), providerOptions: { gateway: { only: ['anthropic'] } } }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'The providerOptions field is not supported. Use provider instead.',
+      error_type: 'unsupported_field',
+      message: 'The providerOptions field is not supported. Use provider instead.',
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('blocks request-local rules-engine block actions before upstream', async () => {
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('block'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));

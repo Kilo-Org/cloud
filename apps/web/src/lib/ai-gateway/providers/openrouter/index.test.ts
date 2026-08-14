@@ -19,9 +19,13 @@ import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
-  isValidOpenRouterModelId: jest.fn((modelId: string) =>
-    Promise.resolve(modelId !== 'vendor/unsynced-model')
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(() =>
+    Promise.resolve({
+      'vendor/model': { endpoints: [] },
+      'anthropic/claude-without-reasoning': { endpoints: [] },
+      'anthropic/claude-with-reasoning': { endpoints: [] },
+      'vendor/disabled-paid-model': { endpoints: [] },
+    })
   ),
 }));
 

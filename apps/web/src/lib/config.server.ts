@@ -207,6 +207,9 @@ export const SLACK_CREDENTIAL_KEYSET_JSON = getEnvVariable('SLACK_CREDENTIAL_KEY
 export const SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(
   'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL'
 );
+// Posts stale sync-providers alerts to #kilo-on-call.
+// Expected to be a Slack Incoming Webhook URL bound to that channel.
+export const SLACK_ON_CALL_WEBHOOK_URL = getEnvVariable('SLACK_ON_CALL_WEBHOOK_URL');
 
 // Linear (bot integration)
 // The adapter stores installations (including OAuth tokens) via the configured

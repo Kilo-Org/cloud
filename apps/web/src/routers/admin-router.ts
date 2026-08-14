@@ -32,6 +32,7 @@ import {
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
+import { postTestStaleSyncAlert } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 import { redisClient } from '@/lib/redis';
 import { SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY } from '@/lib/redis-keys';
@@ -2077,6 +2078,10 @@ export const adminRouter = createTRPCRouter({
     triggerSync: adminProcedure.mutation(async () => {
       const result = await syncAndStoreProviders();
       return result;
+    }),
+    postTestStaleAlert: adminProcedure.mutation(async () => {
+      await postTestStaleSyncAlert();
+      return { posted: true };
     }),
     getLastSync: adminProcedure.query(async () => {
       const [[latest], lastCompletedAt] = await Promise.all([

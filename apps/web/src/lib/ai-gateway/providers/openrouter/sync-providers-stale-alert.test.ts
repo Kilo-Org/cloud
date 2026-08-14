@@ -15,8 +15,8 @@ jest.mock('@/lib/redis', () => ({
   },
 }));
 
-jest.mock('@/lib/slack/admin-notifications', () => ({
-  sendAdminSlackNotification: jest.fn(),
+jest.mock('@/lib/slack/on-call-notifications', () => ({
+  sendOnCallSlackNotification: jest.fn(),
 }));
 
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
@@ -24,8 +24,10 @@ import {
   alertIfSyncProvidersStale,
   buildStaleSyncAlertNotification,
   parseIsoTimestamp,
+  postTestStaleSyncAlert,
   shouldPostStaleSyncAlert,
   SYNC_PROVIDERS_STALE_AFTER_MS,
+  SYNC_PROVIDERS_STALE_ALERT_CHANNEL,
   SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
 } from './sync-providers-stale-alert';
 
@@ -50,7 +52,7 @@ describe('parseIsoTimestamp', () => {
 });
 
 describe('shouldPostStaleSyncAlert', () => {
-  it('does not alert when the last full sync is less than 24 hours ago', () => {
+  it('does not alert when the last full sync is less than 1 hour ago', () => {
     expect(
       shouldPostStaleSyncAlert({
         lastCompletedAt: FRESH_SYNC,
@@ -60,7 +62,7 @@ describe('shouldPostStaleSyncAlert', () => {
     ).toBe(false);
   });
 
-  it('alerts when the last full sync is at least 24 hours ago', () => {
+  it('alerts when the last full sync is at least 1 hour ago', () => {
     expect(
       shouldPostStaleSyncAlert({
         lastCompletedAt: STALE_SYNC,
@@ -112,15 +114,34 @@ describe('shouldPostStaleSyncAlert', () => {
 });
 
 describe('buildStaleSyncAlertNotification', () => {
-  it('includes the last completed timestamp and admin link', () => {
+  it('includes models, providers, investigation guidance, and the on-call channel', () => {
     const notification = buildStaleSyncAlertNotification({
       lastCompletedAt: STALE_SYNC,
       now: NOW,
     });
 
     expect(notification.text).toContain(STALE_SYNC.toISOString());
-    expect(notification.text).toContain('last 24 hours');
+    expect(notification.text).toContain('last 1 hour');
+    expect(notification.text).toContain('Provider and model catalogs');
+    expect(notification.text).toContain('New models and providers can be missing');
+    expect(notification.text).toContain('Sentry and Vercel logs');
     expect(JSON.stringify(notification.blocks)).toContain('/admin/gateway|Open Gateway admin');
+    expect(JSON.stringify(notification.blocks)).toContain(SYNC_PROVIDERS_STALE_ALERT_CHANNEL);
+    expect(notification.text).not.toContain('[TEST]');
+  });
+
+  it('marks test alerts so they cannot be mistaken for a live page', () => {
+    const notification = buildStaleSyncAlertNotification({
+      lastCompletedAt: STALE_SYNC,
+      now: NOW,
+      kind: 'test',
+    });
+
+    expect(notification.text).toContain('[TEST]');
+    expect(JSON.stringify(notification.blocks)).toContain('[TEST ALERT]');
+    expect(JSON.stringify(notification.blocks)).toContain('Test alert posted to #kilo-on-call');
+    expect(notification.text).toContain('Provider and model catalogs');
+    expect(notification.text).toContain('Sentry and Vercel logs');
   });
 
   it('says never recorded when no full sync timestamp exists', () => {
@@ -152,6 +173,7 @@ describe('alertIfSyncProvidersStale', () => {
     );
     expect(setLastAlertAt).toHaveBeenCalledWith(NOW.toISOString());
     expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(7 * 24 * 60 * 60);
+    expect(SYNC_PROVIDERS_STALE_AFTER_MS).toBe(60 * 60 * 1000);
   });
 
   it('does not post when a later alert already exists', async () => {
@@ -203,5 +225,22 @@ describe('alertIfSyncProvidersStale', () => {
       })
     ).resolves.toBeUndefined();
     expect(setLastAlertAt).not.toHaveBeenCalled();
+  });
+});
+
+describe('postTestStaleSyncAlert', () => {
+  it('posts a clearly labeled test alert without writing the suppression timestamp', async () => {
+    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+
+    await postTestStaleSyncAlert({
+      now: () => NOW,
+      getLastCompletedAt: async () => STALE_SYNC.toISOString(),
+      sendNotification,
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(
+      buildStaleSyncAlertNotification({ lastCompletedAt: STALE_SYNC, now: NOW, kind: 'test' })
+    );
   });
 });

@@ -7,13 +7,18 @@ import {
   SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
   SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY,
 } from '@/lib/redis-keys';
-import {
-  sendAdminSlackNotification,
-  type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
+import { sendOnCallSlackNotification } from '@/lib/slack/on-call-notifications';
 
-export const SYNC_PROVIDERS_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
 export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const SYNC_PROVIDERS_STALE_ALERT_CHANNEL = '#kilo-on-call';
+
+const STALE_WINDOW_LABEL = '1 hour';
+const IMPACT_COPY =
+  'Provider and model catalogs may be stale. New models and providers can be missing until a full sync completes.';
+const INVESTIGATION_COPY =
+  'Check Sentry and Vercel logs for `web.sync_providers` / `[sync-providers]` errors.';
 
 export function parseIsoTimestamp(value: string | null): Date | null {
   if (!value) return null;
@@ -42,24 +47,54 @@ export function shouldPostStaleSyncAlert(input: {
 export function buildStaleSyncAlertNotification(input: {
   lastCompletedAt: Date | null;
   now: Date;
+  kind?: 'live' | 'test';
 }): AdminSlackNotification {
+  const kind = input.kind ?? 'live';
   const lastCompletedLabel = input.lastCompletedAt
     ? input.lastCompletedAt.toISOString()
     : 'never recorded';
-  const text = `Sync providers has not completed a full run in the last 24 hours. Last completed: ${lastCompletedLabel}.`;
+  const headline =
+    kind === 'test'
+      ? `[TEST] Sync providers / models has not completed a full run in the last ${STALE_WINDOW_LABEL}.`
+      : `Sync providers / models has not completed a full run in the last ${STALE_WINDOW_LABEL}.`;
+  const text = [
+    headline,
+    `Last completed: ${lastCompletedLabel}.`,
+    IMPACT_COPY,
+    INVESTIGATION_COPY,
+  ].join(' ');
+
   return {
     text,
     blocks: [
       {
-        type: 'section' as const,
-        text: { type: 'mrkdwn' as const, text: `:rotating_light: *${text}*` },
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text:
+            kind === 'test'
+              ? `:large_yellow_circle: *[TEST ALERT]* ${headline}`
+              : `:rotating_light: *${headline}*`,
+        },
       },
       {
-        type: 'context' as const,
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: [`*Last completed:* ${lastCompletedLabel}`, IMPACT_COPY, INVESTIGATION_COPY].join(
+            '\n'
+          ),
+        },
+      },
+      {
+        type: 'context',
         elements: [
           {
-            type: 'mrkdwn' as const,
-            text: `Checked at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`,
+            type: 'mrkdwn',
+            text:
+              kind === 'test'
+                ? `Test alert posted to ${SYNC_PROVIDERS_STALE_ALERT_CHANNEL} at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`
+                : `Checked at ${input.now.toISOString()} · Posted to ${SYNC_PROVIDERS_STALE_ALERT_CHANNEL} · <${APP_URL}/admin/gateway|Open Gateway admin>`,
           },
         ],
       },
@@ -74,7 +109,7 @@ type StaleAlertDependencies = {
   getLastCompletedAt?: () => Promise<string | null>;
   getLastAlertAt?: () => Promise<string | null>;
   setLastAlertAt?: (iso: string) => Promise<unknown>;
-  sendNotification?: typeof sendAdminSlackNotification;
+  sendNotification?: typeof sendOnCallSlackNotification;
 };
 
 async function defaultGetLastCompletedAt(): Promise<string | null> {
@@ -91,12 +126,47 @@ async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
   });
 }
 
+export async function postStaleSyncAlert(input: {
+  lastCompletedAt: Date | null;
+  now?: Date;
+  kind?: 'live' | 'test';
+  sendNotification?: typeof sendOnCallSlackNotification;
+}): Promise<void> {
+  const now = input.now ?? new Date();
+  const sendNotification = input.sendNotification ?? sendOnCallSlackNotification;
+  await sendNotification(
+    buildStaleSyncAlertNotification({
+      lastCompletedAt: input.lastCompletedAt,
+      now,
+      kind: input.kind,
+    })
+  );
+}
+
+export async function postTestStaleSyncAlert({
+  now: nowFn = () => new Date(),
+  getLastCompletedAt = defaultGetLastCompletedAt,
+  sendNotification = sendOnCallSlackNotification,
+}: Pick<
+  StaleAlertDependencies,
+  'now' | 'getLastCompletedAt' | 'sendNotification'
+> = {}): Promise<void> {
+  const now = nowFn();
+  const lastCompletedAt = parseIsoTimestamp(await getLastCompletedAt());
+  await postStaleSyncAlert({
+    lastCompletedAt,
+    now,
+    kind: 'test',
+    sendNotification,
+  });
+}
+
 export async function alertIfSyncProvidersStale({
   now: nowFn = () => new Date(),
   getLastCompletedAt = defaultGetLastCompletedAt,
   getLastAlertAt = defaultGetLastAlertAt,
   setLastAlertAt = defaultSetLastAlertAt,
-  sendNotification = sendAdminSlackNotification,
+  sendNotification = sendOnCallSlackNotification,
 }: StaleAlertDependencies = {}): Promise<void> {
   try {
     const now = nowFn();
@@ -108,7 +178,7 @@ export async function alertIfSyncProvidersStale({
     const lastAlertAt = parseIsoTimestamp(lastAlertRaw);
     if (!shouldPostStaleSyncAlert({ lastCompletedAt, lastAlertAt, now })) return;
 
-    await sendNotification(buildStaleSyncAlertNotification({ lastCompletedAt, now }));
+    await postStaleSyncAlert({ lastCompletedAt, now, sendNotification });
     await setLastAlertAt(now.toISOString());
   } catch (error) {
     console.error('[sync-providers] stale full-sync alert failed', error);

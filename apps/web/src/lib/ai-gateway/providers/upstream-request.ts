@@ -9,7 +9,7 @@ import type {
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
@@ -190,6 +190,7 @@ function upstreamFetchFailureResponse(
 }
 
 export async function upstreamRequest({
+  chatApi,
   path,
   search,
   method,
@@ -199,6 +200,7 @@ export async function upstreamRequest({
   signal,
   vercelRequestId,
 }: {
+  chatApi: GatewayChatApiKind;
   path: string;
   search: string;
   method: string;
@@ -220,7 +222,8 @@ export async function upstreamRequest({
     headers.set(key, value);
   });
 
-  const targetUrl = `${provider.apiUrl}${path}${search}`;
+  const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
+  const targetUrl = `${apiUrl}${path}${search}`;
 
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
@@ -264,7 +267,7 @@ export async function upstreamRequest({
       failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
         providerId: provider.id,
-        targetHost: getProviderTargetHost(provider.apiUrl),
+        targetHost: getProviderTargetHost(apiUrl),
         path,
         failureFamily,
         errorName,

@@ -5,6 +5,7 @@ import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/di
 export default {
   id: 'zai-coding',
   base_url: 'https://api.z.ai/api/coding/paas/v4',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

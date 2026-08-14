@@ -939,8 +939,10 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
  *
  * The user variant filters on `kilo_user_id = $1` and returns everything that person
  * owns, in their personal workspace and in any organization workspace they worked in.
- * It skips rows an organization owns outright with no user attached, which exist only on
- * `app_builder_projects` and `app_builder_messages`.
+ * It skips rows an organization owns outright with no user attached, which exist on
+ * `app_builder_projects`, `app_builder_messages` and `code_indexing_manifest`. On the last
+ * of those every organization-scoped row is of that shape, so an organization's indexing
+ * reaches only the organization variant.
  *
  * The organization variant filters on `organization_id = $1`, which returns that
  * organization's workspace and never a member's personal workspace, since the predicate

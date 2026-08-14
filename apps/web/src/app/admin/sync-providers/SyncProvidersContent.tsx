@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { RefreshCw } from 'lucide-react';
+import { Bell, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,17 @@ export function SyncProvidersContent() {
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
 
   const lastSyncQuery = useQuery(trpc.admin.syncProviders.getLastSync.queryOptions());
+
+  const testAlertMutation = useMutation(
+    trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
+      onSuccess: () => {
+        toast.success('Posted a test stale-sync alert');
+      },
+      onError: error => {
+        toast.error(error.message || 'Could not post the test alert');
+      },
+    })
+  );
 
   const syncMutation = useMutation(
     trpc.admin.syncProviders.triggerSync.mutationOptions({
@@ -128,6 +139,31 @@ export function SyncProvidersContent() {
               </ul>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Test stale-sync alert
+          </CardTitle>
+          <CardDescription>
+            Posts a clearly labeled test message through the admin Slack webhook. Live alerts only
+            post from Vercel production. This does not suppress later real alerts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => testAlertMutation.mutate()}
+            disabled={testAlertMutation.isPending}
+            className="w-fit"
+          >
+            <Bell className="h-4 w-4" />
+            {testAlertMutation.isPending ? 'Posting test alert...' : 'Post test alert'}
+          </Button>
         </CardContent>
       </Card>
     </div>

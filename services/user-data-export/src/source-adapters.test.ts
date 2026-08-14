@@ -348,6 +348,7 @@ describe('warehouse availability probe', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'security_findings',
       'microdollar_usage_journal',
       'enrichment_data',
     ]);
@@ -404,6 +405,7 @@ describe('source adapters', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'security_findings',
       'microdollar_usage_journal',
       'enrichment_data',
     ]);
@@ -1328,5 +1330,133 @@ describe('source adapters', () => {
     await expect(
       requireAdapter(adapters, 'microdollar_usage_journal').readPage?.(READ_PAGE_INPUT)
     ).rejects.toThrow('least_significant_position');
+  });
+
+  const FINDING_ROW = {
+    id: 'finding-1',
+    repo_full_name: 'acme/private-api',
+    package_name: 'lodash',
+    manifest_path: 'package.json',
+    title: 'Prototype pollution',
+    description: 'A crafted payload can reach Object.prototype.',
+    status: 'open',
+    ignored_reason: null,
+    ignored_by: null,
+    fixed_at: null,
+    dependabot_html_url: 'https://github.com/acme/private-api/security/dependabot/1',
+    cwe_ids: '{CWE-1321}',
+    cvss_score: '9.8',
+    dependency_scope: 'runtime',
+    analysis: { reachable: true },
+    raw_data: { number: 1 },
+  };
+
+  it('emits every declared finding field, keyed by the finding', async () => {
+    const { adapters } = harness([FINDING_ROW]);
+
+    const page = await requireAdapter(adapters, 'security_findings').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    // Derived from one declaration, so the count is what stops a column being selected
+    // and then quietly not emitted.
+    expect(page?.records).toHaveLength(15);
+    for (const record of page?.records ?? []) expect(record.id).toBe('finding-1');
+    expect(byField.get('repo_full_name')).toBe('acme/private-api');
+    expect(byField.get('title')).toBe('Prototype pollution');
+    expect(byField.get('status')).toBe('open');
+    expect(byField.get('analysis')).toBe(JSON.stringify(FINDING_ROW.analysis));
+    expect(byField.get('raw_data')).toBe(JSON.stringify(FINDING_ROW.raw_data));
+    expect(page?.nextCursor).toEqual({ key: ['finding-1'] });
+  });
+
+  // The owner columns are the scope and are never emitted: the subject already implies
+  // them, and re-exporting them would put an organization's id in a personal file.
+  it('never emits the finding owner columns as fields', async () => {
+    const { adapters } = harness([{ ...FINDING_ROW, kilo_user_id: 'owner-user' }]);
+
+    const page = await requireAdapter(adapters, 'security_findings').readPage?.(READ_PAGE_INPUT);
+    const fields = page?.records.map(record => record.field) ?? [];
+
+    expect(fields).not.toContain('kilo_user_id');
+    expect(fields).not.toContain('organization_id');
+  });
+
+  // `cvss_score` is numeric(3,1). A driver may hand it back as a string or a number
+  // depending on whether a type parser is registered, and reading only one of the two
+  // would drop the score on the other.
+  it.each([
+    ['string', '9.8'],
+    ['number', 9.8],
+  ])('reads a %s cvss score as a number', async (_label, raw) => {
+    const { adapters } = harness([{ ...FINDING_ROW, cvss_score: raw }]);
+
+    const page = await requireAdapter(adapters, 'security_findings').readPage?.(READ_PAGE_INPUT);
+    const score = page?.records.find(record => record.field === 'cvss_score')?.value;
+
+    expect(score).toBe(9.8);
+  });
+
+  it('reads an unusable cvss score as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ ...FINDING_ROW, cvss_score: 'n/a' }]);
+
+    const page = await requireAdapter(adapters, 'security_findings').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('cvss_score')).toBeNull();
+    expect(byField.get('title')).toBe('Prototype pollution');
+  });
+
+  // `cwe_ids` is text[] in prod but reaches the warehouse flattened. Carried verbatim,
+  // because splitting it would mean guessing at a serialisation nobody has confirmed.
+  it('carries the cwe list verbatim', async () => {
+    const { adapters } = harness([FINDING_ROW]);
+
+    const page = await requireAdapter(adapters, 'security_findings').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records.find(record => record.field === 'cwe_ids')?.value).toBe('{CWE-1321}');
+  });
+
+  // Audit trail, like created_by_user_id on deployment_events. Exported so the person can
+  // see who dismissed a finding, never used to decide whose finding it is.
+  it('exports the dismisser without ever scoping on it', async () => {
+    const { adapters, warehouseCalls } = harness([
+      { ...FINDING_ROW, ignored_by: 'admin-user', ignored_reason: 'accepted risk' },
+    ]);
+    const adapter = requireAdapter(adapters, 'security_findings');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    for (const call of warehouseCalls) expect(call.text).not.toContain('ignored_by = $');
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    const page = await adapter.readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+    expect(byField.get('ignored_by')).toBe('admin-user');
+    expect(byField.get('ignored_reason')).toBe('accepted risk');
+  });
+
+  it('scopes each finding read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([FINDING_ROW]);
+    const adapter = requireAdapter(adapters, 'security_findings');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  it('never marks a finding as deleted', async () => {
+    const { adapters } = harness([{ ...FINDING_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'security_findings').readPage?.(READ_PAGE_INPUT);
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 });

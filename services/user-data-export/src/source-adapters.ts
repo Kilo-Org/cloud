@@ -29,10 +29,11 @@ export type ExportRecord = {
  * Naming the column on any of them is a runtime error, so records from those sources are
  * never labelled.
  *
- * The two narrowed tables are where the flag was given up rather than never held.
- * `enrichment_data` carried 5 deleted rows against 16,661 live, so it separated nothing.
- * `microdollar_usage_journal` is insert-only — every one of its 158,433,290 rows is an
- * `IncrementalInsertRows` event — so there is nothing for a deletion flag to mark.
+ * The narrowed tables are where the flag was given up rather than never held, and in each
+ * case it was separating nothing. `enrichment_data` carried 5 deleted rows against 16,661
+ * live. `security_findings` carried none at all. `microdollar_usage_journal` is
+ * insert-only — every one of its 158,433,290 rows is an `IncrementalInsertRows` event — so
+ * nothing there can be deleted in the first place.
  */
 export const DELETED_COLUMN = '_snowflake_deleted';
 export const SOURCES_WITHOUT_DELETED_COLUMN = [
@@ -41,6 +42,7 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'users',
   'enrichment_data',
   'microdollar_usage_journal',
+  'security_findings',
 ] as const;
 
 /**
@@ -267,6 +269,11 @@ LIMIT 1`;
  *     microdollar_usage_metadata        0    both columns set
  *     code_indexing_search              0    both columns set
  *     microdollar_usage_journal         -    not counted
+ *     security_findings                 -    user XOR org, by construction
+ *
+ * `security_findings` earns its XOR from the table rather than from a count: prod carries
+ * one partial unique index per owner column, each conditioned on that column being NOT
+ * NULL, so `organization_id` is set exactly when `kilo_user_id` is not.
  *
  * `microdollar_usage_journal` carries the same owner pair as the other microdollar
  * tables, but the count above was never rerun for it, so it is left blank rather than
@@ -630,6 +637,75 @@ const microdollarJournalQueries: Record<ExportSubject['type'], string> = {
   organization: microdollarJournalPageQuery('organization'),
 };
 
+/**
+ * User or org, never both — `organization_id` is set exactly when `kilo_user_id` is not.
+ * That is stated by the table itself rather than inferred: prod carries two partial unique
+ * indexes, one per owner column, each with a `WHERE <owner> IS NOT NULL` clause, because
+ * the same upstream alert can exist independently for more than one Security Agent owner.
+ * Ownership is part of a finding's identity here, not a tag on it.
+ *
+ * `ignored_by` is the third user column of this batch, after `deployment_events`'
+ * `created_by_user_id`, and it behaves the same way: audit trail naming whoever dismissed
+ * the finding, never attribution. The access path settles it — every read in
+ * `security-agent/db/security-findings.ts` goes through `ownerFindingPredicate()`, which
+ * matches the owner columns and nothing else. It is exported as a field and never scoped
+ * on.
+ *
+ * The cursor is `id`, which both warehouse indexes already lead into as `(owner, id)`.
+ *
+ * Everything the source held is exported except the two owner columns, which the subject
+ * already implies. That includes `raw_data`, the unmodified upstream alert. This is the
+ * most sensitive source in the export — unpatched vulnerabilities against named private
+ * repositories — which is an argument for handling it carefully, not for withholding it
+ * from the person whose repositories they are.
+ *
+ * `severity`, `cve_id` and `ghsa_id` are absent because the load dropped them on request.
+ * A finding reads as less than it is without them, and that is a gap in the warehouse
+ * rather than a choice made here.
+ */
+/**
+ * Every exported field of a finding, paired with the reader for its column.
+ *
+ * One declaration rather than three, on the same principle as `WAREHOUSE_PROFILE_FIELDS`:
+ * the SELECT list, the probe's column declaration and the emitted records are all derived
+ * from this, so a column cannot be selected without being read, declared to the probe, and
+ * emitted. At fifteen fields, three hand-maintained lists would drift.
+ *
+ * Readers are lenient by column type. The text columns take `warehouseText`, the two jsonb
+ * payloads `jsonValue`, `cvss_score` `warehouseNumber` because it is `numeric(3,1)`, and
+ * `fixed_at` the timestamp reader.
+ *
+ * `cwe_ids` is `text[]` in prod but reaches the warehouse flattened to a single string, so
+ * it is carried verbatim. Splitting it would mean guessing at a serialisation nobody has
+ * confirmed, and a wrong guess would quietly corrupt the list.
+ */
+const SECURITY_FINDING_FIELDS: Record<string, (value: unknown) => string | number | null> = {
+  repo_full_name: warehouseText,
+  package_name: warehouseText,
+  manifest_path: warehouseText,
+  title: warehouseText,
+  description: warehouseText,
+  status: warehouseText,
+  ignored_reason: warehouseText,
+  ignored_by: warehouseText,
+  fixed_at: value => nullableTimestamp(value, 'fixed_at'),
+  dependabot_html_url: warehouseText,
+  cwe_ids: warehouseText,
+  cvss_score: warehouseNumber,
+  dependency_scope: warehouseText,
+  analysis: jsonValue,
+  raw_data: jsonValue,
+};
+
+/** The finding's own columns, cursor first. Interpolated from the constant above, never
+ * from caller input, on the same basis as `singleKeyPageQuery`. */
+const SECURITY_FINDING_COLUMNS = ['id', ...Object.keys(SECURITY_FINDING_FIELDS)];
+
+const securityFindingQueries = subjectPageQueries({
+  table: 'security_findings',
+  columns: SECURITY_FINDING_COLUMNS.join(', '),
+});
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
@@ -642,6 +718,12 @@ const SEARCH_PAGE_SIZE = 200;
 
 /** Deployment events carry a payload per event, so the page is cut for the same reason. */
 const DEPLOYMENT_EVENT_PAGE_SIZE = 200;
+
+/**
+ * A finding carries the whole upstream alert in `raw_data`, plus a description and an
+ * analysis blob, and emits fifteen records per row. Cut hardest of the four.
+ */
+const SECURITY_FINDING_PAGE_SIZE = 100;
 
 type ProjectRow = { id: string; title: string | null; deleted: unknown };
 type MessageRow = { id: string; data: unknown; deleted: unknown };
@@ -660,6 +742,10 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type SecurityFindingRow = {
+  id: string;
+  fields: { field: string; value: string | number | null }[];
+};
 type MicrodollarJournalRow = {
   payload_id: string | null;
   project_id: string | null;
@@ -724,6 +810,28 @@ function nullableString(value: unknown, field: string): string | null {
  */
 function warehouseText(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+/**
+ * A `numeric` column, read as a number.
+ *
+ * Both branches are load-bearing rather than defensive. Postgres drivers may hand a
+ * `numeric` back as a string, to avoid the precision loss of a float, or as a number if a
+ * type parser is registered for the OID. Passing this through `warehouseText` would
+ * silently drop the value on whichever of the two the driver did not do.
+ *
+ * A number rather than the text, because the one column that needs this is a score and a
+ * quoted score reads as a label. `numeric(3,1)` has three significant digits, so nothing
+ * is lost converting it; a wider numeric would need the string form kept instead.
+ *
+ * Lenient like `warehouseText`, and for the same reason: an unparseable cell is one bad
+ * value, not grounds for failing an export against a frozen snapshot.
+ */
+function warehouseNumber(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function isoTimestamp(value: unknown, field: string): string {
@@ -1295,6 +1403,39 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'security_findings',
+      warehouseTable: 'security_findings',
+      pageSize: SECURITY_FINDING_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: SecurityFindingRow[] = await warehouseQuery(
+          securityFindingQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            fields: Object.entries(SECURITY_FINDING_FIELDS).map(([field, read]) => ({
+              field,
+              value: read(row[field]),
+            })),
+          }))
+        );
+        return {
+          // No deletion mark: the column went with the narrowing, and the table carried no
+          // deleted rows anyway. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row =>
+            row.fields.map(({ field, value }) => ({
+              source: 'security_findings',
+              id: row.id,
+              field,
+              value,
+            }))
+          ),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
       name: 'microdollar_usage_journal',
       warehouseTable: 'microdollar_usage_journal',
       async readPage(input): Promise<SourcePage> {
@@ -1439,6 +1580,8 @@ export const warehouseQueries = {
   enrichmentUserQuery: enrichmentQuery,
   microdollarJournalUserQuery: microdollarJournalQueries.user,
   microdollarJournalOrgQuery: microdollarJournalQueries.organization,
+  securityFindingUserQuery: securityFindingQueries.user,
+  securityFindingOrgQuery: securityFindingQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1524,6 +1667,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
+  // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
+  // column the query started reading. No deletion column: it went with the narrowing.
+  security_findings: SECURITY_FINDING_COLUMNS,
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1650,6 +1796,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   enrichmentUserQuery: 'kilo_user_id = $1',
   microdollarJournalUserQuery: 'kilo_user_id = $1',
   microdollarJournalOrgQuery: 'organization_id = $1',
+  securityFindingUserQuery: 'kilo_user_id = $1',
+  securityFindingOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

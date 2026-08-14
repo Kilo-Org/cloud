@@ -29,6 +29,8 @@
  *        `microdollar_usage_journal`
  *                                 one record pair per usage event, naming the event and
  *                                 the project it belongs to
+ *        `security_findings`      one dependency vulnerability per repository, with its
+ *                                 triage state, classification and the upstream alert
  *
  *      One entry rather than one per source, because they ship together. A reader cares
  *      that the file gained sources at 4, not the order they were written in.

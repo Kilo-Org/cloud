@@ -965,6 +965,66 @@ describe('kilo-auto/efficient classifier billing', () => {
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
   });
+
+  it('guides teams that block every pool model to configure a custom Efficient pool', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: false,
+      denialSource: 'group_model',
+    });
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'model_not_allowed',
+      message: expect.stringContaining('custom Efficient model pool'),
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('guides enterprise teams whose deny list blocks every pool model to configure a custom Efficient pool', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { model_deny_list: ['anthropic/claude-haiku-4'] },
+      plan: 'enterprise',
+    });
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'model_not_allowed',
+      message: expect.stringContaining('custom Efficient model pool'),
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe('auto-routing shadow classifier', () => {

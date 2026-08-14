@@ -1,9 +1,9 @@
-// Generated local barrel: deep-imports keep the 1700-module lucide package
+// Hand-maintained local barrel: deep-imports keep the 1700-module lucide package
 // barrel out of the JS boot path. Add icons here; importing
 // 'lucide-react-native' directly is lint-banned.
 // The type re-export below is erased at transpile (TS `export type`), so it
 // adds no runtime import of the package barrel.
-export type { LucideIcon, LucideProps } from 'lucide-react-native';
+export type { LucideIcon } from 'lucide-react-native';
 export { default as Activity } from 'lucide-react-native/icons/activity';
 export { default as AlertCircle } from 'lucide-react-native/icons/circle-alert';
 export { default as AlertTriangle } from 'lucide-react-native/icons/triangle-alert';

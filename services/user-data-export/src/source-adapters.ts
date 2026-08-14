@@ -233,14 +233,22 @@ LIMIT 1`;
  *
  *     app_builder_projects          2,143    user XOR org
  *     app_builder_messages        266,095    user XOR org
+ *     code_indexing_manifest   20,170,449    user XOR org
  *     cli_sessions                      0    both columns set
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
  *
- * On the first two, an organization can own a row outright with no user attached, so
+ * On the first three, an organization can own a row outright with no user attached, so
  * `kilo_user_id = $1` genuinely skips those. On the other three every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
+ *
+ * `code_indexing_manifest` is the strongest form of the first case, and it qualifies the
+ * "everything they own across both" above: indexing under an organization writes
+ * `kilo_user_id` as NULL outright, so a person's own export carries their personal
+ * indexing only and the organization's export carries the rest. It is also the one table
+ * whose `organization_id` is not always an organization — see `codeIndexingPageQuery`,
+ * which is where that column's two readings are set out.
  *
  * The warehouse has no `created_at` on any table and is itself a point-in-time
  * snapshot, so there is no `snapshot_at` bound to apply here.
@@ -402,6 +410,39 @@ const userPromptQueries = subjectPageQueries({
   columns: 'id, user_prompt_prefix',
 });
 
+/**
+ * The two owner columns are complementary rather than alternative, and neither is a plain
+ * organization tag:
+ *
+ *   - `kilo_user_id` is set only when the file was indexed in a PERSONAL context, and is
+ *     NULL on rows indexed under an organization. It names one person's own work.
+ *   - `organization_id` is NOT always an organization. Indexing outside an org falls
+ *     through to `getUserUUID(user)` = `uuidv5(user.id, ...)`, so a personal row carries a
+ *     uuid DERIVED FROM THE USER. Measured 2026-08-12: 13,010 such ids appear in no
+ *     `organizations` row, in strict 1:1 with 13,010 users. A real organization appears
+ *     only on rows where `kilo_user_id` is NULL.
+ *
+ * Both scopes therefore land where they should with no extra predicate, and this source
+ * needs no builder of its own. `kilo_user_id = $1` selects that person's personal
+ * indexing; `organization_id = $1` is bound to a real organization id, which no personal
+ * row's derived uuid can equal, so personal work cannot reach an organization's export
+ * through the column that merely looks like an org tag.
+ *
+ * Rows with both columns NULL are the source's tombstones — 9,591,426 of 41,368,545, every
+ * payload column NULL. Neither predicate matches NULL, so scoping alone excludes them and
+ * they never reach the file as id-only records. `_snowflake_deleted` is still selected,
+ * because the deleted rows that do carry an owner are labelled rather than hidden.
+ *
+ * No `snapshot_at` bound, for the same reason as its neighbours. The warehouse copy was
+ * narrowed on 2026-08-14 to the six requested columns plus `_snowflake_deleted`;
+ * `_snowflake_inserted_at` survives only in the unload's WHERE clause, so the loaded table
+ * is already cut at the shared cutoff and carries no column to bound on.
+ */
+const codeIndexingQueries = subjectPageQueries({
+  table: 'code_indexing_manifest',
+  columns: 'id, project_id, git_branch, file_path, _snowflake_deleted',
+});
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
@@ -423,6 +464,13 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type CodeIndexingRow = {
+  id: string;
+  project_id: string | null;
+  git_branch: string | null;
+  file_path: string | null;
+  deleted: unknown;
+};
 
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== 'string') throw new Error(`Replica row has invalid ${field}`);
@@ -833,6 +881,59 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'code_indexing_manifest',
+      warehouseTable: 'code_indexing_manifest',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: CodeIndexingRow[] = await warehouseQuery(
+          codeIndexingQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            // Nullable through `warehouseText` rather than `nullableString`, though all
+            // three are NOT NULL on the primary. The warehouse declares no constraints,
+            // and a strict mapper would spend the queue's retries on a value frozen in
+            // the snapshot. See the note on `warehouseText`.
+            project_id: warehouseText(row.project_id),
+            git_branch: warehouseText(row.git_branch),
+            file_path: warehouseText(row.file_path),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          // Three records per manifest row, sharing the row's id, so a file and the
+          // branch and project it was indexed under stay groupable. `file_hash`,
+          // `chunk_count` and the line counts are deliberately not exported: they
+          // describe the index, not the person's work.
+          records: rows.flatMap(row => [
+            {
+              source: 'code_indexing_manifest',
+              id: row.id,
+              field: 'project_id',
+              value: row.project_id,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_manifest',
+              id: row.id,
+              field: 'git_branch',
+              value: row.git_branch,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_manifest',
+              id: row.id,
+              field: 'file_path',
+              value: row.file_path,
+              ...deletionMark(row.deleted),
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
   ];
 }
 
@@ -865,6 +966,8 @@ export const warehouseQueries = {
   systemPromptOrgQuery: systemPromptQueries.organization,
   userPromptUserQuery: userPromptQueries.user,
   userPromptOrgQuery: userPromptQueries.organization,
+  codeIndexingUserQuery: codeIndexingQueries.user,
+  codeIndexingOrgQuery: codeIndexingQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -922,6 +1025,11 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   ],
   system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix', DELETED_COLUMN],
   microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
+  // The whole of the narrowed table bar its two owner columns, which `sourceQueryScopes`
+  // covers. `_snowflake_inserted_at` is deliberately absent: it was dropped from the load
+  // on 2026-08-14 and survives only in the unload's WHERE clause, so probing for it would
+  // fail a table that is in fact present and complete.
+  code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1039,6 +1147,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   systemPromptOrgQuery: 'organization_id = $1',
   userPromptUserQuery: 'kilo_user_id = $1',
   userPromptOrgQuery: 'organization_id = $1',
+  codeIndexingUserQuery: 'kilo_user_id = $1',
+  codeIndexingOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

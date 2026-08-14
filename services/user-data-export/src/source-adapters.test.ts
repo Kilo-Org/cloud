@@ -336,6 +336,7 @@ describe('warehouse availability probe', () => {
       'cli_sessions',
       'system_prompt_prefix',
       'microdollar_usage_metadata',
+      'code_indexing_manifest',
     ]);
   });
 
@@ -387,6 +388,7 @@ describe('source adapters', () => {
       'cli_sessions',
       'system_prompt_prefix',
       'microdollar_usage_metadata',
+      'code_indexing_manifest',
     ]);
   });
 
@@ -828,5 +830,103 @@ describe('source adapters', () => {
     await expect(
       requireAdapter(adapters, 'cli_sessions').readPage?.(READ_PAGE_INPUT)
     ).rejects.toThrow('most_significant_position');
+  });
+
+  const MANIFEST_ROW = {
+    id: 'manifest-1',
+    project_id: 'project-a',
+    git_branch: 'main',
+    file_path: 'src/index.ts',
+  };
+
+  it('emits the three manifest fields per row, keyed by the row that carried them', async () => {
+    const { adapters } = harness([MANIFEST_ROW]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    // One id across all three, so a file, its branch and its project stay groupable.
+    expect(page?.records).toEqual([
+      {
+        source: 'code_indexing_manifest',
+        id: 'manifest-1',
+        field: 'project_id',
+        value: 'project-a',
+      },
+      { source: 'code_indexing_manifest', id: 'manifest-1', field: 'git_branch', value: 'main' },
+      {
+        source: 'code_indexing_manifest',
+        id: 'manifest-1',
+        field: 'file_path',
+        value: 'src/index.ts',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['manifest-1'] });
+  });
+
+  // The load was narrowed on 2026-08-14 and `_snowflake_inserted_at` went with it, leaving
+  // the cutoff in the unload's WHERE clause alone. Naming it here would fail a table that
+  // is present and complete, so the read is scope, cursor and limit like its neighbours.
+  it('reads the manifest with no snapshot bound of its own', async () => {
+    const { adapters, warehouseCalls } = harness([MANIFEST_ROW]);
+
+    await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).not.toContain('_snowflake_inserted_at');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+  });
+
+  // `organization_id` is NOT NULL on this table, so a personal row still names an
+  // organization and only `kilo_user_id` isolates one person's rows.
+  it('scopes the manifest on the column the subject calls for', async () => {
+    const { adapters, warehouseCalls } = harness([MANIFEST_ROW]);
+    const adapter = requireAdapter(adapters, 'code_indexing_manifest');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].values[0]).toBe('owner-user');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].values[0]).toBe('org-1');
+  });
+
+  it('marks every field of a manifest row prod has since deleted', async () => {
+    const { adapters } = harness([{ ...MANIFEST_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records).toHaveLength(3);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  // Unknown is not deleted: the column is NULL throughout on a table whose reload has not
+  // run, so an absent mark has to cover both readings.
+  it('leaves a manifest row unmarked when the warehouse cannot say', async () => {
+    const { adapters } = harness([{ ...MANIFEST_ROW, _snowflake_deleted: null }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  // NOT NULL on the primary, unconstrained in the warehouse. One odd cell must not spend
+  // the queue's retries on a value frozen in the snapshot.
+  it('reads a non-string manifest value as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ ...MANIFEST_ROW, git_branch: 42 }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('git_branch')).toBeNull();
+    expect(byField.get('file_path')).toBe('src/index.ts');
   });
 });

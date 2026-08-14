@@ -6,6 +6,8 @@ import {
   type RoutingCohort,
 } from '@/lib/ai-gateway/providers/routing-percentage';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 type PartnerRoute = {
   provider: Provider;
@@ -21,11 +23,11 @@ export type PercentageRoutedPartnerInput = {
 };
 
 const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
-  'z-ai/glm-5.2': {
+  [FRIENDLI_GLM_PUBLIC_ID]: {
     provider: PROVIDERS.FRIENDLI_GLM,
     cohort: 'friendli',
   },
-  'moonshotai/kimi-k3': {
+  [PERPLEXITY_KIMI_PUBLIC_ID]: {
     provider: PROVIDERS.PERPLEXITY_KIMI,
     cohort: 'perplexity',
   },

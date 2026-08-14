@@ -3,6 +3,8 @@ import { describe, expect, test } from '@jest/globals';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 describe('LongCat provider', () => {
   test('targets the LongCat chat completions endpoint', () => {
@@ -39,14 +41,14 @@ describe.each([
     name: 'Friendli GLM',
     provider: PROVIDERS.FRIENDLI_GLM,
     expectedUrl: 'https://api.friendli.ai/serverless/v1/messages',
-    requestedModel: 'z-ai/glm-5.2',
+    requestedModel: FRIENDLI_GLM_PUBLIC_ID,
     upstreamModel: 'zai-org/GLM-5.2',
   },
   {
     name: 'Perplexity Kimi',
     provider: PROVIDERS.PERPLEXITY_KIMI,
     expectedUrl: 'https://api.perplexity.ai/router/v1/messages',
-    requestedModel: 'moonshotai/kimi-k3',
+    requestedModel: PERPLEXITY_KIMI_PUBLIC_ID,
     upstreamModel: 'perplexity/kimi-k3',
   },
 ])('$name provider', ({ provider, expectedUrl, requestedModel, upstreamModel }) => {

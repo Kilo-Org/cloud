@@ -118,6 +118,25 @@ export async function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
+export function applyAnthropicThinkingDefault(
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+) {
+  const defaultsToThinking =
+    (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
+    isGlmModel(requestedModel) ||
+    isKimiModel(requestedModel);
+  if (
+    defaultsToThinking &&
+    requestToMutate.kind === 'messages' &&
+    !isReasoningExplicitlyEnabled(requestToMutate)
+  ) {
+    // The Anthropic provider omits thinking:disabled when reasoning is not enabled, but these
+    // models can default to thinking when the field is absent.
+    requestToMutate.body.thinking = { type: 'disabled' };
+  }
+}
+
 export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -182,16 +201,7 @@ export async function applyProviderSpecificLogic(
     addCacheBreakpoints(requestToMutate);
   }
 
-  if (
-    isMinimaxModel(requestedModel) &&
-    requestedModel.includes('m3') &&
-    !isReasoningExplicitlyEnabled(requestToMutate) &&
-    requestToMutate.kind === 'messages'
-  ) {
-    // MiniMax defaults to thinking, but the Anthropic provider does not include thinking:disabled in the request, creating a mismatch.
-    // https://github.com/vercel/ai/blob/4a441d8fb584b231f771348de3e7f383ab7aa95b/packages/anthropic/src/anthropic-language-model.ts#L421-L453
-    requestToMutate.body.thinking = { type: 'disabled' };
-  }
+  applyAnthropicThinkingDefault(requestedModel, requestToMutate);
 
   await provider.transformRequest({
     provider,

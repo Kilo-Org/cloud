@@ -1,6 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
@@ -103,11 +105,11 @@ describe('custom model pricing', () => {
       cacheWriteTokens: 30,
     });
 
-    expect(calculateCustomCost_mUsd('moonshotai/kimi-k3', usage)).toBe(
+    expect(calculateCustomCost_mUsd(PERPLEXITY_KIMI_PUBLIC_ID, usage)).toBe(
       Math.round(50 * 3 + 10 * 15 + 20 * 0.3 + 30 * 3)
     );
     expect(
-      calculateCustomCost_mUsd('moonshotai/kimi-k3', { ...usage, cost_mUsd: 123 })
+      calculateCustomCost_mUsd(PERPLEXITY_KIMI_PUBLIC_ID, { ...usage, cost_mUsd: 123 })
     ).toBeUndefined();
   });
 
@@ -119,14 +121,16 @@ describe('custom model pricing', () => {
       cacheWriteTokens: 30,
     });
 
-    expect(calculateCustomCost_mUsd('z-ai/glm-5.2', usage)).toBe(
+    expect(calculateCustomCost_mUsd(FRIENDLI_GLM_PUBLIC_ID, usage)).toBe(
       Math.round(50 * 1.4 + 10 * 4.4 + 20 * 0.26 + 30 * 1.4)
     );
-    expect(calculateCustomCost_mUsd('z-ai/glm-5.2', { ...usage, cost_mUsd: 123 })).toBeUndefined();
+    expect(
+      calculateCustomCost_mUsd(FRIENDLI_GLM_PUBLIC_ID, { ...usage, cost_mUsd: 123 })
+    ).toBeUndefined();
   });
 
   test('does not replace displayed pricing for fallback-only custom pricing', () => {
-    const model = makeModel('moonshotai/kimi-k3');
+    const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
 
     expect(applyCustomPricingToModel(model)).toBe(model);
     expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);

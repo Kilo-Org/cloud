@@ -7,6 +7,8 @@ import {
 } from '@/lib/ai-gateway/providers/partner-routing';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { RuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 function request(
   kind: GatewayRequest['kind'] = 'messages',
@@ -35,7 +37,7 @@ const routingConfig: RuntimeGatewayRoutingConfig = {
 };
 
 const defaultInput = {
-  requestedModel: 'z-ai/glm-5.2',
+  requestedModel: FRIENDLI_GLM_PUBLIC_ID,
   request: request(),
   randomSeed: 'user-id',
   sourceProviderId: 'openrouter',
@@ -51,8 +53,8 @@ function selectPartner(
 
 describe('getPercentageRoutedPartnerProvider', () => {
   it.each([
-    ['z-ai/glm-5.2', PROVIDERS.FRIENDLI_GLM],
-    ['moonshotai/kimi-k3', PROVIDERS.PERPLEXITY_KIMI],
+    [FRIENDLI_GLM_PUBLIC_ID, PROVIDERS.FRIENDLI_GLM],
+    [PERPLEXITY_KIMI_PUBLIC_ID, PROVIDERS.PERPLEXITY_KIMI],
   ])('routes exact model %s', (model, expectedProvider) => {
     expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
   });
@@ -94,7 +96,7 @@ describe('getPercentageRoutedPartnerProvider', () => {
     expect(selectPartner({ sourceProviderId: 'vercel', hasUserByok: true })).toBeNull();
   });
 
-  it.each(['z-ai/glm-5.2-fast', 'moonshotai/kimi-k3-fast', 'zai/glm-5.2'])(
+  it.each([`${FRIENDLI_GLM_PUBLIC_ID}-fast`, `${PERPLEXITY_KIMI_PUBLIC_ID}-fast`, 'zai/glm-5.2'])(
     'does not route non-exact model %s',
     model => {
       expect(selectPartner({ requestedModel: model })).toBeNull();

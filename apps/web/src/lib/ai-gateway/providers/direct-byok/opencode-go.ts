@@ -4,6 +4,7 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 export default {
   id: 'opencode-go',
   base_url: 'https://opencode.ai/zen/go/v1',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

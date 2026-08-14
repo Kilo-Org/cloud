@@ -1,4 +1,9 @@
-import { ExportQueueMessageSchema, type ExportCursor, type ExportQueueMessage } from './contracts';
+import {
+  EXPORT_FILE_SCHEMA_VERSION,
+  ExportQueueMessageSchema,
+  type ExportCursor,
+  type ExportQueueMessage,
+} from './contracts';
 import {
   createReplicaQuery,
   createStateDb,
@@ -279,7 +284,7 @@ export function exportHeader(
 ): string {
   return `${JSON.stringify({
     type: 'header',
-    schemaVersion: 1,
+    schemaVersion: EXPORT_FILE_SCHEMA_VERSION,
     exportId: job.id,
     requestedAt: strictIsoTimestamp(job.requested_at),
     generatedAt: new Date().toISOString(),

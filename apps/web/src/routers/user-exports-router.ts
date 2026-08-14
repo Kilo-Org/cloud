@@ -22,6 +22,7 @@ import {
   ORGANIZATION_EXPORT_ROLES,
   organizationExportAccess,
 } from '@kilocode/db/organization-export-access';
+import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import {
   dispatchUserDataExport,
   requestUserDataExportDownload,
@@ -261,11 +262,15 @@ async function createExportRequest(subject: {
 
     return tx.execute<UserExportRow>(sql`
       WITH created AS (
-        INSERT INTO user_data_exports (kilo_user_id, subject_type, organization_id, snapshot_at)
+        INSERT INTO user_data_exports (kilo_user_id, subject_type, organization_id, schema_version, snapshot_at)
         VALUES (
           ${subject.kiloUserId},
           ${isOrg ? 'organization' : 'user'},
           ${subject.organizationId}::uuid,
+          -- Set explicitly rather than left to the column default, so the row records the
+          -- format of the file the Worker will actually write. The default stays at 1, so
+          -- raising the format never needs a migration.
+          ${EXPORT_FILE_SCHEMA_VERSION},
           ${EXPORT_DATA_CUTOFF}::timestamptz
         )
         RETURNING id, subject_type, organization_id, status, requested_at, started_at, completed_at,

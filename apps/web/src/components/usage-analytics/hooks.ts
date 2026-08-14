@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { BreakdownDimension } from '@/routers/usage-analytics-schemas';
 import type { CostSource, Dimension, Granularity, MetricKey, PeriodOption } from './types';
 
 export type DateRange = {
@@ -199,7 +200,7 @@ export function useUsageTimeseries(
 
 export function useUsageBreakdown(
   args: CommonArgs & {
-    dimension: Dimension;
+    dimension: BreakdownDimension;
     metric: 'cost' | 'requests' | 'tokens';
     limit?: number;
     enabled?: boolean;

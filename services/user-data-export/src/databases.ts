@@ -1,4 +1,5 @@
 import { getWorkerDb, pg } from '@kilocode/db/client';
+import { organizationExportAccess } from '@kilocode/db/organization-export-access';
 import { sql } from 'drizzle-orm';
 import { safeError, setSpanFields, withSpan } from './observability';
 import type { ReplicaQuery } from './source-adapters';
@@ -8,7 +9,11 @@ export type StateDb = ReturnType<typeof createStateDb>;
 
 export type ExportJob = {
   id: string;
+  /** The requester, for both subject types. Not necessarily whose data this contains. */
   kilo_user_id: string;
+  subject_type: 'user' | 'organization';
+  /** Set exactly when subject_type is 'organization'; a CHECK constraint enforces it. */
+  organization_id: string | null;
   status: 'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired';
   snapshot_at: string;
   requested_at: string;
@@ -27,6 +32,33 @@ type MultipartUpload = { id: string; multipart_upload_id: string };
 export type ExportCompletionResult = 'completed' | 'already_completed' | 'fenced';
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
 type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
+
+/**
+ * Whether `kiloUserId` may reach an export row, for either subject type.
+ *
+ * A personal export is reachable only by the person it belongs to. An organization's
+ * goes through the predicate shared with the web router, so this Worker and the request
+ * path cannot disagree — which they once did, producing an export that generated,
+ * showed as ready, and refused every download.
+ *
+ * Still evaluated here rather than trusted from the caller: this runs on the download
+ * path, and a Worker that took the router's word for it would have no check at all. It
+ * is also evaluated in the same statement as the row lookup, so a revoked admin loses
+ * access immediately rather than at the next lease or cache expiry.
+ */
+function callerMayAccess(kiloUserId: string) {
+  return sql`(
+    (subject_type = 'user' AND kilo_user_id = ${kiloUserId})
+    OR (
+      subject_type = 'organization'
+      AND organization_id IS NOT NULL
+      AND ${organizationExportAccess({
+        kiloUserId,
+        organizationId: sql`user_data_exports.organization_id`,
+      })}
+    )
+  )`;
+}
 
 export function createStateDb(binding: HyperdriveBinding) {
   const db = getWorkerDb(binding.connectionString, { statement_timeout: 30_000 });
@@ -47,7 +79,8 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
           AND (lease_expires_at IS NULL OR lease_expires_at < now())
-        RETURNING id, kilo_user_id, status, snapshot_at, requested_at, current_source, source_cursor, multipart_upload_id,
+        RETURNING id, kilo_user_id, subject_type, organization_id, status, snapshot_at, requested_at,
+          current_source, source_cursor, multipart_upload_id,
           next_part_number, dispatch_generation, lease_token, r2_object_key
       `);
       return rows.rows[0] ?? null;
@@ -234,7 +267,8 @@ export function createStateDb(binding: HyperdriveBinding) {
     ): Promise<boolean> {
       const rows = await db.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
-        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        WHERE id = ${exportId}
+          AND ${callerMayAccess(kiloUserId)}
           AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
         LIMIT 1
@@ -245,7 +279,8 @@ export function createStateDb(binding: HyperdriveBinding) {
       const rows = await db.execute<ReadyExportObject>(sql`
         SELECT r2_object_key, expires_at
         FROM user_data_exports
-        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        WHERE id = ${exportId}
+          AND ${callerMayAccess(kiloUserId)}
           AND status = 'ready' AND expires_at > now() AND r2_object_key IS NOT NULL
         LIMIT 1
       `);
@@ -408,3 +443,5 @@ export function createReplicaQuery(binding: HyperdriveBinding, database: string)
       }
     );
 }
+
+export const __test__ = { callerMayAccess };

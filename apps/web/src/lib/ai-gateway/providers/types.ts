@@ -8,6 +8,7 @@ export type ProviderId =
   | 'seed'
   | 'direct-byok'
   | 'inception'
+  | 'longcat'
   | 'martian'
   | 'mistral'
   | 'streamlake'
@@ -36,7 +37,7 @@ export type TransformRequestContext = {
 export type GatewayChatApiKind = GatewayRequest['kind'];
 
 export type ProviderResponseTransforms = {
-  thoughtContentMapping: string | null;
+  mapGeminiThoughtContent: boolean;
 };
 
 export type Provider = {

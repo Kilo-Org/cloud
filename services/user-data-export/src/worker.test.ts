@@ -5,9 +5,11 @@ import {
   deletePendingObjects,
   exportHeader,
   exportArtifact,
+  exportSubject,
   handleFencedCompletion,
   handleGenerationFailure,
   hasRetiredGeneratorState,
+  partitionSources,
   processScheduledExportWork,
   persistCompletedExport,
   recoverInterruptedMultipartUpload,
@@ -16,6 +18,7 @@ import {
 } from './worker';
 import { TerminalExportError } from './errors';
 import type { ExportJob } from './databases';
+import type { SourceAdapter } from './source-adapters';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -108,27 +111,141 @@ describe('dead-letter queue consumption', () => {
   });
 });
 
+function exportJob(overrides: Partial<ExportJob> = {}): ExportJob {
+  return {
+    id: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+    kilo_user_id: 'user-id',
+    subject_type: 'user',
+    organization_id: null,
+    status: 'processing',
+    snapshot_at: '2026-08-03 00:00:00+00',
+    requested_at: '2026-08-09 05:00:00.123+00',
+    current_source: 'app_builder_projects',
+    source_cursor: null,
+    multipart_upload_id: null,
+    next_part_number: 1,
+    dispatch_generation: 0,
+    lease_token: null,
+    r2_object_key: null,
+    ...overrides,
+  };
+}
+
+/** Stand-in adapters; only the fields the partition and header read are populated. */
+function sourceAdapter(name: string, warehouseTable?: string): SourceAdapter {
+  return { name, warehouseTable, readPage: async () => ({ records: [], nextCursor: null }) };
+}
+
+const ALL_ADAPTERS = [
+  sourceAdapter('kilocode_users', 'users'),
+  sourceAdapter('app_builder_projects', 'app_builder_projects'),
+  sourceAdapter('audiences', 'audiences'),
+];
+
+const ALL_TABLES = new Set(['users', 'app_builder_projects', 'audiences']);
+
+function sourcesFor(job: ExportJob, present: Set<string> = ALL_TABLES) {
+  return partitionSources(ALL_ADAPTERS, job.subject_type, present);
+}
+
 describe('export header timestamps', () => {
   it('normalizes PostgreSQL timestamps and keeps request time distinct from cutoff', () => {
-    const header = JSON.parse(
-      exportHeader({
-        id: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
-        kilo_user_id: 'user-id',
-        status: 'processing',
-        snapshot_at: '2026-08-03 00:00:00+00',
-        requested_at: '2026-08-09 05:00:00.123+00',
-        current_source: 'app_builder_projects',
-        source_cursor: null,
-        multipart_upload_id: null,
-        next_part_number: 1,
-        dispatch_generation: 0,
-        lease_token: null,
-        r2_object_key: null,
-      } satisfies ExportJob).trim()
-    ) as { requestedAt: string; snapshotAt: string };
+    const job = exportJob();
+    const header = JSON.parse(exportHeader(job, sourcesFor(job)).trim()) as {
+      requestedAt: string;
+      snapshotAt: string;
+    };
 
     expect(header.requestedAt).toBe('2026-08-09T05:00:00.123Z');
     expect(header.snapshotAt).toBe('2026-08-03T00:00:00.000Z');
+  });
+});
+
+// The warehouse loads table by table and the export ships ahead of it, so a source whose
+// table has not landed must not take the whole export down with it.
+describe('source availability', () => {
+  it('keeps every source when all tables are present', () => {
+    const sources = sourcesFor(exportJob());
+
+    expect(sources.available.map(adapter => adapter.name)).toEqual([
+      'kilocode_users',
+      'app_builder_projects',
+      'audiences',
+    ]);
+    expect(sources.unavailable).toEqual([]);
+  });
+
+  it('sets an absent table aside instead of failing', () => {
+    const sources = sourcesFor(exportJob(), new Set(['users', 'app_builder_projects']));
+
+    expect(sources.available.map(adapter => adapter.name)).toEqual([
+      'kilocode_users',
+      'app_builder_projects',
+    ]);
+    expect(sources.unavailable).toEqual(['audiences']);
+  });
+
+  // "We hold nothing for you here" and "this has not been exported yet" are different
+  // statements, and a consumer can only tell them apart if the header says so.
+  it('names absent sources in the header', () => {
+    const job = exportJob();
+    const header = JSON.parse(exportHeader(job, sourcesFor(job, new Set(['users']))).trim()) as {
+      includedSources: string[];
+      unavailableSources: string[];
+    };
+
+    expect(header.includedSources).toEqual(['kilocode_users']);
+    expect(header.unavailableSources).toEqual(['app_builder_projects', 'audiences']);
+  });
+
+  // An organization export never has an identity section, which is a fact about the
+  // subject rather than the warehouse. Reporting it as unavailable would tell an admin
+  // their identity data was withheld when no such section was ever going to exist.
+  it('drops the identity source from an organization export without calling it absent', () => {
+    const sources = sourcesFor(
+      exportJob({ subject_type: 'organization', organization_id: 'org-1' })
+    );
+
+    expect(sources.available.map(adapter => adapter.name)).not.toContain('kilocode_users');
+    expect(sources.unavailable).not.toContain('kilocode_users');
+  });
+});
+
+describe('export subject', () => {
+  it('reads a personal export for the requester', () => {
+    expect(exportSubject(exportJob())).toEqual({ type: 'user', kiloUserId: 'user-id' });
+  });
+
+  // The requester is not the subject of an organization export. Falling back to their
+  // id would hand them their own data under an organization's label.
+  it('reads an organization export for the organization, not the requester', () => {
+    expect(
+      exportSubject(exportJob({ subject_type: 'organization', organization_id: 'org-1' }))
+    ).toEqual({ type: 'organization', organizationId: 'org-1' });
+  });
+
+  it('fails terminally when an organization export has no organization', () => {
+    const error = (() => {
+      try {
+        return exportSubject(exportJob({ subject_type: 'organization', organization_id: null }));
+      } catch (caught: unknown) {
+        return caught;
+      }
+    })();
+
+    expect(error).toBeInstanceOf(TerminalExportError);
+    expect((error as TerminalExportError).failureCode).toBe('export_subject_incomplete');
+  });
+
+  it('names the subject in the header so a consumer need not infer it', () => {
+    const job = exportJob({ subject_type: 'organization', organization_id: 'org-1' });
+    const header = JSON.parse(exportHeader(job, sourcesFor(job)).trim()) as {
+      subjectType: string;
+      organizationId: string | null;
+    };
+
+    expect(header.subjectType).toBe('organization');
+    expect(header.organizationId).toBe('org-1');
   });
 });
 

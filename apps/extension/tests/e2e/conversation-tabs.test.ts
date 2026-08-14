@@ -83,6 +83,10 @@ const installTimedChatStream = async (page: Page, chunks: string[]): Promise<voi
             const chunk = streamChunks[chunkIndex];
 
             if (chunk === undefined) {
+              // The real gateway always reports a finish_reason; without one the turn runner retries the stream as truncated.
+              controller.enqueue(
+                encoder.encode('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n')
+              );
               controller.enqueue(encoder.encode('data: [DONE]\n\n'));
               controller.close();
               return;

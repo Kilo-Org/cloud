@@ -236,16 +236,12 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### AI Providers
 
 - `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
-- `OPENAI_API_KEY` - OpenAI API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for the `text-embedding-3-small` embedding model, and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
+- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
 - `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `XAI_API_KEY` - xAI / Grok API key; referenced in `.env.local.example` as "your-xai-grok-key" and in Grok model naming (`x-ai/grok-*`). No direct `process.env.XAI_API_KEY` call was found outside `.env` files, so actual runtime wiring is likely via `OPENROUTER_API_KEY` routing through OpenRouter to Grok models. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
-- `GIGAPOTATO_API_KEY` - Only appears in `.env.local.example` and `apps/web/.env.test`; no production usage found. Presumed API key for the Gigapotato API provider. `[SECRET]`
-- `GIGAPOTATO_API_URL` - Only appears in `.env.local.example` and `apps/web/.env.test`; no production usage found. Presumed base URL for the Gigapotato provider. [SERVER]
-- `GENLABS_API_KEY` - Only appears in `.env.local.example` and `apps/web/.env.test`; no production usage found. Presumed API key for the GenLabs provider. `[SECRET]`
 - `FAKE_LLM_URL` - URL for a fake/local LLM server used in `services/cloud-agent-next` E2E tests (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`); defaults to `http://localhost:8811`. [SERVER]
 
 ### Vector DBs

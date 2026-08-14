@@ -1,10 +1,14 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { credit_transactions, organizations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { credit_transactions, organization_memberships, organizations } from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
+
+jest.mock('@/lib/organizations/organization-billing', () => ({
+  getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_child_org'),
+}));
 
 // Test users and organization will be created dynamically
 let regularUser: User;
@@ -71,6 +75,7 @@ describe('organizations trpc router', () => {
       expect(result).toMatchObject({
         id: testOrganization.id,
         name: 'Test Organization',
+        callerRole: 'owner',
         total_microdollars_acquired: 1000000,
         microdollars_used: 0,
         stripe_customer_id: 'cus_test_org',
@@ -105,6 +110,7 @@ describe('organizations trpc router', () => {
       expect(result).toMatchObject({
         id: testOrganization.id,
         name: 'Test Organization',
+        callerRole: 'member',
         members: expect.arrayContaining([
           expect.objectContaining({
             id: regularUser.id,
@@ -175,6 +181,7 @@ describe('organizations trpc router', () => {
         .update(organizations)
         .set({ parent_organization_id: parentOrganization.id })
         .where(eq(organizations.id, childOrganization.id));
+      await addUserToOrganization(childOrganization.id, parentOwner.id, 'member');
 
       try {
         const caller = await createCallerForUser(parentOwner.id);
@@ -185,6 +192,7 @@ describe('organizations trpc router', () => {
         expect(result).toMatchObject({
           id: childOrganization.id,
           name: 'Child Access Organization',
+          callerRole: 'owner',
         });
       } finally {
         await db
@@ -344,6 +352,248 @@ describe('organizations trpc router', () => {
           expect(member).toHaveProperty('currentDailyUsageUsd');
         }
       });
+    });
+  });
+
+  describe('list procedure', () => {
+    it('nests only inherited direct children under eligible direct memberships', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: 'list-parent-owner@example.com',
+        google_user_name: 'List Parent Owner',
+        is_admin: false,
+      });
+      const billingManager = await insertTestUser({
+        google_user_email: 'list-parent-billing@example.com',
+        google_user_name: 'List Parent Billing Manager',
+        is_admin: false,
+      });
+      const parentMember = await insertTestUser({
+        google_user_email: 'list-parent-member@example.com',
+        google_user_name: 'List Parent Member',
+        is_admin: false,
+      });
+      const childOwner = await insertTestUser({
+        google_user_email: 'list-child-owner@example.com',
+        google_user_name: 'List Child Owner',
+        is_admin: false,
+      });
+      const deletedChildOwner = await insertTestUser({
+        google_user_email: 'list-deleted-child-owner@example.com',
+        google_user_name: 'List Deleted Child Owner',
+        is_admin: false,
+      });
+      const grandchildOwner = await insertTestUser({
+        google_user_email: 'list-grandchild-owner@example.com',
+        google_user_name: 'List Grandchild Owner',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization('List Parent', parentOwner.id);
+      await addUserToOrganization(parentOrganization.id, billingManager.id, 'billing_manager');
+      await addUserToOrganization(parentOrganization.id, parentMember.id, 'member');
+
+      const inheritedChild = await createOrganization('Alpha Inherited Child', childOwner.id);
+      const directChild = await createOrganization('Beta Direct Child', parentOwner.id);
+      const deletedChild = await createOrganization('Deleted Child', deletedChildOwner.id);
+      const grandchild = await createOrganization('Nested Grandchild', grandchildOwner.id);
+      const childOrganizationIds = [
+        inheritedChild.id,
+        directChild.id,
+        deletedChild.id,
+        grandchild.id,
+      ];
+
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parentOrganization.id })
+        .where(inArray(organizations.id, [inheritedChild.id, directChild.id, deletedChild.id]));
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: inheritedChild.id })
+        .where(eq(organizations.id, grandchild.id));
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, deletedChild.id));
+
+      try {
+        const ownerCaller = await createCallerForUser(parentOwner.id);
+        const ownerOrganizations = await ownerCaller.organizations.list();
+        const ownerParent = ownerOrganizations.find(
+          organization => organization.organizationId === parentOrganization.id
+        );
+
+        expect(ownerOrganizations.map(organization => organization.organizationId)).toEqual(
+          expect.arrayContaining([parentOrganization.id, directChild.id])
+        );
+        expect(ownerParent?.inheritedChildren).toEqual([
+          {
+            organizationId: inheritedChild.id,
+            organizationName: 'Alpha Inherited Child',
+            role: 'owner',
+          },
+          {
+            organizationId: directChild.id,
+            organizationName: 'Beta Direct Child',
+            role: 'owner',
+          },
+        ]);
+
+        const billingCaller = await createCallerForUser(billingManager.id);
+        const billingOrganizations = await billingCaller.organizations.list();
+        expect(billingOrganizations).toHaveLength(1);
+        expect(billingOrganizations[0].inheritedChildren).toEqual([
+          {
+            organizationId: inheritedChild.id,
+            organizationName: 'Alpha Inherited Child',
+            role: 'billing_manager',
+          },
+          {
+            organizationId: directChild.id,
+            organizationName: 'Beta Direct Child',
+            role: 'billing_manager',
+          },
+        ]);
+
+        const memberCaller = await createCallerForUser(parentMember.id);
+        const memberOrganizations = await memberCaller.organizations.list();
+        expect(memberOrganizations).toHaveLength(1);
+        expect(memberOrganizations[0].inheritedChildren).toEqual([]);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, childOrganizationIds));
+        await db.delete(organizations).where(inArray(organizations.id, childOrganizationIds));
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+  });
+
+  describe('createChild procedure', () => {
+    it('allows an organization admin to create an empty child organization', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: `child-create-owner-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'Child Create Owner',
+        is_admin: false,
+      });
+      const parentAdmin = await insertTestUser({
+        google_user_email: `child-create-admin-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'Child Create Admin',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization(
+        `Child Create Parent ${crypto.randomUUID()}`,
+        parentOwner.id
+      );
+      await addUserToOrganization(parentOrganization.id, parentAdmin.id, 'admin');
+      let childOrganizationId: string | null = null;
+
+      try {
+        const caller = await createCallerForUser(parentAdmin.id);
+        const result = await caller.organizations.createChild({
+          organizationId: parentOrganization.id,
+          name: 'Admin Created Child',
+        });
+        childOrganizationId = result.organization.id;
+
+        expect(result.organization).toMatchObject({
+          name: 'Admin Created Child',
+          parent_organization_id: parentOrganization.id,
+          require_seats: false,
+          free_trial_end_at: null,
+          settings: expect.objectContaining({ suppress_trial_messaging: true }),
+        });
+
+        const memberships = await db
+          .select({ id: organization_memberships.id })
+          .from(organization_memberships)
+          .where(eq(organization_memberships.organization_id, childOrganizationId));
+        expect(memberships).toEqual([]);
+
+        await expect(
+          caller.organizations.childOrganizations({ organizationId: parentOrganization.id })
+        ).resolves.toContainEqual({
+          id: childOrganizationId,
+          name: 'Admin Created Child',
+        });
+      } finally {
+        if (childOrganizationId) {
+          await db.delete(organizations).where(eq(organizations.id, childOrganizationId));
+        }
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
+    it('rejects child creation by an ordinary organization member', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.createChild({
+          organizationId: testOrganization.id,
+          name: 'Unauthorized Child',
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('rejects child creation by a billing manager', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: `child-create-billing-owner-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'Child Create Billing Owner',
+        is_admin: false,
+      });
+      const billingManager = await insertTestUser({
+        google_user_email: `child-create-billing-manager-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'Child Create Billing Manager',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization(
+        `Child Create Billing Parent ${crypto.randomUUID()}`,
+        parentOwner.id
+      );
+      await addUserToOrganization(parentOrganization.id, billingManager.id, 'billing_manager');
+
+      try {
+        const caller = await createCallerForUser(billingManager.id);
+        await expect(
+          caller.organizations.createChild({
+            organizationId: parentOrganization.id,
+            name: 'Billing Manager Child',
+          })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
+    it('rejects creating a child under an organization that is already a child', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: `nested-child-owner-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'Nested Child Owner',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization(
+        `Nested Child Parent ${crypto.randomUUID()}`,
+        parentOwner.id
+      );
+      const caller = await createCallerForUser(parentOwner.id);
+      const child = await caller.organizations.createChild({
+        organizationId: parentOrganization.id,
+        name: 'Existing Child',
+      });
+
+      try {
+        await expect(
+          caller.organizations.createChild({
+            organizationId: child.organization.id,
+            name: 'Nested Child',
+          })
+        ).rejects.toThrow(
+          'Cannot add child organizations to an organization that is already a child'
+        );
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, child.organization.id));
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
     });
   });
 

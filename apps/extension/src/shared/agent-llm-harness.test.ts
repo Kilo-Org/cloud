@@ -88,6 +88,7 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'web_search',
       'search_memories',
       'get_memory',
     ]);
@@ -95,6 +96,7 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'web_search',
       'search_memories',
       'get_memory',
       'get_viewport_screenshot',
@@ -385,11 +387,48 @@ describe('agent LLM harness', () => {
       'The user approves each saved memory on a card, and each workflow script version too unless auto-approve workflow changes is on.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
-      'Follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user.'
+      'follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user.'
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'Never start a real run of a workflow whose actions buy, send, delete, or otherwise change data without asking the user first.'
     );
+  });
+
+  it('gives a URL-first, save-first workflow creation recipe', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Write workflow scripts URL-first');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'call save_workflow right away when the task and site are clear'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Take at most one get_page_snapshot, and only when you actually need page details'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toMatch(
+      /Once you have inspected enough|Google Flights/
+    );
+  });
+
+  it('teaches param declaration and text-based targeting', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'never ask the user for such values and never hard-code them'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Mark a param required only when the workflow cannot run without it'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('page.fillLabel(label, value)');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('page.clickText(text)');
+  });
+
+  it('tells the model that get_element_details never returns a CSS selector', () => {
+    const definitions = createSafeToolDefinitions({ supportsImages: false });
+    const elementDetails = definitions.find(tool => tool.function.name === 'get_element_details');
+
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
+      'use targeted reads only when a required selector is missing'
+    );
+    expect(elementDetails?.function.description).toContain(
+      "The record repeats that node's snapshot fields (role, tag, label, text, href, state)"
+    );
+    expect(elementDetails?.function.description).toContain('never contains a CSS selector');
   });
 
   it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {
@@ -421,7 +460,7 @@ describe('agent LLM harness', () => {
     const definitions = createWorkflowToolDefinitions({ mode: 'safe' });
     const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
     expect(JSON.stringify(saveWorkflow?.function.parameters)).toContain(
-      'When updating, omitting pathPrefix, startUrl, or params clears the stored value.'
+      'When updating, omitting script keeps the stored script, while omitting pathPrefix, startUrl, or params clears the stored value.'
     );
   });
 

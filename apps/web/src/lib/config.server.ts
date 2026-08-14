@@ -57,7 +57,6 @@ export const TURNSTILE_SECRET_KEY = getEnvVariable('TURNSTILE_SECRET_KEY');
 export const NEXTAUTH_SECRET = getEnvVariable('NEXTAUTH_SECRET');
 export const OPENROUTER_API_KEY = getEnvVariable('OPENROUTER_API_KEY');
 export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
-export const OPENAI_API_KEY = getEnvVariable('OPENAI_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');

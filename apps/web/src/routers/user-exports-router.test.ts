@@ -2,9 +2,16 @@ import { TRPCError } from '@trpc/server';
 import { eq, sql } from 'drizzle-orm';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { db } from '@/lib/drizzle';
-import { magic_link_tokens, user_data_exports, type User } from '@kilocode/db/schema';
+import {
+  magic_link_tokens,
+  organization_memberships,
+  organizations,
+  user_data_exports,
+  type User,
+} from '@kilocode/db/schema';
 import { createCallerForUser } from '@/routers/test-utils';
 import { __test__ } from '@/routers/user-exports-router';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 // Partial mocks: `@/lib/email` also exports the template registry that sibling
@@ -82,6 +89,27 @@ async function insertReadyExport(kiloUserId: string): Promise<string> {
   return row.id;
 }
 
+async function insertReadyOrganizationExport(
+  requesterId: string,
+  organizationId: string
+): Promise<string> {
+  const [row] = await db
+    .insert(user_data_exports)
+    .values({
+      kilo_user_id: requesterId,
+      subject_type: 'organization',
+      organization_id: organizationId,
+      snapshot_at: new Date().toISOString(),
+      status: 'ready',
+      r2_object_key: `exports/${crypto.randomUUID()}/export.jsonl.gz`,
+      size_bytes: 1,
+      completed_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    })
+    .returning({ id: user_data_exports.id });
+  return row.id;
+}
+
 /** Reads the emailed code out of the mocked sender. */
 function lastEmailedCode(): string {
   const call = mockSendCode.mock.calls.at(-1);
@@ -110,6 +138,9 @@ describe('user exports router guards and serialization', () => {
     expect(
       __test__.serialize({
         id: 'f477a317-7f63-4ab0-b5cc-0066b8b7478d',
+        subject_type: 'user',
+        organization_id: null,
+        organization_name: null,
         status: 'ready',
         requested_at: '2026-08-08 12:00:00+00',
         started_at: null,
@@ -220,6 +251,370 @@ describe('user exports router guards and serialization', () => {
     // A still-downloadable ready export must not short-circuit a new request.
     expect(requested.id).not.toBe(ready.id);
     expect(requested.status).toBe('queued');
+  });
+
+  it('records the organization as the subject, leaving the requester as who asked', async () => {
+    const organization = await createTestOrganization('Export Org Subject', owner.id, 0);
+    const caller = await createCallerForUser(owner.id);
+
+    const requested = await caller.userExports.requestOrganization({
+      organizationId: organization.id,
+    });
+
+    expect(requested.subjectType).toBe('organization');
+    expect(requested.organizationId).toBe(organization.id);
+    const [row] = await db
+      .select({
+        subjectType: user_data_exports.subject_type,
+        organizationId: user_data_exports.organization_id,
+        kiloUserId: user_data_exports.kilo_user_id,
+      })
+      .from(user_data_exports)
+      .where(eq(user_data_exports.id, requested.id));
+    // The requester is recorded, but the subject is the organization. Confusing the two
+    // is what would make an organization export return the admin's own rows.
+    expect(row).toEqual({
+      subjectType: 'organization',
+      organizationId: organization.id,
+      kiloUserId: owner.id,
+    });
+  });
+
+  // The two subjects are tracked separately, so a personal export generating must not
+  // consume the organization's slot or vice versa.
+  it('allows a personal and an organization export to be active at once', async () => {
+    const organization = await createTestOrganization('Export Org Parallel', owner.id, 0);
+    const caller = await createCallerForUser(owner.id);
+
+    const personal = await caller.userExports.request();
+    const organizationExport = await caller.userExports.requestOrganization({
+      organizationId: organization.id,
+    });
+
+    expect(personal.id).not.toBe(organizationExport.id);
+    expect(personal.status).toBe('queued');
+    expect(organizationExport.status).toBe('queued');
+  });
+
+  // Keyed on the organization rather than the requester, so a second admin pressing the
+  // button joins the export already running instead of generating a duplicate copy.
+  it('returns the in-flight organization export rather than starting a second', async () => {
+    const organization = await createTestOrganization('Export Org Single', owner.id, 0);
+    const caller = await createCallerForUser(owner.id);
+
+    const first = await caller.userExports.requestOrganization({
+      organizationId: organization.id,
+    });
+    const second = await caller.userExports.requestOrganization({
+      organizationId: organization.id,
+    });
+
+    expect(second.id).toBe(first.id);
+    const rows = await db
+      .select({ id: user_data_exports.id })
+      .from(user_data_exports)
+      .where(eq(user_data_exports.organization_id, organization.id));
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lists an organization export alongside personal ones and labels each', async () => {
+    const organization = await createTestOrganization('Export Org Listing', owner.id, 0);
+    const caller = await createCallerForUser(owner.id);
+    await caller.userExports.request();
+    await caller.userExports.requestOrganization({ organizationId: organization.id });
+
+    const result = await caller.userExports.list();
+
+    expect(
+      result.exports.map(record => [record.subjectType, record.organizationName]).sort()
+    ).toEqual([
+      ['organization', 'Export Org Listing'],
+      ['user', null],
+    ]);
+  });
+
+  it('offers only organizations the caller may export', async () => {
+    const organization = await createTestOrganization('Export Org Offered', owner.id, 0);
+
+    const result = await (
+      await createCallerForUser(owner.id)
+    ).userExports.exportableOrganizations();
+
+    expect(result.organizations).toEqual(
+      expect.arrayContaining([{ id: organization.id, name: 'Export Org Offered' }])
+    );
+  });
+
+  // An owner of a parent organization inherits access to its children, so the request
+  // path accepts a child the caller has no direct membership in. Offering only direct
+  // memberships would let that request succeed and then leave the export invisible.
+  // The listing query and the enforcement predicate are written differently — a UNION
+  // for the list, the shared EXISTS fragment for the check — because the listing is
+  // driven from the caller's memberships for cost. Different shapes can drift, and the
+  // failure that produces is silent: an organization offered but refused, or refused but
+  // offered. This walks the whole role and inheritance matrix and asserts they agree.
+  it.each([
+    ['owner', true],
+    ['admin', true],
+    ['member', false],
+    ['billing_manager', false],
+  ] as const)('offers and admits a direct %s consistently', async (role, allowed) => {
+    const organization = await createTestOrganization(`Export Org Role ${role}`, stranger.id, 0);
+    const actor = await insertTestUser({
+      google_user_email: `data-export-role-${role}@admin.example.com`,
+      is_admin: true,
+    });
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: actor.id,
+      role,
+    });
+    const caller = await createCallerForUser(actor.id);
+
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id).includes(organization.id)).toBe(allowed);
+
+    const request = caller.userExports.requestOrganization({ organizationId: organization.id });
+    if (allowed) await expect(request).resolves.toMatchObject({ subjectType: 'organization' });
+    else await expect(request).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it.each([
+    ['owner', true],
+    ['admin', true],
+    ['member', false],
+  ] as const)('offers and admits a parent-organization %s consistently', async (role, allowed) => {
+    const parent = await createTestOrganization(`Export Parent ${role}`, stranger.id, 0);
+    const child = await createTestOrganization(`Export Child ${role}`, stranger.id, 0);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    const actor = await insertTestUser({
+      google_user_email: `data-export-parent-${role}@admin.example.com`,
+      is_admin: true,
+    });
+    await db.insert(organization_memberships).values({
+      organization_id: parent.id,
+      kilo_user_id: actor.id,
+      role,
+    });
+    const caller = await createCallerForUser(actor.id);
+
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id).includes(child.id)).toBe(allowed);
+
+    const request = caller.userExports.requestOrganization({ organizationId: child.id });
+    if (allowed) await expect(request).resolves.toMatchObject({ subjectType: 'organization' });
+    else await expect(request).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  // A regular member of the organization exports their own data and nothing else. They
+  // are not an owner or admin, so the organization's export is not theirs to request,
+  // and an admin colleague's export is not theirs to see.
+  it('gives a regular organization member no reach beyond their own data', async () => {
+    const organization = await createTestOrganization('Export Org Member', owner.id, 0);
+    const member = await insertTestUser({
+      google_user_email: 'data-export-member@admin.example.com',
+      is_admin: true,
+    });
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: member.id,
+      role: 'member',
+    });
+    const caller = await createCallerForUser(member.id);
+
+    // No organization offered, so no button to press.
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
+
+    // And naming it directly does not work either.
+    await expect(
+      caller.userExports.requestOrganization({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    // The organization's export and an admin's personal export are both invisible, and
+    // neither is downloadable.
+    const organizationExportId = await insertReadyOrganizationExport(owner.id, organization.id);
+    const adminPersonalExportId = await insertReadyExport(owner.id);
+    const listed = await caller.userExports.list();
+    expect(listed.exports.map(record => record.id)).not.toContain(organizationExportId);
+    expect(listed.exports.map(record => record.id)).not.toContain(adminPersonalExportId);
+
+    for (const exportId of [organizationExportId, adminPersonalExportId]) {
+      await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    }
+
+    // Their own export still works.
+    const own = await caller.userExports.request();
+    expect(own.subjectType).toBe('user');
+  });
+
+  // A Kilo employee with /admin access is not a member of the customer's organization
+  // and may not export it. `ensureOrganizationAccess`, which the other organization
+  // routers use, would grant them owner here purely on is_admin — so this router checks
+  // membership itself, and this is the test that says why.
+  it('refuses a Kilo admin who is not a member of the organization', async () => {
+    const organization = await createTestOrganization('Export Org Staff', stranger.id, 0);
+    const kiloStaff = await insertTestUser({
+      google_user_email: 'data-export-staff@admin.example.com',
+      is_admin: true,
+    });
+    const caller = await createCallerForUser(kiloStaff.id);
+
+    await expect(
+      caller.userExports.requestOrganization({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    // Nor by way of an export that already exists: the download path must refuse it too.
+    const exportId = await insertReadyOrganizationExport(stranger.id, organization.id);
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    // And it is not offered to them in the first place.
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
+  });
+
+  // Membership rows outlive a soft-deleted organization, so a former admin can still
+  // name its id directly even though it never appears in the offered list.
+  it('refuses to export a soft-deleted organization', async () => {
+    const organization = await createTestOrganization('Export Org Deleted', owner.id, 0);
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    const caller = await createCallerForUser(owner.id);
+
+    // UNAUTHORIZED rather than NOT_FOUND: existence and permission are settled in one
+    // query, and answering them separately would tell a non-member whether an
+    // organization id is real.
+    await expect(
+      caller.userExports.requestOrganization({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    const offered = await caller.userExports.exportableOrganizations();
+    expect(offered.organizations.map(item => item.id)).not.toContain(organization.id);
+  });
+
+  // The download path answers on an export id the caller supplied, so an authorization
+  // failure must be indistinguishable from a missing export. UNAUTHORIZED would confirm
+  // the id exists.
+  it('reports an inaccessible organization export as not found, not unauthorized', async () => {
+    const organization = await createTestOrganization('Export Org Hidden', stranger.id, 0);
+    const exportId = await insertReadyOrganizationExport(stranger.id, organization.id);
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('offers a child organization reached through a parent organization role', async () => {
+    const parent = await createTestOrganization('Export Org Parent', owner.id, 0);
+    const child = await createTestOrganization('Export Org Child', stranger.id, 0);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+
+    const caller = await createCallerForUser(owner.id);
+    const offered = await caller.userExports.exportableOrganizations();
+
+    expect(offered.organizations.map(organization => organization.id)).toEqual(
+      expect.arrayContaining([parent.id, child.id])
+    );
+
+    // The export requested on that inherited access is listed back to the requester.
+    const requested = await caller.userExports.requestOrganization({ organizationId: child.id });
+    const listed = await caller.userExports.list();
+    expect(listed.exports.map(record => record.id)).toContain(requested.id);
+  });
+
+  // The database refuses a subject it could not scope a query on, independently of the
+  // router. A job reaching the generator as 'organization' with no id would otherwise
+  // have to be caught at read time, after the export had already been admitted.
+  it('rejects an export whose subject and organization disagree', async () => {
+    await expect(
+      db.insert(user_data_exports).values({
+        kilo_user_id: owner.id,
+        snapshot_at: new Date().toISOString(),
+        subject_type: 'organization',
+        organization_id: null,
+      })
+    ).rejects.toThrow();
+
+    const organization = await createTestOrganization('Export Org Shape', owner.id, 0);
+    await expect(
+      db.insert(user_data_exports).values({
+        kilo_user_id: owner.id,
+        snapshot_at: new Date().toISOString(),
+        subject_type: 'user',
+        organization_id: organization.id,
+      })
+    ).rejects.toThrow();
+  });
+
+  // The cursor names a row by id, so it has to be resolved under the caller's own
+  // visibility. An unscoped lookup would page the caller's rows relative to a row they
+  // cannot see, turning the cursor into an ordering oracle over other people's exports.
+  it('ignores a cursor naming an export the caller cannot see', async () => {
+    const [hidden] = await db
+      .insert(user_data_exports)
+      .values({ kilo_user_id: stranger.id, snapshot_at: new Date().toISOString() })
+      .returning({ id: user_data_exports.id });
+    await db.insert(user_data_exports).values({
+      kilo_user_id: owner.id,
+      snapshot_at: new Date().toISOString(),
+    });
+
+    const caller = await createCallerForUser(owner.id);
+    const unpaged = await caller.userExports.list();
+    const paged = await caller.userExports.list({ cursor: hidden.id });
+
+    expect(unpaged.exports).toHaveLength(1);
+    // Fails closed: an unresolvable cursor yields NULL and matches nothing, rather than
+    // silently restarting at the first page.
+    expect(paged.exports).toHaveLength(0);
+  });
+
+  // The download gate scopes personal exports on kilo_user_id. An organization's
+  // export belongs to the organization rather than to whoever pressed the button, so
+  // it has to be reachable by an authorised colleague — scoping it the same way would
+  // report it as missing to everyone but the requester.
+  it('emails a download code for an organization export to an authorized colleague', async () => {
+    const organization = await createTestOrganization('Export Org Download', owner.id, 0);
+    const colleague = await insertTestUser({
+      google_user_email: 'data-export-colleague@admin.example.com',
+      is_admin: true,
+    });
+    // A real membership, not staff status. Kilo admin alone must not reach this export,
+    // which is what the test below asserts.
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: colleague.id,
+      role: 'admin',
+    });
+    const exportId = await insertReadyOrganizationExport(owner.id, organization.id);
+
+    const caller = await createCallerForUser(colleague.id);
+    const result = await caller.userExports.requestDownloadCode({ exportId });
+
+    expect(result.challengeId).toBeDefined();
+    // Delivered to whoever is downloading, not to whoever requested the export.
+    expect(mockSendCode).toHaveBeenCalledWith(
+      'data-export-colleague@admin.example.com',
+      expect.anything()
+    );
   });
 
   it('emails a download code without ever returning it to the caller', async () => {

@@ -6,18 +6,90 @@ export type ExportRecord = {
   field: string;
   value: string | number | boolean | null;
   id?: string;
+  /**
+   * Present, and always `true`, on a row prod has deleted since the snapshot.
+   *
+   * The export returns deleted rows rather than hiding them — it is a truthful copy of
+   * what the warehouse holds about someone, not a view of what prod still serves — so
+   * this labels them instead of filtering them. Only a positive deletion says anything:
+   * a live row and a row whose state is unknown both carry no property at all, because
+   * the warehouse cannot tell those two apart. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+   */
+  softDeleted?: true;
 };
+
+/**
+ * The warehouse is a CDC copy and keeps rows prod has deleted. Tables reloaded after
+ * 2026-08-12 carry `_snowflake_deleted` to mark them; the rest cannot say.
+ *
+ * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
+ * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
+ * `event_type` instead, and `users` has no CDC column. Naming the column on any of them
+ * is a runtime error, so records from those sources are never labelled.
+ */
+export const DELETED_COLUMN = '_snowflake_deleted';
+export const SOURCES_WITHOUT_DELETED_COLUMN = [
+  'microdollar_usage_metadata',
+  'cli_sessions',
+  'users',
+] as const;
+
+/**
+ * `softDeleted: true`, or nothing at all.
+ *
+ * Only `true` is meaningful. The column is NULL throughout on a table whose reload has
+ * not run yet, and NULL means unknown rather than live, so an absent property covers
+ * both "not deleted" and "cannot say" — which is the honest reading of the data.
+ */
+function deletionMark(value: unknown): { softDeleted: true } | Record<string, never> {
+  return value === true ? { softDeleted: true } : {};
+}
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
 export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
 
+/**
+ * Whose data an export contains, which is not the same as who asked for it.
+ *
+ * A user subject selects everything that individual owns, across their personal
+ * workspace and any organization workspace they worked in. An organization subject
+ * selects the rows carrying that organization's id, which is its workspace: work its
+ * members did there, and never what those same members did in their own personal
+ * workspace (`organization_id IS NULL`).
+ *
+ * The two overlap on work done inside an organization, deliberately. That work is both
+ * the organization's and the person's.
+ *
+ * Membership is not part of the subject. The organization tag is on the row itself, so
+ * selection never needs a member list: rows from someone who has since left are still
+ * the organization's, and a current member's personal workspace still is not. Membership
+ * decides only whether the requester may ask, which is settled before a job is created.
+ */
+export type ExportSubject =
+  | { type: 'user'; kiloUserId: string }
+  | { type: 'organization'; organizationId: string };
+
+/** The single bind value that scopes every query for a subject. */
+export function subjectScopeValue(subject: ExportSubject): string {
+  return subject.type === 'user' ? subject.kiloUserId : subject.organizationId;
+}
+
 export type SourceAdapter = {
   name: string;
   disabledReason?: string;
+  /**
+   * The warehouse table this source reads, checked for existence before the export
+   * starts. The warehouse is loaded table by table and the export is released ahead of
+   * that, so a source can legitimately name a table that does not exist yet.
+   *
+   * Distinct from `name`, which is what the export file calls the section. They agree
+   * for most sources but not for the identity one, which reads `users`.
+   */
+  warehouseTable?: string;
   /** Overrides the caller's default page size. Set where rows are large. */
   pageSize?: number;
   readPage?: (input: {
-    kiloUserId: string;
+    subject: ExportSubject;
     snapshotAt: string;
     cursor: ExportCursor | null;
     limit: number;
@@ -77,48 +149,110 @@ WHERE user_id = $1
 LIMIT 1`;
 
 /**
- * Every warehouse query below is scoped by `kilo_user_id = $1` and ordered on the
- * columns its index already covers, so a page is served without a sort step.
+ * Every warehouse query below is scoped by a single owner column — `kilo_user_id` or
+ * `organization_id` — and ordered on the columns its index already covers, so a page is
+ * served from the index with no sort step.
  *
- * `kilo_user_id = $1` never matches SQL NULL, which is what excludes org-owned rows.
- * Those carry a NULL owner in the warehouse and belong to no individual's export.
- * Org coverage is a separate piece of work.
+ * Where a cursor column is selected through a cast, the ORDER BY names it
+ * TABLE-QUALIFIED. That is load-bearing, not style. A bare name in ORDER BY resolves to a
+ * matching SELECT-list output column before it resolves to an input column, so
+ * `ORDER BY most_significant_position` binds to `most_significant_position::text AS
+ * most_significant_position` — the text cast — and not to the bigint column. Two things
+ * broke as a result, and both are silent:
+ *
+ *   - The page was ordered lexicographically while the cursor tuple in the WHERE clause
+ *     compared numerically (WHERE cannot see output aliases). A page's last row was
+ *     therefore not its numeric maximum, and the next page's `>` skipped whatever the
+ *     text order had deferred — the same row loss the composite cursors below exist to
+ *     prevent. Verified live: on `system_prompt_prefix`, 263 org-scoped rows sort
+ *     differently under the two orderings.
+ *   - No btree can serve a text ordering of a bigint column, so every page bitmap-scanned
+ *     and sorted the whole owner's rowset. Measured on a 115k-row organization:
+ *     116,522 startup cost per page against 0.42 for the qualified form, because nothing
+ *     could be returned until all of that owner's rows had been scanned and sorted.
+ *
+ * A qualified name, or any expression such as the `COALESCE` below, is read as an input
+ * reference, which is what both the index and the cursor comparison are built on.
+ *
+ * Neither predicate matches SQL NULL. That bounds each query to one subject, but the two
+ * subjects are deliberately NOT disjoint, and a comment claiming otherwise was wrong.
+ *
+ * A person works in their personal workspace (`organization_id IS NULL`) and in the
+ * workspace of any organization they belong to. `kilo_user_id = $1` returns everything
+ * they own across both, which is the intent: their export is their work, wherever they
+ * did it. `organization_id = $1` returns the organization's workspace only, so a
+ * member's personal workspace never appears in it.
+ *
+ * A row someone created in an organization's workspace therefore belongs to both
+ * exports. That overlap is correct rather than a leak.
+ *
+ * The warehouse expresses this two ways, and only one of them is exclusive. Measured
+ * 2026-08-13, counting rows carrying an organization but no user:
+ *
+ *     app_builder_projects          2,143    user XOR org
+ *     app_builder_messages        266,095    user XOR org
+ *     cli_sessions                      0    both columns set
+ *     system_prompt_prefix              0    both columns set
+ *     microdollar_usage_metadata        0    both columns set
+ *
+ * On the first two, an organization can own a row outright with no user attached, so
+ * `kilo_user_id = $1` genuinely skips those. On the other three every row names a user,
+ * so an organization-workspace row matches both predicates. Both outcomes are intended;
+ * the difference is in what the source model records, not in the export's rules.
  *
  * The warehouse has no `created_at` on any table and is itself a point-in-time
  * snapshot, so there is no `snapshot_at` bound to apply here.
  */
+export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
+
 /**
- * A single-key keyset page, defined once so a change to the predicate cannot reach
- * some sources and miss others.
+ * A keyset page over a table whose own `id` is unique, defined once so a change to the
+ * predicate cannot reach some sources and miss others.
  *
- * `table`, `columns` and `key` are module constants below, never caller input. The
- * user id and the cursor are always bind parameters, so nothing user-supplied is
- * interpolated into the statement.
+ * The cursor column is fixed at `id` rather than parameterised: every source that once
+ * needed a different key now has its own builder, because each turned out to need a
+ * composite cursor rather than a differently named single one.
+ *
+ * `table`, `columns` and `scope` are module constants below, never caller input; `scope`
+ * in particular is indexed out of `SCOPE_COLUMNS` rather than passed as a string, so no
+ * call site can name a column of its own. The subject id and the cursor are always bind
+ * parameters, so nothing user-supplied is interpolated.
  */
 function singleKeyPageQuery(input: {
   table: string;
   columns: string;
-  key?: string;
-  keyType?: 'text' | 'bigint';
+  scope: keyof typeof SCOPE_COLUMNS;
 }): string {
-  const key = input.key ?? 'id';
-  const keyType = input.keyType ?? 'text';
   return `SELECT ${input.columns}
 FROM ${input.table}
-WHERE kilo_user_id = $1
-  AND ($2::${keyType} IS NULL OR ${key} > $2::${keyType})
-ORDER BY ${key}
+WHERE ${SCOPE_COLUMNS[input.scope]} = $1
+  AND ($2::text IS NULL OR id > $2::text)
+ORDER BY id
 LIMIT $3`;
 }
 
-const projectQuery = singleKeyPageQuery({
+/**
+ * Both subject variants of one source, so an adapter picks by subject type rather than
+ * branching on a predicate it assembles itself.
+ */
+function subjectPageQueries(input: {
+  table: string;
+  columns: string;
+}): Record<ExportSubject['type'], string> {
+  return {
+    user: singleKeyPageQuery({ ...input, scope: 'user' }),
+    organization: singleKeyPageQuery({ ...input, scope: 'organization' }),
+  };
+}
+
+const projectQueries = subjectPageQueries({
   table: 'app_builder_projects',
-  columns: 'id, title',
+  columns: 'id, title, _snowflake_deleted',
 });
 
-const messageQuery = singleKeyPageQuery({
+const messageQueries = subjectPageQueries({
   table: 'app_builder_messages',
-  columns: 'id, data',
+  columns: 'id, data, _snowflake_deleted',
 });
 
 /**
@@ -133,16 +267,27 @@ const messageQuery = singleKeyPageQuery({
  * had. Each record is keyed by its journal position so repeated values read as a
  * timeline instead of looking like duplication, and session_id is exported so rows
  * belonging to one session can be grouped.
+ *
+ * The ORDER BY must stay table-qualified: both position columns are selected through a
+ * `::text` cast under their own names, so a bare name there sorts the page as text while
+ * the cursor above compares as bigint. See the note on `SCOPE_COLUMNS`.
  */
-const cliSessionQuery = `SELECT session_id, title, git_url, git_branch,
+function cliSessionPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT session_id, title, git_url, git_branch,
   most_significant_position::text AS most_significant_position,
   least_significant_position::text AS least_significant_position
 FROM cli_sessions
-WHERE kilo_user_id = $1
+WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
     OR (most_significant_position, least_significant_position) > ($2::bigint, $3::bigint))
-ORDER BY most_significant_position, least_significant_position
+ORDER BY cli_sessions.most_significant_position, cli_sessions.least_significant_position
 LIMIT $4`;
+}
+
+const cliSessionQueries: Record<ExportSubject['type'], string> = {
+  user: cliSessionPageQuery('user'),
+  organization: cliSessionPageQuery('organization'),
+};
 
 /**
  * System prompts and user prompts ship as two independent sets.
@@ -161,14 +306,56 @@ LIMIT $4`;
  * Decided deliberately: the export lists every system prompt the user used and
  * every prompt they wrote, with no correspondence between the two.
  */
-const systemPromptQuery = singleKeyPageQuery({
-  table: 'system_prompt_prefix',
-  columns: 'system_prompt_prefix_id::text AS system_prompt_prefix_id, system_prompt_prefix',
-  key: 'system_prompt_prefix_id',
-  keyType: 'bigint',
-});
+/**
+ * The grain of this table is the triple `(prefix id, user, org)`, not the prefix, so
+ * `system_prompt_prefix_id` alone repeats and cannot be the cursor.
+ *
+ * Measured 2026-08-12: user `05d920e4` carries prefix id 2 twice, once with an
+ * organization and once without, and one organization carries prefix id 1 nine times.
+ * A single-column cursor pages with `id > $cursor`, so every duplicate that landed on a
+ * page boundary was silently dropped — the same defect found in `cli_sessions.session_id`.
+ *
+ * The remaining dimension of the triple therefore joins the cursor, and which one that
+ * is depends on the scope: a user's export varies by organization, an organization's
+ * export varies by user.
+ *
+ * The COALESCE is required, not cosmetic: a user's personal rows carry a NULL
+ * organization, and a NULL inside a tuple comparison yields NULL rather than false, so
+ * an uncoalesced cursor would drop exactly the rows this exists to keep.
+ *
+ * `-` rather than `''` as the substitute. Both sort before any id, and the dbt export
+ * normalises '' to NULL so neither collides with a real value — but `KeyCursorSchema`
+ * requires non-empty strings, and an empty cursor value would be rejected on resume and
+ * silently restart the source.
+ *
+ * `system_prompt_prefix_id` is table-qualified in the ORDER BY for the reason recorded on
+ * `SCOPE_COLUMNS`: it is selected through a `::text` cast under its own name, and this is
+ * the table where the two orderings provably disagree on live data. The `COALESCE` needs
+ * no qualifier — an expression is already read as an input reference — and it matches the
+ * expression index the warehouse carries for this ordering.
+ */
+const NULL_CURSOR_SENTINEL = '-';
+function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  // The dimension the scope does not already pin: scoping by user leaves org varying,
+  // and scoping by org leaves user varying.
+  const cursorColumn = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  return `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
+  COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}') AS cursor_secondary,
+  system_prompt_prefix, _snowflake_deleted
+FROM system_prompt_prefix
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::bigint IS NULL
+    OR (system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')) > ($2::bigint, $3::text))
+ORDER BY system_prompt_prefix.system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')
+LIMIT $4`;
+}
 
-const userPromptQuery = singleKeyPageQuery({
+const systemPromptQueries: Record<ExportSubject['type'], string> = {
+  user: systemPromptPageQuery('user'),
+  organization: systemPromptPageQuery('organization'),
+};
+
+const userPromptQueries = subjectPageQueries({
   table: 'microdollar_usage_metadata',
   columns: 'id, user_prompt_prefix',
 });
@@ -177,8 +364,8 @@ const userPromptQuery = singleKeyPageQuery({
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
 
-type ProjectRow = { id: string; title: string | null };
-type MessageRow = { id: string; data: unknown };
+type ProjectRow = { id: string; title: string | null; deleted: unknown };
+type MessageRow = { id: string; data: unknown; deleted: unknown };
 type CliSessionRow = {
   session_id: string | null;
   title: string | null;
@@ -187,7 +374,12 @@ type CliSessionRow = {
   most_significant_position: string;
   least_significant_position: string;
 };
-type SystemPromptRow = { system_prompt_prefix_id: string; system_prompt_prefix: string | null };
+type SystemPromptRow = {
+  system_prompt_prefix_id: string;
+  cursor_secondary: string;
+  system_prompt_prefix: string | null;
+  deleted: unknown;
+};
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
 
 function requiredString(value: unknown, field: string): string {
@@ -348,11 +540,19 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
   return [
     {
       name: 'kilocode_users',
+      // Reads the warehouse's `users`, not a table of its own name.
+      warehouseTable: 'users',
       async readPage(input): Promise<SourcePage> {
         if (input.cursor) return { records: [], nextCursor: null };
+        // Identity is a property of a person, and the warehouse holds no organization
+        // record at all — it has no `organizations` table, and `users` has no org
+        // column. An organization export therefore has no identity section; the
+        // organization it belongs to is named in the file header instead.
+        if (input.subject.type !== 'user') return { records: [], nextCursor: null };
+        const { kiloUserId } = input.subject;
         const [rows, profileRows] = await Promise.all([
-          replicaQuery(userQuery, [input.kiloUserId]),
-          warehouseQuery(warehouseProfileQuery, [input.kiloUserId]),
+          replicaQuery(userQuery, [kiloUserId]),
+          warehouseQuery(warehouseProfileQuery, [kiloUserId]),
         ]);
         const row = rows[0];
         if (!row) throw new Error('Export user was not found');
@@ -395,23 +595,27 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'app_builder_projects',
+      warehouseTable: 'app_builder_projects',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: ProjectRow[] = await warehouseQuery(projectQuery, [
-          input.kiloUserId,
+        const rows: ProjectRow[] = await warehouseQuery(projectQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           after,
           input.limit,
         ]).then(result =>
           result.map(row => ({
             id: requiredString(row.id, 'id'),
             title: nullableString(row.title, 'title'),
+            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.map(row => ({
             source: 'app_builder_projects',
+            id: row.id,
             field: 'title',
             value: row.title,
+            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
@@ -419,15 +623,20 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'app_builder_messages',
+      warehouseTable: 'app_builder_messages',
       pageSize: MESSAGE_PAGE_SIZE,
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: MessageRow[] = await warehouseQuery(messageQuery, [
-          input.kiloUserId,
+        const rows: MessageRow[] = await warehouseQuery(messageQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           after,
           input.limit,
         ]).then(result =>
-          result.map(row => ({ id: requiredString(row.id, 'id'), data: row.data }))
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            data: row.data,
+            deleted: row._snowflake_deleted,
+          }))
         );
         return {
           records: rows.map(row => ({
@@ -435,6 +644,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             id: row.id,
             field: 'data',
             value: jsonValue(row.data),
+            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
@@ -442,10 +652,11 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'cli_sessions',
+      warehouseTable: 'cli_sessions',
       async readPage(input): Promise<SourcePage> {
         const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
-        const rows: CliSessionRow[] = await warehouseQuery(cliSessionQuery, [
-          input.kiloUserId,
+        const rows: CliSessionRow[] = await warehouseQuery(cliSessionQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           afterMost,
           afterLeast,
           input.limit,
@@ -486,37 +697,50 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     },
     {
       name: 'system_prompt_prefix',
+      warehouseTable: 'system_prompt_prefix',
       async readPage(input): Promise<SourcePage> {
-        const [after] = keyCursorValues(input.cursor, 1);
-        const rows: SystemPromptRow[] = await warehouseQuery(systemPromptQuery, [
-          input.kiloUserId,
-          after,
-          input.limit,
-        ]).then(result =>
+        const [afterId, afterSecondary] = keyCursorValues(input.cursor, 2);
+        const rows: SystemPromptRow[] = await warehouseQuery(
+          systemPromptQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterId, afterSecondary, input.limit]
+        ).then(result =>
           result.map(row => ({
             system_prompt_prefix_id: digitString(
               row.system_prompt_prefix_id,
               'system_prompt_prefix_id'
             ),
+            // COALESCE in the query means this is '' rather than null on a personal row,
+            // so the cursor always has a comparable value to carry forward.
+            cursor_secondary: requiredString(row.cursor_secondary, 'cursor_secondary'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
+            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.map(row => ({
             source: 'system_prompt_prefix',
+            // The prefix id repeats across the triple, so it cannot identify a row on
+            // its own. The pair that orders the page does, and it is what a deletion
+            // mark has to hang off to mean anything.
+            id: `${row.system_prompt_prefix_id}.${row.cursor_secondary}`,
             field: 'system_prompt_prefix',
             value: row.system_prompt_prefix,
+            ...deletionMark(row.deleted),
           })),
-          nextCursor: nextKeyCursor(rows, input.limit, row => [row.system_prompt_prefix_id]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.system_prompt_prefix_id,
+            row.cursor_secondary,
+          ]),
         };
       },
     },
     {
       name: 'microdollar_usage_metadata',
+      warehouseTable: 'microdollar_usage_metadata',
       async readPage(input): Promise<SourcePage> {
         const [after] = keyCursorValues(input.cursor, 1);
-        const rows: UserPromptRow[] = await warehouseQuery(userPromptQuery, [
-          input.kiloUserId,
+        const rows: UserPromptRow[] = await warehouseQuery(userPromptQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
           after,
           input.limit,
         ]).then(result =>
@@ -540,48 +764,208 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
 }
 
 /**
- * Owned-row warehouse queries: every one filters on `kilo_user_id = $1`, which
- * excludes NULL-owned (organization) rows by construction. `userQuery` is scoped
- * differently (`id = $1`, the user's own row rather than a row it owns) and is not
- * part of this map.
+ * Owned-row warehouse queries, both subject variants of each.
+ *
+ * The user variant filters on `kilo_user_id = $1` and returns everything that person
+ * owns, in their personal workspace and in any organization workspace they worked in.
+ * It skips rows an organization owns outright with no user attached, which exist only on
+ * `app_builder_projects` and `app_builder_messages`.
+ *
+ * The organization variant filters on `organization_id = $1`, which returns that
+ * organization's workspace and never a member's personal workspace, since the predicate
+ * cannot match SQL NULL.
+ *
+ * The two therefore overlap on work done inside an organization, by design. See the note
+ * on `SCOPE_COLUMNS` for the measured counts.
+ *
+ * `userQuery` is scoped differently (`id = $1`, the user's own row rather than a row it
+ * owns) and is not part of this map.
  */
 export const warehouseQueries = {
-  projectQuery,
-  messageQuery,
-  cliSessionQuery,
-  systemPromptQuery,
-  userPromptQuery,
+  projectUserQuery: projectQueries.user,
+  projectOrgQuery: projectQueries.organization,
+  messageUserQuery: messageQueries.user,
+  messageOrgQuery: messageQueries.organization,
+  cliSessionUserQuery: cliSessionQueries.user,
+  cliSessionOrgQuery: cliSessionQueries.organization,
+  systemPromptUserQuery: systemPromptQueries.user,
+  systemPromptOrgQuery: systemPromptQueries.organization,
+  userPromptUserQuery: userPromptQueries.user,
+  userPromptOrgQuery: userPromptQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
 
 /**
- * The only predicates that scope a query to a single user. `kilo_user_id = $1` matches
- * rows the user owns; `id = $1` and `user_id = $1` match the user's own profile row on
- * the primary and in the warehouse respectively, which name the same column differently.
- * All three take the authenticated user id as their sole bind parameter, and none can
- * match SQL NULL, which is what keeps org-owned rows out.
+ * Which of the tables an export wants are actually readable by it.
+ *
+ * The warehouse is loaded incrementally and the export ships ahead of it, so a source
+ * naming a table that has not landed yet is an expected state rather than a fault. Asked
+ * once per export, before anything is written, so the header can name what is missing
+ * instead of the file simply ending early.
+ *
+ * Existence of the table is not sufficient. A table can be present from an earlier load
+ * and still lack a column a newer query selects — `_snowflake_deleted` arrived table by
+ * table, and a source selecting it against a not-yet-reloaded table fails at read time
+ * with an undefined-column error rather than being classified unavailable. So this asks
+ * about columns, and a source counts as present only when every column it requires is
+ * there.
+ *
+ * Reads `information_schema` rather than probing with a real query: a probe that fails
+ * is indistinguishable from a table that exists but is momentarily unreadable, and this
+ * has to be a fact about the schema alone.
+ */
+export const warehouseColumnProbeQuery = `SELECT table_name, column_name
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = ANY($1::text[])`;
+
+export type WarehouseTableRequirement = { table: string; requiredColumns: readonly string[] };
+
+/**
+ * Every warehouse column each source reads, including the ones it only filters or
+ * orders on. Declared rather than parsed out of the query text, because the probe has to
+ * be exact: a column omitted here is one the export will select from a table it has just
+ * declared present.
+ *
+ * The scope column is deliberately NOT listed here. It is added per subject below,
+ * because requiring both would let a table missing `organization_id` be withheld from
+ * personal exports too — dropping a section from an export that could have been served
+ * perfectly well from `kilo_user_id`.
+ *
+ * `users` is scoped by `user_id`, which is one of its own columns rather than a scope
+ * column, so it takes no addition.
+ */
+export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
+  users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS)],
+  app_builder_projects: ['id', 'title', DELETED_COLUMN],
+  app_builder_messages: ['id', 'data', DELETED_COLUMN],
+  cli_sessions: [
+    'session_id',
+    'title',
+    'git_url',
+    'git_branch',
+    'most_significant_position',
+    'least_significant_position',
+  ],
+  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix', DELETED_COLUMN],
+  microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
+};
+
+/** Sources filtered by a scope column, as opposed to one of their own keys. */
+const SUBJECT_SCOPED_TABLES = new Set(
+  Object.keys(WAREHOUSE_SOURCE_COLUMNS).filter(table => table !== 'users')
+);
+
+/**
+ * The probe input for a set of adapters, for one subject.
+ *
+ * Subject-dependent because the two scopes read different owner columns, and a table
+ * that can serve one is usable for that one even if it cannot serve the other.
+ *
+ * `system_prompt_prefix` is the exception: its cursor reads the opposite scope column
+ * as its second key, so it needs both whichever subject is asking. That does couple the
+ * personal export to a column only the organization export filters on — deliberately.
+ * The alternative, falling back to a single-column cursor when `organization_id` is
+ * absent, would page on a key that repeats and silently skip rows at page boundaries,
+ * which is the defect the composite cursor exists to fix. A source correctly reported
+ * as unavailable beats a section that quietly omits prompts.
+ *
+ * Both columns were confirmed present on the warehouse table on 2026-08-12, so this is
+ * a guard against regression rather than a live constraint.
+ */
+export function warehouseRequirements(
+  adapters: Pick<SourceAdapter, 'warehouseTable'>[],
+  subjectType: ExportSubject['type']
+): WarehouseTableRequirement[] {
+  return adapters
+    .map(adapter => adapter.warehouseTable)
+    .filter((table): table is string => table !== undefined)
+    .map(table => {
+      const declared = WAREHOUSE_SOURCE_COLUMNS[table] ?? [];
+      if (!SUBJECT_SCOPED_TABLES.has(table)) return { table, requiredColumns: declared };
+      const scopeColumns =
+        table === 'system_prompt_prefix'
+          ? [SCOPE_COLUMNS.user, SCOPE_COLUMNS.organization]
+          : [SCOPE_COLUMNS[subjectType]];
+      return { table, requiredColumns: [...scopeColumns, ...declared] };
+    });
+}
+
+export async function findPresentWarehouseTables(
+  warehouseQuery: ReplicaQuery,
+  requirements: WarehouseTableRequirement[]
+): Promise<Set<string>> {
+  if (requirements.length === 0) return new Set();
+  const rows = await warehouseQuery(warehouseColumnProbeQuery, [
+    requirements.map(requirement => requirement.table),
+  ]);
+  const columnsByTable = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const table = requiredString(row.table_name, 'table_name');
+    const column = requiredString(row.column_name, 'column_name');
+    const columns = columnsByTable.get(table) ?? new Set<string>();
+    columns.add(column);
+    columnsByTable.set(table, columns);
+  }
+  return new Set(
+    requirements
+      .filter(requirement => {
+        const columns = columnsByTable.get(requirement.table);
+        // No columns at all means the table itself is absent.
+        if (!columns) return false;
+        return requirement.requiredColumns.every(column => columns.has(column));
+      })
+      .map(requirement => requirement.table)
+  );
+}
+
+/**
+ * The only predicates that scope a query to a single subject. `kilo_user_id = $1`
+ * matches rows one user owns; `organization_id = $1` matches rows one organization
+ * owns; `id = $1` and `user_id = $1` match the user's own profile row on the primary
+ * and in the warehouse respectively, which name the same column differently.
+ *
+ * All four take the subject id as their sole bind parameter, and none can match SQL
+ * NULL. That bounds each query to one subject. It does not make the subjects disjoint,
+ * and is not meant to: work done in an organization's workspace belongs to both that
+ * organization and the person who did it. What the predicates do guarantee is the one
+ * direction that matters, that an organization export can never reach a member's
+ * personal workspace, since those rows carry no organization. See `SCOPE_COLUMNS`.
  *
  * A closed set rather than a free string: a source scoped some other way cannot
  * declare its own predicate and pass the guard below on a technicality. Widening
  * this list is the deliberate, reviewable act that adding such a source requires.
  */
-export const USER_SCOPE_PREDICATES = ['kilo_user_id = $1', 'id = $1', 'user_id = $1'] as const;
-export type UserScopePredicate = (typeof USER_SCOPE_PREDICATES)[number];
+export const SCOPE_PREDICATES = [
+  'kilo_user_id = $1',
+  'organization_id = $1',
+  'id = $1',
+  'user_id = $1',
+] as const;
+export type ScopePredicate = (typeof SCOPE_PREDICATES)[number];
 
 /**
- * The single-user scoping predicate each query in `sourceQueries` must contain,
+ * The single-subject scoping predicate each query in `sourceQueries` must contain,
  * declared beside the queries themselves rather than left to be inferred from
  * which named export a query happens to live in. A query added to `sourceQueries`
  * without an entry here fails the coverage test below, so a new source can't ship
  * unscoped simply by landing outside `warehouseQueries`.
+ *
+ * Each source appears twice, once per subject, and the two must not agree: a query
+ * named `*OrgQuery` scoped on `kilo_user_id` would export the wrong rows to the wrong
+ * requester, which is the failure this table is here to make visible.
  */
-export const sourceQueryScopes: Record<keyof typeof sourceQueries, UserScopePredicate> = {
-  projectQuery: 'kilo_user_id = $1',
-  messageQuery: 'kilo_user_id = $1',
-  cliSessionQuery: 'kilo_user_id = $1',
-  systemPromptQuery: 'kilo_user_id = $1',
-  userPromptQuery: 'kilo_user_id = $1',
+export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicate> = {
+  projectUserQuery: 'kilo_user_id = $1',
+  projectOrgQuery: 'organization_id = $1',
+  messageUserQuery: 'kilo_user_id = $1',
+  messageOrgQuery: 'organization_id = $1',
+  cliSessionUserQuery: 'kilo_user_id = $1',
+  cliSessionOrgQuery: 'organization_id = $1',
+  systemPromptUserQuery: 'kilo_user_id = $1',
+  systemPromptOrgQuery: 'organization_id = $1',
+  userPromptUserQuery: 'kilo_user_id = $1',
+  userPromptOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

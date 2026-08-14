@@ -5,12 +5,16 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsFromRedis,
+  isValidOpenRouterModelId,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
@@ -95,6 +99,9 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/auto-routing-decision');
+jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
+  collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('@/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
   return {
@@ -116,11 +123,13 @@ const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromRedis);
+const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
+const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
@@ -227,6 +236,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['stepfun/step-3.7-flash:free']));
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
@@ -298,7 +308,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
-    const responseTransforms = { thoughtContentMapping: 'extra_content.flags.thought' };
+    const responseTransforms = { mapGeminiThoughtContent: true };
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider: { ...provider, responseTransforms },
@@ -323,6 +333,20 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
     expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toBe(readDb);
+  });
+
+  it('returns 404 when the OpenRouter model id is unknown', async () => {
+    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('not-a-real-model')) as never);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'model_not_found',
+      message: expect.stringContaining("The requested model 'not-a-real-model' does not exist."),
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
@@ -550,6 +574,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: upstreamJsonResponse({
@@ -562,6 +587,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
     // Mock applyResolvedAutoModel to resolve the virtual model and invoke the efficientDecision thunk
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
@@ -865,6 +891,46 @@ describe('kilo-auto/efficient classifier billing', () => {
     );
   });
 
+  it('passes models forbidden by provider access policy to the efficient decision worker', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['google/gemini-2.5-flash']);
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.003,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalled();
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deniedModelIds: ['google/gemini-2.5-flash'],
+      })
+    );
+  });
+
   it('bills classifier cost even when decision is null but cost > 0', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: null,
@@ -898,6 +964,7 @@ describe('auto-routing shadow classifier', () => {
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),

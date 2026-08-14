@@ -81,6 +81,28 @@ async function isLoggingEnabledForUser(
   });
 }
 
+export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
+  const gateway = request.body.providerOptions?.gateway;
+  if (!gateway?.byok) {
+    return sanitizeJsonbValue(request.body);
+  }
+
+  const redactedByok = Object.fromEntries(
+    Object.entries(gateway.byok).map(([provider, credentials]) => [
+      provider,
+      credentials.map(() => ({ apiKey: '[redacted]' })),
+    ])
+  );
+
+  return sanitizeJsonbValue({
+    ...request.body,
+    providerOptions: {
+      ...request.body.providerOptions,
+      gateway: { ...gateway, byok: redactedByok },
+    },
+  });
+}
+
 async function createRequestLogCapture(
   response: Response,
   model: string,
@@ -137,7 +159,7 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: sanitizeJsonbValue(request.body),
+          request: sanitizeApiRequestLogRequest(request),
           response: responseText,
           error: sanitizeJsonbValue(error),
         })
@@ -382,23 +404,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getPropertyPath(target: unknown, path: string): unknown {
-  let current = target;
-  for (const segment of path.split('.')) {
-    if (!isRecord(current)) {
-      return undefined;
-    }
-    current = current[segment];
+function isGeminiThoughtDelta(delta: Record<string, unknown>) {
+  const extraContent = delta.extra_content;
+  if (!isRecord(extraContent)) {
+    return false;
   }
-  return current;
+  const google = extraContent.google;
+  return isRecord(google) && google.thought === true;
 }
 
-function rewriteThoughtContent(delta: unknown, path: string) {
-  if (
-    !isRecord(delta) ||
-    typeof delta.content !== 'string' ||
-    getPropertyPath(delta, path) !== true
-  ) {
+function rewriteGeminiThoughtContent(delta: unknown) {
+  if (!isRecord(delta) || typeof delta.content !== 'string' || !isGeminiThoughtDelta(delta)) {
     return;
   }
 
@@ -495,8 +511,8 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.role === null) {
               delete delta.role;
             }
-            if (responseTransforms?.thoughtContentMapping) {
-              rewriteThoughtContent(delta, responseTransforms.thoughtContentMapping);
+            if (responseTransforms?.mapGeminiThoughtContent) {
+              rewriteGeminiThoughtContent(delta);
             }
           }
 

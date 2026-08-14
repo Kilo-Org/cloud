@@ -50,6 +50,7 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
+  modelDoesNotExistOnOpenRouterResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -97,6 +98,7 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -114,6 +116,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export const maxDuration = 800;
 
@@ -309,42 +312,49 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let classifierCostUsd = 0;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    const efficientDecision =
+    const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
-      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id
-        ? async () => {
-            const { user, authFailedResponse, organizationId } = await authPromise;
-            // The classifier is a paid call on Kilo's own credential. Skip it
-            // for unauthenticated requests: auto-routed models resolve to a
-            // paid model, so an unauthenticated caller is rejected downstream
-            // regardless, and a null decision simply falls back to balanced.
-            // This stops anonymous or abusive traffic from repeatedly spending
-            // Kilo-funded classification with no user to attribute it to.
-            if (!user || authFailedResponse) return null;
-            const { settings, plan } = await balanceAndSettingsPromise;
-            const deniedModelIds =
-              plan === 'enterprise'
-                ? [...new Set(settings?.model_deny_list?.map(normalizeModelId) ?? [])]
-                : undefined;
-            const result = await fetchEfficientAutoDecision({
-              apiKind: requestBodyParsed.kind,
-              body: requestBodyParsed.body,
-              requestedModel,
-              providerHints: autoRoutingProviderHints,
-              bodyBytes: Buffer.byteLength(requestBodyText),
-              userId: user.id,
-              organizationId: organizationId ?? null,
-              sessionId: taskId ?? sessionHeader,
-              machineId: machineIdHeader,
-              clientRequestId,
-              mode: modeHeader,
-              userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
-              deniedModelIds,
-            });
-            classifierCostUsd = result?.costUsd ?? 0;
-            return result?.decision ?? null;
-          }
-        : undefined;
+      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
+    const efficientDecision = isAutoEfficientId
+      ? async () => {
+          const { user, authFailedResponse, organizationId } = await authPromise;
+          // The classifier is a paid call on Kilo's own credential. Skip it
+          // for unauthenticated requests: auto-routed models resolve to a
+          // paid model, so an unauthenticated caller is rejected downstream
+          // regardless, and a null decision simply falls back to balanced.
+          // This stops anonymous or abusive traffic from repeatedly spending
+          // Kilo-funded classification with no user to attribute it to.
+          if (!user || authFailedResponse) return null;
+          const { settings, plan } = await balanceAndSettingsPromise;
+          const deniedFromSettings =
+            plan === 'enterprise' ? (settings?.model_deny_list?.map(normalizeModelId) ?? []) : [];
+          const groupPolicy = await organizationGroupPolicyPromise;
+          const deniedFromPolicy = groupPolicy
+            ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
+                userId: user.id,
+                organizationId: organizationId ?? null,
+              })
+            : [];
+          const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
+          const result = await fetchEfficientAutoDecision({
+            apiKind: requestBodyParsed.kind,
+            body: requestBodyParsed.body,
+            requestedModel,
+            providerHints: autoRoutingProviderHints,
+            bodyBytes: Buffer.byteLength(requestBodyText),
+            userId: user.id,
+            organizationId: organizationId ?? null,
+            sessionId: taskId ?? sessionHeader,
+            machineId: machineIdHeader,
+            clientRequestId,
+            mode: modeHeader,
+            userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+            deniedModelIds,
+          });
+          classifierCostUsd = result?.costUsd ?? 0;
+          return result?.decision ?? null;
+        }
+      : undefined;
     const autoResult = await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
@@ -902,6 +912,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.session_id,
     taskId ?? null
   );
+
+  if (
+    effectiveProviderContext.provider.id === 'openrouter' &&
+    !(await isValidOpenRouterModelId(requestBodyParsed.body.model))
+  ) {
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);

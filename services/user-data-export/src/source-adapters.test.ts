@@ -348,6 +348,7 @@ describe('warehouse availability probe', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'source_embeddings',
       'security_findings',
       'microdollar_usage_journal',
       'enrichment_data',
@@ -405,6 +406,7 @@ describe('source adapters', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'source_embeddings',
       'security_findings',
       'microdollar_usage_journal',
       'enrichment_data',
@@ -1458,5 +1460,79 @@ describe('source adapters', () => {
     const page = await requireAdapter(adapters, 'security_findings').readPage?.(READ_PAGE_INPUT);
 
     for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  const EMBEDDING_ROW = {
+    id: 'chunk-1',
+    project_id: 'project-a',
+    file_path: 'src/index.ts',
+    git_branch: 'main',
+  };
+
+  it('emits the three embedding fields per chunk, keyed by the row that carried them', async () => {
+    const { adapters } = harness([EMBEDDING_ROW]);
+
+    const page = await requireAdapter(adapters, 'source_embeddings').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.records).toEqual([
+      { source: 'source_embeddings', id: 'chunk-1', field: 'project_id', value: 'project-a' },
+      { source: 'source_embeddings', id: 'chunk-1', field: 'file_path', value: 'src/index.ts' },
+      { source: 'source_embeddings', id: 'chunk-1', field: 'git_branch', value: 'main' },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['chunk-1'] });
+  });
+
+  // Both owner columns are notNull() on this table, so the two scopes overlap: an
+  // organization's rows are simultaneously some individual's. Each read must still name
+  // one column and not the other, so a personal lookup routes on kilo_user_id alone.
+  it('scopes each embedding read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([EMBEDDING_ROW]);
+    const adapter = requireAdapter(adapters, 'source_embeddings');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  // The cursor both warehouse indexes are built to serve, as (owner, id).
+  it('pages the embeddings on id', async () => {
+    const { adapters, warehouseCalls } = harness([EMBEDDING_ROW]);
+
+    await requireAdapter(adapters, 'source_embeddings').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['chunk-1'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain('($2::text IS NULL OR id > $2::text)');
+    expect(warehouseCalls[0].text).toContain('ORDER BY id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', 'chunk-1', 100]);
+  });
+
+  it('never marks an embedding record as deleted', async () => {
+    const { adapters } = harness([{ ...EMBEDDING_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'source_embeddings').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(3);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('reads a non-string embedding value as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ ...EMBEDDING_ROW, git_branch: 42 }]);
+
+    const page = await requireAdapter(adapters, 'source_embeddings').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('git_branch')).toBeNull();
+    expect(byField.get('file_path')).toBe('src/index.ts');
   });
 });

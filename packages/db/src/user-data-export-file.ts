@@ -31,6 +31,8 @@
  *                                 the project it belongs to
  *        `security_findings`      one dependency vulnerability per repository, with its
  *                                 triage state, classification and the upstream alert
+ *        `source_embeddings`      the project, file path and branch of each indexed chunk
+ *                                 of source. The vectors are not in the warehouse
  *
  *      One entry rather than one per source, because they ship together. A reader cares
  *      that the file gained sources at 4, not the order they were written in.

@@ -43,6 +43,7 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'enrichment_data',
   'microdollar_usage_journal',
   'security_findings',
+  'source_embeddings',
 ] as const;
 
 /**
@@ -268,6 +269,7 @@ LIMIT 1`;
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
  *     code_indexing_search              0    both columns set
+ *     source_embeddings                 0    both columns set
  *     microdollar_usage_journal         -    not counted
  *     security_findings                 -    user XOR org, by construction
  *
@@ -290,10 +292,10 @@ LIMIT 1`;
  * copy carries no organization column at all, so it is user-only and an organization export
  * never asks for it. See `USER_ONLY_SOURCES`.
  *
- * `code_indexing_search` is the one entry above whose 0 is a schema guarantee rather than
- * a count: both owner columns are `notNull()` on the table, so no row can carry one
- * without the other. Its sibling `code_indexing_manifest` sits at the opposite extreme,
- * which is why the two are read so differently despite the same router writing both.
+ * `code_indexing_search` and `source_embeddings` are the entries whose 0 is a schema
+ * guarantee rather than a count: both owner columns are `notNull()` on each table, so no
+ * row can carry one without the other. `code_indexing_manifest` sits at the opposite
+ * extreme, which is why sources this adjacent are read so differently.
  *
  * `code_indexing_manifest` is the strongest form of the first case, and it qualifies the
  * "everything they own across both" above: indexing under an organization writes
@@ -701,6 +703,46 @@ const SECURITY_FINDING_FIELDS: Record<string, (value: unknown) => string | numbe
  * from caller input, on the same basis as `singleKeyPageQuery`. */
 const SECURITY_FINDING_COLUMNS = ['id', ...Object.keys(SECURITY_FINDING_FIELDS)];
 
+/**
+ * The same three fields as `code_indexing_manifest`, at a finer grain: that source holds
+ * one row per indexed file, this one holds a row per indexed CHUNK of a file, so the same
+ * path recurs across many rows. They are separate sources rather than merged because the
+ * grain is the difference, and collapsing it would misreport how much was indexed.
+ *
+ * Ownership is the opposite of the manifest's, despite the subject matter being adjacent.
+ * Both owner columns are `notNull()` with foreign keys in prod, so every row names both an
+ * individual and an organization, putting this in the "both columns set" group with
+ * `code_indexing_search`.
+ *
+ * `kilo_user_id` is the owner, settled on the strongest evidence available for any source
+ * here: the account-erasure transaction at `apps/web/src/lib/user/index.ts:1395` deletes
+ * these rows by that column when a user is deleted. A row the product destroys with the
+ * user is the user's. Confirmed 2026-08-14 that this remains the only reference to the
+ * table outside `schema.ts`, so there is no competing read path to weigh against it.
+ *
+ * `organization_id` is carried for a v2 that does not exist yet and narrows nothing today,
+ * since every row has one. It is still the organization scope's predicate, because an
+ * organization export asks what its workspace holds rather than what the product reads.
+ * The consequence is the overlap `SCOPE_COLUMNS` describes: an organization's export
+ * returns rows that are simultaneously some individual's, which is correct rather than a
+ * leak. Personal lookups route on `kilo_user_id`, which is the only column that isolates
+ * one person.
+ *
+ * The cursor is `id`, and the warehouse carries an index per scope that leads with the
+ * owner and continues into it: `source_embeddings_user_page (kilo_user_id, id)` and
+ * `source_embeddings_org_page (organization_id, id) WHERE organization_id IS NOT NULL`.
+ * The organization index is partial, which costs this query nothing: `organization_id =
+ * $1` cannot match NULL, so no row the index omits was ever in scope.
+ *
+ * The `embedding` column is not here. The load dropped it — roughly 13.8 KB per row as
+ * text, and essentially all of this table's size — so the vectors are unavailable to any
+ * consumer. What remains is which files were indexed, on which branch, for which project.
+ */
+const sourceEmbeddingQueries = subjectPageQueries({
+  table: 'source_embeddings',
+  columns: 'id, project_id, file_path, git_branch',
+});
+
 const securityFindingQueries = subjectPageQueries({
   table: 'security_findings',
   columns: SECURITY_FINDING_COLUMNS.join(', '),
@@ -742,6 +784,12 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type SourceEmbeddingRow = {
+  id: string;
+  project_id: string | null;
+  file_path: string | null;
+  git_branch: string | null;
+};
 type SecurityFindingRow = {
   id: string;
   fields: { field: string; value: string | number | null }[];
@@ -1403,6 +1451,49 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'source_embeddings',
+      warehouseTable: 'source_embeddings',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: SourceEmbeddingRow[] = await warehouseQuery(
+          sourceEmbeddingQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            project_id: warehouseText(row.project_id),
+            file_path: warehouseText(row.file_path),
+            git_branch: warehouseText(row.git_branch),
+          }))
+        );
+        return {
+          // No deletion mark: the column went with the narrowing to six columns. See
+          // `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => [
+            {
+              source: 'source_embeddings',
+              id: row.id,
+              field: 'project_id',
+              value: row.project_id,
+            },
+            {
+              source: 'source_embeddings',
+              id: row.id,
+              field: 'file_path',
+              value: row.file_path,
+            },
+            {
+              source: 'source_embeddings',
+              id: row.id,
+              field: 'git_branch',
+              value: row.git_branch,
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
       name: 'security_findings',
       warehouseTable: 'security_findings',
       pageSize: SECURITY_FINDING_PAGE_SIZE,
@@ -1582,6 +1673,8 @@ export const warehouseQueries = {
   microdollarJournalOrgQuery: microdollarJournalQueries.organization,
   securityFindingUserQuery: securityFindingQueries.user,
   securityFindingOrgQuery: securityFindingQueries.organization,
+  sourceEmbeddingUserQuery: sourceEmbeddingQueries.user,
+  sourceEmbeddingOrgQuery: sourceEmbeddingQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1670,6 +1763,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. No deletion column: it went with the narrowing.
   security_findings: SECURITY_FINDING_COLUMNS,
+  // No deletion column: it went with the narrowing to six columns, along with the
+  // `embedding` vector that was almost all of this table's size.
+  source_embeddings: ['id', 'project_id', 'file_path', 'git_branch'],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1798,6 +1894,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   microdollarJournalOrgQuery: 'organization_id = $1',
   securityFindingUserQuery: 'kilo_user_id = $1',
   securityFindingOrgQuery: 'organization_id = $1',
+  sourceEmbeddingUserQuery: 'kilo_user_id = $1',
+  sourceEmbeddingOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

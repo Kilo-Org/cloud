@@ -192,33 +192,39 @@ export function DataExportsClient() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Request a new export</CardTitle>
-          <CardDescription>
-            For a limited time, you can use this feature to request an export of your App Builder
-            project titles and prompt prefixes recorded with your usage history from your account
-            creation date to Aug. 2 @ 20:40 UTC. We are making this feature available in response to
-            the{' '}
-            <a
-              className={PROSE_LINK_CLASS}
-              href="https://www.metabase.com/blog/security-update"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Metabase security incident
-            </a>{' '}
-            as part of our commitment to transparency, but we want to reiterate that investigation
-            is ongoing. Should new information arise, we will contact users directly in accordance
-            with our legal obligations. As always, Anaconda offers a process for any user to request
-            deletion of their Kilo account and its data. You can submit your request at{' '}
-            <a
-              className={PROSE_LINK_CLASS}
-              href={SUPPORT_URL}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              kilo.ai/support
-            </a>
-            .
+          <CardTitle>Request a new data export</CardTitle>
+          <CardDescription className="flex flex-col gap-3">
+            <span className="block">
+              For a limited time, you can use this feature to request an export of your data that
+              may have been affected as part of{' '}
+              <a
+                className={PROSE_LINK_CLASS}
+                href="https://www.metabase.com/blog/security-update"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Metabase’s security incident
+              </a>{' '}
+              from your account creation date to Aug. 2 @ 20:40 UTC.
+            </span>
+            <span className="block">
+              We are making this feature available as part of our commitment to transparency. We
+              want to reiterate that investigations are ongoing. Should new information arise, we
+              will contact users directly in accordance with our legal obligations.
+            </span>
+            <span className="block">
+              As always, Anaconda offers a process for users to request deletion of their Kilo
+              account and its data. You can submit your request at{' '}
+              <a
+                className={PROSE_LINK_CLASS}
+                href={SUPPORT_URL}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                kilo.ai/support
+              </a>{' '}
+              or go to the button at the bottom of the page.
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-3">

@@ -11,6 +11,7 @@ import {
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 
@@ -1053,6 +1054,25 @@ describe('rewriteModelResponse', () => {
     expect(await result.json()).toEqual({
       model: QWEN37_PLUS_MODEL_ID,
       usage: {},
+    });
+  });
+
+  test('preserves cost for models with fallback-only custom pricing', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: KIMI_CURRENT_MODEL_ID,
+        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+      }),
+      model: KIMI_CURRENT_MODEL_ID,
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({
+      model: KIMI_CURRENT_MODEL_ID,
+      usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
     });
   });
 

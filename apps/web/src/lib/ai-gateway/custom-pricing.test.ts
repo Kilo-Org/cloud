@@ -2,11 +2,13 @@ import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
+  applyCustomPricingToPricing,
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
   QWEN37_MAX_MODEL_ID,
   QWEN37_PLUS_MODEL_ID,
 } from './custom-pricing';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
@@ -91,6 +93,29 @@ describe('custom model pricing', () => {
     expect(
       calculateCustomCost_mUsd(QWEN37_PLUS_MODEL_ID, makeUsage({ inputTokens: 262_144 }))
     ).toBe(Math.round(262_144 * 0.96));
+  });
+
+  test('uses Kimi K3 custom pricing only when market cost is missing', () => {
+    const usage = makeUsage({
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheHitTokens: 20,
+      cacheWriteTokens: 30,
+    });
+
+    expect(calculateCustomCost_mUsd(KIMI_CURRENT_MODEL_ID, usage)).toBe(
+      Math.round(50 * 3 + 10 * 15 + 20 * 0.3 + 30 * 3)
+    );
+    expect(
+      calculateCustomCost_mUsd(KIMI_CURRENT_MODEL_ID, { ...usage, cost_mUsd: 123 })
+    ).toBeUndefined();
+  });
+
+  test('does not replace displayed pricing for fallback-only custom pricing', () => {
+    const model = makeModel(KIMI_CURRENT_MODEL_ID);
+
+    expect(applyCustomPricingToModel(model)).toBe(model);
+    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
   });
 
   test('reports invalid negative uncached token counts', () => {

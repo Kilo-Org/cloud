@@ -2,6 +2,7 @@ import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import {
   calculateCost_mUsd,
   type Pricing,
@@ -17,6 +18,8 @@ export type CustomPricing = {
   pricing: PricingTiers;
   /** Human-readable discount shown in the model name; never used in calculations. */
   percentage?: number;
+  /** Only use this pricing when the upstream response does not report a market cost. */
+  fallbackOnly?: boolean;
 };
 
 export const customPricingByModelId: Record<string, CustomPricing> = {
@@ -57,6 +60,20 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
+  [KIMI_CURRENT_MODEL_ID]: {
+    fallbackOnly: true,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 3,
+          completion_per_million: 15,
+          input_cache_read_per_million: 0.3,
+          input_cache_write_per_million: null,
+        },
+      },
+    ],
+  },
 };
 
 export function getCustomPricing(modelId: string): CustomPricing | undefined {
@@ -89,12 +106,14 @@ export function applyCustomPricingToPricing(
   pricing: OpenRouterModel['pricing']
 ): OpenRouterModel['pricing'] {
   const customPricing = getCustomPricing(modelId);
-  return customPricing ? applyPricing(pricing, customPricing.pricing[0].pricing) : pricing;
+  return customPricing && !customPricing.fallbackOnly
+    ? applyPricing(pricing, customPricing.pricing[0].pricing)
+    : pricing;
 }
 
 export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
   const customPricing = getCustomPricing(model.id);
-  if (!customPricing) return model;
+  if (!customPricing || customPricing.fallbackOnly) return model;
 
   const discountSuffix =
     customPricing.percentage === undefined ? '' : ` (${customPricing.percentage}% off)`;
@@ -111,7 +130,7 @@ export function calculateCustomCost_mUsd(
   usage: JustTheCostsUsageStats
 ): number | undefined {
   const customPricing = getCustomPricing(modelId);
-  if (!customPricing) return undefined;
+  if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
   if (uncachedInputTokens < 0) {

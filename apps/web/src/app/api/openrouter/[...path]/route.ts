@@ -16,7 +16,10 @@ import type {
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import {
+  getProvider,
+  type GetProviderProviderResult,
+} from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
@@ -845,7 +848,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     sourceProviderId: effectiveProviderContext.provider.id,
     hasUserByok: effectiveProviderContext.userByok !== null,
   });
+  let partnerFallback:
+    | { providerContext: GetProviderProviderResult; request: GatewayRequest }
+    | undefined;
   if (partnerProvider) {
+    partnerFallback = {
+      providerContext: effectiveProviderContext,
+      request: structuredClone(requestBodyParsed),
+    };
     effectiveProviderContext = {
       kind: 'provider',
       provider: partnerProvider,
@@ -923,57 +933,99 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     op: 'http.client',
   });
 
-  const extraHeaders: Record<string, string> = {};
-  await applyProviderSpecificLogic(
-    effectiveProviderContext.provider,
-    effectiveModelIdLowerCased,
+  const sendUpstreamAttempt = async (
+    providerContext: GetProviderProviderResult,
+    parsedRequest: GatewayRequest,
+    delayMs: number
+  ) => {
+    const extraHeaders: Record<string, string> = {};
+    await applyProviderSpecificLogic(
+      providerContext.provider,
+      effectiveModelIdLowerCased,
+      parsedRequest,
+      extraHeaders,
+      providerContext.userByok,
+      fraudHeaders,
+      user.id,
+      organizationId ?? null,
+      usageContext.session_id,
+      taskId ?? null
+    );
+
+    if (
+      providerContext.provider.id === 'openrouter' &&
+      !(await isValidOpenRouterModelId(parsedRequest.body.model ?? effectiveModelIdLowerCased))
+    ) {
+      return {
+        type: 'local-response' as const,
+        response: modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased),
+      };
+    }
+
+    // Capture the bounded prompt for experimented requests AFTER provider
+    // transforms have produced the canonical upstream body. Stored on the
+    // usage context so the async `after()` hook can persist it without
+    // retaining a reference to the full uncapped body.
+    if (providerContext.experiment) {
+      usageContext.experimentPromptCapture = buildExperimentPromptCapture(parsedRequest);
+    }
+
+    if (delayMs > 0) {
+      await sleepForRulesEngineAction(delayMs);
+    }
+
+    const upstreamResult = await upstreamRequest({
+      chatApi: parsedRequest.kind,
+      path,
+      search: url.search,
+      method: request.method,
+      body: parsedRequest.body,
+      extraHeaders,
+      provider: providerContext.provider,
+      signal: request.signal,
+      vercelRequestId,
+    });
+    if (upstreamResult.type === 'error') {
+      return { type: 'local-response' as const, response: upstreamResult.response };
+    }
+    return {
+      type: 'upstream-response' as const,
+      response: upstreamResult.response,
+      toolsAvailable: getToolsAvailable(parsedRequest),
+      toolsUsed: getToolsUsed(parsedRequest),
+    };
+  };
+
+  let attempt = await sendUpstreamAttempt(
+    effectiveProviderContext,
     requestBodyParsed,
-    extraHeaders,
-    effectiveProviderContext.userByok,
-    fraudHeaders,
-    user.id,
-    organizationId ?? null,
-    usageContext.session_id,
-    taskId ?? null
+    rulesEngineDecision.delayMs
   );
+  if (attempt.type === 'local-response') return attempt.response;
 
-  if (
-    effectiveProviderContext.provider.id === 'openrouter' &&
-    !(await isValidOpenRouterModelId(requestBodyParsed.body.model))
-  ) {
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  if (partnerFallback && attempt.response.status >= 400) {
+    console.warn('Partner request failed; retrying initial managed provider', {
+      partner_provider: effectiveProviderContext.provider.id,
+      fallback_provider: partnerFallback.providerContext.provider.id,
+      status_code: attempt.response.status,
+    });
+    try {
+      await attempt.response.body?.cancel();
+    } catch {
+      console.warn('Failed to cancel discarded partner response body');
+    }
+
+    effectiveProviderContext = partnerFallback.providerContext;
+    requestBodyParsed = partnerFallback.request;
+    usageContext.provider = effectiveProviderContext.provider.id;
+    usageContext.user_byok = !!effectiveProviderContext.userByok;
+
+    attempt = await sendUpstreamAttempt(effectiveProviderContext, requestBodyParsed, 0);
+    if (attempt.type === 'local-response') return attempt.response;
   }
 
-  const toolsAvailable = getToolsAvailable(requestBodyParsed);
-  const toolsUsed = getToolsUsed(requestBodyParsed);
-
-  // Capture the bounded prompt for experimented requests AFTER provider
-  // transforms have produced the canonical upstream body. Stored on the
-  // usage context so the async `after()` hook can persist it without
-  // retaining a reference to the full uncapped body.
-  if (effectiveProviderContext.experiment) {
-    usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed);
-  }
-
-  if (rulesEngineDecision.delayMs > 0) {
-    await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-  }
-
-  const upstreamResult = await upstreamRequest({
-    chatApi: requestBodyParsed.kind,
-    path,
-    search: url.search,
-    method: request.method,
-    body: requestBodyParsed.body,
-    extraHeaders,
-    provider: effectiveProviderContext.provider,
-    signal: request.signal,
-    vercelRequestId,
-  });
-  if (upstreamResult.type === 'error') {
-    return upstreamResult.response;
-  }
-  const response = upstreamResult.response;
+  const { response, toolsAvailable, toolsUsed } = attempt;
+  const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',
     response.status,
@@ -1013,7 +1065,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed.body,
       response,
       organizationId,
-      model: requestBodyParsed.body.model,
+      model: finalUpstreamModel,
       errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
       trackInSentry: true,
     });
@@ -1028,7 +1080,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed.body,
       response,
       organizationId,
-      model: requestBodyParsed.body.model,
+      model: finalUpstreamModel,
       errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
       trackInSentry: response.status >= 500,
     });

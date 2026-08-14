@@ -48,13 +48,13 @@ describe('applyAnthropicThinkingDefault', () => {
   );
 
   it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
-    'normalizes explicitly enabled thinking %p',
+    'preserves explicitly enabled thinking %p',
     thinking => {
       const request = makeMessagesRequest(FRIENDLI_GLM_PUBLIC_ID, thinking);
 
       applyAnthropicThinkingDefault(FRIENDLI_GLM_PUBLIC_ID, request);
 
-      expect(request.body.thinking).toEqual({ type: 'enabled' });
+      expect(request.body.thinking).toEqual(thinking);
     }
   );
 

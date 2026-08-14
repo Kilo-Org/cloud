@@ -20,8 +20,6 @@ import {
 } from '@/lib/ai-gateway/providers/variants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 export async function getOpenRouterDerivedModelVariants(
   model: string
@@ -73,20 +71,10 @@ export function getAiSdkProvider(
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';
   }
-  if (isClaudeModel(model)) {
-    // On Vercel AI Gateway, this is necessary to support document attachments.
-    return 'anthropic';
-  }
-  if (!directProviderId && isMinimaxModel(model)) {
-    // On Vercel AI Gateway, this is necessary for reasoning to show.
-    return 'anthropic';
-  }
   if (
-    !directProviderId &&
-    (model === FRIENDLI_GLM_PUBLIC_ID || model === PERPLEXITY_KIMI_PUBLIC_ID)
+    isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
+    (!directProviderId && isMinimaxModel(model)) // on Vercel AI Gateway, this is necessary for reasoning to show
   ) {
-    // Messages is more cross-compatible than Chat Completions across the four managed providers
-    // used for these pinned models: OpenRouter, Vercel, Friendli, and Perplexity.
     return 'anthropic';
   }
   if (isOpenAiModel(model) || isGrokModel(model) || isMuseModel(model)) {

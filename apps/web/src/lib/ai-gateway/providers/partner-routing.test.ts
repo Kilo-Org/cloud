@@ -1,10 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  isPartnerProviderAllowed,
-  selectPercentageRoutedPartnerProvider,
-} from '@/lib/ai-gateway/providers/partner-routing';
+import { selectPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { RuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 
@@ -44,33 +41,44 @@ describe('getPercentageRoutedPartnerProvider', () => {
     );
   });
 
-  it.each(['chat_completions', 'messages'] as const)('routes supported %s requests', kind => {
+  it('routes Messages requests', () => {
     expect(
-      selectPercentageRoutedPartnerProvider('z-ai/glm-5.2', request(kind), 'user-id', routingConfig)
+      selectPercentageRoutedPartnerProvider(
+        'z-ai/glm-5.2',
+        request('messages'),
+        'user-id',
+        routingConfig
+      )
     ).toBe(PROVIDERS.FRIENDLI_GLM);
   });
 
-  it('does not route unsupported API kinds', () => {
-    expect(
-      selectPercentageRoutedPartnerProvider(
-        'z-ai/glm-5.2',
-        request('responses'),
-        'user-id',
-        routingConfig
-      )
-    ).toBeNull();
-  });
+  it.each(['chat_completions', 'responses'] as const)(
+    'does not route unsupported %s requests',
+    kind => {
+      expect(
+        selectPercentageRoutedPartnerProvider(
+          'z-ai/glm-5.2',
+          request(kind),
+          'user-id',
+          routingConfig
+        )
+      ).toBeNull();
+    }
+  );
 
-  it('does not route requests with provider settings', () => {
-    expect(
-      selectPercentageRoutedPartnerProvider(
-        'z-ai/glm-5.2',
-        request('messages', { only: ['friendli'] }),
-        'user-id',
-        routingConfig
-      )
-    ).toBeNull();
-  });
+  it.each([{}, { only: ['friendli'] }])(
+    'does not route requests with provider settings %p',
+    provider => {
+      expect(
+        selectPercentageRoutedPartnerProvider(
+          'z-ai/glm-5.2',
+          request('messages', provider),
+          'user-id',
+          routingConfig
+        )
+      ).toBeNull();
+    }
+  );
 
   it.each(['z-ai/glm-5.2-fast', 'moonshotai/kimi-k3-fast', 'zai/glm-5.2'])(
     'does not route non-exact model %s',
@@ -91,19 +99,5 @@ describe('getPercentageRoutedPartnerProvider', () => {
     expect(
       selectPercentageRoutedPartnerProvider('z-ai/glm-5.2', request(), 'user-id', disabledConfig)
     ).toBeNull();
-  });
-});
-
-describe('isPartnerProviderAllowed', () => {
-  it('allows an unrestricted or explicitly allowed partner', () => {
-    expect(isPartnerProviderAllowed(PROVIDERS.FRIENDLI_GLM, undefined)).toBe(true);
-    expect(isPartnerProviderAllowed(PROVIDERS.FRIENDLI_GLM, { only: ['friendli', 'novita'] })).toBe(
-      true
-    );
-  });
-
-  it('rejects a partner excluded by only or ignore', () => {
-    expect(isPartnerProviderAllowed(PROVIDERS.FRIENDLI_GLM, { only: ['novita'] })).toBe(false);
-    expect(isPartnerProviderAllowed(PROVIDERS.FRIENDLI_GLM, { ignore: ['friendli'] })).toBe(false);
   });
 });

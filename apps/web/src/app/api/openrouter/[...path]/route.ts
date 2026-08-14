@@ -59,7 +59,6 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
-import { isPartnerProviderAllowed } from '@/lib/ai-gateway/providers/partner-routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -874,6 +873,32 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
+
+    if (
+      effectiveProviderContext.percentageRoutedPartner &&
+      requestBodyParsed.body.provider !== undefined
+    ) {
+      // Organization policy is attached after initial provider resolution. Resolve again so
+      // partner routing retains its requirement that the request has no provider configuration.
+      const fallbackProviderResult = await getProvider({
+        requestedModel: effectiveModelIdLowerCased,
+        request: requestBodyParsed,
+        user,
+        organizationId,
+        taskId,
+        clientIp: ipAddress ?? null,
+        machineId: machineIdHeader,
+      });
+      if (fallbackProviderResult.kind === 'not-found') {
+        return modelDoesNotExistResponse();
+      }
+      if (fallbackProviderResult.kind === 'unavailable') {
+        return temporarilyUnavailableResponse();
+      }
+      effectiveProviderContext = fallbackProviderResult;
+      usageContext.provider = fallbackProviderResult.provider.id;
+      usageContext.user_byok = !!fallbackProviderResult.userByok;
+    }
   }
 
   if (
@@ -888,13 +913,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.body.provider
   );
   if (providerNotAllowedError) return providerNotAllowedError;
-
-  if (
-    effectiveProviderContext.percentageRoutedPartner &&
-    !isPartnerProviderAllowed(effectiveProviderContext.provider, requestBodyParsed.body.provider)
-  ) {
-    return modelNotAllowedResponse();
-  }
 
   if (effectiveProviderContext.experiment) {
     usageContext.modelExperimentVariantVersionId =

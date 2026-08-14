@@ -50,9 +50,9 @@ describe.each([
     upstreamModel: 'perplexity/kimi-k3',
   },
 ])('$name provider', ({ provider, expectedUrl, requestedModel, upstreamModel }) => {
-  test('supports chat completions and Messages', () => {
+  test('supports Messages only', () => {
     expect(`${provider.apiUrl}/messages`).toBe(expectedUrl);
-    expect(provider.supportedChatApis).toEqual(['chat_completions', 'messages']);
+    expect(provider.supportedChatApis).toEqual(['messages']);
   });
 
   test('hardwires the upstream model and removes provider settings', async () => {

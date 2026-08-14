@@ -20,8 +20,6 @@ import {
 } from '@/lib/ai-gateway/providers/variants';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 
 export async function getOpenRouterDerivedModelVariants(
   model: string
@@ -76,7 +74,7 @@ export function getAiSdkProvider(
   if (
     isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
     (!directProviderId &&
-      (isMinimaxModel(model) || model === KIMI_CURRENT_MODEL_ID || model === GLM_CURRENT_MODEL_ID)) // gateway providers expose these models through Messages
+      (isMinimaxModel(model) || model === 'moonshotai/kimi-k3' || model === 'z-ai/glm-5.2')) // gateway providers expose these models through Messages
   ) {
     return 'anthropic';
   }

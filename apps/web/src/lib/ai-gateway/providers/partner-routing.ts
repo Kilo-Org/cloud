@@ -1,10 +1,5 @@
-import type {
-  GatewayRequest,
-  OpenRouterProviderConfig,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import {
   passesRoutingPercentage,
@@ -18,11 +13,11 @@ type PartnerRoute = {
 };
 
 const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
-  [GLM_CURRENT_MODEL_ID]: {
+  'z-ai/glm-5.2': {
     provider: PROVIDERS.FRIENDLI_GLM,
     cohort: 'friendli',
   },
-  [KIMI_CURRENT_MODEL_ID]: {
+  'moonshotai/kimi-k3': {
     provider: PROVIDERS.PERPLEXITY_KIMI,
     cohort: 'perplexity',
   },
@@ -64,15 +59,4 @@ export function selectPercentageRoutedPartnerProvider(
 
   const percentage = routingConfig[route.cohort];
   return passesRoutingPercentage(route.cohort, randomSeed, percentage) ? route.provider : null;
-}
-
-export function isPartnerProviderAllowed(
-  provider: Provider,
-  providerConfig: OpenRouterProviderConfig | undefined
-) {
-  if (!providerConfig) return true;
-  return (
-    (!providerConfig.only || providerConfig.only.includes(provider.id)) &&
-    (!providerConfig.ignore || !providerConfig.ignore.includes(provider.id))
-  );
 }

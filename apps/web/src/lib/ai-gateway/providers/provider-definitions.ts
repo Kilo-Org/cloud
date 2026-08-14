@@ -82,7 +82,7 @@ export default {
     id: 'friendli',
     apiUrl: 'https://api.friendli.ai/serverless/v1',
     apiKey: getEnvVariable('FRIENDLI_API_KEY'),
-    supportedChatApis: ['chat_completions', 'messages'],
+    supportedChatApis: ['messages'],
     responseTransforms: null,
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
@@ -93,7 +93,7 @@ export default {
     id: 'perplexity',
     apiUrl: 'https://api.perplexity.ai/router/v1',
     apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
-    supportedChatApis: ['chat_completions', 'messages'],
+    supportedChatApis: ['messages'],
     responseTransforms: null,
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';

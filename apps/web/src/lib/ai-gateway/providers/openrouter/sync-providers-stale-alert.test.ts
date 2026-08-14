@@ -221,7 +221,7 @@ describe('alertIfSyncProvidersStale', () => {
       buildStaleSyncAlertNotification({ lastCompletedAt: STALE_SYNC, now: NOW })
     );
     expect(setLastAlertAt).toHaveBeenCalledWith(NOW.toISOString());
-    expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(7 * 24 * 60 * 60);
+    expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(3 * 24 * 60 * 60);
     expect(SYNC_PROVIDERS_STALE_AFTER_MS).toBe(60 * 60 * 1000);
   });
 

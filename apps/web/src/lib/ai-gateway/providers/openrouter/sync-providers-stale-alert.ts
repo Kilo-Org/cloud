@@ -13,7 +13,7 @@ import {
 } from '@/lib/slack/admin-notifications';
 
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
-export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 3 * 24 * 60 * 60;
 
 const STALE_WINDOW_LABEL = '1 hour';
 const IMPACT_COPY =

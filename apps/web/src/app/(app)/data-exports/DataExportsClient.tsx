@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { LANDING_URL } from '@/lib/constants';
 import { formatBytes } from '@/lib/kiloclaw/instance-display';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
@@ -26,6 +27,11 @@ import {
 import { DownloadCodeDialog, type DownloadCodeChallenge } from './DownloadCodeDialog';
 
 type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
+
+const SUPPORT_URL = `${LANDING_URL}/support`;
+
+/** Inline prose links inherit muted description text, so they need explicit affordance. */
+const PROSE_LINK_CLASS = 'text-primary underline underline-offset-4';
 
 const STATUS_BADGE_VARIANT: Record<UserExportDisplayStatus, BadgeVariant> = {
   queued: 'secondary',
@@ -188,10 +194,31 @@ export function DataExportsClient() {
         <CardHeader>
           <CardTitle>Request a new export</CardTitle>
           <CardDescription>
-            The export includes your App Builder project titles and the prompt prefixes recorded
-            with your usage history. Large accounts can take a while to generate. We&apos;ll email
-            you when it&apos;s ready, and downloads expire 24 hours after that. Each download needs
-            a confirmation code we email you.
+            For a limited time, you can use this feature to request an export of your App Builder
+            project titles and prompt prefixes recorded with your usage history from your account
+            creation date to Aug. 2 @ 20:40 UTC. We are making this feature available in response to
+            the{' '}
+            <a
+              className={PROSE_LINK_CLASS}
+              href="https://www.metabase.com/blog/security-update"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Metabase security incident
+            </a>{' '}
+            as part of our commitment to transparency, but we want to reiterate that investigation
+            is ongoing. Should new information arise, we will contact users directly in accordance
+            with our legal obligations. As always, Anaconda offers a process for any user to request
+            deletion of their Kilo account and its data. You can submit your request at{' '}
+            <a
+              className={PROSE_LINK_CLASS}
+              href={SUPPORT_URL}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              kilo.ai/support
+            </a>
+            .
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-3">

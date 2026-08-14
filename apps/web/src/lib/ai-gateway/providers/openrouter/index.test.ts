@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import {
   formatName,
   getEnhancedOpenRouterModels,
@@ -24,9 +25,7 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 }));
 
 const originalFetch = global.fetch;
-const { isValidOpenRouterModelId: mockedIsValidOpenRouterModelId } = jest.requireMock<{
-  isValidOpenRouterModelId: jest.Mock<(modelId: string) => Promise<boolean>>;
-}>('@/lib/ai-gateway/providers/gateway-models-cache');
+const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 
 const disabledPaidModel = {
   ...qwen36_plus_stealth_model,

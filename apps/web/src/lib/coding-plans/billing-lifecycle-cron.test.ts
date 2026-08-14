@@ -1,7 +1,11 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
 
-import { runCodingPlanBillingLifecycleCron } from '@/lib/coding-plans/billing-lifecycle-cron';
+import {
+  processCodingPlanCancellationAtPeriodEnd,
+  processCodingPlanRenewal,
+  runCodingPlanBillingLifecycleCron,
+} from '@/lib/coding-plans/billing-lifecycle-cron';
 import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans';
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
@@ -257,6 +261,61 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(credential.upstream_plan_id).toEqual(expect.any(String));
     expect(credential.encrypted_api_key).toBeNull();
     expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
+  });
+
+  it('rechecks an extended cancellation deadline after a stale sweep selection', async () => {
+    const { subscriptionId } = await createSubscription(COST_MICRODOLLARS);
+    const futureEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await db
+      .update(coding_plan_subscriptions)
+      .set({
+        cancel_at_period_end: true,
+        current_period_end: futureEnd,
+        credit_renewal_at: futureEnd,
+      })
+      .where(eq(coding_plan_subscriptions.id, subscriptionId));
+
+    await expect(
+      processCodingPlanCancellationAtPeriodEnd(db, subscriptionId, new Date().toISOString())
+    ).resolves.toBe(false);
+
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, subscriptionId));
+    const [credential] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
+    expect(subscription.status).toBe('active');
+    expect(subscription.cancel_at_period_end).toBe(true);
+    expect(subscription.installed_byok_key_id).not.toBeNull();
+    expect(credential.status).toBe('assigned');
+    expect(credential.encrypted_api_key).not.toBeNull();
+  });
+
+  it('rechecks an extended renewal deadline after a stale sweep selection', async () => {
+    const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2);
+    const futureEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ current_period_end: futureEnd, credit_renewal_at: futureEnd })
+      .where(eq(coding_plan_subscriptions.id, subscriptionId));
+
+    await expect(
+      processCodingPlanRenewal(db, subscriptionId, user.id, new Date().toISOString())
+    ).resolves.toBe('waiting');
+
+    const terms = await db
+      .select()
+      .from(coding_plan_terms)
+      .where(eq(coding_plan_terms.subscription_id, subscriptionId));
+    const [savedUser] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(terms.map(term => term.kind)).toEqual(['activation']);
+    expect(savedUser.microdollars_used).toBe(COST_MICRODOLLARS);
   });
 
   it('terminates unfunded renewal immediately when auto-top-up is disabled', async () => {

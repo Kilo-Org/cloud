@@ -30,11 +30,50 @@ describe('upstreamRequest timeout', () => {
     global.fetch = originalFetch;
   });
 
+  test.each([
+    {
+      chatApi: 'messages',
+      path: '/messages',
+      apiUrlOverrides: { messages: 'https://messages.example.test/v3/v1' },
+      expectedUrl: 'https://messages.example.test/v3/v1/messages?beta=true',
+    },
+    {
+      chatApi: 'responses',
+      path: '/responses',
+      apiUrlOverrides: {},
+      expectedUrl: 'https://gateway.example.test/v3/responses?beta=true',
+    },
+  ] as const)(
+    'uses the $chatApi API URL override when provided',
+    async ({ chatApi, path, apiUrlOverrides, expectedUrl }) => {
+      const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+      global.fetch = mockFetch;
+
+      const result = await upstreamRequest({
+        chatApi,
+        path,
+        search: '?beta=true',
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: {
+          ...PROVIDERS.OPENROUTER,
+          apiUrl: 'https://gateway.example.test/v3',
+          apiUrlOverrides,
+        },
+      });
+
+      expect(result.type).toBe('success');
+      expect(mockFetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+    }
+  );
+
   it('reports a client disconnect instead of an upstream disconnect when the caller aborts', async () => {
     const controller = new AbortController();
     controller.abort();
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -68,6 +107,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = jest.fn().mockRejectedValue(timeoutError);
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -96,6 +136,7 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -124,6 +165,7 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -159,6 +201,7 @@ describe('upstreamRequest timeout', () => {
     controller.abort();
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -190,6 +233,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -226,6 +270,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -257,6 +302,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '?trace=search-secret',
       method: 'POST',
@@ -306,6 +352,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '',
       method: 'POST',
@@ -343,6 +390,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      chatApi: 'chat_completions',
       path: '/chat/completions',
       search: '?trace=search-secret',
       method: 'POST',

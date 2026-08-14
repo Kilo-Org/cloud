@@ -6,6 +6,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'byteplus-coding': 'BytePlus Coding Plan',
   'chutes-byok': 'Chutes BYOK',
   crofai: 'CrofAI',
+  edenai: 'Eden AI',
   'kimi-coding': 'Kimi Code',
   'inceptron-byok': 'Inceptron BYOK',
   martian: 'Martian',

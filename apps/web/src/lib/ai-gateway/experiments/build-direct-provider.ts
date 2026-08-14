@@ -157,6 +157,7 @@ export function buildDirectProvider(
   return {
     id,
     apiUrl: upstream.base_url,
+    apiUrlOverrides: {},
     apiKey: upstream.api_key,
     supportedChatApis,
     responseTransforms: upstream.use_gemini_reasoning_transform

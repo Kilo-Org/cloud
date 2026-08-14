@@ -128,13 +128,52 @@ LIMIT 1`;
  * one and forgetting the other would silently keep serving the live value, which is the
  * inconsistency this whole path exists to remove.
  *
- * Only email and name. The table has geo columns too, but the export has never had a geo
- * section and adding one is not what sourcing identity from the warehouse means.
+ * Only email and name are overridden this way, because they are the only two the primary
+ * also holds. The warehouse's other columns have no live counterpart and are exported
+ * directly, through `WAREHOUSE_ONLY_FIELDS` below.
  */
 export const WAREHOUSE_PROFILE_FIELDS = {
   google_user_email: 'email',
   google_user_name: 'name',
 } as const;
+
+/**
+ * Warehouse columns the export returns as they are, having no equivalent on the primary.
+ *
+ * Mostly location: the country, city, region and timezone attributed to the person, in
+ * two generations. The `posthog_*` set is what was recorded historically; the
+ * `current_posthog_*` set is the value as of the snapshot. Both are kept, because the
+ * difference between where someone was and where they are is itself information held
+ * about them, and collapsing it would be the export deciding what they get to see.
+ *
+ * `posthog_email`, `posthog_name` and `posthog_hosted_domain` are the analytics copies of
+ * their identity, distinct from the account's own. They can disagree with
+ * `google_user_email` and `google_user_name`, which is exactly why they are worth
+ * returning rather than deduplicating away.
+ *
+ * These arrived after the identity section first shipped, which is the only reason they
+ * were absent. The export already returned `signup_ip` from the primary, so it was
+ * handing someone the address they signed up from while withholding the country derived
+ * from it.
+ */
+export const WAREHOUSE_ONLY_FIELDS = [
+  'posthog_email',
+  'posthog_name',
+  'posthog_hosted_domain',
+  'posthog_country',
+  'posthog_country_name',
+  'posthog_city',
+  'posthog_region_code',
+  'posthog_region_name',
+  'posthog_timezone',
+  'current_posthog_country',
+  'current_posthog_country_name',
+  'current_posthog_city',
+  'current_posthog_region_code',
+  'current_posthog_region_name',
+  'current_posthog_timezone',
+  'vercel_country',
+] as const;
 
 /**
  * The warehouse's copy of those fields. Keyed on `user_id`, which is the warehouse's name
@@ -143,7 +182,10 @@ export const WAREHOUSE_PROFILE_FIELDS = {
  * The interpolated column list comes from the module constant above, never from caller
  * input, on the same basis as `singleKeyPageQuery` below. The user id is a bind parameter.
  */
-const warehouseProfileQuery = `SELECT user_id, ${Object.values(WAREHOUSE_PROFILE_FIELDS).join(', ')}
+const warehouseProfileQuery = `SELECT user_id, ${[
+  ...Object.values(WAREHOUSE_PROFILE_FIELDS),
+  ...WAREHOUSE_ONLY_FIELDS,
+].join(', ')}
 FROM users
 WHERE user_id = $1
 LIMIT 1`;
@@ -392,6 +434,25 @@ function nullableString(value: unknown, field: string): string | null {
   return requiredString(value, field);
 }
 
+/**
+ * A warehouse text column, where anything that is not a string reads as absent.
+ *
+ * Deliberately more tolerant than `nullableString`, and for the same reason
+ * `warehouseProfileValue` is: these columns are unconstrained nullable text, and the
+ * warehouse's own load checks count nulls rather than forbidding shapes. A strict mapper
+ * throws a plain `Error`, which `handleGenerationFailure` treats as retryable, so a single
+ * odd cell would spend the queue's four retries on a value frozen in the snapshot that no
+ * retry can change, and then fail the whole export.
+ *
+ * The strictness is worth keeping on the primary, where the columns are NOT NULL and a
+ * type mismatch means the query named the wrong one. Here it protects nothing: the probe
+ * already guarantees the column exists, so the only thing left to be strict about is the
+ * value, and one unusable value is not worth an export.
+ */
+function warehouseText(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
 function isoTimestamp(value: unknown, field: string): string {
   if (!(typeof value === 'string' || value instanceof Date)) {
     throw new Error(`Replica row has invalid ${field}`);
@@ -584,11 +645,23 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           merged[exportField] = warehouseProfileValue(profile[warehouseColumn], row[exportField]);
         }
         return {
-          records: USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
-            source: 'kilocode_users',
-            field,
-            value: mapValue(merged[field]),
-          })),
+          records: [
+            ...USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
+              source: 'kilocode_users',
+              field,
+              value: mapValue(merged[field]),
+            })),
+            // Emitted under the same section: these describe the same person, and the
+            // split between "the primary holds it" and "only the warehouse holds it" is
+            // an implementation detail nobody reading their own export should have to
+            // reason about. Nullable throughout, so a blank stays a blank rather than
+            // failing the export.
+            ...WAREHOUSE_ONLY_FIELDS.map(field => ({
+              source: 'kilocode_users',
+              field,
+              value: warehouseText(profile[field]),
+            })),
+          ],
           nextCursor: null,
         };
       },
@@ -836,7 +909,7 @@ export type WarehouseTableRequirement = { table: string; requiredColumns: readon
  * column, so it takes no addition.
  */
 export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
-  users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS)],
+  users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS), ...WAREHOUSE_ONLY_FIELDS],
   app_builder_projects: ['id', 'title', DELETED_COLUMN],
   app_builder_messages: ['id', 'data', DELETED_COLUMN],
   cli_sessions: [

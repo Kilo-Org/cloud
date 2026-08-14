@@ -336,6 +336,7 @@ describe('warehouse availability probe', () => {
       'cli_sessions',
       'system_prompt_prefix',
       'microdollar_usage_metadata',
+      'code_indexing_manifest',
     ]);
   });
 
@@ -387,6 +388,7 @@ describe('source adapters', () => {
       'cli_sessions',
       'system_prompt_prefix',
       'microdollar_usage_metadata',
+      'code_indexing_manifest',
     ]);
   });
 
@@ -828,5 +830,98 @@ describe('source adapters', () => {
     await expect(
       requireAdapter(adapters, 'cli_sessions').readPage?.(READ_PAGE_INPUT)
     ).rejects.toThrow('most_significant_position');
+  });
+
+  const MANIFEST_ROW = {
+    id: 'manifest-1',
+    project_id: 'project-a',
+    git_branch: 'main',
+    file_path: 'src/index.ts',
+  };
+
+  it('emits the three manifest fields per row, keyed by the row that carried them', async () => {
+    const { adapters } = harness([MANIFEST_ROW]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    // One id across all three, so a file, its branch and its project stay groupable.
+    expect(page?.records).toEqual([
+      {
+        source: 'code_indexing_manifest',
+        id: 'manifest-1',
+        field: 'project_id',
+        value: 'project-a',
+      },
+      { source: 'code_indexing_manifest', id: 'manifest-1', field: 'git_branch', value: 'main' },
+      {
+        source: 'code_indexing_manifest',
+        id: 'manifest-1',
+        field: 'file_path',
+        value: 'src/index.ts',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['manifest-1'] });
+  });
+
+  // The tight-scoping guard for this source, and the reason it needs one of its own.
+  // `organization_id` on a personal row is a uuid derived from the user rather than an
+  // organization, which invites a query reaching for both owner columns at once to "catch
+  // everything". A user read must name `kilo_user_id` and nothing else, an org read
+  // `organization_id` and nothing else, so neither subject can widen into the other's rows.
+  // The scope value is the first bind parameter in both, with only cursor and limit after
+  // it: no third predicate, and nothing interpolated.
+  it('scopes each manifest read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([MANIFEST_ROW]);
+    const adapter = requireAdapter(adapters, 'code_indexing_manifest');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  it('marks every field of a manifest row prod has since deleted', async () => {
+    const { adapters } = harness([{ ...MANIFEST_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records).toHaveLength(3);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  // Unknown is not deleted: the column is NULL throughout on a table whose reload has not
+  // run, so an absent mark has to cover both readings.
+  it('leaves a manifest row unmarked when the warehouse cannot say', async () => {
+    const { adapters } = harness([{ ...MANIFEST_ROW, _snowflake_deleted: null }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  // NOT NULL on the primary, unconstrained in the warehouse. One odd cell must not spend
+  // the queue's retries on a value frozen in the snapshot.
+  it('reads a non-string manifest value as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ ...MANIFEST_ROW, git_branch: 42 }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('git_branch')).toBeNull();
+    expect(byField.get('file_path')).toBe('src/index.ts');
   });
 });

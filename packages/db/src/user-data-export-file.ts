@@ -15,9 +15,11 @@
  *   1  the original set of sources
  *   2  the warehouse profile columns added to the identity section (location, historic
  *      and current, plus the analytics copies of name, email and hosted domain)
+ *   3  the `code_indexing_manifest` source (project, branch and file path per indexed
+ *      file), which the original set omitted
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 2;
+export const EXPORT_FILE_SCHEMA_VERSION = 3;

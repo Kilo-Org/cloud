@@ -247,8 +247,8 @@ LIMIT 1`;
  * "everything they own across both" above: indexing under an organization writes
  * `kilo_user_id` as NULL outright, so a person's own export carries their personal
  * indexing only and the organization's export carries the rest. It is also the one table
- * whose `organization_id` is not always an organization — see `codeIndexingPageQuery`,
- * which is where that column's two readings are set out.
+ * whose `organization_id` is not always an organization — see `codeIndexingQueries`, which
+ * is where that column's two readings are set out.
  *
  * The warehouse has no `created_at` on any table and is itself a point-in-time
  * snapshot, so there is no `snapshot_at` bound to apply here.
@@ -422,21 +422,18 @@ const userPromptQueries = subjectPageQueries({
  *     `organizations` row, in strict 1:1 with 13,010 users. A real organization appears
  *     only on rows where `kilo_user_id` is NULL.
  *
- * Both scopes therefore land where they should with no extra predicate, and this source
- * needs no builder of its own. `kilo_user_id = $1` selects that person's personal
- * indexing; `organization_id = $1` is bound to a real organization id, which no personal
- * row's derived uuid can equal, so personal work cannot reach an organization's export
- * through the column that merely looks like an org tag.
+ * Each subject is therefore scoped by exactly one of the two columns, and never by both.
+ * `kilo_user_id = $1` selects that person's personal indexing. `organization_id = $1` is
+ * bound to a real organization id, which no personal row's derived uuid can equal, so
+ * personal work cannot reach an organization's export through the column that merely looks
+ * like an org tag. Widening either read to reach for both columns is what would break
+ * that, which is why this source takes the same single-predicate shape as every other and
+ * needs no builder of its own.
  *
- * Rows with both columns NULL are the source's tombstones — 9,591,426 of 41,368,545, every
- * payload column NULL. Neither predicate matches NULL, so scoping alone excludes them and
- * they never reach the file as id-only records. `_snowflake_deleted` is still selected,
- * because the deleted rows that do carry an owner are labelled rather than hidden.
- *
- * No `snapshot_at` bound, for the same reason as its neighbours. The warehouse copy was
- * narrowed on 2026-08-14 to the six requested columns plus `_snowflake_deleted`;
- * `_snowflake_inserted_at` survives only in the unload's WHERE clause, so the loaded table
- * is already cut at the shared cutoff and carries no column to bound on.
+ * Rows with both columns NULL are the source's tombstones, every payload column NULL.
+ * Neither predicate matches NULL, so scoping alone excludes them and they never reach the
+ * file as id-only records. `_snowflake_deleted` is still selected, because the deleted rows
+ * that do carry an owner are labelled rather than hidden.
  */
 const codeIndexingQueries = subjectPageQueries({
   table: 'code_indexing_manifest',
@@ -1025,10 +1022,8 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   ],
   system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix', DELETED_COLUMN],
   microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
-  // The whole of the narrowed table bar its two owner columns, which `sourceQueryScopes`
-  // covers. `_snowflake_inserted_at` is deliberately absent: it was dropped from the load
-  // on 2026-08-14 and survives only in the unload's WHERE clause, so probing for it would
-  // fail a table that is in fact present and complete.
+  // Every column the query reads, and only those. The two owner columns are covered by
+  // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
 };
 

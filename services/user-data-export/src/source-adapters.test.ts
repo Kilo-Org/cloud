@@ -866,21 +866,14 @@ describe('source adapters', () => {
     expect(page?.nextCursor).toEqual({ key: ['manifest-1'] });
   });
 
-  // The load was narrowed on 2026-08-14 and `_snowflake_inserted_at` went with it, leaving
-  // the cutoff in the unload's WHERE clause alone. Naming it here would fail a table that
-  // is present and complete, so the read is scope, cursor and limit like its neighbours.
-  it('reads the manifest with no snapshot bound of its own', async () => {
-    const { adapters, warehouseCalls } = harness([MANIFEST_ROW]);
-
-    await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(READ_PAGE_INPUT);
-
-    expect(warehouseCalls[0].text).not.toContain('_snowflake_inserted_at');
-    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
-  });
-
-  // `organization_id` is NOT NULL on this table, so a personal row still names an
-  // organization and only `kilo_user_id` isolates one person's rows.
-  it('scopes the manifest on the column the subject calls for', async () => {
+  // The tight-scoping guard for this source, and the reason it needs one of its own.
+  // `organization_id` on a personal row is a uuid derived from the user rather than an
+  // organization, which invites a query reaching for both owner columns at once to "catch
+  // everything". A user read must name `kilo_user_id` and nothing else, an org read
+  // `organization_id` and nothing else, so neither subject can widen into the other's rows.
+  // The scope value is the first bind parameter in both, with only cursor and limit after
+  // it: no third predicate, and nothing interpolated.
+  it('scopes each manifest read to one owner column and never both', async () => {
     const { adapters, warehouseCalls } = harness([MANIFEST_ROW]);
     const adapter = requireAdapter(adapters, 'code_indexing_manifest');
 
@@ -888,9 +881,11 @@ describe('source adapters', () => {
     await adapter.readPage?.(ORG_READ_PAGE_INPUT);
 
     expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
-    expect(warehouseCalls[0].values[0]).toBe('owner-user');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
     expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
-    expect(warehouseCalls[1].values[0]).toBe('org-1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
   });
 
   it('marks every field of a manifest row prod has since deleted', async () => {

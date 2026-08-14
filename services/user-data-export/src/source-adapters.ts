@@ -24,12 +24,15 @@ export type ExportRecord = {
  *
  * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
  * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
- * `event_type` instead, `users` has no CDC column, and `enrichment_data` was narrowed to
- * four columns on request, dropping the flag with them. Naming the column on any of them
- * is a runtime error, so records from those sources are never labelled.
+ * `event_type` instead, `users` has no CDC column, and `enrichment_data` and
+ * `microdollar_usage_journal` were narrowed on request, dropping the flag with the rest.
+ * Naming the column on any of them is a runtime error, so records from those sources are
+ * never labelled.
  *
- * The `enrichment_data` case is the one where the flag was given up rather than never
- * held: it carried 5 deleted rows against 16,661 live, so it separated nothing.
+ * The two narrowed tables are where the flag was given up rather than never held.
+ * `enrichment_data` carried 5 deleted rows against 16,661 live, so it separated nothing.
+ * `microdollar_usage_journal` is insert-only — every one of its 158,433,290 rows is an
+ * `IncrementalInsertRows` event — so there is nothing for a deletion flag to mark.
  */
 export const DELETED_COLUMN = '_snowflake_deleted';
 export const SOURCES_WITHOUT_DELETED_COLUMN = [
@@ -37,6 +40,7 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'cli_sessions',
   'users',
   'enrichment_data',
+  'microdollar_usage_journal',
 ] as const;
 
 /**
@@ -262,6 +266,13 @@ LIMIT 1`;
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
  *     code_indexing_search              0    both columns set
+ *     microdollar_usage_journal         -    not counted
+ *
+ * `microdollar_usage_journal` carries the same owner pair as the other microdollar
+ * tables, but the count above was never rerun for it, so it is left blank rather than
+ * assumed to be 0. Nothing in the export depends on the answer: both predicates are the
+ * standard ones and neither matches NULL, so an unowned row reaches nobody either way.
+ * The entry is here so the gap is visible rather than looking like an omission.
  *
  * On the first four, an organization can own a row outright with no user attached, so
  * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
@@ -578,6 +589,47 @@ const enrichmentQuery = singleKeyPageQuery({
   scope: 'user',
 });
 
+/**
+ * The second journal in the export, and the one place where the cursor is deliberately
+ * NOT the column that would work today.
+ *
+ * `payload_id` is unique across all 158,433,290 rows, measured 2026-08-11. It would serve
+ * as a cursor on this data. It is unique by luck rather than by construction: the journal
+ * emits only `IncrementalInsertRows`, so nothing produces a second row for an entity. The
+ * moment an update event appears, `payload_id` repeats and a cursor built on it starts
+ * skipping rows at page boundaries — which is not a hypothetical, it is the defect that
+ * shipped on `cli_sessions.session_id` and again on `system_prompt_prefix`.
+ *
+ * The position pair is unique by construction, so that is the cursor. `payload_id` is
+ * exported as a field instead, where its uniqueness does not have to hold.
+ *
+ * The ORDER BY is table-qualified, the third table where that matters and the second where
+ * the columns are this exact pair. Both positions are bigints selected through a `::text`
+ * cast under their own names, so a bare name there binds to the text output column: the
+ * page would sort lexicographically while the cursor compares numerically, and no index
+ * could serve it. See the note on `SCOPE_COLUMNS`.
+ *
+ * Both warehouse indexes are `(owner, most_significant_position,
+ * least_significant_position)`, so this ordering is the one they already cover.
+ */
+function microdollarJournalPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT payload_id, project_id,
+  most_significant_position::text AS most_significant_position,
+  least_significant_position::text AS least_significant_position
+FROM microdollar_usage_journal
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::bigint IS NULL
+    OR (most_significant_position, least_significant_position) > ($2::bigint, $3::bigint))
+ORDER BY microdollar_usage_journal.most_significant_position,
+  microdollar_usage_journal.least_significant_position
+LIMIT $4`;
+}
+
+const microdollarJournalQueries: Record<ExportSubject['type'], string> = {
+  user: microdollarJournalPageQuery('user'),
+  organization: microdollarJournalPageQuery('organization'),
+};
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
@@ -608,6 +660,12 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type MicrodollarJournalRow = {
+  payload_id: string | null;
+  project_id: string | null;
+  most_significant_position: string;
+  least_significant_position: string;
+};
 type EnrichmentRow = {
   id: string;
   github_enrichment_data: string | null;
@@ -1237,6 +1295,59 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'microdollar_usage_journal',
+      warehouseTable: 'microdollar_usage_journal',
+      async readPage(input): Promise<SourcePage> {
+        const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
+        const rows: MicrodollarJournalRow[] = await warehouseQuery(
+          microdollarJournalQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterMost, afterLeast, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            payload_id: warehouseText(row.payload_id),
+            project_id: warehouseText(row.project_id),
+            // The cursor pair, read strictly: a page that could not say where it ended
+            // would restart the source rather than continue it.
+            most_significant_position: digitString(
+              row.most_significant_position,
+              'most_significant_position'
+            ),
+            least_significant_position: digitString(
+              row.least_significant_position,
+              'least_significant_position'
+            ),
+          }))
+        );
+        return {
+          // No deletion mark: the column went with the narrowing to six columns, so this
+          // source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => {
+            // The position pair identifies the event, not `payload_id`. Same shape as
+            // `cli_sessions`, and for the reason set out on the query above.
+            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            return [
+              {
+                source: 'microdollar_usage_journal',
+                id,
+                field: 'payload_id',
+                value: row.payload_id,
+              },
+              {
+                source: 'microdollar_usage_journal',
+                id,
+                field: 'project_id',
+                value: row.project_id,
+              },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.most_significant_position,
+            row.least_significant_position,
+          ]),
+        };
+      },
+    },
+    {
       name: 'enrichment_data',
       warehouseTable: 'enrichment_data',
       async readPage(input): Promise<SourcePage> {
@@ -1326,6 +1437,8 @@ export const warehouseQueries = {
   deploymentEventOrgQuery: deploymentEventQueries.organization,
   // No org counterpart, deliberately. See `enrichmentQuery` and `USER_ONLY_SOURCES`.
   enrichmentUserQuery: enrichmentQuery,
+  microdollarJournalUserQuery: microdollarJournalQueries.user,
+  microdollarJournalOrgQuery: microdollarJournalQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1402,6 +1515,15 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // No deletion column: dropped when the table was narrowed to four columns. The probe
   // must not ask for it, or the table would be called absent on every export.
   enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],
+  // The position pair is declared because the query orders and pages on it. A column only
+  // filtered or ordered on still has to be probed: a table the probe calls present must
+  // not then fail at read time on a missing column.
+  microdollar_usage_journal: [
+    'payload_id',
+    'project_id',
+    'most_significant_position',
+    'least_significant_position',
+  ],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1526,6 +1648,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   deploymentEventUserQuery: 'kilo_user_id = $1',
   deploymentEventOrgQuery: 'organization_id = $1',
   enrichmentUserQuery: 'kilo_user_id = $1',
+  microdollarJournalUserQuery: 'kilo_user_id = $1',
+  microdollarJournalOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

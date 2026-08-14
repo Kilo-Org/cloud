@@ -26,6 +26,9 @@
  *        `enrichment_data`        the GitHub and Clay profile data third parties assembled
  *                                 about the person. Personal exports only; the source has
  *                                 no organization reading
+ *        `microdollar_usage_journal`
+ *                                 one record pair per usage event, naming the event and
+ *                                 the project it belongs to
  *
  *      One entry rather than one per source, because they ship together. A reader cares
  *      that the file gained sources at 4, not the order they were written in.

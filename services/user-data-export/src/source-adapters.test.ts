@@ -348,6 +348,7 @@ describe('warehouse availability probe', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'microdollar_usage_journal',
       'enrichment_data',
     ]);
   });
@@ -403,6 +404,7 @@ describe('source adapters', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'microdollar_usage_journal',
       'enrichment_data',
     ]);
   });
@@ -1226,5 +1228,105 @@ describe('source adapters', () => {
     expect(byField.get('github_enrichment_data')).toBe(
       JSON.stringify(ENRICHMENT_ROW.github_enrichment_data)
     );
+  });
+
+  const JOURNAL_ROW = {
+    payload_id: 'payload-1',
+    project_id: 'project-a',
+    most_significant_position: '4',
+    least_significant_position: '9',
+  };
+
+  it('keys the usage journal on the position pair rather than the payload id', async () => {
+    const { adapters } = harness([JOURNAL_ROW]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_journal').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    // `payload_id` is unique in today's data only because the journal is insert-only, so
+    // it is exported as a field and never used to identify the row.
+    expect(page?.records).toEqual([
+      {
+        source: 'microdollar_usage_journal',
+        id: '4.9',
+        field: 'payload_id',
+        value: 'payload-1',
+      },
+      {
+        source: 'microdollar_usage_journal',
+        id: '4.9',
+        field: 'project_id',
+        value: 'project-a',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['4', '9'] });
+  });
+
+  // The cursor must be the pair, not `payload_id`. A cursor on `payload_id` works on the
+  // current data and starts skipping rows at page boundaries the moment an update event
+  // appears, which is how it broke on cli_sessions.
+  it('pages the usage journal on the position pair', async () => {
+    const { adapters, warehouseCalls } = harness([JOURNAL_ROW]);
+
+    await requireAdapter(adapters, 'microdollar_usage_journal').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['4', '9'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain(
+      '(most_significant_position, least_significant_position) > ($2::bigint, $3::bigint)'
+    );
+    expect(warehouseCalls[0].text).not.toContain('payload_id >');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', '4', '9', 100]);
+  });
+
+  // Both positions are bigints selected through a text cast under their own names, so a
+  // bare name in the ORDER BY would sort the page as text while the cursor compares
+  // numerically. Third table where this applies, and the failure is silent every time.
+  it('orders the usage journal on the qualified position columns', async () => {
+    const { adapters, warehouseCalls } = harness([JOURNAL_ROW]);
+
+    await requireAdapter(adapters, 'microdollar_usage_journal').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain(
+      'ORDER BY microdollar_usage_journal.most_significant_position,\n' +
+        '  microdollar_usage_journal.least_significant_position'
+    );
+  });
+
+  it('scopes each usage journal read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([JOURNAL_ROW]);
+    const adapter = requireAdapter(adapters, 'microdollar_usage_journal');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+  });
+
+  // The column went with the narrowing, and the journal is insert-only besides, so this
+  // source has nothing to mark and must not claim otherwise.
+  it('never marks a usage journal record as deleted', async () => {
+    const { adapters } = harness([{ ...JOURNAL_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_journal').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records).toHaveLength(2);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('fails a usage journal page whose cursor column is unreadable', async () => {
+    const { adapters } = harness([{ ...JOURNAL_ROW, least_significant_position: 'not-a-number' }]);
+
+    await expect(
+      requireAdapter(adapters, 'microdollar_usage_journal').readPage?.(READ_PAGE_INPUT)
+    ).rejects.toThrow('least_significant_position');
   });
 });

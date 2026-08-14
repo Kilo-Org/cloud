@@ -838,24 +838,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (
-    !effectiveProviderContext.userByok &&
-    (effectiveProviderContext.provider.id === 'vercel' ||
-      effectiveProviderContext.provider.id === 'openrouter')
-  ) {
-    const partnerProvider = await getPercentageRoutedPartnerProvider(
-      effectiveModelIdLowerCased,
-      requestBodyParsed,
-      taskId || user.id
-    );
-    if (partnerProvider) {
-      effectiveProviderContext = {
-        kind: 'provider',
-        provider: partnerProvider,
-        userByok: null,
-        bypassAccessCheck: false,
-      };
-    }
+  const partnerProvider = await getPercentageRoutedPartnerProvider({
+    requestedModel: effectiveModelIdLowerCased,
+    request: requestBodyParsed,
+    randomSeed: taskId || user.id,
+    sourceProviderId: effectiveProviderContext.provider.id,
+    hasUserByok: effectiveProviderContext.userByok !== null,
+  });
+  if (partnerProvider) {
+    effectiveProviderContext = {
+      kind: 'provider',
+      provider: partnerProvider,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
   }
 
   console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);

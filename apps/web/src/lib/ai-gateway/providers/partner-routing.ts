@@ -12,6 +12,14 @@ type PartnerRoute = {
   cohort: Exclude<RoutingCohort, 'vercel'>;
 };
 
+export type PercentageRoutedPartnerInput = {
+  requestedModel: string;
+  request: GatewayRequest;
+  randomSeed: string;
+  sourceProviderId: Provider['id'];
+  hasUserByok: boolean;
+};
+
 const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
   'z-ai/glm-5.2': {
     provider: PROVIDERS.FRIENDLI_GLM,
@@ -30,13 +38,13 @@ export function hasCustomizedProviderOptions(request: GatewayRequest) {
   return provider !== undefined && Object.keys(provider).length > 0;
 }
 
-function getEligiblePartnerRoute(
-  requestedModel: string,
-  request: GatewayRequest
-): PartnerRoute | null {
+function getEligiblePartnerRoute(input: PercentageRoutedPartnerInput): PartnerRoute | null {
+  const { requestedModel, request, sourceProviderId, hasUserByok } = input;
   const route = PARTNER_ROUTES[requestedModel];
   if (
     !route ||
+    hasUserByok ||
+    (sourceProviderId !== 'vercel' && sourceProviderId !== 'openrouter') ||
     hasCustomizedProviderOptions(request) ||
     !route.provider.supportedChatApis.includes(request.kind)
   ) {
@@ -46,24 +54,22 @@ function getEligiblePartnerRoute(
 }
 
 export async function getPercentageRoutedPartnerProvider(
-  requestedModel: string,
-  request: GatewayRequest,
-  randomSeed: string
+  input: PercentageRoutedPartnerInput
 ): Promise<Provider | null> {
-  if (!getEligiblePartnerRoute(requestedModel, request)) return null;
+  if (!getEligiblePartnerRoute(input)) return null;
   const routingConfig = await getRuntimeGatewayRoutingConfig();
-  return selectPercentageRoutedPartnerProvider(requestedModel, request, randomSeed, routingConfig);
+  return selectPercentageRoutedPartnerProvider(input, routingConfig);
 }
 
 export function selectPercentageRoutedPartnerProvider(
-  requestedModel: string,
-  request: GatewayRequest,
-  randomSeed: string,
+  input: PercentageRoutedPartnerInput,
   routingConfig: Awaited<ReturnType<typeof getRuntimeGatewayRoutingConfig>>
 ): Provider | null {
-  const route = getEligiblePartnerRoute(requestedModel, request);
+  const route = getEligiblePartnerRoute(input);
   if (!route) return null;
 
   const percentage = routingConfig[route.cohort];
-  return passesRoutingPercentage(route.cohort, randomSeed, percentage) ? route.provider : null;
+  return passesRoutingPercentage(route.cohort, input.randomSeed, percentage)
+    ? route.provider
+    : null;
 }

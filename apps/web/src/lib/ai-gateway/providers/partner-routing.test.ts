@@ -1,7 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { selectPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
+import {
+  selectPercentageRoutedPartnerProvider,
+  type PercentageRoutedPartnerInput,
+} from '@/lib/ai-gateway/providers/partner-routing';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { RuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 
@@ -23,77 +26,78 @@ function request(
   };
 }
 
-describe('getPercentageRoutedPartnerProvider', () => {
-  const routingConfig: RuntimeGatewayRoutingConfig = {
-    vercelPaid: 50,
-    vercelFree: 50,
-    vercelOptOutModels: new Set(),
-    friendli: 100,
-    perplexity: 100,
-  };
+const routingConfig: RuntimeGatewayRoutingConfig = {
+  vercelPaid: 50,
+  vercelFree: 50,
+  vercelOptOutModels: new Set(),
+  friendli: 100,
+  perplexity: 100,
+};
 
+const defaultInput = {
+  requestedModel: 'z-ai/glm-5.2',
+  request: request(),
+  randomSeed: 'user-id',
+  sourceProviderId: 'openrouter',
+  hasUserByok: false,
+} satisfies PercentageRoutedPartnerInput;
+
+function selectPartner(
+  overrides: Partial<PercentageRoutedPartnerInput> = {},
+  config = routingConfig
+) {
+  return selectPercentageRoutedPartnerProvider({ ...defaultInput, ...overrides }, config);
+}
+
+describe('getPercentageRoutedPartnerProvider', () => {
   it.each([
     ['z-ai/glm-5.2', PROVIDERS.FRIENDLI_GLM],
     ['moonshotai/kimi-k3', PROVIDERS.PERPLEXITY_KIMI],
   ])('routes exact model %s', (model, expectedProvider) => {
-    expect(selectPercentageRoutedPartnerProvider(model, request(), 'user-id', routingConfig)).toBe(
-      expectedProvider
-    );
+    expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
   });
 
   it('routes Messages requests', () => {
-    expect(
-      selectPercentageRoutedPartnerProvider(
-        'z-ai/glm-5.2',
-        request('messages'),
-        'user-id',
-        routingConfig
-      )
-    ).toBe(PROVIDERS.FRIENDLI_GLM);
+    expect(selectPartner({ request: request('messages') })).toBe(PROVIDERS.FRIENDLI_GLM);
   });
 
   it.each(['chat_completions', 'responses'] as const)(
     'does not route unsupported %s requests',
     kind => {
-      expect(
-        selectPercentageRoutedPartnerProvider(
-          'z-ai/glm-5.2',
-          request(kind),
-          'user-id',
-          routingConfig
-        )
-      ).toBeNull();
+      expect(selectPartner({ request: request(kind) })).toBeNull();
     }
   );
 
   it('allows an empty provider object', () => {
-    expect(
-      selectPercentageRoutedPartnerProvider(
-        'z-ai/glm-5.2',
-        request('messages', {}),
-        'user-id',
-        routingConfig
-      )
-    ).toBe(PROVIDERS.FRIENDLI_GLM);
+    expect(selectPartner({ request: request('messages', {}) })).toBe(PROVIDERS.FRIENDLI_GLM);
   });
 
   it('does not route requests with customized provider options', () => {
-    expect(
-      selectPercentageRoutedPartnerProvider(
-        'z-ai/glm-5.2',
-        request('messages', { only: ['friendli'] }),
-        'user-id',
-        routingConfig
-      )
-    ).toBeNull();
+    expect(selectPartner({ request: request('messages', { only: ['friendli'] }) })).toBeNull();
+  });
+
+  it.each(['openrouter', 'vercel'] as const)(
+    'routes from managed provider %s',
+    sourceProviderId => {
+      expect(selectPartner({ sourceProviderId })).toBe(PROVIDERS.FRIENDLI_GLM);
+    }
+  );
+
+  it.each(['friendli', 'custom', 'direct-byok'] as const)(
+    'does not override provider %s',
+    sourceProviderId => {
+      expect(selectPartner({ sourceProviderId })).toBeNull();
+    }
+  );
+
+  it('does not override user BYOK', () => {
+    expect(selectPartner({ sourceProviderId: 'vercel', hasUserByok: true })).toBeNull();
   });
 
   it.each(['z-ai/glm-5.2-fast', 'moonshotai/kimi-k3-fast', 'zai/glm-5.2'])(
     'does not route non-exact model %s',
     model => {
-      expect(
-        selectPercentageRoutedPartnerProvider(model, request(), 'user-id', routingConfig)
-      ).toBeNull();
+      expect(selectPartner({ requestedModel: model })).toBeNull();
     }
   );
 
@@ -104,8 +108,6 @@ describe('getPercentageRoutedPartnerProvider', () => {
       perplexity: 0,
     };
 
-    expect(
-      selectPercentageRoutedPartnerProvider('z-ai/glm-5.2', request(), 'user-id', disabledConfig)
-    ).toBeNull();
+    expect(selectPartner({}, disabledConfig)).toBeNull();
   });
 });

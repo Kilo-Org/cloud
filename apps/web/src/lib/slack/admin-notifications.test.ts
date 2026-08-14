@@ -57,6 +57,16 @@ describe('sendAdminSlackNotification', () => {
     );
   });
 
+  it('fails when a caller requires a configured webhook', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const { sendAdminSlackNotification } = await loadModule(undefined);
+
+    await expect(
+      sendAdminSlackNotification({ text: 'Test' }, { requireConfigured: true })
+    ).rejects.toMatchObject({ kind: 'configuration' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('throws an upstream error when Slack rejects the request', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(new Response('invalid_payload', { status: 400 }));
     const { sendAdminSlackNotification } = await loadModule(WEBHOOK_URL);

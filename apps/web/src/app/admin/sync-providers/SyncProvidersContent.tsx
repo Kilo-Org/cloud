@@ -30,7 +30,7 @@ export function SyncProvidersContent() {
       onSuccess: result => {
         toast.success(
           result.delivery === 'posted'
-            ? 'Posted a test stale-sync alert to #kilo-on-call'
+            ? 'Posted a test stale-sync alert to the Cloud alerts channel'
             : 'Simulated the test alert in the local server logs'
         );
       },
@@ -153,9 +153,9 @@ export function SyncProvidersContent() {
             Test stale-sync alert
           </CardTitle>
           <CardDescription>
-            Production Vercel posts a clearly labeled test message to #kilo-on-call. Local and
-            preview environments log the same payload without contacting Slack. Tests do not
-            suppress later real alerts.
+            Production Vercel posts a clearly labeled test message to the Cloud alerts channel.
+            Local and preview environments log the same payload without contacting Slack. Tests do
+            not suppress later real alerts.
           </CardDescription>
         </CardHeader>
         <CardContent>

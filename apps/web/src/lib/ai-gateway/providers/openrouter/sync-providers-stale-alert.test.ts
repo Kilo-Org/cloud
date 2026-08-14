@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -15,27 +15,33 @@ jest.mock('@/lib/redis', () => ({
   },
 }));
 
-jest.mock('@/lib/slack/on-call-notifications', () => ({
-  sendOnCallSlackNotification: jest.fn(),
-}));
-
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
   alertIfSyncProvidersStale,
   buildStaleSyncAlertNotification,
   parseIsoTimestamp,
   postTestStaleSyncAlert,
+  sendStaleSyncAlertNotification,
   shouldPostStaleSyncAlert,
   SYNC_PROVIDERS_STALE_AFTER_MS,
-  SYNC_PROVIDERS_STALE_ALERT_CHANNEL,
   SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
 } from './sync-providers-stale-alert';
 
+const originalVercelEnv = process.env.VERCEL_ENV;
 const NOW = new Date('2026-08-12T12:00:00.000Z');
 const FRESH_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS + 1);
 const STALE_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS);
 const OLDER_ALERT = new Date(STALE_SYNC.getTime() - 60_000);
 const NEWER_ALERT = new Date(STALE_SYNC.getTime() + 60_000);
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  if (originalVercelEnv === undefined) {
+    delete process.env.VERCEL_ENV;
+  } else {
+    process.env.VERCEL_ENV = originalVercelEnv;
+  }
+});
 
 describe('parseIsoTimestamp', () => {
   it('returns null for missing or invalid values', () => {
@@ -114,7 +120,7 @@ describe('shouldPostStaleSyncAlert', () => {
 });
 
 describe('buildStaleSyncAlertNotification', () => {
-  it('includes models, providers, investigation guidance, and the on-call channel', () => {
+  it('includes models, providers, investigation guidance, and the Cloud alerts channel', () => {
     const notification = buildStaleSyncAlertNotification({
       lastCompletedAt: STALE_SYNC,
       now: NOW,
@@ -126,7 +132,7 @@ describe('buildStaleSyncAlertNotification', () => {
     expect(notification.text).toContain('New models and providers can be missing');
     expect(notification.text).toContain('Sentry and Vercel logs');
     expect(JSON.stringify(notification.blocks)).toContain('/admin/gateway|Open Gateway admin');
-    expect(JSON.stringify(notification.blocks)).toContain(SYNC_PROVIDERS_STALE_ALERT_CHANNEL);
+    expect(JSON.stringify(notification.blocks)).toContain('Cloud alerts channel');
     expect(notification.text).not.toContain('[TEST]');
   });
 
@@ -139,7 +145,9 @@ describe('buildStaleSyncAlertNotification', () => {
 
     expect(notification.text).toContain('[TEST]');
     expect(JSON.stringify(notification.blocks)).toContain('[TEST ALERT]');
-    expect(JSON.stringify(notification.blocks)).toContain('Test alert posted to #kilo-on-call');
+    expect(JSON.stringify(notification.blocks)).toContain(
+      'Test alert for the Cloud alerts channel generated'
+    );
     expect(notification.text).toContain('Provider and model catalogs');
     expect(notification.text).toContain('Sentry and Vercel logs');
   });
@@ -151,6 +159,45 @@ describe('buildStaleSyncAlertNotification', () => {
     });
 
     expect(notification.text).toContain('never recorded');
+  });
+});
+
+describe('sendStaleSyncAlertNotification', () => {
+  const notification = { text: 'Test stale-sync alert' };
+
+  it('simulates the Cloud alert outside production Vercel', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification, _options?: { requireConfigured?: boolean }) =>
+        undefined
+    );
+
+    await expect(sendStaleSyncAlertNotification(notification, sendNotification)).resolves.toBe(
+      'simulated'
+    );
+
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[sync-providers] Simulated Cloud alert; Slack delivery is enabled only on production Vercel',
+      notification
+    );
+  });
+
+  it('uses the required Cloud alert channel webhook in production Vercel', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification, _options?: { requireConfigured?: boolean }) =>
+        undefined
+    );
+
+    await expect(sendStaleSyncAlertNotification(notification, sendNotification)).resolves.toBe(
+      'posted'
+    );
+
+    expect(sendNotification).toHaveBeenCalledWith(notification, {
+      requireConfigured: true,
+    });
   });
 });
 

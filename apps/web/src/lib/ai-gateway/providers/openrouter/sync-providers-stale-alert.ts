@@ -7,12 +7,13 @@ import {
   SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
   SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY,
 } from '@/lib/redis-keys';
-import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
-import { sendOnCallSlackNotification } from '@/lib/slack/on-call-notifications';
+import {
+  sendAdminSlackNotification,
+  type AdminSlackNotification,
+} from '@/lib/slack/admin-notifications';
 
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
 export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 7 * 24 * 60 * 60;
-export const SYNC_PROVIDERS_STALE_ALERT_CHANNEL = '#kilo-on-call';
 
 const STALE_WINDOW_LABEL = '1 hour';
 const IMPACT_COPY =
@@ -93,8 +94,8 @@ export function buildStaleSyncAlertNotification(input: {
             type: 'mrkdwn',
             text:
               kind === 'test'
-                ? `Test alert posted to ${SYNC_PROVIDERS_STALE_ALERT_CHANNEL} at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`
-                : `Checked at ${input.now.toISOString()} · Posted to ${SYNC_PROVIDERS_STALE_ALERT_CHANNEL} · <${APP_URL}/admin/gateway|Open Gateway admin>`,
+                ? `Test alert for the Cloud alerts channel generated at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`
+                : `Checked at ${input.now.toISOString()} · Cloud alerts channel · <${APP_URL}/admin/gateway|Open Gateway admin>`,
           },
         ],
       },
@@ -104,12 +105,33 @@ export function buildStaleSyncAlertNotification(input: {
   };
 }
 
+type StaleAlertDelivery = 'posted' | 'simulated';
+type SendStaleAlertNotification = (
+  notification: AdminSlackNotification
+) => Promise<StaleAlertDelivery>;
+
+export async function sendStaleSyncAlertNotification(
+  notification: AdminSlackNotification,
+  sendNotification = sendAdminSlackNotification
+): Promise<StaleAlertDelivery> {
+  if (process.env.VERCEL_ENV !== 'production') {
+    console.info(
+      '[sync-providers] Simulated Cloud alert; Slack delivery is enabled only on production Vercel',
+      notification
+    );
+    return 'simulated';
+  }
+
+  await sendNotification(notification, { requireConfigured: true });
+  return 'posted';
+}
+
 type StaleAlertDependencies = {
   now?: () => Date;
   getLastCompletedAt?: () => Promise<string | null>;
   getLastAlertAt?: () => Promise<string | null>;
   setLastAlertAt?: (iso: string) => Promise<unknown>;
-  sendNotification?: typeof sendOnCallSlackNotification;
+  sendNotification?: SendStaleAlertNotification;
 };
 
 async function defaultGetLastCompletedAt(): Promise<string | null> {
@@ -130,10 +152,10 @@ export async function postStaleSyncAlert(input: {
   lastCompletedAt: Date | null;
   now?: Date;
   kind?: 'live' | 'test';
-  sendNotification?: typeof sendOnCallSlackNotification;
-}): ReturnType<typeof sendOnCallSlackNotification> {
+  sendNotification?: SendStaleAlertNotification;
+}): Promise<StaleAlertDelivery> {
   const now = input.now ?? new Date();
-  const sendNotification = input.sendNotification ?? sendOnCallSlackNotification;
+  const sendNotification = input.sendNotification ?? sendStaleSyncAlertNotification;
   return sendNotification(
     buildStaleSyncAlertNotification({
       lastCompletedAt: input.lastCompletedAt,
@@ -146,11 +168,11 @@ export async function postStaleSyncAlert(input: {
 export async function postTestStaleSyncAlert({
   now: nowFn = () => new Date(),
   getLastCompletedAt = defaultGetLastCompletedAt,
-  sendNotification = sendOnCallSlackNotification,
+  sendNotification = sendStaleSyncAlertNotification,
 }: Pick<
   StaleAlertDependencies,
   'now' | 'getLastCompletedAt' | 'sendNotification'
-> = {}): ReturnType<typeof sendOnCallSlackNotification> {
+> = {}): Promise<StaleAlertDelivery> {
   const now = nowFn();
   const lastCompletedAt = parseIsoTimestamp(await getLastCompletedAt());
   return postStaleSyncAlert({
@@ -166,7 +188,7 @@ export async function alertIfSyncProvidersStale({
   getLastCompletedAt = defaultGetLastCompletedAt,
   getLastAlertAt = defaultGetLastAlertAt,
   setLastAlertAt = defaultSetLastAlertAt,
-  sendNotification = sendOnCallSlackNotification,
+  sendNotification = sendStaleSyncAlertNotification,
 }: StaleAlertDependencies = {}): Promise<void> {
   try {
     const now = nowFn();

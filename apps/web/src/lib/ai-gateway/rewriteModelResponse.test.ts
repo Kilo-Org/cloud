@@ -1056,6 +1056,25 @@ describe('rewriteModelResponse', () => {
     });
   });
 
+  test('preserves cost for models with fallback-only custom pricing', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'moonshotai/kimi-k3',
+        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+      }),
+      model: 'moonshotai/kimi-k3',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({
+      model: 'moonshotai/kimi-k3',
+      usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+    });
+  });
+
   test('processes paid-model responses when request logging is enabled', async () => {
     mockedOptIn.mockResolvedValueOnce(true);
     const result = await rewriteModelResponse({

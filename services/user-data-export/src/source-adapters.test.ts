@@ -337,6 +337,7 @@ describe('warehouse availability probe', () => {
       'system_prompt_prefix',
       'microdollar_usage_metadata',
       'code_indexing_manifest',
+      'code_indexing_search',
     ]);
   });
 
@@ -389,6 +390,7 @@ describe('source adapters', () => {
       'system_prompt_prefix',
       'microdollar_usage_metadata',
       'code_indexing_manifest',
+      'code_indexing_search',
     ]);
   });
 
@@ -923,5 +925,103 @@ describe('source adapters', () => {
 
     expect(byField.get('git_branch')).toBeNull();
     expect(byField.get('file_path')).toBe('src/index.ts');
+  });
+
+  const SEARCH_ROW = {
+    id: 'search-1',
+    project_id: 'project-a',
+    query: 'how does auth work',
+    metadata: { results: [{ filePath: 'src/auth.ts', startLine: 10 }], path: 'src/' },
+    created_at: '2026-07-04T09:15:00.000Z',
+  };
+
+  it('emits the four search fields per row, keyed by the row that carried them', async () => {
+    const { adapters } = harness([SEARCH_ROW]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    // One id across all four, so a search, what it ran against, what it returned and when
+    // it ran stay groupable as one event.
+    expect(page?.records).toEqual([
+      { source: 'code_indexing_search', id: 'search-1', field: 'project_id', value: 'project-a' },
+      {
+        source: 'code_indexing_search',
+        id: 'search-1',
+        field: 'query',
+        value: 'how does auth work',
+      },
+      {
+        source: 'code_indexing_search',
+        id: 'search-1',
+        field: 'metadata',
+        value: JSON.stringify(SEARCH_ROW.metadata),
+      },
+      {
+        source: 'code_indexing_search',
+        id: 'search-1',
+        field: 'created_at',
+        value: '2026-07-04T09:15:00.000Z',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['search-1'] });
+  });
+
+  // Both owner columns are notNull() on this table, so unlike its sibling manifest the two
+  // scopes overlap rather than partition. Each read must still name one column and not the
+  // other: an org read that also matched `kilo_user_id` would return the requester's own
+  // personal searches under the organization's name.
+  it('scopes each search read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([SEARCH_ROW]);
+    const adapter = requireAdapter(adapters, 'code_indexing_search');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  // `metadata` is jsonb, so the driver hands back a parsed object. Serialized here rather
+  // than dropped, because the result hits are what the search actually returned.
+  it('serializes the search metadata payload rather than dropping it', async () => {
+    const { adapters } = harness([SEARCH_ROW]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
+    const metadata = page?.records.find(record => record.field === 'metadata')?.value;
+
+    expect(JSON.parse(String(metadata))).toEqual(SEARCH_ROW.metadata);
+  });
+
+  it('marks every field of a search row prod has since deleted', async () => {
+    const { adapters } = harness([{ ...SEARCH_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(4);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  // Reads fewer rows per page than the default, because a row carries a whole result set.
+  it('cuts the search page size, as the message source does', async () => {
+    const { adapters } = harness([SEARCH_ROW]);
+
+    expect(requireAdapter(adapters, 'code_indexing_search').pageSize).toBe(200);
+  });
+
+  it('reads a non-string search value as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ ...SEARCH_ROW, query: 42 }]);
+
+    const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('query')).toBeNull();
+    expect(byField.get('project_id')).toBe('project-a');
   });
 });

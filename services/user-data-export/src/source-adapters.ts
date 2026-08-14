@@ -237,11 +237,17 @@ LIMIT 1`;
  *     cli_sessions                      0    both columns set
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
+ *     code_indexing_search              0    both columns set
  *
  * On the first three, an organization can own a row outright with no user attached, so
- * `kilo_user_id = $1` genuinely skips those. On the other three every row names a user,
+ * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
+ *
+ * `code_indexing_search` is the one entry above whose 0 is a schema guarantee rather than
+ * a count: both owner columns are `notNull()` on the table, so no row can carry one
+ * without the other. Its sibling `code_indexing_manifest` sits at the opposite extreme,
+ * which is why the two are read so differently despite the same router writing both.
  *
  * `code_indexing_manifest` is the strongest form of the first case, and it qualifies the
  * "everything they own across both" above: indexing under an organization writes
@@ -250,8 +256,10 @@ LIMIT 1`;
  * whose `organization_id` is not always an organization — see `codeIndexingQueries`, which
  * is where that column's two readings are set out.
  *
- * The warehouse has no `created_at` on any table and is itself a point-in-time
- * snapshot, so there is no `snapshot_at` bound to apply here.
+ * The warehouse is itself a point-in-time snapshot, cut at the load cutoff before the
+ * export ever reads it, so there is no `snapshot_at` bound to apply here. Only
+ * `code_indexing_search` carries a `created_at` at all, and it is exported as a value
+ * rather than used as a bound, for that reason.
  */
 export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
 
@@ -440,9 +448,38 @@ const codeIndexingQueries = subjectPageQueries({
   columns: 'id, project_id, git_branch, file_path, _snowflake_deleted',
 });
 
+/**
+ * The sibling of `code_indexing_manifest`, written by the same router, but with the
+ * opposite ownership shape. Both owner columns are `notNull()` in `schema.ts`, and the
+ * insert at `code-indexing-router.ts` sets `kilo_user_id` to `ctx.user.id` unconditionally,
+ * so EVERY row carries both. This is the "both columns set" case, not the XOR one.
+ *
+ * That makes the two scopes overlap rather than partition, which is the intended reading
+ * recorded on `SCOPE_COLUMNS`: `kilo_user_id = $1` returns every search that person ran,
+ * in their own workspace and in any organization's, and `organization_id = $1` returns the
+ * searches run in that organization by any member. A search run inside an organization
+ * belongs to both exports.
+ *
+ * `organization_id` is still not always an organization. It comes from the same
+ * `getCodeIndexOrganizationId` helper as the manifest, which falls through to
+ * `getUserUUID(user)` when no org was supplied, so a personal search carries a uuid derived
+ * from the user. An organization read binds a real organization id, which no such derived
+ * uuid can equal, so personal searches cannot reach an organization's export.
+ */
+const codeIndexingSearchQueries = subjectPageQueries({
+  table: 'code_indexing_search',
+  columns: 'id, project_id, query, metadata, created_at, _snowflake_deleted',
+});
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
+
+/**
+ * `metadata` carries the whole result set of a search, not a single value, so rows here
+ * are large in the same way message payloads are and the page is cut for the same reason.
+ */
+const SEARCH_PAGE_SIZE = 200;
 
 type ProjectRow = { id: string; title: string | null; deleted: unknown };
 type MessageRow = { id: string; data: unknown; deleted: unknown };
@@ -461,6 +498,14 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type CodeIndexingSearchRow = {
+  id: string;
+  project_id: string | null;
+  query: string | null;
+  metadata: string | null;
+  created_at: string | null;
+  deleted: unknown;
+};
 type CodeIndexingRow = {
   id: string;
   project_id: string | null;
@@ -931,6 +976,72 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'code_indexing_search',
+      warehouseTable: 'code_indexing_search',
+      pageSize: SEARCH_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: CodeIndexingSearchRow[] = await warehouseQuery(
+          codeIndexingSearchQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            // Every column here is NOT NULL on the primary, and the warehouse enforces
+            // none of that, so each mapper has to tolerate a NULL the source could never
+            // produce. What it does NOT have to tolerate is a wrong type: the loaded
+            // column types still hold, so only the two text columns can carry something
+            // unexpected, and only they need the lenient reader.
+            project_id: warehouseText(row.project_id),
+            query: warehouseText(row.query),
+            // `jsonValue` rather than `warehouseText`: the column is jsonb, so the driver
+            // hands back a parsed object rather than text. Same handling as
+            // `app_builder_messages.data`, the export's other JSON payload.
+            metadata: jsonValue(row.metadata),
+            // Tolerates NULL and nothing else, which is all a `timestamptz` column can
+            // spring on it.
+            created_at: nullableTimestamp(row.created_at, 'created_at'),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          // Four records per search, sharing the row's id, so the query, the project it
+          // ran against, what it returned and when stay groupable as one search.
+          records: rows.flatMap(row => [
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'project_id',
+              value: row.project_id,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'query',
+              value: row.query,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'metadata',
+              value: row.metadata,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'created_at',
+              value: row.created_at,
+              ...deletionMark(row.deleted),
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
   ];
 }
 
@@ -967,6 +1078,8 @@ export const warehouseQueries = {
   userPromptOrgQuery: userPromptQueries.organization,
   codeIndexingUserQuery: codeIndexingQueries.user,
   codeIndexingOrgQuery: codeIndexingQueries.organization,
+  codeIndexingSearchUserQuery: codeIndexingSearchQueries.user,
+  codeIndexingSearchOrgQuery: codeIndexingSearchQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1027,6 +1140,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
+  code_indexing_search: ['id', 'project_id', 'query', 'metadata', 'created_at', DELETED_COLUMN],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1146,6 +1260,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   userPromptOrgQuery: 'organization_id = $1',
   codeIndexingUserQuery: 'kilo_user_id = $1',
   codeIndexingOrgQuery: 'organization_id = $1',
+  codeIndexingSearchUserQuery: 'kilo_user_id = $1',
+  codeIndexingSearchOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

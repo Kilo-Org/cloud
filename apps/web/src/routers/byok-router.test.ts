@@ -15,6 +15,15 @@ import type { User, Organization } from '@kilocode/db/schema';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 
+const VERTEX_CREDENTIALS = JSON.stringify({
+  project: 'example-project',
+  location: 'us-east5',
+  googleCredentials: {
+    privateKey: '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n',
+    clientEmail: 'gateway@example-project.iam.gserviceaccount.com',
+  },
+});
+
 describe('BYOK Router', () => {
   let ownerUser: User;
   let memberUser: User;
@@ -171,6 +180,30 @@ describe('BYOK Router', () => {
       expect(dbKey.encrypted_api_key).toHaveProperty('authTag');
     });
 
+    test('should create a Vertex BYOK credential', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const result = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'vertex',
+        api_key: VERTEX_CREDENTIALS,
+      });
+
+      expect(result.provider_id).toBe('vertex');
+    });
+
+    test('should reject malformed Vertex credentials', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'vertex',
+          api_key: '{"privateKey":"secret"}',
+        })
+      ).rejects.toThrow('Invalid credentials for provider: vertex');
+    });
+
     test('should create audit log entry', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
@@ -275,6 +308,23 @@ describe('BYOK Router', () => {
       expect(typeof dbKey.encrypted_api_key).toBe('object');
       expect(dbKey.encrypted_api_key).toHaveProperty('iv');
       expect(dbKey.encrypted_api_key).toHaveProperty('data');
+    });
+
+    test('should reject malformed Vertex credentials on update', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'vertex',
+        api_key: VERTEX_CREDENTIALS,
+      });
+
+      await expect(
+        caller.byok.update({
+          organizationId: organizationA.id,
+          id: created.id,
+          api_key: '{}',
+        })
+      ).rejects.toThrow('Invalid credentials for provider: vertex');
     });
 
     test('should create audit log entry for update', async () => {

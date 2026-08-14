@@ -23,6 +23,7 @@ import {
 import {
   UserByokProviderIdSchema,
   UserByokTestModels,
+  getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -46,6 +47,23 @@ const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential 
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
+
+function validateVercelUserByokCredential(providerId: string, credential: string) {
+  const parsedProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(providerId);
+  if (!parsedProviderId.success) return;
+
+  try {
+    getVercelInferenceProviderConfigForUserByok({
+      providerId: parsedProviderId.data,
+      decryptedAPIKey: credential,
+    });
+  } catch {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Invalid credentials for provider: ${providerId}`,
+    });
+  }
+}
 
 function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
   if (managementSource === 'coding_plan') {
@@ -86,11 +104,10 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
-      const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(
+      const providerId = getVercelUserByokProviderIdForEndpoint(
         endpoint.provider_name ?? endpoint.tag
       );
-      if (!providerParsed.success) continue;
-      const providerId = providerParsed.data;
+      if (!providerId) continue;
       if (!result[providerId]) result[providerId] = [];
       result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
     }
@@ -160,6 +177,8 @@ export const byokRouter = createTRPCRouter({
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
+
+      validateVercelUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
@@ -249,6 +268,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
+      validateVercelUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const [updatedKey] = await db

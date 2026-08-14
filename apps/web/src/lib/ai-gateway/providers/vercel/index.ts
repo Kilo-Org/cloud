@@ -3,7 +3,9 @@ import type { VercelUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import {
   DirectUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
+  normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
+  VertexCredentialsSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
@@ -68,7 +70,9 @@ export function hasCompatibleVercelInferenceProvider(
   }
 
   return openRouterInferenceProviders.some(provider =>
-    vercelInferenceProviders.includes(openRouterToVercelInferenceProviderId(provider))
+    vercelInferenceProviders
+      .map(normalizeVercelInferenceProviderIdForRouting)
+      .includes(openRouterToVercelInferenceProviderId(provider))
   );
 }
 
@@ -82,9 +86,13 @@ export function getVercelInferenceProvidersExcludingIgnored(
     ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
     : null;
 
-  return vercelInferenceProviders.filter(
-    provider => !ignored.has(provider) && (!only || only.has(provider))
-  );
+  return [
+    ...new Set(
+      vercelInferenceProviders
+        .map(normalizeVercelInferenceProviderIdForRouting)
+        .filter(provider => !ignored.has(provider) && (!only || only.has(provider)))
+    ),
+  ];
 }
 
 export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
@@ -202,6 +210,14 @@ function parseAwsCredentials(input: string) {
   }
 }
 
+function parseVertexCredentials(input: string) {
+  try {
+    return VertexCredentialsSchema.parse(JSON.parse(input));
+  } catch {
+    throw new Error('Failed to parse Google Vertex credentials');
+  }
+}
+
 export function getAnthropicProviderOptionsForVercel(
   request: GatewayRequest
 ): AnthropicProviderOptions | undefined {
@@ -243,6 +259,8 @@ export function getVercelInferenceProviderConfigForUserByok(
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
     list.push(parseAwsCredentials(provider.decryptedAPIKey));
+  } else if (key === VercelUserByokInferenceProviderIdSchema.enum.vertex) {
+    list.push(parseVertexCredentials(provider.decryptedAPIKey));
   } else {
     list.push({ apiKey: provider.decryptedAPIKey });
   }
@@ -288,8 +306,9 @@ export async function applyVercelSettings(
     const byokProviders =
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
-    // this is vercel specific BYOK configuration to force vercel gateway to use the BYOK API key
-    // for the user/org. If the key is invalid the request will faill - it will not fall back to bill our API key.
+    // Vercel tries these request-scoped credentials first. If they fail, Vercel may
+    // use system credentials; usage processing checks the successful credentialType
+    // so system fallback is billed rather than treated as user-funded BYOK.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),

@@ -2,7 +2,10 @@ import type OpenAI from 'openai';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
-import type { AwsCredentials } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type {
+  AwsCredentials,
+  VertexCredentials,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
 
 // Base types for OpenRouter API that don't depend on other lib files
@@ -21,7 +24,10 @@ export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterP
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export type VercelInferenceProviderConfig = { apiKey: string; baseURL?: string } | AwsCredentials;
+export type VercelInferenceProviderConfig =
+  | { apiKey: string; baseURL?: string }
+  | AwsCredentials
+  | VertexCredentials;
 
 export type VercelProviderConfig = {
   gateway?: GatewayProviderOptions & {

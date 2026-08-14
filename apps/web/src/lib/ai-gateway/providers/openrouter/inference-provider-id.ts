@@ -92,6 +92,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'moonshotai',
   'novita',
   'perplexity',
+  'vertex',
   'xai',
   'xiaomi',
   'zai',
@@ -146,6 +147,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/mistral-medium-3.5',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.perplexity]: 'perplexity/sonar',
+  [VercelUserByokInferenceProviderIdSchema.enum.vertex]: 'google/gemini-2.5-flash-lite',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
@@ -203,7 +205,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'stepfun',
   'streamlake',
   'togetherai',
-  'vertex',
   'vertexAnthropic',
   'voyage',
   'wafer',
@@ -225,7 +226,7 @@ const openRouterToVercelInferenceProviderMapping = {
   [OpenRouterInferenceProviderIdSchema.enum['google-ai-studio']]:
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
-    VercelNonUserByokInferenceProviderIdSchema.enum.vertex,
+    VercelUserByokInferenceProviderIdSchema.enum.vertex,
   [OpenRouterInferenceProviderIdSchema.enum.seed]:
     VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:
@@ -245,6 +246,24 @@ export function normalizeInferenceProviderId(providerId: string | undefined) {
 export function openRouterToVercelInferenceProviderId(providerId: string) {
   const normalizedProviderId = normalizeInferenceProviderId(providerId);
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
+}
+
+export function getVercelUserByokProviderIdForEndpoint(
+  providerId: string | undefined
+): VercelUserByokInferenceProviderId | undefined {
+  return VercelUserByokInferenceProviderIdSchema.safeParse(
+    normalizeVercelInferenceProviderIdForRouting(providerId)
+  ).data;
+}
+
+export function normalizeVercelInferenceProviderIdForRouting(providerId: string): string;
+export function normalizeVercelInferenceProviderIdForRouting(
+  providerId: string | undefined
+): string | undefined;
+export function normalizeVercelInferenceProviderIdForRouting(providerId: string | undefined) {
+  return providerId === VercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
+    ? VercelUserByokInferenceProviderIdSchema.enum.vertex
+    : providerId;
 }
 
 const modelPrefixToVercelInferenceProviderMapping = {
@@ -273,3 +292,14 @@ export const AwsCredentialsSchema = z.object({
 });
 
 export type AwsCredentials = z.infer<typeof AwsCredentialsSchema>;
+
+export const VertexCredentialsSchema = z.object({
+  project: z.string().min(1),
+  location: z.string().min(1),
+  googleCredentials: z.object({
+    privateKey: z.string().min(1),
+    clientEmail: z.string().min(1),
+  }),
+});
+
+export type VertexCredentials = z.infer<typeof VertexCredentialsSchema>;

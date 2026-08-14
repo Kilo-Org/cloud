@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
 import {
   countAndStoreUsage,
+  didUseUserByok,
   logMicrodollarUsage,
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
@@ -40,11 +41,15 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
+  VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
+import {
+  computeOpenRouterCostFields,
+  extractVercelIsByok,
+} from '@/lib/ai-gateway/processUsage.shared';
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -940,6 +945,7 @@ type EmbeddingUsage = {
   prompt_tokens: number;
   total_tokens: number;
   cost?: number;
+  is_byok?: boolean | null;
 };
 
 type EmbeddingResponse = {
@@ -947,6 +953,8 @@ type EmbeddingResponse = {
   object: 'list';
   model: string;
   usage: EmbeddingUsage;
+  providerMetadata?: VercelProviderMetaData;
+  provider_metadata?: VercelProviderMetaData;
 };
 
 type TranscriptionUsage = {
@@ -971,9 +979,17 @@ export function parseEmbeddingUsageFromResponse(
   statusCode: number
 ): MicrodollarUsageStats {
   const json: EmbeddingResponse = JSON.parse(responseText);
+  const providerMetadata = json.providerMetadata ?? json.provider_metadata;
+  const gatewayCost = Number(providerMetadata?.gateway?.cost);
+  const gatewayMarketCost = Number(providerMetadata?.gateway?.marketCost);
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
+  const cost_mUsd =
+    json.usage.cost != null
+      ? toMicrodollars(json.usage.cost)
+      : Number.isFinite(gatewayCost)
+        ? toMicrodollars(gatewayCost)
+        : 0;
 
   return {
     messageId: json.id ?? null,
@@ -986,7 +1002,8 @@ export function parseEmbeddingUsageFromResponse(
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd,
-    is_byok: null,
+    market_cost: Number.isFinite(gatewayMarketCost) ? toMicrodollars(gatewayMarketCost) : undefined,
+    is_byok: json.usage.is_byok ?? extractVercelIsByok(providerMetadata?.gateway),
     upstream_id: null,
     finish_reason: null,
     latency: null,
@@ -1080,13 +1097,19 @@ export function countAndStoreEmbeddingUsage(
       }
 
       // Preserve the real upstream cost for analytics before zeroing for BYOK
-      usageStats.market_cost = usageStats.cost_mUsd;
+      usageStats.market_cost ??= usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      const usedUserByok = didUseUserByok(usageStats, usageContext);
+      if (usedUserByok) {
         usageStats.cost_mUsd = 0;
       }
 
-      return logMicrodollarUsage(usageStats, usageContext);
+      return logMicrodollarUsage(
+        usageStats,
+        usedUserByok === usageContext.user_byok
+          ? usageContext
+          : { ...usageContext, user_byok: usedUserByok }
+      );
     })
   );
 }

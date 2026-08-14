@@ -209,6 +209,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return malformedJsonResponse(e);
   }
 
+  if (requestBodyParsed.body.providerOptions !== undefined) {
+    const error = 'The providerOptions field is not supported. Use provider instead.';
+    return NextResponse.json(
+      { error, error_type: ProxyErrorType.unsupported_field, message: error },
+      { status: 400 }
+    );
+  }
+
   if (
     typeof requestBodyParsed.body.model !== 'string' ||
     requestBodyParsed.body.model.trim().length === 0

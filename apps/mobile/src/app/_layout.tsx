@@ -30,6 +30,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -368,7 +369,6 @@ function RootLayoutNav() {
       } else {
         markStartupComplete('force-update');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
       }
       return;
     }
@@ -382,7 +382,6 @@ function RootLayoutNav() {
       if (inAuthGroup) {
         markStartupComplete('login');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
       } else {
         router.replace('/(auth)/login');
       }
@@ -390,14 +389,12 @@ function RootLayoutNav() {
       if (userIdError) {
         markStartupComplete('user-error');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
         return;
       }
 
       if (consentCheckError) {
         markStartupComplete('consent-error');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
         return;
       }
 
@@ -409,7 +406,6 @@ function RootLayoutNav() {
         if (onConsentRoute) {
           markStartupComplete('consent');
           setStartupFinished(true);
-          void SplashScreen.hideAsync();
         } else {
           router.replace('/(app)/consent' as Href);
         }
@@ -423,7 +419,6 @@ function RootLayoutNav() {
 
       markStartupComplete('app');
       setStartupFinished(true);
-      void SplashScreen.hideAsync();
       // Navigate to pending deep link (cold start universal link / notification tap)
       const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
       if (pendingNavigation) {
@@ -585,6 +580,7 @@ function RootLayout() {
         <AppRootProviders>
           <StatusBar style="auto" />
           <RootLayoutNav />
+          <AnimatedSplashOverlay />
         </AppRootProviders>
       </ThemeProvider>
     </ShareIntentProvider>

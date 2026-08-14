@@ -24,6 +24,10 @@ const marks = new Map<StartupMark, number>();
 let outcome: StartupOutcome | undefined = undefined;
 let taken = false;
 
+// Listeners notified exactly once when startup completes. Set iteration is
+// deletion-safe: a listener may unsubscribe itself from inside its callback.
+const completionListeners = new Set<() => void>();
+
 // First mark wins for a given name: these are gate transitions, and the
 // effect that records them re-runs on every later gate change.
 export function markStartup(mark: StartupMark): void {
@@ -38,7 +42,22 @@ export function markStartupComplete(value: StartupOutcome): void {
   if (outcome === undefined) {
     outcome = value;
     markStartup('splash_hidden');
+    for (const listener of completionListeners) {
+      listener();
+    }
   }
+}
+
+// Registers a listener fired exactly once on the first `markStartupComplete`.
+export function subscribeStartupComplete(listener: () => void): () => void {
+  completionListeners.add(listener);
+  return () => {
+    completionListeners.delete(listener);
+  };
+}
+
+export function isStartupComplete(): boolean {
+  return outcome !== undefined;
 }
 
 // Returns the event payload exactly once per launch, and only after startup

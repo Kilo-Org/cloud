@@ -20,7 +20,10 @@ import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS, type AutoModel } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
@@ -114,16 +117,24 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
   const summaries = await getTerminalBenchSummaries();
+  const validatedModels = await Promise.all(
+    models.map(async model => ({
+      model,
+      isValid: await isValidOpenRouterModelId(model.id),
+    }))
+  );
   const enhancedModels = await Promise.all(
-    models
+    validatedModels
       .filter(
-        (model: OpenRouterModel) =>
+        ({ model, isValid }) =>
+          isValid &&
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isUnavailableModel(model.id) &&
           !model.id.endsWith(':batch')
       )
+      .map(({ model }) => model)
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];

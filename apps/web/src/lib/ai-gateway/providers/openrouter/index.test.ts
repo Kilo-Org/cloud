@@ -17,12 +17,15 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+  isValidOpenRouterModelId: jest.fn(() => Promise.resolve(true)),
 }));
 
 const originalFetch = global.fetch;
+const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 
 const disabledPaidModel = {
   ...qwen36_plus_stealth_model,
@@ -186,6 +189,7 @@ describe('isFableModel', () => {
 
 describe('auto models', () => {
   beforeEach(() => {
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -220,6 +224,27 @@ describe('auto models', () => {
 
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
+  });
+
+  it('excludes OpenRouter models that have not completed syncing', async () => {
+    const unsyncedModelId = 'vendor/unsynced-model';
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel(), buildModel({ id: unsyncedModelId })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+    mockedIsValidOpenRouterModelId.mockImplementation(modelId =>
+      Promise.resolve(modelId !== unsyncedModelId)
+    );
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
+    expect(models.data.some(model => model.id === unsyncedModelId)).toBe(false);
   });
 });
 

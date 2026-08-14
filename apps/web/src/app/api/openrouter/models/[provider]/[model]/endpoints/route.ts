@@ -1,6 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 import { applyCustomPricingToPricing } from '@/lib/ai-gateway/custom-pricing';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
@@ -13,7 +16,7 @@ export async function GET(
 ) {
   const { provider, model } = await params;
   const modelId = `${provider}/${model}`;
-  if (isUnavailableModel(modelId)) {
+  if (isUnavailableModel(modelId) || !(await isValidOpenRouterModelId(modelId))) {
     return NextResponse.json(
       { error: { message: 'Not Found', code: 404 } },
       { status: 404, headers: { 'Cache-Control': CACHE_CONTROL } }

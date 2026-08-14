@@ -1,6 +1,9 @@
-import { describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { GET } from './route';
 import { GET as openRouterV1GET } from '@/app/api/openrouter/v1/models/[provider]/[model]/endpoints/route';
@@ -8,17 +11,24 @@ import { GET as gatewayV1GET } from '@/app/api/gateway/v1/models/[provider]/[mod
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+  isValidOpenRouterModelId: jest.fn(),
 }));
 
 const mockedGetOpenRouterModelsMetadataFromDatabase = jest.mocked(
   getOpenRouterModelsMetadataFromDatabase
 );
+const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 
 function request(modelId: string) {
   return new NextRequest(`http://localhost:3000/api/openrouter/models/${modelId}/endpoints`);
 }
 
 describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
+  beforeEach(() => {
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockReset();
+    mockedIsValidOpenRouterModelId.mockReset().mockResolvedValue(true);
+  });
+
   test('uses the canonical handler for versioned routes', () => {
     expect(openRouterV1GET).toBe(GET);
     expect(gatewayV1GET).toBe(GET);
@@ -88,11 +98,28 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
   });
 
   test('returns 404 for unavailable models without reading cached metadata', async () => {
-    mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
     const modelId = 'openai/gpt-oss-20b:free';
 
     const response = await GET(request(modelId), {
       params: Promise.resolve({ provider: 'openai', model: 'gpt-oss-20b:free' }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
+    );
+    await expect(response.json()).resolves.toEqual({
+      error: { message: 'Not Found', code: 404 },
+    });
+    expect(mockedGetOpenRouterModelsMetadataFromDatabase).not.toHaveBeenCalled();
+  });
+
+  test('returns 404 for models that have not completed syncing', async () => {
+    const modelId = 'vendor/unsynced-model';
+    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+
+    const response = await GET(request(modelId), {
+      params: Promise.resolve({ provider: 'vendor', model: 'unsynced-model' }),
     });
 
     expect(response.status).toBe(404);

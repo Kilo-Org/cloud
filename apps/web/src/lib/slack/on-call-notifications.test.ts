@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 const WEBHOOK_URL = 'https://hooks.slack.com/services/test/on-call/webhook';
+const originalVercelEnv = process.env.VERCEL_ENV;
 
 async function loadModule(webhookUrl: string | undefined) {
   jest.resetModules();
@@ -13,10 +14,12 @@ async function loadModule(webhookUrl: string | undefined) {
 afterEach(() => {
   jest.restoreAllMocks();
   jest.dontMock('@/lib/config.server');
+  process.env.VERCEL_ENV = originalVercelEnv;
 });
 
 describe('sendOnCallSlackNotification', () => {
   it('posts text and Block Kit content to the on-call webhook', async () => {
+    process.env.VERCEL_ENV = 'production';
     const fetchSpy = jest
       .spyOn(global, 'fetch')
       .mockResolvedValue(new Response('ok', { status: 200 }));
@@ -32,7 +35,7 @@ describe('sendOnCallSlackNotification', () => {
       unfurl_links: false,
     };
 
-    await sendOnCallSlackNotification(notification);
+    await expect(sendOnCallSlackNotification(notification)).resolves.toBe('posted');
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -45,19 +48,32 @@ describe('sendOnCallSlackNotification', () => {
     );
   });
 
-  it('logs a warning and skips delivery when the webhook is not configured', async () => {
+  it('simulates delivery outside production Vercel even when a webhook is configured', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const { sendOnCallSlackNotification } = await loadModule(undefined);
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+    const { sendOnCallSlackNotification } = await loadModule(WEBHOOK_URL);
 
-    await expect(sendOnCallSlackNotification({ text: 'Test' })).resolves.toBeUndefined();
+    await expect(sendOnCallSlackNotification({ text: 'Test' })).resolves.toBe('simulated');
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[OnCallSlackNotifications] SLACK_ON_CALL_WEBHOOK_URL is not configured; notification skipped'
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[OnCallSlackNotifications] Simulated notification; Slack delivery is enabled only on production Vercel',
+      { text: 'Test' }
     );
   });
 
+  it('fails in production Vercel when the webhook is not configured', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const { sendOnCallSlackNotification } = await loadModule(undefined);
+
+    await expect(sendOnCallSlackNotification({ text: 'Test' })).rejects.toMatchObject({
+      kind: 'configuration',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('maps fetch failures to an error that does not expose the webhook URL', async () => {
+    process.env.VERCEL_ENV = 'production';
     jest.spyOn(global, 'fetch').mockRejectedValue(new Error(`Could not reach ${WEBHOOK_URL}`));
     const { sendOnCallSlackNotification } = await loadModule(WEBHOOK_URL);
 

@@ -131,10 +131,10 @@ export async function postStaleSyncAlert(input: {
   now?: Date;
   kind?: 'live' | 'test';
   sendNotification?: typeof sendOnCallSlackNotification;
-}): Promise<void> {
+}): ReturnType<typeof sendOnCallSlackNotification> {
   const now = input.now ?? new Date();
   const sendNotification = input.sendNotification ?? sendOnCallSlackNotification;
-  await sendNotification(
+  return sendNotification(
     buildStaleSyncAlertNotification({
       lastCompletedAt: input.lastCompletedAt,
       now,
@@ -150,10 +150,10 @@ export async function postTestStaleSyncAlert({
 }: Pick<
   StaleAlertDependencies,
   'now' | 'getLastCompletedAt' | 'sendNotification'
-> = {}): Promise<void> {
+> = {}): ReturnType<typeof sendOnCallSlackNotification> {
   const now = nowFn();
   const lastCompletedAt = parseIsoTimestamp(await getLastCompletedAt());
-  await postStaleSyncAlert({
+  return postStaleSyncAlert({
     lastCompletedAt,
     now,
     kind: 'test',
@@ -178,7 +178,8 @@ export async function alertIfSyncProvidersStale({
     const lastAlertAt = parseIsoTimestamp(lastAlertRaw);
     if (!shouldPostStaleSyncAlert({ lastCompletedAt, lastAlertAt, now })) return;
 
-    await postStaleSyncAlert({ lastCompletedAt, now, sendNotification });
+    const delivery = await postStaleSyncAlert({ lastCompletedAt, now, sendNotification });
+    if (delivery !== 'posted') return;
     await setLastAlertAt(now.toISOString());
   } catch (error) {
     console.error('[sync-providers] stale full-sync alert failed', error);

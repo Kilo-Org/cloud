@@ -156,7 +156,9 @@ describe('buildStaleSyncAlertNotification', () => {
 
 describe('alertIfSyncProvidersStale', () => {
   it('posts once and stores the alert timestamp with a week TTL', async () => {
-    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
     const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
     await alertIfSyncProvidersStale({
@@ -177,7 +179,9 @@ describe('alertIfSyncProvidersStale', () => {
   });
 
   it('does not post when a later alert already exists', async () => {
-    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
     const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
     await alertIfSyncProvidersStale({
@@ -194,7 +198,9 @@ describe('alertIfSyncProvidersStale', () => {
 
   it('swallows Redis failures so the cron can continue', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
 
     await expect(
       alertIfSyncProvidersStale({
@@ -226,17 +232,39 @@ describe('alertIfSyncProvidersStale', () => {
     ).resolves.toBeUndefined();
     expect(setLastAlertAt).not.toHaveBeenCalled();
   });
+
+  it('does not store an alert timestamp for a local simulation', async () => {
+    const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'simulated' as const
+    );
+
+    await alertIfSyncProvidersStale({
+      now: () => NOW,
+      getLastCompletedAt: async () => STALE_SYNC.toISOString(),
+      getLastAlertAt: async () => null,
+      setLastAlertAt,
+      sendNotification,
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(setLastAlertAt).not.toHaveBeenCalled();
+  });
 });
 
 describe('postTestStaleSyncAlert', () => {
   it('posts a clearly labeled test alert without writing the suppression timestamp', async () => {
-    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
 
-    await postTestStaleSyncAlert({
-      now: () => NOW,
-      getLastCompletedAt: async () => STALE_SYNC.toISOString(),
-      sendNotification,
-    });
+    await expect(
+      postTestStaleSyncAlert({
+        now: () => NOW,
+        getLastCompletedAt: async () => STALE_SYNC.toISOString(),
+        sendNotification,
+      })
+    ).resolves.toBe('posted');
 
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledWith(

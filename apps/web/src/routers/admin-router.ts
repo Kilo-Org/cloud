@@ -2080,8 +2080,8 @@ export const adminRouter = createTRPCRouter({
       return result;
     }),
     postTestStaleAlert: adminProcedure.mutation(async () => {
-      await postTestStaleSyncAlert();
-      return { posted: true };
+      const delivery = await postTestStaleSyncAlert();
+      return { delivery };
     }),
     getLastSync: adminProcedure.query(async () => {
       const [[latest], lastCompletedAt] = await Promise.all([

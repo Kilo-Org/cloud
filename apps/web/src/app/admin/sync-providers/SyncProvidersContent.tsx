@@ -27,8 +27,12 @@ export function SyncProvidersContent() {
 
   const testAlertMutation = useMutation(
     trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
-      onSuccess: () => {
-        toast.success('Posted a test stale-sync alert to #kilo-on-call');
+      onSuccess: result => {
+        toast.success(
+          result.delivery === 'posted'
+            ? 'Posted a test stale-sync alert to #kilo-on-call'
+            : 'Simulated the test alert in the local server logs'
+        );
       },
       onError: error => {
         toast.error(error.message || 'Could not post the test alert');
@@ -149,8 +153,9 @@ export function SyncProvidersContent() {
             Test stale-sync alert
           </CardTitle>
           <CardDescription>
-            Posts a clearly labeled test message to #kilo-on-call using the same copy as the live
-            alert. This does not suppress later real alerts.
+            Production Vercel posts a clearly labeled test message to #kilo-on-call. Local and
+            preview environments log the same payload without contacting Slack. Tests do not
+            suppress later real alerts.
           </CardDescription>
         </CardHeader>
         <CardContent>

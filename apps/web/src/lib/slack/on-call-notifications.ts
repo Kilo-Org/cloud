@@ -7,7 +7,7 @@ const SLACK_WEBHOOK_TIMEOUT_MS = 10_000;
 
 export class OnCallSlackNotificationError extends Error {
   constructor(
-    readonly kind: 'network' | 'upstream',
+    readonly kind: 'configuration' | 'network' | 'upstream',
     readonly status?: number
   ) {
     super('On-call Slack notification request failed');
@@ -22,12 +22,17 @@ export class OnCallSlackNotificationError extends Error {
  */
 export async function sendOnCallSlackNotification(
   notification: AdminSlackNotification
-): Promise<void> {
-  if (!SLACK_ON_CALL_WEBHOOK_URL) {
-    console.warn(
-      '[OnCallSlackNotifications] SLACK_ON_CALL_WEBHOOK_URL is not configured; notification skipped'
+): Promise<'posted' | 'simulated'> {
+  if (process.env.VERCEL_ENV !== 'production') {
+    console.info(
+      '[OnCallSlackNotifications] Simulated notification; Slack delivery is enabled only on production Vercel',
+      notification
     );
-    return;
+    return 'simulated';
+  }
+
+  if (!SLACK_ON_CALL_WEBHOOK_URL) {
+    throw new OnCallSlackNotificationError('configuration');
   }
 
   let response: Response;
@@ -52,4 +57,6 @@ export async function sendOnCallSlackNotification(
   if (!response.ok) {
     throw new OnCallSlackNotificationError('upstream', response.status);
   }
+
+  return 'posted';
 }

@@ -113,12 +113,13 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
+  const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
     models
       .filter(
         model =>
-          endpointsMetadata[model.id] !== undefined &&
+          (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&

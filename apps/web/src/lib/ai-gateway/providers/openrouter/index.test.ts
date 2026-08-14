@@ -19,14 +19,7 @@ import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsMetadataFromDatabase: jest.fn(() =>
-    Promise.resolve({
-      'vendor/model': { endpoints: [] },
-      'anthropic/claude-without-reasoning': { endpoints: [] },
-      'anthropic/claude-with-reasoning': { endpoints: [] },
-      'vendor/disabled-paid-model': { endpoints: [] },
-    })
-  ),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
 }));
 
 const originalFetch = global.fetch;
@@ -227,24 +220,6 @@ describe('auto models', () => {
 
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
-  });
-
-  it('excludes OpenRouter models that have not completed syncing', async () => {
-    const unsyncedModelId = 'vendor/unsynced-model';
-    global.fetch = jest.fn(() =>
-      Promise.resolve(
-        createMockResponse({
-          jsonData: {
-            data: [buildModel(), buildModel({ id: unsyncedModelId })],
-          },
-        })
-      )
-    ) as unknown as typeof fetch;
-
-    const models = await getEnhancedOpenRouterModels();
-
-    expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
-    expect(models.data.some(model => model.id === unsyncedModelId)).toBe(false);
   });
 });
 

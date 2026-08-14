@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import {
   formatName,
   getEnhancedOpenRouterModels,
@@ -21,11 +20,12 @@ import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
-  isValidOpenRouterModelId: jest.fn(() => Promise.resolve(true)),
+  isValidOpenRouterModelId: jest.fn((modelId: string) =>
+    Promise.resolve(modelId !== 'vendor/unsynced-model')
+  ),
 }));
 
 const originalFetch = global.fetch;
-const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 
 const disabledPaidModel = {
   ...qwen36_plus_stealth_model,
@@ -189,7 +189,6 @@ describe('isFableModel', () => {
 
 describe('auto models', () => {
   beforeEach(() => {
-    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -237,9 +236,6 @@ describe('auto models', () => {
         })
       )
     ) as unknown as typeof fetch;
-    mockedIsValidOpenRouterModelId.mockImplementation(modelId =>
-      Promise.resolve(modelId !== unsyncedModelId)
-    );
 
     const models = await getEnhancedOpenRouterModels();
 

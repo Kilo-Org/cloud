@@ -24,15 +24,38 @@ export type ExportRecord = {
  *
  * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
  * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
- * `event_type` instead, and `users` has no CDC column. Naming the column on any of them
+ * `event_type` instead, `users` has no CDC column, and `enrichment_data` was narrowed to
+ * four columns on request, dropping the flag with them. Naming the column on any of them
  * is a runtime error, so records from those sources are never labelled.
+ *
+ * The `enrichment_data` case is the one where the flag was given up rather than never
+ * held: it carried 5 deleted rows against 16,661 live, so it separated nothing.
  */
 export const DELETED_COLUMN = '_snowflake_deleted';
 export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'microdollar_usage_metadata',
   'cli_sessions',
   'users',
+  'enrichment_data',
 ] as const;
+
+/**
+ * Sources that describe an individual and have no organization reading at all, so an
+ * organization export never asks for them.
+ *
+ * `kilocode_users` is the identity section, which is a person's own profile. It was
+ * excluded by a name check in `partitionSources` long before this set existed.
+ *
+ * `enrichment_data` has no organization column in the warehouse whatsoever: it is what
+ * third parties assembled about one person, and there is no organization reading of it to
+ * offer. Declared here rather than left to the probe, which would report the table as
+ * unavailable on every organization export and make an inapplicable source look like a
+ * missing one.
+ */
+export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
+  'kilocode_users',
+  'enrichment_data',
+]);
 
 /**
  * `softDeleted: true`, or nothing at all.
@@ -244,6 +267,10 @@ LIMIT 1`;
  * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
+ *
+ * `enrichment_data` is absent from that table because it has neither reading: the warehouse
+ * copy carries no organization column at all, so it is user-only and an organization export
+ * never asks for it. See `USER_ONLY_SOURCES`.
  *
  * `code_indexing_search` is the one entry above whose 0 is a schema guarantee rather than
  * a count: both owner columns are `notNull()` on the table, so no row can carry one
@@ -523,6 +550,34 @@ const deploymentEventQueries: Record<ExportSubject['type'], string> = {
   organization: deploymentEventPageQuery('organization'),
 };
 
+/**
+ * The only source with one subject variant rather than two, and the only place in this
+ * file where that is not an omission.
+ *
+ * The warehouse table has no organization column at all. This is what GitHub and Clay
+ * assembled ABOUT one person, gathered from outside rather than supplied by them, and
+ * `kilo_user_id` is the subject of that enrichment rather than its author. The warehouse
+ * settled that on 2026-08-11 from `schema.ts`, where the column is a notNull foreign key
+ * to `kilocode_users` and the only user column on the table, and from the sole writer,
+ * `admin-router.ts` `enrichmentData.upsert`, which validates it against `kilocode_users`
+ * and pointedly does not store the acting admin's id — unlike `user_admin_notes` in the
+ * same router, which carries both.
+ *
+ * So there is no organization query to write, not merely one left unwritten, and
+ * `USER_ONLY_SOURCES` keeps organization exports from asking. The warehouse renames the
+ * column on the way in: the source calls it `user_id`, and the load aliases it to
+ * `kilo_user_id` for the convention every other source here follows.
+ *
+ * Both payload columns are third-party profile data about a person who did not supply it,
+ * which is the strongest case in the whole export for returning something: it is the one
+ * category a subject has no other way to see.
+ */
+const enrichmentQuery = singleKeyPageQuery({
+  table: 'enrichment_data',
+  columns: 'id, github_enrichment_data, clay_enrichment_data',
+  scope: 'user',
+});
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
@@ -553,6 +608,11 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type EnrichmentRow = {
+  id: string;
+  github_enrichment_data: string | null;
+  clay_enrichment_data: string | null;
+};
 type DeploymentEventRow = {
   build_id: string;
   event_id: string;
@@ -1176,6 +1236,54 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'enrichment_data',
+      warehouseTable: 'enrichment_data',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable: `USER_ONLY_SOURCES` drops this source before an organization
+        // export reaches a read. Kept as a throw rather than an empty page because the
+        // two are not the same statement — an empty page would tell an organization that
+        // no enrichment is held, when the truth is that none was asked for.
+        if (input.subject.type !== 'user') {
+          throw new Error('enrichment_data has no organization scope');
+        }
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: EnrichmentRow[] = await warehouseQuery(enrichmentQuery, [
+          subjectScopeValue(input.subject),
+          after,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            // Both are jsonb, so the driver hands back parsed objects. Serialized whole:
+            // a payload assembled about someone by a third party is exactly the thing an
+            // export exists to show them, and picking fields out of it would be this
+            // service deciding which parts they get to see.
+            github_enrichment_data: jsonValue(row.github_enrichment_data),
+            clay_enrichment_data: jsonValue(row.clay_enrichment_data),
+          }))
+        );
+        return {
+          // No deletion mark anywhere here: the column was dropped when the table was
+          // narrowed, so this source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => [
+            {
+              source: 'enrichment_data',
+              id: row.id,
+              field: 'github_enrichment_data',
+              value: row.github_enrichment_data,
+            },
+            {
+              source: 'enrichment_data',
+              id: row.id,
+              field: 'clay_enrichment_data',
+              value: row.clay_enrichment_data,
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
   ];
 }
 
@@ -1216,6 +1324,8 @@ export const warehouseQueries = {
   codeIndexingSearchOrgQuery: codeIndexingSearchQueries.organization,
   deploymentEventUserQuery: deploymentEventQueries.user,
   deploymentEventOrgQuery: deploymentEventQueries.organization,
+  // No org counterpart, deliberately. See `enrichmentQuery` and `USER_ONLY_SOURCES`.
+  enrichmentUserQuery: enrichmentQuery,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1289,6 +1399,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'payload',
     DELETED_COLUMN,
   ],
+  // No deletion column: dropped when the table was narrowed to four columns. The probe
+  // must not ask for it, or the table would be called absent on every export.
+  enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1412,6 +1525,7 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   codeIndexingSearchOrgQuery: 'organization_id = $1',
   deploymentEventUserQuery: 'kilo_user_id = $1',
   deploymentEventOrgQuery: 'organization_id = $1',
+  enrichmentUserQuery: 'kilo_user_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

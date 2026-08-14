@@ -16,6 +16,7 @@ import {
   createSourceAdapters,
   findPresentWarehouseTables,
   warehouseRequirements,
+  USER_ONLY_SOURCES,
   type ExportRecord,
   type ExportSubject,
 } from './source-adapters';
@@ -253,7 +254,12 @@ export function exportSubject(job: ExportJob): ExportSubject {
  * record — so `kilocode_users` is dropped from it entirely rather than reported missing.
  * That is a property of the subject, not of the warehouse's load state, and conflating
  * the two would tell an org admin their identity data was unavailable when no such
- * section was ever going to exist.
+ * section was ever going to exist. `enrichment_data` is dropped on the same basis: its
+ * table carries no organization column at all, so there is no organization reading of it
+ * to report as anything.
+ *
+ * Both are named in `USER_ONLY_SOURCES` rather than checked by name here, so a source
+ * that has no organization form says so once, beside the query that lacks one.
  *
  * Everything else is classified by the probe. The warehouse loads table by table and the
  * export ships ahead of it, so a source whose table has not landed is expected.
@@ -264,7 +270,7 @@ export function partitionSources(
   presentTables: Set<string>
 ): { available: SourceAdapter[]; unavailable: string[] } {
   const applicable = adapters.filter(
-    adapter => !(subjectType === 'organization' && adapter.name === 'kilocode_users')
+    adapter => !(subjectType === 'organization' && USER_ONLY_SOURCES.has(adapter.name))
   );
   const available: SourceAdapter[] = [];
   const unavailable: string[] = [];

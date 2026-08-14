@@ -164,8 +164,17 @@ describe('warehouse scoping guard', () => {
 
   // Both subjects are covered for every warehouse source. A source reachable by only one
   // of them would silently return nothing to the other rather than failing.
+  //
+  // One declared exception, and it has to be declared rather than inferred: an unpaired
+  // query is normally the bug this test exists to catch. `enrichment_data` has no
+  // organization column in the warehouse at all, so there is no org query to pair it with,
+  // and `USER_ONLY_SOURCES` keeps organization exports from asking. Naming it here means a
+  // source that loses its org variant by accident still fails.
+  const USER_ONLY_QUERY_NAMES = ['enrichmentUserQuery'];
   it('pairs every warehouse source with both subject variants', () => {
-    const names = Object.keys(warehouseQueries);
+    const names = Object.keys(warehouseQueries).filter(
+      name => !USER_ONLY_QUERY_NAMES.includes(name)
+    );
     const orgNames = names.filter(name => name.endsWith('OrgQuery'));
     const userNames = names.filter(name => name.endsWith('UserQuery'));
     expect(orgNames.length).toBe(userNames.length);
@@ -339,6 +348,7 @@ describe('warehouse availability probe', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'enrichment_data',
     ]);
   });
 
@@ -393,6 +403,7 @@ describe('source adapters', () => {
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
+      'enrichment_data',
     ]);
   });
 
@@ -1140,5 +1151,80 @@ describe('source adapters', () => {
     expect(byField.get('deployment_id')).toBeNull();
     expect(byField.get('event_type')).toBeNull();
     expect(byField.get('build_id')).toBe('build-a');
+  });
+
+  const ENRICHMENT_ROW = {
+    id: 'enrichment-1',
+    github_enrichment_data: { login: 'octocat', company: 'GitHub' },
+    clay_enrichment_data: { title: 'Engineer' },
+  };
+
+  it('emits both enrichment payloads whole, keyed by the row that carried them', async () => {
+    const { adapters } = harness([ENRICHMENT_ROW]);
+
+    const page = await requireAdapter(adapters, 'enrichment_data').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.records).toEqual([
+      {
+        source: 'enrichment_data',
+        id: 'enrichment-1',
+        field: 'github_enrichment_data',
+        value: JSON.stringify(ENRICHMENT_ROW.github_enrichment_data),
+      },
+      {
+        source: 'enrichment_data',
+        id: 'enrichment-1',
+        field: 'clay_enrichment_data',
+        value: JSON.stringify(ENRICHMENT_ROW.clay_enrichment_data),
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['enrichment-1'] });
+  });
+
+  // The source has no organization column, so there is no organization reading to serve.
+  // An empty page would say the organization holds no enrichment, which is a different
+  // claim from the true one: it was never a question this source can answer.
+  it('refuses an organization read of enrichment rather than returning nothing', async () => {
+    const { adapters } = harness([ENRICHMENT_ROW]);
+
+    await expect(
+      requireAdapter(adapters, 'enrichment_data').readPage?.(ORG_READ_PAGE_INPUT)
+    ).rejects.toThrow('no organization scope');
+  });
+
+  it('scopes the enrichment read to the subject of the enrichment', async () => {
+    const { adapters, warehouseCalls } = harness([ENRICHMENT_ROW]);
+
+    await requireAdapter(adapters, 'enrichment_data').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+  });
+
+  // The column went with the narrowing, so this source cannot distinguish a deleted row
+  // from a live one and must not claim to.
+  it('never marks an enrichment record as deleted', async () => {
+    const { adapters } = harness([{ ...ENRICHMENT_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'enrichment_data').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(2);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('reads a missing enrichment payload as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ ...ENRICHMENT_ROW, clay_enrichment_data: null }]);
+
+    const page = await requireAdapter(adapters, 'enrichment_data').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('clay_enrichment_data')).toBeNull();
+    expect(byField.get('github_enrichment_data')).toBe(
+      JSON.stringify(ENRICHMENT_ROW.github_enrichment_data)
+    );
   });
 });

@@ -120,36 +120,40 @@ describe('shouldPostStaleSyncAlert', () => {
 });
 
 describe('buildStaleSyncAlertNotification', () => {
-  it('includes models, providers, investigation guidance, and the Cloud alerts channel', () => {
+  it('frames the delay as important but not urgent and includes follow-up guidance', () => {
     const notification = buildStaleSyncAlertNotification({
       lastCompletedAt: STALE_SYNC,
       now: NOW,
     });
 
     expect(notification.text).toContain(STALE_SYNC.toISOString());
-    expect(notification.text).toContain('last 1 hour');
-    expect(notification.text).toContain('Provider and model catalogs');
-    expect(notification.text).toContain('New models and providers can be missing');
-    expect(notification.text).toContain('Sentry and Vercel logs');
+    expect(notification.text).toContain('Provider/model catalog sync is delayed');
+    expect(notification.text).toContain('within the past hour');
+    expect(notification.text).toContain('existing catalog data remains available');
+    expect(notification.text).toContain('Important, not urgent');
+    expect(notification.text).toContain('A few hours of delay is acceptable');
+    expect(notification.text).toContain('During normal operations');
+    expect(notification.text).toContain('Sentry');
+    expect(notification.text).toContain('Vercel logs');
     expect(JSON.stringify(notification.blocks)).toContain('/admin/gateway|Open Gateway admin');
-    expect(JSON.stringify(notification.blocks)).toContain('Cloud alerts channel');
+    expect(JSON.stringify(notification.blocks)).toContain(':large_yellow_circle:');
+    expect(JSON.stringify(notification.blocks)).not.toContain(':rotating_light:');
     expect(notification.text).not.toContain('[TEST]');
   });
 
-  it('marks test alerts so they cannot be mistaken for a live page', () => {
+  it('makes clear that test alerts verify delivery and do not indicate an active issue', () => {
     const notification = buildStaleSyncAlertNotification({
       lastCompletedAt: STALE_SYNC,
       now: NOW,
       kind: 'test',
     });
 
-    expect(notification.text).toContain('[TEST]');
-    expect(JSON.stringify(notification.blocks)).toContain('[TEST ALERT]');
-    expect(JSON.stringify(notification.blocks)).toContain(
-      'Test alert for the Cloud alerts channel generated'
-    );
-    expect(notification.text).toContain('Provider and model catalogs');
-    expect(notification.text).toContain('Sentry and Vercel logs');
+    expect(notification.text).toContain('[TEST] Provider/model catalog sync delay notification');
+    expect(notification.text).toContain('verifies alert delivery only');
+    expect(notification.text).toContain('does not indicate an active issue');
+    expect(JSON.stringify(notification.blocks)).toContain('*Test only:*');
+    expect(JSON.stringify(notification.blocks)).toContain(':large_yellow_circle:');
+    expect(JSON.stringify(notification.blocks)).not.toContain(':rotating_light:');
   });
 
   it('says never recorded when no full sync timestamp exists', () => {

@@ -15,11 +15,14 @@ import {
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
 export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 3 * 24 * 60 * 60;
 
-const STALE_WINDOW_LABEL = '1 hour';
+const STALE_WINDOW_LABEL = 'hour';
+const STATUS_COPY = `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`;
 const IMPACT_COPY =
-  'Provider and model catalogs may be stale. New models and providers can be missing until a full sync completes.';
+  'New providers and models may take longer to appear; existing catalog data remains available.';
+const URGENCY_COPY = 'Important, not urgent. A few hours of delay is acceptable.';
 const INVESTIGATION_COPY =
-  'Check Sentry and Vercel logs for `web.sync_providers` / `[sync-providers]` errors.';
+  'During normal operations, check Sentry for `web.sync_providers` and Vercel logs for `[sync-providers]` errors.';
+const TEST_COPY = 'This verifies alert delivery only; it does not indicate an active issue.';
 
 export function parseIsoTimestamp(value: string | null): Date | null {
   if (!value) return null;
@@ -56,12 +59,15 @@ export function buildStaleSyncAlertNotification(input: {
     : 'never recorded';
   const headline =
     kind === 'test'
-      ? `[TEST] Sync providers / models has not completed a full run in the last ${STALE_WINDOW_LABEL}.`
-      : `Sync providers / models has not completed a full run in the last ${STALE_WINDOW_LABEL}.`;
+      ? '[TEST] Provider/model catalog sync delay notification.'
+      : 'Provider/model catalog sync is delayed.';
   const text = [
     headline,
+    ...(kind === 'test' ? [TEST_COPY] : []),
+    STATUS_COPY,
     `Last completed: ${lastCompletedLabel}.`,
     IMPACT_COPY,
+    URGENCY_COPY,
     INVESTIGATION_COPY,
   ].join(' ');
 
@@ -74,17 +80,22 @@ export function buildStaleSyncAlertNotification(input: {
           type: 'mrkdwn',
           text:
             kind === 'test'
-              ? `:large_yellow_circle: *[TEST ALERT]* ${headline}`
-              : `:rotating_light: *${headline}*`,
+              ? ':large_yellow_circle: *[TEST] Provider/model catalog sync delay notification*'
+              : ':large_yellow_circle: *Provider/model catalog sync is delayed*',
         },
       },
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: [`*Last completed:* ${lastCompletedLabel}`, IMPACT_COPY, INVESTIGATION_COPY].join(
-            '\n'
-          ),
+          text: [
+            ...(kind === 'test' ? [`*Test only:* ${TEST_COPY}`] : []),
+            `*Status:* ${STATUS_COPY}`,
+            `*Last completed:* ${lastCompletedLabel}`,
+            `*Impact:* ${IMPACT_COPY}`,
+            `*Urgency:* ${URGENCY_COPY}`,
+            `*Follow-up:* ${INVESTIGATION_COPY}`,
+          ].join('\n'),
         },
       },
       {
@@ -94,8 +105,8 @@ export function buildStaleSyncAlertNotification(input: {
             type: 'mrkdwn',
             text:
               kind === 'test'
-                ? `Test alert for the Cloud alerts channel generated at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`
-                : `Checked at ${input.now.toISOString()} · Cloud alerts channel · <${APP_URL}/admin/gateway|Open Gateway admin>`,
+                ? `Test generated at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`
+                : `Checked at ${input.now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`,
           },
         ],
       },

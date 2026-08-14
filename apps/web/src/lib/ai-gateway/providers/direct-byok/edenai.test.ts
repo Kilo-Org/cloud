@@ -1,4 +1,5 @@
 import { getAiSdkProvider } from '../model-settings';
+import type { GatewayRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import edenai from './edenai';
 
@@ -19,13 +20,14 @@ describe('Eden AI direct BYOK provider', () => {
     [{ reasoning: { effort: 'high' } }, 'high'],
     [{ reasoning: { effort: 'low' }, reasoning_effort: 'medium' }, 'medium'],
   ] as const)('translates reasoning settings for Chat Completions', (body, expectedEffort) => {
-    const context = {
-      request: { kind: 'chat_completions', body: { model: 'test', messages: [], ...body } },
-    } as TransformRequestContext;
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'test', messages: [], ...body },
+    };
 
-    edenai.transformRequest(context);
+    edenai.transformRequest({ request } as TransformRequestContext);
 
-    expect(context.request.body).toMatchObject({ reasoning_effort: expectedEffort });
-    expect(context.request.body).not.toHaveProperty('reasoning');
+    expect(request.body).toMatchObject({ reasoning_effort: expectedEffort });
+    expect(request.body).not.toHaveProperty('reasoning');
   });
 });

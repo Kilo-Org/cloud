@@ -59,6 +59,7 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
+import { hasCustomizedProviderOptions } from '@/lib/ai-gateway/providers/partner-routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -876,10 +877,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     if (
       effectiveProviderContext.percentageRoutedPartner &&
-      requestBodyParsed.body.provider !== undefined
+      hasCustomizedProviderOptions(requestBodyParsed)
     ) {
       // Organization policy is attached after initial provider resolution. Resolve again so
-      // partner routing retains its requirement that the request has no provider configuration.
+      // partner routing retains its requirement that the request has no customized options.
       const fallbackProviderResult = await getProvider({
         requestedModel: effectiveModelIdLowerCased,
         request: requestBodyParsed,

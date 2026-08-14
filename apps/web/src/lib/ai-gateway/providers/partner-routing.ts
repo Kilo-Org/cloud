@@ -23,6 +23,13 @@ const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
   },
 };
 
+export function hasCustomizedProviderOptions(request: GatewayRequest) {
+  const provider = request.body.provider;
+  // Direct partners do not support advanced provider routing, so customized options cannot be
+  // forwarded safely even when they look compatible at face value. An empty object is harmless.
+  return provider !== undefined && Object.keys(provider).length > 0;
+}
+
 function getEligiblePartnerRoute(
   requestedModel: string,
   request: GatewayRequest
@@ -30,7 +37,7 @@ function getEligiblePartnerRoute(
   const route = PARTNER_ROUTES[requestedModel];
   if (
     !route ||
-    request.body.provider !== undefined ||
+    hasCustomizedProviderOptions(request) ||
     !route.provider.supportedChatApis.includes(request.kind)
   ) {
     return null;

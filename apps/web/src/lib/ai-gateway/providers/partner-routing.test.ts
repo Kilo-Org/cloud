@@ -66,19 +66,27 @@ describe('getPercentageRoutedPartnerProvider', () => {
     }
   );
 
-  it.each([{}, { only: ['friendli'] }])(
-    'does not route requests with provider settings %p',
-    provider => {
-      expect(
-        selectPercentageRoutedPartnerProvider(
-          'z-ai/glm-5.2',
-          request('messages', provider),
-          'user-id',
-          routingConfig
-        )
-      ).toBeNull();
-    }
-  );
+  it('allows an empty provider object', () => {
+    expect(
+      selectPercentageRoutedPartnerProvider(
+        'z-ai/glm-5.2',
+        request('messages', {}),
+        'user-id',
+        routingConfig
+      )
+    ).toBe(PROVIDERS.FRIENDLI_GLM);
+  });
+
+  it('does not route requests with customized provider options', () => {
+    expect(
+      selectPercentageRoutedPartnerProvider(
+        'z-ai/glm-5.2',
+        request('messages', { only: ['friendli'] }),
+        'user-id',
+        routingConfig
+      )
+    ).toBeNull();
+  });
 
   it.each(['z-ai/glm-5.2-fast', 'moonshotai/kimi-k3-fast', 'zai/glm-5.2'])(
     'does not route non-exact model %s',

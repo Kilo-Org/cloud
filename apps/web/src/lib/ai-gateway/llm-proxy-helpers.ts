@@ -304,12 +304,13 @@ export function modelNotAllowedResponse() {
 }
 
 export function efficientPoolBlockedResponse() {
+  const error = 'Your organization blocks every model in the auto-routing pool.';
   const message =
-    'Your organization blocks every model in the auto-routing pool. ' +
-    'Configure a custom Efficient model pool with allowed models, or adjust your organization model restrictions.';
+    `${error} Configure a custom Efficient model pool with allowed models, ` +
+    `or adjust your organization model restrictions.`;
   return NextResponse.json(
     {
-      error: 'Your organization blocks every model in the auto-routing pool.',
+      error,
       error_type: ProxyErrorType.model_not_allowed,
       message,
     },

@@ -7,6 +7,7 @@ import {
   extractNormalizedOrgIdFromItem,
   extractNormalizedGitUrlFromItem,
   extractNormalizedGitBranchFromItem,
+  extractSessionPrLink,
 } from './session-ingest-extractors';
 
 function sessionItem(data: Record<string, unknown>): IngestBatch[number] {
@@ -232,5 +233,61 @@ describe('extractNormalizedGitBranchFromItem', () => {
     expect(
       extractNormalizedGitBranchFromItem(kiloMetaItem({ platform: 'cli', gitBranch: null }))
     ).toBeNull();
+  });
+});
+
+describe('extractSessionPrLink', () => {
+  function prLinkItem(data: Record<string, unknown>): IngestBatch[number] {
+    return { type: 'session_pr_link', data } as IngestBatch[number];
+  }
+
+  it('extracts the full triple for a valid set', () => {
+    expect(
+      extractSessionPrLink(
+        prLinkItem({
+          platform: 'github',
+          prUrl: 'https://github.com/acme/widgets/pull/42',
+          prNumber: 42,
+        })
+      )
+    ).toEqual({
+      prPlatform: 'github',
+      prUrl: 'https://github.com/acme/widgets/pull/42',
+      prNumber: '42',
+    });
+  });
+
+  it('clears all three keys when platform is null', () => {
+    expect(
+      extractSessionPrLink(prLinkItem({ platform: null, prUrl: 'https://x', prNumber: 1 }))
+    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null });
+  });
+
+  it('clears all three keys when prUrl is null', () => {
+    expect(
+      extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: null, prNumber: 1 }))
+    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null });
+  });
+
+  it('clears all three keys when prNumber is null', () => {
+    expect(
+      extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: 'https://x', prNumber: null }))
+    ).toEqual({ prPlatform: null, prUrl: null, prNumber: null });
+  });
+
+  it('returns undefined for a non-session_pr_link item', () => {
+    expect(extractSessionPrLink(messageItem())).toBeUndefined();
+  });
+
+  it('drops an invalid set with an empty platform', () => {
+    expect(
+      extractSessionPrLink(prLinkItem({ platform: '', prUrl: 'https://x', prNumber: 1 }))
+    ).toBeUndefined();
+  });
+
+  it('drops an invalid set with a non-positive prNumber', () => {
+    expect(
+      extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: 'https://x', prNumber: 0 }))
+    ).toBeUndefined();
   });
 });

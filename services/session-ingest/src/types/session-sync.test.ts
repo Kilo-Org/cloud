@@ -78,6 +78,55 @@ describe('SessionItemSchema agent_notification validation', () => {
   });
 });
 
+describe('SessionItemSchema session_pr_link validation', () => {
+  it('parses a valid set', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_pr_link',
+      data: { platform: 'github', prUrl: 'https://github.com/acme/widgets/pull/42', prNumber: 42 },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_pr_link',
+      data: { platform: 'github', prUrl: 'https://github.com/acme/widgets/pull/42', prNumber: 42 },
+    });
+  });
+
+  it('parses a valid clear (all null)', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_pr_link',
+      data: { platform: null, prUrl: null, prNumber: null },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an empty platform', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_pr_link',
+        data: { platform: '', prUrl: 'https://x', prNumber: 1 },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a non-positive prNumber', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_pr_link',
+        data: { platform: 'github', prUrl: 'https://x', prNumber: 0 },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a non-integer prNumber', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_pr_link',
+        data: { platform: 'github', prUrl: 'https://x', prNumber: 1.5 },
+      }).success
+    ).toBe(false);
+  });
+});
+
 describe('SessionItemSchema storage key identity', () => {
   it('rejects slash-bearing message IDs before persistence', () => {
     expect(

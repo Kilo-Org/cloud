@@ -67,3 +67,37 @@ export function extractStatusFromItem(item: IngestBatch[number]): string | null 
   if (item.type !== 'session_status') return undefined;
   return normalizeOptionalString((item.data as { status?: unknown } | null | undefined)?.status);
 }
+
+/**
+ * The PR-link triple, emitted atomically. `prNumber` is serialized to a string so it
+ * flows through the same `string | null` change-map channel as every other extractable
+ * key; `computeSessionMetadataUpdates` converts it back with `Number`.
+ */
+export type SessionPrLinkExtract =
+  | { prPlatform: string; prUrl: string; prNumber: string }
+  | { prPlatform: null; prUrl: null; prNumber: null };
+
+export function extractSessionPrLink(item: IngestBatch[number]): SessionPrLinkExtract | undefined {
+  if (item.type !== 'session_pr_link') return undefined;
+
+  const { platform, prUrl, prNumber } = item.data;
+
+  // Any null field clears the whole link: persist null for all three keys.
+  if (platform === null || prUrl === null || prNumber === null) {
+    return { prPlatform: null, prUrl: null, prNumber: null };
+  }
+
+  // A non-null set must be well-formed; otherwise drop all three keys (metadata no-op).
+  if (
+    typeof platform !== 'string' ||
+    platform.length === 0 ||
+    typeof prUrl !== 'string' ||
+    typeof prNumber !== 'number' ||
+    !Number.isInteger(prNumber) ||
+    prNumber <= 0
+  ) {
+    return undefined;
+  }
+
+  return { prPlatform: platform, prUrl, prNumber: String(prNumber) };
+}

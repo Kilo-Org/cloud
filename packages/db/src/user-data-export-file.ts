@@ -34,11 +34,17 @@
  *        `source_embeddings`      the project, file path and branch of each indexed chunk
  *                                 of source. The vectors are not in the warehouse
  *
- *      One entry rather than one per source, because they ship together. A reader cares
- *      that the file gained sources at 4, not the order they were written in.
+ *      One entry rather than one per source, because they shipped together. A reader
+ *      cares that the file gained sources at 4, not the order they were written in.
+ *   5  the `platform_integrations` source (the connected source forge, the account it was
+ *      connected under, and the repositories it reaches)
+ *
+ *      Its own version rather than an addition to 4, because 4 has shipped. Extending a
+ *      released entry would leave two different file shapes both claiming it, which is
+ *      the one thing this constant exists to prevent.
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 4;
+export const EXPORT_FILE_SCHEMA_VERSION = 5;

@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as fixed-part-row.mounted.test.tsx) */
+/* eslint-disable typescript-eslint/no-deprecated, typescript-eslint/no-unsafe-call -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as fixed-part-row.mounted.test.tsx) */
 import { type AssociatedPrData } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -12,6 +12,7 @@ import { describePrBadge, normalizePrBadgeState } from './session-pr-badge-model
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   openExternalUrl: vi.fn(),
+  useFeatureFlag: vi.fn(() => true),
 }));
 
 vi.mock('react-native', () => ({
@@ -45,6 +46,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: mocks.openExternalUrl,
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
+  useFeatureFlag: mocks.useFeatureFlag,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -197,6 +202,7 @@ describe('SessionPrBadge mounted', () => {
   beforeEach(() => {
     mocks.push.mockClear();
     mocks.openExternalUrl.mockClear();
+    mocks.useFeatureFlag.mockReturnValue(true);
   });
 
   it('reserves a 52pt skeleton while loading', async () => {
@@ -251,6 +257,23 @@ describe('SessionPrBadge mounted', () => {
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith(
       'https://gitlab.com/octocat/hello-world/-/merge_requests/42',
+      { label: 'pull request' }
+    );
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('opens the browser for a GitHub PR when the PR review flag is off', async () => {
+    mocks.useFeatureFlag.mockReturnValue(false);
+    const renderer = await renderBadge({
+      pr: pr({ platform: 'github', url: 'https://github.com/octocat/hello-world/pull/42' }),
+      loading: false,
+    });
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    pressable?.props.onPress();
+
+    expect(mocks.openExternalUrl).toHaveBeenCalledWith(
+      'https://github.com/octocat/hello-world/pull/42',
       { label: 'pull request' }
     );
     expect(mocks.push).not.toHaveBeenCalled();

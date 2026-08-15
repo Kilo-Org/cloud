@@ -13,8 +13,9 @@ import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { openExternalUrl } from '@/lib/external-link';
-import { useThemeColors, type ThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { cn } from '@/lib/utils';
 
@@ -63,6 +64,7 @@ export type SessionPrBadgeProps = Readonly<{
 export function SessionPrBadge({ pr, loading }: SessionPrBadgeProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
 
   if (loading) {
     return <Skeleton className="h-5 w-[52px] rounded-full" />;
@@ -81,6 +83,11 @@ export function SessionPrBadge({ pr, loading }: SessionPrBadgeProps) {
   const Icon = ICON_BY_KIND[descriptor.icon];
 
   function handlePress() {
+    // Flag off: GitHub taps fall back to the browser (same as chat links).
+    if (!prReviewEnabled) {
+      void openExternalUrl(prData.url, { label: 'pull request' });
+      return;
+    }
     const target = resolveSessionPrTapTarget({
       platform: prData.platform,
       url: prData.url,

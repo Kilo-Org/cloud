@@ -56,9 +56,13 @@
  *      row prod has deleted from a live one. Both still RETURN those rows; they have
  *      stopped labelling them, not stopped exporting them. A reader comparing a version 6
  *      file against an earlier one will find the mark absent where it used to appear.
+ *   7  the `audiences` source (the marketing view's copy of the person's email address).
+ *      Personal exports only; the source has no organization reading. It is also the one
+ *      source NOT bounded to `snapshotAt` — the dbt model carries no row timestamp, so it
+ *      holds current state as of its last run rather than state at the cutoff
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 6;
+export const EXPORT_FILE_SCHEMA_VERSION = 7;

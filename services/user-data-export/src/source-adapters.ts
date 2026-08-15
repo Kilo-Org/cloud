@@ -799,21 +799,34 @@ LIMIT $2`;
  * The identity section already returns a country, region and city from analytics; this
  * source resolves location per usage row instead, down to coordinates.
  *
- * CURSOR NOT YET SETTLED. An approximate distinct count in Snowflake on 2026-08-15 came
- * back just under the row count, with no NULL and no empty `id`. That estimator's error
- * margin is wider than the gap it reported, so the result is consistent with `id` being
- * fully distinct AND with it repeating — it does not distinguish the two, and the
- * difference is the difference between a correct export and one that silently drops rows
- * at page boundaries.
+ * CURSOR. `id` alone, and that is measured rather than assumed: an exact
+ * `COUNT(DISTINCT id)` against the source at this cutoff equalled `COUNT(*)`, with no NULL
+ * and no empty value. An earlier approximate count could not settle it — its error margin
+ * was wider than the gap it reported — so the exact one was run. No id repeats globally,
+ * and none repeats within a single `kilo_user_id`, which is the property that actually
+ * governs these queries since every read is already scoped to one owner.
  *
- * Settle it against the loaded Postgres copy, which answers from `pg_stats` without
- * scanning a billion rows:
+ * The uniqueness is a property of the DATA, not a constraint the source enforces. Snowflake
+ * declares no unique key on this table and would not enforce one if it did, so a reload
+ * from a later cutoff could in principle break it. That is the same class of fact as
+ * `microdollar_usage_journal.payload_id`, which is also unique today — the difference is
+ * that the journal has a known mechanism that would break it and a construction-unique
+ * alternative to page on instead, whereas this table has neither. Re-verify on any reload;
+ * `postgres/checks/cursor_uniqueness.sql` answers it from `pg_stats` without scanning.
  *
- *     ./scripts/db.sh -v tbl=int_microdollar_usage_enriched -v col=id \
- *       -f postgres/checks/cursor_uniqueness.sql
+ * INDEXES. The warehouse carries one per scope, each leading with the owner column and
+ * continuing into the cursor — `(kilo_user_id, id)` and `(organization_id, id)` — which is
+ * exactly the shape `WHERE <owner> = $1 AND id > $2 ORDER BY id` reads. Both are partial,
+ * conditioned on their owner being NOT NULL, and that costs these queries nothing: neither
+ * scope predicate matches NULL, so no row an index omits was ever in scope. Same shape and
+ * same reasoning as `source_embeddings`.
  *
- * `n_distinct = -1` with `null_frac = 0` means the single-column cursor is safe. Anything
- * else and this source needs a composite cursor instead.
+ * Neither index is created by the bootstrap. The user-scoped one is large enough that
+ * building it is a deliberate act taking hours, so a window exists in which the table is
+ * loaded and the index is not. A read in that window scans rather than seeks, and the
+ * probe cannot see it — the probe checks that columns exist, never that an index does. It
+ * would surface as an export exhausting its per-source deadline rather than as a failure
+ * naming a cause, so this source should not be enabled until both indexes are in place.
  *
  * OWNERSHIP, measured in the same pass. `kilo_user_id` is populated on every row, with no
  * NULLs and no empty strings, so every row names an individual. `organization_id` is NULL
@@ -826,7 +839,11 @@ LIMIT $2`;
  * every row; this one reports it on a small minority. Absent means NULL on this table, and
  * the projection is right to leave it alone. `project_id` is the one exception, carrying a
  * negligible number of empty strings, passed through as the empty strings they are rather
- * than silently reinterpreted as absent.
+ * than silently reinterpreted as absent — so `= ''` is not impossible on that column
+ * specifically, even though `IS NULL` is the right test everywhere else here.
+ *
+ * `kilo_user_id` is variable width rather than a fixed-length uuid, so nothing should key
+ * off its length. It is non-NULL and non-empty on every row, so no row is unattributed.
  *
  * A dbt model, so there is no CDC column and nothing to mark as deleted.
  */

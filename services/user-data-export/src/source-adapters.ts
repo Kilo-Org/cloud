@@ -740,9 +740,16 @@ const USER_AUTH_PROVIDER_FIELDS = [
  * `user_auth_provider_user_page (kilo_user_id, provider, provider_account_id)`, so this
  * ordering is served from that index with no sort step.
  *
- * No `COALESCE` sentinel on either cursor column, unlike `system_prompt_prefix`. These
- * two are the only NOT NULL columns on the table, so neither can produce the NULL that
- * makes a tuple comparison yield NULL and silently drop the rows it was meant to keep.
+ * No `COALESCE` sentinel on either cursor column, unlike `system_prompt_prefix`. Both are
+ * NOT NULL on the warehouse table, so neither can produce the NULL that makes a tuple
+ * comparison yield NULL and silently drop the rows it was meant to keep.
+ *
+ * Warehouse nullability is not prod's, and the difference is the whole reason the readers
+ * below are split. `schema.ts` marks six columns `notNull()` — `kilo_user_id`, the cursor
+ * pair, `email`, `avatar_url` and `created_at` — but only the cursor pair survives the
+ * load as NOT NULL. Every other column arrives nullable, `kilo_user_id` included. So a
+ * prod constraint is not something a reader here may lean on, and the two columns that
+ * can be read strictly are exactly the two this query pages on.
  *
  * Bare names in the ORDER BY are correct here: neither cursor column is selected through
  * a cast, so the output and input references are the same column. See `SCOPE_COLUMNS` for
@@ -2081,9 +2088,10 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           input.limit,
         ]).then(result =>
           result.map(row => ({
-            // The cursor pair, read strictly. Both are NOT NULL at the source, and a page
-            // that could not say where it ended would restart the source rather than
-            // continue it. Same handling as the position pairs on the two journals.
+            // The cursor pair, read strictly. Both are NOT NULL on the warehouse table —
+            // the only two that are — and a page that could not say where it ended would
+            // restart the source rather than continue it. Same handling as the position
+            // pairs on the two journals.
             provider: requiredString(row.provider, 'provider'),
             provider_account_id: requiredString(row.provider_account_id, 'provider_account_id'),
             // Everything else takes the lenient warehouse reader: these columns are

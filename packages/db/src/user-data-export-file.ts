@@ -42,9 +42,23 @@
  *      Its own version rather than an addition to 4, because 4 has shipped. Extending a
  *      released entry would leave two different file shapes both claiming it, which is
  *      the one thing this constant exists to prevent.
+ *   6  two more sources, and one change to two existing ones:
+ *        `external_usage_daily`   the countries a person appeared from, per workspace. Not
+ *                                 usage history: the source table was reduced to three
+ *                                 columns on 2026-08-14 and holds no date, model or volume
+ *        `cloud_agent_code_reviews`
+ *                                 one journal row per state change of a code review, with
+ *                                 the pull request it covers and the summary it replaced
+ *
+ *      Also at 6, and the reason a reader may care more: `app_builder_projects` and
+ *      `app_builder_messages` no longer carry the `softDeleted` mark. Their projections
+ *      were reduced to `id, title` and `id, data` on request, so neither source can tell a
+ *      row prod has deleted from a live one. Both still RETURN those rows; they have
+ *      stopped labelling them, not stopped exporting them. A reader comparing a version 6
+ *      file against an earlier one will find the mark absent where it used to appear.
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 5;
+export const EXPORT_FILE_SCHEMA_VERSION = 6;

@@ -343,6 +343,7 @@ describe('warehouse availability probe', () => {
       'app_builder_projects',
       'app_builder_messages',
       'cli_sessions',
+      'cloud_agent_code_reviews',
       'system_prompt_prefix',
       'microdollar_usage_metadata',
       'code_indexing_manifest',
@@ -350,6 +351,7 @@ describe('warehouse availability probe', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
       'enrichment_data',
@@ -402,6 +404,7 @@ describe('source adapters', () => {
       'app_builder_projects',
       'app_builder_messages',
       'cli_sessions',
+      'cloud_agent_code_reviews',
       'system_prompt_prefix',
       'microdollar_usage_metadata',
       'code_indexing_manifest',
@@ -409,6 +412,7 @@ describe('source adapters', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
       'enrichment_data',
@@ -629,6 +633,22 @@ describe('source adapters', () => {
     expect(messages.pageSize).toBe(200);
   });
 
+  // The sync metadata was dropped from this projection on request. The table does hold
+  // deleted rows, so the source can no longer tell them apart and must not imply it can:
+  // an absent mark reads as "not deleted, or cannot say", never as a claim of live.
+  // Distinct from `app_builder_projects`, which still carries the column and still labels.
+  it('never marks a message as deleted, having given up the column', async () => {
+    const { adapters, warehouseCalls } = harness([
+      { id: 'message-gone', data: { role: 'user' }, _snowflake_deleted: true },
+    ]);
+
+    const page = await requireAdapter(adapters, 'app_builder_messages').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).not.toContain('_snowflake');
+    expect(page?.records).toHaveLength(1);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
   it('paginates cli sessions on the journal position pair, not session_id', async () => {
     const { adapters, warehouseCalls } = harness([
       {
@@ -772,31 +792,55 @@ describe('source adapters', () => {
     });
   });
 
+  // All three deletion states in one place, on a source that still carries the column.
+  // This used to be asserted on `app_builder_projects`, which gave the flag up when its
+  // projection was reduced; the guarantee is unchanged, so it moved rather than went.
+  //
+  // Only `true` is meaningful. `false` and `null` both produce no property, because the
+  // warehouse cannot distinguish "live" from "not reloaded yet" and the export must not
+  // pretend otherwise.
   it('marks a deleted row and leaves a live one unmarked', async () => {
     const { adapters } = harness([
-      { id: 'project-live', title: 'Live', _snowflake_deleted: false },
-      { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
+      { system_prompt_prefix_id: '1', cursor_secondary: '-', system_prompt_prefix: 'Live' },
+      {
+        system_prompt_prefix_id: '2',
+        cursor_secondary: '-',
+        system_prompt_prefix: 'Deleted',
+        _snowflake_deleted: true,
+      },
       // Unknown state: the table's reload has not run. Not deleted as far as we can say.
-      { id: 'project-unknown', title: 'Unknown', _snowflake_deleted: null },
+      {
+        system_prompt_prefix_id: '3',
+        cursor_secondary: '-',
+        system_prompt_prefix: 'Unknown',
+        _snowflake_deleted: null,
+      },
     ]);
 
-    const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
+    const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toEqual([
-      { source: 'app_builder_projects', id: 'project-live', field: 'title', value: 'Live' },
+      { source: 'system_prompt_prefix', id: '1.-', field: 'system_prompt_prefix', value: 'Live' },
       {
-        source: 'app_builder_projects',
-        id: 'project-gone',
-        field: 'title',
+        source: 'system_prompt_prefix',
+        id: '2.-',
+        field: 'system_prompt_prefix',
         value: 'Deleted',
         softDeleted: true,
       },
-      { source: 'app_builder_projects', id: 'project-unknown', field: 'title', value: 'Unknown' },
+      {
+        source: 'system_prompt_prefix',
+        id: '3.-',
+        field: 'system_prompt_prefix',
+        value: 'Unknown',
+      },
     ]);
   });
 
   // Deleted rows are returned, not filtered. The export is a truthful copy of what the
-  // warehouse holds, so a deleted project still reaches the person it belonged to.
+  // warehouse holds, so a deleted row still reaches the person it belonged to. That holds
+  // for the sources that no longer carry the flag too: they stopped labelling, not
+  // returning.
   it('returns deleted rows rather than dropping them', async () => {
     const { adapters, warehouseCalls } = harness([
       { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
@@ -806,6 +850,19 @@ describe('source adapters', () => {
 
     expect(page?.records).toHaveLength(1);
     expect(warehouseCalls[0].text).not.toContain('_snowflake_deleted IS NOT TRUE');
+  });
+
+  // The projection was reduced on request, so this source can no longer tell a deleted
+  // project from a live one and must not imply it can.
+  it('never marks a project as deleted, having given up the column', async () => {
+    const { adapters, warehouseCalls } = harness([
+      { id: 'project-gone', title: 'Deleted', _snowflake_deleted: true },
+    ]);
+
+    const page = await requireAdapter(adapters, 'app_builder_projects').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).not.toContain('_snowflake');
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   it('emits user prompts as their own set, unpaired from system prompts', async () => {
@@ -1640,5 +1697,199 @@ describe('source adapters', () => {
     expect(byField.get('platform_account_login')).toBeNull();
     expect(byField.get('repositories')).toBeNull();
     expect(byField.get('platform')).toBe('github');
+  });
+
+  const COUNTRY_ROW = { cursor_owner: 'org-9', geoip_country_code: 'NL' };
+
+  it('emits a country under the owner dimension the scope did not pin', async () => {
+    const { adapters } = harness([COUNTRY_ROW]);
+
+    const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    // A personal export gains the organization the country was seen under. That column is
+    // a dimension here, not a second owner of the row.
+    expect(page?.records).toEqual([
+      {
+        source: 'external_usage_daily',
+        id: 'org-9|NL',
+        field: 'organization_id',
+        value: 'org-9',
+      },
+      {
+        source: 'external_usage_daily',
+        id: 'org-9|NL',
+        field: 'geoip_country_code',
+        value: 'NL',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'NL'] });
+  });
+
+  it('emits the member dimension instead when an organization asks', async () => {
+    const { adapters } = harness([{ ...COUNTRY_ROW, cursor_owner: 'member-user' }]);
+
+    const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.(
+      ORG_READ_PAGE_INPUT
+    );
+    const fields = page?.records.map(record => record.field) ?? [];
+
+    expect(fields).toContain('kilo_user_id');
+    expect(fields).not.toContain('organization_id');
+  });
+
+  // The row has no key of its own: all three columns together are what makes it distinct,
+  // which is why the load carries DISTINCT. The scope pins one, so the cursor is the other
+  // two. The previous cursor on this table, (kilo_user_id, usage_date), was never unique.
+  it('pages a country row on both columns the scope did not pin', async () => {
+    const { adapters, warehouseCalls } = harness([COUNTRY_ROW]);
+
+    await requireAdapter(adapters, 'external_usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['org-9', 'NL'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain(
+      "(COALESCE(organization_id, '-'), COALESCE(geoip_country_code, '-')) > ($2::text, $3::text)"
+    );
+    expect(warehouseCalls[0].text).not.toContain('usage_date');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', 'org-9', 'NL', 100]);
+  });
+
+  // A NULL inside a tuple comparison yields NULL rather than false, so an uncoalesced
+  // cursor would drop exactly the rows the sentinel exists to keep. The emitted value
+  // stays null: the sentinel is a cursor device, not a fact about the person.
+  it('substitutes the sentinel for an absent dimension in the cursor only', async () => {
+    const { adapters } = harness([{ cursor_owner: null, geoip_country_code: 'NL' }]);
+
+    const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.nextCursor).toEqual({ key: ['-', 'NL'] });
+    expect(byField.get('organization_id')).toBeNull();
+  });
+
+  it('scopes each country read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([COUNTRY_ROW]);
+    const adapter = requireAdapter(adapters, 'external_usage_daily');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].values[0]).toBe('owner-user');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].values[0]).toBe('org-1');
+  });
+
+  it('never marks a country row as deleted', async () => {
+    const { adapters } = harness([{ ...COUNTRY_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.(READ_PAGE_INPUT);
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  const CODE_REVIEW_ROW = {
+    payload_id: 'review-1',
+    repo_full_name: 'acme/private-api',
+    pr_url: 'https://github.com/acme/private-api/pull/7',
+    pr_title: 'Tighten the auth guard',
+    base_ref: 'main',
+    previous_summary_body: 'An earlier summary.',
+    most_significant_position: '11',
+    least_significant_position: '2',
+  };
+
+  it('keys a code review journal row on the position pair, not the review id', async () => {
+    const { adapters } = harness([CODE_REVIEW_ROW]);
+
+    const page = await requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    // `payload_id` repeats about 7.4 times per review, so it is exported as a field to
+    // group the rows and never used to identify one.
+    expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['11.2']));
+    expect(byField.get('payload_id')).toBe('review-1');
+    expect(byField.get('repo_full_name')).toBe('acme/private-api');
+    expect(byField.get('pr_title')).toBe('Tighten the auth guard');
+    expect(byField.get('base_ref')).toBe('main');
+    expect(byField.get('previous_summary_body')).toBe('An earlier summary.');
+    expect(page?.nextCursor).toEqual({ key: ['11', '2'] });
+  });
+
+  // A keyset on payload_id would skip the rest of a review at any page boundary inside
+  // one, which is the defect cli_sessions and system_prompt_prefix were both fixed for.
+  it('pages code reviews on the position pair and never on payload_id', async () => {
+    const { adapters, warehouseCalls } = harness([CODE_REVIEW_ROW]);
+
+    await requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['11', '2'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain(
+      '(most_significant_position, least_significant_position) > ($2::bigint, $3::bigint)'
+    );
+    expect(warehouseCalls[0].text).not.toContain('payload_id >');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', '11', '2', 100]);
+  });
+
+  // Both positions are bigints selected through a text cast under their own names, so a
+  // bare name in the ORDER BY would sort the page as text while the cursor compares
+  // numerically. Fifth table where this applies, and the failure is silent every time.
+  it('orders code reviews on the qualified position columns', async () => {
+    const { adapters, warehouseCalls } = harness([CODE_REVIEW_ROW]);
+
+    await requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain(
+      'ORDER BY cloud_agent_code_reviews.most_significant_position,\n' +
+        '  cloud_agent_code_reviews.least_significant_position'
+    );
+  });
+
+  it('scopes each code review read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([CODE_REVIEW_ROW]);
+    const adapter = requireAdapter(adapters, 'cloud_agent_code_reviews');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+  });
+
+  // The journal envelope went with the narrowing, so this source can say nothing about
+  // deletion and must not imply otherwise.
+  it('never marks a code review as deleted', async () => {
+    const { adapters } = harness([{ ...CODE_REVIEW_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records).toHaveLength(6);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('fails a code review page whose cursor column is unreadable', async () => {
+    const { adapters } = harness([
+      { ...CODE_REVIEW_ROW, most_significant_position: 'not-a-number' },
+    ]);
+
+    await expect(
+      requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.(READ_PAGE_INPUT)
+    ).rejects.toThrow('most_significant_position');
   });
 });

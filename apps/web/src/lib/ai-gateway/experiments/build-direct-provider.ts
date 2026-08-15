@@ -161,7 +161,7 @@ export function buildDirectProvider(
     apiKey: upstream.api_key,
     supportedChatApis,
     responseTransforms: upstream.use_gemini_reasoning_transform
-      ? { mapGeminiThoughtContent: true }
+      ? { mapGeminiThoughtContent: true, mapReasoningContentToDetails: false }
       : null,
     async transformRequest(context) {
       const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);

@@ -1,8 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
+import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
+  MessageWithReasoning,
   OpenCodeSpecificProperties,
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -280,6 +282,41 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
     }
     if ('reasoning_details' in message) {
       delete message.reasoning_details;
+    }
+  }
+}
+
+/**
+ * Inverse of the `mapReasoningContentToDetails` response transform: folds
+ * OpenRouter-style `reasoning_details` back into the DeepSeek-style
+ * `reasoning_content` string that upstreams like Friendli and Perplexity
+ * expect on chat completions messages.
+ */
+export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    const messageWithReasoning = message as typeof message & MessageWithReasoning;
+    const reasoningDetails = messageWithReasoning.reasoning_details;
+    if (!Array.isArray(reasoningDetails)) {
+      continue;
+    }
+    delete messageWithReasoning.reasoning_details;
+
+    const reasoningContent = reasoningDetails
+      .map(detail => {
+        switch (detail.type) {
+          case ReasoningDetailType.Text:
+            return detail.text ?? '';
+          case ReasoningDetailType.Summary:
+            return detail.summary;
+          case ReasoningDetailType.Encrypted:
+            // Opaque provider-specific blob; not representable as reasoning_content.
+            return '';
+        }
+      })
+      .join('');
+
+    if (reasoningContent) {
+      messageWithReasoning.reasoning_content = reasoningContent;
     }
   }
 }

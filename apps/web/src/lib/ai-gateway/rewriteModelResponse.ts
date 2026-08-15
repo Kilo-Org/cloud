@@ -1,4 +1,5 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
+import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
@@ -422,6 +423,31 @@ function rewriteGeminiThoughtContent(delta: unknown) {
   delete delta.content;
 }
 
+/**
+ * Converts the DeepSeek-style `reasoning_content` string into OpenRouter-style
+ * `reasoning_details`, matching the shape produced by OpenRouter and consumed
+ * by clients such as `@openrouter/ai-sdk-provider`. The flat string carries no
+ * format or signature, so every chunk becomes a `reasoning.text` detail at
+ * index 0; clients merge consecutive same-type deltas into a single block.
+ */
+function rewriteReasoningContentToReasoningDetails(delta: unknown) {
+  if (!isRecord(delta) || typeof delta.reasoning_content !== 'string') {
+    return;
+  }
+
+  const detail = {
+    type: ReasoningDetailType.Text,
+    text: delta.reasoning_content,
+    index: 0,
+  };
+  if (Array.isArray(delta.reasoning_details)) {
+    delta.reasoning_details.push(detail);
+  } else {
+    delta.reasoning_details = [detail];
+  }
+  delete delta.reasoning_content;
+}
+
 export async function rewriteModelResponse_ChatCompletions({
   response,
   removeCost,
@@ -455,6 +481,11 @@ export async function rewriteModelResponse_ChatCompletions({
     const usage = json.usage as OpenRouterUsage;
     if (usage) {
       rewriteUsage(usage, removeCost);
+    }
+    if (responseTransforms?.mapReasoningContentToDetails) {
+      for (const choice of json.choices ?? []) {
+        rewriteReasoningContentToReasoningDetails(choice.message);
+      }
     }
 
     return NextResponse.json(json, {
@@ -513,6 +544,9 @@ export async function rewriteModelResponse_ChatCompletions({
             }
             if (responseTransforms?.mapGeminiThoughtContent) {
               rewriteGeminiThoughtContent(delta);
+            }
+            if (responseTransforms?.mapReasoningContentToDetails) {
+              rewriteReasoningContentToReasoningDetails(delta);
             }
           }
 

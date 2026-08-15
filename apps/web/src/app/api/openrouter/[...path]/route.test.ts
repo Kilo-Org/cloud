@@ -325,7 +325,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
-    const responseTransforms = { mapGeminiThoughtContent: true };
+    const responseTransforms = {
+      mapGeminiThoughtContent: true,
+      mapReasoningContentToDetails: false,
+    };
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider: { ...provider, responseTransforms },

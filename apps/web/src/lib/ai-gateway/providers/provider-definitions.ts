@@ -1,5 +1,8 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  mapReasoningDetailsToReasoningContent,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -90,11 +93,16 @@ export default {
     apiUrlOverrides: {},
     apiKey: getEnvVariable('FRIENDLI_API_KEY'),
     // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
-    supportedChatApis: ['messages'],
-    responseTransforms: null,
+    supportedChatApis: ['chat_completions', 'messages'],
+    // Chat completions responses report reasoning as `reasoning_content`; expose it as
+    // `reasoning_details` so clients can conserve it across turns.
+    responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
       delete context.request.body.provider;
+      if (context.request.kind === 'chat_completions') {
+        mapReasoningDetailsToReasoningContent(context.request.body);
+      }
     },
   },
   PERPLEXITY_KIMI: {
@@ -103,11 +111,16 @@ export default {
     apiUrlOverrides: {},
     apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
     // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
-    supportedChatApis: ['messages'],
-    responseTransforms: null,
+    supportedChatApis: ['chat_completions', 'messages'],
+    // Chat completions responses report reasoning as `reasoning_content`; expose it as
+    // `reasoning_details` so clients can conserve it across turns.
+    responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';
       delete context.request.body.provider;
+      if (context.request.kind === 'chat_completions') {
+        mapReasoningDetailsToReasoningContent(context.request.body);
+      }
     },
   },
   STREAMLAKE: {

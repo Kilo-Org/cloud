@@ -1512,6 +1512,33 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('uses live cache fields when the stored link has a trailing subpath', async () => {
+      // Stored link names the same PR (pull/42) as the cache row, with a
+      // trailing subpath. Raw string equality fails; normalized comparison wins.
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42/files',
+          pr_number: 42,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add feature X',
+        headSha: 'deadbeefcafe',
+        platform: 'github',
+      });
+    });
+
     it('returns the session partial (not the other PR) when the session link disagrees with the branch cache', async () => {
       // Session link points at a different PR than the branch cache (pull/42).
       await db
@@ -1625,6 +1652,50 @@ describe('cli-sessions-v2-router', () => {
       });
       expect(typeof withPr?.associatedPr?.lastSyncedAt).toBe('string');
       expect(withoutPr?.associatedPr).toBeNull();
+    });
+
+    it('list returns live cache fields when the stored link has a trailing subpath', async () => {
+      // Stored link names the same PR (pull/77) as the cache row, with a
+      // trailing subpath. Normalized comparison must yield live cache fields.
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77/files',
+          pr_number: 77,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+
+      const row = result.cliSessions.find(s => s.session_id === sessionWithPr);
+      expect(row?.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/77',
+        number: 77,
+        state: 'open',
+        title: 'List endpoint feature',
+        headSha: 'cafef00d',
+      });
+    });
+
+    it('search returns live cache fields when the stored link has a trailing subpath', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77/files',
+          pr_number: 77,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+      });
+
+      const row = result.results.find(s => s.session_id === sessionWithPr);
+      expect(row?.associatedPr).toMatchObject({ number: 77, state: 'open' });
     });
 
     it.each([
@@ -2168,6 +2239,53 @@ describe('cli-sessions-v2-router', () => {
 
       expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
       expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+    });
+
+    it('updates the matching cache row when the stored link has a trailing subpath', async () => {
+      // Cache row holds the same PR (canonical URL) with stale fields.
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
+        pr_state: 'open',
+        pr_title: 'stale',
+        pr_head_sha: 'old-sha',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+
+      // Session stores a subpath link that names the same PR.
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_url: 'https://github.com/kilo/repo/pull/7/files' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Feature Z',
+        headSha: 'new-sha',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+
+      // The write guard treated the subpath link as the same PR and updated the
+      // existing row in place — no duplicate row and no stale fields.
+      const rows = await readCacheRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
+        pr_head_sha: 'new-sha',
+      });
     });
 
     it('maps GitHubRateLimitError to TOO_MANY_REQUESTS', async () => {

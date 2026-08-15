@@ -292,6 +292,22 @@ function pendingPartialFromSession(
 }
 
 /**
+ * Compare two PR URLs as the same pull request, ignoring trailing subpath,
+ * query, fragment, and trailing slash. A stored link like
+ * `.../pull/7/files` names the same PR as the canonical cache URL
+ * `.../pull/7`. Returns `false` when either URL is not a parseable GitHub PR
+ * URL.
+ */
+function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
+  if (sessionUrl === cacheUrl) return true;
+  const s = parseGitHubPrUrl(sessionUrl);
+  const c = parseGitHubPrUrl(cacheUrl);
+  return (
+    s !== null && c !== null && s.owner === c.owner && s.repo === c.repo && s.number === c.number
+  );
+}
+
+/**
  * Format the associated PR for a session, preferring the session's stored link
  * over the branch cache. Three rules:
  *   1. Session link matches the cache PR → live cache fields.
@@ -304,7 +320,7 @@ function formatAssociatedPr(
   opts?: { partialReviewDecisionPending?: boolean }
 ): z.infer<typeof associatedPrSchema> | null {
   if (session.pr_url) {
-    if (cache.pr_url === session.pr_url) {
+    if (cache.pr_url !== null && samePullRequest(session.pr_url, cache.pr_url)) {
       return formatCacheRow(cache, session.platform ?? 'github');
     }
     return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
@@ -1299,15 +1315,20 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       // Fetch-by-number requires a parseable PR URL. Sessions without one fall
       // back to the branch cache / pending partial without a GitHub call.
-      const parsed = session.pr_url ? parseGitHubPrUrl(session.pr_url) : null;
-      if (!parsed) {
+      const sessionPrUrl = session.pr_url;
+      const parsed = sessionPrUrl ? parseGitHubPrUrl(sessionPrUrl) : null;
+      if (!sessionPrUrl || !parsed) {
         return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
       }
 
       // Throttle: skip the fetch only when the cache row already matches the
       // session's stored link and was synced recently. A mismatched cache row
       // must not short-circuit.
-      if (cacheRow.pr_url === session.pr_url && cacheRow.pr_last_synced_at !== null) {
+      if (
+        cacheRow.pr_url !== null &&
+        samePullRequest(sessionPrUrl, cacheRow.pr_url) &&
+        cacheRow.pr_last_synced_at !== null
+      ) {
         const lastSyncedMs = Date.parse(cacheRow.pr_last_synced_at);
         if (Number.isFinite(lastSyncedMs) && Date.now() - lastSyncedMs < REFRESH_THROTTLE_MS) {
           return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
@@ -1418,7 +1439,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       if (
         gitUrl != null &&
         branch != null &&
-        (cacheRow.pr_url == null || cacheRow.pr_url === session.pr_url)
+        (cacheRow.pr_url == null || samePullRequest(sessionPrUrl, cacheRow.pr_url))
       ) {
         const prColumns = {
           pr_url: fetched?.htmlUrl ?? null,

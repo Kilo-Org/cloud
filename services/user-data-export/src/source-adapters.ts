@@ -24,16 +24,28 @@ export type ExportRecord = {
  *
  * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
  * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
- * `event_type` instead, `users` has no CDC column, and `enrichment_data` and
- * `microdollar_usage_journal` were narrowed on request, dropping the flag with the rest.
+ * `event_type` instead, `users` has no CDC column, and `enrichment_data`,
+ * `microdollar_usage_journal` and `cloud_agent_code_reviews` were narrowed on request,
+ * dropping the flag with the rest.
  * Naming the column on any of them is a runtime error, so records from those sources are
  * never labelled.
+ *
+ * `external_usage_daily` is the odd one out: it is a dbt model rather than a CDC copy of a
+ * prod table, so no such column was ever going to exist on it.
  *
  * The narrowed tables are where the flag was given up rather than never held, and in each
  * case it was separating nothing. `enrichment_data` carried 5 deleted rows against 16,661
  * live. `security_findings` carried none at all. `microdollar_usage_journal` is
  * insert-only — every one of its 158,433,290 rows is an `IncrementalInsertRows` event — so
  * nothing there can be deleted in the first place.
+ *
+ * The two app-builder sources are where the flag was dropped from sources that genuinely
+ * used it. Both projections were reduced on request — to `id, data` and `id, title` — and
+ * both tables hold deleted rows: 224,039 messages and 2,579 projects, counted 2026-08-12.
+ * Neither source can distinguish them now, and neither claims to. The records they emit
+ * are unlabelled rather than labelled live, which is the honest reading: `deletionMark`
+ * already treats an absent mark as "not deleted, or cannot say" precisely so a source
+ * losing the column does not start asserting something false.
  */
 export const DELETED_COLUMN = '_snowflake_deleted';
 export const SOURCES_WITHOUT_DELETED_COLUMN = [
@@ -44,6 +56,10 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'microdollar_usage_journal',
   'security_findings',
   'source_embeddings',
+  'external_usage_daily',
+  'app_builder_messages',
+  'app_builder_projects',
+  'cloud_agent_code_reviews',
 ] as const;
 
 /**
@@ -272,11 +288,13 @@ LIMIT 1`;
  *     code_indexing_manifest   20,170,449    user XOR org
  *     deployment_events           513,069    user XOR org
  *     platform_integrations         1,862    user XOR org
+ *     cloud_agent_code_reviews     73,767    user XOR org
  *     cli_sessions                      0    both columns set
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
  *     code_indexing_search              0    both columns set
  *     source_embeddings                 0    both columns set
+ *     external_usage_daily              -    org is a dimension, not an owner
  *     microdollar_usage_journal         -    not counted
  *     security_findings                 -    user XOR org, by construction
  *
@@ -298,6 +316,12 @@ LIMIT 1`;
  * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
+ *
+ * `external_usage_daily` does not fit the question the table asks. Its `organization_id`
+ * names the workspace a country was seen under, not an alternative owner of the row, so
+ * "an organization but no user" is not a defect there but an ordinary anonymous row. Both
+ * scopes still read it, and the column the scope does not pin becomes a cursor column and
+ * an exported field.
  *
  * `enrichment_data` is absent from that table because it has neither reading: the warehouse
  * copy carries no organization column at all, so it is user-only and an organization export
@@ -362,14 +386,21 @@ function subjectPageQueries(input: {
   };
 }
 
+/** No sync metadata in the projection, by request. See `messageQueries` below. */
 const projectQueries = subjectPageQueries({
   table: 'app_builder_projects',
-  columns: 'id, title, _snowflake_deleted',
+  columns: 'id, title',
 });
 
+/**
+ * No sync metadata in the projection, by request. `_snowflake_inserted_at` and
+ * `_snowflake_updated_at` were never selected here; `_snowflake_deleted` was, and dropping
+ * it means this source can no longer tell a row prod has deleted from a live one. It
+ * therefore labels nothing — see `SOURCES_WITHOUT_DELETED_COLUMN`.
+ */
 const messageQueries = subjectPageQueries({
   table: 'app_builder_messages',
-  columns: 'id, data, _snowflake_deleted',
+  columns: 'id, data',
 });
 
 /**
@@ -400,6 +431,59 @@ WHERE ${SCOPE_COLUMNS[scope]} = $1
 ORDER BY cli_sessions.most_significant_position, cli_sessions.least_significant_position
 LIMIT $4`;
 }
+
+/**
+ * The export's third journal, and the one whose repeating key is worst: `payload_id`
+ * carries 63,879 distinct values across 474,678 rows, so a review appears about 7.4 times.
+ * A cursor on it would skip the rest of a review at any page boundary inside one. The
+ * position pair is the cursor, measured unique across all 474,678 rows and monotonic, and
+ * both warehouse indexes lead with an owner column and continue into it.
+ *
+ * `payload_id` is exported as a field rather than used as a key, so the rows belonging to
+ * one review can still be grouped. Same division as `cli_sessions` makes between
+ * `session_id` and its positions.
+ *
+ * User XOR org: `schema.ts` requires exactly one of the two, corroborated by the
+ * account-deletion transaction erasing these rows by `owned_by_user_id`
+ * (`user/index.ts:1338`). 73,767 rows carry no user and belong to an organization alone.
+ *
+ * The ORDER BY is table-qualified, the fifth table where that matters. Both positions are
+ * bigints selected through a `::text` cast under their own names, so a bare name there
+ * binds to the text output column and the page would sort lexicographically while the
+ * cursor compares numerically. See the note on `SCOPE_COLUMNS`.
+ *
+ * The `ddl` row needs no special handling, and that is measured rather than assumed. The
+ * journal envelope — `event_type`, `seen_at`, `sf_metadata` — was dropped when the table
+ * was narrowed to ten columns on 2026-08-14, and `event_type` was the only thing that
+ * named the single schema-change row, so nothing here can skip it by name. It does not
+ * need to. Counted 2026-08-15 over all 474,678 rows:
+ *
+ *     rows with a NULL `payload_id`                            1
+ *     rows carrying neither owner                              1
+ *     payload-less rows carrying an owner                      0
+ *
+ * The payload-less row IS the unowned row, so both scope predicates already exclude it on
+ * the same terms as any other unowned row: neither matches NULL. It reaches nobody, and no
+ * filter stands in for the column that was dropped.
+ */
+function cloudAgentCodeReviewPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT payload_id, repo_full_name, pr_url, pr_title, base_ref,
+  previous_summary_body,
+  most_significant_position::text AS most_significant_position,
+  least_significant_position::text AS least_significant_position
+FROM cloud_agent_code_reviews
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::bigint IS NULL
+    OR (most_significant_position, least_significant_position) > ($2::bigint, $3::bigint))
+ORDER BY cloud_agent_code_reviews.most_significant_position,
+  cloud_agent_code_reviews.least_significant_position
+LIMIT $4`;
+}
+
+const cloudAgentCodeReviewQueries: Record<ExportSubject['type'], string> = {
+  user: cloudAgentCodeReviewPageQuery('user'),
+  organization: cloudAgentCodeReviewPageQuery('organization'),
+};
 
 const cliSessionQueries: Record<ExportSubject['type'], string> = {
   user: cliSessionPageQuery('user'),
@@ -842,6 +926,59 @@ const platformIntegrationQueries = subjectPageQueries({
   columns: 'id, platform, platform_account_login, repositories, _snowflake_deleted',
 });
 
+/**
+ * Which countries a person appeared from. Not usage history, despite the name: the table
+ * was reduced on 2026-08-14 to the three columns it now holds, and `usage_daily` and
+ * `microdollar_usage_hourly` are where the dates, models and volumes live.
+ *
+ * The reduction is what makes it safe to read. Its previous cursor,
+ * `(kilo_user_id, usage_date)`, was never unique — a daily grain guarantees many rows per
+ * user-day, so a page boundary inside one skipped the rest of it. The table now carries
+ * `SELECT DISTINCT` over exactly its three columns, so the three together ARE the grain
+ * and the cursor is unique by construction. 33,958,723 source rows collapse to roughly
+ * 1.1M here, and that collapse is the product rather than a defect.
+ *
+ * Its two siblings still carry the old defect and are deliberately not sources here. The
+ * same reduction is not automatically right for them: country attribution can lose its
+ * date, and usage history cannot.
+ *
+ * The scope pins one column, so the cursor is the other two. `organization_id` is a
+ * dimension rather than an alternative owner — this table does not follow "user or org,
+ * never both" — so in a personal export it becomes a cursor column and an exported field,
+ * which is why both owner columns must be present whichever subject asks. See
+ * `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ *
+ * Every column is nullable text, so both cursor columns are coalesced to the sentinel: a
+ * NULL inside a tuple comparison yields NULL rather than false, and an uncoalesced cursor
+ * would drop exactly the rows it exists to keep. The dbt source writes empty string for
+ * absent values and the export normalises those to NULL, so a blank cannot collide with
+ * the sentinel. No `::text` casts here, so the ORDER BY needs no qualifying — every
+ * column is already text and the `COALESCE` expressions are input references.
+ *
+ * Expect roughly ten rows per person rather than one. People appear from more than one
+ * country and in more than one organization.
+ */
+function externalUsageDailyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  // The owner the scope has not pinned: scoping by user leaves the org varying, and the
+  // other way round.
+  const cursorOwner = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  const keyed = [
+    `COALESCE(${cursorOwner}, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(geoip_country_code, '${NULL_CURSOR_SENTINEL}')`,
+  ];
+  return `SELECT ${cursorOwner} AS cursor_owner, geoip_country_code
+FROM external_usage_daily
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL OR (${keyed.join(', ')}) > ($2::text, $3::text))
+ORDER BY ${keyed.join(', ')}
+LIMIT $4`;
+}
+
+const externalUsageDailyQueries: Record<ExportSubject['type'], string> = {
+  user: externalUsageDailyPageQuery('user'),
+  organization: externalUsageDailyPageQuery('organization'),
+};
+
 const securityFindingQueries = subjectPageQueries({
   table: 'security_findings',
   columns: SECURITY_FINDING_COLUMNS.join(', '),
@@ -857,6 +994,12 @@ const MESSAGE_PAGE_SIZE = 200;
  */
 const SEARCH_PAGE_SIZE = 200;
 
+/**
+ * A review journal row carries `previous_summary_body`, the whole prior summary text, and
+ * about 7.4 rows exist per review. Cut for the same reason as the message source.
+ */
+const CODE_REVIEW_PAGE_SIZE = 200;
+
 /** Deployment events carry a payload per event, so the page is cut for the same reason. */
 const DEPLOYMENT_EVENT_PAGE_SIZE = 200;
 
@@ -866,8 +1009,18 @@ const DEPLOYMENT_EVENT_PAGE_SIZE = 200;
  */
 const SECURITY_FINDING_PAGE_SIZE = 100;
 
-type ProjectRow = { id: string; title: string | null; deleted: unknown };
-type MessageRow = { id: string; data: unknown; deleted: unknown };
+type ProjectRow = { id: string; title: string | null };
+type MessageRow = { id: string; data: unknown };
+type CloudAgentCodeReviewRow = {
+  payload_id: string | null;
+  repo_full_name: string | null;
+  pr_url: string | null;
+  pr_title: string | null;
+  base_ref: string | null;
+  previous_summary_body: string | null;
+  most_significant_position: string;
+  least_significant_position: string;
+};
 type CliSessionRow = {
   session_id: string | null;
   title: string | null;
@@ -883,6 +1036,10 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type ExternalUsageDailyRow = {
+  cursor_owner: string | null;
+  geoip_country_code: string | null;
+};
 type PlatformIntegrationRow = {
   id: string;
   platform: string | null;
@@ -1223,7 +1380,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           result.map(row => ({
             id: requiredString(row.id, 'id'),
             title: nullableString(row.title, 'title'),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1232,7 +1388,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             id: row.id,
             field: 'title',
             value: row.title,
-            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
@@ -1252,7 +1407,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           result.map(row => ({
             id: requiredString(row.id, 'id'),
             data: row.data,
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1261,7 +1415,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             id: row.id,
             field: 'data',
             value: jsonValue(row.data),
-            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
@@ -1303,6 +1456,74 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               { source: 'cli_sessions', id, field: 'title', value: row.title },
               { source: 'cli_sessions', id, field: 'git_url', value: row.git_url },
               { source: 'cli_sessions', id, field: 'git_branch', value: row.git_branch },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.most_significant_position,
+            row.least_significant_position,
+          ]),
+        };
+      },
+    },
+    {
+      name: 'cloud_agent_code_reviews',
+      warehouseTable: 'cloud_agent_code_reviews',
+      pageSize: CODE_REVIEW_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
+        const rows: CloudAgentCodeReviewRow[] = await warehouseQuery(
+          cloudAgentCodeReviewQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterMost, afterLeast, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            payload_id: warehouseText(row.payload_id),
+            repo_full_name: warehouseText(row.repo_full_name),
+            pr_url: warehouseText(row.pr_url),
+            pr_title: warehouseText(row.pr_title),
+            base_ref: warehouseText(row.base_ref),
+            previous_summary_body: warehouseText(row.previous_summary_body),
+            // The cursor pair, read strictly: a page that could not say where it ended
+            // would restart the source rather than continue it.
+            most_significant_position: digitString(
+              row.most_significant_position,
+              'most_significant_position'
+            ),
+            least_significant_position: digitString(
+              row.least_significant_position,
+              'least_significant_position'
+            ),
+          }))
+        );
+        return {
+          // No deletion mark: the journal envelope went with the narrowing, so this source
+          // cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => {
+            // The position pair identifies the journal row; `payload_id` identifies the
+            // review and repeats about 7.4 times across them, so it is a field rather
+            // than the key. Same division `cli_sessions` makes.
+            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            return [
+              {
+                source: 'cloud_agent_code_reviews',
+                id,
+                field: 'payload_id',
+                value: row.payload_id,
+              },
+              {
+                source: 'cloud_agent_code_reviews',
+                id,
+                field: 'repo_full_name',
+                value: row.repo_full_name,
+              },
+              { source: 'cloud_agent_code_reviews', id, field: 'pr_url', value: row.pr_url },
+              { source: 'cloud_agent_code_reviews', id, field: 'pr_title', value: row.pr_title },
+              { source: 'cloud_agent_code_reviews', id, field: 'base_ref', value: row.base_ref },
+              {
+                source: 'cloud_agent_code_reviews',
+                id,
+                field: 'previous_summary_body',
+                value: row.previous_summary_body,
+              },
             ];
           }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
@@ -1642,6 +1863,58 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'external_usage_daily',
+      warehouseTable: 'external_usage_daily',
+      async readPage(input): Promise<SourcePage> {
+        const [afterOwner, afterCountry] = keyCursorValues(input.cursor, 2);
+        // The owner the scope did not pin, named by its own column. Which one that is
+        // depends on the subject, so this source's field set does too: a personal export
+        // gains the organization the country was seen under, an organization's gains the
+        // member. Both are dimensions of the row rather than a second owner of it.
+        const cursorOwnerField =
+          input.subject.type === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+        const rows: ExternalUsageDailyRow[] = await warehouseQuery(
+          externalUsageDailyQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterOwner, afterCountry, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            cursor_owner: warehouseText(row.cursor_owner),
+            geoip_country_code: warehouseText(row.geoip_country_code),
+          }))
+        );
+        // Must agree exactly with the COALESCE in the query, or a page would resume from
+        // a key the WHERE clause never produced.
+        const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
+        return {
+          // No deletion mark: a dbt model, not a CDC copy, so it carries no such column.
+          records: rows.flatMap(row => {
+            // The row has no key of its own — its grain is its identity, which is why the
+            // load carries DISTINCT. Both parts are emitted below, so a separator
+            // appearing inside a value costs nothing.
+            const id = [keyed(row.cursor_owner), keyed(row.geoip_country_code)].join('|');
+            return [
+              {
+                source: 'external_usage_daily',
+                id,
+                field: cursorOwnerField,
+                value: row.cursor_owner,
+              },
+              {
+                source: 'external_usage_daily',
+                id,
+                field: 'geoip_country_code',
+                value: row.geoip_country_code,
+              },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            keyed(row.cursor_owner),
+            keyed(row.geoip_country_code),
+          ]),
+        };
+      },
+    },
+    {
       name: 'platform_integrations',
       warehouseTable: 'platform_integrations',
       async readPage(input): Promise<SourcePage> {
@@ -1877,6 +2150,8 @@ export const warehouseQueries = {
   messageOrgQuery: messageQueries.organization,
   cliSessionUserQuery: cliSessionQueries.user,
   cliSessionOrgQuery: cliSessionQueries.organization,
+  cloudAgentCodeReviewUserQuery: cloudAgentCodeReviewQueries.user,
+  cloudAgentCodeReviewOrgQuery: cloudAgentCodeReviewQueries.organization,
   systemPromptUserQuery: systemPromptQueries.user,
   systemPromptOrgQuery: systemPromptQueries.organization,
   userPromptUserQuery: userPromptQueries.user,
@@ -1897,6 +2172,8 @@ export const warehouseQueries = {
   sourceEmbeddingOrgQuery: sourceEmbeddingQueries.organization,
   platformIntegrationUserQuery: platformIntegrationQueries.user,
   platformIntegrationOrgQuery: platformIntegrationQueries.organization,
+  externalUsageDailyUserQuery: externalUsageDailyQueries.user,
+  externalUsageDailyOrgQuery: externalUsageDailyQueries.organization,
   // No org counterpart, deliberately. See `userAuthProviderQuery` and `USER_ONLY_SOURCES`.
   userAuthProviderUserQuery: userAuthProviderQuery,
 };
@@ -1944,13 +2221,25 @@ export type WarehouseTableRequirement = { table: string; requiredColumns: readon
  */
 export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS), ...WAREHOUSE_ONLY_FIELDS],
-  app_builder_projects: ['id', 'title', DELETED_COLUMN],
-  app_builder_messages: ['id', 'data', DELETED_COLUMN],
+  app_builder_projects: ['id', 'title'],
+  app_builder_messages: ['id', 'data'],
   cli_sessions: [
     'session_id',
     'title',
     'git_url',
     'git_branch',
+    'most_significant_position',
+    'least_significant_position',
+  ],
+  // The position pair is declared because the query orders and pages on it. No deletion
+  // column: the journal envelope went with the 2026-08-14 narrowing.
+  cloud_agent_code_reviews: [
+    'payload_id',
+    'repo_full_name',
+    'pr_url',
+    'pr_title',
+    'base_ref',
+    'previous_summary_body',
     'most_significant_position',
     'least_significant_position',
   ],
@@ -1999,11 +2288,29 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'repositories',
     DELETED_COLUMN,
   ],
+  // The whole table bar its two owner columns, which `sourceQueryScopes` covers and
+  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of. A dbt model, so there is no
+  // deletion column to declare.
+  external_usage_daily: ['geoip_country_code'],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. The scope column `kilo_user_id` is added per
   // subject below; the cursor pair needs no addition, being two of the fields already.
   user_auth_provider: [...USER_AUTH_PROVIDER_FIELDS, DELETED_COLUMN],
 };
+
+/**
+ * Tables whose query names BOTH owner columns whichever subject is asking, so the probe
+ * has to require both or the read fails on a column it was never asked about.
+ *
+ * Both are here for the same structural reason: their cursor needs a column the scope has
+ * not already pinned, and the only one left is the other owner. `system_prompt_prefix`
+ * pages on `(prefix id, the other owner)`; `external_usage_daily` pages on all three of
+ * its columns, one of which the scope fixes and one of which is the other owner.
+ *
+ * This does couple a personal export to a column only an organization export filters on,
+ * which is deliberate — the alternative is a cursor that repeats and drops rows.
+ */
+const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set(['system_prompt_prefix', 'external_usage_daily']);
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
 const SUBJECT_SCOPED_TABLES = new Set(
@@ -2037,10 +2344,9 @@ export function warehouseRequirements(
     .map(table => {
       const declared = WAREHOUSE_SOURCE_COLUMNS[table] ?? [];
       if (!SUBJECT_SCOPED_TABLES.has(table)) return { table, requiredColumns: declared };
-      const scopeColumns =
-        table === 'system_prompt_prefix'
-          ? [SCOPE_COLUMNS.user, SCOPE_COLUMNS.organization]
-          : [SCOPE_COLUMNS[subjectType]];
+      const scopeColumns = TABLES_NEEDING_BOTH_SCOPE_COLUMNS.has(table)
+        ? [SCOPE_COLUMNS.user, SCOPE_COLUMNS.organization]
+        : [SCOPE_COLUMNS[subjectType]];
       return { table, requiredColumns: [...scopeColumns, ...declared] };
     });
 }
@@ -2116,6 +2422,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   messageOrgQuery: 'organization_id = $1',
   cliSessionUserQuery: 'kilo_user_id = $1',
   cliSessionOrgQuery: 'organization_id = $1',
+  cloudAgentCodeReviewUserQuery: 'kilo_user_id = $1',
+  cloudAgentCodeReviewOrgQuery: 'organization_id = $1',
   systemPromptUserQuery: 'kilo_user_id = $1',
   systemPromptOrgQuery: 'organization_id = $1',
   userPromptUserQuery: 'kilo_user_id = $1',
@@ -2135,6 +2443,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   sourceEmbeddingOrgQuery: 'organization_id = $1',
   platformIntegrationUserQuery: 'kilo_user_id = $1',
   platformIntegrationOrgQuery: 'organization_id = $1',
+  externalUsageDailyUserQuery: 'kilo_user_id = $1',
+  externalUsageDailyOrgQuery: 'organization_id = $1',
   userAuthProviderUserQuery: 'kilo_user_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',

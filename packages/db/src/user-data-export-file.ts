@@ -42,7 +42,21 @@
  *      Its own version rather than an addition to 4, because 4 has shipped. Extending a
  *      released entry would leave two different file shapes both claiming it, which is
  *      the one thing this constant exists to prevent.
- *   6  the `user_auth_provider` source (which identity providers the person signed in
+ *   6  two more sources, and one change to two existing ones:
+ *        `external_usage_daily`   the countries a person appeared from, per workspace. Not
+ *                                 usage history: the source table was reduced to three
+ *                                 columns on 2026-08-14 and holds no date, model or volume
+ *        `cloud_agent_code_reviews`
+ *                                 one journal row per state change of a code review, with
+ *                                 the pull request it covers and the summary it replaced
+ *
+ *      Also at 6, and the reason a reader may care more: `app_builder_projects` and
+ *      `app_builder_messages` no longer carry the `softDeleted` mark. Their projections
+ *      were reduced to `id, title` and `id, data` on request, so neither source can tell a
+ *      row prod has deleted from a live one. Both still RETURN those rows; they have
+ *      stopped labelling them, not stopped exporting them. A reader comparing a version 6
+ *      file against an earlier one will find the mark absent where it used to appear.
+ *   7  the `user_auth_provider` source (which identity providers the person signed in
  *      with, and the account id, email, display name, avatar and hosted domain each one
  *      supplied, plus when it was linked). One record set per linked account, so a person
  *      with Google and GitHub linked has two. Personal exports only; the table carries no
@@ -52,4 +66,4 @@
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 6;
+export const EXPORT_FILE_SCHEMA_VERSION = 7;

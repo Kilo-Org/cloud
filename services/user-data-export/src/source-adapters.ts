@@ -23,26 +23,28 @@ export type ExportRecord = {
  * 2026-08-12 carry `_snowflake_deleted` to mark them; the rest cannot say.
  *
  * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
- * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
+ * was not reloaded (the rewrite cost was judged out of proportion to what it would mark),
+ * `cli_sessions` is a journal carrying
  * `event_type` instead, `users` has no CDC column, and `enrichment_data`,
  * `microdollar_usage_journal` and `cloud_agent_code_reviews` were narrowed on request,
  * dropping the flag with the rest.
  * Naming the column on any of them is a runtime error, so records from those sources are
  * never labelled.
  *
- * `external_usage_daily` and `audiences` are the odd ones out: both are dbt models rather
- * than CDC copies of prod tables, so no such column was ever going to exist on either.
+ * `external_usage_daily`, `audiences` and `int_microdollar_usage_enriched` are the odd ones
+ * out: all three are dbt models rather than CDC copies of prod tables, so no such column
+ * was ever going to exist on any of them.
  *
  * The narrowed tables are where the flag was given up rather than never held, and in each
- * case it was separating nothing. `enrichment_data` carried 5 deleted rows against 16,661
- * live. `security_findings` carried none at all. `microdollar_usage_journal` is
- * insert-only — every one of its 158,433,290 rows is an `IncrementalInsertRows` event — so
- * nothing there can be deleted in the first place.
+ * case it was separating nothing. `enrichment_data` carried a negligible number of deleted
+ * rows against its live set, and `security_findings` none at all.
+ * `microdollar_usage_journal` is insert-only — every row is an `IncrementalInsertRows`
+ * event — so nothing there can be deleted in the first place.
  *
  * The two app-builder sources are where the flag was dropped from sources that genuinely
  * used it. Both projections were reduced on request — to `id, data` and `id, title` — and
- * both tables hold deleted rows: 224,039 messages and 2,579 projects, counted 2026-08-12.
- * Neither source can distinguish them now, and neither claims to. The records they emit
+ * both tables do hold deleted rows. Neither source can distinguish them now, and neither
+ * claims to. The records they emit
  * are unlabelled rather than labelled live, which is the honest reading: `deletionMark`
  * already treats an absent mark as "not deleted, or cannot say" precisely so a source
  * losing the column does not start asserting something false.
@@ -61,6 +63,7 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'app_builder_projects',
   'cloud_agent_code_reviews',
   'audiences',
+  'int_microdollar_usage_enriched',
 ] as const;
 
 /**
@@ -263,9 +266,9 @@ LIMIT 1`;
  *     prevent. Verified live: on `system_prompt_prefix`, 263 org-scoped rows sort
  *     differently under the two orderings.
  *   - No btree can serve a text ordering of a bigint column, so every page bitmap-scanned
- *     and sorted the whole owner's rowset. Measured on a 115k-row organization:
- *     116,522 startup cost per page against 0.42 for the qualified form, because nothing
- *     could be returned until all of that owner's rows had been scanned and sorted.
+ *     and sorted the whole owner's rowset. Measured on a large organization, the startup
+ *     cost per page was five orders of magnitude above the qualified form, because
+ *     nothing could be returned until all of that owner's rows had been scanned.
  *
  * A qualified name, or any expression such as the `COALESCE` below, is read as an input
  * reference, which is what both the index and the cursor comparison are built on.
@@ -283,30 +286,35 @@ LIMIT 1`;
  * exports. That overlap is correct rather than a leak.
  *
  * The warehouse expresses this two ways, and only one of them is exclusive. Measured
- * 2026-08-13, counting rows carrying an organization but no user:
+ * 2026-08-13, asking whether any row carries an organization but no user:
  *
- *     app_builder_projects          2,143    user XOR org
- *     app_builder_messages        266,095    user XOR org
- *     code_indexing_manifest   20,170,449    user XOR org
- *     deployment_events           513,069    user XOR org
- *     platform_integrations         1,862    user XOR org
- *     cloud_agent_code_reviews     73,767    user XOR org
- *     cli_sessions                      0    both columns set
- *     system_prompt_prefix              0    both columns set
- *     microdollar_usage_metadata        0    both columns set
- *     code_indexing_search              0    both columns set
- *     source_embeddings                 0    both columns set
- *     external_usage_daily              -    org is a dimension, not an owner
- *     microdollar_usage_journal         -    not counted
- *     security_findings                 -    user XOR org, by construction
+ *     app_builder_projects                   user XOR org
+ *     app_builder_messages                   user XOR org
+ *     code_indexing_manifest                 user XOR org
+ *     deployment_events                      user XOR org
+ *     platform_integrations                  user XOR org
+ *     cloud_agent_code_reviews               user XOR org
+ *     cli_sessions                           both columns set
+ *     system_prompt_prefix                   both columns set
+ *     microdollar_usage_metadata             both columns set
+ *     code_indexing_search                   both columns set
+ *     source_embeddings                      both columns set
+ *     external_usage_daily                   org is a dimension, not an owner
+ *     int_microdollar_usage_enriched         user always set, org optional
+ *     microdollar_usage_journal              not measured
+ *     security_findings                      user XOR org, by construction
  *
  * `security_findings` earns its XOR from the table rather than from a count: prod carries
  * one partial unique index per owner column, each conditioned on that column being NOT
  * NULL, so `organization_id` is set exactly when `kilo_user_id` is not.
  *
+ * `int_microdollar_usage_enriched` is a third shape again: `kilo_user_id` is populated on
+ * every row and `organization_id` on a minority of them, so no row can reach an
+ * organization export without also reaching that person's own. See `usageEnrichedQueries`.
+ *
  * `platform_integrations` is the only entry counted from both ends. Measured 2026-08-14
- * across all 38,849 rows: 36,987 user-only, the 1,862 org-only above, and zero rows either
- * carrying both owners or carrying neither. The XOR is exact rather than typical.
+ * across the whole table: every row carries exactly one of the two owners, with none
+ * carrying both and none carrying neither. The XOR is exact rather than typical.
  *
  * `microdollar_usage_journal` carries the same owner pair as the other microdollar
  * tables, but the count above was never rerun for it, so it is left blank rather than
@@ -314,8 +322,8 @@ LIMIT 1`;
  * standard ones and neither matches NULL, so an unowned row reaches nobody either way.
  * The entry is here so the gap is visible rather than looking like an omission.
  *
- * On the first four, an organization can own a row outright with no user attached, so
- * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
+ * Where the table says XOR, an organization can own a row outright with no user attached,
+ * so `kilo_user_id = $1` genuinely skips those. Where it says both, every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
  *
@@ -412,9 +420,9 @@ const messageQueries = subjectPageQueries({
  * page boundary landed mid-session.
  *
  * Every journal row is exported rather than collapsed to one row per session.
- * Measured on a real account, 12% of sessions carry values that change across their
- * rows, so collapsing would silently drop titles and branches the user actually
- * had. Each record is keyed by its journal position so repeated values read as a
+ * Measured on a real account, a meaningful share of sessions carry values that
+ * change across their rows, so collapsing would silently drop titles and branches
+ * the user actually had. Each record is keyed by its journal position so repeated values read as a
  * timeline instead of looking like duplication, and session_id is exported so rows
  * belonging to one session can be grouped.
  *
@@ -436,9 +444,9 @@ LIMIT $4`;
 
 /**
  * The export's third journal, and the one whose repeating key is worst: `payload_id`
- * carries 63,879 distinct values across 474,678 rows, so a review appears about 7.4 times.
- * A cursor on it would skip the rest of a review at any page boundary inside one. The
- * position pair is the cursor, measured unique across all 474,678 rows and monotonic, and
+ * repeats several times per review, once per journal event. A cursor on it would skip the
+ * rest of a review at any page boundary inside one. The position pair is the cursor,
+ * measured unique across the table and monotonic, and
  * both warehouse indexes lead with an owner column and continue into it.
  *
  * `payload_id` is exported as a field rather than used as a key, so the rows belonging to
@@ -447,7 +455,7 @@ LIMIT $4`;
  *
  * User XOR org: `schema.ts` requires exactly one of the two, corroborated by the
  * account-deletion transaction erasing these rows by `owned_by_user_id`
- * (`user/index.ts:1338`). 73,767 rows carry no user and belong to an organization alone.
+ * (`user/index.ts:1338`). Rows carrying no user belong to an organization alone.
  *
  * The ORDER BY is table-qualified, the fifth table where that matters. Both positions are
  * bigints selected through a `::text` cast under their own names, so a bare name there
@@ -458,15 +466,11 @@ LIMIT $4`;
  * journal envelope — `event_type`, `seen_at`, `sf_metadata` — was dropped when the table
  * was narrowed to ten columns on 2026-08-14, and `event_type` was the only thing that
  * named the single schema-change row, so nothing here can skip it by name. It does not
- * need to. Counted 2026-08-15 over all 474,678 rows:
- *
- *     rows with a NULL `payload_id`                            1
- *     rows carrying neither owner                              1
- *     payload-less rows carrying an owner                      0
- *
- * The payload-less row IS the unowned row, so both scope predicates already exclude it on
- * the same terms as any other unowned row: neither matches NULL. It reaches nobody, and no
- * filter stands in for the column that was dropped.
+ * need to. Measured 2026-08-15 across the table: the sole payload-less row is also the sole
+ * row carrying neither owner, and no payload-less row carries an owner. Both scope
+ * predicates therefore already exclude it on the same terms as any other unowned row,
+ * since neither matches NULL. It reaches nobody, and no filter stands in for the column
+ * that was dropped.
  */
 function cloudAgentCodeReviewPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT payload_id, repo_full_name, pr_url, pr_title, base_ref,
@@ -571,9 +575,9 @@ const userPromptQueries = subjectPageQueries({
  *     NULL on rows indexed under an organization. It names one person's own work.
  *   - `organization_id` is NOT always an organization. Indexing outside an org falls
  *     through to `getUserUUID(user)` = `uuidv5(user.id, ...)`, so a personal row carries a
- *     uuid DERIVED FROM THE USER. Measured 2026-08-12: 13,010 such ids appear in no
- *     `organizations` row, in strict 1:1 with 13,010 users. A real organization appears
- *     only on rows where `kilo_user_id` is NULL.
+ *     uuid DERIVED FROM THE USER. Verified 2026-08-12: such ids appear in no
+ *     `organizations` row, standing in strict one-to-one correspondence with users. A
+ *     real organization appears only on rows where `kilo_user_id` is NULL.
  *
  * Each subject is therefore scoped by exactly one of the two columns, and never by both.
  * `kilo_user_id = $1` selects that person's personal indexing. `organization_id = $1` is
@@ -629,14 +633,13 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * every access path on the owner columns and none on the creator.
  *
  * The distinction only bites on organization-owned deployments, which is exactly where
- * the two disagree: 513,069 rows carry an organization and no user, and their creator is
- * a member. Scoping a user export on the creator would hand that member an
+ * the two disagree: rows carrying an organization and no user have a member as creator. Scoping a user export on the creator would hand that member an
  * organization's deployment history as their own personal data. `kilo_user_id = $1`
  * therefore stays the only user predicate, and the creator is exported as a field so the
  * provenance is still visible without ever selecting on it.
  *
- * A further 99,210 rows have neither owner. Both predicates skip them, as with any other
- * unowned row, so they reach nobody.
+ * Rows with neither owner exist too. Both predicates skip them, as with any other unowned
+ * row, so they reach nobody.
  *
  * The cursor is the composite `(build_id, event_id)`, prod's primary key, because
  * `event_id` is a per-build sequence number rather than a row identifier and repeats
@@ -647,8 +650,8 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * cast under its own name, so a bare name there would sort the page as text while the
  * cursor below compares as bigint, and no index could serve it.
  *
- * One known cost, accepted upstream when the load was designed. The warehouse holds 1,255
- * byte-identical duplicate `(build_id, event_id)` pairs among 9,049,083 rows. A keyset
+ * One known cost, accepted upstream when the load was designed. The warehouse holds a
+ * negligible number of byte-identical duplicate `(build_id, event_id)` pairs. A keyset
  * cursor can drop one copy of a pair if a page boundary falls exactly between the twins.
  * They carry no information the surviving copy does not.
  */
@@ -726,8 +729,7 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * Which identity providers a person signed in with, and the profile each one supplied.
  *
  * One row per linked authentication account, NOT one per user: someone with Google and
- * GitHub linked has two. Counted in the loaded warehouse 2026-08-12 at 1,068,683 rows
- * over roughly 1.06M users, about 1.02 each.
+ * GitHub linked has two, though most people have one.
  *
  * User only, and it is in `USER_ONLY_SOURCES` rather than left to the probe: the table
  * carries no organization column at all, so there is no organization reading to offer.
@@ -772,8 +774,8 @@ LIMIT $4`;
  * `USER_ONLY_SOURCES`.
  *
  * No cursor, unlike every other paged source. `kilo_user_id` is unique and non-null across
- * all 1,068,509 rows, so the scope already selects at most one row and there is nothing
- * left to page.
+ * the table, so the scope already selects at most one row and there is nothing left to
+ * page.
  *
  * It still orders. Nothing here needs a deterministic sequence today, but the limit is
  * bound rather than fixed at 1 so that a table which stopped being one row per user would
@@ -791,9 +793,65 @@ ORDER BY email
 LIMIT $2`;
 
 /**
+ * Where a usage row was attributed to, geographically: the project it belonged to and the
+ * city, country and coordinates derived from the requesting IP.
+ *
+ * The identity section already returns a country, region and city from analytics; this
+ * source resolves location per usage row instead, down to coordinates.
+ *
+ * CURSOR NOT YET SETTLED. An approximate distinct count in Snowflake on 2026-08-15 came
+ * back just under the row count, with no NULL and no empty `id`. That estimator's error
+ * margin is wider than the gap it reported, so the result is consistent with `id` being
+ * fully distinct AND with it repeating — it does not distinguish the two, and the
+ * difference is the difference between a correct export and one that silently drops rows
+ * at page boundaries.
+ *
+ * Settle it against the loaded Postgres copy, which answers from `pg_stats` without
+ * scanning a billion rows:
+ *
+ *     ./scripts/db.sh -v tbl=int_microdollar_usage_enriched -v col=id \
+ *       -f postgres/checks/cursor_uniqueness.sql
+ *
+ * `n_distinct = -1` with `null_frac = 0` means the single-column cursor is safe. Anything
+ * else and this source needs a composite cursor instead.
+ *
+ * OWNERSHIP, measured in the same pass. `kilo_user_id` is populated on every row, with no
+ * NULLs and no empty strings, so every row names an individual. `organization_id` is NULL
+ * on most rows and empty on none; the minority that carry an organization also carry a
+ * user. So the two scopes overlap here rather than partition, and no row is unowned.
+ *
+ * That also settles the missing `NULLIF(col, '')`, which looked like an oversight beside
+ * its dbt siblings and is not one. A model writing empty strings the way
+ * `microdollar_usage_hourly` does would report `organization_id` as present on nearly
+ * every row; this one reports it on a small minority. Absent means NULL on this table, and
+ * the projection is right to leave it alone. `project_id` is the one exception, carrying a
+ * negligible number of empty strings, passed through as the empty strings they are rather
+ * than silently reinterpreted as absent.
+ *
+ * A dbt model, so there is no CDC column and nothing to mark as deleted.
+ */
+const USAGE_ENRICHED_FIELDS: Record<string, (value: unknown) => string | number | null> = {
+  project_id: warehouseText,
+  // `bigint` and `double precision` in the warehouse. `warehouseNumber` reads both the
+  // string and the number forms, since which one arrives depends on the driver's type
+  // parsers. Geo ids are far below the precision a double loses.
+  vercel_ip_city_id: warehouseNumber,
+  vercel_ip_country_id: warehouseNumber,
+  vercel_ip_latitude: warehouseNumber,
+  vercel_ip_longitude: warehouseNumber,
+};
+
+/** Cursor first, then the declared fields. */
+const USAGE_ENRICHED_COLUMNS = ['id', ...Object.keys(USAGE_ENRICHED_FIELDS)];
+
+const usageEnrichedQueries = subjectPageQueries({
+  table: 'int_microdollar_usage_enriched',
+  columns: USAGE_ENRICHED_COLUMNS.join(', '),
+});
+
+/**
  * The billing customer record Orb holds: postal addresses, tax id, contact emails and
- * name. The most sensitive source in the export, and for that reason one of the ones a
- * person has most claim to see.
+ * name.
  *
  * Third user-only source. Orb has no notion of a Kilo organization, so there is no
  * organization reading. See `USER_ONLY_SOURCES`.
@@ -802,9 +860,9 @@ LIMIT $2`;
  * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides, and it
  * is the reason `external_customer_id` and the scope hold the same value on every row this
  * source can return. Verified against data on 2026-08-11 rather than from code, because
- * the Orb integration does not live in this repo: 493,815 of 507,061 customers matched a
- * user, and the remaining 13,246 carry a NULL `kilo_user_id` and reach nobody, since the
- * scope predicate does not match NULL. The join cannot fan out — `users.user_id` is
+ * the Orb integration does not live in this repo. Most customers matched a user; those that
+ * did not carry a NULL `kilo_user_id` and reach nobody, since the scope predicate does not
+ * match NULL. The join cannot fan out — `users.user_id` is
  * unique — so the grain stays one row per Orb customer.
  *
  * One case the export relies on being unreachable rather than filtered: 82 matched rows
@@ -839,7 +897,7 @@ const orbCustomerQuery = singleKeyPageQuery({
  * The second journal in the export, and the one place where the cursor is deliberately
  * NOT the column that would work today.
  *
- * `payload_id` is unique across all 158,433,290 rows, measured 2026-08-11. It would serve
+ * `payload_id` is unique across the table, measured 2026-08-11. It would serve
  * as a cursor on this data. It is unique by luck rather than by construction: the journal
  * emits only `IncrementalInsertRows`, so nothing produces a second row for an entity. The
  * moment an update event appears, `payload_id` repeats and a cursor built on it starts
@@ -893,10 +951,9 @@ const microdollarJournalQueries: Record<ExportSubject['type'], string> = {
  * The cursor is `id`, which both warehouse indexes already lead into as `(owner, id)`.
  *
  * Everything the source held is exported except the two owner columns, which the subject
- * already implies. That includes `raw_data`, the unmodified upstream alert. This is the
- * most sensitive source in the export — unpatched vulnerabilities against named private
- * repositories — which is an argument for handling it carefully, not for withholding it
- * from the person whose repositories they are.
+ * already implies. That includes `raw_data`, the unmodified upstream alert, which is
+ * carried whole rather than picked over: the export returns what is held about the owner
+ * rather than a summary of it.
  *
  * `severity`, `cve_id` and `ghsa_id` are absent because the load dropped them on request.
  * A finding reads as less than it is without them, and that is a gap in the warehouse
@@ -971,9 +1028,8 @@ const SECURITY_FINDING_COLUMNS = ['id', ...Object.keys(SECURITY_FINDING_FIELDS)]
  * The organization index is partial, which costs this query nothing: `organization_id =
  * $1` cannot match NULL, so no row the index omits was ever in scope.
  *
- * The `embedding` column is not here. The load dropped it — roughly 13.8 KB per row as
- * text, and essentially all of this table's size — so the vectors are unavailable to any
- * consumer. What remains is which files were indexed, on which branch, for which project.
+ * The `embedding` column is not here. The load dropped it — it was essentially all of this
+ * table's size — so the vectors are unavailable to any consumer. What remains is which files were indexed, on which branch, for which project.
  */
 const sourceEmbeddingQueries = subjectPageQueries({
   table: 'source_embeddings',
@@ -985,9 +1041,9 @@ const sourceEmbeddingQueries = subjectPageQueries({
  * repositories that connection reaches.
  *
  * User XOR org, and this one is measured rather than inferred. Counted in Postgres
- * 2026-08-14 across all 38,849 rows: 36,987 name a user and no organization, 1,862 name
- * an organization and no user, and BOTH the both-set and the neither-set counts are zero.
- * No row can reach both exports and none reaches neither.
+ * 2026-08-14 across the whole table: every row names either a user or an organization and
+ * never both, and no row names neither. No row can reach both exports, and none reaches
+ * neither.
  *
  * The warehouse aliases the source's `owned_by_user_id` and `owned_by_organization_id` to
  * the repo convention, and the `owned_by_` naming is the same one already settled on
@@ -1015,8 +1071,8 @@ const platformIntegrationQueries = subjectPageQueries({
  * `(kilo_user_id, usage_date)`, was never unique — a daily grain guarantees many rows per
  * user-day, so a page boundary inside one skipped the rest of it. The table now carries
  * `SELECT DISTINCT` over exactly its three columns, so the three together ARE the grain
- * and the cursor is unique by construction. 33,958,723 source rows collapse to roughly
- * 1.1M here, and that collapse is the product rather than a defect.
+ * and the cursor is unique by construction. The source's rows collapse substantially here,
+ * and that collapse is the product rather than a defect.
  *
  * Its two siblings still carry the old defect and are deliberately not sources here. The
  * same reduction is not automatically right for them: country attribution can lose its
@@ -1067,18 +1123,17 @@ const securityFindingQueries = subjectPageQueries({
 /**
  * Page sizes, and why each is the number it is.
  *
- * A page costs roughly 300-400 ms of fixed round trip before it has returned a single row,
- * which is most of what a small page costs at all. Measured on an organization export
- * 2026-08-15: 200-row pages took 354-668 ms and 1,000-row pages took 620-1,105 ms, so
- * five times the rows cost under twice the time. Wall clock is therefore governed by page
- * COUNT far more than by page size, and every size below is as large as its row width
- * allows rather than as small as it can be.
+ * A page costs a few hundred milliseconds of fixed round trip before it has returned a
+ * single row, which is most of what a small page costs at all. Measured on an organization
+ * export 2026-08-15, raising the row count several fold cost well under double the time.
+ * Wall clock is therefore governed by page COUNT far more than by page size, and every
+ * size below is as large as its row width allows rather than as small as it can be.
  *
  * That inverts the reasoning these constants originally carried. They were cut to keep
  * large rows from making a page unwieldy, which was right, but the cut was expressed as a
- * row count and row counts are not comparable across sources: 200 rows of
- * `app_builder_messages` is 168 KB and 200 rows of `code_indexing_search` is 1,062 KB.
- * Each size is now that source's MEASURED bytes per row divided into a shared budget.
+ * row count, and a row count is not comparable across sources whose rows differ in width
+ * by an order of magnitude. Each size is now that source's measured bytes per row divided
+ * into a shared budget.
  *
  * The budget is about 2 MB of uncompressed payload per page, against a 128 MB Worker. A
  * page is live three times over at peak — the driver's rows, the mapped rows, the emitted
@@ -1091,32 +1146,32 @@ const securityFindingQueries = subjectPageQueries({
  */
 
 /**
- * Whole conversations, one per row. 0.84 KB per row typical, but the widest page observed
- * held 9.04 KB per row — a 10x spread, the largest of any source here. 500 rows is 420 KB
- * typical and 4.5 MB at that observed worst, which is why this rises by 2.5x rather than
- * the 4x its typical width would allow.
+ * Whole conversations, one per row. Typical rows are modest, but the widest page observed
+ * was an order of magnitude above that — the largest spread of any source here. The size
+ * is set for that worst case rather than the typical one, which is why it rises less than
+ * its typical width alone would allow.
  */
 const MESSAGE_PAGE_SIZE = 500;
 
 /**
  * `metadata` carries the whole result set of a search, not a single value. The widest
- * source measured at 5.42 KB per row typical and 6.42 KB worst, so 400 rows is 2.2 MB
- * typical and 2.6 MB worst. Raised the least of the four, being the one whose rows are
- * genuinely large rather than occasionally large.
+ * source measured here, and with little spread between its typical and worst rows. Raised
+ * the least of the four, being the one whose rows are genuinely large rather than
+ * occasionally large.
  */
 const SEARCH_PAGE_SIZE = 400;
 
 /**
  * A review journal row carries `previous_summary_body`, the whole prior summary text, and
- * about 7.4 rows exist per review. 1.37 KB per row typical, 1.96 KB worst, so 1,000 rows
- * is 1.4 MB typical and 2.0 MB worst.
+ * several rows exist per review. Sized so that a page stays within the shared budget even
+ * at the worst row width observed.
  */
 const CODE_REVIEW_PAGE_SIZE = 1_000;
 
 /**
- * Deployment events carry a payload per event, but the payloads proved uniform: 0.84 KB
- * per row typical against 0.90 KB worst, a 7% spread. A tight distribution is what admits
- * the largest jump, so 2,000 rows is 1.8 MB even at the observed worst.
+ * Deployment events carry a payload per event, but the payloads proved uniform in width.
+ * A tight distribution is what admits the largest jump, since the typical row and the
+ * worst row size a page almost identically.
  */
 const DEPLOYMENT_EVENT_PAGE_SIZE = 2_000;
 
@@ -1189,6 +1244,10 @@ type EnrichmentRow = {
   clay_enrichment_data: string | null;
 };
 type AudienceRow = { email: string | null };
+type UsageEnrichedRow = {
+  id: string;
+  fields: { field: string; value: string | number | null }[];
+};
 /**
  * Keyed by the exported field list, so a field added to `USER_AUTH_PROVIDER_FIELDS`
  * without a reader below is a type error rather than an `undefined` in the file.
@@ -1622,7 +1681,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           // cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => {
             // The position pair identifies the journal row; `payload_id` identifies the
-            // review and repeats about 7.4 times across them, so it is a field rather
+            // review and repeats across them, so it is a field rather
             // than the key. Same division `cli_sessions` makes.
             const id = `${row.most_significant_position}.${row.least_significant_position}`;
             return [
@@ -2152,6 +2211,37 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'int_microdollar_usage_enriched',
+      warehouseTable: 'int_microdollar_usage_enriched',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: UsageEnrichedRow[] = await warehouseQuery(
+          usageEnrichedQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            fields: Object.entries(USAGE_ENRICHED_FIELDS).map(([field, read]) => ({
+              field,
+              value: read(row[field]),
+            })),
+          }))
+        );
+        return {
+          // No deletion mark: a dbt model, not a CDC copy, so it carries no such column.
+          records: rows.flatMap(row =>
+            row.fields.map(({ field, value }) => ({
+              source: 'int_microdollar_usage_enriched',
+              id: row.id,
+              field,
+              value,
+            }))
+          ),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
       name: 'audiences',
       warehouseTable: 'audiences',
       async readPage(input): Promise<SourcePage> {
@@ -2330,6 +2420,8 @@ export const warehouseQueries = {
   enrichmentUserQuery: enrichmentQuery,
   // No org counterpart either. See `audienceQuery` and `USER_ONLY_SOURCES`.
   audienceUserQuery: audienceQuery,
+  usageEnrichedUserQuery: usageEnrichedQueries.user,
+  usageEnrichedOrgQuery: usageEnrichedQueries.organization,
   // No org counterpart: Orb has no notion of a Kilo organization.
   orbCustomerUserQuery: orbCustomerQuery,
   microdollarJournalUserQuery: microdollarJournalQueries.user,
@@ -2433,6 +2525,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Two columns in the table, one of which is the scope. A dbt model, so no deletion
   // column exists to declare.
   audiences: ['email'],
+  // Derived from the same constant the SELECT list is. A dbt model, so no deletion column
+  // exists to declare.
+  int_microdollar_usage_enriched: USAGE_ENRICHED_COLUMNS,
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading.
   orb_customer: ORB_CUSTOMER_COLUMNS,
@@ -2608,6 +2703,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   deploymentEventOrgQuery: 'organization_id = $1',
   enrichmentUserQuery: 'kilo_user_id = $1',
   audienceUserQuery: 'kilo_user_id = $1',
+  usageEnrichedUserQuery: 'kilo_user_id = $1',
+  usageEnrichedOrgQuery: 'organization_id = $1',
   orbCustomerUserQuery: 'kilo_user_id = $1',
   microdollarJournalUserQuery: 'kilo_user_id = $1',
   microdollarJournalOrgQuery: 'organization_id = $1',

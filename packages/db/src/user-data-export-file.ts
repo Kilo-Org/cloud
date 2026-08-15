@@ -85,9 +85,13 @@
  *
  *      Where a dropped column was needed to page or to identify a row it is still
  *      SELECTed and simply not returned. Where it was not, it is no longer read at all.
+ *   9  the `int_microdollar_usage_enriched` source (the project a usage row belonged to,
+ *      and the city, country and coordinates derived from the requesting IP). The most
+ *      granular location the file carries: the identity section reports it per person,
+ *      and this resolves it per usage row
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 8;
+export const EXPORT_FILE_SCHEMA_VERSION = 9;

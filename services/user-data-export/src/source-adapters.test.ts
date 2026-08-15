@@ -360,6 +360,7 @@ describe('warehouse availability probe', () => {
       'platform_integrations',
       'microdollar_usage_journal',
       'orb_customer',
+      'int_microdollar_usage_enriched',
       'audiences',
       'enrichment_data',
       'user_auth_provider',
@@ -424,6 +425,7 @@ describe('source adapters', () => {
       'platform_integrations',
       'microdollar_usage_journal',
       'orb_customer',
+      'int_microdollar_usage_enriched',
       'audiences',
       'enrichment_data',
       'user_auth_provider',
@@ -691,7 +693,7 @@ describe('source adapters', () => {
   });
 
   it('keys repeated journal rows for one session by position, keeping every value', async () => {
-    // 12% of real sessions change values across their journal rows, so the rows are
+    // A meaningful share of real sessions change values across their journal rows, so
     // a timeline rather than duplication. Collapsing them would drop titles and
     // branches the user actually had.
     const { adapters } = harness([
@@ -1663,8 +1665,9 @@ describe('source adapters', () => {
     }
   });
 
-  // Measured across all 38,849 rows: 36,987 user-only, 1,862 org-only, zero carrying both
-  // and zero carrying neither. Each read still names one owner column and not the other.
+  // Measured across the whole table: every row carries exactly one of the two owners, with
+  // none carrying both and none carrying neither. Each read still names one owner column
+  // and not the other.
   it('scopes each integration read to one owner column and never both', async () => {
     const { adapters, warehouseCalls } = harness([INTEGRATION_ROW]);
     const adapter = requireAdapter(adapters, 'platform_integrations');
@@ -1680,7 +1683,7 @@ describe('source adapters', () => {
     expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
   });
 
-  // 3,005 of 38,849 rows are deleted in the source, so this source does carry the flag.
+  // The source does hold deleted rows, and this source carries the flag to mark them.
   it('marks every field of an integration prod has since deleted', async () => {
     const { adapters } = harness([{ ...INTEGRATION_ROW, _snowflake_deleted: true }]);
 
@@ -1823,7 +1826,7 @@ describe('source adapters', () => {
     });
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
-    // `payload_id` repeats about 7.4 times per review, so it is exported as a field to
+    // `payload_id` repeats once per journal event, so it is exported as a field to
     // group the rows and never used to identify one.
     expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['11.2']));
     expect(byField.get('payload_id')).toBe('review-1');
@@ -2004,7 +2007,7 @@ describe('source adapters', () => {
     expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, 100]);
   });
 
-  // 639 of 1,068,683 rows are deleted in the source, so this source does carry the flag.
+  // The source does hold deleted rows, and this source carries the flag to mark them.
   it('marks every field of a linked account prod has since deleted', async () => {
     const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, _snowflake_deleted: true }]);
 
@@ -2047,7 +2050,7 @@ describe('source adapters', () => {
     ]);
   });
 
-  // `kilo_user_id` is unique across all 1,068,509 rows, so scoping already selects at most
+  // `kilo_user_id` is unique across the table, so scoping already selects at most
   // one row and there is nothing left to page. A cursor here would page on the same column
   // the WHERE clause has already pinned.
   it('reads the audience row without a cursor and never asks for a second page', async () => {
@@ -2153,5 +2156,88 @@ describe('source adapters', () => {
 
     expect(page?.records).toHaveLength(7);
     for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  const USAGE_ENRICHED_ROW = {
+    id: 'usage-1',
+    project_id: 'project-a',
+    vercel_ip_city_id: '2759794',
+    vercel_ip_country_id: 528,
+    vercel_ip_latitude: '52.3676',
+    vercel_ip_longitude: 4.9041,
+  };
+
+  it('emits the five enriched usage fields, keyed by the usage row', async () => {
+    const { adapters } = harness([USAGE_ENRICHED_ROW]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.records).toHaveLength(5);
+    for (const record of page?.records ?? []) expect(record.id).toBe('usage-1');
+    expect(byField.get('project_id')).toBe('project-a');
+    expect(page?.nextCursor).toEqual({ key: ['usage-1'] });
+  });
+
+  // Every numeric column here arrives as a string or a number depending on the driver's
+  // type parsers: bigint is commonly returned as text to protect precision, double
+  // precision as a number. Reading only one form would drop coordinates on the other.
+  it.each([
+    ['vercel_ip_city_id', 2759794],
+    ['vercel_ip_country_id', 528],
+    ['vercel_ip_latitude', 52.3676],
+    ['vercel_ip_longitude', 4.9041],
+  ])('reads %s as a number whichever form the driver returns', async (field, expected) => {
+    const { adapters } = harness([USAGE_ENRICHED_ROW]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records.find(record => record.field === field)?.value).toBe(expected);
+  });
+
+  it('scopes each enriched usage read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_ENRICHED_ROW]);
+    const adapter = requireAdapter(adapters, 'int_microdollar_usage_enriched');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  // A dbt model with no CDC column, so this source can say nothing about deletion.
+  it('never marks an enriched usage record as deleted', async () => {
+    const { adapters } = harness([{ ...USAGE_ENRICHED_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('reads an unusable coordinate as absent rather than failing the export', async () => {
+    const { adapters } = harness([
+      { ...USAGE_ENRICHED_ROW, vercel_ip_latitude: null, vercel_ip_longitude: 'n/a' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('vercel_ip_latitude')).toBeNull();
+    expect(byField.get('vercel_ip_longitude')).toBeNull();
+    expect(byField.get('project_id')).toBe('project-a');
   });
 });

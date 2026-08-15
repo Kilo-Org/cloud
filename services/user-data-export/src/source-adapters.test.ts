@@ -633,7 +633,7 @@ describe('source adapters', () => {
 
   it('reads fewer message rows per page than the default', () => {
     const messages = requireAdapter(harness().adapters, 'app_builder_messages');
-    expect(messages.pageSize).toBe(200);
+    expect(messages.pageSize).toBe(500);
   });
 
   // The sync metadata was dropped from this projection on request. The table does hold
@@ -1090,10 +1090,15 @@ describe('source adapters', () => {
   });
 
   // Reads fewer rows per page than the default, because a row carries a whole result set.
-  it('cuts the search page size, as the message source does', async () => {
+  // The widest source measured, so it is cut below the message source rather than to the
+  // same number: both sizes come from bytes per row, not from a shared row count.
+  it('cuts the search page size below the message source', async () => {
     const { adapters } = harness([SEARCH_ROW]);
 
-    expect(requireAdapter(adapters, 'code_indexing_search').pageSize).toBe(200);
+    const search = requireAdapter(adapters, 'code_indexing_search').pageSize;
+    const messages = requireAdapter(adapters, 'app_builder_messages').pageSize;
+    expect(search).toBe(400);
+    expect(search).toBeLessThan(messages ?? 0);
   });
 
   it('reads a non-string search value as absent rather than failing the export', async () => {

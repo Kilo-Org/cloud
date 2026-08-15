@@ -26,9 +26,13 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const filePath = typeof input.filePath === 'string' ? input.filePath : '';
   const content = typeof input.content === 'string' ? input.content : '';
   const error = part.state.status === 'error' ? part.state.error : undefined;
+  const isFinal = part.state.status === 'completed' || part.state.status === 'error';
 
   let body: React.ReactNode = null;
-  if (isMarkdownPath(filePath)) {
+  if (content === '' && !isFinal) {
+    // Pending or running: the write has not finished, so the file is not yet
+    // known to be empty. `ToolPartDetailBody` already shows the status line.
+  } else if (isMarkdownPath(filePath)) {
     body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
   } else if (content === '') {
     body = <Text className="text-xs text-muted-foreground">This file is empty.</Text>;

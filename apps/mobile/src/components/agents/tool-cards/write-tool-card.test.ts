@@ -81,14 +81,12 @@ function makeWritePart(overrides: {
   const filePath = overrides.filePath ?? 'src/new.ts';
   const content = overrides.content ?? 'hello world';
 
-  const state: ToolPart['state'] =
-    overrides.status === 'error'
-      ? makeErrorState({
-          filePath,
-          content,
-          error: overrides.error ?? 'failed',
-        })
-      : makeCompletedState({ filePath, content });
+  let state: ToolPart['state'] = makeCompletedState({ filePath, content });
+  if (overrides.status === 'error') {
+    state = makeErrorState({ filePath, content, error: overrides.error ?? 'failed' });
+  } else if (overrides.status === 'running') {
+    state = { status: 'running', input: { filePath, content }, time: { start: 0 } };
+  }
 
   return {
     id: 'write-1',
@@ -204,6 +202,16 @@ describe('WriteToolCard — fixed row', () => {
 });
 
 describe('WriteToolCardBody — smart render routing', () => {
+  it('renders no body for empty content while pending or running', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ status: 'running', filePath: 'src/empty.ts', content: '' }),
+    }) as unknown as React.ReactElement;
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
+    expect(findByType(root, 'Text')).toHaveLength(0);
+  });
+
   it('routes a .md path to ReadMarkdownBody and not CodeBlock', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = WriteToolCardBody({

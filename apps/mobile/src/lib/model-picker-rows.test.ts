@@ -9,7 +9,6 @@ import {
   favoriteKeysForOption,
   favoriteToggleAction,
   isFavoriteOption,
-  modelPickerFavoriteId,
 } from './model-picker-rows';
 
 const noFavorites = new Set<string>();
@@ -186,12 +185,12 @@ describe('buildModelPickerRows', () => {
   });
 });
 
-describe('modelPickerFavoriteId', () => {
+describe('canonicalFavoriteId', () => {
   it('keys CLI catalog options by provider and model identity, not the opaque id', () => {
-    expect(modelPickerFavoriteId(remoteWorkspaceClaude)).toBe(
+    expect(canonicalFavoriteId(remoteWorkspaceClaude)).toBe(
       'remote:anthropic-local:shared/model.id'
     );
-    expect(modelPickerFavoriteId(remoteInternalDeployment)).toBe(
+    expect(canonicalFavoriteId(remoteInternalDeployment)).toBe(
       'remote:custom-openai:shared/model.id'
     );
   });
@@ -205,7 +204,7 @@ describe('modelPickerFavoriteId', () => {
       isPreferred: false,
       showGatewayMetadata: true,
     };
-    expect(modelPickerFavoriteId(gatewayOption)).toBe('anthropic/claude-sonnet-4');
+    expect(canonicalFavoriteId(gatewayOption)).toBe('anthropic/claude-sonnet-4');
   });
 
   it('keeps legacy Gateway options on the Gateway model id shared with Gateway favorites', () => {
@@ -219,7 +218,7 @@ describe('modelPickerFavoriteId', () => {
       overrideSource: 'legacy-gateway',
       showGatewayMetadata: true,
     };
-    expect(modelPickerFavoriteId(legacyOption)).toBe('anthropic/claude-sonnet-4');
+    expect(canonicalFavoriteId(legacyOption)).toBe('anthropic/claude-sonnet-4');
   });
 });
 

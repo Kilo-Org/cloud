@@ -38,9 +38,6 @@ export function canonicalFavoriteId(model: SessionModelOption): string {
   return model.id;
 }
 
-// Legacy alias kept for existing callers and tests.
-export const modelPickerFavoriteId = canonicalFavoriteId;
-
 // Every stored string that marks this option starred. Gateway options accept
 // their Gateway id and the historical `remote:kilo:<id>` alias; kilo CLI options
 // accept the same pair; other-provider CLI options accept only their

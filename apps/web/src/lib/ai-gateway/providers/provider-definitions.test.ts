@@ -79,7 +79,7 @@ describe.each([
 
     await provider.transformRequest({ request } as TransformRequestContext);
 
-    const assistant = request.body.messages[1] as Record<string, unknown>;
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
     expect('reasoning_details' in assistant).toBe(false);
     expect(assistant.reasoning_content).toBe('thinking hard');
     expect(request.body.model).toBe(upstreamModel);

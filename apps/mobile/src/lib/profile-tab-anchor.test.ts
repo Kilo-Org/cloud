@@ -70,3 +70,18 @@ describe('finding detail back control wiring', () => {
     expect(showBackButtonCount).toBe(screenHeaderCount);
   });
 });
+
+describe('profile tab anchor', () => {
+  // The profile tab stack anchors its initial route to `index` so a cold
+  // push-open builds the stack with the profile root underneath, and a tab
+  // re-press returns to the profile root. Pin the anchor by reading the layout
+  // source; this fails if `initialRouteName: 'index'` is removed.
+  const layoutPath = fileURLToPath(
+    new URL('../app/(app)/(tabs)/(3_profile)/_layout.tsx', import.meta.url)
+  );
+  const layoutSource = readFileSync(layoutPath, 'utf8');
+
+  it("declares initialRouteName: 'index'", () => {
+    expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
+  });
+});

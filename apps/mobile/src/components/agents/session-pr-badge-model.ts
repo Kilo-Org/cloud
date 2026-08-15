@@ -1,14 +1,14 @@
 import { type AssociatedPrData } from '@kilocode/cloud-agent-sdk';
 
-export type ReviewDecision = NonNullable<AssociatedPrData['reviewDecision']>;
+type ReviewDecision = NonNullable<AssociatedPrData['reviewDecision']>;
 
-export type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft' | 'unknown';
+type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft' | 'unknown';
 
 export type PrBadgeIconKind = 'check' | 'x' | 'pull-request' | 'draft' | 'merge' | 'closed';
 
 export type PrBadgeAccent = 'good' | 'warn' | 'muted' | 'destructive';
 
-export type PrBadgeDescriptor = Readonly<{
+type PrBadgeDescriptor = Readonly<{
   icon: PrBadgeIconKind;
   accent: PrBadgeAccent;
   accessibilityLabel: string;

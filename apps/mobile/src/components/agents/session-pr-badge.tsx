@@ -61,7 +61,8 @@ export type SessionPrBadgeProps = Readonly<{
  * the fetch it renders the badge or nothing (never a guess from `git_branch`).
  * Tapping navigates in-app for GitHub PRs and opens the browser otherwise.
  */
-export function SessionPrBadge({ pr, loading }: SessionPrBadgeProps) {
+export function SessionPrBadge(props: SessionPrBadgeProps) {
+  const { loading } = props;
   const router = useRouter();
   const colors = useThemeColors();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
@@ -69,29 +70,28 @@ export function SessionPrBadge({ pr, loading }: SessionPrBadgeProps) {
   if (loading) {
     return <Skeleton className="h-5 w-[52px] rounded-full" />;
   }
-  if (!pr) {
+  if (!props.pr) {
     return null;
   }
+  const pr = props.pr;
 
-  const prData = pr;
   const descriptor = describePrBadge({
-    state: prData.state,
-    number: prData.number,
-    reviewDecision: prData.reviewDecision,
-    reviewDecisionPending: prData.reviewDecisionPending,
+    state: pr.state,
+    number: pr.number,
+    reviewDecision: pr.reviewDecision,
+    reviewDecisionPending: pr.reviewDecisionPending,
   });
   const Icon = ICON_BY_KIND[descriptor.icon];
 
   function handlePress() {
     // Flag off: GitHub taps fall back to the browser (same as chat links).
     if (!prReviewEnabled) {
-      void openExternalUrl(prData.url, { label: 'pull request' });
+      void openExternalUrl(pr.url, { label: 'pull request' });
       return;
     }
     const target = resolveSessionPrTapTarget({
-      platform: prData.platform,
-      url: prData.url,
-      number: prData.number,
+      url: pr.url,
+      number: pr.number,
     });
     if (target.kind === 'in-app') {
       router.push(target.href);
@@ -112,7 +112,7 @@ export function SessionPrBadge({ pr, loading }: SessionPrBadgeProps) {
         <Text
           className={cn('text-xs font-medium tabular-nums', ACCENT_TEXT_CLASS[descriptor.accent])}
         >
-          #{prData.number}
+          #{pr.number}
         </Text>
       </View>
     </Pressable>

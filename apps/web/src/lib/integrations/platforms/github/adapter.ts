@@ -1017,6 +1017,68 @@ export async function fetchPullRequestForBranch(params: {
   }
 }
 
+/**
+ * Look up a pull request by its number using an installation token.
+ *
+ * Used by the stored-link-first refresh path: the session carries a concrete
+ * PR URL, so we fetch that exact PR instead of searching by branch.
+ *
+ * @returns The PR, or `null` when the PR does not exist (or the repo is no
+ *   longer accessible to this installation).
+ * @throws {GitHubRateLimitError} when GitHub rate-limits the request.
+ */
+export async function fetchPullRequestByNumber(params: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  number: number;
+  appType: GitHubAppType;
+}): Promise<AssociatedPullRequest | null> {
+  const { installationId, owner, repo, number, appType } = params;
+
+  const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data: pr } = await octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: number,
+    });
+
+    const state: AssociatedPullRequest['state'] =
+      pr.merged_at != null
+        ? 'merged'
+        : pr.state === 'open' && pr.draft
+          ? 'draft'
+          : pr.state === 'open'
+            ? 'open'
+            : 'closed';
+
+    return {
+      number: pr.number,
+      htmlUrl: pr.html_url,
+      state,
+      title: pr.title,
+      headSha: pr.head.sha,
+      updatedAt: pr.updated_at,
+    };
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
+    }
+    if (isHttpError(error) && error.status === 404) {
+      warnExceptInTest('[fetchPullRequestByNumber] PR not found or repo not accessible', {
+        owner,
+        repo,
+        number,
+      });
+      return null;
+    }
+    throw error;
+  }
+}
+
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
 
 export type BatchedPrInput = {

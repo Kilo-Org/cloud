@@ -350,6 +350,7 @@ describe('warehouse availability probe', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'platform_integrations',
       'microdollar_usage_journal',
       'enrichment_data',
     ]);
@@ -408,6 +409,7 @@ describe('source adapters', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'platform_integrations',
       'microdollar_usage_journal',
       'enrichment_data',
     ]);
@@ -1534,5 +1536,109 @@ describe('source adapters', () => {
 
     expect(byField.get('git_branch')).toBeNull();
     expect(byField.get('file_path')).toBe('src/index.ts');
+  });
+
+  const INTEGRATION_ROW = {
+    id: 'integration-1',
+    platform: 'github',
+    platform_account_login: 'acme',
+    repositories: [{ full_name: 'acme/private-api' }],
+  };
+
+  it('emits the three integration fields, keyed by the integration', async () => {
+    const { adapters } = harness([INTEGRATION_ROW]);
+
+    const page = await requireAdapter(adapters, 'platform_integrations').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.records).toEqual([
+      {
+        source: 'platform_integrations',
+        id: 'integration-1',
+        field: 'platform',
+        value: 'github',
+      },
+      {
+        source: 'platform_integrations',
+        id: 'integration-1',
+        field: 'platform_account_login',
+        value: 'acme',
+      },
+      {
+        source: 'platform_integrations',
+        id: 'integration-1',
+        field: 'repositories',
+        value: JSON.stringify(INTEGRATION_ROW.repositories),
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['integration-1'] });
+  });
+
+  // The table holds 29 columns, including installation ids, permission and scope grants
+  // and an auth-invalid reason. Only three are exported, and the query is what enforces
+  // that: a field added here without a decision would ship on the next export.
+  it('reads only the three declared integration columns', async () => {
+    const { adapters, warehouseCalls } = harness([INTEGRATION_ROW]);
+
+    await requireAdapter(adapters, 'platform_integrations').readPage?.(READ_PAGE_INPUT);
+
+    for (const withheld of [
+      'platform_installation_id',
+      'permissions',
+      'scopes',
+      'metadata',
+      'auth_invalid_reason',
+      'created_by_user_id',
+      'suspended_by',
+      'kilo_requester_user_id',
+    ]) {
+      expect(warehouseCalls[0].text).not.toContain(withheld);
+    }
+  });
+
+  // Measured across all 38,849 rows: 36,987 user-only, 1,862 org-only, zero carrying both
+  // and zero carrying neither. Each read still names one owner column and not the other.
+  it('scopes each integration read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([INTEGRATION_ROW]);
+    const adapter = requireAdapter(adapters, 'platform_integrations');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  // 3,005 of 38,849 rows are deleted in the source, so this source does carry the flag.
+  it('marks every field of an integration prod has since deleted', async () => {
+    const { adapters } = harness([{ ...INTEGRATION_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'platform_integrations').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records).toHaveLength(3);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  it('reads a missing integration value as absent rather than failing the export', async () => {
+    const { adapters } = harness([
+      { ...INTEGRATION_ROW, platform_account_login: null, repositories: null },
+    ]);
+
+    const page = await requireAdapter(adapters, 'platform_integrations').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('platform_account_login')).toBeNull();
+    expect(byField.get('repositories')).toBeNull();
+    expect(byField.get('platform')).toBe('github');
   });
 });

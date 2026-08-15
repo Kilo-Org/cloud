@@ -265,6 +265,7 @@ LIMIT 1`;
  *     app_builder_messages        266,095    user XOR org
  *     code_indexing_manifest   20,170,449    user XOR org
  *     deployment_events           513,069    user XOR org
+ *     platform_integrations         1,862    user XOR org
  *     cli_sessions                      0    both columns set
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
@@ -276,6 +277,10 @@ LIMIT 1`;
  * `security_findings` earns its XOR from the table rather than from a count: prod carries
  * one partial unique index per owner column, each conditioned on that column being NOT
  * NULL, so `organization_id` is set exactly when `kilo_user_id` is not.
+ *
+ * `platform_integrations` is the only entry counted from both ends. Measured 2026-08-14
+ * across all 38,849 rows: 36,987 user-only, the 1,862 org-only above, and zero rows either
+ * carrying both owners or carrying neither. The XOR is exact rather than typical.
  *
  * `microdollar_usage_journal` carries the same owner pair as the other microdollar
  * tables, but the count above was never rerun for it, so it is left blank rather than
@@ -743,6 +748,32 @@ const sourceEmbeddingQueries = subjectPageQueries({
   columns: 'id, project_id, file_path, git_branch',
 });
 
+/**
+ * Which source forge a workspace is connected to, under which account, and which
+ * repositories that connection reaches.
+ *
+ * User XOR org, and this one is measured rather than inferred. Counted in Postgres
+ * 2026-08-14 across all 38,849 rows: 36,987 name a user and no organization, 1,862 name
+ * an organization and no user, and BOTH the both-set and the neither-set counts are zero.
+ * No row can reach both exports and none reaches neither.
+ *
+ * The warehouse aliases the source's `owned_by_user_id` and `owned_by_organization_id` to
+ * the repo convention, and the `owned_by_` naming is the same one already settled on
+ * `deployment_events` and `security_findings`: it is the owner, as against the
+ * `created_by_user_id` this table also carries. That column is not exported and never
+ * scopes anything, along with `suspended_by` and `kilo_requester_user_id` — three more
+ * user-shaped columns that are audit trail rather than ownership.
+ *
+ * Deliberately narrow. The table holds 29 columns including installation ids, permission
+ * and scope grants, and an auth-invalid reason; the export returns the three that describe
+ * the connection as its owner would recognise it. The rest is integration plumbing, and
+ * some of it is closer to a credential than to a fact about a person.
+ */
+const platformIntegrationQueries = subjectPageQueries({
+  table: 'platform_integrations',
+  columns: 'id, platform, platform_account_login, repositories, _snowflake_deleted',
+});
+
 const securityFindingQueries = subjectPageQueries({
   table: 'security_findings',
   columns: SECURITY_FINDING_COLUMNS.join(', '),
@@ -784,6 +815,13 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type PlatformIntegrationRow = {
+  id: string;
+  platform: string | null;
+  platform_account_login: string | null;
+  repositories: string | null;
+  deleted: unknown;
+};
 type SourceEmbeddingRow = {
   id: string;
   project_id: string | null;
@@ -1527,6 +1565,53 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'platform_integrations',
+      warehouseTable: 'platform_integrations',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: PlatformIntegrationRow[] = await warehouseQuery(
+          platformIntegrationQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            platform: warehouseText(row.platform),
+            platform_account_login: warehouseText(row.platform_account_login),
+            // jsonb, so the driver returns a parsed value. Serialized whole: which
+            // repositories a connection reaches is the substance of it.
+            repositories: jsonValue(row.repositories),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row => [
+            {
+              source: 'platform_integrations',
+              id: row.id,
+              field: 'platform',
+              value: row.platform,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'platform_integrations',
+              id: row.id,
+              field: 'platform_account_login',
+              value: row.platform_account_login,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'platform_integrations',
+              id: row.id,
+              field: 'repositories',
+              value: row.repositories,
+              ...deletionMark(row.deleted),
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
       name: 'microdollar_usage_journal',
       warehouseTable: 'microdollar_usage_journal',
       async readPage(input): Promise<SourcePage> {
@@ -1675,6 +1760,8 @@ export const warehouseQueries = {
   securityFindingOrgQuery: securityFindingQueries.organization,
   sourceEmbeddingUserQuery: sourceEmbeddingQueries.user,
   sourceEmbeddingOrgQuery: sourceEmbeddingQueries.organization,
+  platformIntegrationUserQuery: platformIntegrationQueries.user,
+  platformIntegrationOrgQuery: platformIntegrationQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1766,6 +1853,15 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // No deletion column: it went with the narrowing to six columns, along with the
   // `embedding` vector that was almost all of this table's size.
   source_embeddings: ['id', 'project_id', 'file_path', 'git_branch'],
+  // Three of the table's 29 columns, plus the cursor and the deletion flag. The rest is
+  // integration plumbing the export deliberately leaves behind.
+  platform_integrations: [
+    'id',
+    'platform',
+    'platform_account_login',
+    'repositories',
+    DELETED_COLUMN,
+  ],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1896,6 +1992,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   securityFindingOrgQuery: 'organization_id = $1',
   sourceEmbeddingUserQuery: 'kilo_user_id = $1',
   sourceEmbeddingOrgQuery: 'organization_id = $1',
+  platformIntegrationUserQuery: 'kilo_user_id = $1',
+  platformIntegrationOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

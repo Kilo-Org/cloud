@@ -10,7 +10,6 @@ import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isModelRestrictionExempt } from '@/lib/model-allow.server';
-import { isLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
 import { db } from '@/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
@@ -114,17 +113,13 @@ export async function getEffectiveModelDecision(
   if (await isModelRestrictionExempt(modelId)) {
     return { allowed: true };
   }
-  // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
-  const latestAlias = isLatestModelAlias(normalizedModelId);
-  if (!latestAlias && policy.organizationModelDenyList.includes(normalizedModelId)) {
+  if (policy.organizationModelDenyList.includes(normalizedModelId)) {
     return { allowed: false, denialSource: 'organization_model' };
   }
   const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
   const currentModelProviders =
     exclusiveProviders ??
-    (policy.requireModelInCurrentSnapshot && !latestAlias
-      ? await providerLookup(normalizedModelId)
-      : undefined);
+    (policy.requireModelInCurrentSnapshot ? await providerLookup(normalizedModelId) : undefined);
   if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
   }
@@ -134,12 +129,6 @@ export async function getEffectiveModelDecision(
 
   async function decisionWithinOrganizationCeiling(): Promise<EffectiveModelDecision> {
     if (!organizationRoutes) return { allowed: true };
-    if (latestAlias) {
-      // Aliases have no snapshot endpoints, so pass the ceiling through to provider.only.
-      return organizationRoutes.size > 0
-        ? { allowed: true, eligibleProviderRoutes: organizationRoutes }
-        : { allowed: false, denialSource: 'organization_provider' };
-    }
     const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
     if (modelProviders.size === 0) {
       return { allowed: false, denialSource: 'organization_model' };
@@ -161,9 +150,7 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.providerAllowList.length === 0) {
     return { allowed: false, denialSource: 'no_grant' };
   }
-  const modelProviders = latestAlias
-    ? new Set(policy.memberGrant.providerAllowList)
-    : (currentModelProviders ?? (await providerLookup(normalizedModelId)));
+  const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
   if (modelProviders.size === 0) {
     return { allowed: false, denialSource: 'group_provider' };
   }

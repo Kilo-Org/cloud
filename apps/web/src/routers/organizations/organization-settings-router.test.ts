@@ -438,7 +438,7 @@ describe('organizations settings trpc router', () => {
       expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
     });
 
-    it('keeps latest aliases available despite model deny lists and missing snapshot routes', async () => {
+    it('excludes latest aliases denied by model policy', async () => {
       const organization = await createTestOrganization(
         'Latest Alias Enterprise',
         owner.id,
@@ -456,7 +456,7 @@ describe('organizations settings trpc router', () => {
         organizationId: organization.id,
       });
 
-      expect(result.data.map(model => model.id)).toEqual([CLAUDE_SONNET_LATEST_MODEL_ALIAS]);
+      expect(result.data).toEqual([]);
     });
 
     it('should exclude models in model_deny_list for enterprise orgs', async () => {

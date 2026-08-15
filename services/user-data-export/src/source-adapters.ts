@@ -342,9 +342,9 @@ LIMIT 1`;
  * is where that column's two readings are set out.
  *
  * The warehouse is itself a point-in-time snapshot, cut at the load cutoff before the
- * export ever reads it, so there is no `snapshot_at` bound to apply here. Only
- * `code_indexing_search` carries a `created_at` at all, and it is exported as a value
- * rather than used as a bound, for that reason.
+ * export ever reads it, so there is no `snapshot_at` bound to apply here — and since the
+ * timestamp columns were dropped from the returned set on request, no source now exports
+ * one either.
  */
 export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
 
@@ -613,7 +613,7 @@ const codeIndexingQueries = subjectPageQueries({
  */
 const codeIndexingSearchQueries = subjectPageQueries({
   table: 'code_indexing_search',
-  columns: 'id, project_id, query, metadata, created_at, _snowflake_deleted',
+  columns: 'id, project_id, query, metadata, _snowflake_deleted',
 });
 
 /**
@@ -654,7 +654,7 @@ const codeIndexingSearchQueries = subjectPageQueries({
  */
 function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
-  event_type, event_timestamp, payload, _snowflake_deleted
+  payload, _snowflake_deleted
 FROM deployment_events
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
@@ -705,22 +705,22 @@ const enrichmentQuery = singleKeyPageQuery({
  * `kilo_user_id` is deliberately absent. It is the scope column, so the subject already
  * implies it, and every other source omits its owner column for the same reason.
  *
- * `provider` and `provider_account_id` lead because they are the key. Both were missing
- * from the projection this source was first specified with, and `provider` is the one
- * that matters most: without it a person with Google and GitHub linked receives two sets
- * of records that are indistinguishable, which is the whole substance of the table.
- * `provider_account_id` is that person's own identifier at Google or GitHub, which is
- * data held about them, so it is returned on the same basis as everything else here.
+ * Split in two on request. `provider` and `provider_account_id` are still SELECTed,
+ * because they are this source's cursor and the two halves of its record id, but they are
+ * no longer returned as fields. They remain visible in the id, which is what identifies
+ * one linked account and keeps a person with Google and GitHub linked from receiving two
+ * indistinguishable sets of records.
+ *
+ * `created_at` is gone entirely: nothing here needs it for a key, so it is not selected
+ * either.
  */
-const USER_AUTH_PROVIDER_FIELDS = [
-  'provider',
-  'provider_account_id',
-  'email',
-  'display_name',
-  'avatar_url',
-  'hosted_domain',
-  'created_at',
-] as const;
+const USER_AUTH_PROVIDER_KEY = ['provider', 'provider_account_id'] as const;
+
+/** What the export returns: the profile each provider supplied. */
+const USER_AUTH_PROVIDER_FIELDS = ['email', 'display_name', 'avatar_url', 'hosted_domain'] as const;
+
+/** Read for the key, then for the fields. Drives the SELECT and the probe alike. */
+const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROVIDER_FIELDS];
 
 /**
  * Which identity providers a person signed in with, and the profile each one supplied.
@@ -757,7 +757,7 @@ const USER_AUTH_PROVIDER_FIELDS = [
  * a cast, so the output and input references are the same column. See `SCOPE_COLUMNS` for
  * the tables where that is not true and the qualifier is load-bearing.
  */
-const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_FIELDS.join(', ')}, ${DELETED_COLUMN}
+const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_COLUMNS.join(', ')}, ${DELETED_COLUMN}
 FROM user_auth_provider
 WHERE ${SCOPE_COLUMNS.user} = $1
   AND ($2::text IS NULL OR (provider, provider_account_id) > ($2::text, $3::text))
@@ -1168,8 +1168,6 @@ type DeploymentEventRow = {
   event_id: string;
   deployment_id: string | null;
   created_by_user_id: string | null;
-  event_type: string | null;
-  event_timestamp: string | null;
   payload: string | null;
   deleted: unknown;
 };
@@ -1178,7 +1176,6 @@ type CodeIndexingSearchRow = {
   project_id: string | null;
   query: string | null;
   metadata: string | null;
-  created_at: string | null;
   deleted: unknown;
 };
 type CodeIndexingRow = {
@@ -1760,15 +1757,14 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // hands back a parsed object rather than text. Same handling as
             // `app_builder_messages.data`, the export's other JSON payload.
             metadata: jsonValue(row.metadata),
-            // Tolerates NULL and nothing else, which is all a `timestamptz` column can
-            // spring on it.
-            created_at: nullableTimestamp(row.created_at, 'created_at'),
             deleted: row._snowflake_deleted,
           }))
         );
         return {
-          // Four records per search, sharing the row's id, so the query, the project it
-          // ran against, what it returned and when stay groupable as one search.
+          // Three records per search, sharing the row's id, so the query, the project it
+          // ran against and what it returned stay groupable as one search. `created_at`
+          // was dropped from the projection on request; nothing here needs it, so it is
+          // not selected either.
           records: rows.flatMap(row => [
             {
               source: 'code_indexing_search',
@@ -1789,13 +1785,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'metadata',
               value: row.metadata,
-              ...deletionMark(row.deleted),
-            },
-            {
-              source: 'code_indexing_search',
-              id: row.id,
-              field: 'created_at',
-              value: row.created_at,
               ...deletionMark(row.deleted),
             },
           ]),
@@ -1822,8 +1811,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // column, so each is read leniently. See the note on `warehouseText`.
             deployment_id: warehouseText(row.deployment_id),
             created_by_user_id: warehouseText(row.created_by_user_id),
-            event_type: warehouseText(row.event_type),
-            event_timestamp: nullableTimestamp(row.event_timestamp, 'event_timestamp'),
             payload: jsonValue(row.payload),
             deleted: row._snowflake_deleted,
           }))
@@ -1849,20 +1836,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
                 id,
                 field: 'created_by_user_id',
                 value: row.created_by_user_id,
-                ...mark,
-              },
-              {
-                source: 'deployment_events',
-                id,
-                field: 'event_type',
-                value: row.event_type,
-                ...mark,
-              },
-              {
-                source: 'deployment_events',
-                id,
-                field: 'event_timestamp',
-                value: row.event_timestamp,
                 ...mark,
               },
               { source: 'deployment_events', id, field: 'payload', value: row.payload, ...mark },
@@ -2245,7 +2218,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             display_name: warehouseText(row.display_name),
             avatar_url: warehouseText(row.avatar_url),
             hosted_domain: warehouseText(row.hosted_domain),
-            created_at: nullableTimestamp(row.created_at, 'created_at'),
             deleted: row._snowflake_deleted,
           }))
         );
@@ -2404,7 +2376,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
-  code_indexing_search: ['id', 'project_id', 'query', 'metadata', 'created_at', DELETED_COLUMN],
+  code_indexing_search: ['id', 'project_id', 'query', 'metadata', DELETED_COLUMN],
   // `created_by_user_id` is probed because the query selects it as a field, not because
   // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
   deployment_events: [
@@ -2412,8 +2384,6 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'event_id',
     'deployment_id',
     'created_by_user_id',
-    'event_type',
-    'event_timestamp',
     'payload',
     DELETED_COLUMN,
   ],
@@ -2457,7 +2427,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. The scope column `kilo_user_id` is added per
   // subject below; the cursor pair needs no addition, being two of the fields already.
-  user_auth_provider: [...USER_AUTH_PROVIDER_FIELDS, DELETED_COLUMN],
+  user_auth_provider: [...USER_AUTH_PROVIDER_COLUMNS, DELETED_COLUMN],
 };
 
 /**

@@ -73,6 +73,19 @@
  *      One entry for the two, because they ship in the same change. Neither extends 7,
  *      which has already been released.
  *
+ *      Also at 8, a narrowing of what three existing sources return, on request. Every
+ *      one of these is a field a reader of an earlier file will find missing:
+ *        `code_indexing_search`   no longer returns `created_at`
+ *        `deployment_events`      no longer returns `event_type` or `event_timestamp`
+ *        `user_auth_provider`     no longer returns `provider`, `provider_account_id` or
+ *                                 `created_at`. The first two are still read, because they
+ *                                 are that source's cursor and the two halves of its
+ *                                 record id, so which account a record belongs to is still
+ *                                 recoverable from the id
+ *
+ *      Where a dropped column was needed to page or to identify a row it is still
+ *      SELECTed and simply not returned. Where it was not, it is no longer read at all.
+ *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.

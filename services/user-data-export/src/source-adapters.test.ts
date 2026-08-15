@@ -1024,7 +1024,7 @@ describe('source adapters', () => {
     created_at: '2026-07-04T09:15:00.000Z',
   };
 
-  it('emits the four search fields per row, keyed by the row that carried them', async () => {
+  it('emits the three search fields per row, keyed by the row that carried them', async () => {
     const { adapters } = harness([SEARCH_ROW]);
 
     const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.({
@@ -1032,8 +1032,8 @@ describe('source adapters', () => {
       limit: 1,
     });
 
-    // One id across all four, so a search, what it ran against, what it returned and when
-    // it ran stay groupable as one event.
+    // One id across all three, so a search, what it ran against and what it returned stay
+    // groupable as one event. `created_at` was dropped from the projection on request.
     expect(page?.records).toEqual([
       { source: 'code_indexing_search', id: 'search-1', field: 'project_id', value: 'project-a' },
       {
@@ -1047,12 +1047,6 @@ describe('source adapters', () => {
         id: 'search-1',
         field: 'metadata',
         value: JSON.stringify(SEARCH_ROW.metadata),
-      },
-      {
-        source: 'code_indexing_search',
-        id: 'search-1',
-        field: 'created_at',
-        value: '2026-07-04T09:15:00.000Z',
       },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['search-1'] });
@@ -1093,7 +1087,7 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(4);
+    expect(page?.records).toHaveLength(3);
     for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 
@@ -1137,9 +1131,10 @@ describe('source adapters', () => {
     expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['build-a.7']));
     expect(byField.get('build_id')).toBe('build-a');
     expect(byField.get('deployment_id')).toBe('deploy-a');
-    expect(byField.get('event_type')).toBe('build.succeeded');
-    expect(byField.get('event_timestamp')).toBe('2026-07-04T09:15:00.000Z');
     expect(byField.get('payload')).toBe(JSON.stringify({ status: 'ok' }));
+    // Dropped from the projection on request.
+    expect(byField.has('event_type')).toBe(false);
+    expect(byField.has('event_timestamp')).toBe(false);
     expect(page?.nextCursor).toEqual({ key: ['build-a', '7'] });
   });
 
@@ -1210,22 +1205,19 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(6);
+    expect(page?.records).toHaveLength(4);
     for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 
   // The joined columns come from a LEFT JOIN through deployment_builds to deployments, so
   // an absent parent row is a null field rather than a failed export.
   it('reads an unjoined deployment event as absent rather than failing the export', async () => {
-    const { adapters } = harness([
-      { ...DEPLOYMENT_EVENT_ROW, deployment_id: null, event_type: null },
-    ]);
+    const { adapters } = harness([{ ...DEPLOYMENT_EVENT_ROW, deployment_id: null }]);
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
     expect(byField.get('deployment_id')).toBeNull();
-    expect(byField.get('event_type')).toBeNull();
     expect(byField.get('build_id')).toBe('build-a');
   });
 
@@ -1922,14 +1914,9 @@ describe('source adapters', () => {
       limit: 1,
     });
 
+    // The key pair is the record id, not a pair of fields: both were dropped from the
+    // returned set on request and survive only as the thing that identifies the account.
     expect(page?.records).toEqual([
-      { source: 'user_auth_provider', id: 'google.110581', field: 'provider', value: 'google' },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'provider_account_id',
-        value: '110581',
-      },
       {
         source: 'user_auth_provider',
         id: 'google.110581',
@@ -1954,19 +1941,13 @@ describe('source adapters', () => {
         field: 'hosted_domain',
         value: 'example.com',
       },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'created_at',
-        value: '2026-03-04T09:15:00.000Z',
-      },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['google', '110581'] });
   });
 
-  // The point of the source. Someone with Google and GitHub linked has two rows, and
-  // without `provider` on the record and in the key the two sets are indistinguishable —
-  // which is what the projection this source was first specified with would have shipped.
+  // The point of the source. Someone with Google and GitHub linked has two rows, and the
+  // record id is now the only thing telling them apart, since `provider` itself is no
+  // longer returned. That is why the key pair stays in the query and in the id.
   it('tells two linked accounts of one person apart', async () => {
     const { adapters } = harness([
       AUTH_PROVIDER_ROW,
@@ -1977,9 +1958,7 @@ describe('source adapters', () => {
     const ids = new Set(page?.records.map(record => record.id));
 
     expect([...ids]).toEqual(['google.110581', 'github.4821']);
-    expect(
-      page?.records.filter(record => record.field === 'provider').map(record => record.value)
-    ).toEqual(['google', 'github']);
+    expect(page?.records.some(record => record.field === 'provider')).toBe(false);
   });
 
   // `kilo_user_id` repeats once per linked account, so it cannot page. The cursor is the
@@ -2026,13 +2005,13 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(7);
+    expect(page?.records).toHaveLength(4);
     for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 
   it('reads a missing linked-account value as absent rather than failing the export', async () => {
     const { adapters } = harness([
-      { ...AUTH_PROVIDER_ROW, hosted_domain: null, display_name: null, created_at: null },
+      { ...AUTH_PROVIDER_ROW, hosted_domain: null, display_name: null },
     ]);
 
     const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
@@ -2040,7 +2019,6 @@ describe('source adapters', () => {
 
     expect(byField.get('hosted_domain')).toBeNull();
     expect(byField.get('display_name')).toBeNull();
-    expect(byField.get('created_at')).toBeNull();
     expect(byField.get('email')).toBe('person@example.com');
   });
 

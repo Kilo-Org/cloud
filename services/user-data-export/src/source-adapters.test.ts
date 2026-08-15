@@ -1915,7 +1915,11 @@ describe('source adapters', () => {
     const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
 
     expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    // No keyset predicate: nothing is compared against a prior page's key.
     expect(warehouseCalls[0].text).not.toContain('>');
+    // Ordered anyway, so the bound limit truncates deterministically rather than
+    // arbitrarily if the table ever stopped being one row per user.
+    expect(warehouseCalls[0].text).toContain('ORDER BY email');
     expect(warehouseCalls[0].values).toEqual(['owner-user', 100]);
     expect(page?.nextCursor).toBeNull();
   });

@@ -700,6 +700,10 @@ const enrichmentQuery = singleKeyPageQuery({
  * all 1,068,509 rows, so the scope already selects at most one row and there is nothing
  * left to page.
  *
+ * It still orders. Nothing here needs a deterministic sequence today, but the limit is
+ * bound rather than fixed at 1 so that a table which stopped being one row per user would
+ * return what it holds; an unordered LIMIT would make which rows it kept arbitrary.
+ *
  * One caveat worth carrying: this is the only source NOT bounded to the snapshot. The dbt
  * model has no row timestamp, so it holds current state as of its last run rather than
  * state at the cutoff, and the file's single `snapshotAt` does not describe it. There is
@@ -708,6 +712,7 @@ const enrichmentQuery = singleKeyPageQuery({
 const audienceQuery = `SELECT email
 FROM audiences
 WHERE ${SCOPE_COLUMNS.user} = $1
+ORDER BY email
 LIMIT $2`;
 
 /**

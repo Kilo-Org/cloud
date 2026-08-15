@@ -17,9 +17,28 @@
  *      and current, plus the analytics copies of name, email and hosted domain)
  *   3  the `code_indexing_manifest` source (project, branch and file path per indexed
  *      file), which the original set omitted
+ *   4  the warehouse sources the original set omitted, added as one batch:
+ *        `code_indexing_search`   the search text, the project it ran against, the
+ *                                 results it returned and when it ran
+ *        `deployment_events`      one record set per deployment event, with the build and
+ *                                 deployment it belongs to, its type, its payload and who
+ *                                 created it
+ *        `enrichment_data`        the GitHub and Clay profile data third parties assembled
+ *                                 about the person. Personal exports only; the source has
+ *                                 no organization reading
+ *        `microdollar_usage_journal`
+ *                                 one record pair per usage event, naming the event and
+ *                                 the project it belongs to
+ *        `security_findings`      one dependency vulnerability per repository, with its
+ *                                 triage state, classification and the upstream alert
+ *        `source_embeddings`      the project, file path and branch of each indexed chunk
+ *                                 of source. The vectors are not in the warehouse
+ *
+ *      One entry rather than one per source, because they ship together. A reader cares
+ *      that the file gained sources at 4, not the order they were written in.
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 3;
+export const EXPORT_FILE_SCHEMA_VERSION = 4;

@@ -24,15 +24,45 @@ export type ExportRecord = {
  *
  * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
  * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
- * `event_type` instead, and `users` has no CDC column. Naming the column on any of them
- * is a runtime error, so records from those sources are never labelled.
+ * `event_type` instead, `users` has no CDC column, and `enrichment_data` and
+ * `microdollar_usage_journal` were narrowed on request, dropping the flag with the rest.
+ * Naming the column on any of them is a runtime error, so records from those sources are
+ * never labelled.
+ *
+ * The narrowed tables are where the flag was given up rather than never held, and in each
+ * case it was separating nothing. `enrichment_data` carried 5 deleted rows against 16,661
+ * live. `security_findings` carried none at all. `microdollar_usage_journal` is
+ * insert-only — every one of its 158,433,290 rows is an `IncrementalInsertRows` event — so
+ * nothing there can be deleted in the first place.
  */
 export const DELETED_COLUMN = '_snowflake_deleted';
 export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'microdollar_usage_metadata',
   'cli_sessions',
   'users',
+  'enrichment_data',
+  'microdollar_usage_journal',
+  'security_findings',
+  'source_embeddings',
 ] as const;
+
+/**
+ * Sources that describe an individual and have no organization reading at all, so an
+ * organization export never asks for them.
+ *
+ * `kilocode_users` is the identity section, which is a person's own profile. It was
+ * excluded by a name check in `partitionSources` long before this set existed.
+ *
+ * `enrichment_data` has no organization column in the warehouse whatsoever: it is what
+ * third parties assembled about one person, and there is no organization reading of it to
+ * offer. Declared here rather than left to the probe, which would report the table as
+ * unavailable on every organization export and make an inapplicable source look like a
+ * missing one.
+ */
+export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
+  'kilocode_users',
+  'enrichment_data',
+]);
 
 /**
  * `softDeleted: true`, or nothing at all.
@@ -234,14 +264,38 @@ LIMIT 1`;
  *     app_builder_projects          2,143    user XOR org
  *     app_builder_messages        266,095    user XOR org
  *     code_indexing_manifest   20,170,449    user XOR org
+ *     deployment_events           513,069    user XOR org
  *     cli_sessions                      0    both columns set
  *     system_prompt_prefix              0    both columns set
  *     microdollar_usage_metadata        0    both columns set
+ *     code_indexing_search              0    both columns set
+ *     source_embeddings                 0    both columns set
+ *     microdollar_usage_journal         -    not counted
+ *     security_findings                 -    user XOR org, by construction
  *
- * On the first three, an organization can own a row outright with no user attached, so
- * `kilo_user_id = $1` genuinely skips those. On the other three every row names a user,
+ * `security_findings` earns its XOR from the table rather than from a count: prod carries
+ * one partial unique index per owner column, each conditioned on that column being NOT
+ * NULL, so `organization_id` is set exactly when `kilo_user_id` is not.
+ *
+ * `microdollar_usage_journal` carries the same owner pair as the other microdollar
+ * tables, but the count above was never rerun for it, so it is left blank rather than
+ * assumed to be 0. Nothing in the export depends on the answer: both predicates are the
+ * standard ones and neither matches NULL, so an unowned row reaches nobody either way.
+ * The entry is here so the gap is visible rather than looking like an omission.
+ *
+ * On the first four, an organization can own a row outright with no user attached, so
+ * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
+ *
+ * `enrichment_data` is absent from that table because it has neither reading: the warehouse
+ * copy carries no organization column at all, so it is user-only and an organization export
+ * never asks for it. See `USER_ONLY_SOURCES`.
+ *
+ * `code_indexing_search` and `source_embeddings` are the entries whose 0 is a schema
+ * guarantee rather than a count: both owner columns are `notNull()` on each table, so no
+ * row can carry one without the other. `code_indexing_manifest` sits at the opposite
+ * extreme, which is why sources this adjacent are read so differently.
  *
  * `code_indexing_manifest` is the strongest form of the first case, and it qualifies the
  * "everything they own across both" above: indexing under an organization writes
@@ -250,8 +304,10 @@ LIMIT 1`;
  * whose `organization_id` is not always an organization — see `codeIndexingQueries`, which
  * is where that column's two readings are set out.
  *
- * The warehouse has no `created_at` on any table and is itself a point-in-time
- * snapshot, so there is no `snapshot_at` bound to apply here.
+ * The warehouse is itself a point-in-time snapshot, cut at the load cutoff before the
+ * export ever reads it, so there is no `snapshot_at` bound to apply here. Only
+ * `code_indexing_search` carries a `created_at` at all, and it is exported as a value
+ * rather than used as a bound, for that reason.
  */
 export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
 
@@ -440,9 +496,276 @@ const codeIndexingQueries = subjectPageQueries({
   columns: 'id, project_id, git_branch, file_path, _snowflake_deleted',
 });
 
+/**
+ * The sibling of `code_indexing_manifest`, written by the same router, but with the
+ * opposite ownership shape. Both owner columns are `notNull()` in `schema.ts`, and the
+ * insert at `code-indexing-router.ts` sets `kilo_user_id` to `ctx.user.id` unconditionally,
+ * so EVERY row carries both. This is the "both columns set" case, not the XOR one.
+ *
+ * That makes the two scopes overlap rather than partition, which is the intended reading
+ * recorded on `SCOPE_COLUMNS`: `kilo_user_id = $1` returns every search that person ran,
+ * in their own workspace and in any organization's, and `organization_id = $1` returns the
+ * searches run in that organization by any member. A search run inside an organization
+ * belongs to both exports.
+ *
+ * `organization_id` is still not always an organization. It comes from the same
+ * `getCodeIndexOrganizationId` helper as the manifest, which falls through to
+ * `getUserUUID(user)` when no org was supplied, so a personal search carries a uuid derived
+ * from the user. An organization read binds a real organization id, which no such derived
+ * uuid can equal, so personal searches cannot reach an organization's export.
+ */
+const codeIndexingSearchQueries = subjectPageQueries({
+  table: 'code_indexing_search',
+  columns: 'id, project_id, query, metadata, created_at, _snowflake_deleted',
+});
+
+/**
+ * Ownership on this source is resolved upstream, through `deployment_builds` to
+ * `deployments`, so the two scope columns are that deployment's owner rather than
+ * anything the event itself records. `kilo_user_id` is `deployments.owned_by_user_id`.
+ *
+ * `created_by_user_id` is a THIRD user column, and it deliberately does not scope
+ * anything. It carries provenance only: who pressed the button, as against who owns the
+ * result. The warehouse settled that split on two pieces of evidence, both checked
+ * 2026-08-11 — `schema.ts` gives `owned_by_user_id` a foreign key to `kilocode_users`
+ * while `created_by_user_id` is bare text with none, and `deployments-service.ts` gates
+ * every access path on the owner columns and none on the creator.
+ *
+ * The distinction only bites on organization-owned deployments, which is exactly where
+ * the two disagree: 513,069 rows carry an organization and no user, and their creator is
+ * a member. Scoping a user export on the creator would hand that member an
+ * organization's deployment history as their own personal data. `kilo_user_id = $1`
+ * therefore stays the only user predicate, and the creator is exported as a field so the
+ * provenance is still visible without ever selecting on it.
+ *
+ * A further 99,210 rows have neither owner. Both predicates skip them, as with any other
+ * unowned row, so they reach nobody.
+ *
+ * The cursor is the composite `(build_id, event_id)`, prod's primary key, because
+ * `event_id` is a per-build sequence number rather than a row identifier and repeats
+ * across builds. A cursor on `event_id` alone would skip whole builds.
+ *
+ * The ORDER BY is table-qualified for the reason recorded on `SCOPE_COLUMNS`, and this is
+ * the third table where it matters: `event_id` is a bigint selected through a `::text`
+ * cast under its own name, so a bare name there would sort the page as text while the
+ * cursor below compares as bigint, and no index could serve it.
+ *
+ * One known cost, accepted upstream when the load was designed. The warehouse holds 1,255
+ * byte-identical duplicate `(build_id, event_id)` pairs among 9,049,083 rows. A keyset
+ * cursor can drop one copy of a pair if a page boundary falls exactly between the twins.
+ * They carry no information the surviving copy does not.
+ */
+function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
+  event_type, event_timestamp, payload, _snowflake_deleted
+FROM deployment_events
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
+ORDER BY deployment_events.build_id, deployment_events.event_id
+LIMIT $4`;
+}
+
+const deploymentEventQueries: Record<ExportSubject['type'], string> = {
+  user: deploymentEventPageQuery('user'),
+  organization: deploymentEventPageQuery('organization'),
+};
+
+/**
+ * The only source with one subject variant rather than two, and the only place in this
+ * file where that is not an omission.
+ *
+ * The warehouse table has no organization column at all. This is what GitHub and Clay
+ * assembled ABOUT one person, gathered from outside rather than supplied by them, and
+ * `kilo_user_id` is the subject of that enrichment rather than its author. The warehouse
+ * settled that on 2026-08-11 from `schema.ts`, where the column is a notNull foreign key
+ * to `kilocode_users` and the only user column on the table, and from the sole writer,
+ * `admin-router.ts` `enrichmentData.upsert`, which validates it against `kilocode_users`
+ * and pointedly does not store the acting admin's id — unlike `user_admin_notes` in the
+ * same router, which carries both.
+ *
+ * So there is no organization query to write, not merely one left unwritten, and
+ * `USER_ONLY_SOURCES` keeps organization exports from asking. The warehouse renames the
+ * column on the way in: the source calls it `user_id`, and the load aliases it to
+ * `kilo_user_id` for the convention every other source here follows.
+ *
+ * Both payload columns are third-party profile data about a person who did not supply it,
+ * which is the strongest case in the whole export for returning something: it is the one
+ * category a subject has no other way to see.
+ */
+const enrichmentQuery = singleKeyPageQuery({
+  table: 'enrichment_data',
+  columns: 'id, github_enrichment_data, clay_enrichment_data',
+  scope: 'user',
+});
+
+/**
+ * The second journal in the export, and the one place where the cursor is deliberately
+ * NOT the column that would work today.
+ *
+ * `payload_id` is unique across all 158,433,290 rows, measured 2026-08-11. It would serve
+ * as a cursor on this data. It is unique by luck rather than by construction: the journal
+ * emits only `IncrementalInsertRows`, so nothing produces a second row for an entity. The
+ * moment an update event appears, `payload_id` repeats and a cursor built on it starts
+ * skipping rows at page boundaries — which is not a hypothetical, it is the defect that
+ * shipped on `cli_sessions.session_id` and again on `system_prompt_prefix`.
+ *
+ * The position pair is unique by construction, so that is the cursor. `payload_id` is
+ * exported as a field instead, where its uniqueness does not have to hold.
+ *
+ * The ORDER BY is table-qualified, the fourth table where that matters and the second where
+ * the columns are this exact pair. Both positions are bigints selected through a `::text`
+ * cast under their own names, so a bare name there binds to the text output column: the
+ * page would sort lexicographically while the cursor compares numerically, and no index
+ * could serve it. See the note on `SCOPE_COLUMNS`.
+ *
+ * Both warehouse indexes are `(owner, most_significant_position,
+ * least_significant_position)`, so this ordering is the one they already cover.
+ */
+function microdollarJournalPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  return `SELECT payload_id, project_id,
+  most_significant_position::text AS most_significant_position,
+  least_significant_position::text AS least_significant_position
+FROM microdollar_usage_journal
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::bigint IS NULL
+    OR (most_significant_position, least_significant_position) > ($2::bigint, $3::bigint))
+ORDER BY microdollar_usage_journal.most_significant_position,
+  microdollar_usage_journal.least_significant_position
+LIMIT $4`;
+}
+
+const microdollarJournalQueries: Record<ExportSubject['type'], string> = {
+  user: microdollarJournalPageQuery('user'),
+  organization: microdollarJournalPageQuery('organization'),
+};
+
+/**
+ * User or org, never both — `organization_id` is set exactly when `kilo_user_id` is not.
+ * That is stated by the table itself rather than inferred: prod carries two partial unique
+ * indexes, one per owner column, each with a `WHERE <owner> IS NOT NULL` clause, because
+ * the same upstream alert can exist independently for more than one Security Agent owner.
+ * Ownership is part of a finding's identity here, not a tag on it.
+ *
+ * `ignored_by` is the third user column of this batch, after `deployment_events`'
+ * `created_by_user_id`, and it behaves the same way: audit trail naming whoever dismissed
+ * the finding, never attribution. The access path settles it — every read in
+ * `security-agent/db/security-findings.ts` goes through `ownerFindingPredicate()`, which
+ * matches the owner columns and nothing else. It is exported as a field and never scoped
+ * on.
+ *
+ * The cursor is `id`, which both warehouse indexes already lead into as `(owner, id)`.
+ *
+ * Everything the source held is exported except the two owner columns, which the subject
+ * already implies. That includes `raw_data`, the unmodified upstream alert. This is the
+ * most sensitive source in the export — unpatched vulnerabilities against named private
+ * repositories — which is an argument for handling it carefully, not for withholding it
+ * from the person whose repositories they are.
+ *
+ * `severity`, `cve_id` and `ghsa_id` are absent because the load dropped them on request.
+ * A finding reads as less than it is without them, and that is a gap in the warehouse
+ * rather than a choice made here.
+ */
+/**
+ * Every exported field of a finding, paired with the reader for its column.
+ *
+ * One declaration rather than three, on the same principle as `WAREHOUSE_PROFILE_FIELDS`:
+ * the SELECT list, the probe's column declaration and the emitted records are all derived
+ * from this, so a column cannot be selected without being read, declared to the probe, and
+ * emitted. At fifteen fields, three hand-maintained lists would drift.
+ *
+ * Readers are lenient by column type. The text columns take `warehouseText`, the two jsonb
+ * payloads `jsonValue`, `cvss_score` `warehouseNumber` because it is `numeric(3,1)`, and
+ * `fixed_at` the timestamp reader.
+ *
+ * `cwe_ids` is `text[]` in prod but reaches the warehouse flattened to a single string, so
+ * it is carried verbatim. Splitting it would mean guessing at a serialisation nobody has
+ * confirmed, and a wrong guess would quietly corrupt the list.
+ */
+const SECURITY_FINDING_FIELDS: Record<string, (value: unknown) => string | number | null> = {
+  repo_full_name: warehouseText,
+  package_name: warehouseText,
+  manifest_path: warehouseText,
+  title: warehouseText,
+  description: warehouseText,
+  status: warehouseText,
+  ignored_reason: warehouseText,
+  ignored_by: warehouseText,
+  fixed_at: value => nullableTimestamp(value, 'fixed_at'),
+  dependabot_html_url: warehouseText,
+  cwe_ids: warehouseText,
+  cvss_score: warehouseNumber,
+  dependency_scope: warehouseText,
+  analysis: jsonValue,
+  raw_data: jsonValue,
+};
+
+/** The finding's own columns, cursor first. Interpolated from the constant above, never
+ * from caller input, on the same basis as `singleKeyPageQuery`. */
+const SECURITY_FINDING_COLUMNS = ['id', ...Object.keys(SECURITY_FINDING_FIELDS)];
+
+/**
+ * The same three fields as `code_indexing_manifest`, at a finer grain: that source holds
+ * one row per indexed file, this one holds a row per indexed CHUNK of a file, so the same
+ * path recurs across many rows. They are separate sources rather than merged because the
+ * grain is the difference, and collapsing it would misreport how much was indexed.
+ *
+ * Ownership is the opposite of the manifest's, despite the subject matter being adjacent.
+ * Both owner columns are `notNull()` with foreign keys in prod, so every row names both an
+ * individual and an organization, putting this in the "both columns set" group with
+ * `code_indexing_search`.
+ *
+ * `kilo_user_id` is the owner, settled on the strongest evidence available for any source
+ * here: the account-erasure transaction at `apps/web/src/lib/user/index.ts:1395` deletes
+ * these rows by that column when a user is deleted. A row the product destroys with the
+ * user is the user's. Confirmed 2026-08-14 that this remains the only reference to the
+ * table outside `schema.ts`, so there is no competing read path to weigh against it.
+ *
+ * `organization_id` is carried for a v2 that does not exist yet and narrows nothing today,
+ * since every row has one. It is still the organization scope's predicate, because an
+ * organization export asks what its workspace holds rather than what the product reads.
+ * The consequence is the overlap `SCOPE_COLUMNS` describes: an organization's export
+ * returns rows that are simultaneously some individual's, which is correct rather than a
+ * leak. Personal lookups route on `kilo_user_id`, which is the only column that isolates
+ * one person.
+ *
+ * The cursor is `id`, and the warehouse carries an index per scope that leads with the
+ * owner and continues into it: `source_embeddings_user_page (kilo_user_id, id)` and
+ * `source_embeddings_org_page (organization_id, id) WHERE organization_id IS NOT NULL`.
+ * The organization index is partial, which costs this query nothing: `organization_id =
+ * $1` cannot match NULL, so no row the index omits was ever in scope.
+ *
+ * The `embedding` column is not here. The load dropped it — roughly 13.8 KB per row as
+ * text, and essentially all of this table's size — so the vectors are unavailable to any
+ * consumer. What remains is which files were indexed, on which branch, for which project.
+ */
+const sourceEmbeddingQueries = subjectPageQueries({
+  table: 'source_embeddings',
+  columns: 'id, project_id, file_path, git_branch',
+});
+
+const securityFindingQueries = subjectPageQueries({
+  table: 'security_findings',
+  columns: SECURITY_FINDING_COLUMNS.join(', '),
+});
+
 // Message payloads are whole conversations rather than single fields, so this source
 // reads fewer rows per page than the others.
 const MESSAGE_PAGE_SIZE = 200;
+
+/**
+ * `metadata` carries the whole result set of a search, not a single value, so rows here
+ * are large in the same way message payloads are and the page is cut for the same reason.
+ */
+const SEARCH_PAGE_SIZE = 200;
+
+/** Deployment events carry a payload per event, so the page is cut for the same reason. */
+const DEPLOYMENT_EVENT_PAGE_SIZE = 200;
+
+/**
+ * A finding carries the whole upstream alert in `raw_data`, plus a description and an
+ * analysis blob, and emits fifteen records per row. Cut hardest of the four.
+ */
+const SECURITY_FINDING_PAGE_SIZE = 100;
 
 type ProjectRow = { id: string; title: string | null; deleted: unknown };
 type MessageRow = { id: string; data: unknown; deleted: unknown };
@@ -461,6 +784,45 @@ type SystemPromptRow = {
   deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type SourceEmbeddingRow = {
+  id: string;
+  project_id: string | null;
+  file_path: string | null;
+  git_branch: string | null;
+};
+type SecurityFindingRow = {
+  id: string;
+  fields: { field: string; value: string | number | null }[];
+};
+type MicrodollarJournalRow = {
+  payload_id: string | null;
+  project_id: string | null;
+  most_significant_position: string;
+  least_significant_position: string;
+};
+type EnrichmentRow = {
+  id: string;
+  github_enrichment_data: string | null;
+  clay_enrichment_data: string | null;
+};
+type DeploymentEventRow = {
+  build_id: string;
+  event_id: string;
+  deployment_id: string | null;
+  created_by_user_id: string | null;
+  event_type: string | null;
+  event_timestamp: string | null;
+  payload: string | null;
+  deleted: unknown;
+};
+type CodeIndexingSearchRow = {
+  id: string;
+  project_id: string | null;
+  query: string | null;
+  metadata: string | null;
+  created_at: string | null;
+  deleted: unknown;
+};
 type CodeIndexingRow = {
   id: string;
   project_id: string | null;
@@ -496,6 +858,28 @@ function nullableString(value: unknown, field: string): string | null {
  */
 function warehouseText(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+/**
+ * A `numeric` column, read as a number.
+ *
+ * Both branches are load-bearing rather than defensive. Postgres drivers may hand a
+ * `numeric` back as a string, to avoid the precision loss of a float, or as a number if a
+ * type parser is registered for the OID. Passing this through `warehouseText` would
+ * silently drop the value on whichever of the two the driver did not do.
+ *
+ * A number rather than the text, because the one column that needs this is a score and a
+ * quoted score reads as a label. `numeric(3,1)` has three significant digits, so nothing
+ * is lost converting it; a wider numeric would need the string form kept instead.
+ *
+ * Lenient like `warehouseText`, and for the same reason: an unparseable cell is one bad
+ * value, not grounds for failing an export against a frozen snapshot.
+ */
+function warehouseNumber(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function isoTimestamp(value: unknown, field: string): string {
@@ -931,6 +1315,318 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'code_indexing_search',
+      warehouseTable: 'code_indexing_search',
+      pageSize: SEARCH_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: CodeIndexingSearchRow[] = await warehouseQuery(
+          codeIndexingSearchQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            // Every column here is NOT NULL on the primary, and the warehouse enforces
+            // none of that, so each mapper has to tolerate a NULL the source could never
+            // produce. What it does NOT have to tolerate is a wrong type: the loaded
+            // column types still hold, so only the two text columns can carry something
+            // unexpected, and only they need the lenient reader.
+            project_id: warehouseText(row.project_id),
+            query: warehouseText(row.query),
+            // `jsonValue` rather than `warehouseText`: the column is jsonb, so the driver
+            // hands back a parsed object rather than text. Same handling as
+            // `app_builder_messages.data`, the export's other JSON payload.
+            metadata: jsonValue(row.metadata),
+            // Tolerates NULL and nothing else, which is all a `timestamptz` column can
+            // spring on it.
+            created_at: nullableTimestamp(row.created_at, 'created_at'),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          // Four records per search, sharing the row's id, so the query, the project it
+          // ran against, what it returned and when stay groupable as one search.
+          records: rows.flatMap(row => [
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'project_id',
+              value: row.project_id,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'query',
+              value: row.query,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'metadata',
+              value: row.metadata,
+              ...deletionMark(row.deleted),
+            },
+            {
+              source: 'code_indexing_search',
+              id: row.id,
+              field: 'created_at',
+              value: row.created_at,
+              ...deletionMark(row.deleted),
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
+      name: 'deployment_events',
+      warehouseTable: 'deployment_events',
+      pageSize: DEPLOYMENT_EVENT_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [afterBuild, afterEvent] = keyCursorValues(input.cursor, 2);
+        const rows: DeploymentEventRow[] = await warehouseQuery(
+          deploymentEventQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterBuild, afterEvent, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            // The cursor pair, so both are read strictly: a page that could not say where
+            // it ended would silently restart the source rather than continue it.
+            build_id: requiredString(row.build_id, 'build_id'),
+            event_id: digitString(row.event_id, 'event_id'),
+            // Everything below is a LEFT JOIN result or an unconstrained warehouse
+            // column, so each is read leniently. See the note on `warehouseText`.
+            deployment_id: warehouseText(row.deployment_id),
+            created_by_user_id: warehouseText(row.created_by_user_id),
+            event_type: warehouseText(row.event_type),
+            event_timestamp: nullableTimestamp(row.event_timestamp, 'event_timestamp'),
+            payload: jsonValue(row.payload),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row => {
+            // `event_id` is unique only within a build, so the pair identifies the event.
+            // The same shape `cli_sessions` uses for its journal positions.
+            const id = `${row.build_id}.${row.event_id}`;
+            const mark = deletionMark(row.deleted);
+            return [
+              { source: 'deployment_events', id, field: 'build_id', value: row.build_id, ...mark },
+              {
+                source: 'deployment_events',
+                id,
+                field: 'deployment_id',
+                value: row.deployment_id,
+                ...mark,
+              },
+              // Provenance, never a scope. See the note on `deploymentEventPageQuery`.
+              {
+                source: 'deployment_events',
+                id,
+                field: 'created_by_user_id',
+                value: row.created_by_user_id,
+                ...mark,
+              },
+              {
+                source: 'deployment_events',
+                id,
+                field: 'event_type',
+                value: row.event_type,
+                ...mark,
+              },
+              {
+                source: 'deployment_events',
+                id,
+                field: 'event_timestamp',
+                value: row.event_timestamp,
+                ...mark,
+              },
+              { source: 'deployment_events', id, field: 'payload', value: row.payload, ...mark },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.build_id, row.event_id]),
+        };
+      },
+    },
+    {
+      name: 'source_embeddings',
+      warehouseTable: 'source_embeddings',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: SourceEmbeddingRow[] = await warehouseQuery(
+          sourceEmbeddingQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            project_id: warehouseText(row.project_id),
+            file_path: warehouseText(row.file_path),
+            git_branch: warehouseText(row.git_branch),
+          }))
+        );
+        return {
+          // No deletion mark: the column went with the narrowing to six columns. See
+          // `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => [
+            {
+              source: 'source_embeddings',
+              id: row.id,
+              field: 'project_id',
+              value: row.project_id,
+            },
+            {
+              source: 'source_embeddings',
+              id: row.id,
+              field: 'file_path',
+              value: row.file_path,
+            },
+            {
+              source: 'source_embeddings',
+              id: row.id,
+              field: 'git_branch',
+              value: row.git_branch,
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
+      name: 'security_findings',
+      warehouseTable: 'security_findings',
+      pageSize: SECURITY_FINDING_PAGE_SIZE,
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: SecurityFindingRow[] = await warehouseQuery(
+          securityFindingQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            fields: Object.entries(SECURITY_FINDING_FIELDS).map(([field, read]) => ({
+              field,
+              value: read(row[field]),
+            })),
+          }))
+        );
+        return {
+          // No deletion mark: the column went with the narrowing, and the table carried no
+          // deleted rows anyway. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row =>
+            row.fields.map(({ field, value }) => ({
+              source: 'security_findings',
+              id: row.id,
+              field,
+              value,
+            }))
+          ),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
+      name: 'microdollar_usage_journal',
+      warehouseTable: 'microdollar_usage_journal',
+      async readPage(input): Promise<SourcePage> {
+        const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
+        const rows: MicrodollarJournalRow[] = await warehouseQuery(
+          microdollarJournalQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterMost, afterLeast, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            payload_id: warehouseText(row.payload_id),
+            project_id: warehouseText(row.project_id),
+            // The cursor pair, read strictly: a page that could not say where it ended
+            // would restart the source rather than continue it.
+            most_significant_position: digitString(
+              row.most_significant_position,
+              'most_significant_position'
+            ),
+            least_significant_position: digitString(
+              row.least_significant_position,
+              'least_significant_position'
+            ),
+          }))
+        );
+        return {
+          // No deletion mark: the column went with the narrowing to six columns, so this
+          // source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => {
+            // The position pair identifies the event, not `payload_id`. Same shape as
+            // `cli_sessions`, and for the reason set out on the query above.
+            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            return [
+              {
+                source: 'microdollar_usage_journal',
+                id,
+                field: 'payload_id',
+                value: row.payload_id,
+              },
+              {
+                source: 'microdollar_usage_journal',
+                id,
+                field: 'project_id',
+                value: row.project_id,
+              },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.most_significant_position,
+            row.least_significant_position,
+          ]),
+        };
+      },
+    },
+    {
+      name: 'enrichment_data',
+      warehouseTable: 'enrichment_data',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable: `USER_ONLY_SOURCES` drops this source before an organization
+        // export reaches a read. Kept as a throw rather than an empty page because the
+        // two are not the same statement — an empty page would tell an organization that
+        // no enrichment is held, when the truth is that none was asked for.
+        if (input.subject.type !== 'user') {
+          throw new Error('enrichment_data has no organization scope');
+        }
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: EnrichmentRow[] = await warehouseQuery(enrichmentQuery, [
+          subjectScopeValue(input.subject),
+          after,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            // Both are jsonb, so the driver hands back parsed objects. Serialized whole:
+            // a payload assembled about someone by a third party is exactly the thing an
+            // export exists to show them, and picking fields out of it would be this
+            // service deciding which parts they get to see.
+            github_enrichment_data: jsonValue(row.github_enrichment_data),
+            clay_enrichment_data: jsonValue(row.clay_enrichment_data),
+          }))
+        );
+        return {
+          // No deletion mark anywhere here: the column was dropped when the table was
+          // narrowed, so this source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
+          records: rows.flatMap(row => [
+            {
+              source: 'enrichment_data',
+              id: row.id,
+              field: 'github_enrichment_data',
+              value: row.github_enrichment_data,
+            },
+            {
+              source: 'enrichment_data',
+              id: row.id,
+              field: 'clay_enrichment_data',
+              value: row.clay_enrichment_data,
+            },
+          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
   ];
 }
 
@@ -967,6 +1663,18 @@ export const warehouseQueries = {
   userPromptOrgQuery: userPromptQueries.organization,
   codeIndexingUserQuery: codeIndexingQueries.user,
   codeIndexingOrgQuery: codeIndexingQueries.organization,
+  codeIndexingSearchUserQuery: codeIndexingSearchQueries.user,
+  codeIndexingSearchOrgQuery: codeIndexingSearchQueries.organization,
+  deploymentEventUserQuery: deploymentEventQueries.user,
+  deploymentEventOrgQuery: deploymentEventQueries.organization,
+  // No org counterpart, deliberately. See `enrichmentQuery` and `USER_ONLY_SOURCES`.
+  enrichmentUserQuery: enrichmentQuery,
+  microdollarJournalUserQuery: microdollarJournalQueries.user,
+  microdollarJournalOrgQuery: microdollarJournalQueries.organization,
+  securityFindingUserQuery: securityFindingQueries.user,
+  securityFindingOrgQuery: securityFindingQueries.organization,
+  sourceEmbeddingUserQuery: sourceEmbeddingQueries.user,
+  sourceEmbeddingOrgQuery: sourceEmbeddingQueries.organization,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1027,6 +1735,37 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
+  code_indexing_search: ['id', 'project_id', 'query', 'metadata', 'created_at', DELETED_COLUMN],
+  // `created_by_user_id` is probed because the query selects it as a field, not because
+  // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
+  deployment_events: [
+    'build_id',
+    'event_id',
+    'deployment_id',
+    'created_by_user_id',
+    'event_type',
+    'event_timestamp',
+    'payload',
+    DELETED_COLUMN,
+  ],
+  // No deletion column: dropped when the table was narrowed to four columns. The probe
+  // must not ask for it, or the table would be called absent on every export.
+  enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],
+  // The position pair is declared because the query orders and pages on it. A column only
+  // filtered or ordered on still has to be probed: a table the probe calls present must
+  // not then fail at read time on a missing column.
+  microdollar_usage_journal: [
+    'payload_id',
+    'project_id',
+    'most_significant_position',
+    'least_significant_position',
+  ],
+  // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
+  // column the query started reading. No deletion column: it went with the narrowing.
+  security_findings: SECURITY_FINDING_COLUMNS,
+  // No deletion column: it went with the narrowing to six columns, along with the
+  // `embedding` vector that was almost all of this table's size.
+  source_embeddings: ['id', 'project_id', 'file_path', 'git_branch'],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1146,6 +1885,17 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   userPromptOrgQuery: 'organization_id = $1',
   codeIndexingUserQuery: 'kilo_user_id = $1',
   codeIndexingOrgQuery: 'organization_id = $1',
+  codeIndexingSearchUserQuery: 'kilo_user_id = $1',
+  codeIndexingSearchOrgQuery: 'organization_id = $1',
+  deploymentEventUserQuery: 'kilo_user_id = $1',
+  deploymentEventOrgQuery: 'organization_id = $1',
+  enrichmentUserQuery: 'kilo_user_id = $1',
+  microdollarJournalUserQuery: 'kilo_user_id = $1',
+  microdollarJournalOrgQuery: 'organization_id = $1',
+  securityFindingUserQuery: 'kilo_user_id = $1',
+  securityFindingOrgQuery: 'organization_id = $1',
+  sourceEmbeddingUserQuery: 'kilo_user_id = $1',
+  sourceEmbeddingOrgQuery: 'organization_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

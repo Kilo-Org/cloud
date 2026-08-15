@@ -209,6 +209,31 @@ describe('source availability', () => {
     expect(sources.available.map(adapter => adapter.name)).not.toContain('kilocode_users');
     expect(sources.unavailable).not.toContain('kilocode_users');
   });
+
+  // Same reasoning, second case: the enrichment table carries no organization column at
+  // all. Present and loaded, but not a question this subject can ask, so it belongs in
+  // neither list rather than being reported missing on every organization export.
+  //
+  // Its own fixture rather than the shared one, so the source lists the tests above pin
+  // exactly stay pinned to what they were written for.
+  const USER_ONLY_ADAPTERS = [
+    sourceAdapter('app_builder_projects', 'app_builder_projects'),
+    sourceAdapter('enrichment_data', 'enrichment_data'),
+  ];
+  const USER_ONLY_TABLES = new Set(['app_builder_projects', 'enrichment_data']);
+
+  it('drops a user-only source from an organization export without calling it absent', () => {
+    const sources = partitionSources(USER_ONLY_ADAPTERS, 'organization', USER_ONLY_TABLES);
+
+    expect(sources.available.map(adapter => adapter.name)).toEqual(['app_builder_projects']);
+    expect(sources.unavailable).toEqual([]);
+  });
+
+  it('keeps a user-only source in a personal export', () => {
+    const sources = partitionSources(USER_ONLY_ADAPTERS, 'user', USER_ONLY_TABLES);
+
+    expect(sources.available.map(adapter => adapter.name)).toContain('enrichment_data');
+  });
 });
 
 describe('export subject', () => {

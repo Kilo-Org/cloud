@@ -41,6 +41,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
+  efficientPoolBlockedResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
@@ -319,11 +320,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
+  // Efficient/balanced requests resolve through the auto-routing pool. Kept for
+  // the org policy check below so a team that blocks every pool model gets
+  // guidance to configure a custom Efficient model pool instead of the generic
+  // model-not-allowed error.
+  let isAutoEfficientRequest = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
+    isAutoEfficientRequest = isAutoEfficientId;
     const efficientDecision = isAutoEfficientId
       ? async () => {
           const { user, authFailedResponse, organizationId } = await authPromise;
@@ -791,7 +798,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       settings,
       organizationPlan: plan,
     });
-    if (modelRestrictionError) return modelRestrictionError;
+    if (modelRestrictionError) {
+      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError;
+    }
 
     let effectiveProviderConfig = providerConfig;
     const groupPolicy = await organizationGroupPolicyPromise;
@@ -802,7 +811,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         groupPolicy,
         effectiveModelIdLowerCased
       );
-      if (!groupDecision.allowed) return modelNotAllowedResponse();
+      if (!groupDecision.allowed) {
+        return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      }
       if (groupDecision.eligibleProviderRoutes) {
         const currentOnly = providerConfig?.only;
         const only = currentOnly

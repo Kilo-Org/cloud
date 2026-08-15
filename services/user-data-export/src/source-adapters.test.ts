@@ -636,7 +636,7 @@ describe('source adapters', () => {
   // The sync metadata was dropped from this projection on request. The table does hold
   // deleted rows, so the source can no longer tell them apart and must not imply it can:
   // an absent mark reads as "not deleted, or cannot say", never as a claim of live.
-  // Distinct from `app_builder_projects`, which still carries the column and still labels.
+  // Distinct from `system_prompt_prefix`, which still carries the column and still labels.
   it('never marks a message as deleted, having given up the column', async () => {
     const { adapters, warehouseCalls } = harness([
       { id: 'message-gone', data: { role: 'user' }, _snowflake_deleted: true },

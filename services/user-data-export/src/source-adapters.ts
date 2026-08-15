@@ -944,30 +944,70 @@ const securityFindingQueries = subjectPageQueries({
   columns: SECURITY_FINDING_COLUMNS.join(', '),
 });
 
-// Message payloads are whole conversations rather than single fields, so this source
-// reads fewer rows per page than the others.
-const MESSAGE_PAGE_SIZE = 200;
+/**
+ * Page sizes, and why each is the number it is.
+ *
+ * A page costs roughly 300-400 ms of fixed round trip before it has returned a single row,
+ * which is most of what a small page costs at all. Measured on an organization export
+ * 2026-08-15: 200-row pages took 354-668 ms and 1,000-row pages took 620-1,105 ms, so
+ * five times the rows cost under twice the time. Wall clock is therefore governed by page
+ * COUNT far more than by page size, and every size below is as large as its row width
+ * allows rather than as small as it can be.
+ *
+ * That inverts the reasoning these constants originally carried. They were cut to keep
+ * large rows from making a page unwieldy, which was right, but the cut was expressed as a
+ * row count and row counts are not comparable across sources: 200 rows of
+ * `app_builder_messages` is 168 KB and 200 rows of `code_indexing_search` is 1,062 KB.
+ * Each size is now that source's MEASURED bytes per row divided into a shared budget.
+ *
+ * The budget is about 2 MB of uncompressed payload per page, against a 128 MB Worker. A
+ * page is live three times over at peak — the driver's rows, the mapped rows, the emitted
+ * records — so the true high-water mark is nearer three times the figures below. Sizes are
+ * bounded by each source's WORST observed row, not its average, because one page of
+ * outliers is what would exhaust memory rather than the typical case.
+ *
+ * Measurements are from a single large organization and bound nothing about another one.
+ * Where a source's observed spread is wide, the size stays conservative for that reason.
+ */
 
 /**
- * `metadata` carries the whole result set of a search, not a single value, so rows here
- * are large in the same way message payloads are and the page is cut for the same reason.
+ * Whole conversations, one per row. 0.84 KB per row typical, but the widest page observed
+ * held 9.04 KB per row — a 10x spread, the largest of any source here. 500 rows is 420 KB
+ * typical and 4.5 MB at that observed worst, which is why this rises by 2.5x rather than
+ * the 4x its typical width would allow.
  */
-const SEARCH_PAGE_SIZE = 200;
+const MESSAGE_PAGE_SIZE = 500;
+
+/**
+ * `metadata` carries the whole result set of a search, not a single value. The widest
+ * source measured at 5.42 KB per row typical and 6.42 KB worst, so 400 rows is 2.2 MB
+ * typical and 2.6 MB worst. Raised the least of the four, being the one whose rows are
+ * genuinely large rather than occasionally large.
+ */
+const SEARCH_PAGE_SIZE = 400;
 
 /**
  * A review journal row carries `previous_summary_body`, the whole prior summary text, and
- * about 7.4 rows exist per review. Cut for the same reason as the message source.
+ * about 7.4 rows exist per review. 1.37 KB per row typical, 1.96 KB worst, so 1,000 rows
+ * is 1.4 MB typical and 2.0 MB worst.
  */
-const CODE_REVIEW_PAGE_SIZE = 200;
+const CODE_REVIEW_PAGE_SIZE = 1_000;
 
-/** Deployment events carry a payload per event, so the page is cut for the same reason. */
-const DEPLOYMENT_EVENT_PAGE_SIZE = 200;
+/**
+ * Deployment events carry a payload per event, but the payloads proved uniform: 0.84 KB
+ * per row typical against 0.90 KB worst, a 7% spread. A tight distribution is what admits
+ * the largest jump, so 2,000 rows is 1.8 MB even at the observed worst.
+ */
+const DEPLOYMENT_EVENT_PAGE_SIZE = 2_000;
 
 /**
  * A finding carries the whole upstream alert in `raw_data`, plus a description and an
- * analysis blob, and emits fifteen records per row. Cut hardest of the four.
+ * analysis blob, and emits fifteen records per row. Still cut hardest of the five, and the
+ * only one raised without measurement: the organization profiled held no findings, so
+ * there is no bytes-per-row figure to divide into the budget. Raised 2.5x on the strength
+ * of the round-trip argument alone, which is the part that does not depend on width.
  */
-const SECURITY_FINDING_PAGE_SIZE = 100;
+const SECURITY_FINDING_PAGE_SIZE = 250;
 
 type ProjectRow = { id: string; title: string | null };
 type MessageRow = { id: string; data: unknown };

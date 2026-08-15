@@ -27,7 +27,17 @@ import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './obs
 const MAX_PROCESSING_MS = 13 * 60 * 1000;
 const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;
-const PAGE_SIZE = 1_000;
+/**
+ * The page size for every source that does not override it, which is every NARROW source:
+ * the widest of them measured 0.48 KB per row, so 4,000 rows is under 2 MB. The sources
+ * whose rows are large enough for that to matter set `pageSize` themselves, and the byte
+ * budget all of those are derived from is documented beside them in `source-adapters.ts`.
+ *
+ * Raised from 1,000 on 2026-08-15. A page costs 300-400 ms of fixed round trip before
+ * returning a row, so an export's wall clock tracks page COUNT far more than page size,
+ * and an organization export was exhausting the 13-minute deadline on round trips alone.
+ */
+const PAGE_SIZE = 4_000;
 
 function exportDeadlineError(): TerminalExportError {
   return new TerminalExportError(

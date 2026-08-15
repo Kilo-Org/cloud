@@ -118,18 +118,6 @@ export function useModelPreferences(organizationId: string | undefined) {
     })
   );
 
-  const toggleFavorite = useCallback(
-    (model: string) => {
-      const isFavorite = query.data?.favorites.includes(model) ?? false;
-      if (isFavorite) {
-        removeFavorite.mutate({ model });
-      } else {
-        addFavorite.mutate({ model });
-      }
-    },
-    [query.data?.favorites, addFavorite, removeFavorite]
-  );
-
   return {
     favorites: query.data?.favorites ?? [],
     favoritesError,
@@ -140,6 +128,5 @@ export function useModelPreferences(organizationId: string | undefined) {
     addFavorite: addFavorite.mutate,
     removeFavorite: removeFavorite.mutate,
     setFavorites: setFavorites.mutate,
-    toggleFavorite,
   };
 }

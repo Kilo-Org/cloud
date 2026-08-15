@@ -220,35 +220,13 @@ describe('canonicalFavoriteId', () => {
     };
     expect(canonicalFavoriteId(legacyOption)).toBe('anthropic/claude-sonnet-4');
   });
-});
 
-describe('canonicalFavoriteId', () => {
   it('keys a Gateway option by its Gateway model id', () => {
     expect(canonicalFavoriteId(gatewayGpt5)).toBe('openai/gpt-5');
   });
 
   it('keys a kilo CLI option by its Gateway model id, not remote:kilo', () => {
     expect(canonicalFavoriteId(remoteKiloClaude)).toBe('anthropic/claude-sonnet-4');
-  });
-
-  it('keys a non-kilo CLI option by remote:provider:model', () => {
-    expect(canonicalFavoriteId(remoteInternalDeployment)).toBe(
-      'remote:custom-openai:shared/model.id'
-    );
-  });
-
-  it('keys a legacy-gateway option by its id', () => {
-    const legacyOption: SessionModelOption = {
-      id: 'anthropic/claude-sonnet-4',
-      name: 'Claude Sonnet 4',
-      displayId: 'anthropic/claude-sonnet-4',
-      variants: [],
-      isPreferred: false,
-      modelRef: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
-      overrideSource: 'legacy-gateway',
-      showGatewayMetadata: true,
-    };
-    expect(canonicalFavoriteId(legacyOption)).toBe('anthropic/claude-sonnet-4');
   });
 });
 

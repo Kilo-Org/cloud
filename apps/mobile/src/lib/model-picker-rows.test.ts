@@ -1,29 +1,38 @@
+/* eslint-disable max-lines -- Favorite-id helpers cover every representation. */
 import { describe, expect, it } from 'vitest';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { buildModelPickerRows, modelPickerFavoriteId } from './model-picker-rows';
+import {
+  buildModelPickerRows,
+  canonicalFavoriteId,
+  favoriteKeysForOption,
+  favoriteToggleAction,
+  isFavoriteOption,
+  modelPickerFavoriteId,
+} from './model-picker-rows';
 
 const noFavorites = new Set<string>();
 
-const gatewayModels: SessionModelOption[] = [
-  {
-    id: 'anthropic/claude-sonnet-4',
-    name: 'Claude Sonnet 4',
-    displayId: 'anthropic/claude-sonnet-4',
-    variants: ['low'],
-    isPreferred: true,
-    showGatewayMetadata: true,
-  },
-  {
-    id: 'openai/gpt-5',
-    name: 'GPT-5',
-    displayId: 'openai/gpt-5',
-    variants: ['medium'],
-    isPreferred: false,
-    showGatewayMetadata: true,
-  },
-];
+const gatewayClaude: SessionModelOption = {
+  id: 'anthropic/claude-sonnet-4',
+  name: 'Claude Sonnet 4',
+  displayId: 'anthropic/claude-sonnet-4',
+  variants: ['low'],
+  isPreferred: true,
+  showGatewayMetadata: true,
+};
+
+const gatewayGpt5: SessionModelOption = {
+  id: 'openai/gpt-5',
+  name: 'GPT-5',
+  displayId: 'openai/gpt-5',
+  variants: ['medium'],
+  isPreferred: false,
+  showGatewayMetadata: true,
+};
+
+const gatewayModels: SessionModelOption[] = [gatewayClaude, gatewayGpt5];
 
 const remoteWorkspaceClaude: SessionModelOption = {
   id: 'remote-model-0',
@@ -45,6 +54,18 @@ const remoteInternalDeployment: SessionModelOption = {
   isPreferred: false,
   provider: { id: 'custom-openai', name: 'Custom OpenAI' },
   modelRef: { providerID: 'custom-openai', modelID: 'shared/model.id' },
+  overrideSource: 'cli-catalog',
+  showGatewayMetadata: false,
+};
+
+const remoteKiloClaude: SessionModelOption = {
+  id: 'remote-model-kilo',
+  name: 'Claude Sonnet 4',
+  displayId: 'anthropic/claude-sonnet-4',
+  variants: [],
+  isPreferred: false,
+  provider: { id: 'kilo', name: 'Kilo' },
+  modelRef: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
   overrideSource: 'cli-catalog',
   showGatewayMetadata: false,
 };
@@ -199,5 +220,165 @@ describe('modelPickerFavoriteId', () => {
       showGatewayMetadata: true,
     };
     expect(modelPickerFavoriteId(legacyOption)).toBe('anthropic/claude-sonnet-4');
+  });
+});
+
+describe('canonicalFavoriteId', () => {
+  it('keys a Gateway option by its Gateway model id', () => {
+    expect(canonicalFavoriteId(gatewayGpt5)).toBe('openai/gpt-5');
+  });
+
+  it('keys a kilo CLI option by its Gateway model id, not remote:kilo', () => {
+    expect(canonicalFavoriteId(remoteKiloClaude)).toBe('anthropic/claude-sonnet-4');
+  });
+
+  it('keys a non-kilo CLI option by remote:provider:model', () => {
+    expect(canonicalFavoriteId(remoteInternalDeployment)).toBe(
+      'remote:custom-openai:shared/model.id'
+    );
+  });
+
+  it('keys a legacy-gateway option by its id', () => {
+    const legacyOption: SessionModelOption = {
+      id: 'anthropic/claude-sonnet-4',
+      name: 'Claude Sonnet 4',
+      displayId: 'anthropic/claude-sonnet-4',
+      variants: [],
+      isPreferred: false,
+      modelRef: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+      overrideSource: 'legacy-gateway',
+      showGatewayMetadata: true,
+    };
+    expect(canonicalFavoriteId(legacyOption)).toBe('anthropic/claude-sonnet-4');
+  });
+});
+
+describe('isFavoriteOption', () => {
+  it('matches a kilo CLI option by its Gateway id', () => {
+    expect(isFavoriteOption(remoteKiloClaude, new Set(['anthropic/claude-sonnet-4']))).toBe(true);
+  });
+
+  it('matches a kilo CLI option by its remote:kilo alias', () => {
+    expect(
+      isFavoriteOption(remoteKiloClaude, new Set(['remote:kilo:anthropic/claude-sonnet-4']))
+    ).toBe(true);
+  });
+
+  it('matches a Gateway option by its Gateway id', () => {
+    expect(isFavoriteOption(gatewayClaude, new Set(['anthropic/claude-sonnet-4']))).toBe(true);
+  });
+
+  it('matches a Gateway option by its remote:kilo alias', () => {
+    expect(
+      isFavoriteOption(gatewayClaude, new Set(['remote:kilo:anthropic/claude-sonnet-4']))
+    ).toBe(true);
+  });
+
+  it('does not match a Gateway option by an unrelated remote key', () => {
+    expect(isFavoriteOption(gatewayGpt5, new Set(['remote:custom-openai:shared/model.id']))).toBe(
+      false
+    );
+  });
+});
+
+describe('favoriteKeysForOption', () => {
+  it('includes both the Gateway id and the remote:kilo alias for a kilo CLI option', () => {
+    expect(favoriteKeysForOption(remoteKiloClaude).toSorted()).toEqual([
+      'anthropic/claude-sonnet-4',
+      'remote:kilo:anthropic/claude-sonnet-4',
+    ]);
+  });
+
+  it('includes both the Gateway id and the remote:kilo alias for a Gateway option', () => {
+    expect(favoriteKeysForOption(gatewayClaude).toSorted()).toEqual([
+      'anthropic/claude-sonnet-4',
+      'remote:kilo:anthropic/claude-sonnet-4',
+    ]);
+  });
+});
+
+describe('favoriteToggleAction', () => {
+  it('removes only the stored remote:kilo alias', () => {
+    expect(favoriteToggleAction(gatewayClaude, ['remote:kilo:anthropic/claude-sonnet-4'])).toEqual({
+      type: 'remove',
+      models: ['remote:kilo:anthropic/claude-sonnet-4'],
+    });
+  });
+
+  it('removes both stored keys in any order', () => {
+    const action = favoriteToggleAction(gatewayClaude, [
+      'anthropic/claude-sonnet-4',
+      'remote:kilo:anthropic/claude-sonnet-4',
+    ]);
+    expect(action.type).toBe('remove');
+    if (action.type === 'remove') {
+      expect(action.models.toSorted()).toEqual([
+        'anthropic/claude-sonnet-4',
+        'remote:kilo:anthropic/claude-sonnet-4',
+      ]);
+    }
+  });
+
+  it('adds the canonical id for an unstarred kilo CLI option', () => {
+    expect(favoriteToggleAction(remoteKiloClaude, [])).toEqual({
+      type: 'add',
+      model: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('removes a stored non-kilo remote key', () => {
+    expect(
+      favoriteToggleAction(remoteInternalDeployment, ['remote:custom-openai:shared/model.id'])
+    ).toEqual({
+      type: 'remove',
+      models: ['remote:custom-openai:shared/model.id'],
+    });
+  });
+});
+
+describe('favorite grouping across representations', () => {
+  it('puts only the Gateway Claude in FAVORITES for a Gateway-only list', () => {
+    const favoriteIds = new Set([
+      'anthropic/claude-sonnet-4',
+      'remote:custom-openai:shared/model.id',
+    ]);
+    const rows = buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds });
+    const favoriteRows = rows.filter(row => row.type === 'model' && row.isFavorite);
+    expect(favoriteRows.map(row => (row.type === 'model' ? row.model.id : ''))).toEqual([
+      'anthropic/claude-sonnet-4',
+    ]);
+  });
+
+  it('puts both the kilo CLI and custom CLI rows in FAVORITES for a CLI list', () => {
+    const favoriteIds = new Set([
+      'anthropic/claude-sonnet-4',
+      'remote:custom-openai:shared/model.id',
+    ]);
+    const rows = buildModelPickerRows({
+      models: [remoteKiloClaude, remoteInternalDeployment],
+      search: '',
+      favoriteIds,
+    });
+    const favoriteRows = rows.filter(row => row.type === 'model' && row.isFavorite);
+    expect(favoriteRows.map(row => (row.type === 'model' ? row.model.id : ''))).toEqual([
+      'remote-model-kilo',
+      'remote-model-1',
+    ]);
+  });
+
+  it('keeps the write id unchanged when BYOK is available on a Gateway option', () => {
+    const byokGateway: SessionModelOption = {
+      ...gatewayClaude,
+      hasUserByokAvailable: true,
+    };
+    expect(canonicalFavoriteId(byokGateway)).toBe('anthropic/claude-sonnet-4');
+  });
+
+  it('keeps the write id unchanged when BYOK is available on a custom CLI option', () => {
+    const byokCustom: SessionModelOption = {
+      ...remoteInternalDeployment,
+      hasUserByokAvailable: true,
+    };
+    expect(canonicalFavoriteId(byokCustom)).toBe('remote:custom-openai:shared/model.id');
   });
 });

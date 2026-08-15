@@ -268,7 +268,8 @@ function formatCacheRow(
  * null).
  */
 function pendingPartialFromSession(
-  session: SessionPrFields
+  session: SessionPrFields,
+  reviewDecisionPending: boolean
 ): z.infer<typeof associatedPrSchema> | null {
   if (session.pr_url === null) {
     return null;
@@ -285,7 +286,7 @@ function pendingPartialFromSession(
       ? new Date(session.updated_at).toISOString()
       : new Date().toISOString(),
     reviewDecision: null,
-    reviewDecisionPending: true,
+    reviewDecisionPending,
     platform: session.platform ?? 'github',
   };
 }
@@ -299,13 +300,14 @@ function pendingPartialFromSession(
  */
 function formatAssociatedPr(
   session: SessionPrFields,
-  cache: AssociatedPrRow
+  cache: AssociatedPrRow,
+  opts?: { partialReviewDecisionPending?: boolean }
 ): z.infer<typeof associatedPrSchema> | null {
   if (session.pr_url) {
     if (cache.pr_url === session.pr_url) {
       return formatCacheRow(cache, session.platform ?? 'github');
     }
-    return pendingPartialFromSession(session);
+    return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
   }
   // No session link: branch fallback. A cache PR only exists for GitHub.
   return formatCacheRow(cache, 'github');
@@ -419,7 +421,8 @@ function projectAssociatedPr<
         pr_last_synced_at,
         pr_review_decision,
         review_decision_pending,
-      }
+      },
+      { partialReviewDecisionPending: false }
     ),
   };
 }

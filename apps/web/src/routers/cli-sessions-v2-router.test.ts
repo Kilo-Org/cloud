@@ -1753,6 +1753,60 @@ describe('cli-sessions-v2-router', () => {
       expect(withoutPr?.associatedPr).toBeNull();
     });
 
+    it('list returns the session partial (not the other cache PR) when the stored link disagrees', async () => {
+      // Session link points at a different PR than the branch cache (pull/77).
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/999',
+          pr_number: 999,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+
+      const row = result.cliSessions.find(s => s.session_id === sessionWithPr);
+
+      expect(row?.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/999',
+        number: 999,
+        state: 'unknown',
+        title: null,
+        headSha: null,
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+      });
+    });
+
+    it('search returns the session partial (not the other cache PR) when the stored link disagrees', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/999',
+          pr_number: 999,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+      });
+
+      const row = result.results.find(s => s.session_id === sessionWithPr);
+
+      expect(row?.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/999',
+        number: 999,
+        state: 'unknown',
+        reviewDecisionPending: false,
+        platform: 'github',
+      });
+    });
+
     it('list row count does not increase when two cache rows share a PR URL', async () => {
       // Two sessions on different branches whose cache rows point at the same
       // PR URL. The JOIN is on (git_url, git_branch, tenant), not pr_url, so

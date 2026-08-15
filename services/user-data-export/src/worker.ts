@@ -24,6 +24,25 @@ import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
 
+/**
+ * The wall-clock deadlines, and the reason tuning past this point does not help.
+ *
+ * These are not the only ceiling a large export runs into. `limits.cpu_ms` in
+ * `wrangler.jsonc` is 300,000, which is Cloudflare's MAXIMUM rather than a number we
+ * chose, so it cannot be raised. Measured on the organization export of 2026-08-15: 202 s
+ * of CPU to write 5.34 M records, or roughly 38 microseconds per record. That puts a hard
+ * ceiling near 7.5 M records on any single invocation, whatever the read path costs.
+ *
+ * So making reads faster moves the binding constraint from this deadline to that cap
+ * rather than removing it. The same export had already been sped up 3.2x — 1.65 M records
+ * to 5.34 M in the identical 12 minutes — and still died, on the last of its fourteen
+ * sources. An organization whose export does not fit needs the work SPLIT across
+ * invocations, not made faster inside one.
+ *
+ * The state columns for that still exist: `current_source`, `source_cursor` and
+ * `next_part_number` on `user_data_exports`, which `hasRetiredGeneratorState` below
+ * rejects because this generator is one-shot.
+ */
 const MAX_PROCESSING_MS = 13 * 60 * 1000;
 const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;

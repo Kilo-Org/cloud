@@ -1129,6 +1129,27 @@ const DEPLOYMENT_EVENT_PAGE_SIZE = 2_000;
  */
 const SECURITY_FINDING_PAGE_SIZE = 250;
 
+/**
+ * The one source that overrides the default UPWARD rather than down, because it is the
+ * narrowest in the export and the default leaves half its budget unspent.
+ *
+ * Measured on the organization export of 2026-08-15: 0.25 KB per row, and the tightest
+ * distribution of any source at 998 KB typical against 1,016 KB worst — under 2% spread,
+ * so the worst case is the typical case. 8,000 rows is 2.0 MB, which is the budget, where
+ * the shared default of 4,000 spends only 1.0 MB of it.
+ *
+ * Worth its own constant because this is the source that decides whether a large
+ * organization finishes: it is both LAST in the order and the largest table in the
+ * warehouse at 158,433,290 rows, so it inherits whatever deadline the thirteen before it
+ * have left. The 2026-08-15 export died inside it having completed every other source.
+ *
+ * Expect roughly 60-90 seconds, not a fix. Fixed cost per page is only about a third of
+ * this source's page time — it reads 0.79 KB/ms against ~1.5 for every other source,
+ * being a keyset scan over the largest index here — so halving the page count does not
+ * halve the time. See the note on the CPU ceiling in `worker.ts`.
+ */
+const MICRODOLLAR_JOURNAL_PAGE_SIZE = 8_000;
+
 type ProjectRow = { id: string; title: string | null };
 type MessageRow = { id: string; data: unknown };
 type CloudAgentCodeReviewRow = {
@@ -2063,6 +2084,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
     {
       name: 'microdollar_usage_journal',
       warehouseTable: 'microdollar_usage_journal',
+      pageSize: MICRODOLLAR_JOURNAL_PAGE_SIZE,
       async readPage(input): Promise<SourcePage> {
         const [afterMost, afterLeast] = keyCursorValues(input.cursor, 2);
         const rows: MicrodollarJournalRow[] = await warehouseQuery(

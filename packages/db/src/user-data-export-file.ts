@@ -60,11 +60,18 @@
  *      Personal exports only; the source has no organization reading. It is also the one
  *      source NOT bounded to `snapshotAt` — the dbt model carries no row timestamp, so it
  *      holds current state as of its last run rather than state at the cutoff
- *   8  the `user_auth_provider` source (which identity providers the person signed in
- *      with, and the account id, email, display name, avatar and hosted domain each one
- *      supplied, plus when it was linked). One record set per linked account, so a person
- *      with Google and GitHub linked has two. Personal exports only; the table carries no
- *      organization column, so there is no organization reading of it
+ *   8  two more sources, both personal exports only, neither having an organization
+ *      reading:
+ *        `user_auth_provider`     which identity providers the person signed in with, and
+ *                                 the account id, email, display name, avatar and hosted
+ *                                 domain each one supplied, plus when it was linked. One
+ *                                 record set per linked account, so a person with Google
+ *                                 and GitHub linked has two
+ *        `orb_customer`           the billing customer record: postal and shipping
+ *                                 addresses, tax id, contact emails and name
+ *
+ *      One entry for the two, because they ship in the same change. Neither extends 7,
+ *      which has already been released.
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it

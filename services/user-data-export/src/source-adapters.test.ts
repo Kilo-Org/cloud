@@ -165,16 +165,16 @@ describe('warehouse scoping guard', () => {
   // Both subjects are covered for every warehouse source. A source reachable by only one
   // of them would silently return nothing to the other rather than failing.
   //
-  // Three declared exceptions, and they have to be declared rather than inferred: an
-  // unpaired query is normally the bug this test exists to catch. `enrichment_data`,
-  // `audiences` and `user_auth_provider` have no organization column in the warehouse at
-  // all, so there is no org query to pair any of them with, and `USER_ONLY_SOURCES` keeps
-  // organization exports from asking. Naming them here means a source that loses its org
-  // variant by accident still fails.
+  // Four declared exceptions, and they have to be declared rather than inferred: an
+  // unpaired query is normally the bug this test exists to catch. None of these four has
+  // an organization reading to pair with, and `USER_ONLY_SOURCES` keeps organization
+  // exports from asking. Naming them here means a source that loses its org variant by
+  // accident still fails.
   const USER_ONLY_QUERY_NAMES = [
     'enrichmentUserQuery',
     'audienceUserQuery',
     'userAuthProviderUserQuery',
+    'orbCustomerUserQuery',
   ];
   it('pairs every warehouse source with both subject variants', () => {
     const names = Object.keys(warehouseQueries).filter(
@@ -359,6 +359,7 @@ describe('warehouse availability probe', () => {
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
+      'orb_customer',
       'audiences',
       'enrichment_data',
       'user_auth_provider',
@@ -422,6 +423,7 @@ describe('source adapters', () => {
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
+      'orb_customer',
       'audiences',
       'enrichment_data',
       'user_auth_provider',
@@ -2105,5 +2107,68 @@ describe('source adapters', () => {
     const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toEqual([{ source: 'audiences', field: 'email', value: null }]);
+  });
+
+  const ORB_ROW = {
+    id: 'orb-cus-1',
+    external_customer_id: 'owner-user',
+    additional_emails: ['billing@example.com'],
+    billing_address: { line1: '1 Example Street', country: 'NL' },
+    email: 'person@example.com',
+    name: 'A Person',
+    corp_tax_id: { value: 'NL1234' },
+    shipping_address: null,
+  };
+
+  it('emits every declared orb field, keyed by the orb customer', async () => {
+    const { adapters } = harness([ORB_ROW]);
+
+    const page = await requireAdapter(adapters, 'orb_customer').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.records).toHaveLength(7);
+    for (const record of page?.records ?? []) expect(record.id).toBe('orb-cus-1');
+    expect(byField.get('email')).toBe('person@example.com');
+    expect(byField.get('name')).toBe('A Person');
+    expect(byField.get('billing_address')).toBe(JSON.stringify(ORB_ROW.billing_address));
+    expect(byField.get('additional_emails')).toBe(JSON.stringify(ORB_ROW.additional_emails));
+    expect(byField.get('corp_tax_id')).toBe(JSON.stringify(ORB_ROW.corp_tax_id));
+    expect(byField.get('shipping_address')).toBeNull();
+    expect(page?.nextCursor).toEqual({ key: ['orb-cus-1'] });
+  });
+
+  // The association is derived: Orb has no owner column, and `kilo_user_id` is produced by
+  // the load matching `external_customer_id` to a Kilo user. The scope must still be the
+  // derived column, since that is what the match resolved to.
+  it('scopes the orb read on the derived user column', async () => {
+    const { adapters, warehouseCalls } = harness([ORB_ROW]);
+
+    await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('WHERE external_customer_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+  });
+
+  // Orb has no notion of a Kilo organization, so an empty page would answer a question the
+  // source cannot be asked.
+  it('refuses an organization read of orb customers rather than returning nothing', async () => {
+    const { adapters } = harness([ORB_ROW]);
+
+    await expect(
+      requireAdapter(adapters, 'orb_customer').readPage?.(ORG_READ_PAGE_INPUT)
+    ).rejects.toThrow('no organization scope');
+  });
+
+  it('marks every field of an orb customer prod has since deleted', async () => {
+    const { adapters } = harness([{ ...ORB_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(7);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 });

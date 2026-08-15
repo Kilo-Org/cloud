@@ -70,16 +70,22 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
  * `kilocode_users` is the identity section, which is a person's own profile. It was
  * excluded by a name check in `partitionSources` long before this set existed.
  *
- * `enrichment_data` and `audiences` have no organization column in the warehouse
- * whatsoever. One is what third parties assembled about a person, the other the marketing
- * view's copy of their address; neither has an organization reading to offer. Declared
- * here rather than left to the probe, which would report the tables as unavailable on
- * every organization export and make an inapplicable source look like a missing one.
+ * `enrichment_data`, `audiences` and `user_auth_provider` have no organization column in
+ * the warehouse whatsoever: what third parties assembled about a person, the marketing
+ * view's copy of their address, and which identity providers they signed in with.
+ * `orb_customer` has none either — it is a billing record from Orb, which has no notion of
+ * a Kilo organization and reaches a person only through a derived user id.
+ *
+ * All four are declared here rather than left to the probe, which would report their
+ * tables as unavailable on every organization export and make an inapplicable source look
+ * like a missing one.
  */
 export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
   'kilocode_users',
   'enrichment_data',
   'audiences',
+  'user_auth_provider',
+  'orb_customer',
 ]);
 
 /**
@@ -319,9 +325,9 @@ LIMIT 1`;
  * scopes still read it, and the column the scope does not pin becomes a cursor column and
  * an exported field.
  *
- * `enrichment_data` and `audiences` are absent from that table because they have neither
- * reading: the warehouse copies carry no organization column at all, so both are user-only
- * and an organization export never asks for them. See `USER_ONLY_SOURCES`.
+ * `enrichment_data`, `audiences` and `orb_customer` are absent from that table because they
+ * have neither reading: none carries an organization column, so all three are user-only and
+ * an organization export never asks for them. See `USER_ONLY_SOURCES`.
  *
  * `code_indexing_search` and `source_embeddings` are the entries whose 0 is a schema
  * guarantee rather than a count: both owner columns are `notNull()` on each table, so no
@@ -336,9 +342,9 @@ LIMIT 1`;
  * is where that column's two readings are set out.
  *
  * The warehouse is itself a point-in-time snapshot, cut at the load cutoff before the
- * export ever reads it, so there is no `snapshot_at` bound to apply here. Only
- * `code_indexing_search` carries a `created_at` at all, and it is exported as a value
- * rather than used as a bound, for that reason.
+ * export ever reads it, so there is no `snapshot_at` bound to apply here — and since the
+ * timestamp columns were dropped from the returned set on request, no source now exports
+ * one either.
  */
 export const SCOPE_COLUMNS = { user: 'kilo_user_id', organization: 'organization_id' } as const;
 
@@ -607,7 +613,7 @@ const codeIndexingQueries = subjectPageQueries({
  */
 const codeIndexingSearchQueries = subjectPageQueries({
   table: 'code_indexing_search',
-  columns: 'id, project_id, query, metadata, created_at, _snowflake_deleted',
+  columns: 'id, project_id, query, metadata, _snowflake_deleted',
 });
 
 /**
@@ -648,7 +654,7 @@ const codeIndexingSearchQueries = subjectPageQueries({
  */
 function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
-  event_type, event_timestamp, payload, _snowflake_deleted
+  payload, _snowflake_deleted
 FROM deployment_events
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
@@ -690,6 +696,75 @@ const enrichmentQuery = singleKeyPageQuery({
 });
 
 /**
+ * Every exported field of a linked authentication account, in the order the file emits
+ * them. One declaration rather than three, on the same principle as
+ * `SECURITY_FINDING_FIELDS`: the SELECT list, the probe's column declaration and the
+ * emitted records are all derived from this, so a column cannot be selected without also
+ * being probed for and emitted.
+ *
+ * `kilo_user_id` is deliberately absent. It is the scope column, so the subject already
+ * implies it, and every other source omits its owner column for the same reason.
+ *
+ * Split in two on request. `provider` and `provider_account_id` are still SELECTed,
+ * because they are this source's cursor and the two halves of its record id, but they are
+ * no longer returned as fields. They remain visible in the id, which is what identifies
+ * one linked account and keeps a person with Google and GitHub linked from receiving two
+ * indistinguishable sets of records.
+ *
+ * `created_at` is gone entirely: nothing here needs it for a key, so it is not selected
+ * either.
+ */
+const USER_AUTH_PROVIDER_KEY = ['provider', 'provider_account_id'] as const;
+
+/** What the export returns: the profile each provider supplied. */
+const USER_AUTH_PROVIDER_FIELDS = ['email', 'display_name', 'avatar_url', 'hosted_domain'] as const;
+
+/** Read for the key, then for the fields. Drives the SELECT and the probe alike. */
+const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROVIDER_FIELDS];
+
+/**
+ * Which identity providers a person signed in with, and the profile each one supplied.
+ *
+ * One row per linked authentication account, NOT one per user: someone with Google and
+ * GitHub linked has two. Counted in the loaded warehouse 2026-08-12 at 1,068,683 rows
+ * over roughly 1.06M users, about 1.02 each.
+ *
+ * User only, and it is in `USER_ONLY_SOURCES` rather than left to the probe: the table
+ * carries no organization column at all, so there is no organization reading to offer.
+ * Attribution is `kilo_user_id`, proven rather than inferred — it is `notNull` in
+ * `schema.ts` and the account-deletion transaction erases these rows by it. A row the
+ * product destroys with the user is the user's.
+ *
+ * The cursor is `(provider, provider_account_id)`, prod's primary key and the only unique
+ * key this table has. `kilo_user_id` repeats once per linked account, so a cursor on it
+ * would skip rows at page boundaries — the defect that shipped twice already, on
+ * `cli_sessions.session_id` and again on `system_prompt_prefix`. The warehouse carries
+ * `user_auth_provider_user_page (kilo_user_id, provider, provider_account_id)`, so this
+ * ordering is served from that index with no sort step.
+ *
+ * No `COALESCE` sentinel on either cursor column, unlike `system_prompt_prefix`. Both are
+ * NOT NULL on the warehouse table, so neither can produce the NULL that makes a tuple
+ * comparison yield NULL and silently drop the rows it was meant to keep.
+ *
+ * Warehouse nullability is not prod's, and the difference is the whole reason the readers
+ * below are split. `schema.ts` marks six columns `notNull()` — `kilo_user_id`, the cursor
+ * pair, `email`, `avatar_url` and `created_at` — but only the cursor pair survives the
+ * load as NOT NULL. Every other column arrives nullable, `kilo_user_id` included. So a
+ * prod constraint is not something a reader here may lean on, and the two columns that
+ * can be read strictly are exactly the two this query pages on.
+ *
+ * Bare names in the ORDER BY are correct here: neither cursor column is selected through
+ * a cast, so the output and input references are the same column. See `SCOPE_COLUMNS` for
+ * the tables where that is not true and the qualifier is load-bearing.
+ */
+const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_COLUMNS.join(', ')}, ${DELETED_COLUMN}
+FROM user_auth_provider
+WHERE ${SCOPE_COLUMNS.user} = $1
+  AND ($2::text IS NULL OR (provider, provider_account_id) > ($2::text, $3::text))
+ORDER BY provider, provider_account_id
+LIMIT $4`;
+
+/**
  * The marketing view's copy of a person's email. Two columns in the table, one of which is
  * the scope, so `email` is all this returns.
  *
@@ -714,6 +789,51 @@ FROM audiences
 WHERE ${SCOPE_COLUMNS.user} = $1
 ORDER BY email
 LIMIT $2`;
+
+/**
+ * The billing customer record Orb holds: postal addresses, tax id, contact emails and
+ * name. The most sensitive source in the export, and for that reason one of the ones a
+ * person has most claim to see.
+ *
+ * Third user-only source. Orb has no notion of a Kilo organization, so there is no
+ * organization reading. See `USER_ONLY_SOURCES`.
+ *
+ * `kilo_user_id` is NOT a column on the source table. It is derived by the load, matching
+ * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides, and it
+ * is the reason `external_customer_id` and the scope hold the same value on every row this
+ * source can return. Verified against data on 2026-08-11 rather than from code, because
+ * the Orb integration does not live in this repo: 493,815 of 507,061 customers matched a
+ * user, and the remaining 13,246 carry a NULL `kilo_user_id` and reach nobody, since the
+ * scope predicate does not match NULL. The join cannot fan out — `users.user_id` is
+ * unique — so the grain stays one row per Orb customer.
+ *
+ * One case the export relies on being unreachable rather than filtered: 82 matched rows
+ * belong to users Kilo has since deleted, whose own record was scrubbed to
+ * `deleted+<uuid>@deleted.invalid` while Orb kept the original name, email and addresses.
+ * Nothing here excludes them. They are unreachable because only a current user can request
+ * an export, which is a property of the request path rather than of this query.
+ */
+const ORB_CUSTOMER_FIELDS: Record<string, (value: unknown) => string | null> = {
+  // Orb's reference to the customer in our system, which is the Kilo user id itself. It
+  // holds the same value the scope was bound to, so this returns the subject their own
+  // identifier rather than anything new.
+  external_customer_id: warehouseText,
+  additional_emails: jsonValue,
+  billing_address: jsonValue,
+  email: warehouseText,
+  name: warehouseText,
+  corp_tax_id: jsonValue,
+  shipping_address: jsonValue,
+};
+
+/** Cursor first, then the declared fields, then the deletion flag. */
+const ORB_CUSTOMER_COLUMNS = ['id', ...Object.keys(ORB_CUSTOMER_FIELDS), DELETED_COLUMN];
+
+const orbCustomerQuery = singleKeyPageQuery({
+  table: 'orb_customer',
+  columns: ORB_CUSTOMER_COLUMNS.join(', '),
+  scope: 'user',
+});
 
 /**
  * The second journal in the export, and the one place where the cursor is deliberately
@@ -1069,13 +1189,25 @@ type EnrichmentRow = {
   clay_enrichment_data: string | null;
 };
 type AudienceRow = { email: string | null };
+/**
+ * Keyed by the exported field list, so a field added to `USER_AUTH_PROVIDER_FIELDS`
+ * without a reader below is a type error rather than an `undefined` in the file.
+ */
+type UserAuthProviderRow = Record<(typeof USER_AUTH_PROVIDER_FIELDS)[number], string | null> & {
+  provider: string;
+  provider_account_id: string;
+  deleted: unknown;
+};
+type OrbCustomerRow = {
+  id: string;
+  fields: { field: string; value: string | null }[];
+  deleted: unknown;
+};
 type DeploymentEventRow = {
   build_id: string;
   event_id: string;
   deployment_id: string | null;
   created_by_user_id: string | null;
-  event_type: string | null;
-  event_timestamp: string | null;
   payload: string | null;
   deleted: unknown;
 };
@@ -1084,7 +1216,6 @@ type CodeIndexingSearchRow = {
   project_id: string | null;
   query: string | null;
   metadata: string | null;
-  created_at: string | null;
   deleted: unknown;
 };
 type CodeIndexingRow = {
@@ -1666,15 +1797,14 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // hands back a parsed object rather than text. Same handling as
             // `app_builder_messages.data`, the export's other JSON payload.
             metadata: jsonValue(row.metadata),
-            // Tolerates NULL and nothing else, which is all a `timestamptz` column can
-            // spring on it.
-            created_at: nullableTimestamp(row.created_at, 'created_at'),
             deleted: row._snowflake_deleted,
           }))
         );
         return {
-          // Four records per search, sharing the row's id, so the query, the project it
-          // ran against, what it returned and when stay groupable as one search.
+          // Three records per search, sharing the row's id, so the query, the project it
+          // ran against and what it returned stay groupable as one search. `created_at`
+          // was dropped from the projection on request; nothing here needs it, so it is
+          // not selected either.
           records: rows.flatMap(row => [
             {
               source: 'code_indexing_search',
@@ -1695,13 +1825,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'metadata',
               value: row.metadata,
-              ...deletionMark(row.deleted),
-            },
-            {
-              source: 'code_indexing_search',
-              id: row.id,
-              field: 'created_at',
-              value: row.created_at,
               ...deletionMark(row.deleted),
             },
           ]),
@@ -1728,8 +1851,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // column, so each is read leniently. See the note on `warehouseText`.
             deployment_id: warehouseText(row.deployment_id),
             created_by_user_id: warehouseText(row.created_by_user_id),
-            event_type: warehouseText(row.event_type),
-            event_timestamp: nullableTimestamp(row.event_timestamp, 'event_timestamp'),
             payload: jsonValue(row.payload),
             deleted: row._snowflake_deleted,
           }))
@@ -1755,20 +1876,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
                 id,
                 field: 'created_by_user_id',
                 value: row.created_by_user_id,
-                ...mark,
-              },
-              {
-                source: 'deployment_events',
-                id,
-                field: 'event_type',
-                value: row.event_type,
-                ...mark,
-              },
-              {
-                source: 'deployment_events',
-                id,
-                field: 'event_timestamp',
-                value: row.event_timestamp,
                 ...mark,
               },
               { source: 'deployment_events', id, field: 'payload', value: row.payload, ...mark },
@@ -2007,6 +2114,44 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'orb_customer',
+      warehouseTable: 'orb_customer',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable: `USER_ONLY_SOURCES` drops this before an organization export
+        // reaches a read. Orb has no notion of a Kilo organization.
+        if (input.subject.type !== 'user') {
+          throw new Error('orb_customer has no organization scope');
+        }
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: OrbCustomerRow[] = await warehouseQuery(orbCustomerQuery, [
+          subjectScopeValue(input.subject),
+          after,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            fields: Object.entries(ORB_CUSTOMER_FIELDS).map(([field, read]) => ({
+              field,
+              value: read(row[field]),
+            })),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row =>
+            row.fields.map(({ field, value }) => ({
+              source: 'orb_customer',
+              id: row.id,
+              field,
+              value,
+              ...deletionMark(row.deleted),
+            }))
+          ),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
       name: 'audiences',
       warehouseTable: 'audiences',
       async readPage(input): Promise<SourcePage> {
@@ -2081,6 +2226,64 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'user_auth_provider',
+      warehouseTable: 'user_auth_provider',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable: `USER_ONLY_SOURCES` drops this source before an organization
+        // export reaches a read. A throw rather than an empty page, for the same reason
+        // `enrichment_data` throws — an empty page would tell an organization that no
+        // accounts are linked, when the truth is that the question never applied to it.
+        if (input.subject.type !== 'user') {
+          throw new Error('user_auth_provider has no organization scope');
+        }
+        const [afterProvider, afterAccountId] = keyCursorValues(input.cursor, 2);
+        const rows: UserAuthProviderRow[] = await warehouseQuery(userAuthProviderQuery, [
+          subjectScopeValue(input.subject),
+          afterProvider,
+          afterAccountId,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            // The cursor pair, read strictly. Both are NOT NULL on the warehouse table —
+            // the only two that are — and a page that could not say where it ended would
+            // restart the source rather than continue it. Same handling as the position
+            // pairs on the two journals.
+            provider: requiredString(row.provider, 'provider'),
+            provider_account_id: requiredString(row.provider_account_id, 'provider_account_id'),
+            // Everything else takes the lenient warehouse reader: these columns are
+            // nullable and unconstrained here, and one odd cell is not worth failing an
+            // export against a frozen snapshot. See `warehouseText`.
+            email: warehouseText(row.email),
+            display_name: warehouseText(row.display_name),
+            avatar_url: warehouseText(row.avatar_url),
+            hosted_domain: warehouseText(row.hosted_domain),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row => {
+            // The key pair identifies the linked account, so the records of one account
+            // stay groupable and two linked accounts never look like duplication.
+            // `AuthProviderId` is a closed set of identifiers none of which contains a
+            // dot, so the first one always separates the halves and this cannot be
+            // ambiguous the way a free-text pair would be.
+            const id = `${row.provider}.${row.provider_account_id}`;
+            return USER_AUTH_PROVIDER_FIELDS.map(field => ({
+              source: 'user_auth_provider',
+              id,
+              field,
+              value: row[field],
+              ...deletionMark(row.deleted),
+            }));
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.provider,
+            row.provider_account_id,
+          ]),
+        };
+      },
+    },
   ];
 }
 
@@ -2127,6 +2330,8 @@ export const warehouseQueries = {
   enrichmentUserQuery: enrichmentQuery,
   // No org counterpart either. See `audienceQuery` and `USER_ONLY_SOURCES`.
   audienceUserQuery: audienceQuery,
+  // No org counterpart: Orb has no notion of a Kilo organization.
+  orbCustomerUserQuery: orbCustomerQuery,
   microdollarJournalUserQuery: microdollarJournalQueries.user,
   microdollarJournalOrgQuery: microdollarJournalQueries.organization,
   securityFindingUserQuery: securityFindingQueries.user,
@@ -2137,6 +2342,8 @@ export const warehouseQueries = {
   platformIntegrationOrgQuery: platformIntegrationQueries.organization,
   externalUsageDailyUserQuery: externalUsageDailyQueries.user,
   externalUsageDailyOrgQuery: externalUsageDailyQueries.organization,
+  // No org counterpart, deliberately. See `userAuthProviderQuery` and `USER_ONLY_SOURCES`.
+  userAuthProviderUserQuery: userAuthProviderQuery,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -2209,7 +2416,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
-  code_indexing_search: ['id', 'project_id', 'query', 'metadata', 'created_at', DELETED_COLUMN],
+  code_indexing_search: ['id', 'project_id', 'query', 'metadata', DELETED_COLUMN],
   // `created_by_user_id` is probed because the query selects it as a field, not because
   // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
   deployment_events: [
@@ -2217,8 +2424,6 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'event_id',
     'deployment_id',
     'created_by_user_id',
-    'event_type',
-    'event_timestamp',
     'payload',
     DELETED_COLUMN,
   ],
@@ -2228,6 +2433,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Two columns in the table, one of which is the scope. A dbt model, so no deletion
   // column exists to declare.
   audiences: ['email'],
+  // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
+  // column the query started reading.
+  orb_customer: ORB_CUSTOMER_COLUMNS,
   // The position pair is declared because the query orders and pages on it. A column only
   // filtered or ordered on still has to be probed: a table the probe calls present must
   // not then fail at read time on a missing column.
@@ -2256,6 +2464,10 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of. A dbt model, so there is no
   // deletion column to declare.
   external_usage_daily: ['geoip_country_code'],
+  // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
+  // column the query started reading. The scope column `kilo_user_id` is added per
+  // subject below; the cursor pair needs no addition, being two of the fields already.
+  user_auth_provider: [...USER_AUTH_PROVIDER_COLUMNS, DELETED_COLUMN],
 };
 
 /**
@@ -2396,6 +2608,7 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   deploymentEventOrgQuery: 'organization_id = $1',
   enrichmentUserQuery: 'kilo_user_id = $1',
   audienceUserQuery: 'kilo_user_id = $1',
+  orbCustomerUserQuery: 'kilo_user_id = $1',
   microdollarJournalUserQuery: 'kilo_user_id = $1',
   microdollarJournalOrgQuery: 'organization_id = $1',
   securityFindingUserQuery: 'kilo_user_id = $1',
@@ -2406,6 +2619,7 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   platformIntegrationOrgQuery: 'organization_id = $1',
   externalUsageDailyUserQuery: 'kilo_user_id = $1',
   externalUsageDailyOrgQuery: 'organization_id = $1',
+  userAuthProviderUserQuery: 'kilo_user_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

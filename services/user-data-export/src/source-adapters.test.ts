@@ -165,13 +165,17 @@ describe('warehouse scoping guard', () => {
   // Both subjects are covered for every warehouse source. A source reachable by only one
   // of them would silently return nothing to the other rather than failing.
   //
-  // Two declared exceptions, and they have to be declared rather than inferred: an
-  // unpaired query is normally the bug this test exists to catch. `enrichment_data` and
-  // `audiences` have no organization column in the warehouse at all, so there is no org
-  // query to pair either with, and `USER_ONLY_SOURCES` keeps organization exports from
-  // asking. Naming them here means a source that loses its org variant by accident still
-  // fails.
-  const USER_ONLY_QUERY_NAMES = ['enrichmentUserQuery', 'audienceUserQuery'];
+  // Four declared exceptions, and they have to be declared rather than inferred: an
+  // unpaired query is normally the bug this test exists to catch. None of these four has
+  // an organization reading to pair with, and `USER_ONLY_SOURCES` keeps organization
+  // exports from asking. Naming them here means a source that loses its org variant by
+  // accident still fails.
+  const USER_ONLY_QUERY_NAMES = [
+    'enrichmentUserQuery',
+    'audienceUserQuery',
+    'userAuthProviderUserQuery',
+    'orbCustomerUserQuery',
+  ];
   it('pairs every warehouse source with both subject variants', () => {
     const names = Object.keys(warehouseQueries).filter(
       name => !USER_ONLY_QUERY_NAMES.includes(name)
@@ -355,8 +359,10 @@ describe('warehouse availability probe', () => {
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
+      'orb_customer',
       'audiences',
       'enrichment_data',
+      'user_auth_provider',
     ]);
   });
 
@@ -417,8 +423,10 @@ describe('source adapters', () => {
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
+      'orb_customer',
       'audiences',
       'enrichment_data',
+      'user_auth_provider',
     ]);
   });
 
@@ -1016,7 +1024,7 @@ describe('source adapters', () => {
     created_at: '2026-07-04T09:15:00.000Z',
   };
 
-  it('emits the four search fields per row, keyed by the row that carried them', async () => {
+  it('emits the three search fields per row, keyed by the row that carried them', async () => {
     const { adapters } = harness([SEARCH_ROW]);
 
     const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.({
@@ -1024,8 +1032,8 @@ describe('source adapters', () => {
       limit: 1,
     });
 
-    // One id across all four, so a search, what it ran against, what it returned and when
-    // it ran stay groupable as one event.
+    // One id across all three, so a search, what it ran against and what it returned stay
+    // groupable as one event. `created_at` was dropped from the projection on request.
     expect(page?.records).toEqual([
       { source: 'code_indexing_search', id: 'search-1', field: 'project_id', value: 'project-a' },
       {
@@ -1039,12 +1047,6 @@ describe('source adapters', () => {
         id: 'search-1',
         field: 'metadata',
         value: JSON.stringify(SEARCH_ROW.metadata),
-      },
-      {
-        source: 'code_indexing_search',
-        id: 'search-1',
-        field: 'created_at',
-        value: '2026-07-04T09:15:00.000Z',
       },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['search-1'] });
@@ -1085,7 +1087,7 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(4);
+    expect(page?.records).toHaveLength(3);
     for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 
@@ -1134,9 +1136,10 @@ describe('source adapters', () => {
     expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['build-a.7']));
     expect(byField.get('build_id')).toBe('build-a');
     expect(byField.get('deployment_id')).toBe('deploy-a');
-    expect(byField.get('event_type')).toBe('build.succeeded');
-    expect(byField.get('event_timestamp')).toBe('2026-07-04T09:15:00.000Z');
     expect(byField.get('payload')).toBe(JSON.stringify({ status: 'ok' }));
+    // Dropped from the projection on request.
+    expect(byField.has('event_type')).toBe(false);
+    expect(byField.has('event_timestamp')).toBe(false);
     expect(page?.nextCursor).toEqual({ key: ['build-a', '7'] });
   });
 
@@ -1207,22 +1210,19 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(6);
+    expect(page?.records).toHaveLength(4);
     for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 
   // The joined columns come from a LEFT JOIN through deployment_builds to deployments, so
   // an absent parent row is a null field rather than a failed export.
   it('reads an unjoined deployment event as absent rather than failing the export', async () => {
-    const { adapters } = harness([
-      { ...DEPLOYMENT_EVENT_ROW, deployment_id: null, event_type: null },
-    ]);
+    const { adapters } = harness([{ ...DEPLOYMENT_EVENT_ROW, deployment_id: null }]);
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
     expect(byField.get('deployment_id')).toBeNull();
-    expect(byField.get('event_type')).toBeNull();
     expect(byField.get('build_id')).toBe('build-a');
   });
 
@@ -1901,6 +1901,142 @@ describe('source adapters', () => {
     ).rejects.toThrow('most_significant_position');
   });
 
+  const AUTH_PROVIDER_ROW = {
+    provider: 'google',
+    provider_account_id: '110581',
+    email: 'person@example.com',
+    display_name: 'Example Person',
+    avatar_url: 'https://example.test/a.png',
+    hosted_domain: 'example.com',
+    created_at: '2026-03-04T09:15:00.000Z',
+  };
+
+  it('emits every field of a linked account, keyed by the provider pair', async () => {
+    const { adapters } = harness([AUTH_PROVIDER_ROW]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    // The key pair is the record id, not a pair of fields: both were dropped from the
+    // returned set on request and survive only as the thing that identifies the account.
+    expect(page?.records).toEqual([
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'email',
+        value: 'person@example.com',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'display_name',
+        value: 'Example Person',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'avatar_url',
+        value: 'https://example.test/a.png',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'hosted_domain',
+        value: 'example.com',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['google', '110581'] });
+  });
+
+  // The point of the source. Someone with Google and GitHub linked has two rows, and the
+  // record id is now the only thing telling them apart, since `provider` itself is no
+  // longer returned. That is why the key pair stays in the query and in the id.
+  it('tells two linked accounts of one person apart', async () => {
+    const { adapters } = harness([
+      AUTH_PROVIDER_ROW,
+      { ...AUTH_PROVIDER_ROW, provider: 'github', provider_account_id: '4821' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+    const ids = new Set(page?.records.map(record => record.id));
+
+    expect([...ids]).toEqual(['google.110581', 'github.4821']);
+    expect(page?.records.some(record => record.field === 'provider')).toBe(false);
+  });
+
+  // `kilo_user_id` repeats once per linked account, so it cannot page. The cursor is the
+  // primary key pair, and it has to travel as both bind parameters or the second page
+  // restarts at the first.
+  it('pages on the provider pair rather than the owner', async () => {
+    const { adapters, warehouseCalls } = harness([AUTH_PROVIDER_ROW]);
+
+    await requireAdapter(adapters, 'user_auth_provider').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['google', '110581'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain(
+      '(provider, provider_account_id) > ($2::text, $3::text)'
+    );
+    expect(warehouseCalls[0].text).toContain('ORDER BY provider, provider_account_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', 'google', '110581', 100]);
+  });
+
+  // Same statement as `enrichment_data`: the table has no organization column, so an
+  // empty page would claim no accounts are linked when the question never applied.
+  it('refuses an organization read of linked accounts rather than returning nothing', async () => {
+    const { adapters } = harness([AUTH_PROVIDER_ROW]);
+
+    await expect(
+      requireAdapter(adapters, 'user_auth_provider').readPage?.(ORG_READ_PAGE_INPUT)
+    ).rejects.toThrow('no organization scope');
+  });
+
+  it('scopes the linked-account read to the person who signed in', async () => {
+    const { adapters, warehouseCalls } = harness([AUTH_PROVIDER_ROW]);
+
+    await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, 100]);
+  });
+
+  // 639 of 1,068,683 rows are deleted in the source, so this source does carry the flag.
+  it('marks every field of a linked account prod has since deleted', async () => {
+    const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(4);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  it('reads a missing linked-account value as absent rather than failing the export', async () => {
+    const { adapters } = harness([
+      { ...AUTH_PROVIDER_ROW, hosted_domain: null, display_name: null },
+    ]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('hosted_domain')).toBeNull();
+    expect(byField.get('display_name')).toBeNull();
+    expect(byField.get('email')).toBe('person@example.com');
+  });
+
+  // The cursor half of the row, unlike every other column, is read strictly: a page that
+  // could not say where it ended would restart the source and repeat rows forever.
+  it('fails a linked-account page that cannot say where it ended', async () => {
+    const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, provider_account_id: null }]);
+
+    await expect(
+      requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT)
+    ).rejects.toThrow('provider_account_id');
+  });
+
   it('emits the audience email as the only field it holds', async () => {
     const { adapters } = harness([{ email: 'marketing@example.com' }]);
 
@@ -1954,5 +2090,68 @@ describe('source adapters', () => {
     const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toEqual([{ source: 'audiences', field: 'email', value: null }]);
+  });
+
+  const ORB_ROW = {
+    id: 'orb-cus-1',
+    external_customer_id: 'owner-user',
+    additional_emails: ['billing@example.com'],
+    billing_address: { line1: '1 Example Street', country: 'NL' },
+    email: 'person@example.com',
+    name: 'A Person',
+    corp_tax_id: { value: 'NL1234' },
+    shipping_address: null,
+  };
+
+  it('emits every declared orb field, keyed by the orb customer', async () => {
+    const { adapters } = harness([ORB_ROW]);
+
+    const page = await requireAdapter(adapters, 'orb_customer').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.records).toHaveLength(7);
+    for (const record of page?.records ?? []) expect(record.id).toBe('orb-cus-1');
+    expect(byField.get('email')).toBe('person@example.com');
+    expect(byField.get('name')).toBe('A Person');
+    expect(byField.get('billing_address')).toBe(JSON.stringify(ORB_ROW.billing_address));
+    expect(byField.get('additional_emails')).toBe(JSON.stringify(ORB_ROW.additional_emails));
+    expect(byField.get('corp_tax_id')).toBe(JSON.stringify(ORB_ROW.corp_tax_id));
+    expect(byField.get('shipping_address')).toBeNull();
+    expect(page?.nextCursor).toEqual({ key: ['orb-cus-1'] });
+  });
+
+  // The association is derived: Orb has no owner column, and `kilo_user_id` is produced by
+  // the load matching `external_customer_id` to a Kilo user. The scope must still be the
+  // derived column, since that is what the match resolved to.
+  it('scopes the orb read on the derived user column', async () => {
+    const { adapters, warehouseCalls } = harness([ORB_ROW]);
+
+    await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('WHERE external_customer_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+  });
+
+  // Orb has no notion of a Kilo organization, so an empty page would answer a question the
+  // source cannot be asked.
+  it('refuses an organization read of orb customers rather than returning nothing', async () => {
+    const { adapters } = harness([ORB_ROW]);
+
+    await expect(
+      requireAdapter(adapters, 'orb_customer').readPage?.(ORG_READ_PAGE_INPUT)
+    ).rejects.toThrow('no organization scope');
+  });
+
+  it('marks every field of an orb customer prod has since deleted', async () => {
+    const { adapters } = harness([{ ...ORB_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(7);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
   });
 });

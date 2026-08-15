@@ -30,8 +30,8 @@ export type ExportRecord = {
  * Naming the column on any of them is a runtime error, so records from those sources are
  * never labelled.
  *
- * `external_usage_daily` is the odd one out: it is a dbt model rather than a CDC copy of a
- * prod table, so no such column was ever going to exist on it.
+ * `external_usage_daily` and `audiences` are the odd ones out: both are dbt models rather
+ * than CDC copies of prod tables, so no such column was ever going to exist on either.
  *
  * The narrowed tables are where the flag was given up rather than never held, and in each
  * case it was separating nothing. `enrichment_data` carried 5 deleted rows against 16,661
@@ -60,6 +60,7 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
   'app_builder_messages',
   'app_builder_projects',
   'cloud_agent_code_reviews',
+  'audiences',
 ] as const;
 
 /**
@@ -69,15 +70,16 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
  * `kilocode_users` is the identity section, which is a person's own profile. It was
  * excluded by a name check in `partitionSources` long before this set existed.
  *
- * `enrichment_data` has no organization column in the warehouse whatsoever: it is what
- * third parties assembled about one person, and there is no organization reading of it to
- * offer. Declared here rather than left to the probe, which would report the table as
- * unavailable on every organization export and make an inapplicable source look like a
- * missing one.
+ * `enrichment_data` and `audiences` have no organization column in the warehouse
+ * whatsoever. One is what third parties assembled about a person, the other the marketing
+ * view's copy of their address; neither has an organization reading to offer. Declared
+ * here rather than left to the probe, which would report the tables as unavailable on
+ * every organization export and make an inapplicable source look like a missing one.
  */
 export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
   'kilocode_users',
   'enrichment_data',
+  'audiences',
 ]);
 
 /**
@@ -317,9 +319,9 @@ LIMIT 1`;
  * scopes still read it, and the column the scope does not pin becomes a cursor column and
  * an exported field.
  *
- * `enrichment_data` is absent from that table because it has neither reading: the warehouse
- * copy carries no organization column at all, so it is user-only and an organization export
- * never asks for it. See `USER_ONLY_SOURCES`.
+ * `enrichment_data` and `audiences` are absent from that table because they have neither
+ * reading: the warehouse copies carry no organization column at all, so both are user-only
+ * and an organization export never asks for them. See `USER_ONLY_SOURCES`.
  *
  * `code_indexing_search` and `source_embeddings` are the entries whose 0 is a schema
  * guarantee rather than a count: both owner columns are `notNull()` on each table, so no
@@ -688,6 +690,40 @@ const enrichmentQuery = singleKeyPageQuery({
 });
 
 /**
+ * The marketing view's copy of a person's email address. Two columns in the whole table,
+ * one of which is the scope, so `email` is the only thing this source returns.
+ *
+ * Second user-only source, on the same footing as `enrichment_data`: there is no
+ * organization column, so no organization reading exists to offer. See
+ * `USER_ONLY_SOURCES`.
+ *
+ * No cursor predicate, which is unlike every other paged source here and is safe for a
+ * reason that was measured rather than assumed. `kilo_user_id` is unique and non-null
+ * across all 1,068,509 rows — the strongest key in the warehouse — so scoping to one
+ * subject already selects at most one row and there is nothing left to page through. The
+ * limit is still bound rather than fixed at 1, so a table that ever stopped being one row
+ * per user would return what it holds instead of silently truncating to the first.
+ *
+ * TWO CAVEATS WORTH CARRYING INTO ANY READING OF THIS SOURCE.
+ *
+ * It is not bounded to the snapshot. The dbt source has no row timestamp, so this is
+ * current state as of the last dbt run rather than the state at the export's cutoff. It is
+ * the only source in the export for which that is true, and the export file's single
+ * `snapshotAt` therefore does not describe it. Nothing here can fix that: there is no
+ * column to bound on.
+ *
+ * Its email can disagree with the account's own. Measured 2026-08-12, the two differed on
+ * 1 of 1,068,508 matched rows, and one row resolves to no Kilo user at all. That is the
+ * reason to return it rather than to suppress it, on the same footing as the `posthog_*`
+ * identity columns: a copy of someone's identity held somewhere else, which they cannot
+ * otherwise see.
+ */
+const audienceQuery = `SELECT email
+FROM audiences
+WHERE ${SCOPE_COLUMNS.user} = $1
+LIMIT $2`;
+
+/**
  * The second journal in the export, and the one place where the cursor is deliberately
  * NOT the column that would work today.
  *
@@ -1000,6 +1036,7 @@ type EnrichmentRow = {
   github_enrichment_data: string | null;
   clay_enrichment_data: string | null;
 };
+type AudienceRow = { email: string | null };
 type DeploymentEventRow = {
   build_id: string;
   event_id: string;
@@ -1938,6 +1975,33 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'audiences',
+      warehouseTable: 'audiences',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable, on the same basis as `enrichment_data` below: no organization
+        // reading of this table exists, so an empty page would answer a question the
+        // source cannot be asked.
+        if (input.subject.type !== 'user') {
+          throw new Error('audiences has no organization scope');
+        }
+        const rows: AudienceRow[] = await warehouseQuery(audienceQuery, [
+          subjectScopeValue(input.subject),
+          input.limit,
+        ]).then(result => result.map(row => ({ email: warehouseText(row.email) })));
+        return {
+          records: rows.map(row => ({
+            source: 'audiences',
+            field: 'email',
+            value: row.email,
+          })),
+          // Always null: `kilo_user_id` is unique, so the scope predicate has already
+          // returned everything this source holds for the subject. There is no second
+          // page and no key left to page on.
+          nextCursor: null,
+        };
+      },
+    },
+    {
       name: 'enrichment_data',
       warehouseTable: 'enrichment_data',
       async readPage(input): Promise<SourcePage> {
@@ -2029,6 +2093,8 @@ export const warehouseQueries = {
   deploymentEventOrgQuery: deploymentEventQueries.organization,
   // No org counterpart, deliberately. See `enrichmentQuery` and `USER_ONLY_SOURCES`.
   enrichmentUserQuery: enrichmentQuery,
+  // No org counterpart either. See `audienceQuery` and `USER_ONLY_SOURCES`.
+  audienceUserQuery: audienceQuery,
   microdollarJournalUserQuery: microdollarJournalQueries.user,
   microdollarJournalOrgQuery: microdollarJournalQueries.organization,
   securityFindingUserQuery: securityFindingQueries.user,
@@ -2127,6 +2193,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // No deletion column: dropped when the table was narrowed to four columns. The probe
   // must not ask for it, or the table would be called absent on every export.
   enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],
+  // Two columns in the table, one of which is the scope. A dbt model, so no deletion
+  // column exists to declare.
+  audiences: ['email'],
   // The position pair is declared because the query orders and pages on it. A column only
   // filtered or ordered on still has to be probed: a table the probe calls present must
   // not then fail at read time on a missing column.
@@ -2294,6 +2363,7 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   deploymentEventUserQuery: 'kilo_user_id = $1',
   deploymentEventOrgQuery: 'organization_id = $1',
   enrichmentUserQuery: 'kilo_user_id = $1',
+  audienceUserQuery: 'kilo_user_id = $1',
   microdollarJournalUserQuery: 'kilo_user_id = $1',
   microdollarJournalOrgQuery: 'organization_id = $1',
   securityFindingUserQuery: 'kilo_user_id = $1',

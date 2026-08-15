@@ -1,7 +1,6 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ToolDiffModel } from '../tool-diff-model';
 import { WriteToolCard, WriteToolCardBody } from './write-tool-card';
 import * as React from 'react';
 
@@ -18,25 +17,19 @@ vi.mock('@/components/ui/text', async () => {
 vi.mock('../bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));
-vi.mock('../mono-scroll-block', () => ({ MonoScrollBlock: 'MonoScrollBlock' }));
 vi.mock('../fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
-vi.mock('../tool-diff-preview', () => ({ ToolDiffPreview: 'ToolDiffPreview' }));
+vi.mock('../code-block', () => ({ CodeBlock: 'CodeBlock' }));
+vi.mock('../read-markdown-body', () => ({ ReadMarkdownBody: 'ReadMarkdownBody' }));
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof React>();
   return {
     default: actual,
     ...actual,
-    useMemo: <T>(fn: () => T): T => fn(),
     // `SelectableText` is invoked directly by the pure walker, outside a React
     // render, so the real `useContext` would throw on the null dispatcher.
     useContext: () => undefined,
   };
 });
-
-const { buildToolDiffModel } = vi.hoisted(() => ({
-  buildToolDiffModel: vi.fn(),
-}));
-vi.mock('../tool-diff-model', () => ({ buildToolDiffModel }));
 
 const { getToolDisplay, toolPartHasDetails, openSpy } = vi.hoisted(() => ({
   getToolDisplay: vi.fn(),
@@ -108,16 +101,6 @@ function makeWritePart(overrides: {
   };
 }
 
-function makeModel(): ToolDiffModel {
-  return {
-    lines: [{ type: 'add', newLine: 1, text: 'hello world', noNewlineAtEndOfFile: false }],
-    filePath: 'src/new.ts',
-    language: 'typescript',
-    truncated: false,
-    tool: 'write',
-  };
-}
-
 function findAll(
   node: unknown,
   predicate: (el: React.ReactElement) => boolean
@@ -152,9 +135,15 @@ function findByType(root: React.ReactElement, type: string): React.ReactElement[
   return findAll(root, el => el.type === type);
 }
 
+function findErrorText(root: React.ReactElement, value: string): React.ReactElement[] {
+  return findAll(
+    root,
+    el => el.type === 'TextInput' && (el.props as { value?: string }).value === value
+  );
+}
+
 describe('WriteToolCard — fixed row', () => {
   beforeEach(() => {
-    buildToolDiffModel.mockReset();
     getToolDisplay.mockReset();
     toolPartHasDetails.mockReset();
     openSpy.mockReset();
@@ -214,84 +203,130 @@ describe('WriteToolCard — fixed row', () => {
   });
 });
 
-describe('WriteToolCardBody — diff preview routing', () => {
-  beforeEach(() => {
-    buildToolDiffModel.mockReset();
-  });
-
-  it('renders ToolDiffPreview when the model exists', () => {
-    const model = makeModel();
-    buildToolDiffModel.mockReturnValue(model);
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCardBody({ part: makeWritePart({}) }) as unknown as React.ReactElement;
-    const previews = findByType(root, 'ToolDiffPreview');
-    expect(previews).toHaveLength(1);
-  });
-
-  it('passes the model and partId to ToolDiffPreview', () => {
-    const model = makeModel();
-    buildToolDiffModel.mockReturnValue(model);
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCardBody({ part: makeWritePart({}) }) as unknown as React.ReactElement;
-    const preview = findByType(root, 'ToolDiffPreview')[0];
-    expect(preview).toBeDefined();
-    if (!preview) {
-      throw new Error('preview not found');
-    }
-    expect((preview.props as { model: unknown }).model).toBe(model);
-    expect((preview.props as { partId: unknown }).partId).toBe('write-1');
-  });
-
-  it('renders MonoScrollBlock fallback when the model does not exist', () => {
-    buildToolDiffModel.mockReturnValue(null);
+describe('WriteToolCardBody — smart render routing', () => {
+  it('routes a .md path to ReadMarkdownBody and not CodeBlock', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = WriteToolCardBody({
-      part: makeWritePart({ content: 'hello' }),
+      part: makeWritePart({ filePath: 'README.md', content: '# Hello' }),
     }) as unknown as React.ReactElement;
+    const bodies = findByType(root, 'ReadMarkdownBody');
+    expect(bodies).toHaveLength(1);
+    const body = bodies[0];
+    if (!body) {
+      throw new Error('body not found');
+    }
+    expect((body.props as { body: unknown }).body).toEqual({ text: '# Hello', footer: undefined });
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
-    const blocks = findByType(root, 'MonoScrollBlock');
+  });
+
+  it('routes a .mdx path to ReadMarkdownBody', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'page.mdx', content: '# Page' }),
+    }) as unknown as React.ReactElement;
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(1);
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+    expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
+  });
+
+  it('routes a .MD path to ReadMarkdownBody', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'NOTES.MD', content: '# Notes' }),
+    }) as unknown as React.ReactElement;
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(1);
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+  });
+
+  it('routes a non-markdown path to CodeBlock with languageForPath', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'src/new.ts', content: 'hello world' }),
+    }) as unknown as React.ReactElement;
+    const blocks = findByType(root, 'CodeBlock');
     expect(blocks).toHaveLength(1);
     const block = blocks[0];
     if (!block) {
       throw new Error('block not found');
     }
-    expect((block.props as { maxLength?: unknown }).maxLength).toBeUndefined();
-  });
-
-  it('renders no body when the model does not exist and content is empty', () => {
-    buildToolDiffModel.mockReturnValue(null);
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = WriteToolCardBody({
-      part: makeWritePart({ content: '' }),
-    }) as unknown as React.ReactElement;
+    expect(block.props).toMatchObject({
+      code: 'hello world',
+      language: 'typescript',
+      maxLength: 50_000,
+    });
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
-    expect(findByType(root, 'MonoScrollBlock')).toHaveLength(0);
   });
 
-  it('preserves the error block when the model exists', () => {
-    const model = makeModel();
-    buildToolDiffModel.mockReturnValue(model);
+  it('routes an unknown extension to CodeBlock with null language', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = WriteToolCardBody({
-      part: makeWritePart({ status: 'error', error: 'write failed' }),
+      part: makeWritePart({ filePath: 'Makefile', content: 'x' }),
     }) as unknown as React.ReactElement;
-    const texts = findAll(
-      root,
-      el => el.type === 'TextInput' && (el.props as { value?: string }).value === 'write failed'
-    );
-    expect(texts).toHaveLength(1);
+    const block = findByType(root, 'CodeBlock')[0];
+    if (!block) {
+      throw new Error('block not found');
+    }
+    expect((block.props as { language: unknown }).language).toBeNull();
   });
 
-  it('preserves the error block when the model does not exist', () => {
-    buildToolDiffModel.mockReturnValue(null);
+  it('renders the empty line for empty non-markdown content', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = WriteToolCardBody({
-      part: makeWritePart({ content: 'hello', status: 'error', error: 'write error' }),
+      part: makeWritePart({ filePath: 'src/empty.ts', content: '' }),
     }) as unknown as React.ReactElement;
-    const texts = findAll(
-      root,
-      el => el.type === 'TextInput' && (el.props as { value?: string }).value === 'write error'
-    );
+    const texts = findByType(root, 'Text');
     expect(texts).toHaveLength(1);
+    const text = texts[0];
+    if (!text) {
+      throw new Error('text not found');
+    }
+    expect((text.props as { children?: unknown }).children).toBe('This file is empty.');
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
+  });
+
+  it('routes empty markdown content through ReadMarkdownBody', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'README.md', content: '' }),
+    }) as unknown as React.ReactElement;
+    const bodies = findByType(root, 'ReadMarkdownBody');
+    expect(bodies).toHaveLength(1);
+    const body = bodies[0];
+    if (!body) {
+      throw new Error('body not found');
+    }
+    expect((body.props as { body: { text: string } }).body.text).toBe('');
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+  });
+
+  it('preserves the error block next to a code body', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({
+        status: 'error',
+        error: 'write failed',
+        filePath: 'src/new.ts',
+        content: 'hello',
+      }),
+    }) as unknown as React.ReactElement;
+    expect(findErrorText(root, 'write failed')).toHaveLength(1);
+    expect(findByType(root, 'CodeBlock')).toHaveLength(1);
+  });
+
+  it('preserves the error block next to a markdown body', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({
+        status: 'error',
+        error: 'write failed',
+        filePath: 'README.md',
+        content: '# Hello',
+      }),
+    }) as unknown as React.ReactElement;
+    expect(findErrorText(root, 'write failed')).toHaveLength(1);
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(1);
   });
 });

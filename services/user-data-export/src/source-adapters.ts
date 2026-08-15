@@ -690,33 +690,20 @@ const enrichmentQuery = singleKeyPageQuery({
 });
 
 /**
- * The marketing view's copy of a person's email address. Two columns in the whole table,
- * one of which is the scope, so `email` is the only thing this source returns.
+ * The marketing view's copy of a person's email. Two columns in the table, one of which is
+ * the scope, so `email` is all this returns.
  *
- * Second user-only source, on the same footing as `enrichment_data`: there is no
- * organization column, so no organization reading exists to offer. See
+ * User-only, like `enrichment_data`: no organization column exists. See
  * `USER_ONLY_SOURCES`.
  *
- * No cursor predicate, which is unlike every other paged source here and is safe for a
- * reason that was measured rather than assumed. `kilo_user_id` is unique and non-null
- * across all 1,068,509 rows — the strongest key in the warehouse — so scoping to one
- * subject already selects at most one row and there is nothing left to page through. The
- * limit is still bound rather than fixed at 1, so a table that ever stopped being one row
- * per user would return what it holds instead of silently truncating to the first.
+ * No cursor, unlike every other paged source. `kilo_user_id` is unique and non-null across
+ * all 1,068,509 rows, so the scope already selects at most one row and there is nothing
+ * left to page.
  *
- * TWO CAVEATS WORTH CARRYING INTO ANY READING OF THIS SOURCE.
- *
- * It is not bounded to the snapshot. The dbt source has no row timestamp, so this is
- * current state as of the last dbt run rather than the state at the export's cutoff. It is
- * the only source in the export for which that is true, and the export file's single
- * `snapshotAt` therefore does not describe it. Nothing here can fix that: there is no
- * column to bound on.
- *
- * Its email can disagree with the account's own. Measured 2026-08-12, the two differed on
- * 1 of 1,068,508 matched rows, and one row resolves to no Kilo user at all. That is the
- * reason to return it rather than to suppress it, on the same footing as the `posthog_*`
- * identity columns: a copy of someone's identity held somewhere else, which they cannot
- * otherwise see.
+ * One caveat worth carrying: this is the only source NOT bounded to the snapshot. The dbt
+ * model has no row timestamp, so it holds current state as of its last run rather than
+ * state at the cutoff, and the file's single `snapshotAt` does not describe it. There is
+ * no column to bound on.
  */
 const audienceQuery = `SELECT email
 FROM audiences

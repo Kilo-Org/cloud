@@ -30,11 +30,51 @@ const STATE_ARIA_LABELS: Readonly<Record<PrBadgeState, string>> = {
  * neutral open presentation while the server resolves the real state.
  */
 export function normalizePrBadgeState(state: string): PrBadgeState {
-  if (state === 'merged') return 'merged';
-  if (state === 'draft') return 'draft';
-  if (state === 'open') return 'open';
-  if (state === 'closed') return 'closed';
+  if (state === 'merged') {
+    return 'merged';
+  }
+  if (state === 'draft') {
+    return 'draft';
+  }
+  if (state === 'open') {
+    return 'open';
+  }
+  if (state === 'closed') {
+    return 'closed';
+  }
   return 'unknown';
+}
+
+/**
+ * Resolve the badge icon and accent for a bucketed PR state. Extracted from
+ * `describePrBadge` so `icon`/`accent` are assigned on declaration, satisfying
+ * the `init-declarations` lint rule.
+ */
+function prBadgeVisual(
+  stateBucket: PrBadgeState,
+  reviewDecision: ReviewDecision | null,
+  updating: boolean
+): Pick<PrBadgeDescriptor, 'icon' | 'accent'> {
+  if (stateBucket === 'merged') {
+    return { icon: 'merge', accent: 'muted' };
+  }
+  if (stateBucket === 'closed') {
+    return { icon: 'closed', accent: 'destructive' };
+  }
+  if (stateBucket === 'draft') {
+    return { icon: 'draft', accent: 'muted' };
+  }
+  if (updating) {
+    return { icon: 'pull-request', accent: 'good' };
+  }
+  if (reviewDecision === 'approved') {
+    return { icon: 'check', accent: 'good' };
+  }
+  if (reviewDecision === 'changes_requested') {
+    return { icon: 'x', accent: 'warn' };
+  }
+  // open with `review_required` or no decision
+  return { icon: 'pull-request', accent: 'good' };
 }
 
 /**
@@ -61,32 +101,7 @@ export function describePrBadge(
   const stateBucket = normalizePrBadgeState(args.state);
   const updating = stateBucket === 'unknown' || args.reviewDecisionPending;
 
-  let icon: PrBadgeIconKind;
-  let accent: PrBadgeAccent;
-
-  if (stateBucket === 'merged') {
-    icon = 'merge';
-    accent = 'muted';
-  } else if (stateBucket === 'closed') {
-    icon = 'closed';
-    accent = 'destructive';
-  } else if (stateBucket === 'draft') {
-    icon = 'draft';
-    accent = 'muted';
-  } else if (updating) {
-    icon = 'pull-request';
-    accent = 'good';
-  } else if (args.reviewDecision === 'approved') {
-    icon = 'check';
-    accent = 'good';
-  } else if (args.reviewDecision === 'changes_requested') {
-    icon = 'x';
-    accent = 'warn';
-  } else {
-    // open with `review_required` or no decision
-    icon = 'pull-request';
-    accent = 'good';
-  }
+  const { icon, accent } = prBadgeVisual(stateBucket, args.reviewDecision, updating);
 
   const accessibilityLabel = updating
     ? `Updating, ${STATE_ARIA_LABELS[stateBucket]} #${args.number}`

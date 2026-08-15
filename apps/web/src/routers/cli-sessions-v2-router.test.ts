@@ -1539,6 +1539,34 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('uses live cache fields when the stored link has mixed-case owner/repo', async () => {
+      // Stored link names the same PR (pull/42) as the canonical lowercase
+      // cache URL, but with mixed-case owner/repo. Owner and repo compare
+      // case-insensitively.
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/Kilo/Repo/pull/42',
+          pr_number: 42,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add feature X',
+        headSha: 'deadbeefcafe',
+        platform: 'github',
+      });
+    });
+
     it('returns the session partial (not the other PR) when the session link disagrees with the branch cache', async () => {
       // Session link points at a different PR than the branch cache (pull/42).
       await db
@@ -2215,6 +2243,9 @@ describe('cli-sessions-v2-router', () => {
         state: 'open',
         platform: 'github',
       });
+      // ...with reviewDecisionPending false: no cache row is written on this
+      // path, so no batch worker can ever clear a pending flag.
+      expect(result.associatedPr?.reviewDecisionPending).toBe(false);
       // ...and writes no cache row (no branch identity).
       const rows = await readCacheRows();
       expect(rows).toHaveLength(0);

@@ -285,6 +285,12 @@ describe('extractSessionPrLink', () => {
     ).toBeUndefined();
   });
 
+  it('drops an invalid set with an empty prUrl', () => {
+    expect(
+      extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: '', prNumber: 1 }))
+    ).toBeUndefined();
+  });
+
   it('drops an invalid set with a non-positive prNumber', () => {
     expect(
       extractSessionPrLink(prLinkItem({ platform: 'github', prUrl: 'https://x', prNumber: 0 }))

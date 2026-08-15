@@ -92,6 +92,7 @@ export function extractSessionPrLink(item: IngestBatch[number]): SessionPrLinkEx
     typeof platform !== 'string' ||
     platform.length === 0 ||
     typeof prUrl !== 'string' ||
+    prUrl.length === 0 ||
     typeof prNumber !== 'number' ||
     !Number.isInteger(prNumber) ||
     prNumber <= 0

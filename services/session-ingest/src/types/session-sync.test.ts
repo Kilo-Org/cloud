@@ -108,6 +108,15 @@ describe('SessionItemSchema session_pr_link validation', () => {
     ).toBe(false);
   });
 
+  it('rejects an empty prUrl', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_pr_link',
+        data: { platform: 'github', prUrl: '', prNumber: 1 },
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects a non-positive prNumber', () => {
     expect(
       SessionItemSchema.safeParse({
@@ -122,6 +131,15 @@ describe('SessionItemSchema session_pr_link validation', () => {
       SessionItemSchema.safeParse({
         type: 'session_pr_link',
         data: { platform: 'github', prUrl: 'https://x', prNumber: 1.5 },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a prNumber above the PostgreSQL int4 range', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_pr_link',
+        data: { platform: 'github', prUrl: 'https://x', prNumber: 2_147_483_648 },
       }).success
     ).toBe(false);
   });

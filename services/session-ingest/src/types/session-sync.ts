@@ -79,8 +79,8 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       // PR host (e.g. "github"), NOT the OS platform. All three keys are always sent;
       // any null field clears the whole link.
       platform: z.string().min(1).max(32).nullable(),
-      prUrl: z.string().max(2048).nullable(),
-      prNumber: z.number().int().positive().nullable(),
+      prUrl: z.string().min(1).max(2048).nullable(),
+      prNumber: z.number().int().positive().max(2_147_483_647).nullable(),
     }),
   }),
 ]);

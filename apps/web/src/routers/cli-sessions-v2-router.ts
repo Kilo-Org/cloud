@@ -303,7 +303,11 @@ function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
   const s = parseGitHubPrUrl(sessionUrl);
   const c = parseGitHubPrUrl(cacheUrl);
   return (
-    s !== null && c !== null && s.owner === c.owner && s.repo === c.repo && s.number === c.number
+    s !== null &&
+    c !== null &&
+    s.owner.toLowerCase() === c.owner.toLowerCase() &&
+    s.repo.toLowerCase() === c.repo.toLowerCase() &&
+    s.number === c.number
   );
 }
 
@@ -1426,7 +1430,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             headSha: fetched.headSha,
             lastSyncedAt: new Date().toISOString(),
             reviewDecision: reviewDecision as z.infer<typeof associatedPrSchema>['reviewDecision'],
-            reviewDecisionPending: !reviewDecisionFetched,
+            reviewDecisionPending: false,
             platform: 'github',
           }
         : null;

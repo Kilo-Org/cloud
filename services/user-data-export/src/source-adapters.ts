@@ -70,16 +70,18 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
  * `kilocode_users` is the identity section, which is a person's own profile. It was
  * excluded by a name check in `partitionSources` long before this set existed.
  *
- * `enrichment_data` and `audiences` have no organization column in the warehouse
- * whatsoever. One is what third parties assembled about a person, the other the marketing
- * view's copy of their address; neither has an organization reading to offer. Declared
- * here rather than left to the probe, which would report the tables as unavailable on
- * every organization export and make an inapplicable source look like a missing one.
+ * `enrichment_data`, `audiences` and `orb_customer` have no organization reading at all.
+ * The first two carry no organization column in the warehouse; the third is a billing
+ * record from Orb, which has no notion of a Kilo organization and reaches a person only
+ * through a derived user id. Declared here rather than left to the probe, which would
+ * report the tables as unavailable on every organization export and make an inapplicable
+ * source look like a missing one.
  */
 export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
   'kilocode_users',
   'enrichment_data',
   'audiences',
+  'orb_customer',
 ]);
 
 /**
@@ -319,9 +321,9 @@ LIMIT 1`;
  * scopes still read it, and the column the scope does not pin becomes a cursor column and
  * an exported field.
  *
- * `enrichment_data` and `audiences` are absent from that table because they have neither
- * reading: the warehouse copies carry no organization column at all, so both are user-only
- * and an organization export never asks for them. See `USER_ONLY_SOURCES`.
+ * `enrichment_data`, `audiences` and `orb_customer` are absent from that table because they
+ * have neither reading: none carries an organization column, so all three are user-only and
+ * an organization export never asks for them. See `USER_ONLY_SOURCES`.
  *
  * `code_indexing_search` and `source_embeddings` are the entries whose 0 is a schema
  * guarantee rather than a count: both owner columns are `notNull()` on each table, so no
@@ -716,6 +718,51 @@ ORDER BY email
 LIMIT $2`;
 
 /**
+ * The billing customer record Orb holds: postal addresses, tax id, contact emails and
+ * name. The most sensitive source in the export, and for that reason one of the ones a
+ * person has most claim to see.
+ *
+ * Third user-only source. Orb has no notion of a Kilo organization, so there is no
+ * organization reading. See `USER_ONLY_SOURCES`.
+ *
+ * `kilo_user_id` is NOT a column on the source table. It is derived by the load, matching
+ * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides, and it
+ * is the reason `external_customer_id` and the scope hold the same value on every row this
+ * source can return. Verified against data on 2026-08-11 rather than from code, because
+ * the Orb integration does not live in this repo: 493,815 of 507,061 customers matched a
+ * user, and the remaining 13,246 carry a NULL `kilo_user_id` and reach nobody, since the
+ * scope predicate does not match NULL. The join cannot fan out — `users.user_id` is
+ * unique — so the grain stays one row per Orb customer.
+ *
+ * One case the export relies on being unreachable rather than filtered: 82 matched rows
+ * belong to users Kilo has since deleted, whose own record was scrubbed to
+ * `deleted+<uuid>@deleted.invalid` while Orb kept the original name, email and addresses.
+ * Nothing here excludes them. They are unreachable because only a current user can request
+ * an export, which is a property of the request path rather than of this query.
+ */
+const ORB_CUSTOMER_FIELDS: Record<string, (value: unknown) => string | null> = {
+  // Orb's reference to the customer in our system, which is the Kilo user id itself. It
+  // holds the same value the scope was bound to, so this returns the subject their own
+  // identifier rather than anything new.
+  external_customer_id: warehouseText,
+  additional_emails: jsonValue,
+  billing_address: jsonValue,
+  email: warehouseText,
+  name: warehouseText,
+  corp_tax_id: jsonValue,
+  shipping_address: jsonValue,
+};
+
+/** Cursor first, then the declared fields, then the deletion flag. */
+const ORB_CUSTOMER_COLUMNS = ['id', ...Object.keys(ORB_CUSTOMER_FIELDS), DELETED_COLUMN];
+
+const orbCustomerQuery = singleKeyPageQuery({
+  table: 'orb_customer',
+  columns: ORB_CUSTOMER_COLUMNS.join(', '),
+  scope: 'user',
+});
+
+/**
  * The second journal in the export, and the one place where the cursor is deliberately
  * NOT the column that would work today.
  *
@@ -1029,6 +1076,11 @@ type EnrichmentRow = {
   clay_enrichment_data: string | null;
 };
 type AudienceRow = { email: string | null };
+type OrbCustomerRow = {
+  id: string;
+  fields: { field: string; value: string | null }[];
+  deleted: unknown;
+};
 type DeploymentEventRow = {
   build_id: string;
   event_id: string;
@@ -1967,6 +2019,44 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'orb_customer',
+      warehouseTable: 'orb_customer',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable: `USER_ONLY_SOURCES` drops this before an organization export
+        // reaches a read. Orb has no notion of a Kilo organization.
+        if (input.subject.type !== 'user') {
+          throw new Error('orb_customer has no organization scope');
+        }
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: OrbCustomerRow[] = await warehouseQuery(orbCustomerQuery, [
+          subjectScopeValue(input.subject),
+          after,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            fields: Object.entries(ORB_CUSTOMER_FIELDS).map(([field, read]) => ({
+              field,
+              value: read(row[field]),
+            })),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row =>
+            row.fields.map(({ field, value }) => ({
+              source: 'orb_customer',
+              id: row.id,
+              field,
+              value,
+              ...deletionMark(row.deleted),
+            }))
+          ),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
       name: 'audiences',
       warehouseTable: 'audiences',
       async readPage(input): Promise<SourcePage> {
@@ -2087,6 +2177,8 @@ export const warehouseQueries = {
   enrichmentUserQuery: enrichmentQuery,
   // No org counterpart either. See `audienceQuery` and `USER_ONLY_SOURCES`.
   audienceUserQuery: audienceQuery,
+  // No org counterpart: Orb has no notion of a Kilo organization.
+  orbCustomerUserQuery: orbCustomerQuery,
   microdollarJournalUserQuery: microdollarJournalQueries.user,
   microdollarJournalOrgQuery: microdollarJournalQueries.organization,
   securityFindingUserQuery: securityFindingQueries.user,
@@ -2188,6 +2280,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Two columns in the table, one of which is the scope. A dbt model, so no deletion
   // column exists to declare.
   audiences: ['email'],
+  // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
+  // column the query started reading.
+  orb_customer: ORB_CUSTOMER_COLUMNS,
   // The position pair is declared because the query orders and pages on it. A column only
   // filtered or ordered on still has to be probed: a table the probe calls present must
   // not then fail at read time on a missing column.
@@ -2356,6 +2451,7 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   deploymentEventOrgQuery: 'organization_id = $1',
   enrichmentUserQuery: 'kilo_user_id = $1',
   audienceUserQuery: 'kilo_user_id = $1',
+  orbCustomerUserQuery: 'kilo_user_id = $1',
   microdollarJournalUserQuery: 'kilo_user_id = $1',
   microdollarJournalOrgQuery: 'organization_id = $1',
   securityFindingUserQuery: 'kilo_user_id = $1',

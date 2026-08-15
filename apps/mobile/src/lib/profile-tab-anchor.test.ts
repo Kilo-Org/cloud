@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findingDetailBackTarget,
   findingDetailHasLocalHistory,
-  PROFILE_TAB_INDEX,
+  PROFILE_TAB_ROOT,
 } from './finding-detail-back';
 
 // The `showBackButton` wiring itself (that `FindingDetailScreen` passes
@@ -41,12 +41,12 @@ describe('findingDetailBackTarget', () => {
   it('replaces to the profile root when a push/deep-link opened the report with no local history', () => {
     expect(findingDetailBackTarget(false)).toEqual({
       kind: 'replace',
-      href: '/(app)/(tabs)/(3_profile)/index',
+      href: '/(app)/(tabs)/(3_profile)',
     });
   });
 
   it('anchors the no-history landing target to the profile tab root', () => {
-    expect(PROFILE_TAB_INDEX).toBe('/(app)/(tabs)/(3_profile)/index');
+    expect(PROFILE_TAB_ROOT).toBe('/(app)/(tabs)/(3_profile)');
   });
 });
 

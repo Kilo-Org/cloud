@@ -2,9 +2,11 @@ import { type Href } from 'expo-router';
 
 /**
  * Profile tab root. This is the fixed landing target when a push/deep-link
- * opened a finding report with no in-app history beneath it.
+ * opened a finding report with no in-app history beneath it. The group href
+ * (no trailing `/index`) is the route expo-router matches — the `/index`
+ * suffix resolves to the not-found screen.
  */
-export const PROFILE_TAB_INDEX = '/(app)/(tabs)/(3_profile)/index' as Href;
+export const PROFILE_TAB_ROOT = '/(app)/(tabs)/(3_profile)' as Href;
 
 export type FindingDetailBackTarget = { kind: 'pop' } | { kind: 'replace'; href: Href };
 
@@ -36,5 +38,5 @@ export function findingDetailBackTarget(hasLocalHistory: boolean): FindingDetail
   if (hasLocalHistory) {
     return { kind: 'pop' };
   }
-  return { kind: 'replace', href: PROFILE_TAB_INDEX };
+  return { kind: 'replace', href: PROFILE_TAB_ROOT };
 }

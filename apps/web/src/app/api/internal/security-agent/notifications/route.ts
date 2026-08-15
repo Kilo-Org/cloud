@@ -296,6 +296,7 @@ export async function POST(req: NextRequest) {
           severity: row.severity,
           repoFullName: row.repoFullName,
           title: row.title,
+          ghsaId: row.ghsaId,
         });
       } catch {
         // Push is best-effort: the email was sent; the response stays `sent`.

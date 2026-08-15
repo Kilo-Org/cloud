@@ -165,12 +165,17 @@ describe('warehouse scoping guard', () => {
   // Both subjects are covered for every warehouse source. A source reachable by only one
   // of them would silently return nothing to the other rather than failing.
   //
-  // One declared exception, and it has to be declared rather than inferred: an unpaired
-  // query is normally the bug this test exists to catch. `enrichment_data` has no
-  // organization column in the warehouse at all, so there is no org query to pair it with,
-  // and `USER_ONLY_SOURCES` keeps organization exports from asking. Naming it here means a
-  // source that loses its org variant by accident still fails.
-  const USER_ONLY_QUERY_NAMES = ['enrichmentUserQuery', 'userAuthProviderUserQuery'];
+  // Three declared exceptions, and they have to be declared rather than inferred: an
+  // unpaired query is normally the bug this test exists to catch. `enrichment_data`,
+  // `audiences` and `user_auth_provider` have no organization column in the warehouse at
+  // all, so there is no org query to pair any of them with, and `USER_ONLY_SOURCES` keeps
+  // organization exports from asking. Naming them here means a source that loses its org
+  // variant by accident still fails.
+  const USER_ONLY_QUERY_NAMES = [
+    'enrichmentUserQuery',
+    'audienceUserQuery',
+    'userAuthProviderUserQuery',
+  ];
   it('pairs every warehouse source with both subject variants', () => {
     const names = Object.keys(warehouseQueries).filter(
       name => !USER_ONLY_QUERY_NAMES.includes(name)
@@ -354,6 +359,7 @@ describe('warehouse availability probe', () => {
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
+      'audiences',
       'enrichment_data',
       'user_auth_provider',
     ]);
@@ -416,6 +422,7 @@ describe('source adapters', () => {
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
+      'audiences',
       'enrichment_data',
       'user_auth_provider',
     ]);
@@ -2043,5 +2050,60 @@ describe('source adapters', () => {
     await expect(
       requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT)
     ).rejects.toThrow('provider_account_id');
+  });
+
+  it('emits the audience email as the only field it holds', async () => {
+    const { adapters } = harness([{ email: 'marketing@example.com' }]);
+
+    const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toEqual([
+      { source: 'audiences', field: 'email', value: 'marketing@example.com' },
+    ]);
+  });
+
+  // `kilo_user_id` is unique across all 1,068,509 rows, so scoping already selects at most
+  // one row and there is nothing left to page. A cursor here would page on the same column
+  // the WHERE clause has already pinned.
+  it('reads the audience row without a cursor and never asks for a second page', async () => {
+    const { adapters, warehouseCalls } = harness([{ email: 'marketing@example.com' }]);
+
+    const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    // No keyset predicate: nothing is compared against a prior page's key.
+    expect(warehouseCalls[0].text).not.toContain('>');
+    // Ordered anyway, so the bound limit truncates deterministically rather than
+    // arbitrarily if the table ever stopped being one row per user.
+    expect(warehouseCalls[0].text).toContain('ORDER BY email');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', 100]);
+    expect(page?.nextCursor).toBeNull();
+  });
+
+  // No organization column exists on this table, so an empty page would answer a question
+  // the source cannot be asked. Same treatment as `enrichment_data`.
+  it('refuses an organization read of audiences rather than returning nothing', async () => {
+    const { adapters } = harness([{ email: 'marketing@example.com' }]);
+
+    await expect(
+      requireAdapter(adapters, 'audiences').readPage?.(ORG_READ_PAGE_INPUT)
+    ).rejects.toThrow('no organization scope');
+  });
+
+  // A dbt model with no CDC column, so this source can say nothing about deletion.
+  it('never marks an audience record as deleted', async () => {
+    const { adapters } = harness([{ email: 'marketing@example.com', _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('reads a missing audience email as absent rather than failing the export', async () => {
+    const { adapters } = harness([{ email: null }]);
+
+    const page = await requireAdapter(adapters, 'audiences').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toEqual([{ source: 'audiences', field: 'email', value: null }]);
   });
 });

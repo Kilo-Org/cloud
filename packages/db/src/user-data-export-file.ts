@@ -56,7 +56,11 @@
  *      row prod has deleted from a live one. Both still RETURN those rows; they have
  *      stopped labelling them, not stopped exporting them. A reader comparing a version 6
  *      file against an earlier one will find the mark absent where it used to appear.
- *   7  the `user_auth_provider` source (which identity providers the person signed in
+ *   7  the `audiences` source (the marketing view's copy of the person's email address).
+ *      Personal exports only; the source has no organization reading. It is also the one
+ *      source NOT bounded to `snapshotAt` — the dbt model carries no row timestamp, so it
+ *      holds current state as of its last run rather than state at the cutoff
+ *   8  the `user_auth_provider` source (which identity providers the person signed in
  *      with, and the account id, email, display name, avatar and hosted domain each one
  *      supplied, plus when it was linked). One record set per linked account, so a person
  *      with Google and GitHub linked has two. Personal exports only; the table carries no
@@ -66,4 +70,4 @@
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 7;
+export const EXPORT_FILE_SCHEMA_VERSION = 8;

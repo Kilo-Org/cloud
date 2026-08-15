@@ -58,10 +58,16 @@ export const SOURCES_WITHOUT_DELETED_COLUMN = [
  * offer. Declared here rather than left to the probe, which would report the table as
  * unavailable on every organization export and make an inapplicable source look like a
  * missing one.
+ *
+ * `user_auth_provider` is here on exactly the same basis. It records which identity
+ * providers one person signed in with; the source table has no organization column, so
+ * the probe would call it unavailable on every organization export and misreport an
+ * inapplicable source as a missing one.
  */
 export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
   'kilocode_users',
   'enrichment_data',
+  'user_auth_provider',
 ]);
 
 /**
@@ -604,6 +610,68 @@ const enrichmentQuery = singleKeyPageQuery({
 });
 
 /**
+ * Every exported field of a linked authentication account, in the order the file emits
+ * them. One declaration rather than three, on the same principle as
+ * `SECURITY_FINDING_FIELDS`: the SELECT list, the probe's column declaration and the
+ * emitted records are all derived from this, so a column cannot be selected without also
+ * being probed for and emitted.
+ *
+ * `kilo_user_id` is deliberately absent. It is the scope column, so the subject already
+ * implies it, and every other source omits its owner column for the same reason.
+ *
+ * `provider` and `provider_account_id` lead because they are the key. Both were missing
+ * from the projection this source was first specified with, and `provider` is the one
+ * that matters most: without it a person with Google and GitHub linked receives two sets
+ * of records that are indistinguishable, which is the whole substance of the table.
+ * `provider_account_id` is that person's own identifier at Google or GitHub, which is
+ * data held about them, so it is returned on the same basis as everything else here.
+ */
+const USER_AUTH_PROVIDER_FIELDS = [
+  'provider',
+  'provider_account_id',
+  'email',
+  'display_name',
+  'avatar_url',
+  'hosted_domain',
+  'created_at',
+] as const;
+
+/**
+ * Which identity providers a person signed in with, and the profile each one supplied.
+ *
+ * One row per linked authentication account, NOT one per user: someone with Google and
+ * GitHub linked has two. Counted in the loaded warehouse 2026-08-12 at 1,068,683 rows
+ * over roughly 1.06M users, about 1.02 each.
+ *
+ * User only, and it is in `USER_ONLY_SOURCES` rather than left to the probe: the table
+ * carries no organization column at all, so there is no organization reading to offer.
+ * Attribution is `kilo_user_id`, proven rather than inferred — it is `notNull` in
+ * `schema.ts` and the account-deletion transaction erases these rows by it. A row the
+ * product destroys with the user is the user's.
+ *
+ * The cursor is `(provider, provider_account_id)`, prod's primary key and the only unique
+ * key this table has. `kilo_user_id` repeats once per linked account, so a cursor on it
+ * would skip rows at page boundaries — the defect that shipped twice already, on
+ * `cli_sessions.session_id` and again on `system_prompt_prefix`. The warehouse carries
+ * `user_auth_provider_user_page (kilo_user_id, provider, provider_account_id)`, so this
+ * ordering is served from that index with no sort step.
+ *
+ * No `COALESCE` sentinel on either cursor column, unlike `system_prompt_prefix`. These
+ * two are the only NOT NULL columns on the table, so neither can produce the NULL that
+ * makes a tuple comparison yield NULL and silently drop the rows it was meant to keep.
+ *
+ * Bare names in the ORDER BY are correct here: neither cursor column is selected through
+ * a cast, so the output and input references are the same column. See `SCOPE_COLUMNS` for
+ * the tables where that is not true and the qualifier is load-bearing.
+ */
+const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_FIELDS.join(', ')}, ${DELETED_COLUMN}
+FROM user_auth_provider
+WHERE ${SCOPE_COLUMNS.user} = $1
+  AND ($2::text IS NULL OR (provider, provider_account_id) > ($2::text, $3::text))
+ORDER BY provider, provider_account_id
+LIMIT $4`;
+
+/**
  * The second journal in the export, and the one place where the cursor is deliberately
  * NOT the column that would work today.
  *
@@ -842,6 +910,15 @@ type EnrichmentRow = {
   id: string;
   github_enrichment_data: string | null;
   clay_enrichment_data: string | null;
+};
+/**
+ * Keyed by the exported field list, so a field added to `USER_AUTH_PROVIDER_FIELDS`
+ * without a reader below is a type error rather than an `undefined` in the file.
+ */
+type UserAuthProviderRow = Record<(typeof USER_AUTH_PROVIDER_FIELDS)[number], string | null> & {
+  provider: string;
+  provider_account_id: string;
+  deleted: unknown;
 };
 type DeploymentEventRow = {
   build_id: string;
@@ -1712,6 +1789,64 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         };
       },
     },
+    {
+      name: 'user_auth_provider',
+      warehouseTable: 'user_auth_provider',
+      async readPage(input): Promise<SourcePage> {
+        // Unreachable: `USER_ONLY_SOURCES` drops this source before an organization
+        // export reaches a read. A throw rather than an empty page, for the same reason
+        // `enrichment_data` throws — an empty page would tell an organization that no
+        // accounts are linked, when the truth is that the question never applied to it.
+        if (input.subject.type !== 'user') {
+          throw new Error('user_auth_provider has no organization scope');
+        }
+        const [afterProvider, afterAccountId] = keyCursorValues(input.cursor, 2);
+        const rows: UserAuthProviderRow[] = await warehouseQuery(userAuthProviderQuery, [
+          subjectScopeValue(input.subject),
+          afterProvider,
+          afterAccountId,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            // The cursor pair, read strictly. Both are NOT NULL at the source, and a page
+            // that could not say where it ended would restart the source rather than
+            // continue it. Same handling as the position pairs on the two journals.
+            provider: requiredString(row.provider, 'provider'),
+            provider_account_id: requiredString(row.provider_account_id, 'provider_account_id'),
+            // Everything else takes the lenient warehouse reader: these columns are
+            // nullable and unconstrained here, and one odd cell is not worth failing an
+            // export against a frozen snapshot. See `warehouseText`.
+            email: warehouseText(row.email),
+            display_name: warehouseText(row.display_name),
+            avatar_url: warehouseText(row.avatar_url),
+            hosted_domain: warehouseText(row.hosted_domain),
+            created_at: nullableTimestamp(row.created_at, 'created_at'),
+            deleted: row._snowflake_deleted,
+          }))
+        );
+        return {
+          records: rows.flatMap(row => {
+            // The key pair identifies the linked account, so the records of one account
+            // stay groupable and two linked accounts never look like duplication.
+            // `AuthProviderId` is a closed set of identifiers none of which contains a
+            // dot, so the first one always separates the halves and this cannot be
+            // ambiguous the way a free-text pair would be.
+            const id = `${row.provider}.${row.provider_account_id}`;
+            return USER_AUTH_PROVIDER_FIELDS.map(field => ({
+              source: 'user_auth_provider',
+              id,
+              field,
+              value: row[field],
+              ...deletionMark(row.deleted),
+            }));
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.provider,
+            row.provider_account_id,
+          ]),
+        };
+      },
+    },
   ];
 }
 
@@ -1762,6 +1897,8 @@ export const warehouseQueries = {
   sourceEmbeddingOrgQuery: sourceEmbeddingQueries.organization,
   platformIntegrationUserQuery: platformIntegrationQueries.user,
   platformIntegrationOrgQuery: platformIntegrationQueries.organization,
+  // No org counterpart, deliberately. See `userAuthProviderQuery` and `USER_ONLY_SOURCES`.
+  userAuthProviderUserQuery: userAuthProviderQuery,
 };
 
 export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
@@ -1862,6 +1999,10 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'repositories',
     DELETED_COLUMN,
   ],
+  // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
+  // column the query started reading. The scope column `kilo_user_id` is added per
+  // subject below; the cursor pair needs no addition, being two of the fields already.
+  user_auth_provider: [...USER_AUTH_PROVIDER_FIELDS, DELETED_COLUMN],
 };
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -1994,6 +2135,7 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   sourceEmbeddingOrgQuery: 'organization_id = $1',
   platformIntegrationUserQuery: 'kilo_user_id = $1',
   platformIntegrationOrgQuery: 'organization_id = $1',
+  userAuthProviderUserQuery: 'kilo_user_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

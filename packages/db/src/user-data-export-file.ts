@@ -42,9 +42,14 @@
  *      Its own version rather than an addition to 4, because 4 has shipped. Extending a
  *      released entry would leave two different file shapes both claiming it, which is
  *      the one thing this constant exists to prevent.
+ *   6  the `user_auth_provider` source (which identity providers the person signed in
+ *      with, and the account id, email, display name, avatar and hosted domain each one
+ *      supplied, plus when it was linked). One record set per linked account, so a person
+ *      with Google and GitHub linked has two. Personal exports only; the table carries no
+ *      organization column, so there is no organization reading of it
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 5;
+export const EXPORT_FILE_SCHEMA_VERSION = 6;

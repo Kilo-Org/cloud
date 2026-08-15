@@ -165,12 +165,13 @@ describe('warehouse scoping guard', () => {
   // Both subjects are covered for every warehouse source. A source reachable by only one
   // of them would silently return nothing to the other rather than failing.
   //
-  // One declared exception, and it has to be declared rather than inferred: an unpaired
-  // query is normally the bug this test exists to catch. `enrichment_data` has no
-  // organization column in the warehouse at all, so there is no org query to pair it with,
-  // and `USER_ONLY_SOURCES` keeps organization exports from asking. Naming it here means a
-  // source that loses its org variant by accident still fails.
-  const USER_ONLY_QUERY_NAMES = ['enrichmentUserQuery'];
+  // Two declared exceptions, and they have to be declared rather than inferred: an
+  // unpaired query is normally the bug this test exists to catch. `enrichment_data` and
+  // `user_auth_provider` have no organization column in the warehouse at all, so there is
+  // no org query to pair either with, and `USER_ONLY_SOURCES` keeps organization exports
+  // from asking. Naming them here means a source that loses its org variant by accident
+  // still fails.
+  const USER_ONLY_QUERY_NAMES = ['enrichmentUserQuery', 'userAuthProviderUserQuery'];
   it('pairs every warehouse source with both subject variants', () => {
     const names = Object.keys(warehouseQueries).filter(
       name => !USER_ONLY_QUERY_NAMES.includes(name)
@@ -353,6 +354,7 @@ describe('warehouse availability probe', () => {
       'platform_integrations',
       'microdollar_usage_journal',
       'enrichment_data',
+      'user_auth_provider',
     ]);
   });
 
@@ -412,6 +414,7 @@ describe('source adapters', () => {
       'platform_integrations',
       'microdollar_usage_journal',
       'enrichment_data',
+      'user_auth_provider',
     ]);
   });
 
@@ -1640,5 +1643,155 @@ describe('source adapters', () => {
     expect(byField.get('platform_account_login')).toBeNull();
     expect(byField.get('repositories')).toBeNull();
     expect(byField.get('platform')).toBe('github');
+  });
+
+  const AUTH_PROVIDER_ROW = {
+    provider: 'google',
+    provider_account_id: '110581',
+    email: 'person@example.com',
+    display_name: 'Example Person',
+    avatar_url: 'https://example.test/a.png',
+    hosted_domain: 'example.com',
+    created_at: '2026-03-04T09:15:00.000Z',
+  };
+
+  it('emits every field of a linked account, keyed by the provider pair', async () => {
+    const { adapters } = harness([AUTH_PROVIDER_ROW]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.records).toEqual([
+      { source: 'user_auth_provider', id: 'google.110581', field: 'provider', value: 'google' },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'provider_account_id',
+        value: '110581',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'email',
+        value: 'person@example.com',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'display_name',
+        value: 'Example Person',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'avatar_url',
+        value: 'https://example.test/a.png',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'hosted_domain',
+        value: 'example.com',
+      },
+      {
+        source: 'user_auth_provider',
+        id: 'google.110581',
+        field: 'created_at',
+        value: '2026-03-04T09:15:00.000Z',
+      },
+    ]);
+    expect(page?.nextCursor).toEqual({ key: ['google', '110581'] });
+  });
+
+  // The point of the source. Someone with Google and GitHub linked has two rows, and
+  // without `provider` on the record and in the key the two sets are indistinguishable —
+  // which is what the projection this source was first specified with would have shipped.
+  it('tells two linked accounts of one person apart', async () => {
+    const { adapters } = harness([
+      AUTH_PROVIDER_ROW,
+      { ...AUTH_PROVIDER_ROW, provider: 'github', provider_account_id: '4821' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+    const ids = new Set(page?.records.map(record => record.id));
+
+    expect([...ids]).toEqual(['google.110581', 'github.4821']);
+    expect(
+      page?.records.filter(record => record.field === 'provider').map(record => record.value)
+    ).toEqual(['google', 'github']);
+  });
+
+  // `kilo_user_id` repeats once per linked account, so it cannot page. The cursor is the
+  // primary key pair, and it has to travel as both bind parameters or the second page
+  // restarts at the first.
+  it('pages on the provider pair rather than the owner', async () => {
+    const { adapters, warehouseCalls } = harness([AUTH_PROVIDER_ROW]);
+
+    await requireAdapter(adapters, 'user_auth_provider').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['google', '110581'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain(
+      '(provider, provider_account_id) > ($2::text, $3::text)'
+    );
+    expect(warehouseCalls[0].text).toContain('ORDER BY provider, provider_account_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', 'google', '110581', 100]);
+  });
+
+  // Same statement as `enrichment_data`: the table has no organization column, so an
+  // empty page would claim no accounts are linked when the question never applied.
+  it('refuses an organization read of linked accounts rather than returning nothing', async () => {
+    const { adapters } = harness([AUTH_PROVIDER_ROW]);
+
+    await expect(
+      requireAdapter(adapters, 'user_auth_provider').readPage?.(ORG_READ_PAGE_INPUT)
+    ).rejects.toThrow('no organization scope');
+  });
+
+  it('scopes the linked-account read to the person who signed in', async () => {
+    const { adapters, warehouseCalls } = harness([AUTH_PROVIDER_ROW]);
+
+    await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, 100]);
+  });
+
+  // 639 of 1,068,683 rows are deleted in the source, so this source does carry the flag.
+  it('marks every field of a linked account prod has since deleted', async () => {
+    const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+
+    expect(page?.records).toHaveLength(7);
+    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+  });
+
+  it('reads a missing linked-account value as absent rather than failing the export', async () => {
+    const { adapters } = harness([
+      { ...AUTH_PROVIDER_ROW, hosted_domain: null, display_name: null, created_at: null },
+    ]);
+
+    const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('hosted_domain')).toBeNull();
+    expect(byField.get('display_name')).toBeNull();
+    expect(byField.get('created_at')).toBeNull();
+    expect(byField.get('email')).toBe('person@example.com');
+  });
+
+  // The cursor half of the row, unlike every other column, is read strictly: a page that
+  // could not say where it ended would restart the source and repeat rows forever.
+  it('fails a linked-account page that cannot say where it ended', async () => {
+    const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, provider_account_id: null }]);
+
+    await expect(
+      requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT)
+    ).rejects.toThrow('provider_account_id');
   });
 });

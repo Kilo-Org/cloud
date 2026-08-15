@@ -16,6 +16,9 @@ export type AssociatedPr = {
   // hook polls while any row is pending so the badge updates without a manual
   // refresh.
   reviewDecisionPending: boolean;
+  // Host platform of the linked PR (e.g. 'github'). Always present when an
+  // associatedPr is returned.
+  platform: string;
 };
 
 export type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft';

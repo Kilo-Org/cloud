@@ -81,6 +81,7 @@ describe('useSidebarSessions live update helpers', () => {
       lastSyncedAt: '2026-01-01T00:00:00.000Z',
       reviewDecision: 'approved' as const,
       reviewDecisionPending: false,
+      platform: 'github',
     };
     const cached = {
       ...makeDbSession('ses_cached', '2026-01-01T00:00:00.000Z'),
@@ -143,6 +144,7 @@ describe('useSidebarSessions live update helpers', () => {
         lastSyncedAt: '2026-01-01T00:00:00.000Z',
         reviewDecision: 'approved' as const,
         reviewDecisionPending: false,
+        platform: 'github',
       },
     };
 

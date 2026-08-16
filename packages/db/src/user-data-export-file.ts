@@ -96,6 +96,12 @@
  *      A trailer also arrives at 9. Every file ends with one, naming any source that
  *      failed while being read, so a file that ends without one was truncated.
  *
+ *      And the identity section is now the warehouse's `users` row alone — the account,
+ *      billing, link, routing-identifier and `signup_ip` columns the primary alone held
+ *      were dropped on request. `email` and `name` are returned under those names rather
+ *      than the account's own column names. The export no longer reads the primary at all,
+ *      so every field in the file is as of the same snapshot.
+ *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.

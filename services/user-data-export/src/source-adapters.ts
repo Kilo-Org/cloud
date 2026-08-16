@@ -100,52 +100,29 @@ export type SourceAdapter = {
  * so they still come from the live primary. This is a single indexed lookup by primary
  * key, once per export, not the bulk traffic the warehouse exists to absorb.
  */
-const userQuery = `SELECT id, google_user_email, google_user_name, google_user_image_url,
-  created_at, updated_at, hosted_domain, microdollars_used, total_microdollars_acquired,
-  next_credit_expiration_at, auto_top_up_enabled, default_model, completed_welcome_form,
-  linkedin_url, github_url, discord_server_membership_verified_at,
-  openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier,
-  vercel_downstream_safety_identifier, customer_source, signup_ip, normalized_email, email_domain
-FROM kilocode_users
-WHERE id = $1
-LIMIT 1`;
-
 /**
- * Export field name to the warehouse column that supplies it, for the profile fields the
- * warehouse carries. Both the SELECT list and the merge below are derived from this, so a
- * field cannot be read from the warehouse without also being applied: adding a column to
- * one and forgetting the other would silently keep serving the live value, which is the
- * inconsistency this whole path exists to remove.
+ * The identity section, and every column of it.
  *
- * Only email and name are overridden this way, because they are the only two the primary
- * also holds. The warehouse's other columns have no live counterpart and are exported
- * directly, through `WAREHOUSE_ONLY_FIELDS` below.
- */
-export const WAREHOUSE_PROFILE_FIELDS = {
-  google_user_email: 'email',
-  google_user_name: 'name',
-} as const;
-
-/**
- * Warehouse columns the export returns as they are, having no equivalent on the primary.
+ * All from the warehouse, so identity is as of the same moment as every other source
+ * rather than showing a name the person changed after the snapshot beside data that
+ * predates the change. The primary is no longer read at all: the columns it alone held —
+ * account, billing, links, routing identifiers, `signup_ip` — were dropped from the
+ * returned set on request, and nothing left needs it.
  *
- * Mostly location: the country, city, region and timezone attributed to the person, in
- * two generations. The `posthog_*` set is what was recorded historically; the
- * `current_posthog_*` set is the value as of the snapshot. Both are kept, because the
- * difference between where someone was and where they are is itself information held
- * about them, and collapsing it would be the export deciding what they get to see.
+ * `user_id` is the warehouse's name for the same value the child tables carry as
+ * `kilo_user_id`.
  *
  * `posthog_email`, `posthog_name` and `posthog_hosted_domain` are the analytics copies of
- * their identity, distinct from the account's own. They can disagree with
- * `google_user_email` and `google_user_name`, which is exactly why they are worth
- * returning rather than deduplicating away.
- *
- * These arrived after the identity section first shipped, which is the only reason they
- * were absent. The export already returned `signup_ip` from the primary, so it was
- * handing someone the address they signed up from while withholding the country derived
- * from it.
+ * the person's identity, distinct from the account's own and able to disagree with it,
+ * which is why they are returned rather than deduplicated away. The location columns come
+ * in two generations: the `posthog_*` set as recorded historically, the `current_posthog_*`
+ * set as of the snapshot. Both are kept, because the difference between where someone was
+ * and where they are is itself information held about them.
  */
-export const WAREHOUSE_ONLY_FIELDS = [
+export const IDENTITY_FIELDS = [
+  'user_id',
+  'email',
+  'name',
   'posthog_email',
   'posthog_name',
   'posthog_hosted_domain',
@@ -165,16 +142,10 @@ export const WAREHOUSE_ONLY_FIELDS = [
 ] as const;
 
 /**
- * The warehouse's copy of those fields. Keyed on `user_id`, which is the warehouse's name
- * for `kilocode_users.id` and the same value the five child tables carry as `kilo_user_id`.
- *
  * The interpolated column list comes from the module constant above, never from caller
  * input, on the same basis as `singleKeyPageQuery` below. The user id is a bind parameter.
  */
-const warehouseProfileQuery = `SELECT user_id, ${[
-  ...Object.values(WAREHOUSE_PROFILE_FIELDS),
-  ...WAREHOUSE_ONLY_FIELDS,
-].join(', ')}
+const warehouseProfileQuery = `SELECT ${IDENTITY_FIELDS.join(', ')}
 FROM users
 WHERE user_id = $1
 LIMIT 1`;
@@ -1369,24 +1340,6 @@ function nullableTimestamp(value: unknown, field: string): string | null {
   return isoTimestamp(value, field);
 }
 
-function requiredBoolean(value: unknown, field: string): boolean {
-  if (typeof value !== 'boolean') throw new Error(`Replica row has invalid ${field}`);
-  return value;
-}
-
-function safeNumber(value: unknown, field: string): number {
-  let number: unknown = value;
-  if (typeof value === 'bigint') {
-    number = Number(value);
-  } else if (typeof value === 'string' && /^-?\d+$/.test(value)) {
-    number = Number(BigInt(value));
-  }
-  if (typeof number !== 'number' || !Number.isSafeInteger(number)) {
-    throw new Error(`Replica row has unsafe ${field}`);
-  }
-  return number;
-}
-
 /**
  * The cursor for the next page, or null when this page ends the source.
  *
@@ -1423,73 +1376,6 @@ function jsonValue(value: unknown): string | null {
   return JSON.stringify(value);
 }
 
-/**
- * Picks the warehouse's copy of a profile field, falling back to the primary's.
- *
- * The warehouse's `users.email` and `users.name` are nullable text with no constraint —
- * the export warehouse declares no keys and its own load checks count nulls rather than
- * forbidding them — while the primary's `google_user_email` and `google_user_name` are
- * NOT NULL. A null or blank warehouse value is therefore a load artifact, not a fact
- * about the user, and the primary value is the true one.
- *
- * Deliberately not passed straight to `requiredString`: that mapper was written for a
- * NOT NULL primary column and throws a plain `Error`, which `handleGenerationFailure`
- * treats as retryable. A null would then spend the queue's four retries on a value
- * frozen in the snapshot that no retry can change — the same waste the missing-row case
- * raises `TerminalExportError` to avoid.
- *
- * Blank counts as absent alongside null: empty string and NULL are not reliably
- * distinguished across this load path, and neither is a usable email or name.
- */
-function warehouseProfileValue(warehouseValue: unknown, primaryValue: unknown): unknown {
-  if (typeof warehouseValue !== 'string' || warehouseValue.trim() === '') return primaryValue;
-  return warehouseValue;
-}
-
-const USER_FIELD_MAPPERS = [
-  ['id', (value: unknown) => requiredString(value, 'id')],
-  ['google_user_email', (value: unknown) => requiredString(value, 'google_user_email')],
-  ['google_user_name', (value: unknown) => requiredString(value, 'google_user_name')],
-  ['google_user_image_url', (value: unknown) => requiredString(value, 'google_user_image_url')],
-  ['created_at', (value: unknown) => isoTimestamp(value, 'created_at')],
-  ['updated_at', (value: unknown) => isoTimestamp(value, 'updated_at')],
-  ['hosted_domain', (value: unknown) => nullableString(value, 'hosted_domain')],
-  ['microdollars_used', (value: unknown) => safeNumber(value, 'microdollars_used')],
-  [
-    'total_microdollars_acquired',
-    (value: unknown) => safeNumber(value, 'total_microdollars_acquired'),
-  ],
-  [
-    'next_credit_expiration_at',
-    (value: unknown) => nullableTimestamp(value, 'next_credit_expiration_at'),
-  ],
-  ['auto_top_up_enabled', (value: unknown) => requiredBoolean(value, 'auto_top_up_enabled')],
-  ['default_model', (value: unknown) => nullableString(value, 'default_model')],
-  ['completed_welcome_form', (value: unknown) => requiredBoolean(value, 'completed_welcome_form')],
-  ['linkedin_url', (value: unknown) => nullableString(value, 'linkedin_url')],
-  ['github_url', (value: unknown) => nullableString(value, 'github_url')],
-  [
-    'discord_server_membership_verified_at',
-    (value: unknown) => nullableTimestamp(value, 'discord_server_membership_verified_at'),
-  ],
-  [
-    'openrouter_upstream_safety_identifier',
-    (value: unknown) => nullableString(value, 'openrouter_upstream_safety_identifier'),
-  ],
-  [
-    'openrouter_downstream_safety_identifier',
-    (value: unknown) => nullableString(value, 'openrouter_downstream_safety_identifier'),
-  ],
-  [
-    'vercel_downstream_safety_identifier',
-    (value: unknown) => nullableString(value, 'vercel_downstream_safety_identifier'),
-  ],
-  ['customer_source', (value: unknown) => nullableString(value, 'customer_source')],
-  ['signup_ip', (value: unknown) => nullableString(value, 'signup_ip')],
-  ['normalized_email', (value: unknown) => nullableString(value, 'normalized_email')],
-  ['email_domain', (value: unknown) => nullableString(value, 'email_domain')],
-] as const;
-
 export type SourceAdapterQueries = {
   /** Live primary replica. The profile columns the warehouse does not carry. */
   replicaQuery: ReplicaQuery;
@@ -1498,7 +1384,7 @@ export type SourceAdapterQueries = {
 };
 
 export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapter[] {
-  const { replicaQuery, warehouseQuery } = queries;
+  const { warehouseQuery } = queries;
 
   return [
     {
@@ -1512,24 +1398,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         // column. An organization export therefore has no identity section; the
         // organization it belongs to is named in the file header instead.
         if (input.subject.type !== 'user') return { records: [], nextCursor: null };
-        const { kiloUserId } = input.subject;
-        const [rows, profileRows] = await Promise.all([
-          replicaQuery(userQuery, [kiloUserId]),
-          warehouseQuery(warehouseProfileQuery, [kiloUserId]),
-        ]);
-        const row = rows[0];
-        if (!row) throw new Error('Export user was not found');
+        const profileRows = await warehouseQuery(warehouseProfileQuery, [input.subject.kiloUserId]);
 
-        // Terminal, not retryable. The primary row above always exists for an
-        // authenticated requester, but the warehouse copy can be genuinely absent — an
+        // Terminal, not retryable. The warehouse copy can be genuinely absent — an
         // account created after the load cutoff, or a gap in the load. No retry makes it
         // appear, so this fails on the first attempt with the real reason instead of
         // spending the queue's retries to arrive at the same place with a generic error.
-        //
-        // Not silently falling back to the primary values: that would put a
-        // current-second name and email beside five sources frozen at the cutoff, which
-        // is the inconsistency reading them from the warehouse exists to remove. A user
-        // absent from the snapshot has nothing to export from it.
         const profile = profileRows[0];
         if (!profile) {
           throw new TerminalExportError(
@@ -1539,31 +1413,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           );
         }
 
-        // The warehouse copy wins for the two fields it carries, so the identity section
-        // is as of the same moment as the rest of the export. Field names are unchanged,
-        // so this is not a schema version change for consumers.
-        const merged: Record<string, unknown> = { ...row };
-        for (const [exportField, warehouseColumn] of Object.entries(WAREHOUSE_PROFILE_FIELDS)) {
-          merged[exportField] = warehouseProfileValue(profile[warehouseColumn], row[exportField]);
-        }
         return {
-          records: [
-            ...USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
-              source: 'kilocode_users',
-              field,
-              value: mapValue(merged[field]),
-            })),
-            // Emitted under the same section: these describe the same person, and the
-            // split between "the primary holds it" and "only the warehouse holds it" is
-            // an implementation detail nobody reading their own export should have to
-            // reason about. Nullable throughout, so a blank stays a blank rather than
-            // failing the export.
-            ...WAREHOUSE_ONLY_FIELDS.map(field => ({
-              source: 'kilocode_users',
-              field,
-              value: warehouseText(profile[field]),
-            })),
-          ],
+          records: IDENTITY_FIELDS.map(field => ({
+            source: 'kilocode_users',
+            field,
+            value: warehouseText(profile[field]),
+          })),
           nextCursor: null,
         };
       },
@@ -2487,7 +2342,7 @@ export const warehouseQueries = {
   userAuthProviderUserQuery: userAuthProviderQuery,
 };
 
-export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
+export const sourceQueries = { ...warehouseQueries, warehouseProfileQuery };
 
 /**
  * Which of the tables an export wants are actually readable by it.
@@ -2529,7 +2384,7 @@ export type WarehouseTableRequirement = { table: string; requiredColumns: readon
  * column, so it takes no addition.
  */
 export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
-  users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS), ...WAREHOUSE_ONLY_FIELDS],
+  users: [...IDENTITY_FIELDS],
   app_builder_projects: ['id', 'title'],
   app_builder_messages: ['id', 'data'],
   cli_sessions: [
@@ -2761,6 +2616,5 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   usageDailyUserQuery: 'kilo_user_id = $1',
   usageDailyOrgQuery: 'organization_id = $1',
   userAuthProviderUserQuery: 'kilo_user_id = $1',
-  userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

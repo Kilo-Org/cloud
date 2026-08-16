@@ -6,8 +6,7 @@ import {
   findPresentWarehouseTables,
   warehouseRequirements,
   SCOPE_PREDICATES,
-  WAREHOUSE_PROFILE_FIELDS,
-  WAREHOUSE_ONLY_FIELDS,
+  IDENTITY_FIELDS,
   WAREHOUSE_SOURCE_COLUMNS,
   warehouseQueries,
   type ReplicaQuery,
@@ -78,10 +77,12 @@ const PRIMARY_USER_ROW = {
  */
 function warehouseUserRow(overrides: Record<string, unknown> = {}) {
   return {
+    // Null-filled first so the named values below win: the declared list now includes
+    // `email` and `name`, which it did not when it was warehouse-only columns.
+    ...Object.fromEntries(IDENTITY_FIELDS.map(field => [field, null])),
     user_id: 'user-1',
     email: 'warehouse@example.com',
     name: 'Warehouse Name',
-    ...Object.fromEntries(WAREHOUSE_ONLY_FIELDS.map(field => [field, null])),
     ...overrides,
   };
 }
@@ -380,9 +381,12 @@ describe('warehouse availability probe', () => {
     expect(sourceQueries.warehouseProfileQuery).not.toContain('load_manifest');
   });
 
-  it('reads the primary profile columns from the primary', () => {
-    expect(sourceQueries.userQuery).toContain('FROM kilocode_users');
-    expect(sourceQueries.userQuery).toContain('WHERE id = $1');
+  // The export no longer reads the primary at all: identity comes entirely from the
+  // warehouse, so every column is as of the same moment as the rest of the file.
+  it('reads no table on the primary', () => {
+    for (const query of Object.values(sourceQueries)) {
+      expect(query).not.toContain('kilocode_users');
+    }
   });
 
   // The warehouse names this column `user_id`; the primary names the same value `id`.
@@ -390,18 +394,15 @@ describe('warehouse availability probe', () => {
   it('reads the warehouse profile fields by the warehouse column names', () => {
     expect(sourceQueries.warehouseProfileQuery).toMatch(/FROM users\b/);
     expect(sourceQueries.warehouseProfileQuery).toContain('WHERE user_id = $1');
-    // Exact, not toContain: a column appended to the SELECT list without a matching entry
-    // in WAREHOUSE_PROFILE_FIELDS would be read from the warehouse and then quietly
-    // discarded in favour of the live value, which is the bug this path exists to remove.
+    // Exact, not toContain: the declared list is the whole identity section, so a column
+    // appended to one without the other would be read and never emitted, or emitted and
+    // never read.
     const selected = sourceQueries.warehouseProfileQuery
       .slice('SELECT '.length, sourceQueries.warehouseProfileQuery.indexOf('\nFROM'))
       .split(', ');
-    expect(selected).toEqual([
-      'user_id',
-      ...Object.values(WAREHOUSE_PROFILE_FIELDS),
-      ...WAREHOUSE_ONLY_FIELDS,
-    ]);
-    // Columns the warehouse does not have. Selecting any of them fails at runtime.
+    expect(selected).toEqual([...IDENTITY_FIELDS]);
+    // Columns the warehouse does not have, and columns dropped from the returned set on
+    // request. Selecting any of them fails at runtime or reintroduces a removed field.
     for (const absent of ['google_user_email', 'google_user_name', 'created_at', 'signup_ip']) {
       expect(sourceQueries.warehouseProfileQuery).not.toContain(absent);
     }
@@ -443,7 +444,9 @@ describe('source adapters', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('reads each identity field from the database that has it', async () => {
+  // Identity comes entirely from the warehouse now, so it is as of the same moment as
+  // every other source and the primary is not read at all.
+  it('reads identity from the warehouse and never from the primary', async () => {
     const { adapters, replicaCalls, warehouseCalls } = harness(
       [PRIMARY_USER_ROW],
       [warehouseUserRow()]
@@ -451,19 +454,14 @@ describe('source adapters', () => {
 
     await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
 
-    expect(replicaCalls).toEqual([
-      { text: expect.stringContaining('FROM kilocode_users'), values: ['owner-user'] },
-    ]);
+    expect(replicaCalls).toEqual([]);
     expect(warehouseCalls).toEqual([
       { text: expect.stringContaining('WHERE user_id = $1'), values: ['owner-user'] },
     ]);
   });
 
-  // The warehouse holds location and analytics-identity columns with no counterpart on
-  // the primary. They were absent only because they arrived after the identity section
-  // shipped, which left the export returning someone's signup IP while withholding the
-  // country derived from it.
-  it('returns the warehouse columns the primary does not hold', async () => {
+  // Every declared column reaches the file, including the two location generations.
+  it('returns every declared identity column', async () => {
     const { adapters } = harness(
       [PRIMARY_USER_ROW],
       [
@@ -480,7 +478,7 @@ describe('source adapters', () => {
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
     // Every declared column reaches the file, not just the ones this fixture populates.
-    for (const field of WAREHOUSE_ONLY_FIELDS) expect(byField.has(field)).toBe(true);
+    for (const field of IDENTITY_FIELDS) expect(byField.has(field)).toBe(true);
     expect(byField.get('posthog_city')).toBe('Amsterdam');
     expect(byField.get('current_posthog_city')).toBe('Rotterdam');
     // Both generations are kept: where someone was and where they are are different facts.
@@ -488,7 +486,7 @@ describe('source adapters', () => {
     // The analytics copy of identity is distinct from the account's own and is not
     // collapsed into it.
     expect(byField.get('posthog_email')).toBe('analytics@example.com');
-    expect(byField.get('google_user_email')).toBe('warehouse@example.com');
+    expect(byField.get('email')).toBe('warehouse@example.com');
     // A blank stays a blank rather than failing the export.
     expect(byField.get('vercel_country')).toBeNull();
   });
@@ -515,37 +513,28 @@ describe('source adapters', () => {
     }
   );
 
-  // The point of the change: the two fields the warehouse carries are reported as of the
-  // snapshot, so a name or email changed after the cutoff does not appear beside five
-  // sources frozen before it.
-  it('prefers the warehouse copy of email and name over the live values', async () => {
+  // The identity section is exactly the declared list. The primary-only columns —
+  // account, billing, links, routing identifiers, signup_ip — were dropped on request.
+  it('returns the declared identity fields and nothing else', async () => {
     const { adapters } = harness([PRIMARY_USER_ROW], [warehouseUserRow()]);
 
     const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
+    const fields = page?.records.map(record => record.field) ?? [];
     const value = (field: string) => page?.records.find(record => record.field === field)?.value;
 
-    expect(value('google_user_email')).toBe('warehouse@example.com');
-    expect(value('google_user_name')).toBe('Warehouse Name');
-    // Everything the warehouse does not carry still comes from the primary row.
-    expect(value('microdollars_used')).toBe(1);
-    expect(value('created_at')).toBe('2026-02-16T19:11:40.809Z');
-  });
-
-  // The warehouse columns are nullable text with no constraint, while the primary's are
-  // NOT NULL. Feeding a null into requiredString would throw a plain Error, which is
-  // retryable, so the export would burn its retries on a value the snapshot has frozen.
-  it.each([
-    ['null', null],
-    ['blank', '   '],
-    ['a non-string', 42],
-  ])('falls back to the live value when the warehouse email is %s', async (_label, bad) => {
-    const { adapters } = harness([PRIMARY_USER_ROW], [warehouseUserRow({ email: bad, name: bad })]);
-
-    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
-    const value = (field: string) => page?.records.find(record => record.field === field)?.value;
-
-    expect(value('google_user_email')).toBe('live@example.com');
-    expect(value('google_user_name')).toBe('Live Name');
+    expect(fields).toEqual([...IDENTITY_FIELDS]);
+    expect(value('email')).toBe('warehouse@example.com');
+    expect(value('name')).toBe('Warehouse Name');
+    for (const dropped of [
+      'google_user_email',
+      'microdollars_used',
+      'created_at',
+      'signup_ip',
+      'openrouter_upstream_safety_identifier',
+      'customer_source',
+    ]) {
+      expect(fields).not.toContain(dropped);
+    }
   });
 
   // A row absent from the warehouse is permanent for the life of a snapshot, so this

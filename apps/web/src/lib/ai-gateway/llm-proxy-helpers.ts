@@ -32,7 +32,6 @@ import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
-import { isLatestModelAlias } from '@/lib/ai-gateway/latest-model-aliases';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
@@ -303,6 +302,21 @@ export function modelNotAllowedResponse() {
   );
 }
 
+export function efficientPoolBlockedResponse() {
+  const error = 'Your organization blocks every model in the auto-routing pool.';
+  const message =
+    `${error} Configure a custom Efficient model pool with allowed models, ` +
+    `or adjust your organization model restrictions.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_allowed,
+      message,
+    },
+    { status: 404 }
+  );
+}
+
 export function unavailableModelResponse() {
   const error = 'The requested model is currently unavailable. Please choose a different model.';
   return NextResponse.json(
@@ -493,11 +507,7 @@ export function checkOrganizationModelRestrictions(params: {
   // Model/provider access restrictions only apply to Enterprise plans.
   if (params.organizationPlan === 'enterprise') {
     const modelDenyList = params.settings.model_deny_list;
-    // TODO: Consider removing latest aliases instead of retaining this model-policy exception.
-    if (
-      !isLatestModelAlias(normalizedModelId) &&
-      modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)
-    ) {
+    if (modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)) {
       return { error: modelNotAllowedResponse() };
     }
   }

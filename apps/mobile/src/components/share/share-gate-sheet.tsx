@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Plus, X } from '@/components/ui/icons';
+import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -13,12 +13,15 @@ import {
 } from '@/components/agents/session-detail-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
+import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
@@ -40,6 +43,7 @@ import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
+import { selectShareReviewPr } from './share-review-pr';
 
 type ShareGateSheetProps = {
   shareId: string | undefined;
@@ -164,6 +168,17 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     ]
   );
 
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  const reviewPr = useMemo(
+    () =>
+      selectShareReviewPr({
+        text: payload?.text ?? '',
+        prReviewEnabled,
+        showNewSession: state.showNewSession,
+      }),
+    [payload?.text, prReviewEnabled, state.showNewSession]
+  );
+
   const instanceRows = useMemo(
     () =>
       selectShareCliSpawnRows({
@@ -189,6 +204,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     abandon();
     router.back();
   }, [abandon, router]);
+
+  const handleReviewPr = useCallback(() => {
+    if (!reviewPr) {
+      return;
+    }
+    void Haptics.selectionAsync();
+    setPendingShareNavigation({
+      href: getPrReviewPath(reviewPr.owner, reviewPr.repo, reviewPr.number) as string,
+      shareId: null,
+    });
+    dismiss();
+  }, [dismiss, reviewPr]);
 
   useEffect(
     () => () => {
@@ -353,6 +380,16 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <View className="items-center px-6 pb-6 pt-4">
           <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
         </View>
+      ) : null}
+
+      {reviewPr ? (
+        <DestinationOptionRow
+          icon={GitPullRequest}
+          title="Review PR"
+          subtitle={`${reviewPr.owner}/${reviewPr.repo} #${reviewPr.number}`}
+          accessibilityLabel="Review PR"
+          onPress={handleReviewPr}
+        />
       ) : null}
 
       {showNewSession ? (

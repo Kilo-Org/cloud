@@ -16,6 +16,7 @@ import {
   createSourceAdapters,
   findPresentWarehouseTables,
   warehouseRequirements,
+  USER_ONLY_SOURCES,
   type ExportRecord,
   type ExportSubject,
 } from './source-adapters';
@@ -23,10 +24,39 @@ import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
 
+/**
+ * The wall-clock deadlines, and the reason tuning past this point does not help.
+ *
+ * These are not the only ceiling a large export runs into. `limits.cpu_ms` in
+ * `wrangler.jsonc` is 300,000, which is Cloudflare's MAXIMUM rather than a number we
+ * chose, so it cannot be raised. Measured on the organization export of 2026-08-15: 202 s
+ * of CPU to write 5.34 M records, or roughly 38 microseconds per record. That puts a hard
+ * ceiling near 7.5 M records on any single invocation, whatever the read path costs.
+ *
+ * So making reads faster moves the binding constraint from this deadline to that cap
+ * rather than removing it. The same export had already been sped up 3.2x — 1.65 M records
+ * to 5.34 M in the identical 12 minutes — and still died, on the last of its fourteen
+ * sources. An organization whose export does not fit needs the work SPLIT across
+ * invocations, not made faster inside one.
+ *
+ * The state columns for that still exist: `current_source`, `source_cursor` and
+ * `next_part_number` on `user_data_exports`, which `hasRetiredGeneratorState` below
+ * rejects because this generator is one-shot.
+ */
 const MAX_PROCESSING_MS = 13 * 60 * 1000;
 const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;
-const PAGE_SIZE = 1_000;
+/**
+ * The page size for every source that does not override it, which is every NARROW source:
+ * the widest of them measured 0.48 KB per row, so 4,000 rows is under 2 MB. The sources
+ * whose rows are large enough for that to matter set `pageSize` themselves, and the byte
+ * budget all of those are derived from is documented beside them in `source-adapters.ts`.
+ *
+ * Raised from 1,000 on 2026-08-15. A page costs 300-400 ms of fixed round trip before
+ * returning a row, so an export's wall clock tracks page COUNT far more than page size,
+ * and an organization export was exhausting the 13-minute deadline on round trips alone.
+ */
+const PAGE_SIZE = 4_000;
 
 function exportDeadlineError(): TerminalExportError {
   return new TerminalExportError(
@@ -253,7 +283,12 @@ export function exportSubject(job: ExportJob): ExportSubject {
  * record — so `kilocode_users` is dropped from it entirely rather than reported missing.
  * That is a property of the subject, not of the warehouse's load state, and conflating
  * the two would tell an org admin their identity data was unavailable when no such
- * section was ever going to exist.
+ * section was ever going to exist. `enrichment_data` is dropped on the same basis: its
+ * table carries no organization column at all, so there is no organization reading of it
+ * to report as anything.
+ *
+ * Both are named in `USER_ONLY_SOURCES` rather than checked by name here, so a source
+ * that has no organization form says so once, beside the query that lacks one.
  *
  * Everything else is classified by the probe. The warehouse loads table by table and the
  * export ships ahead of it, so a source whose table has not landed is expected.
@@ -264,7 +299,7 @@ export function partitionSources(
   presentTables: Set<string>
 ): { available: SourceAdapter[]; unavailable: string[] } {
   const applicable = adapters.filter(
-    adapter => !(subjectType === 'organization' && adapter.name === 'kilocode_users')
+    adapter => !(subjectType === 'organization' && USER_ONLY_SOURCES.has(adapter.name))
   );
   const available: SourceAdapter[] = [];
   const unavailable: string[] = [];

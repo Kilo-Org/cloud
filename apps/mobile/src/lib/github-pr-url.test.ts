@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseGitHubPrUrl } from './github-pr-url';
+import { findFirstGitHubPrUrl, parseGitHubPrUrl } from './github-pr-url';
 
 describe('parseGitHubPrUrl', () => {
   it('parses a canonical PR URL', () => {
@@ -101,6 +101,64 @@ describe('parseGitHubPrUrl', () => {
       owner: 'my.repo',
       repo: 'a-b_c',
       number: 1,
+    });
+  });
+});
+
+describe('findFirstGitHubPrUrl', () => {
+  it('parses a bare canonical PR URL', () => {
+    expect(findFirstGitHubPrUrl('https://github.com/octocat/hello-world/pull/42')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a title plus URL', () => {
+    expect(
+      findFirstGitHubPrUrl('Fix the thing\nhttps://github.com/octocat/hello-world/pull/42')
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('returns the first URL when two PR URLs are present', () => {
+    expect(
+      findFirstGitHubPrUrl(
+        'https://github.com/octocat/hello-world/pull/42 https://github.com/octocat/hello-world/pull/7'
+      )
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('returns null for an issue URL', () => {
+    expect(findFirstGitHubPrUrl('https://github.com/octocat/hello-world/issues/42')).toBeNull();
+  });
+
+  it('returns null for a GitLab URL', () => {
+    expect(findFirstGitHubPrUrl('https://gitlab.com/octocat/hello-world/pull/42')).toBeNull();
+  });
+
+  it('returns null for plain text', () => {
+    expect(findFirstGitHubPrUrl('no url here at all')).toBeNull();
+  });
+
+  it('returns null for an empty string', () => {
+    expect(findFirstGitHubPrUrl('')).toBeNull();
+  });
+
+  it('parses a PR URL with extra words on one line', () => {
+    expect(
+      findFirstGitHubPrUrl('See https://github.com/octocat/hello-world/pull/42 please')
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
     });
   });
 });

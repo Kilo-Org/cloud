@@ -76,12 +76,13 @@
  *        `user_auth_provider`     no longer returns `provider`, `provider_account_id` or
  *                                 `created_at`. The first two are still read, because they
  *                                 are that source's cursor and the two halves of its
- *                                 record id, so which account a record belongs to is still
- *                                 recoverable from the id
+ *                                 record id, so in a version-8 file which account a record
+ *                                 belongs to is recoverable from that id. Not so from 9,
+ *                                 where the id itself is gone
  *
  *      Where a dropped column was needed to page or to identify a row it is still
  *      SELECTed and simply not returned. Where it was not, it is no longer read at all.
- *   9  two sources resolving location below the identity section's per-person country:
+ *   9  three sources resolving location below the identity section's per-person country:
  *        `int_microdollar_usage_enriched`
  *                                 the project a usage row belonged to, and the city,
  *                                 country and coordinates derived from the requesting IP
@@ -89,9 +90,26 @@
  *                                 the countries a person appeared from, per project
  *        `usage_daily`            the countries a person appeared from
  *
- *      Also at 9, every record carries the same four keys and nothing conditional: a
- *      per-record property some sources set and others could not has been removed, so a
- *      consumer can rely on one shape throughout.
+ *      Also at 9, the per-record property some sources set and others could not is gone,
+ *      so a reader no longer has to interpret its absence. `id` remains the one optional
+ *      property: a record carries `source`, `field` and `value` always, and `id` only from
+ *      a source with a stable per-row key. Where the file names a row it still names it
+ *      the same way; where it never could, the property is simply absent.
+ *
+ *      A further narrowing of what three existing sources return, on request. Each is a
+ *      field a reader of an earlier file will find missing:
+ *        `deployment_events`      no longer returns `created_by_user_id`
+ *        `orb_customer`           no longer returns `external_customer_id`. It is still
+ *                                 read, because it is how the load resolves the row to a
+ *                                 person, and it holds the same value as the scope on
+ *                                 every row an export can reach
+ *        `user_auth_provider`     no longer returns a record `id`. The pair it was built
+ *                                 from is still read as that source's cursor, but two
+ *                                 linked accounts supplying the same profile now produce
+ *                                 records nothing in the file tells apart
+ *
+ *      As at 8: where a dropped column is needed to page or to resolve a row it is still
+ *      SELECTed and simply not returned.
  *
  *      A trailer also arrives at 9. Every file ends with one, naming any source that
  *      failed while being read, so a file that ends without one was truncated.

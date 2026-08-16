@@ -17,23 +17,16 @@ import { TerminalExportError } from './errors';
 type Call = { text: string; values: unknown[] };
 
 function harness(rows: Record<string, unknown>[] = [], profileRows?: Record<string, unknown>[]) {
-  const replicaCalls: Call[] = [];
   const warehouseCalls: Call[] = [];
-  const replicaQuery: ReplicaQuery = async (text, values) => {
-    replicaCalls.push({ text, values });
-    return rows;
-  };
   const warehouseQuery: ReplicaQuery = async (text, values) => {
     warehouseCalls.push({ text, values });
     // The identity source reads the warehouse for the profile fields only; every other
     // source reads it for its own rows, which is what `rows` stands in for.
     return profileRows ?? rows;
   };
-  return {
-    replicaCalls,
-    warehouseCalls,
-    adapters: createSourceAdapters({ replicaQuery, warehouseQuery }),
-  };
+  // One query function, because the warehouse is the only database a source reads. That
+  // the primary cannot be reached is now a property of this type rather than an assertion.
+  return { warehouseCalls, adapters: createSourceAdapters({ warehouseQuery }) };
 }
 
 function requireAdapter(adapters: SourceAdapter[], name: string): SourceAdapter {
@@ -447,14 +440,10 @@ describe('source adapters', () => {
   // Identity comes entirely from the warehouse now, so it is as of the same moment as
   // every other source and the primary is not read at all.
   it('reads identity from the warehouse and never from the primary', async () => {
-    const { adapters, replicaCalls, warehouseCalls } = harness(
-      [PRIMARY_USER_ROW],
-      [warehouseUserRow()]
-    );
+    const { adapters, warehouseCalls } = harness([PRIMARY_USER_ROW], [warehouseUserRow()]);
 
     await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
 
-    expect(replicaCalls).toEqual([]);
     expect(warehouseCalls).toEqual([
       { text: expect.stringContaining('WHERE user_id = $1'), values: ['owner-user'] },
     ]);
@@ -607,12 +596,11 @@ describe('source adapters', () => {
   // The identity row belongs to a person. An organization export reading it would put
   // the requesting admin's email and name in a file about the organization.
   it('reads no identity row for an organization subject', async () => {
-    const { adapters, replicaCalls, warehouseCalls } = harness([PRIMARY_USER_ROW]);
+    const { adapters, warehouseCalls } = harness([PRIMARY_USER_ROW]);
 
     const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(ORG_READ_PAGE_INPUT);
 
     expect(page).toEqual({ records: [], nextCursor: null });
-    expect(replicaCalls).toEqual([]);
     expect(warehouseCalls).toEqual([]);
   });
 

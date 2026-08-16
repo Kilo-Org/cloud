@@ -104,8 +104,6 @@ export async function handleGenerationFailure(input: {
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
-  /** Live primary replica. The profile columns the warehouse does not carry. */
-  EXPORT_REPLICA_DB: HyperdriveBinding;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
@@ -427,10 +425,7 @@ export async function processGenerateMessage(
     // page would let a single mis-set field change scope midway through a file.
     const subject = exportSubject(job);
     const warehouseQuery = createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse');
-    const allAdapters = createSourceAdapters({
-      replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB, 'replica'),
-      warehouseQuery,
-    });
+    const allAdapters = createSourceAdapters({ warehouseQuery });
 
     // Before anything is written, because the header names what is missing and cannot
     // be amended once the first part has been uploaded. One query, not one per source.

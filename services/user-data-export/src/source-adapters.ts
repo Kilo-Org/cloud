@@ -989,8 +989,13 @@ const platformIntegrationQueries = subjectPageQueries({
  * the sentinel. No `::text` casts here, so the ORDER BY needs no qualifying — every
  * column is already text and the `COALESCE` expressions are input references.
  *
- * Expect roughly ten rows per person rather than one. People appear from more than one
- * country and in more than one organization.
+ * The same country can arrive more than once, with nothing in the file telling the copies
+ * apart. That is by design, not a defect to collapse. The grain is a country per owner
+ * pair, and only the country is returned, so two rows differing solely by the organization
+ * emit identical records. Both are exported: each line stands for a row that exists, and
+ * de-duplicating would hand back fewer than the source holds. The column that separates
+ * them is read as a cursor column and deliberately not returned. Same shape on
+ * `usage_daily`.
  */
 function externalUsageDailyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   // The owner the scope has not pinned: scoping by user leaves the org varying, and the
@@ -1087,9 +1092,13 @@ const microdollarUsageHourlyQueries: Record<ExportSubject['type'], string> = {
  * use either and scans. They also do the job the sentinel exists for: a NULL inside a tuple
  * comparison yields NULL rather than false and would drop the rows the coalescing keeps.
  *
- * `kilo_user_id` is not reliably a person here — it holds `anon:<ip address>` values, and
- * carries far more distinct values than there are real users, because someone who signs in
- * keeps the anonymous key they had before. Neither scope can reach one: a personal read
+ * The same country can arrive more than once, with nothing in the file telling the copies
+ * apart, for the reason given on `external_usage_daily`: the organization separating two
+ * such rows is a cursor column and is not returned. Both are exported by design.
+ *
+ * `kilo_user_id` is not reliably a person here — it holds `anon:<ip address>` values,
+ * because someone who signs in keeps the anonymous key they had before. Neither scope can
+ * reach one: a personal read
  * binds a real user id, which no anonymous key equals, and an organization read was
  * measured 2026-08-15 to reach none because no anonymous row carries an organization at
  * all. Nothing here treats the column as an identifier; it is a predicate and a cursor
@@ -1385,9 +1394,12 @@ function jsonValue(value: unknown): string | null {
   return JSON.stringify(value);
 }
 
+/**
+ * One database, deliberately. The export used to read the primary as well, for profile
+ * columns the warehouse did not carry; those columns are no longer returned, so the
+ * primary is not read at all and every field in a file is as of the same snapshot.
+ */
 export type SourceAdapterQueries = {
-  /** Live primary replica. The profile columns the warehouse does not carry. */
-  replicaQuery: ReplicaQuery;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   warehouseQuery: ReplicaQuery;
 };
@@ -2254,8 +2266,9 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         );
         return {
           records: rows.flatMap(row => {
-            // The key pair identifies the linked account, so the records of one account
-            // stay groupable and two linked accounts never look like duplication.
+            // No record key: the pair that could serve as one was dropped from the
+            // returned set, so two linked accounts supplying the same profile produce
+            // indistinguishable records. The pair is still read, for the cursor.
             return USER_AUTH_PROVIDER_FIELDS.map(field => ({
               source: 'user_auth_provider',
               field,

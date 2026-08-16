@@ -819,14 +819,8 @@ LIMIT $2`;
  * exactly the shape `WHERE <owner> = $1 AND id > $2 ORDER BY id` reads. Both are partial,
  * conditioned on their owner being NOT NULL, and that costs these queries nothing: neither
  * scope predicate matches NULL, so no row an index omits was ever in scope. Same shape and
- * same reasoning as `source_embeddings`.
- *
- * Neither index is created by the bootstrap. The user-scoped one is large enough that
- * building it is a deliberate act taking hours, so a window exists in which the table is
- * loaded and the index is not. A read in that window scans rather than seeks, and the
- * probe cannot see it — the probe checks that columns exist, never that an index does. It
- * would surface as an export exhausting its per-source deadline rather than as a failure
- * naming a cause, so this source should not be enabled until both indexes are in place.
+ * same reasoning as `source_embeddings`. Neither is created by the bootstrap, so they are
+ * built deliberately rather than as a side effect of provisioning a database.
  *
  * OWNERSHIP, measured in the same pass. `kilo_user_id` is populated on every row, with no
  * NULLs and no empty strings, so every row names an individual. `organization_id` is NULL

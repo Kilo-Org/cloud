@@ -14,7 +14,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   buildModelPickerRows,
-  modelPickerFavoriteId,
+  favoriteToggleAction,
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
 import {
@@ -28,7 +28,7 @@ export function ModelPickerContent() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { favorites, favoritesError, toggleFavorite } = useModelPreferences(undefined);
+  const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const [search, setSearch] = useState('');
   const [bridge, setBridge] = useState(() => getModelPickerBridge());
@@ -88,9 +88,16 @@ export function ModelPickerContent() {
   // selection haptic on press — this callback must not fire a second one.
   const handleToggleFavorite = useCallback(
     (option: SessionModelOption) => {
-      toggleFavorite(modelPickerFavoriteId(option));
+      const action = favoriteToggleAction(option, favorites);
+      if (action.type === 'remove') {
+        for (const model of action.models) {
+          removeFavorite({ model });
+        }
+      } else {
+        addFavorite({ model: action.model });
+      }
     },
-    [toggleFavorite]
+    [favorites, addFavorite, removeFavorite]
   );
 
   const handleSelectVariant = useCallback(

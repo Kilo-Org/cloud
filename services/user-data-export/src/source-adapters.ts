@@ -469,6 +469,13 @@ const cliSessionQueries: Record<ExportSubject['type'], string> = {
  * expression index the warehouse carries for this ordering.
  */
 const NULL_CURSOR_SENTINEL = '-';
+
+/**
+ * The same idea for a `bigint` column, where the text sentinel has no place in the
+ * comparison. `-1` because the warehouse's expression indexes were built on it, and a
+ * cursor expression that differs from the index expression cannot use the index.
+ */
+const NULL_CURSOR_NUMBER = -1;
 function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   // The dimension the scope does not already pin: scoping by user leaves org varying,
   // and scoping by org leaves user varying.
@@ -1035,6 +1042,53 @@ const externalUsageDailyQueries: Record<ExportSubject['type'], string> = {
   organization: externalUsageDailyPageQuery('organization'),
 };
 
+/**
+ * Which countries a person appeared from, per project. Not usage history, despite the
+ * name: the supplied projection carries no hour, model or volume.
+ *
+ * `SELECT DISTINCT` is ours rather than the load's, and it is what makes the cursor valid.
+ * The warehouse table still holds the wider row — hour, session, machine and the rest — so
+ * the five requested columns repeat many times over underneath. Paging on a repeated key
+ * skips rows at any boundary that lands inside a run of them, which is the defect this
+ * file has fixed four times. Deduplicating in the query makes the projected tuple unique,
+ * at the cost of a dedup pass before `LIMIT` applies on each page.
+ *
+ * The scope pins one owner, so the cursor is the other four columns. Both owner columns
+ * must therefore be present whichever subject asks; see `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ *
+ * The `COALESCE` sentinels are not a choice, and they are not only about NULL handling.
+ * Both warehouse indexes are EXPRESSION indexes over exactly these expressions, so a query
+ * comparing the raw columns is not merely less tidy — it cannot use either index and
+ * scans. The expressions here must stay character-for-character what the indexes were
+ * built on, including `-1` for the `bigint` and `'-'` for the text columns, and in the
+ * index's column order.
+ *
+ * `-1` rather than a text sentinel on `vercel_ip_country_id` keeps the comparison numeric,
+ * so the cursor value for it travels as digits and binds as `bigint`.
+ */
+function microdollarUsageHourlyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  const cursorOwner = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  const keyed = [
+    `COALESCE(${cursorOwner}, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(project_id, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(vercel_ip_country_id, ${NULL_CURSOR_NUMBER})`,
+    `COALESCE(vercel_ip_country, '${NULL_CURSOR_SENTINEL}')`,
+  ];
+  return `SELECT DISTINCT ${cursorOwner} AS cursor_owner, project_id,
+  vercel_ip_country_id, vercel_ip_country
+FROM microdollar_usage_hourly
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL
+    OR (${keyed.join(', ')}) > ($2::text, $3::text, $4::bigint, $5::text))
+ORDER BY ${keyed.join(', ')}
+LIMIT $6`;
+}
+
+const microdollarUsageHourlyQueries: Record<ExportSubject['type'], string> = {
+  user: microdollarUsageHourlyPageQuery('user'),
+  organization: microdollarUsageHourlyPageQuery('organization'),
+};
+
 const securityFindingQueries = subjectPageQueries({
   table: 'security_findings',
   columns: SECURITY_FINDING_COLUMNS.join(', '),
@@ -1130,6 +1184,12 @@ type SystemPromptRow = {
   system_prompt_prefix: string | null;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type MicrodollarUsageHourlyRow = {
+  cursor_owner: string | null;
+  project_id: string | null;
+  vercel_ip_country_id: string | null;
+  vercel_ip_country: string | null;
+};
 type ExternalUsageDailyRow = {
   cursor_owner: string | null;
   geoip_country_code: string | null;
@@ -1891,6 +1951,80 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'microdollar_usage_hourly',
+      warehouseTable: 'microdollar_usage_hourly',
+      async readPage(input): Promise<SourcePage> {
+        const [afterOwner, afterProject, afterCountryId, afterCountry] = keyCursorValues(
+          input.cursor,
+          4
+        );
+        const rows: MicrodollarUsageHourlyRow[] = await warehouseQuery(
+          microdollarUsageHourlyQueries[input.subject.type],
+          [
+            subjectScopeValue(input.subject),
+            afterOwner,
+            afterProject,
+            afterCountryId,
+            afterCountry,
+            input.limit,
+          ]
+        ).then(result =>
+          result.map(row => ({
+            cursor_owner: warehouseText(row.cursor_owner),
+            project_id: warehouseText(row.project_id),
+            // Carried as digits because it is half a cursor value and binds back as
+            // `bigint`. The driver may hand a `bigint` back as either form.
+            vercel_ip_country_id:
+              typeof row.vercel_ip_country_id === 'number'
+                ? String(row.vercel_ip_country_id)
+                : warehouseText(row.vercel_ip_country_id),
+            vercel_ip_country: warehouseText(row.vercel_ip_country),
+          }))
+        );
+        // Must agree exactly with the COALESCE in the query, or a page would resume from
+        // a key the WHERE clause never produced.
+        const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
+        // The numeric column takes the numeric sentinel, or the value handed back would
+        // not be one the WHERE clause could compare.
+        const keyedNumber = (value: string | null): string => value ?? String(NULL_CURSOR_NUMBER);
+        return {
+          records: rows.flatMap(row => {
+            const id = [
+              keyed(row.project_id),
+              keyedNumber(row.vercel_ip_country_id),
+              keyed(row.vercel_ip_country),
+            ].join('|');
+            return [
+              {
+                source: 'microdollar_usage_hourly',
+                id,
+                field: 'project_id',
+                value: row.project_id,
+              },
+              {
+                source: 'microdollar_usage_hourly',
+                id,
+                field: 'vercel_ip_country_id',
+                value: row.vercel_ip_country_id,
+              },
+              {
+                source: 'microdollar_usage_hourly',
+                id,
+                field: 'vercel_ip_country',
+                value: row.vercel_ip_country,
+              },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            keyed(row.cursor_owner),
+            keyed(row.project_id),
+            keyedNumber(row.vercel_ip_country_id),
+            keyed(row.vercel_ip_country),
+          ]),
+        };
+      },
+    },
+    {
       name: 'external_usage_daily',
       warehouseTable: 'external_usage_daily',
       async readPage(input): Promise<SourcePage> {
@@ -2265,6 +2399,8 @@ export const warehouseQueries = {
   platformIntegrationOrgQuery: platformIntegrationQueries.organization,
   externalUsageDailyUserQuery: externalUsageDailyQueries.user,
   externalUsageDailyOrgQuery: externalUsageDailyQueries.organization,
+  microdollarUsageHourlyUserQuery: microdollarUsageHourlyQueries.user,
+  microdollarUsageHourlyOrgQuery: microdollarUsageHourlyQueries.organization,
   // No org counterpart, deliberately. See `userAuthProviderQuery` and `USER_ONLY_SOURCES`.
   userAuthProviderUserQuery: userAuthProviderQuery,
 };
@@ -2372,6 +2508,9 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // The whole table bar its two owner columns, which `sourceQueryScopes` covers and
   // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of.
   external_usage_daily: ['geoip_country_code'],
+  // Both owner columns are required whichever subject asks; see
+  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+  microdollar_usage_hourly: ['project_id', 'vercel_ip_country_id', 'vercel_ip_country'],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. The scope column `kilo_user_id` is added per
   // subject below; the cursor pair needs no addition, being two of the fields already.
@@ -2390,7 +2529,11 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
  * This does couple a personal export to a column only an organization export filters on,
  * which is deliberate — the alternative is a cursor that repeats and drops rows.
  */
-const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set(['system_prompt_prefix', 'external_usage_daily']);
+const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set([
+  'system_prompt_prefix',
+  'external_usage_daily',
+  'microdollar_usage_hourly',
+]);
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
 const SUBJECT_SCOPED_TABLES = new Set(
@@ -2529,6 +2672,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   platformIntegrationOrgQuery: 'organization_id = $1',
   externalUsageDailyUserQuery: 'kilo_user_id = $1',
   externalUsageDailyOrgQuery: 'organization_id = $1',
+  microdollarUsageHourlyUserQuery: 'kilo_user_id = $1',
+  microdollarUsageHourlyOrgQuery: 'organization_id = $1',
   userAuthProviderUserQuery: 'kilo_user_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',

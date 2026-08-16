@@ -358,6 +358,7 @@ describe('warehouse availability probe', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'microdollar_usage_hourly',
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
@@ -423,6 +424,7 @@ describe('source adapters', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'microdollar_usage_hourly',
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
@@ -2177,5 +2179,114 @@ describe('source adapters', () => {
     expect(byField.get('vercel_ip_latitude')).toBeNull();
     expect(byField.get('vercel_ip_longitude')).toBeNull();
     expect(byField.get('project_id')).toBe('project-a');
+  });
+});
+
+describe('microdollar usage hourly', () => {
+  const HOURLY_ROW = {
+    cursor_owner: 'org-9',
+    project_id: 'project-a',
+    vercel_ip_country_id: 528,
+    vercel_ip_country: 'NL',
+  };
+
+  it('emits the three requested fields and neither owner', async () => {
+    const { adapters } = harness([HOURLY_ROW]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const fields = page?.records.map(record => record.field) ?? [];
+
+    expect(fields).toEqual(['project_id', 'vercel_ip_country_id', 'vercel_ip_country']);
+    expect(fields).not.toContain('kilo_user_id');
+    expect(fields).not.toContain('organization_id');
+  });
+
+  // The load still holds the wider row, so the five requested columns repeat underneath.
+  // Without DISTINCT the projected tuple is not unique and a page boundary landing inside
+  // a run of them skips the rest, which is the defect this file has fixed four times.
+  it('deduplicates in the query, since the load does not', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+
+    await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text.startsWith('SELECT DISTINCT ')).toBe(true);
+  });
+
+  // The scope pins one owner, so the cursor is the other four columns.
+  it('pages on every column the scope did not pin', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'project-a', '528', 'NL'] });
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, null, null, 1]);
+  });
+
+  // Both warehouse indexes are expression indexes over these exact COALESCE forms, so the
+  // query has to match them character for character or it cannot use either and scans.
+  // `-1` for the bigint, `'-'` for the text columns.
+  it('matches the expression indexes the warehouse built', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+
+    await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['org-9', 'project-a', '528', 'NL'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain('COALESCE(vercel_ip_country_id, -1)');
+    expect(warehouseCalls[0].text).toContain("COALESCE(project_id, '-')");
+    expect(warehouseCalls[0].text).toContain("COALESCE(vercel_ip_country, '-')");
+    expect(warehouseCalls[0].text).toContain('$4::bigint');
+    expect(warehouseCalls[0].values).toEqual([
+      'owner-user',
+      'org-9',
+      'project-a',
+      '528',
+      'NL',
+      100,
+    ]);
+  });
+
+  it('substitutes the sentinel in the cursor only', async () => {
+    const { adapters } = harness([{ ...HOURLY_ROW, project_id: null, cursor_owner: null }]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.nextCursor).toEqual({ key: ['-', '-', '528', 'NL'] });
+    expect(byField.get('project_id')).toBeNull();
+  });
+
+  // The numeric column takes the numeric sentinel, or the cursor would hand back a value
+  // the WHERE clause cannot compare against a bigint.
+  it('substitutes the numeric sentinel for an absent country id', async () => {
+    const { adapters } = harness([{ ...HOURLY_ROW, vercel_ip_country_id: null }]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'project-a', '-1', 'NL'] });
+  });
+
+  it('scopes each read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+    const adapter = requireAdapter(adapters, 'microdollar_usage_hourly');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
   });
 });

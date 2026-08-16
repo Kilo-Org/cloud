@@ -81,10 +81,12 @@
  *
  *      Where a dropped column was needed to page or to identify a row it is still
  *      SELECTed and simply not returned. Where it was not, it is no longer read at all.
- *   9  the `int_microdollar_usage_enriched` source (the project a usage row belonged to,
- *      and the city, country and coordinates derived from the requesting IP). The most
- *      granular location the file carries: the identity section reports it per person,
- *      and this resolves it per usage row
+ *   9  two sources resolving location below the identity section's per-person country:
+ *        `int_microdollar_usage_enriched`
+ *                                 the project a usage row belonged to, and the city,
+ *                                 country and coordinates derived from the requesting IP
+ *        `microdollar_usage_hourly`
+ *                                 the countries a person appeared from, per project
  *
  *      Also at 9, every record carries the same four keys and nothing conditional: a
  *      per-record property some sources set and others could not has been removed, so a

@@ -86,21 +86,6 @@ export type SourceAdapter = {
 };
 
 /**
- * The identity section is assembled from both databases, because the profile fields
- * are split across them.
- *
- * `email` and `name` are the fields the export presents as the user's identity, and
- * the warehouse carries its own copy of both. Those are read from the warehouse
- * (`warehouseProfileQuery`) so they are as of the same moment as the other five
- * sources, rather than showing a name the user changed after the snapshot beside
- * data that predates the change.
- *
- * The remaining columns below have no warehouse equivalent — most were never exported
- * from the source model, and the monetization ones were deliberately dropped from it —
- * so they still come from the live primary. This is a single indexed lookup by primary
- * key, once per export, not the bulk traffic the warehouse exists to absorb.
- */
-/**
  * The identity section, and every column of it.
  *
  * All from the warehouse, so identity is as of the same moment as every other source

@@ -99,10 +99,10 @@
  *      A further narrowing of what three existing sources return, on request. Each is a
  *      field a reader of an earlier file will find missing:
  *        `deployment_events`      no longer returns `created_by_user_id`
- *        `orb_customer`           no longer returns `external_customer_id`. It is still
- *                                 read, because it is how the load resolves the row to a
- *                                 person, and it holds the same value as the scope on
- *                                 every row an export can reach
+ *        `orb_customer`           no longer returns `external_customer_id`, and no longer
+ *                                 selects it either. Nothing here needs it: the load is
+ *                                 what matches it to a person, so on every row an export
+ *                                 can reach it held the same value as the scope already
  *        `user_auth_provider`     no longer returns a record `id`. The pair it was built
  *                                 from is still read as that source's cursor, but two
  *                                 linked accounts supplying the same profile now produce

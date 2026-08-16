@@ -784,25 +784,20 @@ const usageEnrichedQueries = subjectPageQueries({
  * organization reading. See `USER_ONLY_SOURCES`.
  *
  * `kilo_user_id` is NOT a column on the source table. It is derived by the load, matching
- * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides, and it
- * is the reason `external_customer_id` and the scope hold the same value on every row this
- * source can return. Verified against data on 2026-08-11 rather than from code, because
+ * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides.
+ * Verified against data on 2026-08-11 rather than from code, because
  * the Orb integration does not live in this repo. Most customers matched a user; those that
  * did not carry a NULL `kilo_user_id` and reach nobody, since the scope predicate does not
  * match NULL. The join cannot fan out — `users.user_id` is
  * unique — so the grain stays one row per Orb customer.
  *
- * One case the export relies on being unreachable rather than filtered: 82 matched rows
+ * One case the export relies on being unreachable rather than filtered: some matched rows
  * belong to users Kilo has since deleted, whose own record was scrubbed to
  * `deleted+<uuid>@deleted.invalid` while Orb kept the original name, email and addresses.
  * Nothing here excludes them. They are unreachable because only a current user can request
  * an export, which is a property of the request path rather than of this query.
  */
 const ORB_CUSTOMER_FIELDS: Record<string, (value: unknown) => string | null> = {
-  // Orb's reference to the customer in our system, which is the Kilo user id itself. It
-  // holds the same value the scope was bound to, so this returns the subject their own
-  // identifier rather than anything new.
-  external_customer_id: warehouseText,
   additional_emails: jsonValue,
   billing_address: jsonValue,
   email: warehouseText,

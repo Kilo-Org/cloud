@@ -2036,7 +2036,6 @@ describe('source adapters', () => {
 
   const ORB_ROW = {
     id: 'orb-cus-1',
-    external_customer_id: 'owner-user',
     additional_emails: ['billing@example.com'],
     billing_address: { line1: '1 Example Street', country: 'NL' },
     email: 'person@example.com',
@@ -2054,7 +2053,7 @@ describe('source adapters', () => {
     });
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
-    expect(page?.records).toHaveLength(7);
+    expect(page?.records).toHaveLength(6);
     for (const record of page?.records ?? []) expect(record.id).toBe('orb-cus-1');
     expect(byField.get('email')).toBe('person@example.com');
     expect(byField.get('name')).toBe('A Person');
@@ -2093,7 +2092,7 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(7);
+    expect(page?.records).toHaveLength(6);
     for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 

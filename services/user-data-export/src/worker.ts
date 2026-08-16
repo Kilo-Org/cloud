@@ -160,6 +160,18 @@ export function isAllowedWebCallbackUrl(value: string): boolean {
   }
 }
 
+/**
+ * The source after this one, or null at the end. One rule, because the failure path and
+ * the completion path both advance and must agree on what comes next; when they were
+ * written out separately a change to either was a change to only half the loop.
+ */
+export function nextReadableAdapter(
+  adapters: SourceAdapter[],
+  from: SourceAdapter
+): SourceAdapter | null {
+  return adapters.slice(adapters.indexOf(from) + 1).find(item => item.readPage) ?? null;
+}
+
 export function resolveSourceAdapter(
   adapters: SourceAdapter[],
   persistedSource: string | null
@@ -521,6 +533,9 @@ export async function processGenerateMessage(
     // Sources that failed to read. Named in the trailer, so a file says what is missing
     // from it rather than leaving a consumer to infer absence from silence.
     const failedSources: string[] = [];
+    // What could be read at all, which is what "everything failed" has to be measured
+    // against. See the guard after the loop.
+    const readableAdapters = adapters.filter(item => item.readPage);
     let nextSource: string | null = adapter.name;
 
     while (nextSource) {
@@ -564,6 +579,12 @@ export async function processGenerateMessage(
                 limit: pageLimit,
               });
             } catch (error) {
+              // A terminal error is a decision the adapter has already made about the
+              // whole export — `kilocode_users` raises one when the subject is absent
+              // from the snapshot, carrying the message the requester is meant to see.
+              // Wrapping it would demote that to a skipped source and hand back a file
+              // missing its identity section with nothing saying why.
+              if (error instanceof TerminalExportError) throw error;
               throw new SourceReadError(sourceName, error);
             }
             let pageBytes = 0;
@@ -595,8 +616,7 @@ export async function processGenerateMessage(
           // The error itself never reaches the file; it is recorded here instead.
           ...safeError(error.cause),
         });
-        const failedIndex = adapters.indexOf(adapter);
-        const afterFailed = adapters.slice(failedIndex + 1).find(item => item.readPage);
+        const afterFailed = nextReadableAdapter(adapters, adapter);
         if (!afterFailed) {
           nextSource = null;
           cursor = null;
@@ -614,8 +634,7 @@ export async function processGenerateMessage(
         nextSource = adapter.name;
         continue;
       }
-      const currentIndex = adapters.indexOf(adapter);
-      const nextAdapter = adapters.slice(currentIndex + 1).find(item => item.readPage);
+      const nextAdapter = nextReadableAdapter(adapters, adapter);
       if (!nextAdapter) {
         nextSource = null;
         cursor = null;
@@ -628,7 +647,12 @@ export async function processGenerateMessage(
     // Every source failing is not a partial export, it is a broken one. Completing here
     // would hand someone an empty file that claims to be their data, which is a worse
     // outcome than the failure the retry path exists for.
-    if (failedSources.length > 0 && failedSources.length === adapters.length) {
+    //
+    // Counted against the READABLE adapters rather than all of them. `readPage` is
+    // optional on the type and every other advance here filters on it, so comparing
+    // against the full list would let a single reader-less adapter make this condition
+    // unreachable and turn a total failure into a silently empty file.
+    if (failedSources.length > 0 && failedSources.length === readableAdapters.length) {
       throw new Error('Every export source failed to read');
     }
     const trailer = encoder.encode(exportTrailer(failedSources));

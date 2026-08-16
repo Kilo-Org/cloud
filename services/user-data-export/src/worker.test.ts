@@ -5,6 +5,7 @@ import {
   deletePendingObjects,
   exportHeader,
   exportTrailer,
+  nextReadableAdapter,
   exportArtifact,
   exportSubject,
   handleFencedCompletion,
@@ -758,5 +759,60 @@ describe('source read failures', () => {
 
     expect(readFailure.message).not.toContain('column');
     expect((readFailure.cause as Error).message).toBe('column c.foo missing');
+  });
+});
+
+// Containing source failures must not contain the failures an adapter raises deliberately.
+// `kilocode_users` throws TerminalExportError when the subject is absent from the snapshot,
+// carrying the message the requester is meant to read. Absorbing that would complete the
+// export without an identity section and never say why.
+describe('terminal errors are not source failures', () => {
+  it('keeps a terminal error distinguishable from a wrapped read failure', () => {
+    const terminal = new TerminalExportError(
+      'export_identity_row_missing',
+      'Your account was not found in the data snapshot this export reads from.',
+      'Identity row was not present in the export warehouse'
+    );
+
+    expect(terminal).not.toBeInstanceOf(SourceReadError);
+    expect(terminal).toBeInstanceOf(TerminalExportError);
+    // The redacted message is the point: it survives to the requester only by propagating.
+    expect(terminal.redactedMessage).toContain('not found in the data snapshot');
+  });
+
+  it('wraps an ordinary read failure and leaves the cause reachable', () => {
+    const wrapped = new SourceReadError('audiences', new Error('connection reset'));
+
+    expect(wrapped).toBeInstanceOf(SourceReadError);
+    expect(wrapped).not.toBeInstanceOf(TerminalExportError);
+  });
+});
+
+// Both the failure path and the completion path advance through the sources, and they have
+// to agree. Split across two copies of the rule, a change to either was a change to half
+// the loop.
+describe('source advance', () => {
+  const withReader = (name: string): SourceAdapter => sourceAdapter(name, name);
+  const withoutReader = (name: string): SourceAdapter => ({ name, warehouseTable: name });
+
+  it('returns the next source that can actually be read', () => {
+    const list = [withReader('a'), withReader('b'), withReader('c')];
+
+    expect(nextReadableAdapter(list, list[0]!)?.name).toBe('b');
+    expect(nextReadableAdapter(list, list[1]!)?.name).toBe('c');
+  });
+
+  // `readPage` is optional on the type, and an adapter without one is not a source that
+  // failed — it is a source that was never attemptable.
+  it('skips an adapter with no reader rather than stopping on it', () => {
+    const list = [withReader('a'), withoutReader('stub'), withReader('c')];
+
+    expect(nextReadableAdapter(list, list[0]!)?.name).toBe('c');
+  });
+
+  it('returns null at the end rather than wrapping around', () => {
+    const list = [withReader('a'), withReader('b')];
+
+    expect(nextReadableAdapter(list, list[1]!)).toBeNull();
   });
 });

@@ -1703,7 +1703,7 @@ describe('source adapters', () => {
 
   const COUNTRY_ROW = { cursor_owner: 'org-9', geoip_country_code: 'NL' };
 
-  it('emits a country under the owner dimension the scope did not pin', async () => {
+  it('emits the country and nothing else', async () => {
     const { adapters } = harness([COUNTRY_ROW]);
 
     const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.({
@@ -1711,35 +1711,10 @@ describe('source adapters', () => {
       limit: 1,
     });
 
-    // A personal export gains the organization the country was seen under. That column is
-    // a dimension here, not a second owner of the row.
     expect(page?.records).toEqual([
-      {
-        source: 'external_usage_daily',
-        id: 'org-9|NL',
-        field: 'organization_id',
-        value: 'org-9',
-      },
-      {
-        source: 'external_usage_daily',
-        id: 'org-9|NL',
-        field: 'geoip_country_code',
-        value: 'NL',
-      },
+      { source: 'external_usage_daily', id: 'NL', field: 'geoip_country_code', value: 'NL' },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['org-9', 'NL'] });
-  });
-
-  it('emits the member dimension instead when an organization asks', async () => {
-    const { adapters } = harness([{ ...COUNTRY_ROW, cursor_owner: 'member-user' }]);
-
-    const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.(
-      ORG_READ_PAGE_INPUT
-    );
-    const fields = page?.records.map(record => record.field) ?? [];
-
-    expect(fields).toContain('kilo_user_id');
-    expect(fields).not.toContain('organization_id');
   });
 
   // The row has no key of its own: all three columns together are what makes it distinct,
@@ -1761,19 +1736,20 @@ describe('source adapters', () => {
   });
 
   // A NULL inside a tuple comparison yields NULL rather than false, so an uncoalesced
-  // cursor would drop exactly the rows the sentinel exists to keep. The emitted value
-  // stays null: the sentinel is a cursor device, not a fact about the person.
-  it('substitutes the sentinel for an absent dimension in the cursor only', async () => {
+  // cursor would drop exactly the rows the sentinel exists to keep. The sentinel is a
+  // cursor device and never reaches a record.
+  it('substitutes the sentinel in the cursor only', async () => {
     const { adapters } = harness([{ cursor_owner: null, geoip_country_code: 'NL' }]);
 
     const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.({
       ...READ_PAGE_INPUT,
       limit: 1,
     });
-    const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
     expect(page?.nextCursor).toEqual({ key: ['-', 'NL'] });
-    expect(byField.get('organization_id')).toBeNull();
+    expect(page?.records).toEqual([
+      { source: 'external_usage_daily', id: 'NL', field: 'geoip_country_code', value: 'NL' },
+    ]);
   });
 
   it('scopes each country read to one owner column and never both', async () => {

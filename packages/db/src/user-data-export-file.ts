@@ -43,9 +43,9 @@
  *      released entry would leave two different file shapes both claiming it, which is
  *      the one thing this constant exists to prevent.
  *   6  two more sources, and one change to two existing ones:
- *        `external_usage_daily`   the countries a person appeared from, per workspace. Not
- *                                 usage history: the source table was reduced to three
- *                                 columns on 2026-08-14 and holds no date, model or volume
+ *        `external_usage_daily`   the countries a person appeared from. Not usage history:
+ *                                 the source table was reduced to three columns on
+ *                                 2026-08-14 and holds no date, model or volume
  *        `cloud_agent_code_reviews`
  *                                 one journal row per state change of a code review, with
  *                                 the pull request it covers and the summary it replaced

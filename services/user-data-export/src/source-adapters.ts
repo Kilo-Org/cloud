@@ -1004,11 +1004,10 @@ const platformIntegrationQueries = subjectPageQueries({
  * same reduction is not automatically right for them: country attribution can lose its
  * date, and usage history cannot.
  *
- * The scope pins one column, so the cursor is the other two. `organization_id` is a
- * dimension rather than an alternative owner — this table does not follow "user or org,
- * never both" — so in a personal export it becomes a cursor column and an exported field,
- * which is why both owner columns must be present whichever subject asks. See
- * `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ * The scope pins one column, so the cursor is the other two. This table does not follow
+ * "user or org, never both", so in a personal export the organization column becomes a
+ * cursor column, which is why both owner columns must be present whichever subject asks.
+ * See `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
  *
  * Every column is nullable text, so both cursor columns are coalesced to the sentinel: a
  * NULL inside a tuple comparison yields NULL rather than false, and an uncoalesced cursor
@@ -1901,12 +1900,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       warehouseTable: 'external_usage_daily',
       async readPage(input): Promise<SourcePage> {
         const [afterOwner, afterCountry] = keyCursorValues(input.cursor, 2);
-        // The owner the scope did not pin, named by its own column. Which one that is
-        // depends on the subject, so this source's field set does too: a personal export
-        // gains the organization the country was seen under, an organization's gains the
-        // member. Both are dimensions of the row rather than a second owner of it.
-        const cursorOwnerField =
-          input.subject.type === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
         const rows: ExternalUsageDailyRow[] = await warehouseQuery(
           externalUsageDailyQueries[input.subject.type],
           [subjectScopeValue(input.subject), afterOwner, afterCountry, input.limit]
@@ -1920,26 +1913,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         // a key the WHERE clause never produced.
         const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
         return {
-          records: rows.flatMap(row => {
-            // The row has no key of its own — its grain is its identity, which is why the
-            // load carries DISTINCT. Both parts are emitted below, so a separator
-            // appearing inside a value costs nothing.
-            const id = [keyed(row.cursor_owner), keyed(row.geoip_country_code)].join('|');
-            return [
-              {
-                source: 'external_usage_daily',
-                id,
-                field: cursorOwnerField,
-                value: row.cursor_owner,
-              },
-              {
-                source: 'external_usage_daily',
-                id,
-                field: 'geoip_country_code',
-                value: row.geoip_country_code,
-              },
-            ];
-          }),
+          records: rows.map(row => ({
+            source: 'external_usage_daily',
+            id: keyed(row.geoip_country_code),
+            field: 'geoip_country_code',
+            value: row.geoip_country_code,
+          })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             keyed(row.cursor_owner),
             keyed(row.geoip_country_code),

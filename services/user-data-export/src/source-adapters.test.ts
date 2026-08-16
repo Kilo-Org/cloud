@@ -682,15 +682,15 @@ describe('source adapters', () => {
     expect(warehouseCalls[0]?.values).toEqual(['owner-user', null, null, 1]);
     expect(page?.nextCursor).toEqual({ key: ['10', '20'] });
     expect(page?.records).toEqual([
-      { source: 'cli_sessions', id: '10.20', field: 'session_id', value: 'session-1' },
-      { source: 'cli_sessions', id: '10.20', field: 'title', value: 'Session' },
+      { source: 'cli_sessions', id: '10', field: 'session_id', value: 'session-1' },
+      { source: 'cli_sessions', id: '10', field: 'title', value: 'Session' },
       {
         source: 'cli_sessions',
-        id: '10.20',
+        id: '10',
         field: 'git_url',
         value: 'git@example.com:acme/repo.git',
       },
-      { source: 'cli_sessions', id: '10.20', field: 'git_branch', value: 'main' },
+      { source: 'cli_sessions', id: '10', field: 'git_branch', value: 'main' },
     ]);
   });
 
@@ -721,14 +721,12 @@ describe('source adapters', () => {
 
     const branches = page?.records.filter(record => record.field === 'git_branch');
     expect(branches).toEqual([
-      { source: 'cli_sessions', id: '10.1', field: 'git_branch', value: 'main' },
-      { source: 'cli_sessions', id: '10.2', field: 'git_branch', value: 'feature/x' },
+      { source: 'cli_sessions', id: '10', field: 'git_branch', value: 'main' },
+      { source: 'cli_sessions', id: '10', field: 'git_branch', value: 'feature/x' },
     ]);
 
-    // Same session, distinguishable rows.
     const sessionIds = page?.records.filter(record => record.field === 'session_id');
     expect(sessionIds?.map(record => record.value)).toEqual(['session-1', 'session-1']);
-    expect(sessionIds?.map(record => record.id)).toEqual(['10.1', '10.2']);
   });
 
   it('feeds a cli session cursor back as both position bounds', async () => {
@@ -1118,7 +1116,6 @@ describe('source adapters', () => {
     build_id: 'build-a',
     event_id: '7',
     deployment_id: 'deploy-a',
-    created_by_user_id: 'creator-user',
     event_type: 'build.succeeded',
     event_timestamp: '2026-07-04T09:15:00.000Z',
     payload: { status: 'ok' },
@@ -1141,30 +1138,25 @@ describe('source adapters', () => {
     // Dropped from the projection on request.
     expect(byField.has('event_type')).toBe(false);
     expect(byField.has('event_timestamp')).toBe(false);
+    expect(byField.has('created_by_user_id')).toBe(false);
     expect(page?.nextCursor).toEqual({ key: ['build-a', '7'] });
   });
 
-  // The one source with a third user column. `created_by_user_id` is provenance, and on
-  // an org-owned deployment it names a member rather than the owner. Scoping a user read
-  // on it would hand that member the organization's deployment history as their own, so
-  // it must appear in the SELECT list and never in the WHERE clause.
-  it('exports the deployment creator without ever scoping on it', async () => {
+  // The table carries a third user column naming whoever created the deployment. It is
+  // neither read nor returned, and it never scoped anything: on an org-owned deployment it
+  // names a member rather than the owner, so a user read keyed on it would have returned
+  // an organization's deployment history as that member's own.
+  it('neither reads nor returns the deployment creator', async () => {
     const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
     const adapter = requireAdapter(adapters, 'deployment_events');
 
-    await adapter.readPage?.(READ_PAGE_INPUT);
+    const page = await adapter.readPage?.(READ_PAGE_INPUT);
     await adapter.readPage?.(ORG_READ_PAGE_INPUT);
 
-    for (const call of warehouseCalls) {
-      expect(call.text).not.toContain('WHERE created_by_user_id');
-      expect(call.text).not.toContain('created_by_user_id = $');
-    }
+    for (const call of warehouseCalls) expect(call.text).not.toContain('created_by_user_id');
+    expect(page?.records.some(record => record.field === 'created_by_user_id')).toBe(false);
     expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
     expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
-    const page = await adapter.readPage?.(READ_PAGE_INPUT);
-    expect(page?.records.find(record => record.field === 'created_by_user_id')?.value).toBe(
-      'creator-user'
-    );
   });
 
   it('scopes each deployment event read to one owner column and never both', async () => {
@@ -1211,7 +1203,7 @@ describe('source adapters', () => {
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(4);
+    expect(page?.records).toHaveLength(3);
     for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
@@ -1489,8 +1481,8 @@ describe('source adapters', () => {
     expect(page?.records.find(record => record.field === 'cwe_ids')?.value).toBe('{CWE-1321}');
   });
 
-  // Audit trail, like created_by_user_id on deployment_events. Exported so the person can
-  // see who dismissed a finding, never used to decide whose finding it is.
+  // Audit trail rather than attribution: returned so the person can see who dismissed a
+  // finding, never used to decide whose finding it is.
   it('exports the dismisser without ever scoping on it', async () => {
     const { adapters, warehouseCalls } = harness([
       { ...FINDING_ROW, ignored_by: 'admin-user', ignored_reason: 'accepted risk' },
@@ -1824,10 +1816,6 @@ describe('source adapters', () => {
       limit: 1,
     });
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
-
-    // `payload_id` repeats once per journal event, so it is exported as a field to
-    // group the rows and never used to identify one.
-    expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['11.2']));
     expect(byField.get('payload_id')).toBe('review-1');
     expect(byField.get('repo_full_name')).toBe('acme/private-api');
     expect(byField.get('pr_title')).toBe('Tighten the auth guard');
@@ -1921,51 +1909,27 @@ describe('source adapters', () => {
       limit: 1,
     });
 
-    // The key pair is the record id, not a pair of fields: both were dropped from the
-    // returned set on request and survive only as the thing that identifies the account.
     expect(page?.records).toEqual([
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'email',
-        value: 'person@example.com',
-      },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'display_name',
-        value: 'Example Person',
-      },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'avatar_url',
-        value: 'https://example.test/a.png',
-      },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'hosted_domain',
-        value: 'example.com',
-      },
+      { source: 'user_auth_provider', field: 'email', value: 'person@example.com' },
+      { source: 'user_auth_provider', field: 'display_name', value: 'Example Person' },
+      { source: 'user_auth_provider', field: 'avatar_url', value: 'https://example.test/a.png' },
+      { source: 'user_auth_provider', field: 'hosted_domain', value: 'example.com' },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['google', '110581'] });
   });
 
-  // The point of the source. Someone with Google and GitHub linked has two rows, and the
-  // record id is now the only thing telling them apart, since `provider` itself is no
-  // longer returned. That is why the key pair stays in the query and in the id.
-  it('tells two linked accounts of one person apart', async () => {
+  it('returns every linked account and names neither the provider nor its account id', async () => {
     const { adapters } = harness([
       AUTH_PROVIDER_ROW,
       { ...AUTH_PROVIDER_ROW, provider: 'github', provider_account_id: '4821' },
     ]);
 
     const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
-    const ids = new Set(page?.records.map(record => record.id));
+    const fields = page?.records.map(record => record.field) ?? [];
 
-    expect([...ids]).toEqual(['google.110581', 'github.4821']);
-    expect(page?.records.some(record => record.field === 'provider')).toBe(false);
+    expect(page?.records).toHaveLength(8);
+    expect(fields).not.toContain('provider');
+    expect(fields).not.toContain('provider_account_id');
   });
 
   // `kilo_user_id` repeats once per linked account, so it cannot page. The cursor is the

@@ -551,18 +551,17 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * `deployments`, so the two scope columns are that deployment's owner rather than
  * anything the event itself records. `kilo_user_id` is `deployments.owned_by_user_id`.
  *
- * `created_by_user_id` is a THIRD user column, and it deliberately does not scope
- * anything. It carries provenance only: who pressed the button, as against who owns the
- * result. The warehouse settled that split on two pieces of evidence, both checked
- * 2026-08-11 — `schema.ts` gives `owned_by_user_id` a foreign key to `kilocode_users`
- * while `created_by_user_id` is bare text with none, and `deployments-service.ts` gates
- * every access path on the owner columns and none on the creator.
+ * The table carries a THIRD user column naming whoever created the deployment. It is
+ * neither read nor returned. It never scoped anything either: the warehouse settled that
+ * on two pieces of evidence, both checked 2026-08-11 — `schema.ts` gives
+ * `owned_by_user_id` a foreign key to `kilocode_users` while the creator column is bare
+ * text with none, and `deployments-service.ts` gates every access path on the owner
+ * columns and none on the creator.
  *
- * The distinction only bites on organization-owned deployments, which is exactly where
- * the two disagree: rows carrying an organization and no user have a member as creator. Scoping a user export on the creator would hand that member an
- * organization's deployment history as their own personal data. `kilo_user_id = $1`
- * therefore stays the only user predicate, and the creator is exported as a field so the
- * provenance is still visible without ever selecting on it.
+ * The distinction bites on organization-owned deployments, which is where the two
+ * disagree: rows carrying an organization and no user were created by a member. Scoping a
+ * user export on the creator would have handed that member an organization's deployment
+ * history as their own personal data, so `kilo_user_id = $1` is the only user predicate.
  *
  * Rows with neither owner exist too. Both predicates skip them, as with any other unowned
  * row, so they reach nobody.
@@ -582,8 +581,7 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * They carry no information the surviving copy does not.
  */
 function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
-  return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
-  payload
+  return `SELECT build_id, event_id::text AS event_id, deployment_id, payload
 FROM deployment_events
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
@@ -634,14 +632,7 @@ const enrichmentQuery = singleKeyPageQuery({
  * `kilo_user_id` is deliberately absent. It is the scope column, so the subject already
  * implies it, and every other source omits its owner column for the same reason.
  *
- * Split in two on request. `provider` and `provider_account_id` are still SELECTed,
- * because they are this source's cursor and the two halves of its record id, but they are
- * no longer returned as fields. They remain visible in the id, which is what identifies
- * one linked account and keeps a person with Google and GitHub linked from receiving two
- * indistinguishable sets of records.
- *
- * `created_at` is gone entirely: nothing here needs it for a key, so it is not selected
- * either.
+ * Split in two on request: the key columns are read for the cursor and are not returned.
  */
 const USER_AUTH_PROVIDER_KEY = ['provider', 'provider_account_id'] as const;
 
@@ -675,9 +666,8 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * comparison yield NULL and silently drop the rows it was meant to keep.
  *
  * Warehouse nullability is not prod's, and the difference is the whole reason the readers
- * below are split. `schema.ts` marks six columns `notNull()` — `kilo_user_id`, the cursor
- * pair, `email`, `avatar_url` and `created_at` — but only the cursor pair survives the
- * load as NOT NULL. Every other column arrives nullable, `kilo_user_id` included. So a
+ * below are split. `schema.ts` marks several columns `notNull()`, but only the cursor pair
+ * survives the load as NOT NULL. Every other column arrives nullable, `kilo_user_id` included. So a
  * prod constraint is not something a reader here may lean on, and the two columns that
  * can be read strictly are exactly the two this query pages on.
  *
@@ -878,12 +868,11 @@ const microdollarJournalQueries: Record<ExportSubject['type'], string> = {
  * the same upstream alert can exist independently for more than one Security Agent owner.
  * Ownership is part of a finding's identity here, not a tag on it.
  *
- * `ignored_by` is the third user column of this batch, after `deployment_events`'
- * `created_by_user_id`, and it behaves the same way: audit trail naming whoever dismissed
- * the finding, never attribution. The access path settles it — every read in
- * `security-agent/db/security-findings.ts` goes through `ownerFindingPredicate()`, which
- * matches the owner columns and nothing else. It is exported as a field and never scoped
- * on.
+ * `ignored_by` is a third user column, and it is audit trail rather than attribution:
+ * whoever dismissed the finding, not whoever owns it. The access path settles that — every
+ * read in `security-agent/db/security-findings.ts` goes through `ownerFindingPredicate()`,
+ * which matches the owner columns and nothing else. It is returned as a field and never
+ * scoped on.
  *
  * The cursor is `id`, which both warehouse indexes already lead into as `(owner, id)`.
  *
@@ -1199,7 +1188,6 @@ type DeploymentEventRow = {
   build_id: string;
   event_id: string;
   deployment_id: string | null;
-  created_by_user_id: string | null;
   payload: string | null;
 };
 type CodeIndexingSearchRow = {
@@ -1560,9 +1548,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         );
         return {
           records: rows.flatMap(row => {
-            // The journal position identifies the row, so records that repeat a
-            // value are distinguishable rather than looking like duplication.
-            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            const id = row.most_significant_position;
             return [
               { source: 'cli_sessions', id, field: 'session_id', value: row.session_id },
               { source: 'cli_sessions', id, field: 'title', value: row.title },
@@ -1607,35 +1593,26 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          records: rows.flatMap(row => {
-            // The position pair identifies the journal row; `payload_id` identifies the
-            // review and repeats across them, so it is a field rather
-            // than the key. Same division `cli_sessions` makes.
-            const id = `${row.most_significant_position}.${row.least_significant_position}`;
-            return [
+          records: rows.flatMap(row => [
               {
                 source: 'cloud_agent_code_reviews',
-                id,
                 field: 'payload_id',
                 value: row.payload_id,
               },
               {
                 source: 'cloud_agent_code_reviews',
-                id,
                 field: 'repo_full_name',
                 value: row.repo_full_name,
               },
-              { source: 'cloud_agent_code_reviews', id, field: 'pr_url', value: row.pr_url },
-              { source: 'cloud_agent_code_reviews', id, field: 'pr_title', value: row.pr_title },
-              { source: 'cloud_agent_code_reviews', id, field: 'base_ref', value: row.base_ref },
+              { source: 'cloud_agent_code_reviews', field: 'pr_url', value: row.pr_url },
+              { source: 'cloud_agent_code_reviews', field: 'pr_title', value: row.pr_title },
+              { source: 'cloud_agent_code_reviews', field: 'base_ref', value: row.base_ref },
               {
                 source: 'cloud_agent_code_reviews',
-                id,
                 field: 'previous_summary_body',
                 value: row.previous_summary_body,
               },
-            ];
-          }),
+          ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             row.most_significant_position,
             row.least_significant_position,
@@ -1781,9 +1758,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         );
         return {
           // Three records per search, sharing the row's id, so the query, the project it
-          // ran against and what it returned stay groupable as one search. `created_at`
-          // was dropped from the projection on request; nothing here needs it, so it is
-          // not selected either.
+          // ran against and what it returned stay groupable as one search.
           records: rows.flatMap(row => [
             {
               source: 'code_indexing_search',
@@ -1826,7 +1801,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // Everything below is a LEFT JOIN result or an unconstrained warehouse
             // column, so each is read leniently. See the note on `warehouseText`.
             deployment_id: warehouseText(row.deployment_id),
-            created_by_user_id: warehouseText(row.created_by_user_id),
             payload: jsonValue(row.payload),
           }))
         );
@@ -1842,13 +1816,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
                 id,
                 field: 'deployment_id',
                 value: row.deployment_id,
-              },
-              // Provenance, never a scope. See the note on `deploymentEventPageQuery`.
-              {
-                source: 'deployment_events',
-                id,
-                field: 'created_by_user_id',
-                value: row.created_by_user_id,
               },
               { source: 'deployment_events', id, field: 'payload', value: row.payload },
             ];
@@ -2251,13 +2218,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           records: rows.flatMap(row => {
             // The key pair identifies the linked account, so the records of one account
             // stay groupable and two linked accounts never look like duplication.
-            // `AuthProviderId` is a closed set of identifiers none of which contains a
-            // dot, so the first one always separates the halves and this cannot be
-            // ambiguous the way a free-text pair would be.
-            const id = `${row.provider}.${row.provider_account_id}`;
             return USER_AUTH_PROVIDER_FIELDS.map(field => ({
               source: 'user_auth_provider',
-              id,
               field,
               value: row[field],
             }));
@@ -2403,9 +2365,8 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path'],
   code_indexing_search: ['id', 'project_id', 'query', 'metadata'],
-  // `created_by_user_id` is probed because the query selects it as a field, not because
-  // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
-  deployment_events: ['build_id', 'event_id', 'deployment_id', 'created_by_user_id', 'payload'],
+  // The owner columns are covered by `sourceQueryScopes` rather than declared here.
+  deployment_events: ['build_id', 'event_id', 'deployment_id', 'payload'],
   // The whole of the narrowed table bar its owner column, which `sourceQueryScopes`
   // covers.
   enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],

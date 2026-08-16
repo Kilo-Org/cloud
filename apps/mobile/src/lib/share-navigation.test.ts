@@ -8,6 +8,7 @@ import {
   navigationContainsShareGate,
   parseShareHrefParams,
   setPendingShareNavigation,
+  shareDeliveryShareId,
   takePendingShareNavigation,
 } from './share-navigation';
 
@@ -60,7 +61,9 @@ describe('share-navigation', () => {
     const taken: string[] = [];
     let next = takePendingShareNavigation();
     while (next) {
-      taken.push(next.shareId);
+      if (shareDeliveryShareId(next)) {
+        taken.push(next.shareId);
+      }
       next = takePendingShareNavigation();
     }
     expect(taken).toHaveLength(SHARE_PAYLOAD_MAX_ENTRIES);
@@ -77,6 +80,31 @@ describe('share-navigation', () => {
     setPendingShareNavigation({ href: '/b', shareId: 'b' });
     __resetPendingShareNavigationForTests();
     expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('enqueues and returns a null-shareId navigation unchanged', () => {
+    setPendingShareNavigation({
+      href: '/(app)/pr-review/octocat/hello-world/42',
+      shareId: null,
+    });
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/pr-review/octocat/hello-world/42',
+      shareId: null,
+    });
+  });
+});
+
+describe('shareDeliveryShareId', () => {
+  it('is false when shareId is null', () => {
+    expect(
+      shareDeliveryShareId({ href: '/(app)/pr-review/octocat/hello-world/42', shareId: null })
+    ).toBe(false);
+  });
+
+  it('is true when shareId is a string', () => {
+    expect(shareDeliveryShareId({ href: '/(app)/agent-chat/new?shareId=a', shareId: 'a' })).toBe(
+      true
+    );
   });
 });
 

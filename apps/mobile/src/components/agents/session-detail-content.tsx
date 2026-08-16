@@ -4,7 +4,7 @@ import {
   type KiloSessionId,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { type Href, useIsFocused, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +33,7 @@ import {
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import {
@@ -109,6 +110,7 @@ import {
   type ModelPickerSelection,
   type ModelPickerSelectionScope,
 } from '@/lib/picker-bridge';
+import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 type SessionDetailContentProps = {
@@ -329,6 +331,46 @@ export function SessionDetailContent({
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  // Refetch the linked PR on every focus so a link, unlink, or mid-session
+  // decision change surfaces without reopening the session. A pending review
+  // decision gets one 4s follow-up refetch — no polling loop.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const refetch = async (scheduleFollowUp: boolean) => {
+        try {
+          const result = await trpcClient.cliSessionsV2.getWithRuntimeState.query({
+            session_id: sessionId,
+          });
+          if (cancelled) {
+            return;
+          }
+          manager.updateFetchedAssociatedPr(result.associatedPr);
+          if (scheduleFollowUp && result.associatedPr?.reviewDecisionPending) {
+            pendingTimeout = setTimeout(() => {
+              pendingTimeout = null;
+              void refetch(false);
+            }, 4000);
+          }
+        } catch {
+          // Ignore a failed refetch: the badge keeps its current state and a
+          // later focus refetches again.
+        }
+      };
+
+      void refetch(true);
+
+      return () => {
+        cancelled = true;
+        if (pendingTimeout !== null) {
+          clearTimeout(pendingTimeout);
+        }
+      };
+    }, [manager, sessionId])
+  );
 
   useEffect(() => {
     setOpenContextSheetIdentity(openIdentity => {
@@ -563,23 +605,26 @@ export function SessionDetailContent({
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <SessionContextMetrics
-      info={contextInfo}
-      totalCostMicrodollars={totalMicrodollars}
-      hasMessages={messages.length > 0}
-      loading={shouldShowLoading}
-      onPress={
-        contextInfo
-          ? () => {
-              setOpenContextSheetIdentity({
-                sessionId,
-                providerID: contextInfo.providerID,
-                modelID: contextInfo.modelID,
-              });
-            }
-          : undefined
-      }
-    />
+    <View className="flex-row items-center gap-2">
+      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+      <SessionContextMetrics
+        info={contextInfo}
+        totalCostMicrodollars={totalMicrodollars}
+        hasMessages={messages.length > 0}
+        loading={shouldShowLoading}
+        onPress={
+          contextInfo
+            ? () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo.providerID,
+                  modelID: contextInfo.modelID,
+                });
+              }
+            : undefined
+        }
+      />
+    </View>
   );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });

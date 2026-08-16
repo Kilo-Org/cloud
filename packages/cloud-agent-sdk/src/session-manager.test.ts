@@ -5,6 +5,7 @@ import {
   formatError,
   type SessionManagerConfig,
   type FetchedSessionData,
+  type AssociatedPrData,
   type StoredMessage,
 } from './session-manager';
 import {
@@ -1484,6 +1485,60 @@ describe('createSessionManager', () => {
       mockSession.state.getActivity.mockReturnValue({ type: 'idle' as const });
       cloudSubscriberRef.current!();
       expect(atomValue<boolean>(cloudConfig.store, cloudMgr.atoms.isLoading)).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // updateFetchedAssociatedPr
+  // -------------------------------------------------------------------------
+
+  describe('updateFetchedAssociatedPr', () => {
+    const pr: AssociatedPrData = {
+      url: 'https://github.com/test/repo/pull/77',
+      number: 77,
+      state: 'open',
+      title: 'Fix the thing',
+      headSha: 'abc123',
+      lastSyncedAt: '2026-01-01T00:00:00.000Z',
+      platform: 'github',
+      reviewDecision: 'approved',
+      reviewDecisionPending: false,
+    };
+
+    it('merges associatedPr into fetchedSessionData, preserving other fields', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.updateFetchedAssociatedPr(pr);
+
+      const data = atomValue<FetchedSessionData>(config.store, mgr.atoms.fetchedSessionData);
+      expect(data?.associatedPr).toEqual(pr);
+      expect(data?.title).toBe('Test Session');
+      expect(data?.gitBranch).toBe('main');
+    });
+
+    it('clears associatedPr when passed null', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.updateFetchedAssociatedPr(pr);
+      mgr.updateFetchedAssociatedPr(null);
+
+      const data = atomValue<FetchedSessionData>(config.store, mgr.atoms.fetchedSessionData);
+      expect(data?.associatedPr).toBeNull();
+    });
+
+    it('is a no-op when there is no current fetched session', () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mgr.updateFetchedAssociatedPr(pr);
+
+      expect(
+        atomValue<FetchedSessionData | null>(config.store, mgr.atoms.fetchedSessionData)
+      ).toBeNull();
     });
   });
 

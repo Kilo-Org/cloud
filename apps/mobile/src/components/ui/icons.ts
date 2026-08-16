@@ -63,6 +63,8 @@ export { default as GitBranch } from 'lucide-react-native/icons/git-branch';
 export { default as GitCommit } from 'lucide-react-native/icons/git-commit-horizontal';
 export { default as GitMerge } from 'lucide-react-native/icons/git-merge';
 export { default as GitPullRequest } from 'lucide-react-native/icons/git-pull-request';
+export { default as GitPullRequestClosed } from 'lucide-react-native/icons/git-pull-request-closed';
+export { default as GitPullRequestDraft } from 'lucide-react-native/icons/git-pull-request-draft';
 export { default as Globe } from 'lucide-react-native/icons/globe';
 export { default as HelpCircle } from 'lucide-react-native/icons/circle-question-mark';
 export { default as History } from 'lucide-react-native/icons/history';

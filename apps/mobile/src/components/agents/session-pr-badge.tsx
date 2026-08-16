@@ -8,7 +8,7 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   type LucideIcon,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';

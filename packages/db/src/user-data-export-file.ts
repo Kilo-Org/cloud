@@ -50,12 +50,8 @@
  *                                 one journal row per state change of a code review, with
  *                                 the pull request it covers and the summary it replaced
  *
- *      Also at 6, and the reason a reader may care more: `app_builder_projects` and
- *      `app_builder_messages` no longer carry the `softDeleted` mark. Their projections
- *      were reduced to `id, title` and `id, data` on request, so neither source can tell a
- *      row prod has deleted from a live one. Both still RETURN those rows; they have
- *      stopped labelling them, not stopped exporting them. A reader comparing a version 6
- *      file against an earlier one will find the mark absent where it used to appear.
+ *      Also at 6, `app_builder_projects` and `app_builder_messages` narrowed to
+ *      `id, title` and `id, data` on request.
  *   7  the `audiences` source (the marketing view's copy of the person's email address).
  *      Personal exports only; the source has no organization reading. It is also the one
  *      source NOT bounded to `snapshotAt` — the dbt model carries no row timestamp, so it
@@ -89,6 +85,13 @@
  *      and the city, country and coordinates derived from the requesting IP). The most
  *      granular location the file carries: the identity section reports it per person,
  *      and this resolves it per usage row
+ *
+ *      Also at 9, every record carries the same four keys and nothing conditional: a
+ *      per-record property some sources set and others could not has been removed, so a
+ *      consumer can rely on one shape throughout.
+ *
+ *      A trailer also arrives at 9. Every file ends with one, naming any source that
+ *      failed while being read, so a file that ends without one was truncated.
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it

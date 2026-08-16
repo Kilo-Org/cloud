@@ -6,65 +6,7 @@ export type ExportRecord = {
   field: string;
   value: string | number | boolean | null;
   id?: string;
-  /**
-   * Present, and always `true`, on a row prod has deleted since the snapshot.
-   *
-   * The export returns deleted rows rather than hiding them — it is a truthful copy of
-   * what the warehouse holds about someone, not a view of what prod still serves — so
-   * this labels them instead of filtering them. Only a positive deletion says anything:
-   * a live row and a row whose state is unknown both carry no property at all, because
-   * the warehouse cannot tell those two apart. See `SOURCES_WITHOUT_DELETED_COLUMN`.
-   */
-  softDeleted?: true;
 };
-
-/**
- * The warehouse is a CDC copy and keeps rows prod has deleted. Tables reloaded after
- * 2026-08-12 carry `_snowflake_deleted` to mark them; the rest cannot say.
- *
- * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
- * was not reloaded (the rewrite cost was judged out of proportion to what it would mark),
- * `cli_sessions` is a journal carrying
- * `event_type` instead, `users` has no CDC column, and `enrichment_data`,
- * `microdollar_usage_journal` and `cloud_agent_code_reviews` were narrowed on request,
- * dropping the flag with the rest.
- * Naming the column on any of them is a runtime error, so records from those sources are
- * never labelled.
- *
- * `external_usage_daily`, `audiences` and `int_microdollar_usage_enriched` are the odd ones
- * out: all three are dbt models rather than CDC copies of prod tables, so no such column
- * was ever going to exist on any of them.
- *
- * The narrowed tables are where the flag was given up rather than never held, and in each
- * case it was separating nothing. `enrichment_data` carried a negligible number of deleted
- * rows against its live set, and `security_findings` none at all.
- * `microdollar_usage_journal` is insert-only — every row is an `IncrementalInsertRows`
- * event — so nothing there can be deleted in the first place.
- *
- * The two app-builder sources are where the flag was dropped from sources that genuinely
- * used it. Both projections were reduced on request — to `id, data` and `id, title` — and
- * both tables do hold deleted rows. Neither source can distinguish them now, and neither
- * claims to. The records they emit
- * are unlabelled rather than labelled live, which is the honest reading: `deletionMark`
- * already treats an absent mark as "not deleted, or cannot say" precisely so a source
- * losing the column does not start asserting something false.
- */
-export const DELETED_COLUMN = '_snowflake_deleted';
-export const SOURCES_WITHOUT_DELETED_COLUMN = [
-  'microdollar_usage_metadata',
-  'cli_sessions',
-  'users',
-  'enrichment_data',
-  'microdollar_usage_journal',
-  'security_findings',
-  'source_embeddings',
-  'external_usage_daily',
-  'app_builder_messages',
-  'app_builder_projects',
-  'cloud_agent_code_reviews',
-  'audiences',
-  'int_microdollar_usage_enriched',
-] as const;
 
 /**
  * Sources that describe an individual and have no organization reading at all, so an
@@ -91,16 +33,6 @@ export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
   'orb_customer',
 ]);
 
-/**
- * `softDeleted: true`, or nothing at all.
- *
- * Only `true` is meaningful. The column is NULL throughout on a table whose reload has
- * not run yet, and NULL means unknown rather than live, so an absent property covers
- * both "not deleted" and "cannot say" — which is the honest reading of the data.
- */
-function deletionMark(value: unknown): { softDeleted: true } | Record<string, never> {
-  return value === true ? { softDeleted: true } : {};
-}
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
 export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
@@ -402,12 +334,7 @@ const projectQueries = subjectPageQueries({
   columns: 'id, title',
 });
 
-/**
- * No sync metadata in the projection, by request. `_snowflake_inserted_at` and
- * `_snowflake_updated_at` were never selected here; `_snowflake_deleted` was, and dropping
- * it means this source can no longer tell a row prod has deleted from a live one. It
- * therefore labels nothing — see `SOURCES_WITHOUT_DELETED_COLUMN`.
- */
+/** No sync metadata in the projection, by request. */
 const messageQueries = subjectPageQueries({
   table: 'app_builder_messages',
   columns: 'id, data',
@@ -548,7 +475,7 @@ function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   const cursorColumn = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
   return `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
   COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}') AS cursor_secondary,
-  system_prompt_prefix, _snowflake_deleted
+  system_prompt_prefix
 FROM system_prompt_prefix
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
@@ -589,12 +516,11 @@ const userPromptQueries = subjectPageQueries({
  *
  * Rows with both columns NULL are the source's tombstones, every payload column NULL.
  * Neither predicate matches NULL, so scoping alone excludes them and they never reach the
- * file as id-only records. `_snowflake_deleted` is still selected, because the deleted rows
- * that do carry an owner are labelled rather than hidden.
+ * file as id-only records.
  */
 const codeIndexingQueries = subjectPageQueries({
   table: 'code_indexing_manifest',
-  columns: 'id, project_id, git_branch, file_path, _snowflake_deleted',
+  columns: 'id, project_id, git_branch, file_path',
 });
 
 /**
@@ -617,7 +543,7 @@ const codeIndexingQueries = subjectPageQueries({
  */
 const codeIndexingSearchQueries = subjectPageQueries({
   table: 'code_indexing_search',
-  columns: 'id, project_id, query, metadata, _snowflake_deleted',
+  columns: 'id, project_id, query, metadata',
 });
 
 /**
@@ -657,7 +583,7 @@ const codeIndexingSearchQueries = subjectPageQueries({
  */
 function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
-  payload, _snowflake_deleted
+  payload
 FROM deployment_events
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
@@ -759,7 +685,7 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * a cast, so the output and input references are the same column. See `SCOPE_COLUMNS` for
  * the tables where that is not true and the qualifier is load-bearing.
  */
-const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_COLUMNS.join(', ')}, ${DELETED_COLUMN}
+const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_COLUMNS.join(', ')}
 FROM user_auth_provider
 WHERE ${SCOPE_COLUMNS.user} = $1
   AND ($2::text IS NULL OR (provider, provider_account_id) > ($2::text, $3::text))
@@ -895,8 +821,8 @@ const ORB_CUSTOMER_FIELDS: Record<string, (value: unknown) => string | null> = {
   shipping_address: jsonValue,
 };
 
-/** Cursor first, then the declared fields, then the deletion flag. */
-const ORB_CUSTOMER_COLUMNS = ['id', ...Object.keys(ORB_CUSTOMER_FIELDS), DELETED_COLUMN];
+/** Cursor first, then the declared fields. */
+const ORB_CUSTOMER_COLUMNS = ['id', ...Object.keys(ORB_CUSTOMER_FIELDS)];
 
 const orbCustomerQuery = singleKeyPageQuery({
   table: 'orb_customer',
@@ -1070,7 +996,7 @@ const sourceEmbeddingQueries = subjectPageQueries({
  */
 const platformIntegrationQueries = subjectPageQueries({
   table: 'platform_integrations',
-  columns: 'id, platform, platform_account_login, repositories, _snowflake_deleted',
+  columns: 'id, platform, platform_account_login, repositories',
 });
 
 /**
@@ -1219,7 +1145,6 @@ type SystemPromptRow = {
   system_prompt_prefix_id: string;
   cursor_secondary: string;
   system_prompt_prefix: string | null;
-  deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
 type ExternalUsageDailyRow = {
@@ -1231,7 +1156,6 @@ type PlatformIntegrationRow = {
   platform: string | null;
   platform_account_login: string | null;
   repositories: string | null;
-  deleted: unknown;
 };
 type SourceEmbeddingRow = {
   id: string;
@@ -1266,12 +1190,10 @@ type UsageEnrichedRow = {
 type UserAuthProviderRow = Record<(typeof USER_AUTH_PROVIDER_FIELDS)[number], string | null> & {
   provider: string;
   provider_account_id: string;
-  deleted: unknown;
 };
 type OrbCustomerRow = {
   id: string;
   fields: { field: string; value: string | null }[];
-  deleted: unknown;
 };
 type DeploymentEventRow = {
   build_id: string;
@@ -1279,21 +1201,18 @@ type DeploymentEventRow = {
   deployment_id: string | null;
   created_by_user_id: string | null;
   payload: string | null;
-  deleted: unknown;
 };
 type CodeIndexingSearchRow = {
   id: string;
   project_id: string | null;
   query: string | null;
   metadata: string | null;
-  deleted: unknown;
 };
 type CodeIndexingRow = {
   id: string;
   project_id: string | null;
   git_branch: string | null;
   file_path: string | null;
-  deleted: unknown;
 };
 
 function requiredString(value: unknown, field: string): string {
@@ -1688,8 +1607,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the journal envelope went with the narrowing, so this source
-          // cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => {
             // The position pair identifies the journal row; `payload_id` identifies the
             // review and repeats across them, so it is a field rather
@@ -1744,19 +1661,16 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // so the cursor always has a comparable value to carry forward.
             cursor_secondary: requiredString(row.cursor_secondary, 'cursor_secondary'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.map(row => ({
             source: 'system_prompt_prefix',
             // The prefix id repeats across the triple, so it cannot identify a row on
-            // its own. The pair that orders the page does, and it is what a deletion
-            // mark has to hang off to mean anything.
+            // its own. The pair that orders the page does.
             id: `${row.system_prompt_prefix_id}.${row.cursor_secondary}`,
             field: 'system_prompt_prefix',
             value: row.system_prompt_prefix,
-            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             row.system_prompt_prefix_id,
@@ -1809,7 +1723,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             project_id: warehouseText(row.project_id),
             git_branch: warehouseText(row.git_branch),
             file_path: warehouseText(row.file_path),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1823,21 +1736,18 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'project_id',
               value: row.project_id,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_manifest',
               id: row.id,
               field: 'git_branch',
               value: row.git_branch,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_manifest',
               id: row.id,
               field: 'file_path',
               value: row.file_path,
-              ...deletionMark(row.deleted),
             },
           ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -1867,7 +1777,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // hands back a parsed object rather than text. Same handling as
             // `app_builder_messages.data`, the export's other JSON payload.
             metadata: jsonValue(row.metadata),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1881,21 +1790,18 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'project_id',
               value: row.project_id,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_search',
               id: row.id,
               field: 'query',
               value: row.query,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_search',
               id: row.id,
               field: 'metadata',
               value: row.metadata,
-              ...deletionMark(row.deleted),
             },
           ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -1922,7 +1828,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             deployment_id: warehouseText(row.deployment_id),
             created_by_user_id: warehouseText(row.created_by_user_id),
             payload: jsonValue(row.payload),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1930,15 +1835,13 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // `event_id` is unique only within a build, so the pair identifies the event.
             // The same shape `cli_sessions` uses for its journal positions.
             const id = `${row.build_id}.${row.event_id}`;
-            const mark = deletionMark(row.deleted);
             return [
-              { source: 'deployment_events', id, field: 'build_id', value: row.build_id, ...mark },
+              { source: 'deployment_events', id, field: 'build_id', value: row.build_id },
               {
                 source: 'deployment_events',
                 id,
                 field: 'deployment_id',
                 value: row.deployment_id,
-                ...mark,
               },
               // Provenance, never a scope. See the note on `deploymentEventPageQuery`.
               {
@@ -1946,9 +1849,8 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
                 id,
                 field: 'created_by_user_id',
                 value: row.created_by_user_id,
-                ...mark,
               },
-              { source: 'deployment_events', id, field: 'payload', value: row.payload, ...mark },
+              { source: 'deployment_events', id, field: 'payload', value: row.payload },
             ];
           }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.build_id, row.event_id]),
@@ -1972,8 +1874,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the column went with the narrowing to six columns. See
-          // `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => [
             {
               source: 'source_embeddings',
@@ -2017,8 +1917,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the column went with the narrowing, and the table carried no
-          // deleted rows anyway. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row =>
             row.fields.map(({ field, value }) => ({
               source: 'security_findings',
@@ -2055,7 +1953,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         // a key the WHERE clause never produced.
         const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
         return {
-          // No deletion mark: a dbt model, not a CDC copy, so it carries no such column.
           records: rows.flatMap(row => {
             // The row has no key of its own — its grain is its identity, which is why the
             // load carries DISTINCT. Both parts are emitted below, so a separator
@@ -2099,7 +1996,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // jsonb, so the driver returns a parsed value. Serialized whole: which
             // repositories a connection reaches is the substance of it.
             repositories: jsonValue(row.repositories),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -2109,21 +2005,18 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'platform',
               value: row.platform,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'platform_integrations',
               id: row.id,
               field: 'platform_account_login',
               value: row.platform_account_login,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'platform_integrations',
               id: row.id,
               field: 'repositories',
               value: row.repositories,
-              ...deletionMark(row.deleted),
             },
           ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -2155,8 +2048,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the column went with the narrowing to six columns, so this
-          // source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => {
             // The position pair identifies the event, not `payload_id`. Same shape as
             // `cli_sessions`, and for the reason set out on the query above.
@@ -2204,7 +2095,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               field,
               value: read(row[field]),
             })),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -2214,7 +2104,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field,
               value,
-              ...deletionMark(row.deleted),
             }))
           ),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -2239,7 +2128,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: a dbt model, not a CDC copy, so it carries no such column.
           records: rows.flatMap(row =>
             row.fields.map(({ field, value }) => ({
               source: 'int_microdollar_usage_enriched',
@@ -2307,8 +2195,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark anywhere here: the column was dropped when the table was
-          // narrowed, so this source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => [
             {
               source: 'enrichment_data',
@@ -2359,7 +2245,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             display_name: warehouseText(row.display_name),
             avatar_url: warehouseText(row.avatar_url),
             hosted_domain: warehouseText(row.hosted_domain),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -2375,7 +2260,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id,
               field,
               value: row[field],
-              ...deletionMark(row.deleted),
             }));
           }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
@@ -2460,10 +2344,10 @@ export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQ
  * instead of the file simply ending early.
  *
  * Existence of the table is not sufficient. A table can be present from an earlier load
- * and still lack a column a newer query selects — `_snowflake_deleted` arrived table by
- * table, and a source selecting it against a not-yet-reloaded table fails at read time
- * with an undefined-column error rather than being classified unavailable. So this asks
- * about columns, and a source counts as present only when every column it requires is
+ * and still lack a column a newer query selects: the warehouse is loaded table by table,
+ * and a source selecting a column against a not-yet-reloaded table fails at read time with
+ * an undefined-column error rather than being classified unavailable. So this asks about
+ * columns, and a source counts as present only when every column it requires is
  * there.
  *
  * Reads `information_schema` rather than probing with a real query: a probe that fails
@@ -2502,8 +2386,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
-  // The position pair is declared because the query orders and pages on it. No deletion
-  // column: the journal envelope went with the 2026-08-14 narrowing.
+  // The position pair is declared because the query orders and pages on it.
   cloud_agent_code_reviews: [
     'payload_id',
     'repo_full_name',
@@ -2514,30 +2397,21 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
-  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix', DELETED_COLUMN],
+  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix'],
   microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
-  code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
-  code_indexing_search: ['id', 'project_id', 'query', 'metadata', DELETED_COLUMN],
+  code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path'],
+  code_indexing_search: ['id', 'project_id', 'query', 'metadata'],
   // `created_by_user_id` is probed because the query selects it as a field, not because
   // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
-  deployment_events: [
-    'build_id',
-    'event_id',
-    'deployment_id',
-    'created_by_user_id',
-    'payload',
-    DELETED_COLUMN,
-  ],
-  // No deletion column: dropped when the table was narrowed to four columns. The probe
-  // must not ask for it, or the table would be called absent on every export.
+  deployment_events: ['build_id', 'event_id', 'deployment_id', 'created_by_user_id', 'payload'],
+  // The whole of the narrowed table bar its owner column, which `sourceQueryScopes`
+  // covers.
   enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],
-  // Two columns in the table, one of which is the scope. A dbt model, so no deletion
-  // column exists to declare.
+  // Two columns in the table, one of which is the scope.
   audiences: ['email'],
-  // Derived from the same constant the SELECT list is. A dbt model, so no deletion column
-  // exists to declare.
+  // Derived from the same constant the SELECT list is.
   int_microdollar_usage_enriched: USAGE_ENRICHED_COLUMNS,
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading.
@@ -2552,28 +2426,21 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'least_significant_position',
   ],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
-  // column the query started reading. No deletion column: it went with the narrowing.
+  // column the query started reading.
   security_findings: SECURITY_FINDING_COLUMNS,
-  // No deletion column: it went with the narrowing to six columns, along with the
-  // `embedding` vector that was almost all of this table's size.
+  // Narrowed to six columns, which took the `embedding` vector with it — that was
+  // almost all of this table's size.
   source_embeddings: ['id', 'project_id', 'file_path', 'git_branch'],
-  // Three of the table's 29 columns, plus the cursor and the deletion flag. The rest is
-  // integration plumbing the export deliberately leaves behind.
-  platform_integrations: [
-    'id',
-    'platform',
-    'platform_account_login',
-    'repositories',
-    DELETED_COLUMN,
-  ],
+  // Three of the table's 29 columns, plus the cursor. The rest is integration plumbing
+  // the export deliberately leaves behind.
+  platform_integrations: ['id', 'platform', 'platform_account_login', 'repositories'],
   // The whole table bar its two owner columns, which `sourceQueryScopes` covers and
-  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of. A dbt model, so there is no
-  // deletion column to declare.
+  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of.
   external_usage_daily: ['geoip_country_code'],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. The scope column `kilo_user_id` is added per
   // subject below; the cursor pair needs no addition, being two of the fields already.
-  user_auth_provider: [...USER_AUTH_PROVIDER_COLUMNS, DELETED_COLUMN],
+  user_auth_provider: [...USER_AUTH_PROVIDER_COLUMNS],
 };
 
 /**

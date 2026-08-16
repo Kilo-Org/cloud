@@ -5,8 +5,6 @@ import {
   sourceQueryScopes,
   findPresentWarehouseTables,
   warehouseRequirements,
-  DELETED_COLUMN,
-  SOURCES_WITHOUT_DELETED_COLUMN,
   SCOPE_PREDICATES,
   WAREHOUSE_PROFILE_FIELDS,
   WAREHOUSE_ONLY_FIELDS,
@@ -228,21 +226,23 @@ describe('warehouse scoping guard', () => {
     }
   );
 
-  // Selecting the deletion column from a table that has none is an undefined-column
-  // error at read time, after the source has already been declared present. This keeps
-  // the list of tables without it tied to what the queries actually select.
-  it.each(Object.entries(sourceQueries))(
-    '%s selects the deletion column only where it exists',
-    (_name, query) => {
-      const readsTableWithoutColumn = SOURCES_WITHOUT_DELETED_COLUMN.some(table =>
-        new RegExp(`FROM ${table}\\b`).test(query)
-      );
-      if (readsTableWithoutColumn) expect(query).not.toContain(DELETED_COLUMN);
-    }
-  );
-
   // The probe is only as good as what it asks about. A column selected by a query but
   // absent from the declaration would be read from a table the probe just called ready.
+  //
+  // Plain column names only. A cast, an alias or a COALESCE is skipped rather than parsed:
+  // this exists to catch a column quietly added to a SELECT list, and a half-built SQL
+  // parser failing on the composite cursors would cost more than it caught. The scope
+  // columns are excluded because `warehouseRequirements` adds those itself, per subject.
+  const SCOPE_COLUMN_NAMES = ['kilo_user_id', 'organization_id'];
+  function plainSelectedColumns(query: string): string[] {
+    const body = query.slice('SELECT '.length, query.indexOf('\nFROM'));
+    return body
+      .split(',')
+      .map(part => part.trim())
+      .filter(part => /^[a-z_][a-z0-9_]*$/.test(part))
+      .filter(part => !SCOPE_COLUMN_NAMES.includes(part));
+  }
+
   it.each(Object.entries(WAREHOUSE_SOURCE_COLUMNS))(
     '%s declares every column its queries select',
     (table, declared) => {
@@ -251,16 +251,18 @@ describe('warehouse scoping guard', () => {
         .map(([, query]) => query);
       expect(queries.length).toBeGreaterThan(0);
       for (const query of queries) {
-        if (query.includes(DELETED_COLUMN)) expect(declared).toContain(DELETED_COLUMN);
+        for (const column of plainSelectedColumns(query)) {
+          expect(declared).toContain(column);
+        }
       }
     }
   );
 
-  it('requires the deletion column exactly where the source carries one', () => {
-    const withoutColumn = new Set<string>(SOURCES_WITHOUT_DELETED_COLUMN);
-    for (const [table, columns] of Object.entries(WAREHOUSE_SOURCE_COLUMNS)) {
-      expect(columns.includes(DELETED_COLUMN)).toBe(!withoutColumn.has(table));
-    }
+  // The column the export used to label deleted rows with. Rows prod has deleted are still
+  // returned; nothing in the file says which they are, and no query reads the column that
+  // would say. Asserted across every query so it cannot return one source at a time.
+  it.each(Object.entries(sourceQueries))('%s never selects the deletion column', (_name, query) => {
+    expect(query).not.toContain('_snowflake_deleted');
   });
 });
 
@@ -292,7 +294,7 @@ describe('warehouse availability probe', () => {
     const { warehouseQuery } = probeHarness({ audiences: ['kilo_user_id'] });
 
     const present = await findPresentWarehouseTables(warehouseQuery, [
-      { table: 'audiences', requiredColumns: ['kilo_user_id', DELETED_COLUMN] },
+      { table: 'audiences', requiredColumns: ['kilo_user_id', 'segment'] },
     ]);
 
     expect([...present]).toEqual([]);
@@ -805,14 +807,13 @@ describe('source adapters', () => {
     });
   });
 
-  // All three deletion states in one place, on a source that still carries the column.
-  // This used to be asserted on `app_builder_projects`, which gave the flag up when its
-  // projection was reduced; the guarantee is unchanged, so it moved rather than went.
+  // Deleted rows are RETURNED, they are simply no longer distinguished. The export is a
+  // copy of what the warehouse holds about someone rather than a view of what prod still
+  // serves, so withholding the marker had to not become withholding the row.
   //
-  // Only `true` is meaningful. `false` and `null` both produce no property, because the
-  // warehouse cannot distinguish "live" from "not reloaded yet" and the export must not
-  // pretend otherwise.
-  it('marks a deleted row and leaves a live one unmarked', async () => {
+  // All three source states are fed in — deleted, live, and the unknown a not-yet-reloaded
+  // table produces — because the marker's absence must mean the same thing for each.
+  it('returns a deleted row alongside a live one, marking neither', async () => {
     const { adapters } = harness([
       { system_prompt_prefix_id: '1', cursor_secondary: '-', system_prompt_prefix: 'Live' },
       {
@@ -821,7 +822,6 @@ describe('source adapters', () => {
         system_prompt_prefix: 'Deleted',
         _snowflake_deleted: true,
       },
-      // Unknown state: the table's reload has not run. Not deleted as far as we can say.
       {
         system_prompt_prefix_id: '3',
         cursor_secondary: '-',
@@ -839,7 +839,6 @@ describe('source adapters', () => {
         id: '2.-',
         field: 'system_prompt_prefix',
         value: 'Deleted',
-        softDeleted: true,
       },
       {
         source: 'system_prompt_prefix',
@@ -981,7 +980,7 @@ describe('source adapters', () => {
     expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
   });
 
-  it('marks every field of a manifest row prod has since deleted', async () => {
+  it('returns a manifest row prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...MANIFEST_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
@@ -989,7 +988,7 @@ describe('source adapters', () => {
     );
 
     expect(page?.records).toHaveLength(3);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   // Unknown is not deleted: the column is NULL throughout on a table whose reload has not
@@ -1084,13 +1083,13 @@ describe('source adapters', () => {
     expect(JSON.parse(String(metadata))).toEqual(SEARCH_ROW.metadata);
   });
 
-  it('marks every field of a search row prod has since deleted', async () => {
+  it('returns a search row prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...SEARCH_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toHaveLength(3);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   // Reads fewer rows per page than the default, because a row carries a whole result set.
@@ -1207,13 +1206,13 @@ describe('source adapters', () => {
     expect(warehouseCalls[0].values).toEqual(['owner-user', 'build-a', '7', 100]);
   });
 
-  it('marks every field of a deployment event prod has since deleted', async () => {
+  it('returns a deployment event prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...DEPLOYMENT_EVENT_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toHaveLength(4);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   // The joined columns come from a LEFT JOIN through deployment_builds to deployments, so
@@ -1684,7 +1683,7 @@ describe('source adapters', () => {
   });
 
   // The source does hold deleted rows, and this source carries the flag to mark them.
-  it('marks every field of an integration prod has since deleted', async () => {
+  it('returns a integration prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...INTEGRATION_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'platform_integrations').readPage?.(
@@ -1692,7 +1691,7 @@ describe('source adapters', () => {
     );
 
     expect(page?.records).toHaveLength(3);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   it('reads a missing integration value as absent rather than failing the export', async () => {
@@ -2008,13 +2007,13 @@ describe('source adapters', () => {
   });
 
   // The source does hold deleted rows, and this source carries the flag to mark them.
-  it('marks every field of a linked account prod has since deleted', async () => {
+  it('returns a linked account prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toHaveLength(4);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   it('reads a missing linked-account value as absent rather than failing the export', async () => {
@@ -2149,13 +2148,13 @@ describe('source adapters', () => {
     ).rejects.toThrow('no organization scope');
   });
 
-  it('marks every field of an orb customer prod has since deleted', async () => {
+  it('returns a orb customer prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...ORB_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toHaveLength(7);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   const USAGE_ENRICHED_ROW = {

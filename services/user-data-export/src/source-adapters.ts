@@ -1089,6 +1089,52 @@ const microdollarUsageHourlyQueries: Record<ExportSubject['type'], string> = {
   organization: microdollarUsageHourlyPageQuery('organization'),
 };
 
+/**
+ * Which countries a person appeared from. Not usage history: no date, no measures. The
+ * date survives only as the load's cutoff predicate, which excludes the cutoff day itself
+ * as a partial one.
+ *
+ * No `DISTINCT` here, unlike `microdollar_usage_hourly`. The load has already reduced this
+ * table to these three columns and deduplicated them, so the three together are the grain
+ * and the cursor is unique by construction. If that ever stops being true the cursor stops
+ * being unique with it.
+ *
+ * The scope pins one owner, so the cursor is the other two columns, in the order the
+ * indexes were built in. Both owner columns must be present whichever subject asks; see
+ * `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ *
+ * The `COALESCE` sentinels are mandatory rather than defensive. Both warehouse indexes are
+ * EXPRESSION indexes over exactly these forms, so a query comparing the raw columns cannot
+ * use either and scans. They also do the job the sentinel exists for: a NULL inside a tuple
+ * comparison yields NULL rather than false and would drop the rows the coalescing keeps.
+ *
+ * `kilo_user_id` is not reliably a person here — it holds `anon:<ip address>` values, and
+ * carries far more distinct values than there are real users, because someone who signs in
+ * keeps the anonymous key they had before. Neither scope can reach one: a personal read
+ * binds a real user id, which no anonymous key equals, and an organization read was
+ * measured 2026-08-15 to reach none because no anonymous row carries an organization at
+ * all. Nothing here treats the column as an identifier; it is a predicate and a cursor
+ * value, and it is not returned.
+ */
+function usageDailyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  const cursorOwner = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  const keyed = [
+    `COALESCE(${cursorOwner}, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(country_code, '${NULL_CURSOR_SENTINEL}')`,
+  ];
+  return `SELECT ${cursorOwner} AS cursor_owner, country_code
+FROM usage_daily
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL OR (${keyed.join(', ')}) > ($2::text, $3::text))
+ORDER BY ${keyed.join(', ')}
+LIMIT $4`;
+}
+
+const usageDailyQueries: Record<ExportSubject['type'], string> = {
+  user: usageDailyPageQuery('user'),
+  organization: usageDailyPageQuery('organization'),
+};
+
 const securityFindingQueries = subjectPageQueries({
   table: 'security_findings',
   columns: SECURITY_FINDING_COLUMNS.join(', '),
@@ -1184,6 +1230,7 @@ type SystemPromptRow = {
   system_prompt_prefix: string | null;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type UsageDailyRow = { cursor_owner: string | null; country_code: string | null };
 type MicrodollarUsageHourlyRow = {
   cursor_owner: string | null;
   project_id: string | null;
@@ -1951,6 +1998,39 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'usage_daily',
+      warehouseTable: 'usage_daily',
+      async readPage(input): Promise<SourcePage> {
+        const [afterOwner, afterCountry] = keyCursorValues(input.cursor, 2);
+        const rows: UsageDailyRow[] = await warehouseQuery(usageDailyQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
+          afterOwner,
+          afterCountry,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            cursor_owner: warehouseText(row.cursor_owner),
+            country_code: warehouseText(row.country_code),
+          }))
+        );
+        // Must agree exactly with the COALESCE in the query, or a page would resume from
+        // a key the WHERE clause never produced.
+        const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
+        return {
+          records: rows.map(row => ({
+            source: 'usage_daily',
+            id: keyed(row.country_code),
+            field: 'country_code',
+            value: row.country_code,
+          })),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            keyed(row.cursor_owner),
+            keyed(row.country_code),
+          ]),
+        };
+      },
+    },
+    {
       name: 'microdollar_usage_hourly',
       warehouseTable: 'microdollar_usage_hourly',
       async readPage(input): Promise<SourcePage> {
@@ -2401,6 +2481,8 @@ export const warehouseQueries = {
   externalUsageDailyOrgQuery: externalUsageDailyQueries.organization,
   microdollarUsageHourlyUserQuery: microdollarUsageHourlyQueries.user,
   microdollarUsageHourlyOrgQuery: microdollarUsageHourlyQueries.organization,
+  usageDailyUserQuery: usageDailyQueries.user,
+  usageDailyOrgQuery: usageDailyQueries.organization,
   // No org counterpart, deliberately. See `userAuthProviderQuery` and `USER_ONLY_SOURCES`.
   userAuthProviderUserQuery: userAuthProviderQuery,
 };
@@ -2511,6 +2593,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
   // Both owner columns are required whichever subject asks; see
   // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
   microdollar_usage_hourly: ['project_id', 'vercel_ip_country_id', 'vercel_ip_country'],
+  usage_daily: ['country_code'],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. The scope column `kilo_user_id` is added per
   // subject below; the cursor pair needs no addition, being two of the fields already.
@@ -2533,6 +2616,7 @@ const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set([
   'system_prompt_prefix',
   'external_usage_daily',
   'microdollar_usage_hourly',
+  'usage_daily',
 ]);
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
@@ -2674,6 +2758,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   externalUsageDailyOrgQuery: 'organization_id = $1',
   microdollarUsageHourlyUserQuery: 'kilo_user_id = $1',
   microdollarUsageHourlyOrgQuery: 'organization_id = $1',
+  usageDailyUserQuery: 'kilo_user_id = $1',
+  usageDailyOrgQuery: 'organization_id = $1',
   userAuthProviderUserQuery: 'kilo_user_id = $1',
   userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',

@@ -87,6 +87,7 @@
  *                                 country and coordinates derived from the requesting IP
  *        `microdollar_usage_hourly`
  *                                 the countries a person appeared from, per project
+ *        `usage_daily`            the countries a person appeared from
  *
  *      Also at 9, every record carries the same four keys and nothing conditional: a
  *      per-record property some sources set and others could not has been removed, so a

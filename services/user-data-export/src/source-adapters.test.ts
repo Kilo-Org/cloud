@@ -358,6 +358,7 @@ describe('warehouse availability probe', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'usage_daily',
       'microdollar_usage_hourly',
       'external_usage_daily',
       'platform_integrations',
@@ -424,6 +425,7 @@ describe('source adapters', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'usage_daily',
       'microdollar_usage_hourly',
       'external_usage_daily',
       'platform_integrations',
@@ -2288,5 +2290,93 @@ describe('microdollar usage hourly', () => {
 
     expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
     expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+  });
+});
+
+describe('usage daily', () => {
+  const USAGE_DAILY_ROW = { cursor_owner: 'org-9', country_code: 'NL' };
+
+  it('emits the country and neither owner', async () => {
+    const { adapters } = harness([USAGE_DAILY_ROW]);
+
+    const page = await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.records).toEqual([
+      { source: 'usage_daily', id: 'NL', field: 'country_code', value: 'NL' },
+    ]);
+  });
+
+  // Both warehouse indexes are expression indexes over these exact COALESCE forms, in this
+  // order, so comparing the raw columns would scan instead of seeking.
+  it('matches the expression indexes the warehouse built', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+
+    await requireAdapter(adapters, 'usage_daily').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain(
+      "(COALESCE(organization_id, '-'), COALESCE(country_code, '-')) > ($2::text, $3::text)"
+    );
+    expect(warehouseCalls[0].text).toContain(
+      "ORDER BY COALESCE(organization_id, '-'), COALESCE(country_code, '-')"
+    );
+  });
+
+  // The load has already deduplicated this table, so the grain is unique without our help.
+  // Its sibling microdollar_usage_hourly has not, and carries its own DISTINCT.
+  it('does not deduplicate, the load having done it', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+
+    await requireAdapter(adapters, 'usage_daily').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text.startsWith('SELECT DISTINCT')).toBe(false);
+  });
+
+  it('pages on both columns the scope did not pin', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+
+    const page = await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['org-9', 'NL'] },
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'NL'] });
+    expect(warehouseCalls[1].values).toEqual(['owner-user', 'org-9', 'NL', 100]);
+  });
+
+  it('substitutes the sentinel in the cursor only', async () => {
+    const { adapters } = harness([{ cursor_owner: null, country_code: 'NL' }]);
+
+    const page = await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['-', 'NL'] });
+    expect(page?.records).toEqual([
+      { source: 'usage_daily', id: 'NL', field: 'country_code', value: 'NL' },
+    ]);
+  });
+
+  // `kilo_user_id` holds anon:<ip> values on this table, so it is a predicate and a cursor
+  // value and never a returned field.
+  it('scopes each read to one owner column and returns neither', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+    const adapter = requireAdapter(adapters, 'usage_daily');
+
+    const page = await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+    const fields = page?.records.map(record => record.field) ?? [];
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(fields).not.toContain('kilo_user_id');
+    expect(fields).not.toContain('organization_id');
   });
 });

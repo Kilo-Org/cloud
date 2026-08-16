@@ -5,7 +5,7 @@ import { selectRowPlatformPresentation, sessionPlatformIconKind } from './sessio
 // The module under test is a .tsx that imports Lucide / brand icons (RN).
 // Stub those so the pure mapper can be unit-tested in the node environment.
 // (`vi.mock` calls are hoisted above the import by vitest.)
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Cloud: () => null,
   Code: () => null,
   Terminal: () => null,

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, Monitor, RefreshCw } from 'lucide-react-native';
+import { MessageSquare, Monitor, RefreshCw } from '@/components/ui/icons';
 import { useCallback } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import Animated, {

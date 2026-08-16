@@ -1,4 +1,4 @@
-import { AlertTriangle, ExternalLink, ShieldAlert } from 'lucide-react-native';
+import { AlertTriangle, ExternalLink, ShieldAlert } from '@/components/ui/icons';
 import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 

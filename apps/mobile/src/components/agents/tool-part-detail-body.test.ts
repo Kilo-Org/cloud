@@ -22,7 +22,7 @@ import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
-vi.mock('lucide-react-native', () => ({ Terminal: 'Terminal' }));
+vi.mock('@/components/ui/icons', () => ({ Terminal: 'Terminal' }));
 vi.mock('./bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));

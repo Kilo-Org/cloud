@@ -67,7 +67,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Check: () => null,
   Share: () => null,
 }));

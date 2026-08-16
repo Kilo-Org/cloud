@@ -7,7 +7,7 @@ import {
   Shield,
   Smartphone,
   User,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

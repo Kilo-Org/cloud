@@ -10,7 +10,7 @@ const connection = vi.hoisted(() => ({ connected: true }));
 vi.mock('react-native', () => ({
   View: 'View',
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   WifiOff: 'WifiOff',
 }));
 vi.mock('@/components/ui/text', () => ({

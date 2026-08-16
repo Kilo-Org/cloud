@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { UserPlus, Users } from 'lucide-react-native';
+import { UserPlus, Users } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';

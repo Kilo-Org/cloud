@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react-native';
+import { Info } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

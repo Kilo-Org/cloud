@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { GitPullRequest, Plus, X } from 'lucide-react-native';
+import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';

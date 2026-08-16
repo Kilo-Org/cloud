@@ -1,6 +1,6 @@
 import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';

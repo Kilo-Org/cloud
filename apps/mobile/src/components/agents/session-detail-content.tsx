@@ -6,7 +6,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
-import { MessageSquare } from 'lucide-react-native';
+import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';

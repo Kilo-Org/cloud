@@ -1,4 +1,4 @@
-import { Newspaper } from 'lucide-react-native';
+import { Newspaper } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';

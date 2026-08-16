@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { RefreshCw, Unplug } from 'lucide-react-native';
+import { RefreshCw, Unplug } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';

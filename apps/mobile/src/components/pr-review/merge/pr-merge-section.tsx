@@ -10,7 +10,7 @@
 // under the repo's 300-line limit.
 
 import { type Href, useRouter } from 'expo-router';
-import { GitMerge } from 'lucide-react-native';
+import { GitMerge } from '@/components/ui/icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 

@@ -7,7 +7,7 @@ import {
   RotateCcw,
   Server,
   Sparkles,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { KvRow } from '@/components/ui/kv-row';

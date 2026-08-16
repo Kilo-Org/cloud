@@ -12,7 +12,7 @@ import {
 } from '@/lib/onboarding';
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { X } from 'lucide-react-native';
+import { X } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';

@@ -29,7 +29,7 @@
 //     thread just routes the events and lets the cache flow.
 
 import * as Haptics from 'expo-haptics';
-import { Check, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Check, CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 

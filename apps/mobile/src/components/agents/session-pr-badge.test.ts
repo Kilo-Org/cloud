@@ -22,7 +22,7 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   CircleCheck: 'CircleCheck',
   CircleX: 'CircleX',
   GitMerge: 'GitMerge',

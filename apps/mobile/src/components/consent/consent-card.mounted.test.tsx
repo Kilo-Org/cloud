@@ -40,7 +40,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
   LineChart: 'LineChart',
   MessageSquare: 'MessageSquare',

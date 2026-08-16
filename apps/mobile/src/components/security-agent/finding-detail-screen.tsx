@@ -1,5 +1,5 @@
 import { useNavigation, useRouter } from 'expo-router';
-import { Ban, ShieldOff } from 'lucide-react-native';
+import { Ban, ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 

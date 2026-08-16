@@ -1045,8 +1045,16 @@ function microdollarUsageHourlyPageQuery(scope: keyof typeof SCOPE_COLUMNS): str
     `COALESCE(vercel_ip_country_id, ${NULL_CURSOR_NUMBER})`,
     `COALESCE(vercel_ip_country, '${NULL_CURSOR_SENTINEL}')`,
   ];
+  // The coalesced forms are SELECTed as well as ordered on, which `SELECT DISTINCT`
+  // requires: Postgres rejects an ORDER BY expression that is not in the select list of a
+  // DISTINCT query, and this read is the only one here that is DISTINCT. Selecting them
+  // changes no grain — each is a function of a column already selected — and it removes
+  // the risk of the cursor's SQL and its reader disagreeing, since the reader now takes
+  // the coalesced value rather than recomputing it.
+  const keyedSelect = keyed.map((expr, index) => `${expr} AS key_${index}`);
   return `SELECT DISTINCT ${cursorOwner} AS cursor_owner, project_id,
-  vercel_ip_country_id, vercel_ip_country
+  vercel_ip_country_id, vercel_ip_country,
+  ${keyedSelect.join(', ')}
 FROM microdollar_usage_hourly
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::text IS NULL
@@ -1203,10 +1211,11 @@ type SystemPromptRow = {
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
 type UsageDailyRow = { cursor_owner: string | null; country_code: string | null };
 type MicrodollarUsageHourlyRow = {
-  cursor_owner: string | null;
   project_id: string | null;
   vercel_ip_country_id: string | null;
   vercel_ip_country: string | null;
+  /** The coalesced cursor values, read from the query rather than recomputed. */
+  key: string[];
 };
 type ExternalUsageDailyRow = {
   cursor_owner: string | null;
@@ -1905,30 +1914,21 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           ]
         ).then(result =>
           result.map(row => ({
-            cursor_owner: warehouseText(row.cursor_owner),
             project_id: warehouseText(row.project_id),
-            // Carried as digits because it is half a cursor value and binds back as
-            // `bigint`. The driver may hand a `bigint` back as either form.
             vercel_ip_country_id:
               typeof row.vercel_ip_country_id === 'number'
                 ? String(row.vercel_ip_country_id)
                 : warehouseText(row.vercel_ip_country_id),
             vercel_ip_country: warehouseText(row.vercel_ip_country),
+            key: [0, 1, 2, 3].map(index => {
+              const value = row[`key_${index}`];
+              return typeof value === 'number' ? String(value) : requiredString(value, 'cursor');
+            }),
           }))
         );
-        // Must agree exactly with the COALESCE in the query, or a page would resume from
-        // a key the WHERE clause never produced.
-        const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
-        // The numeric column takes the numeric sentinel, or the value handed back would
-        // not be one the WHERE clause could compare.
-        const keyedNumber = (value: string | null): string => value ?? String(NULL_CURSOR_NUMBER);
         return {
           records: rows.flatMap(row => {
-            const id = [
-              keyed(row.project_id),
-              keyedNumber(row.vercel_ip_country_id),
-              keyed(row.vercel_ip_country),
-            ].join('|');
+            const id = row.key.slice(1).join('|');
             return [
               {
                 source: 'microdollar_usage_hourly',
@@ -1950,12 +1950,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               },
             ];
           }),
-          nextCursor: nextKeyCursor(rows, input.limit, row => [
-            keyed(row.cursor_owner),
-            keyed(row.project_id),
-            keyedNumber(row.vercel_ip_country_id),
-            keyed(row.vercel_ip_country),
-          ]),
+          nextCursor: nextKeyCursor(rows, input.limit, row => row.key),
         };
       },
     },

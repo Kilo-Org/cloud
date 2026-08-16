@@ -2174,11 +2174,18 @@ describe('source adapters', () => {
 });
 
 describe('microdollar usage hourly', () => {
+  // The coalesced key columns are SELECTed as well as ordered on, which SELECT DISTINCT
+  // requires, so a row carries both the raw values and the cursor values. `key_2` comes
+  // back as a number here and as text elsewhere, since a bigint arrives as either.
   const HOURLY_ROW = {
     cursor_owner: 'org-9',
     project_id: 'project-a',
     vercel_ip_country_id: 528,
     vercel_ip_country: 'NL',
+    key_0: 'org-9',
+    key_1: 'project-a',
+    key_2: 528,
+    key_3: 'NL',
   };
 
   it('emits the three requested fields and neither owner', async () => {
@@ -2219,10 +2226,12 @@ describe('microdollar usage hourly', () => {
     expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, null, null, 1]);
   });
 
-  // Both warehouse indexes are expression indexes over these exact COALESCE forms, so the
-  // query has to match them character for character or it cannot use either and scans.
-  // `-1` for the bigint, `'-'` for the text columns.
-  it('matches the expression indexes the warehouse built', async () => {
+  // Two things at once. The indexes are expression indexes over these exact COALESCE
+  // forms, so the query must match them character for character or it cannot use either.
+  // And Postgres rejects an ORDER BY expression absent from the select list of a DISTINCT
+  // query, so the same expressions have to be selected — verified against the database,
+  // since a text-only assertion cannot see a planner error.
+  it('matches the expression indexes and selects what it orders by', async () => {
     const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
 
     await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
@@ -2234,6 +2243,16 @@ describe('microdollar usage hourly', () => {
     expect(warehouseCalls[0].text).toContain("COALESCE(project_id, '-')");
     expect(warehouseCalls[0].text).toContain("COALESCE(vercel_ip_country, '-')");
     expect(warehouseCalls[0].text).toContain('$4::bigint');
+    // Every ORDER BY expression appears in the select list, which SELECT DISTINCT requires.
+    const selectList = warehouseCalls[0].text.slice(0, warehouseCalls[0].text.indexOf('\nFROM'));
+    for (const expr of [
+      "COALESCE(organization_id, '-')",
+      "COALESCE(project_id, '-')",
+      'COALESCE(vercel_ip_country_id, -1)',
+      "COALESCE(vercel_ip_country, '-')",
+    ]) {
+      expect(selectList).toContain(expr);
+    }
     expect(warehouseCalls[0].values).toEqual([
       'owner-user',
       'org-9',
@@ -2245,7 +2264,9 @@ describe('microdollar usage hourly', () => {
   });
 
   it('substitutes the sentinel in the cursor only', async () => {
-    const { adapters } = harness([{ ...HOURLY_ROW, project_id: null, cursor_owner: null }]);
+    const { adapters } = harness([
+      { ...HOURLY_ROW, project_id: null, cursor_owner: null, key_0: '-', key_1: '-' },
+    ]);
 
     const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
       ...READ_PAGE_INPUT,
@@ -2260,7 +2281,7 @@ describe('microdollar usage hourly', () => {
   // The numeric column takes the numeric sentinel, or the cursor would hand back a value
   // the WHERE clause cannot compare against a bigint.
   it('substitutes the numeric sentinel for an absent country id', async () => {
-    const { adapters } = harness([{ ...HOURLY_ROW, vercel_ip_country_id: null }]);
+    const { adapters } = harness([{ ...HOURLY_ROW, vercel_ip_country_id: null, key_2: -1 }]);
 
     const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
       ...READ_PAGE_INPUT,

@@ -57,8 +57,8 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             <View className="mt-3 gap-3">
               <View className="rounded-md bg-warn-tile-bg p-3">
                 <Text className="text-xs text-warn">
-                  We do not capture session replay, screenshots of your screen, or your
-                  screen&apos;s view hierarchy.
+                  Crash reports include no screen capture unless optional sharing is on (see below).
+                  We never capture your screen&apos;s view hierarchy.
                 </Text>
               </View>
             </View>
@@ -81,6 +81,21 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
               <View className="rounded-md bg-warn-tile-bg p-3">
                 <Text className="text-xs text-warn">
                   No prompt or conversation content is sent to product analytics.
+                </Text>
+              </View>
+            </View>
+          }
+        />
+        <Section
+          title="Error screenshots and session replay"
+          what="Masked screenshots when an error happens, and masked recordings of a small sample of sessions."
+          why="See what the app displayed when something broke."
+          who="Sentry."
+          footer={
+            <View className="mt-3">
+              <View className="rounded-md bg-warn-tile-bg p-3">
+                <Text className="text-xs text-warn">
+                  Text and images are masked on your device before anything is sent.
                 </Text>
               </View>
             </View>

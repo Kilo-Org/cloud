@@ -19,7 +19,6 @@ import {
   Slot,
   ThemeProvider,
   useGlobalSearchParams,
-  useNavigationContainerRef,
   usePathname,
   useRouter,
   useSegments,
@@ -84,9 +83,6 @@ import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
-const navigationIntegration = Sentry.reactNavigationIntegration({
-  enableTimeToInitialDisplay: !isRunningInExpoGo(),
-});
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
@@ -122,7 +118,7 @@ function initSentry(optionalConsented: boolean) {
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [navigationIntegration, expoRouterIntegration, Sentry.deeplinkIntegration()],
+    integrations: [expoRouterIntegration, Sentry.deeplinkIntegration()],
     enableNativeFramesTracking: false,
 
     beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
@@ -645,14 +641,7 @@ function RootLayoutNav() {
 }
 
 function RootLayout() {
-  const ref = useNavigationContainerRef();
   const navigationTheme = useNavigationTheme();
-
-  useEffect(() => {
-    if (ref.current) {
-      navigationIntegration.registerNavigationContainer(ref);
-    }
-  }, [ref]);
 
   useEffect(() => {
     const subscription = setupNotificationResponseHandler();

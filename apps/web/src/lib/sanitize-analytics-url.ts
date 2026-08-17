@@ -1,9 +1,19 @@
 const SENSITIVE_QUERY_PARAMS = new Set(['callbackurl', 'code', 'email', 'state', 'token']);
 const SENSITIVE_PATHS = new Set(['/auth/verify-magic-link']);
+const SESSION_SHARE_PATH_REDACTION = '/s/:share_token';
+
+export function isSessionSharePath(pathname: string): boolean {
+  return pathname === '/s' || pathname.startsWith('/s/');
+}
+
+export function sanitizeAnalyticsPathname(pathname: string): string {
+  return isSessionSharePath(pathname) ? SESSION_SHARE_PATH_REDACTION : pathname;
+}
 
 function sanitizeUrlParts(origin: string, pathname: string, searchParams: string): string {
-  const baseUrl = `${origin}${pathname}`;
-  if (SENSITIVE_PATHS.has(pathname) || !searchParams) {
+  const sanitizedPathname = sanitizeAnalyticsPathname(pathname);
+  const baseUrl = `${origin}${sanitizedPathname}`;
+  if (SENSITIVE_PATHS.has(sanitizedPathname) || !searchParams) {
     return baseUrl;
   }
 

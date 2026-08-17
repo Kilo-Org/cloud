@@ -209,23 +209,33 @@ export async function fetchSessionMessagesPage(
 // Share
 // ---------------------------------------------------------------------------
 
-const ShareResponseSchema = z.object({
-  success: z.literal(true),
-  public_id: z.string(),
-});
+const ShareResponseSchema = z
+  .object({
+    success: z.literal(true),
+    share_token: z.string().min(1),
+  })
+  .strict();
+
+const SharedSessionMetadataResponseSchema = z
+  .object({
+    success: z.literal(true),
+    title: z.string().nullable(),
+    owner_name: z.string().nullable(),
+  })
+  .strict();
 
 /**
  * Share a session via the session-ingest worker.
  *
  * Calls POST /session/:sessionId/share which is idempotent — if the session
- * already has a public_id, the existing one is returned.
+ * already has an active share generation, the existing one is reused.
  *
- * @returns The public_id used to construct the /s/{public_id} share URL.
+ * @returns The opaque JWT used to construct the /s/{share_token} share URL.
  */
 export async function shareSession(
   sessionId: string,
   userId: string
-): Promise<{ public_id: string }> {
+): Promise<{ share_token: string }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
@@ -255,7 +265,52 @@ export async function shareSession(
   }
 
   const body = ShareResponseSchema.parse(await response.json());
-  return { public_id: body.public_id };
+  return { share_token: body.share_token };
+}
+
+/**
+ * Resolve the metadata for a public session share token without downloading
+ * the session snapshot. The token is intentionally never included in errors
+ * or Sentry context.
+ */
+export async function fetchSharedSessionMetadata(
+  shareToken: string
+): Promise<{ title: string | null; ownerName: string | null } | null> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}/metadata`;
+  const response = await fetch(url, { cache: 'no-store' });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      `Session ingest metadata failed: ${response.status} ${response.statusText}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'metadata' },
+      extra: { status: response.status },
+    });
+    throw error;
+  }
+
+  const parsed = SharedSessionMetadataResponseSchema.safeParse(
+    await response.json().catch(() => undefined)
+  );
+  if (!parsed.success) {
+    const error = new Error('Session ingest metadata response was malformed');
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'metadata' },
+      extra: { status: response.status, issues: parsed.error.issues },
+    });
+    throw error;
+  }
+
+  return { title: parsed.data.title, ownerName: parsed.data.owner_name };
 }
 
 // ---------------------------------------------------------------------------

@@ -25,14 +25,13 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
+import { generateApiToken } from '@/lib/tokens';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
 } from '@/lib/session-ingest-client';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
@@ -1639,10 +1638,10 @@ export const cliSessionsV2Router = createTRPCRouter({
   }),
 
   /**
-   * Share a V2 session by generating a public_id.
+   * Share a V2 session by issuing an opaque JWT share token.
    *
    * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has a public_id, the existing one is returned.
+   * already has an active share generation, the existing one is reused.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
@@ -1650,7 +1649,7 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id);
-      return { public_id: result.public_id };
+      return { share_token: result.share_token };
     } catch (error) {
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
@@ -1700,40 +1699,14 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      if (!SESSION_INGEST_WORKER_URL) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'SESSION_INGEST_WORKER_URL is not configured',
-        });
-      }
-
-      const token = generateInternalServiceToken(session.kilo_user_id);
-      const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(input.kilo_session_id)}/share`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Session share failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`,
-        });
-      }
-
-      const shareResponseSchema = z.object({ public_id: z.string() });
-      let body: z.infer<typeof shareResponseSchema>;
       try {
-        body = shareResponseSchema.parse(await response.json());
-      } catch {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Session share succeeded but response was malformed',
-        });
+        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
+        return { share_token: result.share_token, session_id: input.kilo_session_id };
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Session not found') {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
+        throw error;
       }
-
-      return { share_id: body.public_id, session_id: input.kilo_session_id };
     }),
 });

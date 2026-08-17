@@ -39,4 +39,31 @@ describe('sanitizeAnalyticsUrl', () => {
     expect(sanitizeAnalyticsUrlValue('not a url')).toBe('not a url');
     expect(sanitizeAnalyticsUrlValue(null)).toBeNull();
   });
+
+  it('redacts share tokens from /s/* pathnames', () => {
+    expect(
+      sanitizeAnalyticsUrl(
+        'https://app.kilo.ai',
+        '/s/eyJhbGciOiJIUzI1NiJ9.share.token',
+        'utm_source=copy'
+      )
+    ).toBe('https://app.kilo.ai/s/:share_token?utm_source=copy');
+    expect(
+      sanitizeAnalyticsUrlValue(
+        'https://app.kilo.ai/s/eyJhbGciOiJIUzI1NiJ9.share.token?email=user%40example.com'
+      )
+    ).toBe('https://app.kilo.ai/s/:share_token');
+    expect(sanitizeAnalyticsUrlValue('/s/eyJhbGciOiJIUzI1NiJ9.share.token')).toBe(
+      'http://localhost/s/:share_token'
+    );
+  });
+
+  it('leaves neighboring /s paths unchanged', () => {
+    expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/sessions/abc', '')).toBe(
+      'https://app.kilo.ai/sessions/abc'
+    );
+    expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/share/abc', '')).toBe(
+      'https://app.kilo.ai/share/abc'
+    );
+  });
 });

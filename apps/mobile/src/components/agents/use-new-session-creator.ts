@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useRef } from 'react';
-import { type Href, useNavigation, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
+import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { useHoistedOperationKey } from '@/lib/operation-key';
@@ -52,7 +53,6 @@ export function useNewSessionCreator({
   variant,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useRouter();
-  const navigation = useNavigation();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const promptRef = useRef('');
@@ -156,27 +156,13 @@ export function useNewSessionCreator({
         } catch {
           // A failed haptics call is cosmetic; stay silent and navigate.
         }
-        const path = organizationId
-          ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
-          : `/(app)/agent-chat/${result.kiloSessionId}`;
-        router.push(path as Href);
-        requestAnimationFrame(() => {
-          // Runs after the surrounding try returned, so a failure here would
-          // escape uncaught. The stack cleanup is cosmetic; contain it.
-          try {
-            navigation.dispatch(state => {
-              const routes = state.routes.filter(
-                (r: { name: string }) => r.name !== 'agent-chat/new'
-              );
-              return {
-                type: 'RESET' as const,
-                payload: { ...state, routes, index: routes.length - 1 },
-              };
-            });
-          } catch {
-            // The session already exists; stay silent.
-          }
-        });
+        // One atomic navigation: `replace` drops the new-session route as it
+        // pushes the session route, so back still lands on the session list.
+        // The previous form — `push` plus a `RESET` dispatched one frame later —
+        // mutated the stack while the native push transition was still running,
+        // which crashed Fabric on Android ("addViewAt: failed to insert view
+        // ... The specified child already has a parent", Sentry KILO-APP-25).
+        replaceWithAgentSession(router, result.kiloSessionId, organizationId);
       } catch {
         // Stay silent: no create-failure toast, no duplicate-create retry.
       }
@@ -200,7 +186,6 @@ export function useNewSessionCreator({
     queryClient,
     trpc,
     router,
-    navigation,
     attachments,
     setIsCreating,
     getKey,

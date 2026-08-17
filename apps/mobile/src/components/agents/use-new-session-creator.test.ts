@@ -11,8 +11,7 @@ import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
-const routerPush = vi.hoisted(() => vi.fn());
-const navigationDispatch = vi.hoisted(() => vi.fn());
+const routerReplace = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const captureEventMock = vi.hoisted(() => vi.fn());
 const invalidateAgentSessionQueries = vi.hoisted(() => vi.fn(async () => undefined));
@@ -25,8 +24,7 @@ const hapticsMock = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: routerPush }),
-  useNavigation: () => ({ dispatch: navigationDispatch }),
+  useRouter: () => ({ replace: routerReplace }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -179,11 +177,15 @@ function requireResult(resultRef: { current: CreatorResult | null }): CreatorRes
   return result;
 }
 
-// Fires the frame synchronously so the navigation RESET dispatch runs inside
-// the act() block. Hoisted so the stub is not an inline callback argument
+// Counts the frames the hook schedules and fires them synchronously. The
+// creator must not defer any navigation work to a frame boundary — a stack
+// mutation dispatched one frame after the push crashed Fabric on Android. The
+// stub is hoisted so it is not an inline callback argument
 // (prefer-await-to-callbacks); the parameter is named `frame` because the
 // promise plugin treats a `callback`-named parameter as a promise callback.
+const scheduledFrames = { count: 0 };
 const requestAnimationFrameStub = (frame: () => void): number => {
+  scheduledFrames.count += 1;
   frame();
   return 0;
 };
@@ -218,6 +220,7 @@ beforeEach(() => {
   hapticsMock.calls = 0;
   hapticsMock.rejectWith = undefined;
   attachmentsWire = null;
+  scheduledFrames.count = 0;
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrameStub);
 });
 
@@ -454,7 +457,7 @@ describe('useNewSessionCreator operationKey', () => {
 
   it('does not treat a post-success navigation failure as a create failure and rotates the key', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());
-    routerPush.mockImplementationOnce(() => {
+    routerReplace.mockImplementationOnce(() => {
       throw new Error('navigation failed');
     });
     const creator = runCreator({});
@@ -511,42 +514,23 @@ describe('useNewSessionCreator operationKey', () => {
     }
   });
 
-  it('contains a deferred stack-cleanup failure after a success and rotates the key', async () => {
+  it('navigates once and defers no stack mutation to a later frame', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());
-    navigationDispatch.mockImplementationOnce(() => {
-      throw new Error('stack cleanup failed');
-    });
-    // The test environment has no requestAnimationFrame; capture the deferred
-    // callback so it can be run after the submit settles, like the real frame
-    // boundary does.
-    const scheduledFrames: (() => void)[] = [];
-    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the arrow is a global stub, not an async callback
-    vi.stubGlobal('requestAnimationFrame', (callback: () => void) => {
-      scheduledFrames.push(callback);
-      return 1;
-    });
-
     const creator = runCreator({});
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-    expect(toastError).not.toHaveBeenCalled();
 
-    // The deferred stack cleanup runs after the submit returned; a failure
-    // there must be contained instead of surfacing as an uncaught exception.
-    expect(scheduledFrames).toHaveLength(1);
-    expect(() => {
-      scheduledFrames[0]?.();
-    }).not.toThrow();
-    expect(toastError).not.toHaveBeenCalled();
-
-    // The next submit is a fresh intent with a fresh key, not a retry of the
-    // successful operation key.
     creator.promptRef.current = 'hello';
     await creator.createSessionFromDraft();
 
-    const keys = usedOperationKeys();
-    expect(keys[1]).toBeDefined();
-    expect(keys[1]).not.toBe(keys[0]);
+    // The old form pushed the session route and then dispatched a stack RESET
+    // one frame later to drop `agent-chat/new`. That second commit landed while
+    // the native push transition was still running and crashed Fabric on
+    // Android (Sentry KILO-APP-25). `replace` reaches the same stack in one
+    // commit, so nothing may be scheduled on a frame boundary.
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith(
+      expect.stringContaining(`agent-chat/${sessionResult().kiloSessionId}`)
+    );
+    expect(scheduledFrames.count).toBe(0);
   });
 });
 
@@ -563,7 +547,7 @@ describe('useNewSessionCreator onCreated', () => {
 
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(prepareSessionMutate).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
+    expect(routerReplace).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
     expect(captureEventMock).toHaveBeenCalledWith('session_created', expect.anything());
     expect(invalidateAgentSessionQueries).toHaveBeenCalledTimes(1);
     expect(toastError).not.toHaveBeenCalled();
@@ -582,7 +566,7 @@ describe('useNewSessionCreator onCreated', () => {
     });
 
     expect(onCreated).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
+    expect(routerReplace).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -598,7 +582,7 @@ describe('useNewSessionCreator onCreated', () => {
     });
 
     expect(onCreated).not.toHaveBeenCalled();
-    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledWith('boom');
   });
 
@@ -614,7 +598,7 @@ describe('useNewSessionCreator onCreated', () => {
 
     expect(prepareSessionMutate).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
-    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 });
 
@@ -633,7 +617,7 @@ describe('restored new-session submit', () => {
     expect(prepareSessionMutate).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'Restored draft prompt' })
     );
-    expect(routerPush).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
+    expect(routerReplace).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
   });
 });
 

@@ -1,5 +1,5 @@
 import { getSecurityAgentAuditUrl } from '@kilocode/app-shared/security-agent';
-import { MoreHorizontal } from 'lucide-react-native';
+import { MoreHorizontal } from '@/components/ui/icons';
 import { Pressable } from 'react-native';
 
 import { WEB_BASE_URL } from '@/lib/config';

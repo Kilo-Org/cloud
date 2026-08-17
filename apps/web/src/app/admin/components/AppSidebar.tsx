@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Ban,
   Database,
+  DatabaseBackup,
   BarChart,
   Rocket,
   Blocks,
@@ -237,6 +238,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Cloud Agent health',
     url: '/admin/cloud-agent-next',
     icon: () => <BarChart />,
+  },
+  {
+    title: () => 'Data export health',
+    url: '/admin/data-exports',
+    icon: () => <DatabaseBackup />,
   },
   {
     title: () => 'Session Traces',

@@ -81,7 +81,8 @@ test('env sync refreshes source-backed Wrangler secrets through completed stdin 
   const envOutput = fs.readFileSync('dev/local/env-sync/output.ts', 'utf8');
 
   assert.match(plan, /Recreate source-backed secrets/);
-  assert.match(envOutput, /input: `\$\{value\}\\n`/);
+  assert.match(envOutput, /`\$\{value\}\\n`/);
+  assert.match(envOutput, /child\.stdin\.end\(input\)/);
   assert.match(envOutput, /Failed to create Secrets Store secret/);
 });
 

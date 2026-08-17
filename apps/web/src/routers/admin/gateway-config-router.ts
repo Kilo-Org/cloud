@@ -25,9 +25,17 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   }),
 
   set: adminProcedure.input(GatewayConfigInputSchema).mutation(async ({ input, ctx }) => {
+    const optOutModels = [
+      ...new Set(
+        input.vercel_routing_opt_out_models.map(model => model.trim().toLowerCase()).filter(Boolean)
+      ),
+    ];
     const config: GatewayConfig = {
       vercel_routing_percentage: input.vercel_routing_percentage,
       vercel_routing_percentage_free: input.vercel_routing_percentage_free,
+      vercel_routing_opt_out_models: optOutModels,
+      friendli_routing_percentage: input.friendli_routing_percentage,
+      perplexity_routing_percentage: input.perplexity_routing_percentage,
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,

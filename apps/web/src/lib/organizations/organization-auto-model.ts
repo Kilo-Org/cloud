@@ -142,6 +142,7 @@ export async function validateOrganizationAutoTarget(
   }
 
   const restrictions = {
+    requireModelInCurrentSnapshot: organization.plan === 'enterprise',
     providerAllowList:
       organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
     modelDenyList:
@@ -192,7 +193,7 @@ export async function validateOrganizationAutoTarget(
   }
 
   const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-  if (!(await isAllowed(normalizedModelId))) {
+  if (!(await isAllowed(catalogModel.id))) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,

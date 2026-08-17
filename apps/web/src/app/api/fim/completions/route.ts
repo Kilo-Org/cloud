@@ -29,6 +29,7 @@ import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { findSupportedFimModel, type FimProvider } from '@/lib/ai-gateway/supported-fim-models';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -41,25 +42,16 @@ const MISTRAL_CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completio
 const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';
 const FIM_MAX_TOKENS_LIMIT = 1000;
 
-type FimProvider = 'mistral' | 'inception';
-
 function resolveFimProvider(model: string): {
   provider: FimProvider;
   upstreamModel: string;
 } | null {
-  if (model.startsWith('mistralai/')) {
-    return {
-      provider: 'mistral',
-      upstreamModel: model.slice('mistralai/'.length),
-    };
-  }
-  if (model.startsWith('inception/')) {
-    return {
-      provider: 'inception',
-      upstreamModel: model.slice('inception/'.length),
-    };
-  }
-  return null;
+  const supportedModel = findSupportedFimModel(model);
+  if (!supportedModel) return null;
+  return {
+    provider: supportedModel.provider,
+    upstreamModel: supportedModel.upstreamModel,
+  };
 }
 
 function resolveFimUpstreamUrl(provider: FimProvider, usingCodestralByok: boolean): string {

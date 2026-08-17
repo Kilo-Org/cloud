@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { CheckCheck, GitPullRequest } from 'lucide-react-native';
+import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
 import { useCallback } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';

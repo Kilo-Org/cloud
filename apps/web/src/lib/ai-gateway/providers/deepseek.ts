@@ -6,10 +6,10 @@ export function isDeepseekModel(model: string) {
 
 export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-pro:discounted',
-  internal_id: 'deepseek/deepseek-v4-pro',
-  display_name: 'DeepSeek: DeepSeek V4 Pro (lowest price)',
+  internal_id: 'deepseek/deepseek-v4-pro-0813',
+  display_name: 'DeepSeek: DeepSeek V4 Pro 0813 (lowest price)',
   description:
-    'This DeepSeek V4 Pro endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
+    'This DeepSeek V4 Pro 0813 endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
@@ -31,10 +31,10 @@ export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
 
 const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-flash:discounted',
-  internal_id: 'deepseek/deepseek-v4-flash',
-  display_name: 'DeepSeek: DeepSeek V4 Flash (lowest price)',
+  internal_id: 'deepseek/deepseek-v4-flash-0731',
+  display_name: 'DeepSeek: DeepSeek V4 Flash 0731 (lowest price)',
   description:
-    'This DeepSeek V4 Flash endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
+    'This DeepSeek V4 Flash 0731 endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,

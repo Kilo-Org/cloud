@@ -6,7 +6,7 @@ import {
   type LucideIcon,
   PauseCircle,
   ShieldAlert,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { Linking, Platform, View } from 'react-native';
 

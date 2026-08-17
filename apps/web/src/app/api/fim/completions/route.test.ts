@@ -187,6 +187,24 @@ describe('POST /api/fim/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'codestral-2508',
+    'mistralai/codestral-2508:free',
+    'mistralai/codestral-latest',
+    'inception/mercury-edit-latest',
+  ])('rejects unknown FIM model or alias %s', async model => {
+    setOrganizationAuth(1000);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(model) as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: ProxyErrorType.unsupported_fim_model,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('continues to allow Inception BYOK when the promotion is disabled', async () => {
     mockInceptionPromoRunning = false;
     setOrganizationAuth(0);

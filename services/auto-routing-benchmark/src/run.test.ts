@@ -508,7 +508,16 @@ describe('decider message fan-out', () => {
   });
 
   it('computeDeciderShardCount maximizes shard lanes under the live container cap', () => {
-    expect(computeDeciderShardCount({ modelCount: 2, repetitions: 3, chunkCount: 36 })).toBe(16);
+    // No explicit budget → the full container cap.
+    expect(computeDeciderShardCount({ modelCount: 2, repetitions: 3, chunkCount: 36 })).toBe(33);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 2,
+        repetitions: 3,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(16);
     expect(
       computeDeciderShardCount({
         modelCount: 7,
@@ -550,13 +559,21 @@ describe('decider message fan-out', () => {
 
     const models = ['model/a', 'model/b'];
     const repetitions = 3;
-    const messages = buildDeciderMessages('run-test', 'decider', models, repetitions, chunks);
+    const maxLiveContainers = 100;
+    const messages = buildDeciderMessages(
+      'run-test',
+      'decider',
+      models,
+      repetitions,
+      chunks,
+      maxLiveContainers
+    );
     const expectedShardCount = 16;
 
-    // Initial fan-out is bounded by the 100-container budget while running
+    // Initial fan-out is bounded by the queue's container budget while running
     // multiple independent chunk lanes per model/repetition.
     expect(messages).toHaveLength(models.length * repetitions * expectedShardCount);
-    expect(messages.length).toBeLessThanOrEqual(100);
+    expect(messages.length).toBeLessThanOrEqual(maxLiveContainers);
 
     for (let rep = 0; rep < repetitions; rep++) {
       const forRep = messages.filter(m => m.body.rep === rep);

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Check } from 'lucide-react-native';
+import { Check } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 

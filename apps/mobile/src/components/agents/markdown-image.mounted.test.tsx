@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarkdownImage } from './markdown-image';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable' }));
-vi.mock('lucide-react-native', () => ({ AlertCircle: 'AlertCircle' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle' }));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

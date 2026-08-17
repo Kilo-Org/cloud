@@ -3,7 +3,7 @@ import {
   type SecurityFindingFilters,
 } from '@kilocode/app-shared/security-agent';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Info } from 'lucide-react-native';
+import { Info } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 

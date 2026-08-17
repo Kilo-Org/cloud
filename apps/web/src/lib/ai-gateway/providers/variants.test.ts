@@ -7,7 +7,7 @@ import {
 } from '@/lib/ai-gateway/providers/variants';
 
 describe('getFallbackModelVariants', () => {
-  test.each(['google/gemma-4-26b-a4b-it', 'poolside/laguna-s-2.1:free'])(
+  test.each(['google/gemma-4-26b-a4b-it', 'vendor/longcat-preview', 'poolside/laguna-s-2.1:free'])(
     'returns binary variants for %s',
     model => {
       expect(getFallbackModelVariants(model)).toBe(REASONING_VARIANTS_BINARY);

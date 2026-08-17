@@ -6,7 +6,7 @@ import {
   MessageSquareText,
   ScrollText,
   ShieldCheck,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';

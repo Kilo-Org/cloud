@@ -6,7 +6,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { findPartById, getPartDetailTitle } from './part-detail-model';
+import { findPartById, getPartDetailTitle, shouldAutoFollowPartDetail } from './part-detail-model';
 
 const { getToolDisplay } = vi.hoisted(() => ({
   getToolDisplay: vi.fn(),
@@ -118,5 +118,32 @@ describe('getPartDetailTitle', () => {
 
   it('falls back to Details for other part types', () => {
     expect(getPartDetailTitle(makeTextPart())).toBe('Details');
+  });
+});
+
+describe('shouldAutoFollowPartDetail', () => {
+  it('returns false for a null part', () => {
+    expect(shouldAutoFollowPartDetail(null)).toBe(false);
+  });
+
+  it('returns true for a streaming reasoning part', () => {
+    expect(shouldAutoFollowPartDetail(makeReasoningPart('thinking', false))).toBe(true);
+  });
+
+  it('returns false for a completed reasoning part', () => {
+    expect(shouldAutoFollowPartDetail(makeReasoningPart('thought', true))).toBe(false);
+  });
+
+  it('returns false for a running tool part', () => {
+    const runningTool: ToolPart = {
+      id: 'tool-1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'tool',
+      callID: 'call-tool-1',
+      tool: 'bash',
+      state: { status: 'running', input: { command: 'echo hi' }, time: { start: 1 } },
+    };
+    expect(shouldAutoFollowPartDetail(runningTool)).toBe(false);
   });
 });

@@ -13,6 +13,7 @@ import {
   GlobToolCardBody,
   GrepToolCardBody,
   ListToolCardBody,
+  PatchToolCardBody,
   ReadToolCardBody,
   TaskToolCardBody,
   TodoToolCardBody,
@@ -47,6 +48,10 @@ function renderToolBody(part: ToolPart): React.ReactNode {
     }
     case 'list': {
       return <ListToolCardBody part={part} />;
+    }
+    case 'patch':
+    case 'apply_patch': {
+      return <PatchToolCardBody part={part} />;
     }
     case 'todoread':
     case 'todowrite': {

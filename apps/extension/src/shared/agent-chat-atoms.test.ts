@@ -8,6 +8,7 @@ import {
   contextUsageAtomFamily,
   draftAtomFamily,
   evictConversationAtoms,
+  queuedMessageAtomFamily,
   runningConversationIdsAtom,
   sessionCostAtomFamily,
   streamingMessageIdAtomFamily,
@@ -20,6 +21,7 @@ describe('per-conversation atom eviction', () => {
     store.set(contextUsageAtomFamily('conversation-1'), { promptTokens: 42 });
     store.set(sessionCostAtomFamily('conversation-1'), 0.0123);
     store.set(streamingMessageIdAtomFamily('conversation-1'), 'msg-streaming');
+    store.set(queuedMessageAtomFamily('conversation-1'), 'queued');
 
     evictConversationAtoms('conversation-1');
 
@@ -28,6 +30,7 @@ describe('per-conversation atom eviction', () => {
     expect(store.get(contextUsageAtomFamily('conversation-1'))).toBeUndefined();
     expect(store.get(sessionCostAtomFamily('conversation-1'))).toBe(0);
     expect(store.get(streamingMessageIdAtomFamily('conversation-1'))).toBeUndefined();
+    expect(store.get(queuedMessageAtomFamily('conversation-1'))).toBeUndefined();
   });
 
   it('clearPerConversationAtoms wipes all drafts, usage, session cost, and streaming ids on sign-out', () => {
@@ -36,6 +39,7 @@ describe('per-conversation atom eviction', () => {
     store.set(contextUsageAtomFamily('conversation-2'), { promptTokens: 999 });
     store.set(sessionCostAtomFamily('conversation-3'), 1.5);
     store.set(streamingMessageIdAtomFamily('conversation-3'), 'msg-only-streaming');
+    store.set(queuedMessageAtomFamily('conversation-2'), 'queued');
 
     clearPerConversationAtoms();
 
@@ -43,6 +47,7 @@ describe('per-conversation atom eviction', () => {
     expect(store.get(contextUsageAtomFamily('conversation-2'))).toBeUndefined();
     expect(store.get(sessionCostAtomFamily('conversation-3'))).toBe(0);
     expect(store.get(streamingMessageIdAtomFamily('conversation-3'))).toBeUndefined();
+    expect(store.get(queuedMessageAtomFamily('conversation-2'))).toBeUndefined();
   });
 
   it('clearPerConversationAtoms clears run-state on sign-out', () => {

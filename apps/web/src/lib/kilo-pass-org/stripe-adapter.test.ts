@@ -15,6 +15,7 @@ const invoicePaymentsList =
     (params: Stripe.InvoicePaymentListParams) => Promise<Stripe.ApiList<Stripe.InvoicePayment>>
   >();
 const select = jest.fn();
+const selectOrderBy = jest.fn();
 const updateDb = jest.fn();
 const updateSet = jest.fn();
 const activatePaidAgreement = jest.fn();
@@ -106,11 +107,12 @@ describe('organization Kilo Pass Stripe adapter', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     const rows = [dbAgreement()];
+    selectOrderBy.mockReturnValue({ limit: async () => rows });
     select.mockReturnValue({
       from: () => ({
         where: () => ({
           limit: async () => rows,
-          orderBy: () => ({ limit: async () => rows }),
+          orderBy: selectOrderBy,
         }),
       }),
     });
@@ -342,6 +344,29 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expand: ['data.payment.payment_intent'],
       limit: 10,
     });
+    expect(selectOrderBy).toHaveBeenCalledTimes(1);
+  });
+
+  test('rejects an ended seat subscription before creating a pending agreement', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        status: 'canceled',
+        ended_at: 1_776_120_000,
+        items: { ...subscription().items, data: [subscription().items.data[0]!] },
+      })
+    );
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toThrow('An active organization seat subscription is required');
+    expect(createPendingAgreement).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 
   test('does not request a browser action after a hard payment decline', async () => {
@@ -567,6 +592,30 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(activatePaidAgreement).toHaveBeenCalledWith(
       expect.objectContaining({ agreementId: 'agreement_1' })
     );
+  });
+
+  test('ends a pending agreement when its seat subscription has ended without a pass invoice', async () => {
+    const rows = [{ id: 'agreement_1', providerSubscriptionId: 'sub_1' }];
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({ orderBy: () => ({ limit: async () => rows }) }),
+      }),
+    });
+    retrieve.mockResolvedValue(
+      subscription({
+        status: 'canceled',
+        ended_at: 1_776_120_000,
+        latest_invoice: {
+          status: 'paid',
+          parent: { subscription_details: { subscription: 'sub_1' } },
+          lines: { data: [] },
+        } as unknown as Stripe.Invoice,
+      })
+    );
+    const { reconcileOrganizationKiloPassPayment } = await import('./stripe-adapter');
+
+    await expect(reconcileOrganizationKiloPassPayment('org_1')).resolves.toBe(true);
+    expect(updateSet).toHaveBeenCalledWith({ state: 'ended' });
   });
 
   test('does not grant a supplement while payment review suspends issuance', async () => {

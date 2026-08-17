@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import {
+  DEFAULT_WORKFLOW_SETTINGS,
   MAX_WORKFLOW_COUNT,
   agentWorkflowInputSchema,
   agentWorkflowSchema,
@@ -231,12 +232,12 @@ export const loadWorkflowSettings = async (
 ): Promise<AgentWorkflowSettings> => {
   const value = await storageArea.getItem(WORKFLOW_SETTINGS_STORAGE_KEY);
   if (value === null || value === undefined) {
-    return { allowWorkflowsInSafeMode: false };
+    return DEFAULT_WORKFLOW_SETTINGS;
   }
 
   const parsed = agentWorkflowSettingsSchema.safeParse(value);
   if (!parsed.success) {
-    return { allowWorkflowsInSafeMode: false };
+    return DEFAULT_WORKFLOW_SETTINGS;
   }
 
   return parsed.data;

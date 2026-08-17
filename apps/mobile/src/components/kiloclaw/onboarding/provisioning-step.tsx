@@ -5,7 +5,7 @@ import {
   type ProvisioningTerminalReason,
   shouldAdvanceFromProvisioning,
 } from '@/lib/onboarding';
-import { AlertTriangle } from 'lucide-react-native';
+import { AlertTriangle } from '@/components/ui/icons';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {

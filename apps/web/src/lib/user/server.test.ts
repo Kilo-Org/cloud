@@ -682,6 +682,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     expect(events[0]).toMatchObject({
       event: 'admin_access',
       surface: 'rest',
+      kind: 'admin_guard',
       authVia: 'token',
       adminTier: 'super_admin',
       kiloUserId: admin.id,

@@ -13,6 +13,12 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
+  getProviderSlugsForModel: jest.fn(async (modelId: string) =>
+    modelId === 'openai/gpt-4o' ? new Set(['openai']) : new Set()
+  ),
+}));
+
 const mockedIsReleaseToggleEnabled = jest.mocked(
   jest.requireMock('@/lib/posthog-feature-flags').isReleaseToggleEnabled
 );

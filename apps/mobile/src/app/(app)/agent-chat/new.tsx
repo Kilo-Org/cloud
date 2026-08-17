@@ -3,8 +3,10 @@ import { AppState, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
+import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   useFencedDraftLoad,
   useNewSessionCreator,
@@ -21,8 +23,10 @@ import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
 import {
   clearDraft,
@@ -31,7 +35,7 @@ import {
   resolvePrefillOverDraft,
   saveDraft,
 } from '@/lib/persist/drafts';
-import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -59,6 +63,7 @@ function NewSessionScreenBody() {
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
+  const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasPrompt, setHasPrompt] = useState(false);
@@ -113,6 +118,30 @@ function NewSessionScreenBody() {
     isError: isModelsError,
     refetch: refetchModels,
   } = useAvailableModels(organizationId);
+  const instanceCatalog = useInstanceModelCatalog(runOnInstance?.connectionId ?? null);
+  const modelView = useMemo(
+    () =>
+      resolveNewSessionModelView({
+        isRemoteTarget: runOnInstance !== null,
+        catalog: instanceCatalog.catalog,
+        catalogLoading: instanceCatalog.isLoading,
+        gatewayModels: models,
+        gatewayModelsLoading: isLoadingModels,
+        gatewayModel: model,
+        gatewayVariant: variant,
+        remoteOverride,
+      }),
+    [
+      runOnInstance,
+      instanceCatalog.catalog,
+      instanceCatalog.isLoading,
+      models,
+      isLoadingModels,
+      model,
+      variant,
+      remoteOverride,
+    ]
+  );
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { saveModel } = usePersistedAgentModel();
   const attachments = useAgentAttachmentUpload({ organizationId });
@@ -203,25 +232,41 @@ function NewSessionScreenBody() {
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
     organizationId,
+    mode,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,
     instanceList,
     promptRef,
     attachments: attachments.attachments,
+    selection: modelView.spawnSelection,
     // Arms the draft-clearing marker only when the dispatch admits the spawn:
     // a blocked admission or cancelled voice submit never clears the draft.
     onSpawnAdmitted: markRemoteSpawnAttempted,
   });
 
   const handleModelSelect = useCallback(
-    (modelId: string, newVariant: string) => {
+    (modelId: string, newVariant: string, pickerSelection?: ModelPickerSelection) => {
+      setRemoteOverride(
+        pickerSelection ? createRemoteModelOverride(pickerSelection.option, newVariant) : null
+      );
+      if (pickerSelection?.option.overrideSource === 'cli-catalog') {
+        return;
+      }
       setModel(modelId);
       setVariant(newVariant);
       saveModel(organizationId, { model: modelId, variant: newVariant });
       persistServerLastSelected({ model: modelId, ...(newVariant ? { variant: newVariant } : {}) });
     },
     [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
+  );
+
+  const handleRunOnChange = useCallback(
+    (next: InstancePickerInstance | null) => {
+      setRemoteOverride(null);
+      handleRunOnInstanceChange(next);
+    },
+    [handleRunOnInstanceChange]
   );
 
   function handlePromptChange(text: string) {
@@ -270,7 +315,11 @@ function NewSessionScreenBody() {
 
   const isRemoteTargetSelected = runOnInstance !== null;
   const isStartDisabled = isRemoteTargetSelected
-    ? remoteSpawn.isSpawningRemote || isSubmitting || attachments.hasFailedAttachments
+    ? remoteSpawn.isSpawningRemote ||
+      isSubmitting ||
+      attachments.hasFailedAttachments ||
+      modelView.isSelectionUnavailable ||
+      instanceCatalog.isLoading
     : resolveNewSessionSubmitDisabled({
         attachmentsHasFailed: attachments.hasFailedAttachments,
         attachmentsIsUploading: attachments.isUploading,
@@ -304,11 +353,11 @@ function NewSessionScreenBody() {
           attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
           isCreating={isCreating}
           isModelsError={isModelsError}
-          isLoadingModels={isLoadingModels}
+          isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
           mode={mode}
-          model={model}
-          variant={variant}
-          modelOptions={models}
+          model={modelView.selectedValue}
+          variant={modelView.selectedVariant}
+          modelOptions={modelView.options}
           initialPrompt={initialPrompt}
           onChangeText={handlePromptChange}
           onModeChange={setMode}
@@ -324,7 +373,7 @@ function NewSessionScreenBody() {
           runOnInstance={runOnInstance}
           instanceList={instanceList}
           isLoadingInstances={isLoadingInstances}
-          onChangeRunOnInstance={handleRunOnInstanceChange}
+          onChangeRunOnInstance={handleRunOnChange}
           showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
           view={view}
           isRetrying={isRetrying}

@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { AlertCircle, File as FileIcon, RotateCcw, X } from 'lucide-react-native';
+import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
 import { formatFileSize } from '@kilocode/kilo-chat';
 

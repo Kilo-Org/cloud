@@ -57,49 +57,43 @@ export function getTokensFromCompletionUsage(
   return hasAny ? tokens : undefined;
 }
 
+function trimString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function labeledTool(kind: string, name: unknown): string {
+  const trimmed = trimString(name);
+  return trimmed ? `${kind}:${trimmed}` : `${kind}:unknown`;
+}
+
+function isObjectEntry<T>(value: T): value is T & object {
+  return typeof value === 'object' && value !== null;
+}
+
 export function getToolsAvailable(request: GatewayRequest): string[] {
-  if (!request.body.tools) return [];
+  if (!Array.isArray(request.body.tools)) return [];
 
   if (request.kind === 'responses') {
-    return request.body.tools.map((tool): string => {
-      if (tool.type === 'function') {
-        const name = typeof tool.name === 'string' ? tool.name.trim() : '';
-        return name ? `function:${name}` : 'function:unknown';
-      }
-
-      if (tool.type === 'custom') {
-        const name = typeof tool.name === 'string' ? tool.name.trim() : '';
-        return name ? `custom:${name}` : 'custom:unknown';
-      }
-
-      if (tool.type === 'mcp') {
-        const label = tool.server_label.trim();
-        return label ? `mcp:${label}` : 'mcp:unknown';
-      }
-
-      return tool.type;
+    return request.body.tools.flatMap((tool): string[] => {
+      if (!isObjectEntry(tool)) return [];
+      if (tool.type === 'function') return [labeledTool('function', tool.name)];
+      if (tool.type === 'custom') return [labeledTool('custom', tool.name)];
+      if (tool.type === 'mcp') return [labeledTool('mcp', tool.server_label)];
+      return typeof tool.type === 'string' && tool.type ? [tool.type] : ['unknown:unknown'];
     });
   }
 
   if (request.kind === 'messages') {
-    return request.body.tools.map((tool): string => {
-      const name = typeof tool.name === 'string' ? tool.name.trim() : '';
-      return name ? `function:${name}` : 'function:unknown';
-    });
+    return request.body.tools.flatMap((tool): string[] =>
+      isObjectEntry(tool) ? [labeledTool('function', tool.name)] : []
+    );
   }
 
-  return request.body.tools.map((tool): string => {
-    if (tool.type === 'function') {
-      const toolName = typeof tool.function?.name === 'string' ? tool.function.name.trim() : '';
-      return toolName ? `function:${toolName}` : 'function:unknown';
-    }
-
-    if (tool.type === 'custom') {
-      const toolName = typeof tool.custom?.name === 'string' ? tool.custom.name.trim() : '';
-      return toolName ? `custom:${toolName}` : 'custom:unknown';
-    }
-
-    return 'unknown:unknown';
+  return request.body.tools.flatMap((tool): string[] => {
+    if (!isObjectEntry(tool)) return [];
+    if (tool.type === 'function') return [labeledTool('function', tool.function?.name)];
+    if (tool.type === 'custom') return [labeledTool('custom', tool.custom?.name)];
+    return ['unknown:unknown'];
   });
 }
 
@@ -111,12 +105,11 @@ export function getToolsUsed(request: GatewayRequest): string[] {
     const used = new Array<string>();
 
     for (const item of input) {
+      if (!item || typeof item !== 'object') continue;
       if (item.type === 'function_call') {
-        const name = item.name.trim();
-        used.push(name ? `function:${name}` : 'function:unknown');
+        used.push(labeledTool('function', item.name));
       } else if (item.type === 'custom_tool_call') {
-        const name = item.name.trim();
-        used.push(name ? `custom:${name}` : 'custom:unknown');
+        used.push(labeledTool('custom', item.name));
       }
     }
 
@@ -125,13 +118,15 @@ export function getToolsUsed(request: GatewayRequest): string[] {
 
   if (request.kind === 'messages') {
     const used = new Array<string>();
+    if (!Array.isArray(request.body.messages)) return used;
     for (const message of request.body.messages) {
+      if (!message || typeof message !== 'object') continue;
       if (message.role !== 'assistant') continue;
       const content = Array.isArray(message.content) ? message.content : [];
       for (const block of content) {
+        if (!block || typeof block !== 'object') continue;
         if (block.type === 'tool_use') {
-          const name = typeof block.name === 'string' ? block.name.trim() : '';
-          used.push(name ? `function:${name}` : 'function:unknown');
+          used.push(labeledTool('function', block.name));
         }
       }
     }
@@ -143,20 +138,20 @@ export function getToolsUsed(request: GatewayRequest): string[] {
   const used = new Array<string>();
 
   for (const message of request.body.messages) {
+    if (!message || typeof message !== 'object') continue;
     if (message.role !== 'assistant') continue;
 
-    for (const toolCall of message.tool_calls ?? []) {
+    if (!Array.isArray(message.tool_calls)) continue;
+
+    for (const toolCall of message.tool_calls) {
+      if (!toolCall || typeof toolCall !== 'object') continue;
       if (toolCall.type === 'function') {
-        const toolName =
-          typeof toolCall.function?.name === 'string' ? toolCall.function.name.trim() : '';
-        used.push(toolName ? `function:${toolName}` : 'function:unknown');
+        used.push(labeledTool('function', toolCall.function?.name));
         continue;
       }
 
       if (toolCall.type === 'custom') {
-        const toolName =
-          typeof toolCall.custom?.name === 'string' ? toolCall.custom.name.trim() : '';
-        used.push(toolName ? `custom:${toolName}` : 'custom:unknown');
+        used.push(labeledTool('custom', toolCall.custom?.name));
         continue;
       }
 

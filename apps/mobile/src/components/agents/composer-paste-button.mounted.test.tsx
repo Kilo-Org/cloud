@@ -8,7 +8,7 @@ import { ComposerPasteButton } from './composer-paste-button';
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   ClipboardPaste: 'ClipboardPaste',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

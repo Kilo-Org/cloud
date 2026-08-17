@@ -20,6 +20,9 @@ jest.mock('@/lib/user/server');
 jest.mock('@/lib/user');
 jest.mock('@/lib/external-services');
 jest.mock('@/lib/kiloclaw/instance-registry');
+jest.mock('@/lib/kiloclaw/admin-audit-log', () => ({
+  createKiloClawAdminAuditLog: jest.fn().mockResolvedValue({}),
+}));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 const destroy = jest.fn();

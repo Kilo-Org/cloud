@@ -181,6 +181,14 @@ vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
   }),
 }));
 
+vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
+  useClipboardPaste: () => ({
+    visible: false,
+    refresh: vi.fn(),
+    paste: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/agent-attachments/validate', () => ({
   describeClassificationFailure: vi.fn(),
 }));

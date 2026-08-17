@@ -1,58 +1,104 @@
 import { describe, test, expect } from '@jest/globals';
 import {
-  GatewayPercentageSchema,
+  GatewayRoutingConfigSchema,
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   NOTE_MAX_LENGTH,
-  VercelRoutingPercentageSchema,
+  RoutingPercentageSchema,
 } from './gateway-config';
 
-describe('VercelRoutingPercentageSchema', () => {
+describe('RoutingPercentageSchema', () => {
   test.each([0, 0.001, 12.345, 99.9, 99.999, 100])('accepts %s', percentage => {
-    expect(VercelRoutingPercentageSchema.parse(percentage)).toBe(percentage);
+    expect(RoutingPercentageSchema.parse(percentage)).toBe(percentage);
   });
 
   test.each([-0.001, 12.3456, 100.001])('rejects %s', percentage => {
-    expect(() => VercelRoutingPercentageSchema.parse(percentage)).toThrow();
+    expect(() => RoutingPercentageSchema.parse(percentage)).toThrow();
   });
 });
 
-describe('GatewayPercentageSchema', () => {
+describe('GatewayRoutingConfigSchema', () => {
   test('accepts a numeric percentage', () => {
-    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
+      friendli_routing_percentage: null,
+      perplexity_routing_percentage: null,
     });
   });
 
   test('accepts null (written when an admin clears the override)', () => {
-    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: null })).toEqual({
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: null })).toEqual({
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
+      friendli_routing_percentage: null,
+      perplexity_routing_percentage: null,
     });
   });
 
   test('defaults the free percentage to null for pre-existing entries', () => {
-    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
+    expect(GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
+      friendli_routing_percentage: null,
+      perplexity_routing_percentage: null,
     });
   });
 
   test('accepts a separate free percentage', () => {
     expect(
-      GatewayPercentageSchema.parse({
+      GatewayRoutingConfigSchema.parse({
         vercel_routing_percentage: 25,
         vercel_routing_percentage_free: 80,
       })
-    ).toEqual({ vercel_routing_percentage: 25, vercel_routing_percentage_free: 80 });
+    ).toEqual({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: 80,
+      vercel_routing_opt_out_models: [],
+      friendli_routing_percentage: null,
+      perplexity_routing_percentage: null,
+    });
+  });
+
+  test('accepts model opt-outs', () => {
+    expect(
+      GatewayRoutingConfigSchema.parse({
+        vercel_routing_percentage: 25,
+        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+      })
+    ).toEqual({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+      friendli_routing_percentage: null,
+      perplexity_routing_percentage: null,
+    });
+  });
+
+  test('accepts Friendli and Perplexity percentages', () => {
+    expect(
+      GatewayRoutingConfigSchema.parse({
+        vercel_routing_percentage: 25,
+        friendli_routing_percentage: 10,
+        perplexity_routing_percentage: 20,
+      })
+    ).toEqual({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
+      friendli_routing_percentage: 10,
+      perplexity_routing_percentage: 20,
+    });
   });
 
   test('rejects out-of-range values', () => {
-    expect(() => GatewayPercentageSchema.parse({ vercel_routing_percentage: 101 })).toThrow();
-    expect(() => GatewayPercentageSchema.parse({ vercel_routing_percentage: -1 })).toThrow();
+    expect(() => GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: 101 })).toThrow();
+    expect(() => GatewayRoutingConfigSchema.parse({ vercel_routing_percentage: -1 })).toThrow();
     expect(() =>
-      GatewayPercentageSchema.parse({
+      GatewayRoutingConfigSchema.parse({
         vercel_routing_percentage: 25,
         vercel_routing_percentage_free: 101,
       })
@@ -69,6 +115,9 @@ describe('GatewayConfigSchema', () => {
       updated_by_email: 'a@example.com',
     });
     expect(parsed.note).toBeNull();
+    expect(parsed.vercel_routing_opt_out_models).toEqual([]);
+    expect(parsed.friendli_routing_percentage).toBeNull();
+    expect(parsed.perplexity_routing_percentage).toBeNull();
   });
 
   test('round-trips a note', () => {
@@ -89,11 +138,17 @@ describe('GatewayConfigInputSchema', () => {
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: 75,
         vercel_routing_percentage_free: 60,
+        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+        friendli_routing_percentage: 10,
+        perplexity_routing_percentage: 20,
         note: 'Rollout stable',
       })
     ).toEqual({
       vercel_routing_percentage: 75,
       vercel_routing_percentage_free: 60,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+      friendli_routing_percentage: 10,
+      perplexity_routing_percentage: 20,
       note: 'Rollout stable',
     });
   });
@@ -103,11 +158,17 @@ describe('GatewayConfigInputSchema', () => {
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: null,
         vercel_routing_percentage_free: null,
+        vercel_routing_opt_out_models: [],
+        friendli_routing_percentage: null,
+        perplexity_routing_percentage: null,
         note: null,
       })
     ).toEqual({
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
+      vercel_routing_opt_out_models: [],
+      friendli_routing_percentage: null,
+      perplexity_routing_percentage: null,
       note: null,
     });
   });
@@ -117,6 +178,9 @@ describe('GatewayConfigInputSchema', () => {
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: 50,
         vercel_routing_percentage_free: 50,
+        vercel_routing_opt_out_models: [],
+        friendli_routing_percentage: 0,
+        perplexity_routing_percentage: 0,
         note: 'x'.repeat(NOTE_MAX_LENGTH + 1),
       })
     ).toThrow();

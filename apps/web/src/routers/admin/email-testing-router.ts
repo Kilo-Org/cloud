@@ -180,6 +180,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
+    case 'dataExportDownloadCode':
+      return { code: '123456', email: 'user@example.com', expires_in: '10 minutes' };
     case 'creditsTopUp':
       return {
         heading: 'Thanks for your top-up',

@@ -1,5 +1,7 @@
 import { type RefObject, useCallback, useRef } from 'react';
+import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
+import { type AgentMode } from '@/components/agents/mode-selector';
 import { useRemoteSpawnDispatch } from '@/components/agents/use-remote-spawn-dispatch';
 import { type AgentAttachment } from '@/lib/agent-attachments/agent-attachment-types';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -11,6 +13,7 @@ type InstancesRefetch = () => Promise<{
 
 type UseNewSessionShareRemoteArgs = {
   organizationId: string | undefined;
+  mode: AgentMode;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   refetchInstances: InstancesRefetch;
@@ -19,6 +22,7 @@ type UseNewSessionShareRemoteArgs = {
   promptRef: RefObject<string>;
   /** Live attachment list owned by `useAgentAttachmentUpload`. */
   attachments: AgentAttachment[];
+  selection?: ModelSelection;
   /**
    * Invoked when a remote spawn passes voice settlement and admission and
    * commits to a spawn attempt; forwarded to `useRemoteSpawnDispatch`. The
@@ -34,12 +38,14 @@ type UseNewSessionShareRemoteArgs = {
  */
 export function useNewSessionShareRemote({
   organizationId,
+  mode,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
   instanceList,
   promptRef,
   attachments,
+  selection,
   onSpawnAdmitted,
 }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
@@ -59,6 +65,8 @@ export function useNewSessionShareRemote({
 
   const remoteSpawn = useRemoteSpawnDispatch({
     organizationId,
+    mode,
+    selection,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,

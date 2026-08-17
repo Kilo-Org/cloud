@@ -133,7 +133,10 @@ describe('getRoutingTable', () => {
     expect(result).toEqual(SAMPLE_TABLE);
     expect(puts).toHaveLength(1);
     expect(puts[0].key).toBe('routing_table_v1');
-    expect(puts[0].options).toEqual({ expirationTtl: 3600 });
+    expect(puts[0].options).toEqual({
+      expirationTtl: 3600,
+      metadata: { writtenAt: expect.any(Number) },
+    });
   });
 
   it('returns null when origin responds non-OK', async () => {

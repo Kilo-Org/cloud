@@ -1,0 +1,2 @@
+ALTER TABLE "user_data_export_object_deletions" DROP CONSTRAINT "user_data_export_object_deletions_reason_check";--> statement-breakpoint
+ALTER TABLE "user_data_export_object_deletions" ADD CONSTRAINT "user_data_export_object_deletions_reason_check" CHECK ("user_data_export_object_deletions"."reason" IN ('account_deletion', 'admin_cancel', 'admin_replace'));

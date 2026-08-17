@@ -1,5 +1,5 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { CheckCircle2, type LucideIcon, Scale, Zap } from 'lucide-react-native';
+import { CheckCircle2, type LucideIcon, Scale, Zap } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';

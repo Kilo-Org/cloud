@@ -1,6 +1,6 @@
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
-import { ArrowRight, FolderGit2, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 

@@ -1,4 +1,4 @@
-import { Mic, Square } from 'lucide-react-native';
+import { Mic, Square } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

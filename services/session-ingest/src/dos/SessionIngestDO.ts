@@ -17,6 +17,7 @@ import {
   extractNormalizedParentIdFromItem,
   extractNormalizedPlatformFromItem,
   extractNormalizedTitleFromItem,
+  extractSessionPrLink,
   extractStatusFromItem,
 } from './session-ingest-extractors';
 import {
@@ -68,7 +69,10 @@ type ExtractableMetaKey =
   | 'orgId'
   | 'gitUrl'
   | 'gitBranch'
-  | 'status';
+  | 'status'
+  | 'prPlatform'
+  | 'prUrl'
+  | 'prNumber';
 
 function writeIngestMetaIfChanged(
   db: DrizzleSqliteDODatabase,
@@ -274,6 +278,9 @@ export class SessionIngestDO extends DurableObject<Env> {
       gitUrl: undefined,
       gitBranch: undefined,
       status: undefined,
+      prPlatform: undefined,
+      prUrl: undefined,
+      prNumber: undefined,
     };
 
     const lifecycleEvents: IngestLifecycleEvent[] = [];
@@ -384,6 +391,15 @@ export class SessionIngestDO extends DurableObject<Env> {
         if (maybeValue !== undefined) {
           incomingByKey[extractor.key] = maybeValue;
         }
+      }
+
+      // session_pr_link emits the whole triple atomically (or nothing), so the change
+      // map always receives all three keys together.
+      const prLink = extractSessionPrLink(item);
+      if (prLink !== undefined) {
+        incomingByKey.prPlatform = prLink.prPlatform;
+        incomingByKey.prUrl = prLink.prUrl;
+        incomingByKey.prNumber = prLink.prNumber;
       }
 
       if (ingestVersion >= 1) {

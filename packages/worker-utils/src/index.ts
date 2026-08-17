@@ -92,6 +92,18 @@ export {
   buildGitLabPersonalAccessTokenAad,
   buildGitLabProjectAccessTokenAad,
 } from './gitlab-credential.js';
+export {
+  SLACK_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
+  SLACK_OAUTH_CREDENTIAL_ENVELOPE_VERSION,
+  SLACK_OAUTH_CREDENTIAL_PLATFORM,
+  buildSlackCredentialLockKey,
+  buildSlackOAuthCredentialAad,
+} from './slack-credential.js';
+export type {
+  SlackCredentialOwner,
+  SlackOAuthCredentialAadInput,
+  SlackOAuthSecretKind,
+} from './slack-credential.js';
 export type {
   GitLabAccessTokenCredentialAadInput,
   GitLabCredentialOwner,

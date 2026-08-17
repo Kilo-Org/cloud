@@ -46,6 +46,7 @@ import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
 import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
+import { userExportsRouter } from '@/routers/user-exports-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -93,6 +94,7 @@ export const rootRouter = createTRPCRouter({
   mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
+  userExports: userExportsRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

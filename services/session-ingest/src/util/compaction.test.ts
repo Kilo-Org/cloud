@@ -72,6 +72,13 @@ describe('getItemIdentity', () => {
     });
   });
 
+  it('returns fixed id for session_pr_link item', () => {
+    expect(getItemIdentity(item('session_pr_link'))).toEqual({
+      item_id: 'session_pr_link',
+      item_type: 'session_pr_link',
+    });
+  });
+
   it('throws for unknown item type', () => {
     expect(() => getItemIdentity(item('unknown_type'))).toThrow('Unknown item type: unknown_type');
   });

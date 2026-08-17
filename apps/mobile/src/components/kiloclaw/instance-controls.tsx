@@ -1,4 +1,4 @@
-import { Play, Power, RefreshCw, RotateCcw } from 'lucide-react-native';
+import { Play, Power, RefreshCw, RotateCcw } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';

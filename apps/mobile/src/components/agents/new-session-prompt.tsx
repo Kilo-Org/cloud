@@ -9,7 +9,7 @@ import {
   type TextStyle,
   View,
 } from 'react-native';
-import { Paperclip } from 'lucide-react-native';
+import { Paperclip } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
@@ -24,7 +24,9 @@ import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
 import { QueryError } from '@/components/query-error';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type ModelPickerSelection } from '@/lib/picker-bridge';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -66,10 +68,10 @@ type NewSessionPromptProps = {
   mode: AgentMode;
   model: string;
   variant: string;
-  modelOptions: ModelOption[];
+  modelOptions: (ModelOption | SessionModelOption)[];
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
-  onModelSelect: (modelId: string, variant: string) => void;
+  onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
@@ -257,7 +259,9 @@ export function NewSessionPrompt({
           editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
-          autoFocus
+          // A shared payload prefills this input, so raising the keyboard on
+          // arrival hides the attachment strip and the Start button.
+          autoFocus={shareId === undefined || shareId === ''}
         />
         <View className="flex-row items-center justify-between pb-2">
           <View className="flex-row items-center gap-1">

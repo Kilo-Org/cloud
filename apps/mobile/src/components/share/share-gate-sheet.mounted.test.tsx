@@ -68,12 +68,17 @@ vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
+  GitPullRequest: 'GitPullRequest',
   Plus: 'Plus',
   X: 'X',
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: toastError },
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  FEATURE_FLAG_PR_REVIEW: 'pr_review',
+  useFeatureFlag: () => true,
 }));
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',

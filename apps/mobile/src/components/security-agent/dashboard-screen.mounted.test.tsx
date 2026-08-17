@@ -63,7 +63,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   RefreshCw: 'RefreshCw',
   Settings: 'Settings',
   ShieldAlert: 'ShieldAlert',

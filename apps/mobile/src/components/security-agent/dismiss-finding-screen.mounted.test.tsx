@@ -54,7 +54,7 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
 }));
-vi.mock('lucide-react-native', () => ({ ShieldOff: 'ShieldOff' }));
+vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
 }));

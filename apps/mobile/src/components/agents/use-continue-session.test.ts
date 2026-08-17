@@ -145,11 +145,14 @@ vi.mock('@/components/agents/new-session-prefill', () => ({
   buildContinuePrefillParams: () => ({}),
 }));
 // The real continuation-seed module pulls in mode-options -> lucide-react-native
-// (RN tree); this suite pins key wiring, so the resolver is a test hook.
+// (RN tree); this suite pins key wiring, so the builders are test hooks.
 vi.mock('@/components/agents/continuation-seed', () => ({
   buildContinuationSeed: () => 'seed-text',
-  resolveContinueRemoteModel: (model: string, variant: string) => ({ model, variant }),
+  buildContinueRemoteSpawnInput: () => undefined,
   resolveContinuationDestinations: () => destinationsRef.value,
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({}),
 }));
 // Keep the real input builder; only stub the RN-touching spawn hook. The
 // builder is imported from the pure classifier module — the hook module

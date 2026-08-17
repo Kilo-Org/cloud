@@ -75,7 +75,6 @@ export function InviteMemberSheet() {
       <FormField
         label="Email"
         required
-        accessibilityLabel="Email"
         placeholder="name@company.com"
         keyboardType="email-address"
         autoCapitalize="none"
@@ -129,8 +128,6 @@ export function InviteMemberSheet() {
         className="text-sm"
       />
 
-      {/* Disabled-until-valid (D11): the button cannot fire while the email is
-          invalid, so focus-to-first-invalid has no reachable submit boundary. */}
       <Button disabled={!canSubmit} loading={mutations.invite.isPending} onPress={onSubmit}>
         <Text className="text-primary-foreground">Send invite</Text>
       </Button>

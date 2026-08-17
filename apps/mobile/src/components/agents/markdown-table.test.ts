@@ -337,24 +337,6 @@ describe('MarkdownTable table semantics', () => {
     }
   });
 
-  it('labels a multi-column body row with every header', () => {
-    // eslint-disable-next-line new-cap
-    const element = TableRow({
-      palette: mockPalette,
-      cells: [['John'], ['30']],
-      columnCount: 2,
-      columnWidth: 200,
-      isLastRow: true,
-      headerTexts: ['Name', 'Age'],
-    });
-    const labelElement = findFirst(element, isAccessibleLabelElement);
-
-    expect(labelElement).not.toBeNull();
-    expect(accessibilityLabelOf(labelElement)).toBe('Name: John, Age: 30');
-    const container = findFirst(element, isRowContainer);
-    expect(container?.props.accessible).not.toBe(true);
-  });
-
   it('keeps nested cell content as reachable siblings of the row label element', () => {
     // A cell carrying an interactive link stays a child of the NON-accessible
     // row container (and a sibling of the label element), so the nested

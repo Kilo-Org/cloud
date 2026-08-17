@@ -266,7 +266,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           .
         </Text>
 
-        {error ? <AccessibleStatus message={error} className="mt-6 text-sm" /> : null}
+        <AccessibleStatus message={error} className="mt-6 text-sm" />
 
         <View className="mt-8 gap-3">
           <Button

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
+import {
+  DEFAULT_TOKEN_COLOR,
+  MUTED_COLOR,
+  TOKEN_DARK_LIGHT,
+} from '@/lib/pr-review/diff/syntax-colors';
 
 vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
 vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
@@ -123,14 +128,36 @@ describe('status token contrast on light surfaces (WCAG AA text)', () => {
       }
     }
   });
+});
 
-  it('composite helper follows the global.css tile convention', () => {
-    // The tile tokens in global.css are the status hex with a `1a` (10%)
-    // alpha suffix, e.g. `--good-tile-bg: #24784a1a`. Asserting the derived
-    // composite keeps the diff-token assertions in syntax-colors.test.ts on
-    // the same surfaces the renderer actually paints.
-    expect(compositeHex(`${lightColors.good}1a`, lightColors.background)).toBe('#e5ede4');
-    expect(compositeHex(`${lightColors.destructive}1a`, lightColors.background)).toBe('#f3e8e2');
+describe('light diff token contrast on tinted surfaces (WCAG AA text)', () => {
+  // The diff renderer paints token colors as inline text style on top of the
+  // tinted tiles in `global.css` (`--good-tile-bg` / `--danger-tile-bg` = the
+  // status hue at 10% alpha over the theme background), so every light token
+  // must clear 4.5:1 on the composite surfaces, not just on plain background.
+  const surfaces = {
+    plain: lightColors.background,
+    goodTile: compositeHex(`${lightColors.good}1a`, lightColors.background),
+    dangerTile: compositeHex(`${lightColors.destructive}1a`, lightColors.background),
+  } as const;
+
+  const lightTokens: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(TOKEN_DARK_LIGHT).map(([name, pair]) => [name, pair.light])
+    ),
+    default: DEFAULT_TOKEN_COLOR.light,
+    muted: MUTED_COLOR.light,
+  };
+
+  it('every light token clears 4.5:1 on plain, good-tile, and danger-tile', () => {
+    for (const [token, color] of Object.entries(lightTokens)) {
+      for (const [surfaceName, surface] of Object.entries(surfaces)) {
+        const ratio = contrastRatio(color, surface);
+        expect(ratio, `${token} (${color}) vs ${surfaceName} (light)`).toBeGreaterThanOrEqual(
+          MIN_TEXT_RATIO
+        );
+      }
+    }
   });
 });
 

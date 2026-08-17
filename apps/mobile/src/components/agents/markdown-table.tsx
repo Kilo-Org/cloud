@@ -58,24 +58,16 @@ function getColumnCount(header: ReactNode[][], rows: ReactNode[][][]): number {
   return columnCount;
 }
 
-function pluralizeCount(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
+function pluralizeCount(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
 }
 
 function formatTableSummary(columnCount: number, rowCount: number): string {
-  return `${pluralizeCount(columnCount, 'column', 'columns')} · ${pluralizeCount(
-    rowCount,
-    'row',
-    'rows'
-  )}`;
+  return `${pluralizeCount(columnCount, 'column')} · ${pluralizeCount(rowCount, 'row')}`;
 }
 
 function formatChipAccessibilityLabel(columnCount: number, rowCount: number): string {
-  return `Table, ${pluralizeCount(columnCount, 'column', 'columns')}, ${pluralizeCount(
-    rowCount,
-    'row',
-    'rows'
-  )}, opens full screen`;
+  return `Table, ${pluralizeCount(columnCount, 'column')}, ${pluralizeCount(rowCount, 'row')}, opens full screen`;
 }
 
 // Markdown tables never fit inside a chat bubble: a horizontal ScrollView in a

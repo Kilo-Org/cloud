@@ -24,7 +24,7 @@ export function RadioGroup({
   );
 }
 
-export type RadioItemA11y = {
+type RadioItemA11y = {
   accessibilityRole: 'radio';
   accessibilityLabel: string;
   accessibilityState: {

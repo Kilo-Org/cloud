@@ -112,14 +112,13 @@ describe('AccessibleStatus platform channels (D14)', () => {
     renderer.unmount();
   });
 
-  it('applies the error tone class by default and merges a call-site className', async () => {
+  it('applies the error tone class by default', async () => {
     platformMock.OS = 'android';
     const renderer = await mount('Failed to load');
 
     const text = textNodes(renderer.root)[0];
     expect(text?.props.className).toContain('text-destructive');
 
-    await update(renderer, 'Listening...');
     renderer.unmount();
   });
 });

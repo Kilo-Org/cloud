@@ -58,7 +58,6 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
       <FormField
         label="Limit (USD per day)"
         required
-        accessibilityLabel="Daily usage limit"
         placeholder="No limit"
         keyboardType="decimal-pad"
         defaultValue={currentLimit != null ? String(currentLimit) : undefined}
@@ -77,10 +76,6 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         className="text-sm"
       />
 
-      {/* Disabled-until-valid (D11): the Save button cannot fire while the
-          limit is invalid, so focus-to-first-invalid has no reachable submit
-          boundary. The `if (!canSave) return;` guard in onSave is a second,
-          unreachable-in-practice gate. */}
       <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
         <Text className="text-primary-foreground">Save</Text>
       </Button>

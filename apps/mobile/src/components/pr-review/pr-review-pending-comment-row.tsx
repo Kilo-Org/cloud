@@ -60,16 +60,10 @@ export function PrReviewPendingCommentRow({
 }
 
 /**
- * Pending-comment removal outcome: announce the deletion and land focus on
- * the always-mounted, accessibility-labeled Review summary input. A toast
- * would paint behind the form sheet on iOS, so the announcement is
- * imperative (`announceForA11y`) rather than toast-owned.
- *
- * `removed` must be the caller's confirmed synchronous successful remove —
- * the item was still queued at delete-confirm time, so the provider's
- * id-filter definitely dropped it. A failed or absent remove (stale id that
- * was already dropped) announces nothing and moves no focus, mirroring the
- * confirmed-success gate on the session-list delete focus handoff.
+ * Announce a confirmed pending-comment removal and land focus on the
+ * always-mounted Review summary input. A toast would paint behind the form
+ * sheet on iOS, so the announcement is imperative. `removed` is the caller's
+ * confirmed synchronous remove; a stale id announces nothing.
  */
 export function focusAfterPendingCommentRemoval(
   inputRef: RefObject<TextInput | null>,

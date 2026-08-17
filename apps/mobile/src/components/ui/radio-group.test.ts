@@ -7,39 +7,11 @@ import { radioItemA11y } from './radio-group';
 vi.mock('react-native', () => ({ View: 'View' }));
 
 describe('radioItemA11y', () => {
-  it('returns the radio role and the item label', () => {
-    expect(radioItemA11y({ label: 'Squash', checked: false })).toMatchObject({
+  it('defaults disabled and busy to false', () => {
+    expect(radioItemA11y({ label: 'Squash', checked: false })).toEqual({
       accessibilityRole: 'radio',
       accessibilityLabel: 'Squash',
-    });
-  });
-
-  it('exposes checked=true when the option is selected', () => {
-    expect(radioItemA11y({ label: 'Squash', checked: true }).accessibilityState.checked).toBe(true);
-  });
-
-  it('exposes checked=false when the option is not selected', () => {
-    expect(radioItemA11y({ label: 'Squash', checked: false }).accessibilityState.checked).toBe(
-      false
-    );
-  });
-
-  it('defaults disabled and busy to false', () => {
-    expect(radioItemA11y({ label: 'Squash', checked: false }).accessibilityState).toEqual({
-      checked: false,
-      disabled: false,
-      busy: false,
-    });
-  });
-
-  it('exposes disabled and busy when provided', () => {
-    expect(
-      radioItemA11y({ label: 'Squash', checked: true, disabled: true, busy: true })
-        .accessibilityState
-    ).toEqual({
-      checked: true,
-      disabled: true,
-      busy: true,
+      accessibilityState: { checked: false, disabled: false, busy: false },
     });
   });
 

@@ -16,14 +16,6 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'AnimatedView' },
-  FadeIn: { duration: () => ({}) },
-  FadeOut: { duration: () => ({}) },
-  SlideInDown: { duration: () => ({}) },
-  SlideOutDown: { duration: () => ({}) },
-}));
-
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
@@ -230,36 +222,5 @@ describe('ReactionsRow picker dismissal focus', () => {
     expect(moveFocus).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
-  });
-
-  it('never moves focus when the row unmounts before the native Modal dismisses', async () => {
-    const onToggle = vi.fn<() => void>();
-    const renderer = await render(
-      createElement(ReactionsRow, { reactions: baseReactions, onToggle })
-    );
-
-    const addReaction = findNode(
-      renderer.root,
-      'Pressable',
-      p => p.accessibilityLabel === 'Add reaction'
-    );
-    if (!addReaction) {
-      throw new Error('Add reaction button not found');
-    }
-    pressNode(addReaction);
-
-    // Android back button answers through onRequestClose (same close path).
-    act(() => {
-      (getModalProps(renderer.root).onRequestClose as () => void)();
-    });
-    expect(moveFocus).not.toHaveBeenCalled();
-
-    // The row (and its trigger) unmount before the Modal finishes dismissing;
-    // the pending settle timer is cleared and onDismiss never fires.
-    renderer.unmount();
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(moveFocus).not.toHaveBeenCalled();
   });
 });

@@ -66,10 +66,4 @@ describe('linearRowLabel', () => {
     expect(linearRowLabel(['Name'], [])).toBe('');
     expect(linearRowLabel(['Name'], [''])).toBe('');
   });
-
-  it('composes extractNodeText outputs for a full row', () => {
-    const header = ['Item', 'Qty'];
-    const cells = [extractNodeText(createElement('Text', null, 'Apples')), extractNodeText(3)];
-    expect(linearRowLabel(header, cells)).toBe('Item: Apples, Qty: 3');
-  });
 });

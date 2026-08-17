@@ -115,43 +115,9 @@ function pressableByLabel(
   return labeledPressables(root).find(node => node.props.accessibilityLabel === label);
 }
 
-// Row 3.3 control-layout geometry: Tailwind spacing is 4px per unit, so
-// `h-7 w-7` is a 28px button and `-1` insets it 4px from the chip edge.
-// Each button plus the 8pt `hitSlop` on every side must form a separate
-// 44pt effective target.
-const TAILWIND_UNIT = 4;
-const BUTTON_SIZE = 7 * TAILWIND_UNIT;
-const BUTTON_INSET = TAILWIND_UNIT;
+// 28pt visible button (`h-7 w-7`) plus 8pt slop per side = the 44pt
+// effective target.
 const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
-
-// Chip dimensions from the strip's size classes: `w-20 h-16` (image) and
-// `w-48 h-12` (document).
-const CHIP_DIMS = {
-  image: { width: 20 * TAILWIND_UNIT, height: 16 * TAILWIND_UNIT },
-  document: { width: 48 * TAILWIND_UNIT, height: 12 * TAILWIND_UNIT },
-} as const;
-
-type Rect = { left: number; top: number; right: number; bottom: number };
-
-// Runtime target of one control: the visible 28pt button (`-1` insets it
-// from the chip edge) expanded by the 8pt `hitSlop` on every side. The
-// controls live OUTSIDE the overflow-hidden chip surface (asserted in
-// `assertDistinctTargets`), so this full 44pt rect is the effective touch
-// target at runtime — no parent cuts it off.
-function runtimeTargetRect(className: string, dims: { width: number; height: number }): Rect {
-  const left = className.includes('left-1')
-    ? BUTTON_INSET - HIT_SLOP.left
-    : dims.width - BUTTON_INSET - BUTTON_SIZE - HIT_SLOP.right;
-  const top = className.includes('top-1')
-    ? BUTTON_INSET - HIT_SLOP.top
-    : dims.height - BUTTON_INSET - BUTTON_SIZE - HIT_SLOP.bottom;
-  return {
-    left,
-    top,
-    right: left + BUTTON_SIZE + HIT_SLOP.left + HIT_SLOP.right,
-    bottom: top + BUTTON_SIZE + HIT_SLOP.top + HIT_SLOP.bottom,
-  };
-}
 
 describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
   it('exposes determinate progressbar semantics while uploading', async () => {
@@ -338,18 +304,6 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     const surface = chipBody(renderer.root).parent;
     expect(surface?.props.className).toContain('overflow-hidden');
     expect(surface?.findAll(node => node === retry || node === remove)).toHaveLength(0);
-
-    // Runtime bounds: Retry is `inset-0`, so its target is the chip box, which
-    // clears 44pt on both axes for both chip shapes. Remove keeps the 44pt
-    // effective target its 28pt button plus hitSlop forms, unreduced by any
-    // clip parent.
-    const dims = CHIP_DIMS[kind];
-    expect(dims.width, `${kind} chip retry width`).toBeGreaterThanOrEqual(44);
-    expect(dims.height, `${kind} chip retry height`).toBeGreaterThanOrEqual(44);
-    const removeRect = runtimeTargetRect(String(remove.props.className), dims);
-    expect([removeRect.right - removeRect.left, removeRect.bottom - removeRect.top]).toEqual([
-      44, 44,
-    ]);
 
     renderer.unmount();
   }

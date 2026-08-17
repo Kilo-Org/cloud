@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -240,9 +241,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            accessibilityLabel={
-              urlError ? `Pull request URL, error: ${urlError}` : 'Pull request URL'
-            }
+            accessibilityLabel={formFieldA11y({ label: 'Pull request URL', error: urlError })}
             onChangeText={value => {
               urlRef.current = value;
               if (urlError) {

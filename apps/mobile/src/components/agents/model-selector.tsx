@@ -247,10 +247,7 @@ export function ModelPickerOptionRow({
   // to preserve the exact visual order (content, star, check).
   return (
     <View className="border-b border-border">
-      <View
-        accessible={false}
-        className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}
-      >
+      <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
         <Pressable
           className="min-h-9 flex-1 flex-row items-center py-3 pl-4 active:bg-secondary"
           onPress={() => {

@@ -6,16 +6,11 @@ import { useReducedMotion } from 'react-native-reanimated';
 // essential presentation motion, outside WCAG 2.3.3's non-essential scope.
 
 export type MotionPolicy = {
-  reduceMotion: boolean;
   /** `false` when reduce motion is on, so imperative scrolls go immediate. */
   scrollAnimated: boolean;
 };
 
 /** Wrap Reanimated's `useReducedMotion` in the app's motion vocabulary. */
 export function useMotionPolicy(): MotionPolicy {
-  const reduceMotion = useReducedMotion();
-  return {
-    reduceMotion,
-    scrollAnimated: !reduceMotion,
-  };
+  return { scrollAnimated: !useReducedMotion() };
 }

@@ -177,8 +177,6 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     inlineErrorKind === 'reconnect';
 
   const keyboardVisible = useFormSheetKeyboardVisible();
-  // Keyboard-open viewport is tight; keep the count, hide per-item rows so
-  // Submit + Cancel stay above the keyboard at scroll offset 0.
 
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
@@ -231,6 +229,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
             </Text>
             {queueHint}
+            {/* Keyboard-open viewport is tight; keep the count, hide per-item
+                rows so Submit + Cancel stay above the keyboard at offset 0. */}
             {!keyboardVisible
               ? pending.items.map(item => (
                   <PrReviewPendingCommentRow
@@ -322,17 +322,15 @@ function ReviewEventChips(props: {
               {...radioItemA11y({ label: option.label, checked: active, disabled: props.disabled })}
               className={cn(
                 'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
-                active && 'border-primary bg-primary',
-                !active && props.disabled && 'border-hair-soft bg-secondary',
-                !active && !props.disabled && 'border-border bg-secondary'
+                active ? 'border-primary bg-primary' : 'bg-secondary',
+                !active && (props.disabled ? 'border-hair-soft' : 'border-border')
               )}
             >
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  active && 'text-primary-foreground',
-                  !active && props.disabled && 'text-muted-foreground',
-                  !active && !props.disabled && 'text-foreground'
+                  active ? 'text-primary-foreground' : 'text-foreground',
+                  !active && props.disabled && 'text-muted-foreground'
                 )}
               >
                 {option.label}

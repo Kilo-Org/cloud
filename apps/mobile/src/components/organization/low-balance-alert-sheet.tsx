@@ -100,7 +100,6 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           <FormField
             label="Alert below (USD)"
             required
-            accessibilityLabel="Alert threshold"
             placeholder="10.00"
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
@@ -115,7 +114,6 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             <FormField
               label="Notify emails"
               required
-              accessibilityLabel="Notify emails"
               placeholder="name@company.com"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -146,9 +144,6 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         className="text-sm"
       />
 
-      {/* Disabled-until-valid (D11): the Save button cannot fire while an
-          enabled alert has an invalid threshold or emails, so
-          focus-to-first-invalid has no reachable submit boundary. */}
       <Button
         disabled={!canSave}
         loading={mutations.updateMinimumBalanceAlert.isPending}

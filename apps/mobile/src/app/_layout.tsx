@@ -14,6 +14,7 @@ import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
+  ErrorBoundary as ExpoRouterErrorBoundary,
   type Href,
   Slot,
   ThemeProvider,
@@ -77,12 +78,16 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
+import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
+  enableTimeToInitialDisplay: !isRunningInExpoGo(),
+});
+const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
 
@@ -94,6 +99,9 @@ installE2EWebSocketLatency();
 // must still be reported. The optional group is `tracesSampleRate`
 // only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
 // `enableTombstone` is Android 12+ only; NDK stays on for older devices.
+// `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
+// hangs are not reported twice. Native init in the Expo plugin captures
+// crashes before JS loads.
 //
 // In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
 // — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
@@ -101,18 +109,20 @@ installE2EWebSocketLatency();
 //   `app_startup` event in src/lib/startup-timing.ts.
 function initSentry(optionalConsented: boolean) {
   Sentry.init({
-    dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
+    dsn: SENTRY_DSN,
 
     enabled: true,
 
     sendDefaultPii: false,
 
     enableTombstone: true,
+    enableMetricKit: true,
+    enableAppHangTracking: false,
 
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [navigationIntegration],
+    integrations: [navigationIntegration, expoRouterIntegration, Sentry.deeplinkIntegration()],
     enableNativeFramesTracking: false,
 
     beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
@@ -663,5 +673,7 @@ function RootLayout() {
     </ShareIntentProvider>
   );
 }
+
+export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(ExpoRouterErrorBoundary);
 
 export default Sentry.wrap(RootLayout);

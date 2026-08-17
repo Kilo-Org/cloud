@@ -32,6 +32,7 @@ vi.mock('./dos/SessionAccessCacheDO', () => ({
 
 import { app } from './index';
 import { getWorkerDb } from '@kilocode/db/client';
+import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 
 type TestBindings = {
@@ -168,13 +169,37 @@ describe('public session route', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 404 without looking up the public_id', async () => {
+  it('returns 404 when public_id not found', async () => {
     const { db, selectResult } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValueOnce([]);
 
     const res = await app.request('/session/11111111-1111-4111-8111-111111111111', {}, defaultEnv);
 
     expect(res.status).toBe(404);
-    expect(selectResult).not.toHaveBeenCalled();
+  });
+
+  it('returns DO snapshot json with content-type', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        kilo_user_id: 'usr_123',
+      },
+    ]);
+
+    const stub = {
+      getAllStream: vi.fn(async () => new Response('{"ok":true}').body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      stub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await app.request('/session/11111111-1111-4111-8111-111111111111', {}, defaultEnv);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(await res.text()).toBe('{"ok":true}');
   });
 });

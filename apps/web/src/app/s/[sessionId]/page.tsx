@@ -17,8 +17,6 @@ export default async function SharedSessionPage({
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
-  notFound();
-
   const { sessionId } = await params;
 
   // Validate sessionId is a valid UUID before querying the database

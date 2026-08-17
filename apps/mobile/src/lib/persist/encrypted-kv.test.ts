@@ -376,8 +376,9 @@ describe('open failure recovery', () => {
     }
   );
 
-  // The probe failure is reported from the reset path; a PRAGMA failure on the
-  // recovery open rethrows before that report, so the count differs per seam.
+  // Every recovery failure reports once, whichever seam fails: the open memo
+  // makes one failure reject every later caller, so silence would hide a
+  // persistence outage that lasts the rest of the install.
   it.each([
     {
       seam: 'probe',
@@ -398,7 +399,7 @@ describe('open failure recovery', () => {
       recover: () => {
         failEveryPragma = false;
       },
-      sentryReports: 0,
+      sentryReports: 1,
     },
   ])(
     'a $seam that fails on recovery too closes both handles and rejects every later caller',

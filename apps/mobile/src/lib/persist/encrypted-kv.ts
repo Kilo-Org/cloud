@@ -192,10 +192,11 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     if (db) {
       await closeQuietly(db.$client);
     }
-    await SQLite.deleteDatabaseAsync(DATABASE_NAME);
-    const freshKey = await generateAndStoreKey();
-    const reopened = await openWithKey(freshKey);
+    let reopened: KVDatabase | undefined = undefined;
     try {
+      await SQLite.deleteDatabaseAsync(DATABASE_NAME);
+      const freshKey = await generateAndStoreKey();
+      reopened = await openWithKey(freshKey);
       await probeAndMigrate(reopened);
       Sentry.captureException(openError, {
         level: 'warning',
@@ -203,9 +204,14 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       });
       return reopened;
     } catch (resetError) {
+      // The whole recovery is inside this try: a failed delete, key
+      // regeneration, or reopen must report too, because the open memo makes
+      // one failure reject every caller for the rest of the install.
       // Close the reopened handle before rethrowing so a failed recovery
       // cannot leak it; the delete above already removed the file.
-      await closeQuietly(reopened.$client);
+      if (reopened) {
+        await closeQuietly(reopened.$client);
+      }
       Sentry.captureException(resetError, {
         level: 'error',
         extra: { database: DATABASE_NAME, reason: 'encrypted-kv reset failed' },

@@ -13,6 +13,20 @@
  */
 export const DOWNLOAD_CODE_LENGTH = 8;
 
+export type DownloadCodeChallenge = {
+  exportId: string;
+  challengeId: string;
+  expiresAt: number;
+};
+
+export function canReuseDownloadCodeChallenge(
+  challenge: DownloadCodeChallenge | null,
+  exportId: string,
+  now = Date.now()
+): challenge is DownloadCodeChallenge {
+  return challenge?.exportId === exportId && challenge.expiresAt > now;
+}
+
 export const USER_EXPORT_STATUSES = [
   'queued',
   'processing',

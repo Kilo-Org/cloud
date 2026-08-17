@@ -19,7 +19,7 @@ import {
   useCancelSecurityRemediation,
   useRetrySecurityRemediation,
   useStartSecurityRemediation,
-} from '@/lib/hooks/use-security-findings';
+} from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';

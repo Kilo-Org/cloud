@@ -91,8 +91,11 @@ installE2EWebSocketLatency();
 
 // DEC-02 consent rule: crash and error reporting is mandatory, so
 // `initSentry(false)` runs at module scope — a crash during bootstrap
-// must still be reported. The optional group is `tracesSampleRate`
-// only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// must still be reported. The optional group is `tracesSampleRate` plus
+// MASKED session replay and error screenshots (DEC-02 amendment, owner
+// decision 2026-08-17); the replay integration is only registered once
+// optional consent is accepted, so no replay code runs before the
+// decision. Account identity is cleared by step 7's `Sentry.setUser(null)`.
 //
 // In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
 // — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
@@ -109,7 +112,16 @@ function initSentry(optionalConsented: boolean) {
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [navigationIntegration],
+    integrations: optionalConsented
+      ? [
+          navigationIntegration,
+          Sentry.mobileReplayIntegration({
+            maskAllText: true,
+            maskAllImages: true,
+            maskAllVectors: true,
+          }),
+        ]
+      : [navigationIntegration],
     enableNativeFramesTracking: false,
 
     beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
@@ -335,7 +347,10 @@ function RootLayoutNav() {
     accountId: userId,
     optionalConsent,
   });
-  useScreenTracking();
+  // Screen capture must wait for consent: analytics eligibility is decided
+  // only after the account's consent decision has loaded without error.
+  const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
+  useScreenTracking(bootstrapSettled);
 
   useEffect(() => {
     if (shareIntentError) {

@@ -1,6 +1,5 @@
 import {
   getNextSecurityFindingsOffset,
-  getRemediationUnavailableCopy,
   isActiveRemediationStatus,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
@@ -8,6 +7,11 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
+import {
+  isSecuritySyncRetryable,
+  mapSecurityDismissOperationError,
+} from '@/lib/hooks/use-security-agent-mutations';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -94,19 +98,54 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
 // No hook-level onError toast: dismiss-finding-screen.tsx is the sole caller
 // and is a form sheet that stays open on failure — it renders
 // `dismissFinding.isError` inline above the confirm button instead (P2).
+
+/**
+ * Intent fingerprint for a finding dismissal (P1-A-08e): a form edit or a
+ * scope change is a new intent.
+ */
+export function dismissFindingIntentFingerprint(
+  scope: string,
+  vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
+): string {
+  return JSON.stringify({
+    resource: [scope],
+    findingId: vars.findingId,
+    reason: vars.reason,
+    comment: vars.comment,
+  });
+}
+
 export function useDismissSecurityFinding(scope: string) {
   const queryClient = useQueryClient();
+  const { getKey, rotateKey } = useHoistedOperationKey();
   return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.dismissFinding.mutate(vars)
-        : trpcClient.organizations.securityAgent.dismissFinding.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
+    mutationFn: async (
+      vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
+    ) => {
+      const operationKey = getKey(dismissFindingIntentFingerprint(scope, vars));
+      try {
+        const result = isPersonalSecurityScope(scope)
+          ? await trpcClient.securityAgent.dismissFinding.mutate({ ...vars, operationKey })
+          : await trpcClient.organizations.securityAgent.dismissFinding.mutate({
+              organizationId: scope,
+              ...vars,
+              operationKey,
+            });
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isSecuritySyncRetryable(error)) {
+          rotateKey();
+        }
+        // Map the raw `operation_in_progress` CONFLICT marker onto retryable
+        // dismissal copy before the form renders it inline (P2).
+        throw mapSecurityDismissOperationError(error);
+      }
+    },
     onSuccess: result => {
-      trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      if (result.commandId) {
+        trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      }
     },
   });
 }
@@ -159,180 +198,6 @@ export function useStartSecurityAnalysis(scope: string) {
           }),
         }),
       ]);
-    },
-  });
-}
-
-async function invalidateRemediationQueries(
-  deps: {
-    trpc: ReturnType<typeof useTRPC>;
-    queryClient: ReturnType<typeof useQueryClient>;
-  },
-  target: { scope: string; findingId: string }
-): Promise<void> {
-  const { trpc, queryClient } = deps;
-  const { scope, findingId } = target;
-  if (isPersonalSecurityScope(scope)) {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: trpc.securityAgent.getAnalysis.queryKey({ findingId }),
-      }),
-      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() }),
-      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
-      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
-    ]);
-    return;
-  }
-  const ownerInput = { organizationId: scope };
-  await Promise.all([
-    queryClient.invalidateQueries({
-      queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey({
-        ...ownerInput,
-        findingId,
-      }),
-    }),
-    queryClient.invalidateQueries({
-      queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
-    }),
-    queryClient.invalidateQueries({
-      queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
-    }),
-    queryClient.invalidateQueries({
-      queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
-    }),
-  ]);
-}
-
-export function useStartSecurityRemediation(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startRemediation.mutate>[0]) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.startRemediation.mutate(vars)
-        : trpcClient.organizations.securityAgent.startRemediation.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
-    onError: error => {
-      toast.error(error.message);
-    },
-    onSuccess: async (result, vars) => {
-      if (!result.queued) {
-        toast.error(
-          getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
-        );
-      } else {
-        toast.success('Remediation queued');
-      }
-      await invalidateRemediationQueries(
-        { trpc, queryClient },
-        { scope, findingId: vars.findingId }
-      );
-    },
-  });
-}
-
-export function useRetrySecurityRemediation(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.retryRemediation.mutate>[0]) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.retryRemediation.mutate(vars)
-        : trpcClient.organizations.securityAgent.retryRemediation.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
-    onError: error => {
-      toast.error(error.message);
-    },
-    onSuccess: async (result, vars) => {
-      if (!result.queued) {
-        toast.error(
-          getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
-        );
-      } else {
-        toast.success('Remediation retry queued');
-      }
-      await invalidateRemediationQueries(
-        { trpc, queryClient },
-        { scope, findingId: vars.findingId }
-      );
-    },
-  });
-}
-
-function getSecurityAnalysisQueryKey(
-  trpc: ReturnType<typeof useTRPC>,
-  scope: string,
-  findingId: string
-) {
-  return isPersonalSecurityScope(scope)
-    ? trpc.securityAgent.getAnalysis.queryKey({ findingId })
-    : trpc.organizations.securityAgent.getAnalysis.queryKey({ organizationId: scope, findingId });
-}
-
-// cancelRemediation resolves synchronously (no background command to track),
-// so — unlike start/retry — we invalidate the affected queries ourselves
-// once the immediate result comes back. Reuses invalidateRemediationQueries
-// (the same helper start/retry use) so the analysis query — the one that
-// actually owns remediationAttempts — is never left stale, which the
-// hand-rolled invalidation list here used to miss.
-export function useCancelSecurityRemediation(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: { attemptId: string; findingId: string }) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.cancelRemediation.mutate({ attemptId: vars.attemptId })
-        : trpcClient.organizations.securityAgent.cancelRemediation.mutate({
-            organizationId: scope,
-            attemptId: vars.attemptId,
-          }),
-    onMutate: async vars => {
-      const analysisQueryKey = getSecurityAnalysisQueryKey(trpc, scope, vars.findingId);
-      await queryClient.cancelQueries({ queryKey: analysisQueryKey });
-      const previous = queryClient.getQueryData<SecurityAnalysis>(analysisQueryKey);
-      queryClient.setQueryData<SecurityAnalysis>(analysisQueryKey, old =>
-        old
-          ? {
-              ...old,
-              remediationAttempts: old.remediationAttempts.map(attempt =>
-                attempt.id === vars.attemptId
-                  ? { ...attempt, cancellationRequestedAt: new Date().toISOString() }
-                  : attempt
-              ),
-            }
-          : old
-      );
-      return { previous, analysisQueryKey };
-    },
-    onError: (error, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.analysisQueryKey, context.previous);
-      }
-      toast.error(error.message);
-    },
-    onSuccess: result => {
-      // 'cancellation_requested' means the attempt was already running and
-      // was only asked to stop — it may still finish and produce a PR.
-      toast.success(
-        result.status === 'cancellation_requested'
-          ? 'Cancellation requested'
-          : 'Remediation cancelled'
-      );
-    },
-    onSettled: async (_result, _error, vars) => {
-      await invalidateRemediationQueries(
-        { trpc, queryClient },
-        { scope, findingId: vars.findingId }
-      );
     },
   });
 }

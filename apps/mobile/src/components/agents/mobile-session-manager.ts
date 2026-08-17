@@ -64,6 +64,38 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * tRPC codes transient enough to keep the same cloud-prepare `operationKey`
+ * across a retry. Any other typed code is a terminal rejection and rotates it.
+ */
+const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
+  'INTERNAL_SERVER_ERROR',
+  'BAD_GATEWAY',
+  'SERVICE_UNAVAILABLE',
+  'GATEWAY_TIMEOUT',
+  'TIMEOUT',
+  'TOO_MANY_REQUESTS',
+]);
+
+/** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
+const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
+
+/**
+ * True when a `prepareSession` failure may be retried with the SAME
+ * `operationKey`: `creation_in_progress`, a transient 5xx, or a codeless
+ * transport failure (the ledger reconciles the ambiguous prior attempt).
+ */
+export function isCloudPrepareRetryableError(error: unknown): boolean {
+  const code = readFetchSessionErrorCode(error);
+  if (code === undefined) {
+    return true;
+  }
+  if (code === 'CONFLICT') {
+    return error instanceof Error && error.message === CLOUD_PREPARE_IN_PROGRESS_MESSAGE;
+  }
+  return CLOUD_PREPARE_TRANSIENT_CODES.has(code);
+}
+
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
 async function defaultFetchSessionQuery(
   sessionId: KiloSessionId

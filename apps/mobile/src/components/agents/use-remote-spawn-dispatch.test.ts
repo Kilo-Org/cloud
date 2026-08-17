@@ -219,6 +219,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         model: { providerID: 'anthropic', modelID: 'claude-x', variant: 'high' },
         orgId: 'org-xyz',
       },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -227,7 +228,11 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       organizationId: 'org-xyz',
     });
 
-    expect(await captureSpawnCall(onStart)).toEqual(['conn-abc', { orgId: 'org-xyz' }]);
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
+    ]);
   });
 
   it('explicit mode and selection reach the spawn input', async () => {
@@ -240,6 +245,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       { agent: 'code', model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -266,6 +272,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         agent: 'code',
         model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
       },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -283,6 +290,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         model: { providerID: 'opencode', modelID: 'opencode-model', variant: 'xhigh' },
         orgId: 'org-xyz',
       },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -295,6 +303,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       { agent: 'code', orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
     ]);
   });
 

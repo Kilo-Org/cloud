@@ -21,6 +21,7 @@ import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
@@ -68,6 +69,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const { spawn } = useRemoteInstanceSpawn();
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
+  // P1-A-08b: one `operationKey` per share-spawn intent (share + instance), so
+  // a retryable failure keeps the key and the relay dedupes the retry.
+  const { getKey, rotateKey } = useHoistedOperationKey();
   // Per-attempt token so a stale spawn's finally cannot clear a newer lock
   // (share replace mid-flight, or same-connection re-tap after replace).
   const spawnAttemptRef = useRef(0);
@@ -298,8 +302,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         spawnAttemptRef.current += 1;
         const attempt = spawnAttemptRef.current;
         setSpawningConnectionId(instance.connectionId);
+        const operationKey = getKey(
+          JSON.stringify({ connectionId: instance.connectionId, shareId })
+        );
         try {
-          const outcome = await spawn(instance.connectionId);
+          const outcome = await spawn(instance.connectionId, undefined, { operationKey });
           // Gate has no "Run on" selection; ignore selection-reset flags.
           const action = resolveRemoteSubmitOutcome({
             outcome,
@@ -308,6 +315,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           });
 
           if (action.kind === 'navigate') {
+            // Rotate before the suppressed-navigation early return, so a later
+            // eligible spawn cannot reuse the settled key.
+            rotateKey();
             if (
               !shouldCommitShareSpawnReady({
                 committedShareId: committedShareIdRef.current,
@@ -332,6 +342,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
             return;
           }
 
+          // A typed non-retryable rejection ends the intent.
+          rotateKey();
           toast.error(action.toast);
         } finally {
           // Only the attempt that still owns the lock may clear it.
@@ -341,7 +353,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         }
       })();
     },
-    [commit, commitEnabled, isSpawning, payload, refetchInstances, shareId, spawn, validation]
+    [
+      commit,
+      commitEnabled,
+      getKey,
+      isSpawning,
+      payload,
+      refetchInstances,
+      rotateKey,
+      shareId,
+      spawn,
+      validation,
+    ]
   );
 
   const handleRetry = useCallback(() => {

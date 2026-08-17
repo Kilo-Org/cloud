@@ -1,4 +1,5 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- injectable query/sleep fakes settle without await */
+/* eslint-disable max-lines -- the manager suite pins retry cadence and attachment mints in one file. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
@@ -41,17 +42,22 @@ vi.mock('@/components/agents/tool-card-image-cache', () => ({
 }));
 
 const mutate = vi.fn();
+const prepareSessionMutate = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate },
+      prepareSession: { mutate: prepareSessionMutate },
+    },
+    organizations: {
+      cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } },
     },
   },
 }));
 
 const { buildRemoteAttachmentParts } =
   await import('@/components/agents/mobile-session-manager-helpers');
-const { fetchSessionWithNotFoundRetry, readFetchSessionErrorCode } =
+const { fetchSessionWithNotFoundRetry, isCloudPrepareRetryableError, readFetchSessionErrorCode } =
   await import('@/components/agents/mobile-session-manager');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
@@ -60,6 +66,10 @@ function notFoundError(): Error {
   const error = new Error('Session not found') as Error & { data: { code: string } };
   error.data = { code: 'NOT_FOUND' };
   return error;
+}
+
+function withCode(code: string, message: string): Error {
+  return Object.assign(new Error(message), { data: { code } });
 }
 
 describe('buildRemoteAttachmentParts', () => {
@@ -186,6 +196,46 @@ describe('readFetchSessionErrorCode', () => {
   it('returns undefined for non-objects', () => {
     expect(readFetchSessionErrorCode(null)).toBeUndefined();
     expect(readFetchSessionErrorCode('nope')).toBeUndefined();
+  });
+});
+
+describe('isCloudPrepareRetryableError', () => {
+  it('keeps the key for creation_in_progress (CONFLICT)', () => {
+    expect(isCloudPrepareRetryableError(withCode('CONFLICT', 'creation_in_progress'))).toBe(true);
+  });
+
+  it('keeps the key for a network error with no tRPC code', () => {
+    expect(isCloudPrepareRetryableError(new Error('Network request failed'))).toBe(true);
+  });
+
+  it('keeps the key for transient 5xx-class and rate-limit codes', () => {
+    for (const code of [
+      'INTERNAL_SERVER_ERROR',
+      'BAD_GATEWAY',
+      'SERVICE_UNAVAILABLE',
+      'GATEWAY_TIMEOUT',
+      'TIMEOUT',
+      'TOO_MANY_REQUESTS',
+    ]) {
+      expect(isCloudPrepareRetryableError(withCode(code, 'boom'))).toBe(true);
+    }
+  });
+
+  it('rotates the key on typed terminal rejections', () => {
+    for (const code of [
+      'BAD_REQUEST',
+      'UNAUTHORIZED',
+      'FORBIDDEN',
+      'NOT_FOUND',
+      'PAYMENT_REQUIRED',
+      'PRECONDITION_FAILED',
+    ]) {
+      expect(isCloudPrepareRetryableError(withCode(code, 'nope'))).toBe(false);
+    }
+  });
+
+  it('rotates the key on a CONFLICT with any other message', () => {
+    expect(isCloudPrepareRetryableError(withCode('CONFLICT', 'something else'))).toBe(false);
   });
 });
 

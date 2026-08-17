@@ -323,4 +323,69 @@ describe('createRemoteSessionOnConnection', () => {
       expectedConnectionId: 'cli-owner-1',
     });
   });
+
+  it('forwards the caller mutationId as the extended wire identity (`${key}:ext`)', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'spawn-key-1:ext',
+    });
+  });
+
+  it('uses the distinct bare identity (`${key}:bare`) for the old-CLI retry', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      mutationId: 'spawn-key-1',
+      agent: 'code',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(1, {
+      command: 'create_session',
+      data: { protocolVersion: 1, agent: 'code' },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'spawn-key-1:ext',
+    });
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(2, {
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+      mutationId: 'spawn-key-1:bare',
+    });
+    expect(parseCreateSessionResponse(result)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
+    });
+  });
+
+  it('omits mutationId on both attempts when the caller provides none', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', { agent: 'code' });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    for (const call of connection.sendCommandToConnection.mock.calls) {
+      expect(call[0]).not.toHaveProperty('mutationId');
+    }
+  });
 });

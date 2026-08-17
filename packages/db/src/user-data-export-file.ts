@@ -43,19 +43,15 @@
  *      released entry would leave two different file shapes both claiming it, which is
  *      the one thing this constant exists to prevent.
  *   6  two more sources, and one change to two existing ones:
- *        `external_usage_daily`   the countries a person appeared from, per workspace. Not
- *                                 usage history: the source table was reduced to three
- *                                 columns on 2026-08-14 and holds no date, model or volume
+ *        `external_usage_daily`   the countries a person appeared from. Not usage history:
+ *                                 the source table was reduced to three columns on
+ *                                 2026-08-14 and holds no date, model or volume
  *        `cloud_agent_code_reviews`
  *                                 one journal row per state change of a code review, with
  *                                 the pull request it covers and the summary it replaced
  *
- *      Also at 6, and the reason a reader may care more: `app_builder_projects` and
- *      `app_builder_messages` no longer carry the `softDeleted` mark. Their projections
- *      were reduced to `id, title` and `id, data` on request, so neither source can tell a
- *      row prod has deleted from a live one. Both still RETURN those rows; they have
- *      stopped labelling them, not stopped exporting them. A reader comparing a version 6
- *      file against an earlier one will find the mark absent where it used to appear.
+ *      Also at 6, `app_builder_projects` and `app_builder_messages` narrowed to
+ *      `id, title` and `id, data` on request.
  *   7  the `audiences` source (the marketing view's copy of the person's email address).
  *      Personal exports only; the source has no organization reading. It is also the one
  *      source NOT bounded to `snapshotAt` — the dbt model carries no row timestamp, so it
@@ -80,14 +76,52 @@
  *        `user_auth_provider`     no longer returns `provider`, `provider_account_id` or
  *                                 `created_at`. The first two are still read, because they
  *                                 are that source's cursor and the two halves of its
- *                                 record id, so which account a record belongs to is still
- *                                 recoverable from the id
+ *                                 record id, so in a version-8 file which account a record
+ *                                 belongs to is recoverable from that id. Not so from 9,
+ *                                 where the id itself is gone
  *
  *      Where a dropped column was needed to page or to identify a row it is still
  *      SELECTed and simply not returned. Where it was not, it is no longer read at all.
+ *   9  three sources resolving location below the identity section's per-person country:
+ *        `int_microdollar_usage_enriched`
+ *                                 the project a usage row belonged to, and the city,
+ *                                 country and coordinates derived from the requesting IP
+ *        `microdollar_usage_hourly`
+ *                                 the countries a person appeared from, per project
+ *        `usage_daily`            the countries a person appeared from
+ *
+ *      Also at 9, the per-record property some sources set and others could not is gone,
+ *      so a reader no longer has to interpret its absence. `id` remains the one optional
+ *      property: a record carries `source`, `field` and `value` always, and `id` only from
+ *      a source with a stable per-row key. Where the file names a row it still names it
+ *      the same way; where it never could, the property is simply absent.
+ *
+ *      A further narrowing of what three existing sources return, on request. Each is a
+ *      field a reader of an earlier file will find missing:
+ *        `deployment_events`      no longer returns `created_by_user_id`
+ *        `orb_customer`           no longer returns `external_customer_id`, and no longer
+ *                                 selects it either. Nothing here needs it: the load is
+ *                                 what matches it to a person, so on every row an export
+ *                                 can reach it held the same value as the scope already
+ *        `user_auth_provider`     no longer returns a record `id`. The pair it was built
+ *                                 from is still read as that source's cursor, but two
+ *                                 linked accounts supplying the same profile now produce
+ *                                 records nothing in the file tells apart
+ *
+ *      As at 8: where a dropped column is needed to page or to resolve a row it is still
+ *      SELECTed and simply not returned.
+ *
+ *      A trailer also arrives at 9. Every file ends with one, naming any source that
+ *      failed while being read, so a file that ends without one was truncated.
+ *
+ *      And the identity section is now the warehouse's `users` row alone — the account,
+ *      billing, link, routing-identifier and `signup_ip` columns the primary alone held
+ *      were dropped on request. `email` and `name` are returned under those names rather
+ *      than the account's own column names. The export no longer reads the primary at all,
+ *      so every field in the file is as of the same snapshot.
  *
  * The column's database default stays at 1 deliberately. Every insert sets this value
  * explicitly, so bumping the format never needs a migration, and a row written without it
  * is visibly stale rather than quietly wrong.
  */
-export const EXPORT_FILE_SCHEMA_VERSION = 8;
+export const EXPORT_FILE_SCHEMA_VERSION = 9;

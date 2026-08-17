@@ -68,6 +68,13 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'Success' },
 }));
 
+// `pr-merge-sheet` imports the ledger helpers, which import `expo-crypto`
+// (and transitively expo-modules-core). Mock it so this suite stays
+// node-only, same as the other ledger pure tests.
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => 'not-used-in-pure-tests',
+}));
+
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));

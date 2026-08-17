@@ -102,6 +102,8 @@ import {
   coding_plan_availability_intents,
   coding_plan_subscriptions,
   deployments_ephemeral,
+  operation_ledgers,
+  analytics_event_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
   user_data_exports,
@@ -1006,6 +1008,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
+ * - operation_ledgers (keyed by kilo_user_id)
+ * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
+ *   writer's email lookup failed, the user id)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1054,6 +1059,14 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(security_finding_notifications)
       .where(eq(security_finding_notifications.recipient_user_id, userId));
+
+    // ── 0b. Operation ledger and analytics outbox ────────────────────────
+    // Outbox rows are keyed by distinct_id: the user's email, or the user id
+    // when the writer's email lookup failed. Delete both identities.
+    await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
+    await tx
+      .delete(analytics_event_outbox)
+      .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx

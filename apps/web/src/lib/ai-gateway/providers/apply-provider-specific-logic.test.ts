@@ -24,7 +24,10 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
 
 type MessagesThinking = Extract<GatewayRequest, { kind: 'messages' }>['body']['thinking'];
 
-function makeMessagesRequest(model: string, thinking?: MessagesThinking): GatewayRequest {
+function makeMessagesRequest(
+  model: string,
+  thinking?: MessagesThinking
+): Extract<GatewayRequest, { kind: 'messages' }> {
   return {
     kind: 'messages',
     body: {
@@ -92,7 +95,7 @@ describe('applyReasoningDetailsTransform', () => {
     };
   }
 
-  function makeReasoningRequest(): GatewayRequest {
+  function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
       kind: 'chat_completions',
       body: {

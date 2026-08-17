@@ -130,6 +130,24 @@ describe('hasVercelProvidersButNoOpenRouterProviders', () => {
     ).toBe(true);
   });
 
+  it('recognizes an alias for an endpointless OpenRouter model', () => {
+    expect(
+      hasVercelProvidersButNoOpenRouterProviders('kimi-k3', new Set(['moonshotai/kimi-k3']), [
+        'provider',
+      ])
+    ).toBe(true);
+  });
+
+  it('recognizes the internal id of a Kilo-exclusive model', () => {
+    expect(
+      hasVercelProvidersButNoOpenRouterProviders(
+        'deepseek/deepseek-v4-pro:discounted',
+        new Set(['deepseek/deepseek-v4-pro-0813']),
+        ['provider']
+      )
+    ).toBe(true);
+  });
+
   it('returns false when OpenRouter still has inference providers', () => {
     expect(
       hasVercelProvidersButNoOpenRouterProviders(requestedModel, new Set(), ['provider'])

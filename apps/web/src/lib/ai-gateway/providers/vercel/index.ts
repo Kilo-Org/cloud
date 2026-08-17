@@ -21,6 +21,7 @@ import {
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -63,8 +64,15 @@ export function hasVercelProvidersButNoOpenRouterProviders(
   openRouterModelIdsWithoutEndpoints: ReadonlySet<string>,
   vercelInferenceProviders: string[] | null
 ) {
+  const possibleOpenRouterModelIds = [
+    requestedModel,
+    mapModelIdToVercel(requestedModel),
+    findKiloExclusiveModel(requestedModel)?.internal_id,
+  ];
   return (
-    openRouterModelIdsWithoutEndpoints.has(requestedModel) &&
+    possibleOpenRouterModelIds.some(
+      modelId => modelId !== undefined && openRouterModelIdsWithoutEndpoints.has(modelId)
+    ) &&
     vercelInferenceProviders !== null &&
     vercelInferenceProviders.length > 0
   );

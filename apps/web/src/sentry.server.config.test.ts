@@ -1,6 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import type { Event } from '@sentry/nextjs';
-import { sanitizeSentryRequestData } from '../sentry.server.config';
+import { APICallError } from 'ai';
+import { isAIUsageLimitError, sanitizeSentryRequestData } from '../sentry.server.config';
 
 describe('sanitizeSentryRequestData', () => {
   test('removes the GitHub OAuth state token from request URL and query string', () => {
@@ -274,5 +275,47 @@ describe('sanitizeSentryRequestData', () => {
     const event: Event = { message: 'no request data' };
 
     expect(sanitizeSentryRequestData(event)).toBe(event);
+  });
+});
+
+describe('isAIUsageLimitError', () => {
+  function apiCallError(statusCode: number): APICallError {
+    return new APICallError({
+      message: 'Add credits to continue, or switch to a free model',
+      url: 'https://app.kilo.sh/api/openrouter/chat/completions',
+      requestBodyValues: {},
+      statusCode,
+    });
+  }
+
+  test('matches a real AI SDK APICallError with statusCode 402', () => {
+    expect(isAIUsageLimitError(apiCallError(402))).toBe(true);
+  });
+
+  test('does not match AI SDK call failures with other statuses', () => {
+    expect(isAIUsageLimitError(apiCallError(429))).toBe(false);
+    expect(isAIUsageLimitError(apiCallError(500))).toBe(false);
+  });
+
+  test('does not match an AI SDK call failure without a status', () => {
+    const error = new APICallError({
+      message: 'network failure',
+      url: 'https://app.kilo.sh/api/openrouter/chat/completions',
+      requestBodyValues: {},
+    });
+
+    expect(isAIUsageLimitError(error)).toBe(false);
+  });
+
+  test('does not match a 402 error that is not an AI SDK call error', () => {
+    const error = Object.assign(new Error('payment required'), { statusCode: 402 });
+
+    expect(isAIUsageLimitError(error)).toBe(false);
+  });
+
+  test('does not match plain errors or non-error values', () => {
+    expect(isAIUsageLimitError(new Error('Add credits to continue'))).toBe(false);
+    expect(isAIUsageLimitError({ name: 'AI_APICallError', statusCode: 402 })).toBe(false);
+    expect(isAIUsageLimitError(undefined)).toBe(false);
   });
 });

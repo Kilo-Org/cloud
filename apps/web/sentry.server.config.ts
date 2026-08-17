@@ -79,6 +79,24 @@ function isTRPC4xxError(error: unknown): boolean {
   );
 }
 
+// The AI gateway returns 402 when the caller's own credit balance is exhausted
+// (`usage_limit_exceeded`, "Add credits to continue, or switch to a free
+// model"), and the AI SDK surfaces that as AI_APICallError with statusCode 402
+// (e.g. Kilo Bot calling the gateway on behalf of a user who is out of
+// credits). That is expected per-user billing state, not an application bug.
+// Upstream provider 402s (our provider account) never reach callers: the
+// gateway converts them to a 503 and reports them itself via
+// captureProxyError. Duck-typed like isTRPC4xxError to keep the `ai` package
+// out of the Sentry init bundle.
+export function isAIUsageLimitError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'AI_APICallError' &&
+    'statusCode' in error &&
+    error.statusCode === 402
+  );
+}
+
 // The GitHub OAuth callback uses `state` as a short-lived bearer token, and the
 // mobile app handoff carries a C1 bearer in `installState`. Sentry's automatic
 // request-data integration can capture either in the request URL or query
@@ -196,7 +214,7 @@ if (process.env.NODE_ENV !== 'development') {
 
     beforeSend(event, hint) {
       const error = hint.originalException;
-      if (isTRPC4xxError(error)) {
+      if (isTRPC4xxError(error) || isAIUsageLimitError(error)) {
         return null;
       }
 

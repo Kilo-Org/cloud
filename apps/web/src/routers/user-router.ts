@@ -46,24 +46,21 @@ const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
 
-type RevokeDeviceSessionOutcome = 'revoked' | 'already_revoked' | 'not_found';
-
 /**
- * Revoke a device session owned by `userId`, race-safe without a transaction.
+ * Revoke a device session owned by `userId`.
  *
- * One atomic conditional UPDATE claims the row: it only matches when the
- * session belongs to the user and is still active, so a concurrent revoke can
- * never be double-applied. When the UPDATE matches no row, a single follow-up
- * SELECT distinguishes "already revoked" (owned, `revoked_at` set) from
- * "missing or not owned" (deliberately indistinguishable, so a caller cannot
- * probe whether another user's session id exists).
+ * One conditional UPDATE does the whole job: the ownership filter means a
+ * caller can never revoke another user's session, and the `revoked_at` filter
+ * keeps the first revocation's timestamp and reason. A missing, foreign, or
+ * already-revoked session is a silent no-op — no caller reads the difference,
+ * and staying silent stops a caller probing for other users' session ids.
  */
 async function revokeOwnedDeviceSession(
   sessionId: string,
   userId: string,
   reason: 'user_revoked' | 'logout'
-): Promise<RevokeDeviceSessionOutcome> {
-  const revoked = await db
+): Promise<void> {
+  await db
     .update(device_sessions)
     .set({ revoked_at: sql`now()`, revoked_reason: reason })
     .where(
@@ -72,20 +69,7 @@ async function revokeOwnedDeviceSession(
         eq(device_sessions.kilo_user_id, userId),
         isNull(device_sessions.revoked_at)
       )
-    )
-    .returning({ id: device_sessions.id });
-
-  if (revoked.length > 0) {
-    return 'revoked';
-  }
-
-  const [row] = await db
-    .select({ revoked_at: device_sessions.revoked_at })
-    .from(device_sessions)
-    .where(and(eq(device_sessions.id, sessionId), eq(device_sessions.kilo_user_id, userId)))
-    .limit(1);
-
-  return row?.revoked_at ? 'already_revoked' : 'not_found';
+    );
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -460,22 +444,15 @@ export const userRouter = createTRPCRouter({
   revokeDeviceSessionById: baseProcedure
     .input(z.object({ sessionId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const outcome = await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
-      if (outcome === 'not_found') {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Device session not found' });
-      }
-      return { outcome };
+      await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
+      return successResult();
     }),
 
   revokeCurrentDeviceSession: baseProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.deviceSessionId) {
-      return { outcome: 'no_identifiable_session' } as const;
+    if (ctx.deviceSessionId) {
+      await revokeOwnedDeviceSession(ctx.deviceSessionId, ctx.user.id, 'logout');
     }
-    const outcome = await revokeOwnedDeviceSession(ctx.deviceSessionId, ctx.user.id, 'logout');
-    if (outcome === 'not_found') {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Device session not found' });
-    }
-    return { outcome };
+    return successResult();
   }),
 
   getCreditBlocks: baseProcedure

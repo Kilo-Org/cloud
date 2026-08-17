@@ -4,7 +4,6 @@ import {
   classifyDeviceSessionsState,
   type DeviceSession,
   deviceSessionLabel,
-  mapRevokeOutcome,
   sortDeviceSessions,
 } from '@/lib/device-sessions';
 
@@ -65,37 +64,6 @@ describe('sortDeviceSessions', () => {
 
     expect(output).not.toBe(input);
     expect(input.map(s => s.id)).toEqual(['a', 'b']);
-  });
-});
-
-describe('mapRevokeOutcome', () => {
-  it.each([
-    {
-      name: 'a fulfilled revoked result → success toast and refetch',
-      result: { outcome: 'revoked' } as const,
-      error: undefined,
-      expected: { toast: 'success', message: 'Session signed out.', refetch: true },
-    },
-    {
-      name: 'a fulfilled already_revoked result → info toast and refetch',
-      result: { outcome: 'already_revoked' } as const,
-      error: undefined,
-      expected: { toast: 'info', message: 'Session was already signed out', refetch: true },
-    },
-    {
-      name: 'a NOT_FOUND error → terminal toast and refetch',
-      result: undefined,
-      error: { message: 'Device session not found', code: 'NOT_FOUND' },
-      expected: { toast: 'error', message: 'This session is no longer active.', refetch: true },
-    },
-    {
-      name: 'any other error → error.message and keeps the row',
-      result: undefined,
-      error: { message: 'Network request failed' },
-      expected: { toast: 'error', message: 'Network request failed', refetch: false },
-    },
-  ])('maps $name', ({ result, error, expected }) => {
-    expect(mapRevokeOutcome(result, error)).toEqual(expected);
   });
 });
 

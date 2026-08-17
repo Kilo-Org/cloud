@@ -3,9 +3,6 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 /** One active device session as returned by `user.listDeviceSessions`. */
 export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDeviceSessions'][number];
 
-type RevokeDeviceSessionResult =
-  inferRouterOutputs<MobileRouter>['user']['revokeDeviceSessionById'];
-
 const UNKNOWN_DEVICE_LABEL = 'Unknown device';
 
 /**
@@ -39,40 +36,6 @@ export function sortDeviceSessions(sessions: readonly DeviceSession[]): DeviceSe
     ...sessions.filter(session => session.isCurrent),
     ...sessions.filter(session => !session.isCurrent),
   ];
-}
-
-export type RevokeOutcome = {
-  toast: 'success' | 'info' | 'error';
-  message: string;
-  /** When true the list refetches to show the server's authoritative truth. */
-  refetch: boolean;
-};
-
-type RevokeMutationError = { message: string; code?: string | null };
-
-/**
- * Map a `revokeDeviceSessionById` mutation result (fulfilled or rejected) to
- * the exact UI action for that outcome. Only `NOT_FOUND` is terminal for the
- * row; every other rejection keeps the row and surfaces `error.message`.
- */
-export function mapRevokeOutcome(
-  result: RevokeDeviceSessionResult | undefined,
-  error: RevokeMutationError | undefined
-): RevokeOutcome {
-  if (result?.outcome === 'revoked') {
-    return { toast: 'success', message: 'Session signed out.', refetch: true };
-  }
-  if (result?.outcome === 'already_revoked') {
-    return { toast: 'info', message: 'Session was already signed out', refetch: true };
-  }
-  if (error?.code === 'NOT_FOUND') {
-    return { toast: 'error', message: 'This session is no longer active.', refetch: true };
-  }
-  return {
-    toast: 'error',
-    message: error?.message ?? 'Could not sign out this device.',
-    refetch: false,
-  };
 }
 
 type DeviceSessionsQueryState = 'loading' | 'error' | 'empty' | 'happy' | 'no-current';

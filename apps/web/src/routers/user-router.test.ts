@@ -930,9 +930,7 @@ describe('user router - device sessions', () => {
   it('revokes an owned active session with the user_revoked reason', async () => {
     const caller = await createCallerForUser(owner.id);
 
-    const result = await caller.user.revokeDeviceSessionById({ sessionId: revokeByIdSessionId });
-
-    expect(result).toEqual({ outcome: 'revoked' });
+    await caller.user.revokeDeviceSessionById({ sessionId: revokeByIdSessionId });
 
     const [row] = await db
       .select()
@@ -942,26 +940,10 @@ describe('user router - device sessions', () => {
     expect(row?.revoked_reason).toBe('user_revoked');
   });
 
-  it('is idempotent: a second revocation of the same session reports already_revoked', async () => {
-    const caller = await createCallerForUser(owner.id);
-
-    // The session is already revoked (revoked_at pre-set in the fixture).
-    const first = await caller.user.revokeDeviceSessionById({ sessionId: alreadyRevokedSessionId });
-    expect(first).toEqual({ outcome: 'already_revoked' });
-
-    // Repeating the revoke must stay idempotent.
-    const second = await caller.user.revokeDeviceSessionById({
-      sessionId: alreadyRevokedSessionId,
-    });
-    expect(second).toEqual({ outcome: 'already_revoked' });
-  });
-
   it('refuses to revoke a session owned by another user', async () => {
     const caller = await createCallerForUser(otherUser.id);
 
-    await expect(
-      caller.user.revokeDeviceSessionById({ sessionId: currentSessionId })
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await caller.user.revokeDeviceSessionById({ sessionId: currentSessionId });
 
     // The owner's session stays active.
     const [row] = await db
@@ -969,14 +951,6 @@ describe('user router - device sessions', () => {
       .from(device_sessions)
       .where(eq(device_sessions.id, currentSessionId));
     expect(row?.revoked_at).toBeNull();
-  });
-
-  it('returns NOT_FOUND for a session id that does not exist', async () => {
-    const caller = await createCallerForUser(owner.id);
-
-    await expect(
-      caller.user.revokeDeviceSessionById({ sessionId: crypto.randomUUID() })
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('rejects a non-UUID session id', async () => {
@@ -987,13 +961,12 @@ describe('user router - device sessions', () => {
     ).rejects.toThrow();
   });
 
-  it('revokes the current device session with the logout reason and stays idempotent', async () => {
+  it('revokes the current device session with the logout reason', async () => {
     const caller = await createCallerForUser(owner.id, {
       deviceSessionId: revokeCurrentSessionId,
     });
 
-    const first = await caller.user.revokeCurrentDeviceSession();
-    expect(first).toEqual({ outcome: 'revoked' });
+    await caller.user.revokeCurrentDeviceSession();
 
     const [row] = await db
       .select()
@@ -1001,17 +974,12 @@ describe('user router - device sessions', () => {
       .where(eq(device_sessions.id, revokeCurrentSessionId));
     expect(row?.revoked_at).not.toBeNull();
     expect(row?.revoked_reason).toBe('logout');
-
-    const second = await caller.user.revokeCurrentDeviceSession();
-    expect(second).toEqual({ outcome: 'already_revoked' });
   });
 
-  it('returns no_identifiable_session when the request carries no deviceSessionId claim', async () => {
+  it('is a no-op when the request carries no deviceSessionId claim', async () => {
     const caller = await createCallerForUser(owner.id);
 
-    const result = await caller.user.revokeCurrentDeviceSession();
-
-    expect(result).toEqual({ outcome: 'no_identifiable_session' });
+    await expect(caller.user.revokeCurrentDeviceSession()).resolves.toBeDefined();
   });
 
   it('refuses to revoke the current session when the claim names a session owned by another user', async () => {
@@ -1019,9 +987,7 @@ describe('user router - device sessions', () => {
       deviceSessionId: currentSessionId,
     });
 
-    await expect(caller.user.revokeCurrentDeviceSession()).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
+    await caller.user.revokeCurrentDeviceSession();
 
     const [row] = await db
       .select()

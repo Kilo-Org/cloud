@@ -16,8 +16,6 @@ import {
   classifyDeviceSessionsState,
   type DeviceSession,
   deviceSessionLabel,
-  mapRevokeOutcome,
-  type RevokeOutcome,
   sortDeviceSessions,
 } from '@/lib/device-sessions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -83,25 +81,14 @@ export function DeviceSessionsScreen() {
   const state = classifyDeviceSessionsState({ isLoading, isError, data });
   const sessions = sortDeviceSessions(data ?? []);
 
-  // Shared outcome sink for the revoke mutation. `mapRevokeOutcome` decides
-  // the toast type and whether the authoritative list refetches; only the
-  // generic error keeps the row without a refetch.
-  const applyRevokeOutcome = (outcome: RevokeOutcome) => {
-    toast[outcome.toast](outcome.message);
-    if (outcome.refetch) {
-      void refetch();
-    }
-  };
-
   const revokeSession = useMutation(
     trpc.user.revokeDeviceSessionById.mutationOptions({
-      onSuccess: result => {
-        applyRevokeOutcome(mapRevokeOutcome(result, undefined));
+      onSuccess: () => {
+        toast.success('Session signed out.');
+        void refetch();
       },
       onError: error => {
-        applyRevokeOutcome(
-          mapRevokeOutcome(undefined, { message: error.message, code: error.data?.code })
-        );
+        toast.error(error.message);
       },
     })
   );
@@ -128,7 +115,7 @@ export function DeviceSessionsScreen() {
     }
     Alert.alert(
       'Sign out this session?',
-      `${deviceSessionLabel(session.user_agent)} will be signed out on that device.`,
+      `${deviceSessionLabel(session.user_agent)} will be signed out. It can keep API access for up to an hour.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -181,7 +168,7 @@ export function DeviceSessionsScreen() {
             icon={Smartphone}
             placement="top"
             title="No active sessions"
-            description="Sign in on another device and it will show up here."
+            description="Sign in with the Kilo app on another device and it will show up here."
             action={
               <Button
                 variant="outline"
@@ -210,6 +197,9 @@ export function DeviceSessionsScreen() {
                 Current device could not be identified
               </Text>
             )}
+            <Text variant="muted" className="text-xs">
+              Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.
+            </Text>
           </View>
         )}
       </DetailScreenScrollView>

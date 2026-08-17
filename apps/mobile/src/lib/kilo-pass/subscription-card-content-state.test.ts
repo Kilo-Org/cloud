@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatDate, parseTimestamp } from '@/lib/utils';
+import {
+  KILO_PASS_MANAGE_CTA_LABEL,
+  KILO_PASS_TITLE,
+  KILO_PASS_UNAVAILABLE_DESCRIPTION,
+  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
+} from '@kilocode/app-shared/commerce';
 
 import { getKiloPassSubscriptionCardContentState } from './subscription-card-state';
 
@@ -15,23 +21,40 @@ const activeAppStoreSubscription = {
 const endDate = formatDate(parseTimestamp(activeAppStoreSubscription.refillAt));
 
 describe('getKiloPassSubscriptionCardContentState', () => {
-  it('keeps unresolved iOS state non-actionable while loading', () => {
+  it('keeps pending presentation or state non-actionable while loading', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: undefined,
-        isError: false,
-        isPending: true,
+        presentation: undefined,
+        presentationIsError: false,
+        presentationIsPending: true,
+        subscription: undefined,
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({ kind: 'loading' });
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: undefined,
+        stateIsError: false,
+        stateIsPending: true,
         platformOS: 'ios',
       })
     ).toEqual({ kind: 'loading' });
   });
 
-  it('keeps unresolved iOS errors on retry instead of subscribe', () => {
+  it('keeps presentation or state errors on retry', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: undefined,
-        isError: true,
-        isPending: false,
+        presentation: undefined,
+        presentationIsError: true,
+        presentationIsPending: false,
+        subscription: undefined,
+        stateIsError: false,
+        stateIsPending: false,
         platformOS: 'ios',
       })
     ).toEqual({
@@ -42,76 +65,95 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     });
   });
 
-  it('keeps Android pending and error states away from subscribe', () => {
+  it('keeps a missing presentation loading', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: undefined,
-        isError: false,
-        isPending: true,
-        platformOS: 'android',
+        presentation: undefined,
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: undefined,
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'ios',
       })
     ).toEqual({ kind: 'loading' });
+  });
+
+  it('renders the unavailable surface without a purchase CTA', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: undefined,
-        isError: true,
-        isPending: false,
+        presentation: { kind: 'unavailable', statusClass: 'inactive' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: null,
+        stateIsError: false,
+        stateIsPending: false,
         platformOS: 'android',
       })
     ).toEqual({
-      actionLabel: 'Retry',
-      description: 'Try again from Profile.',
-      kind: 'error',
-      title: 'Kilo Pass unavailable',
+      kind: 'card',
+      state: {
+        action: 'open-native',
+        actionLabel: null,
+        description: KILO_PASS_UNAVAILABLE_DESCRIPTION,
+        title: KILO_PASS_TITLE,
+      },
     });
   });
 
-  it('shows subscribe only after iOS returns a confirmed null subscription', () => {
+  it('renders the web-management surface with a Manage action', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: { subscription: null },
-        isError: false,
-        isPending: false,
+        presentation: { kind: 'web_management', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: null,
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'android',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-web',
+        actionLabel: KILO_PASS_MANAGE_CTA_LABEL,
+        description: KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
+        title: KILO_PASS_TITLE,
+      },
+    });
+  });
+
+  it('shows subscribe only for native_iap without a live subscription', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'inactive' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: null,
+        stateIsError: false,
+        stateIsPending: false,
         platformOS: 'ios',
       })
     ).toEqual({
       kind: 'card',
       state: {
-        action: 'open-store-sheet',
+        action: 'open-native',
         actionLabel: 'Subscribe',
         description: 'Monthly credits with bonus progress',
-        title: 'Kilo Pass',
+        title: KILO_PASS_TITLE,
       },
     });
   });
 
-  it('renders an inert iOS ownership mismatch before subscribe', () => {
+  it('renders active App Store subscriptions on native_iap', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        appStoreOwnershipPreflight: 'owned-by-another-account',
-        data: { subscription: null },
-        isError: false,
-        isPending: false,
-        platformOS: 'ios',
-      })
-    ).toEqual({
-      kind: 'card',
-      state: {
-        action: 'none',
-        actionLabel: null,
-        description: 'Kilo Pass subscription is owned by another account',
-        title: 'Kilo Pass',
-      },
-    });
-  });
-
-  it('does not override an active local subscription with ownership preflight copy', () => {
-    expect(
-      getKiloPassSubscriptionCardContentState({
-        appStoreOwnershipPreflight: 'owned-by-another-account',
-        data: { subscription: activeAppStoreSubscription },
-        isError: false,
-        isPending: false,
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: activeAppStoreSubscription,
+        stateIsError: false,
+        stateIsPending: false,
         platformOS: 'ios',
       })
     ).toEqual({
@@ -125,47 +167,15 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     });
   });
 
-  it('keeps confirmed null subscriptions hidden on Android', () => {
+  it('renders canceling App Store subscriptions on native_iap', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: { subscription: null },
-        isError: false,
-        isPending: false,
-        platformOS: 'android',
-      })
-    ).toEqual({ kind: 'hidden' });
-  });
-
-  it('renders active App Store subscriptions on iOS', () => {
-    expect(
-      getKiloPassSubscriptionCardContentState({
-        data: { subscription: activeAppStoreSubscription },
-        isError: false,
-        isPending: false,
-        platformOS: 'ios',
-      })
-    ).toEqual({
-      kind: 'card',
-      state: {
-        action: 'open-store-management',
-        actionLabel: 'Manage',
-        description: '$19 monthly credits · Managed in App Store',
-        title: 'Kilo Pass active',
-      },
-    });
-  });
-
-  it('renders canceling App Store subscriptions on iOS', () => {
-    expect(
-      getKiloPassSubscriptionCardContentState({
-        data: {
-          subscription: {
-            ...activeAppStoreSubscription,
-            cancelAtPeriodEnd: true,
-          },
-        },
-        isError: false,
-        isPending: false,
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: { ...activeAppStoreSubscription, cancelAtPeriodEnd: true },
+        stateIsError: false,
+        stateIsPending: false,
         platformOS: 'ios',
       })
     ).toEqual({
@@ -179,12 +189,21 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     });
   });
 
-  it('renders active App Store subscriptions as inert status cards on Android', () => {
+  it('renders Google Play subscriptions as inert status cards', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: { subscription: activeAppStoreSubscription },
-        isError: false,
-        isPending: false,
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: {
+          cancelAtPeriodEnd: false,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'google_play',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
+        },
+        stateIsError: false,
+        stateIsPending: false,
         platformOS: 'android',
       })
     ).toEqual({
@@ -192,32 +211,36 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'none',
         actionLabel: null,
-        description: '$19 monthly credits · Managed in App Store',
+        description: '$49 monthly credits · Managed on Google Play',
         title: 'Kilo Pass active',
       },
     });
   });
 
-  it('renders canceling App Store subscriptions as inert status cards on Android', () => {
+  it('renders Stripe-managed subscriptions as inert status cards on native_iap', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        data: {
-          subscription: {
-            ...activeAppStoreSubscription,
-            cancelAtPeriodEnd: true,
-          },
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: {
+          cancelAtPeriodEnd: false,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'stripe',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
         },
-        isError: false,
-        isPending: false,
-        platformOS: 'android',
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'ios',
       })
     ).toEqual({
       kind: 'card',
       state: {
         action: 'none',
         actionLabel: null,
-        description: `$19 monthly credits · Ends ${endDate} · Managed in App Store`,
-        title: 'Kilo Pass canceling',
+        description: '$49 monthly credits · This Kilo Pass is managed on web',
+        title: 'Kilo Pass active',
       },
     });
   });

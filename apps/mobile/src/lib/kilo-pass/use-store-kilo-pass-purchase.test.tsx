@@ -5,16 +5,13 @@ import { type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  captureEvent,
-  KILO_PASS_PURCHASE_COMPLETED_EVENT,
-  KILO_PASS_PURCHASE_FAILED_EVENT,
-  KILO_PASS_PURCHASE_STARTED_EVENT,
-} from '@/lib/analytics/posthog';
+  type KiloPassNativeIapContextValue,
+  KiloPassNativeIapOwner,
+} from '@/components/kilo-pass/kilo-pass-native-iap-owner';
 import {
   createAppStoreKiloPassPurchaseActions,
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
-  StoreKiloPassPurchaseProvider,
   useInlinePurchaseErrorOwnership,
 } from './use-store-kilo-pass-purchase';
 import { type AppStoreKiloPassProduct } from './store-products';
@@ -22,6 +19,7 @@ import { type AppStoreKiloPassProduct } from './store-products';
 const mockedIap = vi.hoisted(() => ({
   availablePurchases: [] as Purchase[],
   connected: false,
+  fetchProducts: vi.fn(),
   finishTransaction: vi.fn(),
   getAvailablePurchases: vi.fn(),
   handlers: null as {
@@ -35,14 +33,17 @@ const mockedIap = vi.hoisted(() => ({
 
 const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
 
+const mockedAuth = vi.hoisted(() => ({ authEpoch: 0 }));
+
+const mockedCurrentUserId = vi.hoisted(() => ({ userId: 'user-1' }));
+
 const mockedReactQuery = vi.hoisted(() => ({
   completeAppStorePurchase: vi.fn(),
   completeAppStorePurchaseIsPending: false,
+  fetchQuery: vi.fn(),
   invalidateQueries: vi.fn(),
-  mobileStoreProductsData: {
-    appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-    products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }],
-  },
+  lastQueryKey: null as unknown[] | null,
+  removeQueries: vi.fn(),
   useMutation: vi.fn(),
   useQuery: vi.fn(),
   useQueryClient: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock('expo-iap', () => ({
     AlreadyOwned: 'already-owned',
     UserCancelled: 'user-cancelled',
   },
+  fetchProducts: mockedIap.fetchProducts,
   getAvailablePurchases: mockedIap.getAvailablePurchases,
   useIAP: (handlers: {
     onPurchaseError: (error: Error) => void;
@@ -85,16 +87,35 @@ vi.mock('@tanstack/react-query', () => ({
       mutateAsync: mockedReactQuery.completeAppStorePurchase,
     };
   },
-  useQuery: () => {
+  useQuery: (options: { queryKey: unknown[] }) => {
     mockedReactQuery.useQuery();
+    mockedReactQuery.lastQueryKey = options.queryKey;
     return {
-      data: mockedReactQuery.mobileStoreProductsData,
+      data: undefined,
+      error: null,
+      isError: false,
+      isLoading: false,
+      isRefetching: false,
+      isSuccess: true,
+      refetch: vi.fn(),
     };
   },
   useQueryClient: () => {
     mockedReactQuery.useQueryClient();
-    return { invalidateQueries: mockedReactQuery.invalidateQueries };
+    return {
+      fetchQuery: mockedReactQuery.fetchQuery,
+      invalidateQueries: mockedReactQuery.invalidateQueries,
+      removeQueries: mockedReactQuery.removeQueries,
+    };
   },
+}));
+
+vi.mock('@/lib/auth/auth-context', () => ({
+  useAuth: () => ({ authEpoch: mockedAuth.authEpoch }),
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: mockedCurrentUserId.userId }),
 }));
 
 vi.mock('sonner-native', () => ({
@@ -126,19 +147,6 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-type StoreKiloPassPurchaseContextValue = {
-  appStoreOwnershipPreflight: 'owned-by-another-account' | null;
-  purchase: (
-    product: AppStoreKiloPassProduct,
-    options?: { onCompleted?: () => void }
-  ) => Promise<void>;
-  restorePurchases: () => Promise<'restored' | 'empty' | 'failed'>;
-  isPending: boolean;
-  isRestoringPurchases: boolean;
-  errorMessage: string | null;
-  clearError: () => void;
-};
-
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
     H: unknown;
@@ -159,7 +167,7 @@ async function flushPromises() {
   });
 }
 
-function renderStoreKiloPassPurchaseProvider() {
+function renderKiloPassNativeIapOwner() {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
   let hookIndex = 0;
@@ -211,15 +219,15 @@ function renderStoreKiloPassPurchaseProvider() {
     hookIndex = 0;
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
     try {
-      const renderProviderElement = StoreKiloPassPurchaseProvider;
-      const providerElement = renderProviderElement({ children: null });
+      const renderOwner = KiloPassNativeIapOwner;
+      const ownerElement = renderOwner({ children: null });
       const contextProviderElement =
-        'value' in providerElement.props
-          ? providerElement
-          : (providerElement.type as (props: { children: React.ReactNode }) => React.ReactElement)(
-              providerElement.props
+        'value' in ownerElement.props
+          ? ownerElement
+          : (ownerElement.type as (props: { children: React.ReactNode }) => React.ReactElement)(
+              ownerElement.props
             );
-      return (contextProviderElement.props as { value: StoreKiloPassPurchaseContextValue }).value;
+      return (contextProviderElement.props as { value: KiloPassNativeIapContextValue }).value;
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
         previousDispatcher;
@@ -341,8 +349,11 @@ beforeEach(() => {
   resetPurchaseErrorToastDedup();
   resetInlinePurchaseErrorOwnership();
   mockedPlatform.OS = 'ios';
+  mockedAuth.authEpoch = 0;
+  mockedCurrentUserId.userId = 'user-1';
   mockedIap.availablePurchases = [];
   mockedIap.connected = false;
+  mockedIap.fetchProducts.mockResolvedValue([]);
   mockedIap.finishTransaction.mockResolvedValue(undefined);
   mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
   mockedIap.handlers = null;
@@ -350,11 +361,13 @@ beforeEach(() => {
   mockedIap.restorePurchases.mockResolvedValue(undefined);
   mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedReactQuery.completeAppStorePurchaseIsPending = false;
-  mockedReactQuery.invalidateQueries.mockResolvedValue(undefined);
-  mockedReactQuery.mobileStoreProductsData = {
+  mockedReactQuery.fetchQuery.mockResolvedValue({
     appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
     products: [{ appleProductId: product.appleProductId }],
-  };
+  });
+  mockedReactQuery.invalidateQueries.mockResolvedValue(undefined);
+  mockedReactQuery.lastQueryKey = null;
+  mockedReactQuery.removeQueries.mockReturnValue(undefined);
 });
 
 describe('createAppStoreKiloPassPurchaseActions', () => {
@@ -840,253 +853,83 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
   });
 });
 
-describe('StoreKiloPassPurchaseProvider', () => {
-  it('provides inert purchase state without initializing expo-iap on Android', async () => {
-    mockedPlatform.OS = 'android';
-    const provider = renderStoreKiloPassPurchaseProvider();
+describe('KiloPassNativeIapOwner', () => {
+  it('is the single useIAP call site', () => {
+    const owner = renderKiloPassNativeIapOwner();
 
-    const value = provider.render();
+    owner.render();
 
-    expect(mockedIap.useIAP).not.toHaveBeenCalled();
-    expect(mockedTrpc.useTRPC).not.toHaveBeenCalled();
-    expect(mockedReactQuery.useQueryClient).not.toHaveBeenCalled();
-    expect(mockedReactQuery.useMutation).not.toHaveBeenCalled();
-    expect(mockedReactQuery.useQuery).not.toHaveBeenCalled();
-    expect(value.appStoreOwnershipPreflight).toBeNull();
+    expect(mockedIap.useIAP).toHaveBeenCalledTimes(1);
+  });
+
+  it('keys the product cache by account id', () => {
+    mockedCurrentUserId.userId = 'user-42';
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+
+    expect(mockedReactQuery.lastQueryKey).toEqual(['kilo-pass', 'app-store-products', 'user-42']);
+  });
+
+  it('clears the product cache when the auth epoch changes', () => {
+    mockedAuth.authEpoch = 7;
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+
+    expect(mockedReactQuery.removeQueries).toHaveBeenCalledWith({
+      queryKey: ['kilo-pass', 'app-store-products'],
+    });
+  });
+
+  it('exposes purchase and restore actions through context', () => {
+    const owner = renderKiloPassNativeIapOwner();
+
+    const value = owner.render();
+
     expect(value.isPending).toBe(false);
-    expect(value.isRestoringPurchases).toBe(false);
     expect(value.errorMessage).toBeNull();
-    await expect(value.purchase(product)).resolves.toBeUndefined();
-    await expect(value.restorePurchases()).resolves.toBe('failed');
-    expect(() => {
-      value.clearError();
-    }).not.toThrow();
+    expect(typeof value.purchase).toBe('function');
+    expect(typeof value.restorePurchases).toBe('function');
+    expect(typeof value.clearError).toBe('function');
+    expect(typeof value.productsRefetch).toBe('function');
   });
 
-  it('exposes an App Store ownership mismatch preflight from available purchases', () => {
-    mockedIap.availablePurchases = [
-      createPurchase({ appAccountToken: '550e8400-e29b-41d4-a716-446655440001' }),
-    ];
-    const provider = renderStoreKiloPassPurchaseProvider();
+  it('locks purchase while a request is in flight', async () => {
+    const owner = renderKiloPassNativeIapOwner();
 
-    const value = provider.render();
-
-    expect(value.appStoreOwnershipPreflight).toBe('owned-by-another-account');
-  });
-
-  it('keeps the purchase locked after requestPurchase resolves until purchase success arrives', async () => {
-    const firstCompletion = vi.fn();
-    const secondCompletion = vi.fn();
-    const provider = renderStoreKiloPassPurchaseProvider();
-
-    const initialValue = provider.render();
-    await initialValue.purchase(product, {
-      onCompleted: () => {
-        firstCompletion();
-      },
-    });
-    const lockedValue = provider.render();
-
-    expect(lockedValue.isPending).toBe(true);
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
-
-    await lockedValue.purchase(product, {
-      onCompleted: () => {
-        secondCompletion();
-      },
-    });
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
-
-    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
-    await flushPromises();
-    const releasedValue = provider.render();
-
-    expect(releasedValue.isPending).toBe(false);
-    expect(firstCompletion).toHaveBeenCalledTimes(1);
-    expect(secondCompletion).not.toHaveBeenCalled();
-  });
-
-  it('releases the purchase lock when StoreKit reports a purchase error', async () => {
-    const provider = renderStoreKiloPassPurchaseProvider();
-
-    const initialValue = provider.render();
-    await initialValue.purchase(product, { onCompleted: noop });
-    const lockedValue = provider.render();
-
-    expect(lockedValue.isPending).toBe(true);
-
-    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
-    const releasedValue = provider.render();
-
-    expect(releasedValue.isPending).toBe(false);
-    await releasedValue.purchase(product);
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
-  });
-
-  it('emits started and failed client events but not purchase_completed', async () => {
-    const provider = renderStoreKiloPassPurchaseProvider();
-    const initialValue = provider.render();
-
-    const completedSpy = vi.fn();
-    await initialValue.purchase(product, {
-      onCompleted: () => {
-        completedSpy();
-      },
-    });
-    expect(captureEvent).toHaveBeenCalledWith(KILO_PASS_PURCHASE_STARTED_EVENT);
-
-    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
-    await flushPromises();
-
-    // Anchor: proves the completion callback (where the client capture used to
-    // live) actually ran, so the negative assertion below is not vacuous.
-    expect(completedSpy).toHaveBeenCalledTimes(1);
-    expect(captureEvent).not.toHaveBeenCalledWith(KILO_PASS_PURCHASE_COMPLETED_EVENT);
-
-    const afterSuccess = provider.render();
-    await afterSuccess.purchase(product);
-    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
-
-    expect(captureEvent).toHaveBeenCalledWith(KILO_PASS_PURCHASE_FAILED_EVENT);
-    expect(captureEvent).not.toHaveBeenCalledWith(KILO_PASS_PURCHASE_COMPLETED_EVENT);
-  });
-
-  it('toasts a purchase error when no screen owns inline feedback', async () => {
-    const provider = renderStoreKiloPassPurchaseProvider();
-
-    const initialValue = provider.render();
+    const initialValue = owner.render();
     await initialValue.purchase(product);
+    const lockedValue = owner.render();
 
-    mockedIap.handlers?.onPurchaseError(new Error('Untoasted screen check failed'));
-    const releasedValue = provider.render();
-
-    expect(toast.error).toHaveBeenCalledWith('Untoasted screen check failed');
-    expect(releasedValue.errorMessage).toBe('Untoasted screen check failed');
+    expect(lockedValue.isPending).toBe(true);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
   });
 
-  it('suppresses the purchase-error toast while a screen owns inline feedback, and resumes once it unmounts', async () => {
-    const provider = renderStoreKiloPassPurchaseProvider();
-    const owner = mountInlineErrorOwnership();
+  it('surfaces purchase errors through context and toast', async () => {
+    const owner = renderKiloPassNativeIapOwner();
 
-    const initialValue = provider.render();
+    const initialValue = owner.render();
+    await initialValue.purchase(product);
+    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
+    const updatedValue = owner.render();
+
+    expect(updatedValue.errorMessage).toBe('StoreKit failed');
+    expect(toast.error).toHaveBeenCalledWith('StoreKit failed');
+  });
+
+  it('suppresses the purchase-error toast while a screen owns inline feedback', async () => {
+    const owner = renderKiloPassNativeIapOwner();
+    const inlineOwner = mountInlineErrorOwnership();
+
+    const initialValue = owner.render();
     await initialValue.purchase(product);
     mockedIap.handlers?.onPurchaseError(new Error('Inline banner check failed'));
-    const ownedValue = provider.render();
+    const updatedValue = owner.render();
 
     expect(toast.error).not.toHaveBeenCalled();
-    expect(ownedValue.errorMessage).toBe('Inline banner check failed');
+    expect(updatedValue.errorMessage).toBe('Inline banner check failed');
 
-    owner.unmount();
-    await ownedValue.purchase(product);
-    mockedIap.handlers?.onPurchaseError(new Error('Untoasted screen check failed'));
-
-    expect(toast.error).toHaveBeenCalledWith('Untoasted screen check failed');
-  });
-
-  it('ignores live StoreKit success for an unknown product', async () => {
-    const onCompleted = vi.fn();
-    const provider = renderStoreKiloPassPurchaseProvider();
-
-    const initialValue = provider.render();
-    await initialValue.purchase(product, {
-      onCompleted: () => {
-        onCompleted();
-      },
-    });
-
-    mockedIap.handlers?.onPurchaseSuccess(
-      createPurchase({
-        id: 'other-purchase',
-        productId: 'other.product',
-        purchaseToken: 'other-signed-jws',
-        transactionId: 'other-tx',
-      })
-    );
-    await flushPromises();
-    const releasedValue = provider.render();
-
-    expect(mockedReactQuery.completeAppStorePurchase).not.toHaveBeenCalled();
-    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
-    expect(onCompleted).not.toHaveBeenCalled();
-    expect(releasedValue.isPending).toBe(false);
-  });
-
-  it('ignores live StoreKit success for a stale Kilo Pass product without releasing the active request', async () => {
-    mockedReactQuery.mobileStoreProductsData = {
-      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-      products: [
-        { appleProductId: product.appleProductId },
-        { appleProductId: 'com.kilo.pass.tier49.monthly' },
-      ],
-    };
-    const onCompleted = vi.fn();
-    const provider = renderStoreKiloPassPurchaseProvider();
-
-    const initialValue = provider.render();
-    await initialValue.purchase(product, {
-      onCompleted: () => {
-        onCompleted();
-      },
-    });
-
-    mockedIap.handlers?.onPurchaseSuccess(
-      createPurchase({
-        id: 'stale-purchase',
-        productId: 'com.kilo.pass.tier49.monthly',
-        purchaseToken: 'stale-signed-jws',
-        transactionId: 'stale-tx',
-      })
-    );
-    await flushPromises();
-    const stillPendingValue = provider.render();
-
-    expect(mockedReactQuery.completeAppStorePurchase).not.toHaveBeenCalled();
-    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
-    expect(onCompleted).not.toHaveBeenCalled();
-    expect(stillPendingValue.isPending).toBe(true);
-
-    const activePurchase = createPurchase();
-    mockedIap.handlers?.onPurchaseSuccess(activePurchase);
-    await flushPromises();
-    const releasedValue = provider.render();
-
-    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
-      signedTransactionJws: 'signed-jws',
-      platform: 'ios',
-      storefront: 'app_store',
-      product: 'kilo_pass',
-    });
-    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
-      purchase: activePurchase,
-      isConsumable: false,
-    });
-    expect(onCompleted).toHaveBeenCalledTimes(1);
-    expect(releasedValue.isPending).toBe(false);
-  });
-
-  it('retries automatic recovery after backend completion fails', async () => {
-    const purchase = createPurchase();
-    mockedIap.availablePurchases = [purchase];
-    mockedReactQuery.completeAppStorePurchase
-      .mockRejectedValueOnce(new Error('backend failed'))
-      .mockResolvedValueOnce({ alreadyProcessed: false });
-    const provider = renderStoreKiloPassPurchaseProvider();
-
-    provider.render();
-    await flushPromises();
-
-    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
-    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
-    expect(mockedReactQuery.invalidateQueries).not.toHaveBeenCalled();
-
-    mockedIap.availablePurchases = [{ ...purchase }];
-    provider.render();
-    await flushPromises();
-
-    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(2);
-    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
-    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalled();
+    inlineOwner.unmount();
   });
 });

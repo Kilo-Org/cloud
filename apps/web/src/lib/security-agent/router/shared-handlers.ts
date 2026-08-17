@@ -285,8 +285,9 @@ async function assembleAuditReportResponse<TExtra>(params: {
 // row BEFORE submitting to the security-sync Worker, and only then runs the
 // submission. Later same-key calls dedupe, replay the canonical result, or
 // conflict. The Worker dedupes the command itself by `operation_key`, so the
-// ledger row is settled here, from the terminal command state `getCommandStatus`
-// reads, joined by the stored `provider_ref` (the Worker's `commandId`). A
+// Worker settles the ledger row from the terminal command state. The
+// `getCommandStatus` handler retries that settle as a fallback, joined by the
+// stored `provider_ref` (the Worker's `commandId`). A
 // definitive pre-acceptance rejection (4xx, disabled routing, unconfigured
 // service) settles the row `failed`; an ambiguous transport outcome
 // (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
@@ -542,8 +543,8 @@ const SECURITY_COMMAND_TERMINAL_STATUS = {
 } as const;
 
 /**
- * Settles the ledger row of a terminal command, which is where the terminal
- * analytics event is emitted. The row is joined by `provider_ref` (the Worker
+ * Retries settlement for a terminal command when the Worker did not complete
+ * it. The row is joined by `provider_ref` (the Worker
  * `commandId`) recorded at acceptance and scoped to the admitting user, so a
  * poll never settles another user's row. The settle is a compare-and-set, so
  * later polls are no-ops and the event is emitted exactly once. A settle

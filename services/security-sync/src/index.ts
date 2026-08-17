@@ -9,11 +9,13 @@ import {
   requireSecurityAgentCommandTransitionOrTerminal,
   transitionSecurityAgentCommandWithCurrentState,
   type CreateSecurityAgentCommandInput,
+  type SecurityAgentCommand,
   type SecurityAgentCommandOwner,
   type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { agent_configs } from '@kilocode/db/schema';
+import { agent_configs, operation_ledgers } from '@kilocode/db/schema';
+import { settleOperation } from '@kilocode/db/operation-ledger';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -389,26 +391,46 @@ function resolveOwner(
   return null;
 }
 
-function commandCorrelation(body: unknown): {
+type CommandCorrelation = {
   commandId?: string;
   commandType?: 'sync' | 'dismiss_finding';
   ownerType?: 'org' | 'user';
-} {
+  ledger?: {
+    actor: { id: string; email?: string | null };
+    intent: 'manual_sync' | 'dismiss_finding';
+    dispatchedAt: string;
+  };
+};
+
+function commandCorrelation(body: unknown): CommandCorrelation {
   const dismiss = SecurityDismissMessageSchema.safeParse(body);
   if (dismiss.success) {
     return {
       commandId: dismiss.data.commandId,
       commandType: 'dismiss_finding',
       ownerType: dismiss.data.owner.organizationId ? 'org' : 'user',
+      ledger: {
+        actor: dismiss.data.actor,
+        intent: 'dismiss_finding',
+        dispatchedAt: dismiss.data.dispatchedAt,
+      },
     };
   }
   const sync = SecuritySyncMessageSchema.safeParse(body);
   if (!sync.success || !sync.data.commandId) return {};
-  return {
+  const correlation: CommandCorrelation = {
     commandId: sync.data.commandId,
     commandType: 'sync',
     ownerType: sync.data.owner.organizationId ? 'org' : 'user',
   };
+  if (sync.data.trigger === 'manual' && sync.data.actor) {
+    correlation.ledger = {
+      actor: sync.data.actor,
+      intent: 'manual_sync',
+      dispatchedAt: sync.data.dispatchedAt,
+    };
+  }
+  return correlation;
 }
 
 function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>): {
@@ -428,6 +450,75 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
     return { status: 'failed', resultCode: 'SYNC_PARTIAL_FAILURE' };
   }
   return { status: 'succeeded', resultCode: 'SYNC_COMPLETED' };
+}
+
+function securityLedgerTerminalStatus(status: SecurityAgentCommand['status']) {
+  switch (status) {
+    case 'succeeded':
+      return 'completed' as const;
+    case 'failed':
+      return 'failed' as const;
+    case 'no_op':
+      return 'no_op' as const;
+    default:
+      return null;
+  }
+}
+
+async function settleSecurityLedgerForTerminalCommand(
+  db: WorkerDb,
+  command: SecurityAgentCommand | null,
+  params: {
+    actor: { id: string; email?: string | null };
+    intent: 'manual_sync' | 'dismiss_finding';
+    dispatchedAt: string;
+    counts?: { repo_count: number; error_count: number };
+  }
+): Promise<void> {
+  if (!command) throw new Error('Security Agent terminal transition has no command');
+  if (!command.operation_key) return;
+
+  const status = securityLedgerTerminalStatus(command.status);
+  if (!status) throw new Error(`Security Agent command ${command.id} is not terminal`);
+
+  const [row] = await db
+    .select({ id: operation_ledgers.id })
+    .from(operation_ledgers)
+    .where(
+      and(
+        eq(operation_ledgers.domain, 'security'),
+        eq(operation_ledgers.kilo_user_id, params.actor.id),
+        eq(operation_ledgers.intent, params.intent),
+        eq(operation_ledgers.provider_ref, command.id)
+      )
+    )
+    .limit(1);
+  if (!row) {
+    throw new Error(`Security operation ledger row is not ready for command ${command.id}`);
+  }
+
+  const settled = await settleOperation(db, {
+    rowId: row.id,
+    status,
+    outcomeCode: command.result_code,
+    canonicalResult: params.counts,
+    outboxEvent: {
+      eventName: 'security_command_settled',
+      distinctId: params.actor.email ?? params.actor.id,
+      properties: {
+        source: 'server',
+        surface: 'security',
+        phase: 'terminal',
+        intent: params.intent,
+        outcome: status,
+        ...params.counts,
+        duration_ms: Math.max(0, Date.now() - new Date(params.dispatchedAt).getTime()),
+      },
+    },
+  });
+  if (!settled.row) {
+    throw new Error(`Security operation ledger row vanished for command ${command.id}`);
+  }
 }
 
 async function processSecurityDismissMessage(
@@ -451,6 +542,11 @@ async function processSecurityDismissMessage(
       result_code: running.command?.result_code,
       attempts: message.attempts,
     });
+    await settleSecurityLedgerForTerminalCommand(db, running.command, {
+      actor: parsed.data.actor,
+      intent: 'dismiss_finding',
+      dispatchedAt: parsed.data.dispatchedAt,
+    });
     message.ack();
     return true;
   }
@@ -466,6 +562,11 @@ async function processSecurityDismissMessage(
     resultCode: result.resultCode,
   });
   requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
+  await settleSecurityLedgerForTerminalCommand(db, terminal.command, {
+    actor: parsed.data.actor,
+    intent: 'dismiss_finding',
+    dispatchedAt: parsed.data.dispatchedAt,
+  });
   console.info('Security Agent dismissal command completed', {
     command_id: parsed.data.commandId,
     command_type: 'dismiss_finding',
@@ -519,6 +620,12 @@ async function processSecuritySyncMessage(
         result_code: running.command?.result_code,
         attempts: message.attempts,
       });
+      if (!body.actor) throw new Error('Manual security sync command has no actor');
+      await settleSecurityLedgerForTerminalCommand(db, running.command, {
+        actor: body.actor,
+        intent: 'manual_sync',
+        dispatchedAt: body.dispatchedAt,
+      });
       message.ack();
       return;
     }
@@ -547,6 +654,13 @@ async function processSecuritySyncMessage(
       resultCode: terminal.resultCode,
     });
     requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
+    if (!body.actor) throw new Error('Manual security sync command has no actor');
+    await settleSecurityLedgerForTerminalCommand(db, terminalTransition.command, {
+      actor: body.actor,
+      intent: 'manual_sync',
+      dispatchedAt: body.dispatchedAt,
+      counts: { repo_count: result.synced, error_count: result.errors },
+    });
   }
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
@@ -778,6 +892,13 @@ export default {
               db,
               correlation.commandId
             );
+            if (exhaustionOutcome.command && correlation.ledger) {
+              await settleSecurityLedgerForTerminalCommand(
+                db,
+                exhaustionOutcome.command,
+                correlation.ledger
+              );
+            }
             if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
               console.info('Security Agent command delivery already terminal after failure', {
                 command_id: correlation.commandId,

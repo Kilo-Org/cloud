@@ -8,6 +8,7 @@ import {
 } from '@kilocode/db';
 import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
+import { settleOperation } from '@kilocode/db/operation-ledger';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
@@ -29,6 +30,7 @@ vi.mock('@kilocode/db', async importOriginal => {
   };
 });
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+vi.mock('@kilocode/db/operation-ledger', () => ({ settleOperation: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
@@ -48,11 +50,22 @@ beforeEach(() => {
     command: {},
   } as never);
   vi.mocked(runSecurityNotificationSweep).mockResolvedValue({} as never);
+  vi.mocked(settleOperation).mockResolvedValue({ settled: true, row: {} } as never);
 });
 
 /** Worker database stub; every repository call it would serve is mocked. */
 function workerDbStub(): never {
   return {} as never;
+}
+
+function ledgerDb(rows: { id: string }[]): never {
+  return {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: async () => rows }),
+      }),
+    }),
+  } as never;
 }
 
 describe('collectScheduledSyncOwners', () => {
@@ -756,6 +769,17 @@ describe('manual dismissal dispatch', () => {
       transitioned: false,
       command: null,
     });
+    vi.mocked(markSecurityAgentCommandRetriesExhausted).mockResolvedValueOnce({
+      transitioned: true,
+      command: {
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        operation_key: 'retry-safe-key-123',
+        status: 'failed',
+        result_code: 'QUEUE_RETRIES_EXHAUSTED',
+      },
+    } as never);
+    const workerDb = ledgerDb([{ id: 'ledger-row-id' }]);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
     const ack = vi.fn();
     const retry = vi.fn();
 
@@ -786,12 +810,23 @@ describe('manual dismissal dispatch', () => {
     );
 
     expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
-      {},
+      workerDb,
       'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
     );
     expect(
       vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
     ).toBeLessThan(retry.mock.invocationCallOrder[0] ?? Infinity);
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'failed',
+        outcomeCode: 'QUEUE_RETRIES_EXHAUSTED',
+      })
+    );
+    expect(vi.mocked(settleOperation).mock.invocationCallOrder[0]).toBeLessThan(
+      retry.mock.invocationCallOrder[0] ?? Infinity
+    );
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
   });
@@ -1030,5 +1065,81 @@ describe('same-key command dedupe (P1-A-08e)', () => {
       worker.fetch(manualSyncRequest('reuse-key'), manualSyncEnv(queuedBatches))
     ).rejects.toThrow('was reused for another command type');
     expect(queuedBatches).toHaveLength(0);
+  });
+});
+
+describe('security operation ledger settlement', () => {
+  const terminalCommand = {
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    operation_key: 'retry-safe-key-123',
+    status: 'succeeded',
+    result_code: 'SYNC_COMPLETED',
+  };
+
+  async function processTerminalSync(rows: { id: string }[]) {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerDb(rows));
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: terminalCommand,
+    } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              commandId: terminalCommand.id,
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'manual-sync-message',
+              trigger: 'manual',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              ownerKey: 'org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              chunkIndex: 0,
+              chunkCount: 1,
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              actor: { id: 'user-123', email: 'owner@example.com' },
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+    return { ack, retry };
+  }
+
+  it('settles a terminal command without a client status poll', async () => {
+    const { ack, retry } = await processTerminalSync([{ id: 'ledger-row-id' }]);
+
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'completed',
+        outcomeCode: 'SYNC_COMPLETED',
+        outboxEvent: expect.objectContaining({
+          eventName: 'security_command_settled',
+          distinctId: 'owner@example.com',
+        }),
+      })
+    );
+    expect(vi.mocked(settleOperation).mock.invocationCallOrder[0]).toBeLessThan(
+      ack.mock.invocationCallOrder[0] ?? Infinity
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('retries until the web handler records the command provider reference', async () => {
+    const { ack, retry } = await processTerminalSync([]);
+
+    expect(settleOperation).not.toHaveBeenCalled();
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });

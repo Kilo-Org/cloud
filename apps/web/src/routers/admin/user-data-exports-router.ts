@@ -45,6 +45,9 @@ type ExportRow = {
   kilo_user_id: string;
   user_email: string;
   user_name: string | null;
+  subject_type: 'user' | 'organization';
+  organization_id: string | null;
+  organization_name: string | null;
   status: ExportStatus;
   schema_version: number;
   snapshot_at: string;
@@ -249,10 +252,20 @@ function healthInput(row: ExportRow): ExportHealthInput {
   };
 }
 
+function serializeSubject(row: ExportRow) {
+  if (row.subject_type === 'user') return { type: 'user' as const, organization: null };
+  if (!row.organization_id) throw new Error('Organization export is missing its subject ID');
+  return {
+    type: 'organization' as const,
+    organization: { id: row.organization_id, name: row.organization_name },
+  };
+}
+
 function serialize(row: ExportRow, asOf: string) {
   return {
     id: row.id,
     user: { id: row.kilo_user_id, email: row.user_email, name: row.user_name },
+    subject: serializeSubject(row),
     status: row.status,
     schemaVersion: row.schema_version,
     currentSource: row.current_source,
@@ -326,7 +339,8 @@ function listConditions(input: z.infer<typeof ListInputSchema>) {
 const baseSelect = sql`
   SELECT
     e.id, e.kilo_user_id, u.google_user_email AS user_email,
-    u.google_user_name AS user_name, e.status, e.schema_version, e.snapshot_at,
+    u.google_user_name AS user_name, e.subject_type, e.organization_id,
+    org.name AS organization_name, e.status, e.schema_version, e.snapshot_at,
     e.current_source, e.source_cursor IS NOT NULL AS has_source_cursor,
     EXISTS (
       SELECT 1 FROM user_data_export_parts persisted_parts WHERE persisted_parts.export_id = e.id
@@ -341,7 +355,15 @@ const baseSelect = sql`
     e.r2_object_key IS NOT NULL AS has_r2_object,
     EXISTS (
       SELECT 1 FROM user_data_exports other
-      WHERE other.kilo_user_id = e.kilo_user_id AND other.id <> e.id
+      WHERE other.id <> e.id
+        AND other.subject_type = e.subject_type
+        AND (
+          (e.subject_type = 'user' AND other.kilo_user_id = e.kilo_user_id)
+          OR (
+            e.subject_type = 'organization'
+            AND other.organization_id = e.organization_id
+          )
+        )
         AND (
           other.status IN ('queued', 'processing', 'finalizing')
           OR (other.status = 'ready' AND other.expires_at > now())
@@ -351,6 +373,7 @@ const baseSelect = sql`
     o.attempt_count AS current_outbox_attempt_count, o.sent_at AS current_outbox_sent_at
   FROM user_data_exports e
   INNER JOIN kilocode_users u ON u.id = e.kilo_user_id
+  LEFT JOIN organizations org ON org.id = e.organization_id
   LEFT JOIN user_data_export_outbox o
     ON o.export_id = e.id
     AND o.generation = e.dispatch_generation
@@ -537,7 +560,7 @@ export const adminUserDataExportsRouter = createTRPCRouter({
       cancelAndRetry: {
         eligible: !row.has_other_usable_export,
         disabledReason: row.has_other_usable_export
-          ? 'This user already has another active or downloadable export.'
+          ? `This ${row.subject_type === 'organization' ? 'organization' : 'user'} already has another active or downloadable export.`
           : null,
       },
     };

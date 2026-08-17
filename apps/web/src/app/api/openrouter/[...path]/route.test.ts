@@ -1188,15 +1188,12 @@ describe('percentage-routed partner fallback', () => {
       const partnerLog = mockedAfter.mock.calls[0]?.[0];
       expect(partnerLog).toBeInstanceOf(Promise);
       await partnerLog;
-      expect(consoleWarn).toHaveBeenCalledWith(
-        'Partner request failed; retrying initial managed provider',
-        {
-          partner_provider: partnerProvider.id,
-          fallback_provider: sourceProvider.id,
-          status_code: partnerStatus,
-          body: 'partner failed',
-        }
-      );
+      expect(consoleWarn).toHaveBeenCalledWith('Partner request failed before managed fallback', {
+        partner_provider: partnerProvider.id,
+        fallback_provider: sourceProvider.id,
+        status_code: partnerStatus,
+        body: 'partner failed',
+      });
       expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
         expect.objectContaining({ provider: sourceProvider.id, statusCode: 200 }),
         expect.any(Response),
@@ -1238,15 +1235,12 @@ describe('percentage-routed partner fallback', () => {
     await partnerLog;
 
     expect(response.status).toBe(200);
-    expect(consoleWarn).toHaveBeenCalledWith(
-      'Partner request failed; retrying initial managed provider',
-      {
-        partner_provider: partnerProvider.id,
-        fallback_provider: provider.id,
-        status_code: 500,
-        response_body_read_error: 'Error: read failed',
-      }
-    );
+    expect(consoleWarn).toHaveBeenCalledWith('Partner request failed before managed fallback', {
+      partner_provider: partnerProvider.id,
+      fallback_provider: provider.id,
+      status_code: 500,
+      response_body_read_error: 'Error: read failed',
+    });
   });
 
   it('does not retry a successful partner response', async () => {

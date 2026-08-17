@@ -970,12 +970,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     after(
       (async () => {
         try {
-          console.warn('Partner request failed; retrying initial managed provider', {
+          console.warn('Partner request failed before managed fallback', {
             ...partnerFailureLog,
             body: await responseForLogging.text(),
           });
         } catch (error) {
-          console.warn('Partner request failed; retrying initial managed provider', {
+          console.warn('Partner request failed before managed fallback', {
             ...partnerFailureLog,
             response_body_read_error: String(error),
           });

@@ -1510,7 +1510,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         );
         return {
           records: rows.flatMap(row => {
-            const id = row.most_significant_position;
+            const id = `${row.most_significant_position}.${row.least_significant_position}`;
             return [
               { source: 'cli_sessions', id, field: 'session_id', value: row.session_id },
               { source: 'cli_sessions', id, field: 'title', value: row.title },
@@ -1555,26 +1555,32 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          records: rows.flatMap(row => [
-            {
-              source: 'cloud_agent_code_reviews',
-              field: 'payload_id',
-              value: row.payload_id,
-            },
-            {
-              source: 'cloud_agent_code_reviews',
-              field: 'repo_full_name',
-              value: row.repo_full_name,
-            },
-            { source: 'cloud_agent_code_reviews', field: 'pr_url', value: row.pr_url },
-            { source: 'cloud_agent_code_reviews', field: 'pr_title', value: row.pr_title },
-            { source: 'cloud_agent_code_reviews', field: 'base_ref', value: row.base_ref },
-            {
-              source: 'cloud_agent_code_reviews',
-              field: 'previous_summary_body',
-              value: row.previous_summary_body,
-            },
-          ]),
+          records: rows.flatMap(row => {
+            const id = `${row.most_significant_position}.${row.least_significant_position}`;
+            return [
+              {
+                source: 'cloud_agent_code_reviews',
+                id,
+                field: 'payload_id',
+                value: row.payload_id,
+              },
+              {
+                source: 'cloud_agent_code_reviews',
+                id,
+                field: 'repo_full_name',
+                value: row.repo_full_name,
+              },
+              { source: 'cloud_agent_code_reviews', id, field: 'pr_url', value: row.pr_url },
+              { source: 'cloud_agent_code_reviews', id, field: 'pr_title', value: row.pr_title },
+              { source: 'cloud_agent_code_reviews', id, field: 'base_ref', value: row.base_ref },
+              {
+                source: 'cloud_agent_code_reviews',
+                id,
+                field: 'previous_summary_body',
+                value: row.previous_summary_body,
+              },
+            ];
+          }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             row.most_significant_position,
             row.least_significant_position,

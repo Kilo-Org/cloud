@@ -663,15 +663,15 @@ describe('source adapters', () => {
     expect(warehouseCalls[0]?.values).toEqual(['owner-user', null, null, 1]);
     expect(page?.nextCursor).toEqual({ key: ['10', '20'] });
     expect(page?.records).toEqual([
-      { source: 'cli_sessions', id: '10', field: 'session_id', value: 'session-1' },
-      { source: 'cli_sessions', id: '10', field: 'title', value: 'Session' },
+      { source: 'cli_sessions', id: '10.20', field: 'session_id', value: 'session-1' },
+      { source: 'cli_sessions', id: '10.20', field: 'title', value: 'Session' },
       {
         source: 'cli_sessions',
-        id: '10',
+        id: '10.20',
         field: 'git_url',
         value: 'git@example.com:acme/repo.git',
       },
-      { source: 'cli_sessions', id: '10', field: 'git_branch', value: 'main' },
+      { source: 'cli_sessions', id: '10.20', field: 'git_branch', value: 'main' },
     ]);
   });
 
@@ -702,8 +702,8 @@ describe('source adapters', () => {
 
     const branches = page?.records.filter(record => record.field === 'git_branch');
     expect(branches).toEqual([
-      { source: 'cli_sessions', id: '10', field: 'git_branch', value: 'main' },
-      { source: 'cli_sessions', id: '10', field: 'git_branch', value: 'feature/x' },
+      { source: 'cli_sessions', id: '10.1', field: 'git_branch', value: 'main' },
+      { source: 'cli_sessions', id: '10.2', field: 'git_branch', value: 'feature/x' },
     ]);
 
     const sessionIds = page?.records.filter(record => record.field === 'session_id');
@@ -1778,7 +1778,22 @@ describe('source adapters', () => {
     expect(byField.get('pr_title')).toBe('Tighten the auth guard');
     expect(byField.get('base_ref')).toBe('main');
     expect(byField.get('previous_summary_body')).toBe('An earlier summary.');
+    expect(page?.records.every(record => record.id === '11.2')).toBe(true);
     expect(page?.nextCursor).toEqual({ key: ['11', '2'] });
+  });
+
+  it('distinguishes code review journal rows sharing a most-significant position', async () => {
+    const { adapters } = harness([
+      CODE_REVIEW_ROW,
+      { ...CODE_REVIEW_ROW, least_significant_position: '3' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const payloadIds = page?.records.filter(record => record.field === 'payload_id');
+
+    expect(payloadIds?.map(record => record.id)).toEqual(['11.2', '11.3']);
   });
 
   // A keyset on payload_id would skip the rest of a review at any page boundary inside

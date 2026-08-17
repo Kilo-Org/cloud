@@ -1,11 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { LogOut, Smartphone } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
+import { LogOut, Smartphone } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';

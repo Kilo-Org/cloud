@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- spawn-input, navigation, and admission suites share the hook harness. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
@@ -352,7 +353,9 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       getSubmitPayload: () => samplePayload,
-      onSpawnAdmitted,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
     });
 
     await captureSpawnCall(onStart);
@@ -364,7 +367,9 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       getSubmitPayload: () => filesPayload,
-      onSpawnAdmitted,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
     });
 
     onStart();
@@ -378,7 +383,9 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',
       runOnInstance: null,
-      onSpawnAdmitted,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
     });
 
     onStart();

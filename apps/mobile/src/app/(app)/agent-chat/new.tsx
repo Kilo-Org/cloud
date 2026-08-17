@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the route coordinates the new-session draft, model selection, and submit lifecycle. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';

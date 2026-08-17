@@ -65,10 +65,6 @@ export function isSupportDeletionRefused(user: {
   is_admin: boolean;
   is_super_admin: boolean;
   is_bot: boolean;
-  hosted_domain: string | null;
-  google_user_email: string;
 }): boolean {
-  if (user.is_admin || user.is_super_admin || user.is_bot) return true;
-  if (user.hosted_domain === 'kilocode.ai') return true;
-  return isKiloOwnedEmailDomain(emailDomainAfterLastAt(user.google_user_email));
+  return user.is_admin || user.is_super_admin || user.is_bot;
 }

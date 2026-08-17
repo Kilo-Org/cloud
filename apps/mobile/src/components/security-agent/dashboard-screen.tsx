@@ -4,9 +4,9 @@ import {
   getSecurityRepositoriesInScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -14,6 +14,7 @@ import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
+import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
@@ -31,6 +32,7 @@ import {
   isSecuritySyncRetryable,
   SECURITY_CONFIGURATION_COPY,
 } from '@/lib/hooks/use-security-agent-mutations';
+import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -55,6 +57,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const repositories = useSecurityAgentRepositories(scope);
   const canManage = useSecurityAgentCapability(scope).canManage;
   const triggerSync = useTriggerSecuritySync(scope);
+  const dismissFailures = useSecurityDismissFailures(scope);
+  const { refresh: refreshDismissFailures } = dismissFailures;
+
+  // The dashboard stays mounted while the dismiss sheet is open, so re-read
+  // the failed dismiss drafts on focus: a fresh failure must show a card and
+  // an accepted dismissal must drop it.
+  useFocusEffect(
+    useCallback(() => {
+      refreshDismissFailures();
+    }, [refreshDismissFailures])
+  );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
   const data = dashboardStats.data;
@@ -204,6 +217,20 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               : triggerSync.error.message}
           </Text>
         ) : null}
+
+        {dismissFailures.failures.map(failure => (
+          <SecurityCommandRetryCard
+            key={failure.findingId}
+            lastError={failure.lastError}
+            retryable={failure.retryable === true}
+            onRetry={() => {
+              router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
+            }}
+            onDiscard={() => {
+              dismissFailures.clear(failure.findingId);
+            }}
+          />
+        ))}
 
         {dashboardStats.isLoading ? (
           <View className="flex-row flex-wrap gap-3">

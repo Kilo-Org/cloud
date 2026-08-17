@@ -67,6 +67,11 @@ export function prReviewDraftKey(owner: string, repo: string, number: number): s
   return `pr-review:${owner}/${repo}#${number}`;
 }
 
+/** Security dismiss draft entity key, unique per scope and finding. */
+export function securityDismissDraftKey(scope: string, findingId: string): string {
+  return `security-dismiss:${scope}:${findingId}`;
+}
+
 /**
  * New-session initial-prompt precedence: a non-empty share prefill always
  * beats a stored draft (the share payload is the user's explicit current

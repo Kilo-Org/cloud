@@ -57,6 +57,26 @@ const capability = vi.hoisted(() => ({
   isError: false,
   refetch: vi.fn(),
 }));
+const dismissFailures = vi.hoisted(() => ({
+  failures: [] as { findingId: string; lastError: string; retryable: boolean | null }[],
+  clear: vi.fn(),
+  refresh: vi.fn(),
+}));
+
+// Captures the useFocusEffect callback so a test can simulate a focus event.
+const focusEffect = vi.hoisted(() => ({
+  effect: undefined as (() => void) | undefined,
+}));
+
+// Captures the retry-card props the dashboard renders per failure.
+const retryCards = vi.hoisted(() => ({
+  cards: [] as {
+    lastError: string;
+    retryable: boolean;
+    onRetry?: () => void;
+    onDiscard?: () => void;
+  }[],
+}));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -70,6 +90,9 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: (effect: () => void) => {
+    focusEffect.effect = effect;
+  },
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
@@ -85,6 +108,20 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentLastSyncTime: () => lastSync,
   useSecurityAgentRepositories: () => repositories,
   useTriggerSecuritySync: () => triggerSync,
+}));
+vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
+  useSecurityDismissFailures: () => dismissFailures,
+}));
+vi.mock('@/components/security-agent/security-command-retry-card', () => ({
+  SecurityCommandRetryCard: (props: {
+    lastError: string;
+    retryable: boolean;
+    onRetry?: () => void;
+    onDiscard?: () => void;
+  }) => {
+    retryCards.cards.push(props);
+    return null;
+  },
 }));
 // Faithful-enough mirror of the real classifier (covered by its own suite):
 // the persistence-failure and replay-failed markers and the
@@ -195,6 +232,11 @@ describe('DashboardScreen sync control terminal states', () => {
     repositories.isError = false;
     repositories.data = [];
     capability.canManage = false;
+    dismissFailures.failures = [];
+    dismissFailures.clear.mockClear();
+    dismissFailures.refresh.mockClear();
+    retryCards.cards = [];
+    focusEffect.effect = undefined;
   });
 
   it('keeps both sync controls enabled in the happy state', () => {
@@ -252,5 +294,64 @@ describe('DashboardScreen sync control terminal states', () => {
       { repoFullName: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+});
+
+describe('DashboardScreen dismiss failure card states', () => {
+  beforeEach(() => {
+    dismissFailures.failures = [];
+    dismissFailures.clear.mockClear();
+    dismissFailures.refresh.mockClear();
+    retryCards.cards = [];
+    focusEffect.effect = undefined;
+  });
+
+  it('renders no retry card when there are no failed dismissals (empty)', () => {
+    dismissFailures.failures = [];
+    renderScreen();
+
+    expect(retryCards.cards).toHaveLength(0);
+  });
+
+  it('renders a retry card with the error and Retry for a retryable failure', () => {
+    dismissFailures.failures = [{ findingId: 'f1', lastError: 'Network error', retryable: true }];
+    renderScreen();
+
+    expect(retryCards.cards).toHaveLength(1);
+    expect(retryCards.cards[0]?.lastError).toBe('Network error');
+    expect(retryCards.cards[0]?.retryable).toBe(true);
+  });
+
+  it('renders a retry card with the error and no Retry for a non-retryable failure', () => {
+    dismissFailures.failures = [
+      { findingId: 'f1', lastError: 'Security service is not configured', retryable: false },
+    ];
+    renderScreen();
+
+    expect(retryCards.cards).toHaveLength(1);
+    expect(retryCards.cards[0]?.lastError).toBe('Security service is not configured');
+    expect(retryCards.cards[0]?.retryable).toBe(false);
+  });
+
+  it('drops the card after accept by clearing the failure', () => {
+    dismissFailures.failures = [{ findingId: 'f1', lastError: 'boom', retryable: true }];
+    renderScreen();
+    expect(retryCards.cards).toHaveLength(1);
+
+    act(() => {
+      retryCards.cards[0]?.onDiscard?.();
+    });
+
+    expect(dismissFailures.clear).toHaveBeenCalledWith('f1');
+  });
+
+  it('re-reads the failed dismissals on focus', () => {
+    renderScreen();
+
+    act(() => {
+      focusEffect.effect?.();
+    });
+
+    expect(dismissFailures.refresh).toHaveBeenCalledTimes(1);
   });
 });

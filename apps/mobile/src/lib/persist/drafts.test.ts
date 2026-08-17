@@ -38,6 +38,7 @@ import {
   resetDraftTimersForTests,
   resolvePrefillOverDraft,
   saveDraft,
+  securityDismissDraftKey,
 } from './drafts';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
@@ -116,6 +117,9 @@ describe('draft scope and entity keys', () => {
     expect(agentComposerDraftKey('sess-1')).toBe('agent-composer:sess-1');
     expect(NEW_SESSION_DRAFT_KEY).toBe('agent-composer:new');
     expect(prReviewDraftKey('acme', 'kilo', 42)).toBe('pr-review:acme/kilo#42');
+    expect(securityDismissDraftKey('personal', 'finding-1')).toBe(
+      'security-dismiss:personal:finding-1'
+    );
   });
 
   it('resolvePrefillOverDraft lets a non-empty prefill beat the stored draft', () => {

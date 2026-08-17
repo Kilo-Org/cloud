@@ -84,6 +84,15 @@ describe('session share tokens', () => {
     ['unknown version', async () => signPayload({ ...validPayload(), version: 2 })],
     ['malformed subject', async () => signPayload({ ...validPayload(), sub: 'ses_bad' })],
     ['malformed generation id', async () => signPayload({ ...validPayload(), jti: 'not-a-uuid' })],
+    ['empty generation id', async () => signPayload({ ...validPayload(), jti: '' })],
+    [
+      'missing generation id',
+      async () => {
+        const payload = validPayload();
+        delete payload.jti;
+        return signPayload(payload);
+      },
+    ],
     [
       'missing iat',
       async () => {
@@ -135,6 +144,13 @@ describe('session share tokens', () => {
 
   it('does not query the database for an invalid token', async () => {
     await expect(verifySessionShareToken(makeEnv(), 'not-a-jwt')).resolves.toBeNull();
+    expect(getWorkerDb).not.toHaveBeenCalled();
+  });
+
+  it('does not query the database for a token with an empty public_id', async () => {
+    const token = await signPayload({ ...validPayload(), jti: '' });
+
+    await expect(resolveSessionShareToken(makeEnv(), token)).resolves.toBeNull();
     expect(getWorkerDb).not.toHaveBeenCalled();
   });
 

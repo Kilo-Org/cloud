@@ -1,5 +1,5 @@
 import { jwtVerify, SignJWT } from 'jose';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import { z } from 'zod';
@@ -117,7 +117,7 @@ export async function resolveSessionShareToken(
   token: string
 ): Promise<ResolvedSessionShare | null> {
   const payload = await verifySessionShareToken(env, token);
-  if (!payload) {
+  if (!payload?.jti) {
     return null;
   }
 
@@ -132,7 +132,11 @@ export async function resolveSessionShareToken(
     .from(cli_sessions_v2)
     .leftJoin(kilocode_users, eq(cli_sessions_v2.kilo_user_id, kilocode_users.id))
     .where(
-      and(eq(cli_sessions_v2.session_id, payload.sub), eq(cli_sessions_v2.public_id, payload.jti))
+      and(
+        eq(cli_sessions_v2.session_id, payload.sub),
+        isNotNull(cli_sessions_v2.public_id),
+        eq(cli_sessions_v2.public_id, payload.jti)
+      )
     )
     .limit(1);
 

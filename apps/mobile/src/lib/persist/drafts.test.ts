@@ -427,10 +427,10 @@ describe('write rejection boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('clearDraft reports and resolves when the remove fails', async () => {
+  it('clearDraft reports and returns false when the remove fails', async () => {
     kvMock.removeItem.mockRejectedValueOnce(new Error('kv down'));
     seedStoredValue('draft:u1', 'k', '"old"');
-    await expect(clearDraft('u1', 'k')).resolves.toBeUndefined();
+    await expect(clearDraft('u1', 'k')).resolves.toBe(false);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 

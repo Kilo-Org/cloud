@@ -41,6 +41,8 @@ import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
+import { useNewSessionDiscardGuard } from './use-new-session-discard-guard';
+
 export default function NewSessionScreen() {
   const { organizationId } = useLocalSearchParams<{
     organizationId?: string;
@@ -67,6 +69,12 @@ function NewSessionScreenBody() {
   const [hasPrompt, setHasPrompt] = useState(false);
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
+  // Armed right before a successful Start/spawn navigation so the discard
+  // confirm is skipped for a leave the user already committed to. The remote
+  // spawn path arms it at admission and resets it when the spawn settles
+  // without navigating (failure), so an abandon after a failed spawn still
+  // confirms.
+  const skipDiscardGuardRef = useRef(false);
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
@@ -170,11 +178,15 @@ function NewSessionScreenBody() {
   );
 
   // A successful session creation owns clearing the new-session draft; a
-  // failure must preserve it for the retry.
+  // failure must preserve it for the retry. The success path navigates via
+  // `replace`, so arm the discard-confirm bypass here — `onCreated` runs
+  // synchronously before the navigation, and the leave must not be
+  // intercepted as an abandon.
   const handleCreated = useCallback(() => {
     if (userId) {
       void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
     }
+    skipDiscardGuardRef.current = true;
   }, [userId]);
 
   // Remote spawn success lives inside the spawn dispatch (it replaces the
@@ -185,6 +197,14 @@ function NewSessionScreenBody() {
   // blocked admission or cancelled voice submit never arms the marker, so
   // the unmount flush preserves the draft.
   const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({ userId });
+
+  // A committed remote spawn arms the discard-confirm bypass alongside the
+  // draft-clearing marker. The bypass is reset when the spawn settles without
+  // navigating (a failed spawn), so an abandon after a failure still confirms.
+  const handleSpawnAdmitted = useCallback(() => {
+    markRemoteSpawnAttempted();
+    skipDiscardGuardRef.current = true;
+  }, [markRemoteSpawnAttempted]);
 
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
@@ -250,7 +270,14 @@ function NewSessionScreenBody() {
     selection: modelView.spawnSelection,
     // Arms the draft-clearing marker only when the dispatch admits the spawn:
     // a blocked admission or cancelled voice submit never clears the draft.
-    onSpawnAdmitted: markRemoteSpawnAttempted,
+    onSpawnAdmitted: handleSpawnAdmitted,
+    // A committed spawn that settles without navigating (retryable or
+    // non-retryable) must re-arm the discard confirm, so an abandon after a
+    // failed spawn still asks. A successful spawn replaces the screen before
+    // this can run, so the bypass stays armed and the guard consumes it.
+    onSpawnFailed: () => {
+      skipDiscardGuardRef.current = false;
+    },
   });
 
   const handleModelSelect = useCallback(
@@ -285,6 +312,27 @@ function NewSessionScreenBody() {
       saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
     }
   }
+
+  // Discard confirm: leaving with a non-empty prompt asks first. Discard
+  // clears the stored draft and the route-owned prompt ref before the captured
+  // navigation action is replayed, so a discarded prompt can never resurface.
+  const handleDiscardDraft = useCallback(async () => {
+    if (userId) {
+      const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+      if (!cleared) {
+        // The stored draft could not be removed: stay on the screen so the
+        // guard keeps the draft and toasts instead of navigating away.
+        throw new Error('Failed to clear the new-session draft');
+      }
+    }
+    promptRef.current = '';
+  }, [userId, promptRef]);
+
+  useNewSessionDiscardGuard({
+    dirty: hasPrompt,
+    onDiscard: handleDiscardDraft,
+    skipNextGuardRef: skipDiscardGuardRef,
+  });
 
   const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
     await settleVoiceInputBeforeSubmit({

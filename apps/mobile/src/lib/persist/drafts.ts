@@ -304,12 +304,13 @@ export async function flushDraft(userId: string, entityKey: string): Promise<voi
  * Serialized behind any in-flight write for the same key, so a clear can
  * never race a queued save back into existence. Not epoch-fenced: clearing
  * is explicit user intent and must work regardless of auth transitions.
- * Remove failures are reported to Sentry and swallowed, so callers can
- * invoke it fire-and-forget.
+ * Remove failures are reported to Sentry and swallowed, but the returned
+ * boolean tells the caller whether the entry was actually removed, so a
+ * discard flow can stay on the screen when the clear fails.
  */
-export async function clearDraft(userId: string, entityKey: string): Promise<void> {
+export async function clearDraft(userId: string, entityKey: string): Promise<boolean> {
   if (!userId) {
-    return;
+    return true;
   }
   const key = fullKey(userId, entityKey);
   const pending = pendingSaves.get(key);
@@ -321,6 +322,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<voi
     await chainSave(key, async () => {
       await encryptedKv.removeItem(draftScope(userId), entityKey);
     });
+    return true;
   } catch (error) {
     reportDraftFailure({
       message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
@@ -328,6 +330,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<voi
       userId,
       entityKey,
     });
+    return false;
   }
 }
 

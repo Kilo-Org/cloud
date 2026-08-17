@@ -5,12 +5,8 @@ import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
 
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
+import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
-
-const IMAGE_PICKER_OPTIONS = {
-  mediaTypes: ['images'],
-  quality: 1,
-} satisfies ImagePicker.ImagePickerOptions;
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
   Alert.alert(title, message, [
@@ -73,22 +69,18 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
     });
     return [];
   }
-  const result = await ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS);
-  if (result.canceled) {
-    return [];
-  }
-  return result.assets.map(normalizeImageAsset);
+  const assets = await launchImagePicker(ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS));
+  return assets.map(asset => normalizeImageAsset(asset));
 }
 
 async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
-  const result = await ImagePicker.launchImageLibraryAsync({
-    ...IMAGE_PICKER_OPTIONS,
-    allowsMultipleSelection: true,
-  });
-  if (result.canceled) {
-    return [];
-  }
-  return result.assets.map(normalizeImageAsset);
+  const assets = await launchImagePicker(
+    ImagePicker.launchImageLibraryAsync({
+      ...IMAGE_PICKER_OPTIONS,
+      allowsMultipleSelection: true,
+    })
+  );
+  return assets.map(asset => normalizeImageAsset(asset));
 }
 
 async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {

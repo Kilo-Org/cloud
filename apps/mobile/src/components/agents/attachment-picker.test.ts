@@ -1,5 +1,6 @@
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { describe, expect, it, vi } from 'vitest';
 
 import { pickAgentAttachments } from './attachment-picker';
@@ -9,9 +10,15 @@ const reactNativeMock = vi.hoisted(() => ({
   openSettings: vi.fn(),
 }));
 
+const announcingToastMock = vi.hoisted(() => ({ error: vi.fn() }));
+
 vi.mock('react-native', () => ({
   Alert: { alert: reactNativeMock.alert },
   Linking: { openSettings: reactNativeMock.openSettings },
+}));
+
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: announcingToastMock.error, success: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock('expo-document-picker', () => ({
@@ -63,6 +70,21 @@ describe('agent attachment picker', () => {
       expect.any(Function)
     );
     expect(reactNativeMock.alert).not.toHaveBeenCalled();
+  });
+
+  // Android unregisters the picker's ActivityResultLauncher when the launching
+  // Activity is destroyed, so every later launch rejects until the process
+  // restarts. Surface it instead of rejecting into an unhandled promise.
+  it('toasts a recovery hint when the library launch rejects', async () => {
+    announcingToastMock.error.mockClear();
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockRejectedValueOnce(
+      new Error("Call to function 'ExponentImagePicker.launchImageLibraryAsync' has been rejected.")
+    );
+
+    expect(await pickWithSheetSelection(1)).toEqual([]);
+    expect(announcingToastMock.error).toHaveBeenCalledWith(
+      'Could not open the photo picker. Restart Kilo and try again.'
+    );
   });
 });
 

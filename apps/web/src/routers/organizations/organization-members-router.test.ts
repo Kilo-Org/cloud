@@ -2,6 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import {
+  organization_audit_logs,
   organization_memberships,
   organizations,
   type User,
@@ -146,6 +147,43 @@ describe('organizations members trpc router', () => {
         success: true,
         updated: 'role and limit',
       });
+    });
+
+    it('writes a change_role audit row naming the actor and both roles', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@role-change-audit.example.com`,
+        google_user_name: 'Role Change Audit Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+      const caller = await createCallerForUser(regularUser.id);
+
+      await caller.organizations.members.update({
+        organizationId: testOrganization.id,
+        memberId: targetUser.id,
+        role: 'admin',
+      });
+
+      const auditRows = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.member.change_role'),
+            eq(
+              organization_audit_logs.message,
+              `Changed role for user ${targetUser.google_user_email} from member to admin`
+            )
+          )
+        );
+      expect(auditRows).toEqual([
+        expect.objectContaining({
+          actor_id: regularUser.id,
+          actor_email: regularUser.google_user_email,
+          actor_name: regularUser.google_user_name,
+        }),
+      ]);
     });
 
     it('should update daily usage limit for organization owner', async () => {
@@ -686,6 +724,64 @@ describe('organizations members trpc router', () => {
           memberId: memberUser.id,
         })
       ).rejects.toThrow('You do not have access to this organization');
+    });
+
+    it('refuses to remove a service account member', async () => {
+      const botUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@service-account-remove.example.com`,
+        google_user_name: 'Service Account Remove Target',
+        is_bot: true,
+      });
+      await addUserToOrganization(testOrganization.id, botUser.id, 'member');
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.members.remove({
+          organizationId: testOrganization.id,
+          memberId: botUser.id,
+        })
+      ).rejects.toThrow('Service account users cannot be removed');
+
+      const membership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, botUser.id)
+        ),
+      });
+      expect(membership).toBeDefined();
+    });
+
+    it('writes a remove audit row naming the actor and the removed member', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@remove-audit.example.com`,
+        google_user_name: 'Remove Audit Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+      const caller = await createCallerForUser(regularUser.id);
+
+      await caller.organizations.members.remove({
+        organizationId: testOrganization.id,
+        memberId: targetUser.id,
+      });
+
+      const auditRows = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.member.remove'),
+            eq(organization_audit_logs.message, `Removed user ${targetUser.google_user_email}`)
+          )
+        );
+      expect(auditRows).toEqual([
+        expect.objectContaining({
+          actor_id: regularUser.id,
+          actor_email: regularUser.google_user_email,
+          actor_name: regularUser.google_user_name,
+        }),
+      ]);
     });
 
     it('lets an organization admin remove a non-owner member', async () => {

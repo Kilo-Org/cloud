@@ -6,12 +6,33 @@
 // and then routes the result through `assertMergeResult`, so a
 // `merged: false` reply throws `MergeNotCompletedError` and lands in
 // React Query's `onError` (NOT `onSuccess`).
+//
+// P1-A-08c wiring: the hoisted operation key is merged into the mutate
+// input and the key rotation policy (real `isPrMutationRetryable`) runs
+// inside `mutationFn`; only `useHoistedOperationKey` is mocked (it holds
+// React ref state that needs a mounted renderer).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OperationKeyModule from '@/lib/operation-key';
+import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import { useMergePullRequestMutation } from './use-pr-merge-mutations';
 import { MergeNotCompletedError } from './merge-result-error';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+
+const hoistedKeys = vi.hoisted(() => ({
+  getKey: vi.fn(() => 'hoisted-op-key'),
+  rotateKey: vi.fn(),
+}));
+
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => 'not-used',
+}));
+
+vi.mock('@/lib/operation-key', async importOriginal => {
+  const actual = await importOriginal<typeof OperationKeyModule>();
+  return { ...actual, useHoistedOperationKey: () => hoistedKeys };
+});
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -84,6 +105,8 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     mutateMock.mockReset();
     invalidateQueriesMock.mockReset();
     toastErrorMock.mockReset();
+    hoistedKeys.getKey.mockClear();
+    hoistedKeys.rotateKey.mockClear();
   });
 
   afterEach(() => {
@@ -157,5 +180,109 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     useMergePullRequestMutation(REF);
     lastCapturedOptions?.onError?.(new Error('boom'));
     expect(toastErrorMock).toHaveBeenCalledWith('boom');
+  });
+
+  it('merges the hoisted operation key into the merge input (P1-A-08c)', async () => {
+    mutateMock.mockResolvedValueOnce({ merged: true, sha: 's1', branchDeleted: true });
+    useMergePullRequestMutation(REF);
+
+    await lastCapturedOptions?.mutationFn?.(INPUT);
+
+    // The fingerprint is the dedupe identity the server hashes into
+    // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
+    // field list must fail here instead of silently rotating in-flight keys.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
+    expect(mutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'hoisted-op-key' })
+    );
+    expect(mutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        method: 'squash',
+        expectedHeadSha: 'a'.repeat(40),
+      })
+    );
+  });
+
+  it('regenerates the key after a successful merge (fresh intent next)', async () => {
+    mutateMock.mockResolvedValueOnce({ merged: true, sha: 's1', branchDeleted: true });
+    useMergePullRequestMutation(REF);
+
+    await lastCapturedOptions?.mutationFn?.(INPUT);
+
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the key when GitHub declines the merge (merged:false is retryable)', async () => {
+    mutateMock.mockResolvedValueOnce({ merged: false, sha: 's1', branchDeleted: false });
+    useMergePullRequestMutation(REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toBeInstanceOf(
+      MergeNotCompletedError
+    );
+
+    // The key stays stable so the next same-intent retry reconciles on the
+    // server instead of admitting a brand-new operation.
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+  });
+
+  it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
+    const badRequest = new Error('Cannot approve your own pull request');
+    Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
+    mutateMock.mockRejectedValueOnce(badRequest);
+    useMergePullRequestMutation(REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toMatchObject({
+      message: 'Cannot approve your own pull request',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the key on an in-progress CONFLICT and maps it onto the merge retryable copy', async () => {
+    mutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useMergePullRequestMutation(REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toMatchObject({
+      message: 'Could not merge pull request.',
+    });
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+  });
+
+  it('maps the ambiguous ledger marker onto the verify-before-retrying copy in onError', () => {
+    useMergePullRequestMutation(REF);
+    lastCapturedOptions?.onError?.(new Error("Couldn't confirm — check the PR before retrying."));
+    expect(toastErrorMock).toHaveBeenCalledWith("Couldn't confirm — check the PR before retrying.");
+  });
+});
+
+describe('merge fingerprint (P1-A-08c changed-input)', () => {
+  it('stays stable for a retry of the same merge and rotates when the method or message changes', () => {
+    const original = prIntentFingerprint('merge', INPUT);
+    expect(prIntentFingerprint('merge', INPUT)).toBe(original);
+
+    const changedMethod = prIntentFingerprint('merge', { ...INPUT, method: 'rebase' });
+    expect(changedMethod).not.toBe(original);
+
+    const changedMessage = prIntentFingerprint('merge', {
+      ...INPUT,
+      commitMessage: 'merge it now',
+    });
+    expect(changedMessage).not.toBe(original);
+
+    const changedFence = prIntentFingerprint('merge', {
+      ...INPUT,
+      expectedHeadSha: 'b'.repeat(40),
+    });
+    expect(changedFence).not.toBe(original);
+
+    const changedDeleteBranch = prIntentFingerprint('merge', {
+      ...INPUT,
+      deleteBranch: false,
+    });
+    expect(changedDeleteBranch).not.toBe(original);
   });
 });

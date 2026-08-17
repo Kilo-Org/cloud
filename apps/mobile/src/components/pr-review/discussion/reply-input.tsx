@@ -11,6 +11,10 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import {
+  isPrOperationPersistenceFailed,
+  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 
 const REPLY_PLACEHOLDER = 'Reply…';
 
@@ -37,6 +41,13 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
   // without waiting for a re-fetch.
   useEffect(() => {
     if (reply.error) {
+      // The ledger persistence-failure marker is retry-blocking: the row never
+      // became `reconcile_pending`, so the same key must not be retried.
+      if (isPrOperationPersistenceFailed(reply.error)) {
+        setInlineError(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+        setInlineErrorKind('bad-request');
+        return;
+      }
       const classification = classifyPrReviewMutationError(reply.error);
       if (classification.kind === 'bad-request') {
         setInlineError("This reply can't be posted. The thread may have changed.");

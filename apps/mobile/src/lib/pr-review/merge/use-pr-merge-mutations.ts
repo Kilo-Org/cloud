@@ -14,6 +14,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -22,6 +24,12 @@ import {
   gateMergeResult,
   type MergePullRequestResult,
 } from '@/lib/pr-review/merge/merge-result-gate';
+import { useHoistedOperationKey } from '@/lib/operation-key';
+import {
+  isPrMutationRetryable,
+  mapPrOperationError,
+  prOperationToastMessage,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 
 type PrRef = { owner: string; repo: string; number: number };
 
@@ -59,6 +67,7 @@ async function invalidatePrCaches(
 export function useMergePullRequestMutation(ref: PrRef) {
   const queryClient = useQueryClient();
   const keys = usePrRefKeys(ref);
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   // P0-B-08: gate success on the authoritative `merged: true` result
   // BEFORE React Query resolves the mutation. The server only treats
@@ -70,12 +79,26 @@ export function useMergePullRequestMutation(ref: PrRef) {
   // bad-request), so the submit button stays enabled and the user can
   // retry. The typed return is preserved so `performSubmit` can read
   // the sha / branchDeleted / branchDeleteError off the resolved value.
+  //
+  // P1-A-08c: the hoisted operation key rides the input so a same-key retry
+  // reconciles against authoritative PR state before ever re-merging.
   return useMutation<MergePullRequestResult, Error, MergePullRequestInput>({
     mutationFn: async input => {
-      const result = await trpcClient.githubPrReview.mergePullRequest.mutate(input);
-      // Throws on `merged: false`; returns the gate on clean / partial.
-      assertMergeResult(result);
-      return result;
+      try {
+        const result = await trpcClient.githubPrReview.mergePullRequest.mutate({
+          ...input,
+          operationKey: getKey(prIntentFingerprint('merge', input)),
+        });
+        // Throws on `merged: false`; returns the gate on clean / partial.
+        assertMergeResult(result);
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isPrMutationRetryable(error)) {
+          rotateKey();
+        }
+        throw mapPrOperationError(error, 'merge');
+      }
     },
     onSuccess: (result: MergePullRequestResult) => {
       // One announcement owner per outcome. `assertMergeResult` gated
@@ -89,7 +112,7 @@ export function useMergePullRequestMutation(ref: PrRef) {
       announceForA11y(message);
     },
     onError: (error: { message: string }) => {
-      announcingToast.error(error.message);
+      announcingToast.error(prOperationToastMessage(error, 'merge'));
     },
     onSettled: async () => {
       await invalidatePrCaches(queryClient, keys);

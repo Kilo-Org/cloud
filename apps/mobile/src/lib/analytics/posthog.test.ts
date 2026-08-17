@@ -80,6 +80,13 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 
 vi.stubGlobal('__DEV__', false);
 
+// `appsflyer.ts` mirrors dynamic funnel names, so it always calls `captureEvent`
+// with a `string`, never a catalog literal. Widen the same way here to exercise
+// that overload.
+function dynamicName(name: string): string {
+  return name;
+}
+
 function readCustomAppProperties(): (
   properties: Record<string, unknown>
 ) => Record<string, unknown> {
@@ -244,6 +251,70 @@ describe('capture gate and generation scoping', () => {
     identifyUser('test@test.com');
 
     expect(hoisted.client.identify).not.toHaveBeenCalled();
+  });
+});
+
+describe('captureEvent privacy and gates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('drops payload keys that name a prohibited data class before capture', async () => {
+    const { initPostHog, captureEvent } = await loadModule();
+    initPostHog();
+    captureEvent(dynamicName('onboarding-entered'), {
+      surface: 'claw',
+      email: 'a@b.co',
+      session_id: 'x',
+      repo_name: 'acme/app',
+      APIToken: 'tok',
+      ok_count: 1,
+    });
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('onboarding-entered', {
+      surface: 'claw',
+      ok_count: 1,
+    });
+  });
+
+  it('warns in development and names every dropped key', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.stubGlobal('__DEV__', true);
+    try {
+      const { initPostHog, captureEvent } = await loadModule();
+      initPostHog();
+      captureEvent(dynamicName('onboarding-entered'), {
+        surface: 'claw',
+        repo_name: 'acme/app',
+        session_id: 'x',
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        'Analytics onboarding-entered: redacted prohibited properties repo_name, session_id'
+      );
+    } finally {
+      vi.stubGlobal('__DEV__', false);
+      warn.mockRestore();
+    }
+  });
+
+  it('keeps every allowed key on an uncataloged payload', async () => {
+    const { initPostHog, captureEvent } = await loadModule();
+    initPostHog();
+    captureEvent('provision-failed', { category: 'lock' });
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('provision-failed', { category: 'lock' });
+  });
+
+  it('passes no properties through unchanged when none are given', async () => {
+    const { initPostHog, captureEvent } = await loadModule();
+    initPostHog();
+    captureEvent('completion-reached');
+
+    expect(hoisted.client.capture).toHaveBeenCalledWith('completion-reached', undefined);
   });
 });
 

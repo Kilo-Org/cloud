@@ -1,5 +1,6 @@
 import { db } from '@/lib/drizzle';
 import {
+  createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,
   deleteRetainedSecurityAgentCommands,
   getSecurityAgentCommandForOwner,
@@ -123,6 +124,62 @@ describe('Security Agent command ledger', () => {
       transitioned: false,
       command: { status: 'no_op', result_code: 'ALREADY_IGNORED' },
     });
+  });
+
+  it('resolves a same-key command to the original row instead of a duplicate', async () => {
+    const owner = await insertTestUser();
+    const otherOwner = await insertTestUser();
+
+    const first = await createOrFindSecurityAgentCommandByOperationKey(db, {
+      commandType: 'sync',
+      origin: 'dashboard_refresh',
+      owner: { type: 'user', id: owner.id },
+      operationKey: 'retry-safe-key',
+    });
+    expect(first.created).toBe(true);
+
+    const retry = await createOrFindSecurityAgentCommandByOperationKey(db, {
+      commandType: 'sync',
+      origin: 'dashboard_refresh',
+      owner: { type: 'user', id: owner.id },
+      operationKey: 'retry-safe-key',
+    });
+    expect(retry).toMatchObject({ created: false, command: { id: first.command.id } });
+
+    // The key is unique per owner only, so another owner reusing it still gets
+    // its own command.
+    const otherOwnerCommand = await createOrFindSecurityAgentCommandByOperationKey(db, {
+      commandType: 'sync',
+      origin: 'dashboard_refresh',
+      owner: { type: 'user', id: otherOwner.id },
+      operationKey: 'retry-safe-key',
+    });
+    expect(otherOwnerCommand.created).toBe(true);
+    expect(otherOwnerCommand.command.id).not.toBe(first.command.id);
+
+    await expect(
+      createOrFindSecurityAgentCommandByOperationKey(db, {
+        commandType: 'dismiss_finding',
+        origin: 'manual',
+        owner: { type: 'user', id: owner.id },
+        operationKey: 'retry-safe-key',
+      })
+    ).rejects.toThrow('was reused for another command type');
+  });
+
+  it('leaves keyless commands unconstrained', async () => {
+    const owner = await insertTestUser();
+    const first = await createSecurityAgentCommand(db, {
+      commandType: 'sync',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    const second = await createSecurityAgentCommand(db, {
+      commandType: 'sync',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    expect(second.id).not.toBe(first.id);
   });
 
   it('enforces exactly one owner', async () => {

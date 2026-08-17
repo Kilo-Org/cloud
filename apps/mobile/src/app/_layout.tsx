@@ -335,7 +335,10 @@ function RootLayoutNav() {
     accountId: userId,
     optionalConsent,
   });
-  useScreenTracking();
+  // Screen capture must wait for consent: analytics eligibility is decided
+  // only after the account's consent decision has loaded without error.
+  const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
+  useScreenTracking(bootstrapSettled);
 
   useEffect(() => {
     if (shareIntentError) {

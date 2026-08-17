@@ -7,8 +7,10 @@ import { toast } from 'sonner-native';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
+import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   type AgentAttachmentWire,
   type useAgentAttachmentUpload,
@@ -54,6 +56,9 @@ export function useNewSessionCreator({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const promptRef = useRef('');
+  // P1-A-08b: one `operationKey` per submit intent, so a retry of the same
+  // intent dedupes on the ledger instead of spawning a second session.
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   const createSessionFromDraft = useCallback(async () => {
     // Read the live, post-settlement draft (see `settleVoiceInputBeforeSubmit`
@@ -74,6 +79,20 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // Computed once and reused for both the fingerprint and the create body, so
+    // the two cannot disagree and a swapped attachment set is a fresh intent.
+    const attachmentWire = attachments.toWirePayload();
+    const intentFingerprint = JSON.stringify({
+      prompt,
+      mode,
+      model,
+      variant: variant || undefined,
+      repo: selectedRepo,
+      organizationId: organizationId ?? null,
+      attachments: attachmentWire ?? null,
+    });
+    const operationKey = getKey(intentFingerprint);
+
     try {
       const initialMessageId = generateMessageId();
       const baseInput: {
@@ -85,6 +104,7 @@ export function useNewSessionCreator({
         githubRepo: string;
         autoCommit: boolean;
         autoInitiate: boolean;
+        operationKey: string;
         attachments?: AgentAttachmentWire;
       } = {
         prompt,
@@ -95,10 +115,10 @@ export function useNewSessionCreator({
         githubRepo: selectedRepo,
         autoCommit: true,
         autoInitiate: true,
+        operationKey,
       };
-      const wireAttachments = attachments.toWirePayload();
-      if (wireAttachments) {
-        baseInput.attachments = wireAttachments;
+      if (attachmentWire) {
+        baseInput.attachments = attachmentWire;
       }
 
       const result = organizationId
@@ -108,29 +128,66 @@ export function useNewSessionCreator({
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
 
-      captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-      await invalidateAgentSessionQueries(queryClient, trpc);
-      // Signal the host (e.g. clear the new-session draft) before navigating,
-      // so the draft is gone by the time the route unmounts and can never be
-      // flushed back by an unmount write.
-      onCreated?.();
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const path = organizationId
-        ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
-        : `/(app)/agent-chat/${result.kiloSessionId}`;
-      router.push(path as Href);
-      requestAnimationFrame(() => {
-        navigation.dispatch(state => {
-          const routes = state.routes.filter((r: { name: string }) => r.name !== 'agent-chat/new');
-          return {
-            type: 'RESET' as const,
-            payload: { ...state, routes, index: routes.length - 1 },
-          };
+      // Rotate before the post-success work so a UI failure cannot keep the
+      // successful key for a retry.
+      rotateKey();
+
+      // The cloud session already exists, so no post-success UI failure may
+      // report the create as failed or invite a duplicate retry.
+      try {
+        // Contained together so neither can skip the host signal below.
+        try {
+          captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
+          await invalidateAgentSessionQueries(queryClient, trpc);
+        } catch {
+          // Analytics and cache invalidation are cosmetic; stay silent.
+        }
+        // Signal the host (e.g. clear the new-session draft) before navigating,
+        // so the draft is gone by the time the route unmounts and can never be
+        // flushed back by an unmount write.
+        try {
+          onCreated?.();
+        } catch {
+          // The session exists; a host callback failure must not skip navigation.
+        }
+        // Contained on its own so a rejected haptics call still navigates.
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {
+          // A failed haptics call is cosmetic; stay silent and navigate.
+        }
+        const path = organizationId
+          ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
+          : `/(app)/agent-chat/${result.kiloSessionId}`;
+        router.push(path as Href);
+        requestAnimationFrame(() => {
+          // Runs after the surrounding try returned, so a failure here would
+          // escape uncaught. The stack cleanup is cosmetic; contain it.
+          try {
+            navigation.dispatch(state => {
+              const routes = state.routes.filter(
+                (r: { name: string }) => r.name !== 'agent-chat/new'
+              );
+              return {
+                type: 'RESET' as const,
+                payload: { ...state, routes, index: routes.length - 1 },
+              };
+            });
+          } catch {
+            // The session already exists; stay silent.
+          }
         });
-      });
+      } catch {
+        // Stay silent: no create-failure toast, no duplicate-create retry.
+      }
     } catch (error) {
+      // Only `prepareSession` errors reach here; UI failures are swallowed.
       const message = error instanceof Error ? error.message : 'Failed to create session';
       toast.error(message);
+      // A typed terminal rejection ends the intent; a retryable one keeps the key.
+      if (!isCloudPrepareRetryableError(error)) {
+        rotateKey();
+      }
     } finally {
       setIsCreating(false);
     }
@@ -146,6 +203,8 @@ export function useNewSessionCreator({
     navigation,
     attachments,
     setIsCreating,
+    getKey,
+    rotateKey,
     onCreated,
   ]);
 

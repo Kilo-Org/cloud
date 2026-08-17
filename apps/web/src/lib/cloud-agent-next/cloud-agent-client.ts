@@ -144,6 +144,8 @@ export type PrepareSessionInput = {
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
   devcontainer?: boolean;
   initialMessageId?: string | null;
+  /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
+  operationKey?: string;
 };
 
 /** Output from prepareSession procedure */
@@ -151,6 +153,8 @@ export type PrepareSessionOutput = {
   /** The Kilo CLI session ID */
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  /** `true` when the response replays an already-settled create for the same `operationKey`. */
+  replayed?: boolean;
 };
 
 /** Input for initiating from a prepared session */

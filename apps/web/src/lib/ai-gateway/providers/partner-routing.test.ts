@@ -126,6 +126,13 @@ describe('getPercentageRoutedPartnerProvider', () => {
     );
   });
 
+  it.each([{ order: ['friendli'] }, { require_parameters: true }])(
+    'does not route with unsupported provider options',
+    provider => {
+      expect(selectPartner({ request: request('messages', provider) })).toBeNull();
+    }
+  );
+
   it.each(['openrouter', 'vercel'] as const)(
     'routes from managed provider %s',
     sourceProviderId => {

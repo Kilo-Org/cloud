@@ -33,8 +33,16 @@ const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
   },
 };
 
+const SAFE_PARTNER_PROVIDER_OPTIONS = new Set(['only', 'ignore', 'data_collection', 'zdr']);
+
 function isPartnerProviderAllowed(request: GatewayRequest, providerId: Provider['id']) {
   const provider = request.body.provider;
+  if (
+    provider &&
+    Object.keys(provider).some(option => !SAFE_PARTNER_PROVIDER_OPTIONS.has(option))
+  ) {
+    return false;
+  }
   return (
     (!provider?.only || provider.only.includes(providerId)) &&
     (!provider?.ignore || !provider.ignore.includes(providerId))

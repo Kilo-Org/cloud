@@ -719,7 +719,7 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
-  it('regression: bootstrap does not publish the preloaded token over credentials written during the load', async () => {
+  it('regression: bootstrap publishes the refreshed token when credentials change during the load', async () => {
     let releaseRead: (() => void) | undefined = undefined;
     const readGate = new Promise<void>(resolve => {
       releaseRead = resolve;
@@ -757,13 +757,57 @@ describe('bootstrap and foreground race fencing', () => {
     });
 
     // The refresh-owned session stands: the preloaded snapshot was not
-    // republished over it, and bootstrap never surfaced a token in React state.
+    // republished over it, and bootstrap surfaced the refreshed token instead
+    // of ending with none — publishing nothing sends a signed-in user to the
+    // login screen until the next relaunch.
     const tokenOwner = await import('@/lib/auth/token-owner');
     expect(tokenOwner.getActiveToken()).toEqual({
       token: 'newer-token',
       expiresAtMs: expect.any(Number),
     });
+    expect(getCtx().token).toBe('newer-token');
+
+    unmount();
+  });
+
+  it('regression: sign-out during bootstrap wins over changed stored credentials', async () => {
+    let releaseRead: (() => void) | undefined = undefined;
+    const readGate = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, then the expiry read (held). The credential
+    // re-read falls back to the null base mock, so the stored pair no longer
+    // matches the preloaded snapshot — the sign-out deleted it.
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce('stored-token')
+      .mockResolvedValueOnce('stored-refresh')
+      .mockImplementationOnce(async () => {
+        await readGate;
+        return '9999999999999';
+      });
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // Sign out while the bootstrap expiry read is in flight.
+    await act(async () => {
+      await getCtx().signOut(true);
+    });
+
+    releaseRead?.();
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The changed-credentials branch publishes the session winner, but the
+    // epoch fence stops it after sign-out: a torn-down session must never be
+    // resurrected.
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toBeNull();
     expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
 
     unmount();
   });

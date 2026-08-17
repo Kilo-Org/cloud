@@ -25,7 +25,12 @@ import {
   REFRESH_MARGIN_MS,
   writeCredentials,
 } from '@/lib/auth/credentials';
-import { clearActiveToken, setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import {
+  clearActiveToken,
+  getActiveToken,
+  setActiveToken,
+  setSignOutTeardownActive,
+} from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -119,12 +124,21 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
           const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
 
-          // Fence the asynchronous expiry read: publish only when the epoch
-          // is still current and the stored credentials still match the
-          // preloaded session. A refresh or sign-in that completed during the
-          // reads already owns the session; the stale snapshot must not win.
+          // Fence the asynchronous expiry read: a sign-out or newer sign-in
+          // during the reads owns the session, so the stale snapshot must not
+          // be republished and nothing may be surfaced for the torn-down
+          // session.
           const currentStored = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-          if (!isCurrentAuthEpoch(epoch) || currentStored !== stored) {
+          if (!isCurrentAuthEpoch(epoch)) {
+            return;
+          }
+          // A same-session refresh replaced the stored pair while the reads
+          // were in flight. The preloaded snapshot is stale, but the session
+          // is alive: publish the winner the refresh already put in the owner,
+          // or the provider ends bootstrap with no token and sends a
+          // signed-in user to the login screen.
+          if (currentStored !== stored) {
+            setToken(getActiveToken()?.token ?? currentStored ?? undefined);
             return;
           }
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);

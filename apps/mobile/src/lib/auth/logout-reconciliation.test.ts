@@ -77,13 +77,15 @@ describe('attemptLogoutReconciliation', () => {
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 
-  it('leaves a different known user tombstone untouched', async () => {
+  it('discards a different known user tombstone without a network call', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone({ userId: 'u1' }));
 
     const outcome = await attemptLogoutReconciliation('u2');
 
-    expect(outcome).toEqual({ kind: 'different-user-skipped' });
-    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
+    // The unregister needs the previous user's auth, so it can never run:
+    // the record is deleted instead of holding their id and push token.
+    expect(outcome).toEqual({ kind: 'different-user-discarded' });
+    expect(cleanupMock.deleteLogoutCleanupTombstone).toHaveBeenCalledTimes(1);
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 
@@ -179,22 +181,6 @@ describe('attemptLogoutReconciliation', () => {
     expect(firstOutcome.kind).toBe('attempted');
   });
 
-  it('regression: retains the tombstone when a newer tombstone replaced it during the attempt', async () => {
-    cleanupMock.readLogoutCleanupTombstone
-      .mockResolvedValueOnce(makeTombstone())
-      .mockResolvedValueOnce(makeTombstone({ pushToken: 'push-newer' }));
-    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
-    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    // The attempt completed its remote parts, but the sign-out cleanup that
-    // ran meanwhile wrote a newer tombstone: the stale attempt must not
-    // delete it.
-    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
-    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
-  });
-
   it('regression: retains the tombstone when the auth epoch moves during the attempt', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone());
     const gate = { release: null as (() => void) | null };
@@ -244,18 +230,5 @@ describe('attemptLogoutReconciliation', () => {
     const outcome = await attemptLogoutReconciliation('u1');
 
     expect(outcome).toEqual({ kind: 'expired-retained' });
-  });
-
-  it('regression: retains an expired tombstone when a newer tombstone replaced it', async () => {
-    cleanupMock.readLogoutCleanupTombstone
-      .mockResolvedValueOnce(
-        makeTombstone({ failedAt: Date.now() - TOMBSTONE_MAX_AGE_MS - DAY_MS })
-      )
-      .mockResolvedValueOnce(makeTombstone({ pushToken: 'push-newer' }));
-
-    const outcome = await attemptLogoutReconciliation('u1');
-
-    expect(outcome).toEqual({ kind: 'expired-retained' });
-    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
   });
 });

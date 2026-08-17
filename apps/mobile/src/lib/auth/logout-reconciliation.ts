@@ -14,14 +14,13 @@ import { trpcClient } from '@/lib/trpc';
  *
  * A tombstone older than the refresh-token lifetime (30 days) is discarded
  * without a network call. For a current user the unregister is retried; for a
- * different known user nothing is attempted.
+ * different known user the record is discarded without a network call,
+ * because the unregister needs an auth no later session has.
  *
- * The tombstone is deleted only when the attempt is still authoritative: the
- * auth epoch has not moved (no sign-out or sign-in advanced it) and the
- * persisted record still equals the one this attempt reconciled. A
- * sign-out cleanup that rewrote or deleted the tombstone mid-attempt is never
- * undone by a stale reconciliation, and a deletion storage failure keeps the
- * tombstone for the next attempt instead of surfacing an unhandled rejection.
+ * The tombstone is deleted only when the auth epoch has not moved: a sign-out
+ * or sign-in during the attempt owns the record, so a stale reconciliation
+ * never deletes it. A deletion storage failure keeps the tombstone for the
+ * next attempt instead of surfacing an unhandled rejection.
  */
 
 const MIN_ATTEMPT_SPACING_MS = 60_000;
@@ -36,7 +35,7 @@ export type ReconciliationAttemptOutcome =
   | { kind: 'no-tombstone' }
   | { kind: 'expired-discarded' }
   | { kind: 'expired-retained' }
-  | { kind: 'different-user-skipped' }
+  | { kind: 'different-user-discarded' }
   | { kind: 'attempted'; tombstoneDeleted: boolean };
 
 /** Test-only: clears the single-flight and spacing state between tests. */
@@ -78,62 +77,39 @@ async function runReconciliation(userId: string): Promise<ReconciliationAttemptO
     return { kind: 'no-tombstone' };
   }
   if (Date.now() - tombstone.failedAt > TOMBSTONE_MAX_AGE_MS) {
-    const deleted = await deleteTombstoneIfUnchanged(tombstone, epoch);
+    const deleted = await deleteTombstone(epoch);
     return deleted ? { kind: 'expired-discarded' } : { kind: 'expired-retained' };
   }
   if (tombstone.userId !== null && tombstone.userId !== userId) {
-    // Different known user: no attempt. The tombstone stays until ownership
-    // or the 30-day expiry removes it.
-    return { kind: 'different-user-skipped' };
+    // Different known user: the unregister needs their auth, which no later
+    // session has, so it can never run. Discard the record instead of holding
+    // their user id and push token in the keychain, which on iOS survives
+    // app deletion.
+    await deleteTombstone(epoch);
+    return { kind: 'different-user-discarded' };
   }
 
   const allDone = await reconcilePushUnregister(tombstone);
   if (allDone) {
-    const deleted = await deleteTombstoneIfUnchanged(tombstone, epoch);
+    const deleted = await deleteTombstone(epoch);
     return { kind: 'attempted', tombstoneDeleted: deleted };
   }
   return { kind: 'attempted', tombstoneDeleted: false };
 }
 
-function tombstonesEqual(a: LogoutCleanupTombstone, b: LogoutCleanupTombstone): boolean {
-  return (
-    a.userId === b.userId &&
-    a.pushToken === b.pushToken &&
-    a.needsPushUnregister === b.needsPushUnregister &&
-    a.failedAt === b.failedAt
-  );
-}
-
 /**
- * Deletes the tombstone only when the attempt is still authoritative: the
- * auth epoch has not moved (no sign-out or sign-in advanced it) and the
- * persisted tombstone still equals the one this attempt reconciled. A
- * sign-out cleanup that rewrote or deleted the tombstone mid-attempt must
- * never be undone by a stale reconciliation.
+ * Deletes the tombstone unless the auth epoch moved: a sign-out or sign-in
+ * during the attempt owns the record now, so a stale reconciliation must not
+ * remove it.
  *
  * Never throws: a storage rejection keeps the tombstone so the next attempt
- * retries. Returns whether the tombstone is gone afterwards (it can already
- * be gone when a concurrent sign-out cleanup deleted it). SecureStore has no
- * compare-and-delete, so a tombstone written in the window between the
- * verify-read and the delete could still be removed; that loss is bounded by
- * the accepted residual for a lost tombstone (the orphaned session stays
- * revocable server-side until its refresh token expires).
+ * retries. Returns whether the tombstone was deleted.
  */
-async function deleteTombstoneIfUnchanged(
-  expected: LogoutCleanupTombstone,
-  epoch: number
-): Promise<boolean> {
+async function deleteTombstone(epoch: number): Promise<boolean> {
   if (!isCurrentAuthEpoch(epoch)) {
     return false;
   }
   try {
-    const current = await readLogoutCleanupTombstone();
-    if (current === null) {
-      return true;
-    }
-    if (!tombstonesEqual(current, expected)) {
-      return false;
-    }
     await deleteLogoutCleanupTombstone();
     return true;
   } catch {

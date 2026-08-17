@@ -756,6 +756,36 @@ describe('restoreSession', () => {
     expect(fs.existsSync(path.join(workspace, 'src/index.ts'))).toBe(false);
   });
 
+  it('unlinks a deleted file when its patch cannot be applied', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    const deletedFile = path.join(workspace, 'src/gone.ts');
+    fs.writeFileSync(deletedFile, 'should be removed');
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [
+          {
+            file: 'src/gone.ts',
+            patch: 'not a git patch',
+            after: '',
+            status: 'deleted',
+          },
+        ],
+      })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.existsSync(deletedFile)).toBe(false);
+  });
+
   it('clears failed three-way state before writing after-content', async () => {
     fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
     Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });

@@ -1419,6 +1419,43 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ).toBe(true);
   });
 
+  it('reports an incomplete backup restore without calling it cold', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.workspace.restoredFromBackup = true;
+    request.materialized.setupCommands = [];
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const progress = mock(() => {});
+
+    const result = await prepareWrapperBootstrapWorkspace(request, progress, {
+      git: async args => {
+        if (args.join(' ') === 'ls-remote --symref origin HEAD') {
+          return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 1, total: 2 },
+      }),
+    });
+
+    expect(result.restore).toEqual({
+      path: 'backup',
+      diffs: { applied: 1, skipped: 1, total: 2 },
+    });
+    expect(progress).toHaveBeenCalledWith(
+      'kilo_session',
+      'Resume restore incomplete, 1/2 files restored'
+    );
+    expect(progress).not.toHaveBeenCalledWith(
+      'kilo_session',
+      'Cold restore incomplete, 1/2 files restored'
+    );
+  });
+
   it('reclones unfinished workspaces that have no bootstrap marker', async () => {
     const request = makeRequest(tmpDir);
     await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });

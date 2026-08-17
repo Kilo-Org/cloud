@@ -277,8 +277,8 @@ export function MessageBubble({
   // Assistant message
   if (isAssistantMessage(message.info)) {
     const { error } = message.info;
-    const showError = !isStreaming && error !== undefined;
-    const interrupted = error !== undefined && isAssistantInterruptError(error);
+    const showError = !isStreaming && error != null;
+    const interrupted = error != null && isAssistantInterruptError(error);
     const errorMessage = error
       ? interrupted
         ? undefined

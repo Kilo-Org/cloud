@@ -1255,11 +1255,12 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         restoredFromBackup ? 'backup' : 'cold'
       );
       if (restoreTelemetry?.diffs) {
+        const restoreLabel = restoreTelemetry.path === 'backup' ? 'Resume restore' : 'Cold restore';
         progress?.(
           'kilo_session',
           restoreTelemetry.diffs.skipped > 0
-            ? `Cold restore incomplete, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
-            : `Cold restore, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+            ? `${restoreLabel} incomplete, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+            : `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
         );
       }
 

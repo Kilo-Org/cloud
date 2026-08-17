@@ -78,4 +78,39 @@ describe('MessageBubble', () => {
     expect(html).toContain('Interrupted');
     expect(html).not.toContain('Failed');
   });
+
+  it('does not treat a null assistant error as Failed', () => {
+    const info: AssistantMessage = {
+      id: 'msg-3',
+      sessionID: 'ses-1',
+      role: 'assistant',
+      time: { created: 1, completed: 2 },
+      parentID: 'msg-parent',
+      modelID: 'test-model',
+      providerID: 'test-provider',
+      mode: 'code',
+      agent: 'test-agent',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: { read: 0, write: 0 },
+      },
+    };
+    Object.defineProperty(info, 'error', {
+      value: null,
+      enumerable: true,
+    });
+    const message: StoredMessage = {
+      info,
+      parts: [],
+    };
+
+    const html = renderToStaticMarkup(React.createElement(MessageBubble, { message }));
+
+    expect(html).not.toContain('Failed');
+    expect(html).not.toContain('Interrupted');
+  });
 });

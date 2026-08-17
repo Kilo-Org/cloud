@@ -181,16 +181,16 @@ export type WrapperCloneTelemetry = {
   receivedBytes?: number;
 };
 
-/**
- * Non-sensitive bootstrap diagnostics, kept as a sibling of `workspaceReady` rather
- * than a member of it: `workspaceReady` carries `gitToken`, so nesting telemetry there
- * would make the object unsafe to log wholesale. Everything here is safe to log.
- */
 export type WrapperRestoreTelemetry = {
   path: 'warm' | 'cold' | 'backup';
   diffs?: { applied: number; skipped: number; total: number };
 };
 
+/**
+ * Non-sensitive bootstrap diagnostics, kept as a sibling of `workspaceReady` rather
+ * than a member of it: `workspaceReady` carries `gitToken`, so nesting telemetry there
+ * would make the object unsafe to log wholesale. Everything here is safe to log.
+ */
 export type WrapperBootstrapTelemetry = {
   workspaceWasWarm: boolean;
   /**

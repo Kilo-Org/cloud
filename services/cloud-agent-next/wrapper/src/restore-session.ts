@@ -570,9 +570,10 @@ async function applyPatch(
     const resetExitCode = await reset.exited;
     signal?.throwIfAborted();
     if (resetExitCode !== 0) {
-      throw new Error(
-        `failed to clear three-way apply state exitCode=${resetExitCode}${resetStderr.trim() ? ` stderr=${resetStderr.trim()}` : ''}`
+      log(
+        `failed to clear three-way apply state file=${diff.file} exitCode=${resetExitCode}${resetStderr.trim() ? ` stderr=${resetStderr.trim()}` : ''}`
       );
+      return false;
     }
 
     const plain = await runGitApply(workspacePath, file, [], signal);
@@ -584,6 +585,25 @@ async function applyPatch(
     log(
       `git apply fallback failed file=${diff.file} exitCode=${plain.exitCode}${plain.stderr ? ` stderr=${plain.stderr}` : ''}`
     );
+
+    if (diff.status === 'deleted') {
+      const resolvedWorkspace = path.resolve(workspacePath);
+      const fp = path.resolve(resolvedWorkspace, diff.file);
+      if (!fp.startsWith(resolvedWorkspace + '/')) {
+        log(`skipping deleted-file unlink outside workspace file=${fp}`);
+        return false;
+      }
+      try {
+        fs.unlinkSync(fp);
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          log(`failed to unlink deleted file=${diff.file}`);
+          return false;
+        }
+      }
+      log(`unlinked deleted file after failed patch file=${diff.file}`);
+      return true;
+    }
 
     if (diff.after !== undefined) {
       const resolvedWorkspace = path.resolve(workspacePath);
@@ -775,9 +795,15 @@ export async function restoreSession(
     for (const diff of uniqueDiffs) {
       options.signal?.throwIfAborted();
       if (diff.patch) {
-        if (await applyPatch(workspacePath, diff, options.signal)) {
-          applied++;
-        } else {
+        try {
+          if (await applyPatch(workspacePath, diff, options.signal)) {
+            applied++;
+          } else {
+            skipped++;
+          }
+        } catch (err) {
+          if (options.signal?.aborted) throw err;
+          log(`failed to apply patch file=${diff.file}`);
           skipped++;
         }
         continue;

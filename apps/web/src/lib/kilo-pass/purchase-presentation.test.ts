@@ -2,11 +2,11 @@ import { describe, expect, it } from '@jest/globals';
 
 import { APP_URL } from '@/lib/constants';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { buildPurchasePresentation } from '@/lib/kilo-pass/purchase-presentation';
 import {
-  buildPurchasePresentation,
-  WEB_MANAGE_CTA_LABEL,
-} from '@/lib/kilo-pass/purchase-presentation';
-import type { KiloPassSubscriptionStatus } from '@kilocode/app-shared/commerce';
+  KILO_PASS_MANAGE_CTA_LABEL,
+  type KiloPassSubscriptionStatus,
+} from '@kilocode/app-shared/commerce';
 
 function stripeSub(status: KiloPassSubscriptionStatus) {
   return { paymentProvider: KiloPassPaymentProvider.Stripe, status };
@@ -46,7 +46,7 @@ describe('buildPurchasePresentation', () => {
 
     expect(result.kind).toBe('web_management');
     expect(result.reason).toBeNull();
-    expect(result.cta).toEqual({ label: WEB_MANAGE_CTA_LABEL, action: 'open_web' });
+    expect(result.cta).toEqual({ label: KILO_PASS_MANAGE_CTA_LABEL, action: 'open_web' });
     expect(result.webUrl).toBe(`${APP_URL}/subscriptions/kilo-pass`);
   });
 
@@ -57,7 +57,7 @@ describe('buildPurchasePresentation', () => {
     });
 
     expect(result.kind).toBe('web_management');
-    expect(result.cta).toEqual({ label: WEB_MANAGE_CTA_LABEL, action: 'open_web' });
+    expect(result.cta).toEqual({ label: KILO_PASS_MANAGE_CTA_LABEL, action: 'open_web' });
     expect(result.webUrl).toBe(`${APP_URL}/credits`);
   });
 

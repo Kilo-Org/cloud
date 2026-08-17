@@ -1098,6 +1098,56 @@ describe('kiloPassRouter', () => {
 
       expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
     });
+
+    it.each(['canceled', 'unpaid', 'incomplete_expired'] as const)(
+      'allows a purchase when the existing subscription is ended (%s)',
+      async status => {
+        const user = await insertTestUser();
+        await insertSubscription({
+          kiloUserId: user.id,
+          stripeSubscriptionId: `sub_test_preflight_ended_${status}`,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status,
+        });
+        const caller = await createCallerForUser(user.id);
+
+        const result = await caller.kiloPass.preflightPurchase({
+          platform: 'ios',
+          storefront: 'app_store',
+          product: 'kilo_pass',
+          appleProductId: 'kilopass.tier19.monthly.v1',
+        });
+
+        expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
+      }
+    );
+
+    it('rejects a live Google Play subscription', async () => {
+      const user = await insertTestUser();
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'gpa_preflight_play',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'ios',
+        storefront: 'app_store',
+        product: 'kilo_pass',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+      });
+
+      expect(result).toEqual({
+        allowed: false,
+        statusClass: 'terminal',
+        reason: 'already_subscribed',
+      });
+    });
   });
 
   describe('getState', () => {

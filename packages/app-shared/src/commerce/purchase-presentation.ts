@@ -6,6 +6,19 @@
  * performs no I/O and imports no server or mobile code.
  */
 
+/** Kilo Pass plan title. Consumed by mobile and E2E; keep exact. */
+export const KILO_PASS_TITLE = 'Kilo Pass';
+
+/** Android unavailable description. Consumed by mobile and E2E; keep exact. */
+export const KILO_PASS_UNAVAILABLE_DESCRIPTION =
+  'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.';
+
+/** Web-management description. Consumed by mobile and E2E; keep exact. */
+export const KILO_PASS_WEB_MANAGEMENT_DESCRIPTION = 'This Kilo Pass is managed on the web.';
+
+/** Label for the web-management CTA. Consumed by mobile and E2E; keep exact. */
+export const KILO_PASS_MANAGE_CTA_LABEL = 'Manage';
+
 export const PURCHASE_PLATFORMS = ['ios', 'android'] as const;
 export type PurchasePlatform = (typeof PURCHASE_PLATFORMS)[number];
 

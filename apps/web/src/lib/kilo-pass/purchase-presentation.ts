@@ -4,6 +4,7 @@ import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
 import {
+  KILO_PASS_MANAGE_CTA_LABEL,
   mapKiloPassStatusToClass,
   resolvePurchasePresentation,
   type KiloPassSubscriptionStatus,
@@ -18,9 +19,6 @@ import {
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
-
-/** Label for the web-management CTA. Consumed by mobile and E2E; keep exact. */
-export const WEB_MANAGE_CTA_LABEL = 'Manage';
 
 export type PurchasePresentationResult = {
   kind: PurchasePresentationKind;
@@ -76,7 +74,7 @@ export function buildPurchasePresentation(params: {
 
   const cta =
     presentation.cta.action === 'open_web'
-      ? { label: WEB_MANAGE_CTA_LABEL, action: 'open_web' as const }
+      ? { label: KILO_PASS_MANAGE_CTA_LABEL, action: 'open_web' as const }
       : { label: null, action: presentation.cta.action };
 
   const webUrl =

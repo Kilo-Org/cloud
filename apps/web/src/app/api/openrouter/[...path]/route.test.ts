@@ -1151,6 +1151,7 @@ describe('percentage-routed partner fallback', () => {
         bypassAccessCheck: false,
       });
       const failedPartnerResponse = new Response('partner failed', { status: partnerStatus });
+      jest.spyOn(failedPartnerResponse, 'clone').mockReturnValue(new Response('partner failed'));
       const cancelPartnerBody = jest.spyOn(failedPartnerResponse.body!, 'cancel');
       mockedUpstreamRequest
         .mockResolvedValueOnce({ type: 'success', response: failedPartnerResponse })

@@ -23,6 +23,10 @@ export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(
   'ai-gateway:sync-providers:last-completed-at'
 );
 
+export const SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY = redisKey(
+  'ai-gateway:sync-providers:stale-alert-last-posted-at'
+);
+
 export const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: redisKey('ai-gateway.metadata:all-providers'),
   // Lightweight lists of language model ids used for existence checks without

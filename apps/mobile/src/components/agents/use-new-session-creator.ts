@@ -20,6 +20,8 @@ type UseNewSessionCreatorInput = {
   mode: AgentMode;
   model: string;
   organizationId?: string;
+  /** Invoked on the success path before navigation; failures never fire it. */
+  onCreated?: () => void;
   selectedRepo: string;
   setIsCreating: (value: boolean) => void;
   variant: string;
@@ -42,6 +44,7 @@ export function useNewSessionCreator({
   mode,
   model,
   organizationId,
+  onCreated,
   selectedRepo,
   setIsCreating,
   variant,
@@ -107,6 +110,10 @@ export function useNewSessionCreator({
 
       captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
       await invalidateAgentSessionQueries(queryClient, trpc);
+      // Signal the host (e.g. clear the new-session draft) before navigating,
+      // so the draft is gone by the time the route unmounts and can never be
+      // flushed back by an unmount write.
+      onCreated?.();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const path = organizationId
         ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
@@ -139,6 +146,7 @@ export function useNewSessionCreator({
     navigation,
     attachments,
     setIsCreating,
+    onCreated,
   ]);
 
   return { createSessionFromDraft, promptRef };

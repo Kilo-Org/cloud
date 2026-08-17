@@ -60,6 +60,8 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
+import { queryClient } from '@/lib/query-client';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -179,6 +181,13 @@ function RootLayoutNav() {
       Sentry.captureException(fontsError);
     }
   }, [fontsError]);
+
+  // Cold-start read-cache restore: best effort, never blocks startup. Starts
+  // before the auth gate resolves so allowlisted queries can hydrate under
+  // the splash; the authenticated mount abandons or rescopes it on identity.
+  useEffect(() => {
+    void restorePersistedCacheOnColdStart(queryClient);
+  }, []);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 

@@ -1,7 +1,6 @@
-import * as SecureStore from 'expo-secure-store';
 import { useCallback } from 'react';
 
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { parseTimestamp } from '@/lib/utils';
 import { trpcClient } from '@/lib/trpc';
 
@@ -39,10 +38,11 @@ export function subscribeToKiloChatTokenResponses(listener: TokenResponseListene
  * until 60 seconds before expiry. Concurrent callers share a single in-flight
  * fetch via a module-level dedup ref.
  *
- * The auth token is read from SecureStore at call time (matching `trpcClient`)
- * rather than captured from `useAuth()`, so a getter constructed before auth
- * has loaded — or before the user signs in — picks up the correct token on
- * its next call instead of permanently capturing `undefined`.
+ * The auth token is read at call time through `getAuthTokenForRequest`
+ * (matching `trpcClient`) rather than captured from `useAuth()`, so a getter
+ * constructed before auth has loaded — or before the user signs in — picks up
+ * the correct token on its next call instead of permanently capturing
+ * `undefined`.
  */
 export function useKiloChatTokenGetter(): () => Promise<string> {
   const getTokenResponse = useKiloChatTokenResponseGetter();
@@ -54,7 +54,7 @@ export function useKiloChatTokenGetter(): () => Promise<string> {
 
 export function useKiloChatTokenResponseGetter(): () => Promise<KiloChatTokenResponse> {
   return useCallback(async () => {
-    const authToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    const authToken = await getAuthTokenForRequest();
     if (!authToken) {
       throw new Error('Cannot fetch kilo-chat token: not authenticated');
     }

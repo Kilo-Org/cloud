@@ -23,6 +23,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   isPrMutationRetryable,
@@ -64,20 +66,6 @@ export type CreateReviewCommentInput = {
   commitSha: string;
 };
 
-/** Intent fingerprint for a create-comment submit: any changed field is a new intent. */
-export function createReviewCommentIntentFingerprint(input: CreateReviewCommentInput): string {
-  return JSON.stringify({
-    resource: [input.owner, input.repo, input.number],
-    body: input.body,
-    path: input.path,
-    line: input.line,
-    side: input.side,
-    startLine: input.startLine,
-    startSide: input.startSide,
-    commitSha: input.commitSha,
-  });
-}
-
 export function useCreateReviewCommentMutation(ref: PrRef) {
   const queryClient = useQueryClient();
   const keys = usePrRefKeys(ref);
@@ -88,7 +76,7 @@ export function useCreateReviewCommentMutation(ref: PrRef) {
       try {
         const result = await trpcClient.githubPrReview.createReviewComment.mutate({
           ...input,
-          operationKey: getKey(createReviewCommentIntentFingerprint(input)),
+          operationKey: getKey(prIntentFingerprint('create_review_comment', input)),
         });
         rotateKey();
         return result;
@@ -127,20 +115,6 @@ export type SubmitReviewInput = {
   comments?: SubmitReviewComment[];
 };
 
-/**
- * Intent fingerprint for a submit-review: the event, summary, commit sha, and
- * the full queued comment batch. Any change is a new intent.
- */
-export function submitReviewIntentFingerprint(input: SubmitReviewInput): string {
-  return JSON.stringify({
-    resource: [input.owner, input.repo, input.number],
-    event: input.event,
-    body: input.body,
-    commitSha: input.commitSha,
-    comments: input.comments,
-  });
-}
-
 export function useSubmitReviewMutation(ref: PrRef) {
   const queryClient = useQueryClient();
   const keys = usePrRefKeys(ref);
@@ -151,7 +125,7 @@ export function useSubmitReviewMutation(ref: PrRef) {
       try {
         const result = await trpcClient.githubPrReview.submitReview.mutate({
           ...input,
-          operationKey: getKey(submitReviewIntentFingerprint(input)),
+          operationKey: getKey(prIntentFingerprint('submit_review', input)),
         });
         rotateKey();
         return result;

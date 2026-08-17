@@ -8,6 +8,7 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { type OperationLedgerRow } from '@kilocode/db/schema';
 import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
+import { prIntentFingerprint, type PrLedgerIntent } from '@kilocode/app-shared/pr-review';
 import {
   admitOperation,
   markReconcilePending,
@@ -687,8 +688,6 @@ const PR_LEDGER_DOMAIN = 'pr' as const;
 // `operation_in_progress` instead of re-executing.
 const PR_LEDGER_LEASE_SECONDS = 120;
 
-type PrLedgerIntent = 'merge' | 'submit_review' | 'create_review_comment' | 'reply_comment';
-
 // Client-facing CONFLICT markers. `operation_in_progress` keeps the existing
 // mobile pending/retry UI; `operation_key_reuse_mismatch` refuses a key reused
 // for a DIFFERENT intent/resource/request without any effect or replay.
@@ -712,34 +711,24 @@ function ambiguousPrError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: PR_AMBIGUOUS_MESSAGE });
 }
 
-// The intent inputs folded into the ledger fingerprint. Any change to one
-// (comment body, review contents, merge method, fence sha, …) yields a
-// different fingerprint, so a key reused for a different request is rejected
-// instead of replaying the old canonical result. Field ORDER is part of the
-// hash — do not reorder.
-const PR_FINGERPRINT_FIELDS: Record<PrLedgerIntent, readonly string[]> = {
-  create_review_comment: ['body', 'path', 'line', 'side', 'startLine', 'startSide', 'commitSha'],
-  reply_comment: ['commentId', 'body'],
-  submit_review: ['event', 'body', 'commitSha', 'comments'],
-  merge: ['method', 'commitTitle', 'commitMessage', 'deleteBranch', 'expectedHeadSha'],
-};
-
 /**
- * The PR ledger resource identity: `owner/repo#number` plus a fingerprint of
- * the intent-defining inputs. Stored verbatim in `resource_key` (never
+ * The PR ledger resource identity: `owner/repo#number` plus a hash of the
+ * shared intent fingerprint. Stored verbatim in `resource_key` (never
  * analytics) and compared on every admission so an existing key with a
  * different intent/resource/request is rejected instead of replayed. Exported
  * so router tests can build the exact stored identity.
+ *
+ * The fingerprint itself lives in `@kilocode/app-shared/pr-review` because the
+ * mobile mutation hooks derive their operation key from the same bytes.
  */
 export function prLedgerResourceKey(
   intent: PrLedgerIntent,
   input: Record<string, unknown>
 ): string {
-  const parts: Record<string, unknown> = { resource: [input.owner, input.repo, input.number] };
-  for (const field of PR_FINGERPRINT_FIELDS[intent]) {
-    parts[field] = input[field];
-  }
-  const fingerprint = createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
+  const fingerprint = createHash('sha256')
+    .update(prIntentFingerprint(intent, input))
+    .digest('hex')
+    .slice(0, 16);
   return `${String(input.owner)}/${String(input.repo)}#${String(input.number)}::${fingerprint}`;
 }
 

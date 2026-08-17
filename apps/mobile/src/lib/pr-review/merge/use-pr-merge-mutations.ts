@@ -15,6 +15,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   assertMergeResult,
@@ -39,22 +41,6 @@ type MergePullRequestInput = {
   deleteBranch: boolean;
   expectedHeadSha: string;
 };
-
-/**
- * Intent fingerprint for a merge submit: the method, commit title/message,
- * delete-branch flag, expected-head fence, and resource. Any change is a new
- * intent.
- */
-export function mergePullRequestIntentFingerprint(input: MergePullRequestInput): string {
-  return JSON.stringify({
-    resource: [input.owner, input.repo, input.number],
-    method: input.method,
-    commitTitle: input.commitTitle,
-    commitMessage: input.commitMessage,
-    deleteBranch: input.deleteBranch,
-    expectedHeadSha: input.expectedHeadSha,
-  });
-}
 
 function usePrRefKeys(ref: PrRef) {
   const trpc = useTRPC();
@@ -99,7 +85,7 @@ export function useMergePullRequestMutation(ref: PrRef) {
       try {
         const result = await trpcClient.githubPrReview.mergePullRequest.mutate({
           ...input,
-          operationKey: getKey(mergePullRequestIntentFingerprint(input)),
+          operationKey: getKey(prIntentFingerprint('merge', input)),
         });
         // Throws on `merged: false`; returns the gate on clean / partial.
         assertMergeResult(result);

@@ -36,6 +36,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   isPrMutationRetryable,
@@ -75,15 +77,6 @@ export type ReplyToCommentInput = {
   body: string;
 };
 
-/** Intent fingerprint for a reply: a changed body or target comment is a new intent. */
-export function replyToCommentIntentFingerprint(input: ReplyToCommentInput): string {
-  return JSON.stringify({
-    resource: [input.owner, input.repo, input.number],
-    commentId: input.commentId,
-    body: input.body,
-  });
-}
-
 export function useReplyToCommentMutation() {
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
@@ -94,7 +87,7 @@ export function useReplyToCommentMutation() {
       try {
         const result = await trpcClient.githubPrReview.replyToComment.mutate({
           ...input,
-          operationKey: getKey(replyToCommentIntentFingerprint(input)),
+          operationKey: getKey(prIntentFingerprint('reply_comment', input)),
         });
         rotateKey();
         return result;

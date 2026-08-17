@@ -13,10 +13,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operation-ledger';
-import {
-  replyToCommentIntentFingerprint,
-  useReplyToCommentMutation,
-} from './use-review-discussion-mutations';
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { useReplyToCommentMutation } from './use-review-discussion-mutations';
 
 const hoistedKeys = vi.hoisted(() => ({
   getKey: vi.fn(() => 'hoisted-op-key'),
@@ -118,7 +116,12 @@ describe('useReplyToCommentMutation (P1-A-08c wiring)', () => {
 
     await lastCapturedOptions?.mutationFn?.(REPLY_INPUT);
 
-    expect(hoistedKeys.getKey).toHaveBeenCalled();
+    // The fingerprint is the dedupe identity the server hashes into
+    // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
+    // field list must fail here instead of silently rotating in-flight keys.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"commentId":42,"body":"good point"}'
+    );
     expect(replyMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: 'hoisted-op-key' })
     );
@@ -176,18 +179,18 @@ describe('useReplyToCommentMutation (P1-A-08c wiring)', () => {
   });
 });
 
-describe('replyToCommentIntentFingerprint (P1-A-08c changed-input)', () => {
+describe('reply_comment fingerprint (P1-A-08c changed-input)', () => {
   it('stays stable for a retry of the same reply and rotates when the body or target changes', () => {
-    const original = replyToCommentIntentFingerprint(REPLY_INPUT);
-    expect(replyToCommentIntentFingerprint(REPLY_INPUT)).toBe(original);
+    const original = prIntentFingerprint('reply_comment', REPLY_INPUT);
+    expect(prIntentFingerprint('reply_comment', REPLY_INPUT)).toBe(original);
 
-    const editedBody = replyToCommentIntentFingerprint({
+    const editedBody = prIntentFingerprint('reply_comment', {
       ...REPLY_INPUT,
       body: 'good point, edited',
     });
     expect(editedBody).not.toBe(original);
 
-    const otherComment = replyToCommentIntentFingerprint({
+    const otherComment = prIntentFingerprint('reply_comment', {
       ...REPLY_INPUT,
       commentId: 43,
     });

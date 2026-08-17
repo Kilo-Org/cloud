@@ -16,10 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operation-ledger';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import {
-  mergePullRequestIntentFingerprint,
-  useMergePullRequestMutation,
-} from './use-pr-merge-mutations';
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { useMergePullRequestMutation } from './use-pr-merge-mutations';
 import { MergeNotCompletedError } from './merge-result-error';
 
 const hoistedKeys = vi.hoisted(() => ({
@@ -178,7 +176,12 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
 
     await lastCapturedOptions?.mutationFn?.(INPUT);
 
-    expect(hoistedKeys.getKey).toHaveBeenCalled();
+    // The fingerprint is the dedupe identity the server hashes into
+    // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
+    // field list must fail here instead of silently rotating in-flight keys.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: 'hoisted-op-key' })
     );
@@ -244,27 +247,27 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
   });
 });
 
-describe('mergePullRequestIntentFingerprint (P1-A-08c changed-input)', () => {
+describe('merge fingerprint (P1-A-08c changed-input)', () => {
   it('stays stable for a retry of the same merge and rotates when the method or message changes', () => {
-    const original = mergePullRequestIntentFingerprint(INPUT);
-    expect(mergePullRequestIntentFingerprint(INPUT)).toBe(original);
+    const original = prIntentFingerprint('merge', INPUT);
+    expect(prIntentFingerprint('merge', INPUT)).toBe(original);
 
-    const changedMethod = mergePullRequestIntentFingerprint({ ...INPUT, method: 'rebase' });
+    const changedMethod = prIntentFingerprint('merge', { ...INPUT, method: 'rebase' });
     expect(changedMethod).not.toBe(original);
 
-    const changedMessage = mergePullRequestIntentFingerprint({
+    const changedMessage = prIntentFingerprint('merge', {
       ...INPUT,
       commitMessage: 'merge it now',
     });
     expect(changedMessage).not.toBe(original);
 
-    const changedFence = mergePullRequestIntentFingerprint({
+    const changedFence = prIntentFingerprint('merge', {
       ...INPUT,
       expectedHeadSha: 'b'.repeat(40),
     });
     expect(changedFence).not.toBe(original);
 
-    const changedDeleteBranch = mergePullRequestIntentFingerprint({
+    const changedDeleteBranch = prIntentFingerprint('merge', {
       ...INPUT,
       deleteBranch: false,
     });

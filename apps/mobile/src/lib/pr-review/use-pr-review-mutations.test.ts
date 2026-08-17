@@ -13,12 +13,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operation-ledger';
-import {
-  createReviewCommentIntentFingerprint,
-  submitReviewIntentFingerprint,
-  useCreateReviewCommentMutation,
-  useSubmitReviewMutation,
-} from './use-pr-review-mutations';
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { useCreateReviewCommentMutation, useSubmitReviewMutation } from './use-pr-review-mutations';
 
 const hoistedKeys = vi.hoisted(() => ({
   getKey: vi.fn(() => 'hoisted-op-key'),
@@ -142,7 +138,12 @@ describe('useCreateReviewCommentMutation (P1-A-08c wiring)', () => {
 
     await lastCapturedOptions?.mutationFn?.(COMMENT_INPUT);
 
-    expect(hoistedKeys.getKey).toHaveBeenCalled();
+    // The fingerprint is the dedupe identity the server hashes into
+    // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
+    // field list must fail here instead of silently rotating in-flight keys.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"body":"inline nit","path":"README.md","line":3,"side":"RIGHT","commitSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
     expect(createCommentMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: 'hoisted-op-key' })
     );
@@ -240,7 +241,12 @@ describe('useSubmitReviewMutation (P1-A-08c wiring)', () => {
 
     await lastCapturedOptions?.mutationFn?.(REVIEW_INPUT);
 
-    expect(hoistedKeys.getKey).toHaveBeenCalled();
+    // The fingerprint is the dedupe identity the server hashes into
+    // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
+    // field list must fail here instead of silently rotating in-flight keys.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"event":"APPROVE","body":"LGTM","commitSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","comments":[{"path":"README.md","line":3,"side":"RIGHT","body":"nit"}]}'
+    );
     expect(submitReviewMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: 'hoisted-op-key' })
     );
@@ -295,27 +301,27 @@ describe('useSubmitReviewMutation (P1-A-08c wiring)', () => {
   });
 });
 
-describe('createReviewCommentIntentFingerprint (P1-A-08c changed-input)', () => {
+describe('create_review_comment fingerprint (P1-A-08c changed-input)', () => {
   it('stays stable for a retry of the same comment and rotates when any intent input changes', () => {
-    const original = createReviewCommentIntentFingerprint(COMMENT_INPUT);
-    expect(createReviewCommentIntentFingerprint(COMMENT_INPUT)).toBe(original);
+    const original = prIntentFingerprint('create_review_comment', COMMENT_INPUT);
+    expect(prIntentFingerprint('create_review_comment', COMMENT_INPUT)).toBe(original);
 
-    const editedBody = createReviewCommentIntentFingerprint({
+    const editedBody = prIntentFingerprint('create_review_comment', {
       ...COMMENT_INPUT,
       body: 'inline nit (edited)',
     });
     expect(editedBody).not.toBe(original);
 
-    const movedLine = createReviewCommentIntentFingerprint({ ...COMMENT_INPUT, line: 4 });
+    const movedLine = prIntentFingerprint('create_review_comment', { ...COMMENT_INPUT, line: 4 });
     expect(movedLine).not.toBe(original);
 
-    const newCommitSha = createReviewCommentIntentFingerprint({
+    const newCommitSha = prIntentFingerprint('create_review_comment', {
       ...COMMENT_INPUT,
       commitSha: 'b'.repeat(40),
     });
     expect(newCommitSha).not.toBe(original);
 
-    const otherRepo = createReviewCommentIntentFingerprint({
+    const otherRepo = prIntentFingerprint('create_review_comment', {
       ...COMMENT_INPUT,
       repo: 'world',
     });
@@ -323,21 +329,24 @@ describe('createReviewCommentIntentFingerprint (P1-A-08c changed-input)', () => 
   });
 });
 
-describe('submitReviewIntentFingerprint (P1-A-08c changed-input)', () => {
+describe('submit_review fingerprint (P1-A-08c changed-input)', () => {
   it('stays stable for a retry of the same review and rotates when the event or any comment changes', () => {
-    const original = submitReviewIntentFingerprint(REVIEW_INPUT);
-    expect(submitReviewIntentFingerprint(REVIEW_INPUT)).toBe(original);
+    const original = prIntentFingerprint('submit_review', REVIEW_INPUT);
+    expect(prIntentFingerprint('submit_review', REVIEW_INPUT)).toBe(original);
 
-    const changedEvent = submitReviewIntentFingerprint({
+    const changedEvent = prIntentFingerprint('submit_review', {
       ...REVIEW_INPUT,
       event: 'REQUEST_CHANGES',
     });
     expect(changedEvent).not.toBe(original);
 
-    const changedSummary = submitReviewIntentFingerprint({ ...REVIEW_INPUT, body: 'LGTM!!' });
+    const changedSummary = prIntentFingerprint('submit_review', {
+      ...REVIEW_INPUT,
+      body: 'LGTM!!',
+    });
     expect(changedSummary).not.toBe(original);
 
-    const changedComment = submitReviewIntentFingerprint({
+    const changedComment = prIntentFingerprint('submit_review', {
       ...REVIEW_INPUT,
       comments: [{ path: 'README.md', line: 4, side: 'RIGHT' as const, body: 'nit' }],
     });

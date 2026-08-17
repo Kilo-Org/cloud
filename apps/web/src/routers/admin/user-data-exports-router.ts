@@ -145,13 +145,24 @@ async function lockRecoveryTarget(
   tx: DbTransaction,
   input: z.infer<typeof RecoveryInputSchema>
 ): Promise<RecoveryTarget> {
-  const initial = await tx.execute<{ kilo_user_id: string }>(sql`
-    SELECT kilo_user_id FROM user_data_exports WHERE id = ${input.exportId} LIMIT 1
+  const initial = await tx.execute<{
+    kilo_user_id: string;
+    organization_id: string | null;
+  }>(sql`
+    SELECT kilo_user_id, organization_id
+    FROM user_data_exports
+    WHERE id = ${input.exportId}
+    LIMIT 1
   `);
-  const ownerId = initial.rows[0]?.kilo_user_id;
-  if (!ownerId) throw new TRPCError({ code: 'NOT_FOUND', message: 'Data export not found' });
+  const initialRow = initial.rows[0];
+  if (!initialRow) throw new TRPCError({ code: 'NOT_FOUND', message: 'Data export not found' });
 
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerId}, 0))`);
+  const ownerId = initialRow.kilo_user_id;
+  const subjectLockKey = initialRow.organization_id ?? ownerId;
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${subjectLockKey}, 0))`);
+  if (subjectLockKey !== ownerId) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerId}, 0))`);
+  }
   const owner = await tx.execute<{ id: string; blocked_reason: string | null }>(sql`
     SELECT id, blocked_reason FROM kilocode_users WHERE id = ${ownerId} FOR UPDATE
   `);
@@ -697,7 +708,15 @@ export const adminUserDataExportsRouter = createTRPCRouter({
       const target = await lockRecoveryTarget(tx, input);
       const blocker = await tx.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
-        WHERE kilo_user_id = ${target.kilo_user_id} AND id <> ${target.id}
+        WHERE id <> ${target.id}
+          AND subject_type = ${target.subject_type}
+          AND (
+            (subject_type = 'user' AND kilo_user_id = ${target.kilo_user_id})
+            OR (
+              subject_type = 'organization'
+              AND organization_id = ${target.organization_id}::uuid
+            )
+          )
           AND (
             status IN ('queued', 'processing', 'finalizing')
             OR (status = 'ready' AND expires_at > now())
@@ -705,7 +724,9 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         LIMIT 1
       `);
       if (blocker.rows[0]) {
-        conflict('This user already has another active or downloadable export');
+        conflict(
+          `This ${target.subject_type === 'organization' ? 'organization' : 'user'} already has another active or downloadable export`
+        );
       }
       const cleanupQueued = await scheduleCleanup(tx, target, 'admin_replace');
       const deleted = await tx.execute<{ id: string }>(sql`

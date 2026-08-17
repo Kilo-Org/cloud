@@ -35,7 +35,7 @@
     "@react-native-google-signin/google-signin": "16.1.2",
     "@rn-primitives/portal": "1.5.2",
     "@rn-primitives/slot": "1.5.2",
-    "@sentry/react-native": "~7.11.0",
+    "@sentry/react-native": "~8.22.0",
     "@shopify/flash-list": "2.0.2",
     "@tailwindcss/postcss": "4.3.3",
     "@tanstack/query-async-storage-persister": "catalog:",
@@ -120,6 +120,11 @@
   "dependenciesMeta": {
     "@kilocode/kilo-chat-hooks": {
       "injected": true
+    }
+  },
+  "expo": {
+    "install": {
+      "exclude": ["@sentry/react-native"]
     }
   },
   "private": true

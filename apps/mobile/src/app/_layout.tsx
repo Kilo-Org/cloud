@@ -93,6 +93,7 @@ installE2EWebSocketLatency();
 // `initSentry(false)` runs at module scope — a crash during bootstrap
 // must still be reported. The optional group is `tracesSampleRate`
 // only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// `enableTombstone` is Android 12+ only; NDK stays on for older devices.
 //
 // In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
 // — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
@@ -105,6 +106,8 @@ function initSentry(optionalConsented: boolean) {
     enabled: true,
 
     sendDefaultPii: false,
+
+    enableTombstone: true,
 
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),

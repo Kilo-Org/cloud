@@ -961,11 +961,27 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (attempt.type === 'error') return attempt.response;
 
   if (partnerFallback && attempt.response.status >= 400) {
-    console.warn('Partner request failed; retrying initial managed provider', {
+    const partnerFailureLog = {
       partner_provider: effectiveProviderContext.provider.id,
       fallback_provider: partnerFallback.providerContext.provider.id,
       status_code: attempt.response.status,
-    });
+    };
+    const responseForLogging = attempt.response.clone();
+    after(
+      (async () => {
+        try {
+          console.warn('Partner request failed; retrying initial managed provider', {
+            ...partnerFailureLog,
+            body: await responseForLogging.text(),
+          });
+        } catch (error) {
+          console.warn('Partner request failed; retrying initial managed provider', {
+            ...partnerFailureLog,
+            response_body_read_error: String(error),
+          });
+        }
+      })()
+    );
     try {
       await attempt.response.body?.cancel();
     } catch {

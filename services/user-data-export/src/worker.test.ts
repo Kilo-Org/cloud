@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   consumeDeadLetterBatch,
   consumeExportBatch,
+  closeReplicaDatabase,
   deletePendingObjects,
   exportHeader,
   exportTrailer,
@@ -322,6 +323,53 @@ describe('one-shot generator state', () => {
         next_part_number: 2,
       })
     ).toBe(true);
+  });
+});
+
+describe('replica database cleanup', () => {
+  it('closes the invocation-owned database exactly once', async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+
+    await closeReplicaDatabase({
+      database: { query: vi.fn(), close },
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 2,
+    });
+
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('does not replace a completed generation outcome when close fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(
+      closeReplicaDatabase({
+        database: {
+          query: vi.fn(),
+          close: vi.fn().mockRejectedValue(new Error('connection shutdown failed')),
+        },
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 2,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(parsedLog(warn)).toEqual({
+      event: 'export_warehouse_close_failed',
+      service: 'user-data-export',
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 2,
+      errorName: 'Error',
+    });
+  });
+
+  it('does nothing when generation exits before opening the database', async () => {
+    await expect(
+      closeReplicaDatabase({
+        database: undefined,
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 2,
+      })
+    ).resolves.toBeUndefined();
   });
 });
 

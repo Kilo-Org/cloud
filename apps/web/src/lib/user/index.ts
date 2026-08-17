@@ -1008,10 +1008,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
- * - operation_ledgers (per-intent dedupe rows, keyed by kilo_user_id)
- * - analytics_event_outbox (pending analytics delivery rows, keyed by the
- *   user's email as distinct_id, plus fallback-identity rows keyed by the
- *   user id when the email lookup fails)
+ * - operation_ledgers (keyed by kilo_user_id)
+ * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
+ *   writer's email lookup failed, the user id)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1062,22 +1061,12 @@ export async function softDeleteUser(userId: string) {
       .where(eq(security_finding_notifications.recipient_user_id, userId));
 
     // ── 0b. Operation ledger and analytics outbox ────────────────────────
-    // Ledger rows are keyed by kilo_user_id; delete them so the dedupe
-    // identity dies with the account. Outbox rows are keyed by distinct_id:
-    // normally the user's email (captured before the user row is anonymized
-    // below), but outbox writers fall back to the user id when the email
-    // lookup fails — delete rows matching either identity. The email clause
-    // matches nothing for users without an email, so the id clause is what
-    // catches their fallback-identity rows.
+    // Outbox rows are keyed by distinct_id: the user's email, or the user id
+    // when the writer's email lookup failed. Delete both identities.
     await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
     await tx
       .delete(analytics_event_outbox)
-      .where(
-        or(
-          eq(analytics_event_outbox.distinct_id, originalEmail),
-          eq(analytics_event_outbox.distinct_id, userId)
-        )
-      );
+      .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx

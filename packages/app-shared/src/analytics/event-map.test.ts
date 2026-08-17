@@ -213,7 +213,11 @@ describe('app_startup validation', () => {
 
   it('accepts the current takeStartupTimings() payload shape', () => {
     expect(
-      startupSchema.safeParse({ outcome: 'app', auth_ready: 0, splash_hidden: 80 }).success
+      startupSchema.safeParse({
+        outcome: 'app',
+        auth_ready: 0,
+        splash_hidden: 80,
+      }).success
     ).toBe(true);
     expect(
       startupSchema.safeParse({
@@ -248,8 +252,9 @@ describe('app_startup validation', () => {
 });
 
 describe('privacy deny-list', () => {
-  it('rejects prohibited property keys and allows event_uuid', () => {
+  it('rejects prohibited keys across case, separator, acronym, and suffix variants', () => {
     for (const key of [
+      // bare terms
       'email',
       'url',
       'repo',
@@ -258,18 +263,57 @@ describe('privacy deny-list', () => {
       'token',
       'secret',
       'transaction',
+      'comment',
+      'message',
+      // resource ids
       'session_id',
       'user_id',
+      'userId',
       'repo_id',
       'stripe_invoice_id',
       'provider_transaction_id',
+      // separator and case variants
+      'raw_prompt',
+      'Raw_Prompt',
+      'rawPrompt',
+      'api_token',
+      'API_TOKEN',
+      'apiToken',
+      'secret_value',
+      'SECRET_VALUE',
+      'secretValue',
+      'user_email',
+      'user_message',
+      'userComment',
+      'Email',
+      'EMAIL',
+      'Comment',
+      'Message',
+      // letter-suffix variants
+      'repository',
+      'REPOSITORY',
+      'Repositories',
+      'emails',
+      'prompts',
+      'tokens',
+      'secrets',
+      'comments',
+      'messages',
+      'repos',
+      // repository names and acronym camel case
+      'repo_name',
+      'repoName',
+      'RepositoryName',
+      'repo_url',
+      'APIToken',
+      'ApiToken',
+      'OAuthToken',
     ]) {
       expect(isProhibitedPropertyKey(key), key).toBe(true);
     }
-    expect(isProhibitedPropertyKey('event_uuid')).toBe(false);
   });
 
-  it('allows allowed enum, count, and duration keys', () => {
+  it('allows enum, count, duration, and event-identity keys', () => {
     for (const key of [
       'source',
       'surface',
@@ -280,11 +324,15 @@ describe('privacy deny-list', () => {
       'duration_ms',
       'repo_count',
       'error_count',
+      'ok_count',
       'in_organization',
       'skipped',
       'sentiment',
       'role',
       'via',
+      'event_uuid',
+      'Event_UUID',
+      'eventUuid',
     ]) {
       expect(isProhibitedPropertyKey(key), key).toBe(false);
     }
@@ -318,125 +366,34 @@ describe('privacy deny-list', () => {
     expect(redactProhibitedProperties(payload)).toEqual(payload);
   });
 
-  it('drops prohibited keys from an uncataloged runtime payload', () => {
-    const input = { surface: 'claw', email: 'a@b.co', session_id: 'x', ok_count: 1 };
-    expect(redactProhibitedProperties(input)).toEqual({ surface: 'claw', ok_count: 1 });
-    expect(input).toEqual({ surface: 'claw', email: 'a@b.co', session_id: 'x', ok_count: 1 });
-  });
-
-  it('blocks the named variant examples', () => {
-    for (const key of [
-      'repository',
-      'comment',
-      'message',
-      'raw_prompt',
-      'api_token',
-      'secret_value',
-    ]) {
-      expect(isProhibitedPropertyKey(key), key).toBe(true);
-    }
-  });
-
-  it('blocks common case, separator, and suffix variants', () => {
-    for (const key of [
-      'Email',
-      'EMAIL',
-      'REPOSITORY',
-      'Repositories',
-      'Raw_Prompt',
-      'rawPrompt',
-      'API_TOKEN',
-      'apiToken',
-      'SECRET_VALUE',
-      'secretValue',
-      'Comment',
-      'userComment',
-      'Message',
-      'user_message',
-      'emails',
-      'user_email',
-      'prompts',
-      'tokens',
-      'secrets',
-      'comments',
-      'messages',
-      'repos',
-      'provider_transaction_id',
-      'userId',
-      'session_id',
-    ]) {
-      expect(isProhibitedPropertyKey(key), key).toBe(true);
-    }
-  });
-
-  it('blocks repository-name and acronym camel-case variants', () => {
-    for (const key of [
-      'repo_name',
-      'repoName',
-      'RepositoryName',
-      'repo_url',
-      'APIToken',
-      'ApiToken',
-      'OAuthToken',
-    ]) {
-      expect(isProhibitedPropertyKey(key), key).toBe(true);
-    }
-  });
-
-  it('keeps allowed catalog fields allowed across case variants', () => {
-    for (const key of [
-      'repo_count',
-      'error_count',
-      'duration_ms',
-      'event_uuid',
-      'Event_UUID',
-      'eventUuid',
-      'ok_count',
-    ]) {
-      expect(isProhibitedPropertyKey(key), key).toBe(false);
-    }
-  });
-
-  it('redacts the named variants while keeping allowed catalog fields', () => {
+  it('drops prohibited keys from a runtime payload without mutating the input', () => {
     const input = {
       surface: 'claw',
+      email: 'a@b.co',
+      session_id: 'x',
       repository: 'acme/app',
-      comment: 'lgtm',
-      message: 'hello',
-      raw_prompt: 'write tests',
-      api_token: 'tok',
-      secret_value: 's3cr3t',
-      repo_count: 3,
-      duration_ms: 42,
-      event_uuid: 'abc',
-    };
-    expect(redactProhibitedProperties(input)).toEqual({
-      surface: 'claw',
-      repo_count: 3,
-      duration_ms: 42,
-      event_uuid: 'abc',
-    });
-  });
-
-  it('redacts case and camelCase variants at runtime', () => {
-    const input = { Raw_Prompt: 'x', apiToken: 'y', SecretValue: 'z', ok_count: 1 };
-    expect(redactProhibitedProperties(input)).toEqual({ ok_count: 1 });
-  });
-
-  it('redacts the repaired repository and acronym variants at runtime', () => {
-    const input = {
       repo_name: 'acme/app',
       repoName: 'acme/app',
-      repository: 'acme/app',
+      comment: 'lgtm',
+      message: 'hello',
+      Raw_Prompt: 'write tests',
+      apiToken: 'tok',
       APIToken: 'tok',
+      SecretValue: 's3cr3t',
+      ok_count: 1,
       repo_count: 3,
       duration_ms: 42,
       event_uuid: 'abc',
     };
+    const copy = { ...input };
+
     expect(redactProhibitedProperties(input)).toEqual({
+      surface: 'claw',
+      ok_count: 1,
       repo_count: 3,
       duration_ms: 42,
       event_uuid: 'abc',
     });
+    expect(input).toEqual(copy);
   });
 });

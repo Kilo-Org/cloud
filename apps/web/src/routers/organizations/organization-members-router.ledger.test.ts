@@ -206,6 +206,24 @@ function ledgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedger
   };
 }
 
+/** `ledgerRow` for the member-removal intent. */
+function removeRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedgerRow {
+  return ledgerRow({
+    intent: 'member_remove',
+    resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+    ...overrides,
+  });
+}
+
+/** The outbox event of the first settle call. */
+function firstSettleOutboxEvent(): { eventName: string; properties: Record<string, unknown> } {
+  return (
+    mockSettleOperation.mock.calls[0]?.[1] as {
+      outboxEvent: { eventName: string; properties: Record<string, unknown> };
+    }
+  )?.outboxEvent;
+}
+
 describe('organizations members ledger (P1-A-08e)', () => {
   describe('update: role-change ledger', () => {
     const input = {
@@ -255,10 +273,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
           canonicalResult: { updated: 'role and limit' },
         })
       );
-      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
-        outboxEvent: { eventName: string; properties: Record<string, unknown> };
-      };
-      expect(settleCall?.outboxEvent).toMatchObject({
+      expect(firstSettleOutboxEvent()).toMatchObject({
         eventName: 'organization_write_settled',
         distinctId: 'owner@example.com',
         properties: {
@@ -289,10 +304,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
           outcomeCode: 'role_change_failed',
         })
       );
-      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
-        outboxEvent: { eventName: string; properties: Record<string, unknown> };
-      };
-      expect(settleCall?.outboxEvent).toMatchObject({
+      expect(firstSettleOutboxEvent()).toMatchObject({
         eventName: 'organization_write_settled',
         properties: { intent: 'member_role_change', outcome: 'failed' },
       });
@@ -391,10 +403,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
           outcomeCode: 'authorization_failed',
         })
       );
-      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
-        outboxEvent: { eventName: string; properties: Record<string, unknown> };
-      };
-      expect(settleCall?.outboxEvent).toMatchObject({
+      expect(firstSettleOutboxEvent()).toMatchObject({
         eventName: 'organization_write_settled',
         properties: { intent: 'member_role_change', outcome: 'failed' },
       });
@@ -534,10 +543,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
         tx,
         expect.objectContaining({ rowId: 'org-ledger-row-id', status: 'completed' })
       );
-      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
-        outboxEvent?: { eventName: string; properties: { outcome: string } };
-      };
-      expect(settleCall?.outboxEvent).toMatchObject({
+      expect(firstSettleOutboxEvent()).toMatchObject({
         eventName: 'organization_write_settled',
         properties: { intent: 'member_role_change', outcome: 'completed' },
       });
@@ -639,10 +645,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('admits before the helper and settles completed with audit + outbox in one transaction', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
 
@@ -678,10 +681,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
           canonicalResult: { updated: MEMBER_ID, cleanup: 'pending' },
         })
       );
-      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
-        outboxEvent: { eventName: string; properties: Record<string, unknown> };
-      };
-      expect(settleCall?.outboxEvent).toMatchObject({
+      expect(firstSettleOutboxEvent()).toMatchObject({
         eventName: 'organization_write_settled',
         properties: { intent: 'member_remove', outcome: 'completed' },
       });
@@ -695,10 +695,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('settles the row failed without success audit or outbox when the helper removes nothing', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockRemoveUserFromOrganization.mockResolvedValue({ rowCount: 0 });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
@@ -723,9 +720,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('replays a settled duplicate without re-running the helper, even when the member is already gone', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_settled',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        row: removeRow({
           status: 'completed',
           canonical_result: { updated: MEMBER_ID },
         }),
@@ -748,10 +743,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       // settled row records the cleanup as pending.
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
       mockRevokeGatewayStateForOrganizationMember.mockRejectedValueOnce(
@@ -771,9 +763,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       // replaying a false success.
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_settled',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        row: removeRow({
           status: 'completed',
           canonical_result: { updated: MEMBER_ID, cleanup: 'pending' },
         }),
@@ -795,9 +785,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('replays a settled member removal without re-running cleanup when cleanup is already complete', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_settled',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        row: removeRow({
           status: 'completed',
           canonical_result: { updated: MEMBER_ID, cleanup: 'complete' },
         }),
@@ -818,10 +806,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('conflicts on an in-flight duplicate instead of re-running the helper', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_in_flight',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
 
@@ -835,10 +820,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('settles the row failed when a first-time removal finds the member already gone', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [];
 
@@ -862,10 +844,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('settles the row failed when the target is a service account (bot)', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: true }];
 
@@ -889,10 +868,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('settles the row failed when the access re-check rejects a keyed removal', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
       mockEnsureOrganizationAccess.mockRejectedValue(
@@ -917,10 +893,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
           outcomeCode: 'authorization_failed',
         })
       );
-      const settleCall = mockSettleOperation.mock.calls[0]?.[1] as {
-        outboxEvent: { eventName: string; properties: Record<string, unknown> };
-      };
-      expect(settleCall?.outboxEvent).toMatchObject({
+      expect(firstSettleOutboxEvent()).toMatchObject({
         eventName: 'organization_write_settled',
         properties: { intent: 'member_remove', outcome: 'failed' },
       });
@@ -932,10 +905,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('settles the row failed when the owner-authority check rejects a keyed removal', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'owner', isBot: false }];
       mockEnsureOrganizationAccess.mockResolvedValue('admin');
@@ -961,9 +931,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('replays a settled failed removal as non-retryable instead of taking over', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'duplicate_settled',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
+        row: removeRow({
           status: 'failed',
           outcome_code: 'authorization_failed',
         }),
@@ -985,10 +953,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       // must not settle the admitted row as a terminal authorization failure.
       mockAdmitOperation.mockResolvedValue({
         admission: 'admitted',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
       mockEnsureOrganizationAccess.mockRejectedValue(new Error('database connection failed'));
@@ -1012,10 +977,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('completes the record and replays when the read-back shows the member already gone', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'takeover',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       // The member is already removed when the retry arrives (lost response
       // after the first removal committed): the missing-member precondition
@@ -1044,10 +1006,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('re-runs the helper under the same row when the read-back still shows the member', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'takeover',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
       mockDbState.memberReadBack = [{ id: MEMBER_ID }];
@@ -1073,10 +1032,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       // instead of taking over again.
       mockAdmitOperation.mockResolvedValue({
         admission: 'takeover',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
       mockEnsureOrganizationAccess.mockRejectedValue(
@@ -1107,10 +1063,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
     it('settles the row failed when the takeover owner-authority check rejects a member removal', async () => {
       mockAdmitOperation.mockResolvedValue({
         admission: 'takeover',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'owner', isBot: false }];
       mockEnsureOrganizationAccess.mockResolvedValue('admin');
@@ -1138,10 +1091,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       // untouched and never settles the row: the retry stays retryable.
       mockAdmitOperation.mockResolvedValue({
         admission: 'takeover',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: false }];
       mockEnsureOrganizationAccess.mockRejectedValue(new Error('database connection failed'));
@@ -1162,10 +1112,7 @@ describe('organizations members ledger (P1-A-08e)', () => {
       // guard.
       mockAdmitOperation.mockResolvedValue({
         admission: 'takeover',
-        row: ledgerRow({
-          intent: 'member_remove',
-          resource_key: `organization:${ORG_ID}:member:${MEMBER_ID}`,
-        }),
+        row: removeRow(),
       });
       mockDbState.removeTargetMember = [{ role: 'member', isBot: true }];
       mockDbState.memberReadBack = [{ id: MEMBER_ID, isBot: true }];

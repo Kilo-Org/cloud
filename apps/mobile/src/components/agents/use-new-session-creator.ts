@@ -53,11 +53,8 @@ export function useNewSessionCreator({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const promptRef = useRef('');
-  // P1-A-08b: one `operationKey` per submit intent, hoisted so a retry of the
-  // same intent reuses the key (the ledger dedupes/reconciles instead of
-  // spawning a second session) and rotated on success or a typed terminal
-  // rejection. The fingerprint covers every intent-defining input, so a
-  // changed draft/selection becomes a fresh intent with a fresh key.
+  // P1-A-08b: one `operationKey` per submit intent, so a retry of the same
+  // intent dedupes on the ledger instead of spawning a second session.
   const { getKey, rotateKey } = useHoistedOperationKey();
 
   const createSessionFromDraft = useCallback(async () => {
@@ -79,15 +76,8 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
-    // The wire payload is the exact attachment input the create carries (the
-    // upload path plus every uploaded remote filename). Include it in the
-    // intent fingerprint so a changed attachment set becomes a fresh intent
-    // with a fresh key — otherwise a same-key retry after the user swapped
-    // files would replay the previous intent's ledger result. Computed once,
-    // before the fingerprint, and reused for the create body so the two
-    // cannot disagree. At submit time the screen has already gated on
-    // `attachments.isUploading` / `attachments.hasFailedAttachments`, so the
-    // payload is stable across retries of the same intent.
+    // Computed once and reused for both the fingerprint and the create body, so
+    // the two cannot disagree and a swapped attachment set is a fresh intent.
     const attachmentWire = attachments.toWirePayload();
     const intentFingerprint = JSON.stringify({
       prompt,
@@ -135,24 +125,16 @@ export function useNewSessionCreator({
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
 
-      // The intent settled (the ledger now owns the create); the next submit
-      // is a fresh intent with a fresh key. Rotate before the post-success
-      // work so a UI failure cannot keep the successful key for a retry.
+      // Rotate before the post-success work so a UI failure cannot keep the
+      // successful key for a retry.
       rotateKey();
 
-      // Post-success UI work is outside the server failure boundary: the
-      // cloud operation is already successful here, so a cache-invalidation,
-      // haptics, navigation, or stack-cleanup failure must not report the
-      // create as failed or invite a duplicate retry. Failures are
-      // intentionally swallowed so they never reach the create-failure path
-      // below.
+      // The cloud session already exists, so no post-success UI failure may
+      // report the create as failed or invite a duplicate retry.
       try {
         captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
         await invalidateAgentSessionQueries(queryClient, trpc);
-        // Haptics is fire-and-forget outcome feedback. Await it inside its
-        // own boundary so a rejected call is contained: no unhandled
-        // rejection, no create-failure toast, and the navigation below still
-        // runs.
+        // Contained on its own so a rejected haptics call still navigates.
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch {
@@ -163,9 +145,8 @@ export function useNewSessionCreator({
           : `/(app)/agent-chat/${result.kiloSessionId}`;
         router.push(path as Href);
         requestAnimationFrame(() => {
-          // This callback runs after the surrounding try block has returned,
-          // so a failure here would escape as an uncaught exception. The
-          // stack cleanup is cosmetic; contain it.
+          // Runs after the surrounding try returned, so a failure here would
+          // escape uncaught. The stack cleanup is cosmetic; contain it.
           try {
             navigation.dispatch(state => {
               const routes = state.routes.filter(
@@ -181,16 +162,13 @@ export function useNewSessionCreator({
           }
         });
       } catch {
-        // The cloud session already exists. Stay silent: no create-failure
-        // toast, no duplicate-create retry.
+        // Stay silent: no create-failure toast, no duplicate-create retry.
       }
     } catch (error) {
-      // Only `prepareSession` errors can reach here; post-success UI
-      // failures are swallowed above.
+      // Only `prepareSession` errors reach here; UI failures are swallowed.
       const message = error instanceof Error ? error.message : 'Failed to create session';
       toast.error(message);
-      // A typed terminal rejection ends the intent; retryable failures
-      // (transport and `creation_in_progress`) keep the key.
+      // A typed terminal rejection ends the intent; a retryable one keeps the key.
       if (!isCloudPrepareRetryableError(error)) {
         rotateKey();
       }

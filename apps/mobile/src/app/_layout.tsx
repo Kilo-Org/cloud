@@ -325,9 +325,8 @@ function RootLayoutNav() {
     accountId: userId,
     optionalConsent,
   });
-  // Consent is settled when the account and its consent decision have loaded
-  // without error and no consent prompt is outstanding. Screen capture must
-  // wait for this: analytics eligibility is decided only after consent.
+  // Screen capture must wait for consent: analytics eligibility is decided
+  // only after the account's consent decision has loaded without error.
   const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
   useScreenTracking(bootstrapSettled);
 

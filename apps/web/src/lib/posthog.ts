@@ -40,9 +40,8 @@ export default function PostHogClient(): Pick<
 }
 
 /**
- * Flushes any buffered PostHog events and resolves when the send completes.
- * Outside production (where the client is a disabled no-op and no shared
- * instance exists) this is a successful no-op, so callers can always await it.
+ * Flushes buffered events. A no-op outside production, where no shared
+ * instance exists, so callers can always await it.
  */
 export async function flushPostHog(): Promise<void> {
   if (!instance) {

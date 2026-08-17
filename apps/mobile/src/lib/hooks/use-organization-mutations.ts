@@ -15,11 +15,8 @@ const onMutationError = (error: { message: string }) => {
 };
 
 // P1-A-08e ledger markers (server contract, mirrored from
-// organization-members-router.ts). The role-change and member-removal
-// mutations carry an optional `operationKey`; these hooks hoist one key per
-// intent so retries of the SAME intent dedupe/replay/conflict on the server.
-// Only `operation_in_progress` is a raw marker — the server sends user-facing
-// copy for every other ledger outcome, so it is the only one translated here.
+// organization-members-router.ts). `operation_in_progress` is the only raw
+// marker — the server sends user-facing copy for the other ledger outcomes.
 const ORG_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
 const ORG_OPERATION_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
 const ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
@@ -30,12 +27,9 @@ const ORG_LEDGER_SETTLE_FAILED_MESSAGE =
 const ORG_OPERATION_IN_PROGRESS_COPY = 'This change is still being processed. Please try again.';
 
 /**
- * True when the mutation may be retried under the SAME operation key.
- * Retryable: `operation_in_progress`, the settle-failed marker (a same-key
- * retry repairs the committed write by read-back), and generic transient
- * errors. Non-retryable: the replay-failed marker (the row settled `failed`),
- * the cross-intent key-reuse rejection, and typed validation/permission
- * errors — the next submit must be a fresh intent with a fresh key.
+ * True when the mutation may be retried under the SAME operation key. The
+ * settle-failed marker is retryable: a same-key retry repairs the committed
+ * write by read-back.
  */
 export function isOrganizationMutationRetryable(error: unknown): boolean {
   if (error instanceof Error) {
@@ -60,12 +54,7 @@ export function mapOrganizationOperationError(error: unknown): unknown {
   return error;
 }
 
-/**
- * Deterministic intent fingerprint for a role change. Every intent-defining
- * input is included: a retry of the SAME target+role reuses the hoisted key,
- * and any change (different member or role) rotates it so the ledger treats
- * the submit as a fresh intent.
- */
+/** Intent fingerprint for a role change: a changed member or role is a new intent. */
 export function organizationRoleChangeIntentFingerprint(
   organizationId: string,
   memberId: string,
@@ -74,7 +63,7 @@ export function organizationRoleChangeIntentFingerprint(
   return JSON.stringify({ resource: [organizationId, memberId], role });
 }
 
-/** Deterministic intent fingerprint for a member removal. */
+/** Intent fingerprint for a member removal. */
 export function organizationRemoveMemberIntentFingerprint(
   organizationId: string,
   memberId: string
@@ -99,10 +88,8 @@ export function useOrganizationMutations(
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  // One hoisted key state per operation family: a retryable role change must
-  // keep its key even when a removal runs, and a removal must not rotate or
-  // clear the role-change key. Two `useHoistedOperationKey` calls give each
-  // family its own getKey/rotateKey pair instead of a shared single key state.
+  // One hoisted key per operation family: a removal must not rotate or clear a
+  // pending role change's key, and the reverse.
   const { getKey: getRoleKey, rotateKey: rotateRoleKey } = useHoistedOperationKey();
   const { getKey: getRemoveKey, rotateKey: rotateRemoveKey } = useHoistedOperationKey();
 
@@ -211,11 +198,8 @@ export function useOrganizationMutations(
         role?: OrgRole;
         dailyUsageLimitUsd?: number | null;
       }) => {
-        // Only the role branch is ledger-backed (P1-A-08e); a limit-only
-        // request carries no key. Key rotation (regenerate after a terminal
-        // outcome) must therefore run only when a keyed role mutation actually
-        // ran — a limit-only update must not clear the pending role-change key
-        // hoisted for another intent.
+        // Only the role branch is ledger-backed (P1-A-08e), so a limit-only
+        // update carries no key and must not rotate the role-change key.
         const isKeyedRoleMutation = input.role !== undefined;
         try {
           const result = await trpcClient.organizations.members.update.mutate({

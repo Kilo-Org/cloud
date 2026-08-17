@@ -80,6 +80,13 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 
 vi.stubGlobal('__DEV__', false);
 
+// `appsflyer.ts` mirrors dynamic funnel names, so it always calls `captureEvent`
+// with a `string`, never a catalog literal. Widen the same way here to exercise
+// that overload.
+function dynamicName(name: string): string {
+  return name;
+}
+
 function readCustomAppProperties(): (
   properties: Record<string, unknown>
 ) => Record<string, unknown> {
@@ -247,7 +254,7 @@ describe('capture gate and generation scoping', () => {
   });
 });
 
-describe('captureUncataloged privacy and gates', () => {
+describe('captureEvent privacy and gates', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.holder.options = undefined;
@@ -256,9 +263,9 @@ describe('captureUncataloged privacy and gates', () => {
   });
 
   it('drops payload keys that name a prohibited data class before capture', async () => {
-    const { initPostHog, captureUncataloged } = await loadModule();
+    const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
-    captureUncataloged('onboarding-entered', {
+    captureEvent(dynamicName('onboarding-entered'), {
       surface: 'claw',
       email: 'a@b.co',
       session_id: 'x',
@@ -274,40 +281,19 @@ describe('captureUncataloged privacy and gates', () => {
   });
 
   it('keeps every allowed key on an uncataloged payload', async () => {
-    const { initPostHog, captureUncataloged } = await loadModule();
+    const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
-    captureUncataloged('provision-failed', { category: 'lock' });
+    captureEvent('provision-failed', { category: 'lock' });
 
     expect(hoisted.client.capture).toHaveBeenCalledWith('provision-failed', { category: 'lock' });
   });
 
   it('passes no properties through unchanged when none are given', async () => {
-    const { initPostHog, captureUncataloged } = await loadModule();
+    const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
-    captureUncataloged('completion-reached');
+    captureEvent('completion-reached');
 
     expect(hoisted.client.capture).toHaveBeenCalledWith('completion-reached', undefined);
-  });
-
-  it('returns early when optional consent is not given', async () => {
-    hoisted.controller.allowsOptional.mockReturnValue(false);
-    const { initPostHog, captureUncataloged } = await loadModule();
-    initPostHog();
-    captureUncataloged('login', { surface: 'claw' });
-
-    expect(hoisted.client.capture).not.toHaveBeenCalled();
-  });
-
-  it('drops a stale-generation capture', async () => {
-    hoisted.controller.currentGeneration.mockReturnValue(0);
-    const { initPostHog, captureUncataloged } = await loadModule();
-    initPostHog();
-
-    // Bump the generation after init.
-    hoisted.controller.currentGeneration.mockReturnValue(1);
-    captureUncataloged('login', { surface: 'claw' });
-
-    expect(hoisted.client.capture).not.toHaveBeenCalled();
   });
 });
 

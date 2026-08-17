@@ -29,18 +29,19 @@ the recorded exclusions.
 - `distinct_id` is the identity channel, **not** an event property. The DEC-05
   property deny-list does not apply to it.
 - The deterministic outbox `event_uuid` (Wave 2) is event identity for
-  at-least-once delivery and deduplication; it is a property carve-out in the
-  deny-list predicate because it is identity, not content.
+  at-least-once delivery and deduplication, not content. It is allowed because
+  the resource-ID rule matches only keys ending in `_id`.
 
 ## Privacy deny-list (DEC-05)
 
 Prohibited in analytics payloads (enforced by schema and test): raw prompts,
 message content, URLs, repository names, comments, emails, tokens, secrets,
-transaction IDs, and resource IDs. The predicate (`privacy.ts`) rejects any
-property key named `email`, `url`, `repo`, `prompt`, `content`, `token`,
-`secret`, `transaction`, or any key ending in `_id` (except `event_uuid`).
-Allowed: stable enum strings, integer counts, `duration_ms` integers, and
-booleans.
+transaction IDs, and resource IDs. The predicate (`privacy.ts`) rejects any key
+segment named `email`, `url`, `repo`, `prompt`, `content`, `token`, `secret`,
+`transaction`, `comment`, or `message` (with optional letter suffix, so
+`repository` and `tokens` match too), and any key ending in `_id`. The one
+carve-out is `repo_count`. Allowed: stable enum strings, integer counts,
+`duration_ms` integers, and booleans.
 
 Two enforcement layers:
 

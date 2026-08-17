@@ -95,11 +95,6 @@ describe('useReplyToCommentMutation (P1-A-08c wiring)', () => {
     vi.clearAllMocks();
   });
 
-  it('mounts a useMutation with a custom mutationFn', () => {
-    useReplyToCommentMutation();
-    expect(lastCapturedOptions?.mutationFn).toBeDefined();
-  });
-
   it('delegates the input to replyToComment.mutate and resolves the reply', async () => {
     const reply = { id: 43, htmlUrl: 'https://example.com' };
     replyMutateMock.mockResolvedValueOnce(reply);
@@ -144,16 +139,6 @@ describe('useReplyToCommentMutation (P1-A-08c wiring)', () => {
 
     await expect(lastCapturedOptions?.mutationFn?.(REPLY_INPUT)).rejects.toMatchObject({
       message: 'Could not reply.',
-    });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
-  it('keeps the key on a retryable network failure (the ledger owns the retry)', async () => {
-    replyMutateMock.mockRejectedValueOnce(new Error('Network request failed'));
-    useReplyToCommentMutation();
-
-    await expect(lastCapturedOptions?.mutationFn?.(REPLY_INPUT)).rejects.toMatchObject({
-      message: 'Network request failed',
     });
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });

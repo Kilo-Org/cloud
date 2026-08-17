@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- cloud prepare and remote spawn key rotation stay in the one continue hook. */
+/* eslint-disable max-lines -- 333 lines: cloud prepare and remote spawn key rotation stay in the one continue hook. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
@@ -70,10 +70,8 @@ export function useContinueSession(args: {
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);
-  // P1-A-08b: one hoisted `operationKey` per submit intent for each
-  // destination family. Cloud prepares and remote spawns are different
-  // intents, so they never share a key; each is kept across retryable
-  // failures and rotated on success or a typed terminal rejection.
+  // P1-A-08b: cloud prepares and remote spawns are different intents, so each
+  // destination family holds its own hoisted `operationKey`.
   const cloudOperationKey = useHoistedOperationKey();
   const remoteOperationKey = useHoistedOperationKey();
 
@@ -112,11 +110,9 @@ export function useContinueSession(args: {
         // successful key for a retry or rotate it a second time.
         cloudOperationKey.rotateKey();
 
-        // Post-success work is outside the server failure boundary: the
-        // cloud operation is already successful, so a cache-invalidation,
-        // haptics, or navigation failure must not report the create as
-        // failed or invite a duplicate retry. Each step is contained on its
-        // own so one failure cannot skip the navigation to the session.
+        // The cloud session already exists, so no post-success UI failure may
+        // report the create as failed or invite a duplicate retry. Each step is
+        // contained on its own so one failure cannot skip the navigation.
         try {
           captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
         } catch {
@@ -125,8 +121,7 @@ export function useContinueSession(args: {
         try {
           await invalidateAgentSessionQueries(queryClient, trpc);
         } catch {
-          // A failed cache invalidation is cosmetic; the session exists and
-          // navigation must still run.
+          // A failed cache invalidation is cosmetic; navigation must still run.
         }
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -136,14 +131,11 @@ export function useContinueSession(args: {
         try {
           router.push(getAgentSessionPath(result.kiloSessionId, args.organizationId));
         } catch {
-          // The session already exists; a navigation failure is not a
-          // create failure.
+          // A navigation failure is not a create failure.
         }
       } catch (error) {
-        // Only `prepareSession` errors can reach here; post-success
-        // failures are swallowed above. A typed terminal rejection ends the
-        // intent; retryable failures (transport and `creation_in_progress`)
-        // keep the key.
+        // Only `prepareSession` errors reach here; UI failures are contained
+        // above. A typed terminal rejection ends the intent.
         if (!isCloudPrepareRetryableError(error)) {
           cloudOperationKey.rotateKey();
         }
@@ -211,8 +203,8 @@ export function useContinueSession(args: {
             ? REMOTE_SPAWN_RETRYABLE_TOAST
             : REMOTE_SPAWN_NON_RETRYABLE_TOAST
         );
-        // A typed non-retryable spawn rejection ends the intent; retryable
-        // outcomes keep the key so a same-key retry dedupes on the relay.
+        // A non-retryable rejection ends the intent; a retryable outcome keeps
+        // the key so a same-key retry dedupes on the relay.
         if (outcome.status === 'nonRetryable') {
           remoteOperationKey.rotateKey();
         }

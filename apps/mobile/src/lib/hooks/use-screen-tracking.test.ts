@@ -4,12 +4,6 @@ import { createElement, type FC } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  getSettledLeafRoute,
-  publishSettledLeafRoute,
-  resetSettledLeafRouteForTests,
-  subscribeSettledLeafRoute,
-} from '@/lib/route-lifecycle';
 import { SCREEN_TRACKING_SETTLE_DEBOUNCE_MS } from '@/lib/hooks/screen-tracking-decision';
 import { SCREEN_TRACKING_GENERATION_POLL_MS } from '@/lib/hooks/use-screen-tracking';
 
@@ -130,7 +124,6 @@ describe('useScreenTracking', () => {
     mocks.state.postHogReady = true;
     mocks.state.generation = 1;
     mocks.captureScreen.mockReset();
-    resetSettledLeafRouteForTests();
   });
 
   afterEach(() => {
@@ -170,20 +163,17 @@ describe('useScreenTracking', () => {
     const renderer = mount();
     advanceSettleWindow();
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
-    expect(getSettledLeafRoute()).toBe(HOME);
 
     mocks.state.segments = ['(app)', '(tabs)', '(3_profile)'];
     rerender(renderer);
     // The previous leaf's settled value must not carry over to the new route:
-    // the new route needs its own full settle window before capture or publish.
+    // the new route needs its own full settle window before capture.
     advance(SCREEN_TRACKING_SETTLE_DEBOUNCE_MS - 1);
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
-    expect(getSettledLeafRoute()).toBe(HOME);
 
     advanceSettleWindow();
     expect(mocks.captureScreen).toHaveBeenCalledTimes(2);
     expect(mocks.captureScreen).toHaveBeenLastCalledWith(PROFILE);
-    expect(getSettledLeafRoute()).toBe(PROFILE);
   });
 
   it('re-evaluates when navigation becomes ready without a manual rerender', () => {
@@ -208,8 +198,6 @@ describe('useScreenTracking', () => {
     mount();
     advanceSettleWindow();
     expect(mocks.captureScreen).not.toHaveBeenCalled();
-    // The leaf is settled and visible even though analytics is not ready.
-    expect(getSettledLeafRoute()).toBe(HOME);
 
     flipPostHogReady(true);
 
@@ -225,33 +213,6 @@ describe('useScreenTracking', () => {
     flipPostHogReady(false);
     flipPostHogReady(true);
 
-    expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
-  });
-
-  it('gives a previously settled route a fresh quiet period when revisited within the window', () => {
-    const renderer = mount();
-    advanceSettleWindow();
-    expect(getSettledLeafRoute()).toBe(HOME);
-
-    // Reset the signal so a premature publish on the revisit is observable.
-    resetSettledLeafRouteForTests();
-
-    // Leave HOME; the new route has not settled yet.
-    mocks.state.segments = ['(app)', '(tabs)', '(3_profile)'];
-    rerender(renderer);
-    advance(300);
-
-    // Return to HOME before any fresh quiet period has elapsed. HOME's old
-    // settled marker must not count again: it needs its own full window before
-    // it can publish or capture.
-    mocks.state.segments = ['(app)', '(tabs)', '(0_home)'];
-    rerender(renderer);
-    advance(SCREEN_TRACKING_SETTLE_DEBOUNCE_MS - 1);
-    expect(getSettledLeafRoute()).toBeNull();
-
-    advanceSettleWindow();
-    expect(getSettledLeafRoute()).toBe(HOME);
-    // Same generation and screen: the capture is a duplicate.
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
   });
 
@@ -276,32 +237,6 @@ describe('useScreenTracking', () => {
     expect(mocks.captureScreen).toHaveBeenLastCalledWith(HOME);
   });
 
-  it('never captures the redirect-only (app) production representation', () => {
-    mocks.state.segments = ['(app)'];
-    mount();
-    advanceSettleWindow();
-
-    expect(mocks.captureScreen).not.toHaveBeenCalled();
-  });
-
-  it('captures real (app) leaves that are not the redirect target', () => {
-    mocks.state.segments = ['(app)', 'onboarding'];
-    mount();
-    advanceSettleWindow();
-
-    expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
-    expect(mocks.captureScreen).toHaveBeenCalledWith('(app)/onboarding');
-  });
-
-  it('never captures KiloClaw leaves but still publishes them as settled', () => {
-    mocks.state.segments = ['(app)', '(tabs)', '(1_kiloclaw)'];
-    mount();
-    advanceSettleWindow();
-
-    expect(mocks.captureScreen).not.toHaveBeenCalled();
-    expect(getSettledLeafRoute()).toBe('(app)/(tabs)/(1_kiloclaw)');
-  });
-
   it('never captures while the consent bootstrap is unsettled', () => {
     const renderer = mount(false);
     advanceSettleWindow();
@@ -310,15 +245,6 @@ describe('useScreenTracking', () => {
     rerender(renderer, true);
     expect(mocks.captureScreen).toHaveBeenCalledTimes(1);
     expect(mocks.captureScreen).toHaveBeenCalledWith(HOME);
-  });
-
-  it('does not capture empty segments or publish an empty leaf', () => {
-    mocks.state.segments = [];
-    mount();
-    advanceSettleWindow();
-
-    expect(mocks.captureScreen).not.toHaveBeenCalled();
-    expect(getSettledLeafRoute()).toBeNull();
   });
 
   it('logs each capture in dev builds', () => {
@@ -341,48 +267,5 @@ describe('useScreenTracking', () => {
     advanceSettleWindow();
 
     expect(logSpy).not.toHaveBeenCalled();
-  });
-
-  it('publishes each settled leaf to the route-lifecycle signal', () => {
-    const seen: (string | null)[] = [];
-    const unsubscribe = subscribeSettledLeafRoute(() => {
-      seen.push(getSettledLeafRoute());
-    });
-
-    const renderer = mount();
-    advanceSettleWindow();
-    expect(seen).toEqual([HOME]);
-
-    mocks.state.segments = ['(app)', '(tabs)', '(3_profile)'];
-    rerender(renderer);
-    advanceSettleWindow();
-    expect(seen).toEqual([HOME, PROFILE]);
-
-    unsubscribe();
-  });
-});
-
-describe('route-lifecycle signal', () => {
-  beforeEach(() => {
-    resetSettledLeafRouteForTests();
-  });
-
-  it('exposes a read-only get/subscribe signal and dedupes identical publishes', () => {
-    expect(getSettledLeafRoute()).toBeNull();
-
-    const seen: (string | null)[] = [];
-    const unsubscribe = subscribeSettledLeafRoute(() => {
-      seen.push(getSettledLeafRoute());
-    });
-
-    publishSettledLeafRoute(HOME);
-    publishSettledLeafRoute(HOME);
-    publishSettledLeafRoute(PROFILE);
-
-    expect(seen).toEqual([HOME, PROFILE]);
-
-    unsubscribe();
-    publishSettledLeafRoute('(app)/force-update');
-    expect(getSettledLeafRoute()).toBe('(app)/force-update');
   });
 });

@@ -157,10 +157,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
-  // A persistence failure (or any typed terminal rejection) ended the intent:
-  // the hook already rotated the operation key, so a re-submit would be a
-  // fresh intent against a ledger row that was never recorded. Disable the
-  // CTA and let the inline state-specific copy explain the outcome.
+  // A terminal rejection ended the intent, so disable the CTA and let the
+  // inline copy explain the outcome.
   const dismissBlocked = dismissFinding.isError && !isSecuritySyncRetryable(dismissFinding.error);
 
   return (

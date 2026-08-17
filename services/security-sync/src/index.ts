@@ -13,6 +13,7 @@ import {
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { agent_configs, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import {
+  isTerminalOperationStatus,
   recordOperationAcceptance,
   recordOperationProgress,
   settleOperation,
@@ -214,22 +215,14 @@ async function timingSafeEqual(left: string, right: string): Promise<boolean> {
 
 // ----- security operation ledger dedupe (P1-A-08e) ---------------------------
 //
-// Manual sync and dismissal commands carry the web's stable `operationKey`.
-// The web admits a `security`-domain ledger row BEFORE calling the Worker, so
-// at enqueue time a keyed request locks the matching row with `FOR UPDATE` and
-// either reuses the already-recorded acceptance (no second command, run,
-// message, or queued effect) or creates the command and records `provider_ref`
-// plus `canonical_result` in the SAME transaction. A missing ledger row or a
-// failed acceptance update fails the request before any command or queue
-// effect. The queue batch is sent only after that transaction commits, so
-// acceptance always precedes queue send. Every post-acceptance ledger write is
-// fenced on the `queueSendClaimId` recorded at acceptance: a stale sender whose
-// claim was superseded cannot clear or confirm a newer claim. A queue-send
-// failure releases the sender's claim (keeping `queueAdmitted: false`) so a
-// same-key retry re-claims and re-sends the original command and message
-// instead of creating a second one, and the queue error is reported only after
-// that release commits. Scheduled syncs and keyless commands never touch this
-// path.
+// A command carrying the web's stable `operationKey` locks the row the web
+// admitted (`FOR UPDATE`) and either reuses the recorded acceptance or creates
+// the command and records `provider_ref` plus `canonical_result` in the SAME
+// transaction, before the queue send. Every post-acceptance ledger write is
+// fenced on the `queueSendClaimId` recorded at acceptance, so a stale sender
+// cannot clear or confirm a newer claim. A queue-send failure releases the
+// claim, so a same-key retry re-sends the original command instead of creating
+// a second one. Scheduled syncs and keyless commands never touch this path.
 
 const SECURITY_LEDGER_DOMAIN = 'security';
 const QUEUE_SEND_LEASE_MS = 60_000;
@@ -252,11 +245,9 @@ type SecurityLedgerAcceptance = {
 };
 
 /**
- * Locks the security ledger row admitted for a stable operation key inside the
- * caller's transaction. The `FOR UPDATE` lock serializes concurrent same-key
- * requests: the first enqueuer commits its acceptance, then a blocked requester
- * re-reads the row and reuses that acceptance instead of creating a second
- * command, run, message, or queued effect.
+ * Locks the ledger row admitted for an operation key inside the caller's
+ * transaction, so concurrent same-key requests serialize and the loser reuses
+ * the committed acceptance instead of creating a second command.
  */
 async function lockSecurityLedgerRow(
   tx: LedgerTransaction,
@@ -283,11 +274,7 @@ async function lockSecurityLedgerRow(
   return rows[0] ?? null;
 }
 
-/**
- * Extracts the recorded Worker acceptance from a ledger row when the matching
- * intent already accepted a command. The `provider_ref` plus the replay-safe
- * `canonical_result` carry the original command identifiers.
- */
+/** The recorded acceptance (original command identifiers) of a matching row. */
 function securityLedgerAcceptanceFromRow(
   row: SecurityLedgerLookupRow,
   intent: 'manual_sync' | 'dismiss_finding'
@@ -305,9 +292,7 @@ function securityLedgerAcceptanceFromRow(
       commandId: canonical.commandId,
       runId: canonical.runId,
       messageId: canonical.messageId,
-      queueAdmitted:
-        canonical.queueAdmitted === true ||
-        ['completed', 'failed', 'no_op', 'interrupted', 'superseded'].includes(row.status),
+      queueAdmitted: canonical.queueAdmitted === true || isTerminalOperationStatus(row.status),
       queueSendClaimedUntil:
         typeof canonical.queueSendClaimedUntil === 'string'
           ? canonical.queueSendClaimedUntil
@@ -387,7 +372,6 @@ async function enqueueKeyedSecurityCommand(
     intent: 'manual_sync' | 'dismiss_finding';
     runId: string;
     messageId: string;
-    description: string;
     createCommand: (tx: LedgerTransaction) => Promise<{ id: string }>;
     buildMessage: (ids: KeyedEnqueueIds) => MessageSendRequest<SecuritySyncQueueMessage>;
   }
@@ -408,14 +392,10 @@ async function enqueueKeyedSecurityCommand(
       );
     }
     const reused = securityLedgerAcceptanceFromRow(row, params.intent);
-    const queueSendClaimedUntil = reused?.queueSendClaimedUntil
-      ? Date.parse(reused.queueSendClaimedUntil)
-      : Number.NaN;
-    if (
-      reused?.queueAdmitted ||
-      (Number.isFinite(queueSendClaimedUntil) && queueSendClaimedUntil > Date.now())
-    ) {
-      if (!reused) throw new Error('Security operation ledger acceptance is missing');
+    // `NaN > now` is false, so a missing or unparsable claim lease never counts
+    // as live.
+    const claimedUntil = Date.parse(reused?.queueSendClaimedUntil ?? '');
+    if (reused && (reused.queueAdmitted || claimedUntil > Date.now())) {
       return {
         reused: true,
         ids: {
@@ -480,7 +460,8 @@ async function enqueueKeyedSecurityCommand(
   });
 
   if (admission.reused) {
-    console.info(`${params.description} reused from operation ledger acceptance`, {
+    console.info('Security command reused from operation ledger acceptance', {
+      intent: params.intent,
       operation_key: params.operationKey,
       command_id: admission.ids.commandId,
       run_id: admission.ids.runId,
@@ -557,7 +538,6 @@ async function enqueueManualSyncCommand(
       intent: 'manual_sync',
       runId,
       messageId,
-      description: 'Manual sync command',
       createCommand: tx =>
         createSecurityAgentCommand(tx, {
           commandType: 'sync',
@@ -611,7 +591,6 @@ async function enqueueDismissFindingCommand(
       intent: 'dismiss_finding',
       runId,
       messageId,
-      description: 'Finding dismissal command',
       createCommand: tx =>
         createSecurityAgentCommand(tx, {
           commandType: 'dismiss_finding',
@@ -729,15 +708,10 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
 
 // ----- security operation ledger join (P1-A-08e) ----------------------------
 //
-// Manual sync and dismissal commands admitted with an `operationKey` store the
-// Worker `messageId` in `operation_ledgers.provider_ref` at acceptance. After
-// the command reaches a terminal state, the Worker joins that row by provider
-// reference and settles it with the security terminal mapping
-// (succeeded→completed, failed→failed, no_op→no_op) plus a durable
-// `security_command_settled` outbox event written atomically by
-// `settleOperation`. Rows that are missing or already terminal are skipped:
-// scheduled syncs and keyless commands have no ledger row, and a second settle
-// of a terminal row is a no-op by ledger design.
+// A keyed command stores the Worker `messageId` in
+// `operation_ledgers.provider_ref` at acceptance. On a terminal command state
+// the Worker joins that row by provider reference and settles it with the
+// outbox event. Scheduled syncs and keyless commands have no row and skip.
 
 const SECURITY_TERMINAL_STATUS_MAP = {
   succeeded: 'completed',
@@ -748,7 +722,7 @@ const SECURITY_TERMINAL_STATUS_MAP = {
 function isTerminalSecurityLedgerStatus(
   status: string
 ): status is keyof typeof SECURITY_TERMINAL_STATUS_MAP {
-  return status === 'succeeded' || status === 'failed' || status === 'no_op';
+  return status in SECURITY_TERMINAL_STATUS_MAP;
 }
 
 /** Resolves the analytics identity channel (user email) for the outbox event. */
@@ -774,11 +748,9 @@ async function resolveSecuritySettleDistinctId(
 }
 
 /**
- * Settles the ledger row joined by `provider_ref = messageId`. Missing rows
- * skip (scheduled syncs and keyless commands have no ledger row, and a second
- * settle of a terminal row is a no-op by ledger design). A failed lookup or
- * settle re-throws so the caller leaves the queue message unacknowledged —
- * the message is retried instead of losing the terminal settlement.
+ * Settles the ledger row joined by `provider_ref = messageId`. A missing row
+ * skips; a failed lookup or settle re-throws so the caller leaves the queue
+ * message unacknowledged and the settlement is retried.
  */
 async function settleSecurityLedgerByProviderRef(
   db: WorkerDb,
@@ -794,58 +766,47 @@ async function settleSecurityLedgerByProviderRef(
     errorCount?: number;
   }
 ): Promise<void> {
-  let row: { id: string } | undefined;
+  const status = SECURITY_TERMINAL_STATUS_MAP[params.status];
+  const counts = {
+    ...(params.repoCount !== undefined ? { repo_count: params.repoCount } : {}),
+    ...(params.errorCount !== undefined ? { error_count: params.errorCount } : {}),
+  };
+  const dispatched = new Date(params.dispatchedAt).getTime();
+  const durationMs = Number.isFinite(dispatched) ? Math.max(0, Date.now() - dispatched) : 0;
+
   try {
-    const rows = await db
+    const [row] = await db
       .select({ id: operation_ledgers.id })
       .from(operation_ledgers)
       .where(eq(operation_ledgers.provider_ref, params.providerRef))
       .limit(1);
-    row = rows[0];
-  } catch (error) {
-    console.error('Security operation ledger lookup failed', {
-      provider_ref: params.providerRef,
-      error_type: error instanceof Error ? error.name : 'UnknownError',
-    });
-    throw error;
-  }
-  if (!row) {
-    console.info('Security operation ledger row not found for provider ref; skipping settle', {
-      provider_ref: params.providerRef,
-      intent: params.intent,
-      result_code: params.resultCode,
-    });
-    return;
-  }
+    if (!row) {
+      console.info('Security operation ledger row not found for provider ref; skipping settle', {
+        provider_ref: params.providerRef,
+        intent: params.intent,
+        result_code: params.resultCode,
+      });
+      return;
+    }
 
-  const status = SECURITY_TERMINAL_STATUS_MAP[params.status];
-  const dispatched = new Date(params.dispatchedAt).getTime();
-  const durationMs = Number.isFinite(dispatched) ? Math.max(0, Date.now() - dispatched) : 0;
-  const distinctId = await resolveSecuritySettleDistinctId(db, {
-    userId: params.userId,
-    email: params.actorEmail,
-  });
-
-  try {
     await settleOperation(db, {
       rowId: row.id,
       status,
       outcomeCode: params.resultCode,
-      canonicalResult: {
-        ...(params.repoCount !== undefined ? { repo_count: params.repoCount } : {}),
-        ...(params.errorCount !== undefined ? { error_count: params.errorCount } : {}),
-      },
+      canonicalResult: counts,
       outboxEvent: {
         eventName: 'security_command_settled',
-        distinctId,
+        distinctId: await resolveSecuritySettleDistinctId(db, {
+          userId: params.userId,
+          email: params.actorEmail,
+        }),
         properties: {
           source: 'server',
           surface: 'security',
           phase: 'terminal',
           intent: params.intent,
           outcome: status,
-          ...(params.repoCount !== undefined ? { repo_count: params.repoCount } : {}),
-          ...(params.errorCount !== undefined ? { error_count: params.errorCount } : {}),
+          ...counts,
           duration_ms: durationMs,
         },
       },
@@ -859,7 +820,7 @@ async function settleSecurityLedgerByProviderRef(
     });
   } catch (error) {
     console.error('Failed to settle security operation ledger row', {
-      row_id: row.id,
+      provider_ref: params.providerRef,
       status,
       result_code: params.resultCode,
       error_type: error instanceof Error ? error.name : 'UnknownError',

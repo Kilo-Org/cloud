@@ -11,6 +11,7 @@
 
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
+  isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
   PR_OPERATION_AMBIGUOUS_MESSAGE,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -44,16 +45,14 @@ export function mutationErrorDisplay(
   classification: Classification,
   rawError?: unknown
 ): MutationErrorDisplay {
-  // The ledger's ambiguous outcome is NOT the generic retryable copy: the
-  // effect may have committed, so the user must verify the PR before
-  // retrying. Pass it through verbatim on both surfaces.
-  if (rawError instanceof Error && rawError.message === PR_OPERATION_AMBIGUOUS_MESSAGE) {
+  // The ambiguous outcome is NOT the generic retryable copy: the effect may
+  // have committed, so the user must verify the PR. Verbatim on both surfaces.
+  if (isPrOperationAmbiguous(rawError)) {
     return { kind: 'retryable', message: PR_OPERATION_AMBIGUOUS_MESSAGE };
   }
-  // The ledger's persistence-failure marker is retry-BLOCKING: the row never
-  // became `reconcile_pending`, so the same key must not be retried. Map it to
-  // the retry-blocking bad-request kind with the honest server copy (not the
-  // surface-specific validation copy) so no retry CTA is offered.
+  // The persistence-failure marker is retry-BLOCKING: the row never became
+  // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
+  // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
     return { kind: 'bad-request', message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE };
   }

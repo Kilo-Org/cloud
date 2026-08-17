@@ -69,12 +69,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const { spawn } = useRemoteInstanceSpawn();
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
-  // P1-A-08b: one `operationKey` per share-spawn intent (share + instance),
-  // hoisted so a retryable failure keeps the key (the relay dedupes the
-  // retry) and rotated on a terminal outcome (a `ready` spawn — even when
-  // commit navigation is suppressed — or a typed non-retryable rejection).
-  // Uses the share flow's own key, never the new-session or continue flows'
-  // keys.
+  // P1-A-08b: one `operationKey` per share-spawn intent (share + instance), so
+  // a retryable failure keeps the key and the relay dedupes the retry.
   const { getKey, rotateKey } = useHoistedOperationKey();
   // Per-attempt token so a stale spawn's finally cannot clear a newer lock
   // (share replace mid-flight, or same-connection re-tap after replace).
@@ -319,10 +315,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           });
 
           if (action.kind === 'navigate') {
-            // The spawn settled; the next share attempt is a fresh intent.
-            // Rotate before the suppressed-navigation early return so a later
-            // eligible spawn cannot reuse the settled key and replay the old
-            // session result.
+            // Rotate before the suppressed-navigation early return, so a later
+            // eligible spawn cannot reuse the settled key.
             rotateKey();
             if (
               !shouldCommitShareSpawnReady({

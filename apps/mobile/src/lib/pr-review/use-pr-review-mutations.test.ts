@@ -116,11 +116,6 @@ describe('useCreateReviewCommentMutation (P1-A-08c wiring)', () => {
     vi.clearAllMocks();
   });
 
-  it('mounts a useMutation with a custom mutationFn', () => {
-    useCreateReviewCommentMutation(REF);
-    expect(lastCapturedOptions?.mutationFn).toBeDefined();
-  });
-
   it('delegates the input to createReviewComment.mutate and resolves the reply', async () => {
     const reply = { id: 42, htmlUrl: 'https://example.com' };
     createCommentMutateMock.mockResolvedValueOnce(reply);
@@ -168,16 +163,6 @@ describe('useCreateReviewCommentMutation (P1-A-08c wiring)', () => {
 
     await expect(lastCapturedOptions?.mutationFn?.(COMMENT_INPUT)).rejects.toMatchObject({
       message: 'Could not post comment.',
-    });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
-  it('keeps the key on a retryable network failure (the ledger owns the retry)', async () => {
-    createCommentMutateMock.mockRejectedValueOnce(new Error('Network request failed'));
-    useCreateReviewCommentMutation(REF);
-
-    await expect(lastCapturedOptions?.mutationFn?.(COMMENT_INPUT)).rejects.toMatchObject({
-      message: 'Network request failed',
     });
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });
@@ -230,11 +215,6 @@ describe('useSubmitReviewMutation (P1-A-08c wiring)', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('mounts a useMutation with a custom mutationFn', () => {
-    useSubmitReviewMutation(REF);
-    expect(lastCapturedOptions?.mutationFn).toBeDefined();
   });
 
   it('delegates the input to submitReview.mutate and resolves the result', async () => {

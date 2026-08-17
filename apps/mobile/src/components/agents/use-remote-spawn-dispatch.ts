@@ -138,10 +138,8 @@ export function useRemoteSpawnDispatch({
     ) => Promise<CreateSessionOutcome>;
   } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
-  // P1-A-08b: one `operationKey` per spawn intent, hoisted so a retryable
-  // failure keeps the key (the relay dedupes the retry) and rotated on a
-  // terminal outcome (`ready` or a typed non-retryable rejection). The
-  // fingerprint covers the target instance and every create field.
+  // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
+  // the key and the relay dedupes the retry.
   const { getKey, rotateKey } = useHoistedOperationKey();
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)

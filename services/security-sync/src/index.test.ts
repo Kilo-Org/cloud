@@ -12,6 +12,7 @@ import {
   recordOperationAcceptance,
   recordOperationProgress,
 } from '@kilocode/db/operation-ledger';
+import type * as LedgerModule from '@kilocode/db/operation-ledger';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
@@ -32,8 +33,8 @@ vi.mock('@kilocode/db', async importOriginal => {
   };
 });
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
-vi.mock('@kilocode/db/operation-ledger', () => ({
-  OPERATION_NON_TERMINAL_STATUSES: ['admitted', 'reconcile_pending'],
+vi.mock('@kilocode/db/operation-ledger', async importOriginal => ({
+  ...(await importOriginal<typeof LedgerModule>()),
   recordOperationAcceptance: vi.fn(),
   recordOperationProgress: vi.fn(),
   settleOperation: vi.fn(),
@@ -1680,7 +1681,7 @@ describe('security operation ledger provider_ref join', () => {
     const { ack, retry } = await processSyncMessage();
 
     expect(errorLog).toHaveBeenCalledWith(
-      expect.stringContaining('Security operation ledger lookup failed'),
+      expect.stringContaining('Failed to settle security operation ledger row'),
       expect.objectContaining({ provider_ref: messageId })
     );
     errorLog.mockRestore();

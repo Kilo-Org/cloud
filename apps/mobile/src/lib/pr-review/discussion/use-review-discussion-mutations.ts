@@ -75,12 +75,7 @@ export type ReplyToCommentInput = {
   body: string;
 };
 
-/**
- * Deterministic intent fingerprint for a reply submit. The retry of the SAME
- * reply text on the SAME comment reuses the hoisted operation key; changing
- * the reply body or the target comment rotates the key so a changed intent
- * cannot replay the previous reply's canonical ledger result.
- */
+/** Intent fingerprint for a reply: a changed body or target comment is a new intent. */
 export function replyToCommentIntentFingerprint(input: ReplyToCommentInput): string {
   return JSON.stringify({
     resource: [input.owner, input.repo, input.number],

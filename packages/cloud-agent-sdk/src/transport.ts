@@ -17,10 +17,8 @@ import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
  */
 type CreateRemoteSessionInput = {
   /**
-   * Stable key for a caller retry of the same create intent. The
-   * connection-scoped spawn helper derives distinct durable wire identities
-   * from it (`${key}:ext` extended attempt, `${key}:bare` old-CLI retry) so
-   * the two attempts never collide in the relay's mutationId dedupe.
+   * Stable key for a caller retry of the same create intent. The spawn helper
+   * derives distinct durable wire identities from it (`${key}:ext`, `${key}:bare`).
    */
   mutationId?: string;
   agent?: string;

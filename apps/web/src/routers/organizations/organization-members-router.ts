@@ -16,7 +16,7 @@ import {
   operation_ledgers,
   type OperationLedgerRow,
 } from '@kilocode/db/schema';
-import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   ensureOrganizationAccess,
@@ -126,59 +126,33 @@ async function getDirectOrganizationRole(
 //
 // The role-change (`update` with `role`) and member-removal (`remove`)
 // mutations accept an optional `operationKey`. When present, the mutation
-// admits an `organization`-domain ledger row BEFORE the mutable membership
-// lookup, and only then executes. Later same-key calls dedupe, replay the
-// canonical result, or conflict. After a successful helper commit, the success
-// audit log, the terminal settle, and the `organization_write_settled` outbox
-// event are written in ONE transaction (atomic). A failed helper result
-// settles the row `failed` without a success audit or success outbox. A
-// definitive authorization rejection on the keyed paths — an
-// `ensureOrganizationAccess` denial or an `assertOwnerAuthority` refusal —
-// settles the row `failed` the same way before the existing typed error
-// returns, so a same-key retry replays the rejection instead of taking over.
-// Only known authorization `TRPCError` codes (`UNAUTHORIZED` from
-// `ensureOrganizationAccess`, `FORBIDDEN` from `assertOwnerAuthority`) settle
-// as `authorization_failed`; an operational database error from the access
-// re-check is rethrown untouched and leaves the row retryable instead of
-// terminalizing it as a rejection. The takeover/repair paths
-// (`repairOrgRoleChange`, `repairOrgMemberRemove`) re-check access and owner
-// authority the same way before re-running the helper, and settle the same
-// `authorization_failed` outcome on a definitive rejection. A
-// takeover/reconcile retry reads the membership back FIRST: an already-applied
-// role or an already-removed member settles completed and replays, which
-// avoids the NOT_FOUND trap of re-running the helper on the already-applied
-// state. For member removal the ledger admission runs BEFORE the
-// missing-membership precondition: a retry of an already-removed member must
-// reach the settled replay or takeover repair instead of being rejected with
-// NOT_FOUND first; the permission and bot checks are retained for a
-// first-time removal. For keyed role changes the same admission-before-lookup
-// order holds: a settled role change replays even when the member was removed
-// after the original success, and a takeover read-back that finds the member
-// gone (the keyed path reads membership only after admission, so an absent
-// read-back means the member was removed after the original success) completes
-// the record as completed and replays. A completed `member_remove` row records
-// its post-removal gateway cleanup in the canonical result (`cleanup:
-// 'pending'` until the revocation succeeds, then `'complete'`); a same-key
-// replay of a row whose cleanup is not recorded complete retries the idempotent
-// cleanup before replaying, so a gateway revocation failure after the settle
-// is repaired by the retry instead of being skipped. The membership helpers
-// and the `dailyUsageLimitUsd` path are unchanged.
+// admits a `reconcile-first` ledger row BEFORE the mutable membership lookup,
+// so a same-key retry replays, repairs, or conflicts instead of being rejected
+// by a precondition the first attempt already satisfied. On success the audit
+// log, the terminal settle and the `organization_write_settled` outbox event
+// share ONE transaction. Every definitive rejection (failed helper, absent
+// member, bot refusal, authorization denial) settles the row `failed` so the
+// same-key retry replays the rejection; an operational error is rethrown
+// untouched and leaves the row retryable. A takeover reads the membership back
+// FIRST: re-running the helper over already-applied state would fail with
+// NOT_FOUND. The un-keyed paths and the `dailyUsageLimitUsd` path are unchanged.
 
 const ORG_LEDGER_DOMAIN = 'organization' as const;
 /** The in-flight window: while an `admitted` row holds a live lease, same-key
  *  retries receive CONFLICT `operation_in_progress` instead of re-running. */
 const ORG_LEDGER_LEASE_SECONDS = 120;
 
-const ORG_LEDGER_INTENTS = ['member_role_change', 'member_remove'] as const;
-type OrgLedgerIntent = (typeof ORG_LEDGER_INTENTS)[number];
+type OrgLedgerIntent = 'member_role_change' | 'member_remove';
 
 const ORG_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
 const ORG_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
 const ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
-// Member-removal cleanup marker recorded in a settled row's canonical result.
-// `completeOrgMemberRemoval` settles with `cleanup: 'pending'` and flips it to
-// `'complete'` only after the post-removal gateway revocation succeeds, so a
-// same-key replay can tell whether the required cleanup still needs retrying.
+/** Canonical result and response value of a settled role change; they must match. */
+const ORG_ROLE_CHANGE_UPDATED = 'role and limit';
+// Member-removal cleanup marker in a settled row's canonical result: the settle
+// records `pending`, and only a successful post-removal gateway revocation
+// flips it to `complete`, so a same-key replay can tell whether the required
+// cleanup still needs retrying.
 const ORG_MEMBER_REMOVAL_CLEANUP_PENDING = 'pending';
 const ORG_MEMBER_REMOVAL_CLEANUP_COMPLETE = 'complete';
 // A provider-confirmed outcome whose ledger settle failed: the membership
@@ -187,23 +161,26 @@ const ORG_MEMBER_REMOVAL_CLEANUP_COMPLETE = 'complete';
 const ORG_LEDGER_SETTLE_FAILED_MESSAGE =
   'The action completed, but we could not record the result. Please try again.';
 
-function orgOperationInProgressError(): TRPCError {
-  return new TRPCError({ code: 'CONFLICT', message: ORG_OPERATION_IN_PROGRESS_MESSAGE });
-}
+type OrgActor = {
+  id: string;
+  google_user_email: string | null;
+  google_user_name: string | null;
+  is_admin: boolean;
+};
 
-function orgOperationKeyReuseMismatchError(): TRPCError {
-  return new TRPCError({ code: 'CONFLICT', message: ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
-}
+/** Result of a keyed organization write; `replayed` marks a deduped retry. */
+type OrgWriteResult = SuccessResult<{ updated: string; replayed?: boolean }>;
 
 /** `organization_write_settled` outbox payload (DEC-05): no free text, no resource keys. */
 function orgSettledOutboxEvent(params: {
-  distinctId: string;
+  user: OrgActor;
   intent: OrgLedgerIntent;
   outcome: 'completed' | 'failed';
 }): OutboxEventInput {
   return {
     eventName: 'organization_write_settled',
-    distinctId: params.distinctId,
+    // Identity channel (the user's email), not an event property.
+    distinctId: params.user.google_user_email || params.user.id,
     properties: {
       source: 'web',
       surface: 'organization',
@@ -223,13 +200,68 @@ function orgMemberRemoveResourceKey(organizationId: string, memberId: string): s
 }
 
 /**
- * Best-effort ledger write, reserved for FAILED-status settles only: the
- * caller is already receiving a typed rejection, so a ledger write that fails
- * here must never mask the helper outcome.
+ * The target membership's role, or undefined when the user is not a member.
+ * `UQ_organization_memberships_org_user` makes the row unique per
+ * (organization, member).
  */
-async function bestEffortOrgLedgerWrite(work: () => Promise<unknown>): Promise<void> {
+async function readOrgMemberRole(
+  organizationId: string,
+  memberId: string
+): Promise<{ role: OrganizationRole } | undefined> {
+  const [member] = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    );
+  return member;
+}
+
+/** The target membership plus the service-account flag used by the removal guard. */
+async function readOrgMemberWithBotFlag(
+  organizationId: string,
+  memberId: string
+): Promise<{ role: OrganizationRole; isBot: boolean } | undefined> {
+  const [member] = await db
+    .select({
+      role: organization_memberships.role,
+      isBot: kilocode_users.is_bot,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    );
+  return member;
+}
+
+/**
+ * Best-effort FAILED settle: the caller is already returning a typed rejection,
+ * so a ledger write failure here must never mask the helper outcome.
+ */
+async function settleOrgWriteFailed(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  intent: OrgLedgerIntent;
+  outcomeCode: string;
+}): Promise<void> {
   try {
-    await work();
+    await settleOperation(db, {
+      rowId: args.row.id,
+      status: 'failed',
+      outcomeCode: args.outcomeCode,
+      outboxEvent: orgSettledOutboxEvent({
+        user: args.user,
+        intent: args.intent,
+        outcome: 'failed',
+      }),
+    });
   } catch (error) {
     console.error(
       `Failed to write organization operation ledger row: ${error instanceof Error ? error.message : String(error)}`
@@ -238,106 +270,152 @@ async function bestEffortOrgLedgerWrite(work: () => Promise<unknown>): Promise<v
 }
 
 /**
- * Classifies a rejection raised by the keyed-path access re-check as a
- * definitive authorization failure: a `TRPCError` with an authorization code
- * thrown by `ensureOrganizationAccess` (`UNAUTHORIZED`) or by the
- * owner-authority refusal (`FORBIDDEN`). Operational database errors are not
- * classified: they stay retryable and must never settle the row as a terminal
- * `authorization_failed` rejection.
+ * Re-checks organization access and owner authority on a keyed path. Only a
+ * definitive authorization rejection (`UNAUTHORIZED` from
+ * `ensureOrganizationAccess`, `FORBIDDEN` from `assertOwnerAuthority`) settles
+ * the row `failed`, so a same-key retry replays it. An operational database
+ * error is rethrown untouched and leaves the row retryable.
  */
-function isOrgAuthorizationRejection(error: unknown): boolean {
-  if (error instanceof TRPCError) {
-    return error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN';
+async function assertKeyedOrgAuthority(args: {
+  row: OperationLedgerRow;
+  ctx: TRPCContext;
+  user: OrgActor;
+  organizationId: string;
+  intent: OrgLedgerIntent;
+  target: { currentRole?: OrganizationRole | null; nextRole?: OrganizationRole | null };
+}): Promise<void> {
+  try {
+    const actorRole = await ensureOrganizationAccess(
+      args.ctx,
+      args.organizationId,
+      ORGANIZATION_MANAGE_ROLES
+    );
+    assertOwnerAuthority(actorRole, args.target);
+  } catch (error) {
+    if (
+      error instanceof TRPCError &&
+      (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN')
+    ) {
+      await settleOrgWriteFailed({
+        row: args.row,
+        user: args.user,
+        intent: args.intent,
+        outcomeCode: 'authorization_failed',
+      });
+    }
+    throw error;
   }
-  return false;
-}
-
-/** Replays a terminal row: only `completed`/`no_op` may replay a canonical result. */
-function replaySettledOrgRow<T>(row: OperationLedgerRow): T {
-  if (row.status === 'completed' || row.status === 'no_op') {
-    return { success: true, ...(row.canonical_result ?? {}), replayed: true } as T;
-  }
-  throw new TRPCError({ code: 'BAD_REQUEST', message: ORG_REPLAY_FAILED_MESSAGE });
 }
 
 /**
- * Replays a settled `member_remove` row. The removal itself is never re-run,
- * but the post-removal gateway revocation IS retried when it was not recorded
- * complete: a first attempt whose cleanup failed settled the row with
- * `cleanup: 'pending'`, and rows settled before this marker predate it, so the
- * absence of `cleanup: 'complete'` also counts as incomplete. The cleanup is
- * idempotent, so re-running it over an already-complete cleanup is harmless. A
- * cleanup retry that fails again keeps the row retryable and surfaces the
- * failure instead of replaying a false success.
+ * Durably records a provider-confirmed org outcome: the success audit log, the
+ * terminal settle and the success outbox event share ONE transaction. A settle
+ * failure must never yield a success receipt for an un-recorded row.
+ */
+async function auditAndSettleOrgCompleted(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  intent: OrgLedgerIntent;
+  action: 'organization.member.change_role' | 'organization.member.remove';
+  message: string;
+  canonicalResult: Record<string, unknown>;
+}): Promise<void> {
+  await db.transaction(async tx => {
+    await createAuditLog({
+      action: args.action,
+      actor_email: args.user.google_user_email,
+      actor_id: args.user.id,
+      actor_name: args.user.google_user_name,
+      message: args.message,
+      organization_id: args.organizationId,
+      tx,
+    });
+    try {
+      await settleOperation(tx, {
+        rowId: args.row.id,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: args.canonicalResult,
+        outboxEvent: orgSettledOutboxEvent({
+          user: args.user,
+          intent: args.intent,
+          outcome: 'completed',
+        }),
+      });
+    } catch (error) {
+      console.error(
+        `Failed to settle completed organization operation ledger row: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: ORG_LEDGER_SETTLE_FAILED_MESSAGE,
+        cause: error,
+      });
+    }
+  });
+}
+
+/** Audit + settle + outbox for a completed role change. */
+async function auditAndSettleOrgRoleChange(args: {
+  row: OperationLedgerRow;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+  fromRole: string;
+  toRole: OrganizationRole;
+}): Promise<void> {
+  const updatedUser = await findUserById(args.memberId);
+  await auditAndSettleOrgCompleted({
+    row: args.row,
+    user: args.user,
+    organizationId: args.organizationId,
+    intent: 'member_role_change',
+    action: 'organization.member.change_role',
+    message: `Changed role for user ${updatedUser?.google_user_email || 'unknown'} from ${args.fromRole} to ${args.toRole}`,
+    canonicalResult: { updated: ORG_ROLE_CHANGE_UPDATED },
+  });
+}
+
+/** Replays a terminal row: only `completed`/`no_op` may replay a canonical result. */
+function replaySettledOrgRow(row: OperationLedgerRow): OrgWriteResult {
+  if (row.status !== 'completed' && row.status !== 'no_op') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ORG_REPLAY_FAILED_MESSAGE });
+  }
+  return { success: true, ...(row.canonical_result ?? {}), replayed: true } as OrgWriteResult;
+}
+
+/**
+ * Replays a settled `member_remove` row. The removal is never re-run, but the
+ * post-removal cleanup IS retried when it was not recorded complete: a first
+ * attempt whose cleanup failed settled with `cleanup: 'pending'`, and rows
+ * settled before this marker predate it, so anything but `'complete'` counts as
+ * incomplete. The cleanup is idempotent. A cleanup retry that fails again keeps
+ * the row retryable and surfaces the failure instead of a false success.
  */
 async function replaySettledOrgMemberRemoval(args: {
   row: OperationLedgerRow;
   organizationId: string;
   memberId: string;
-}): Promise<SuccessResult<{ updated: string }>> {
+}): Promise<OrgWriteResult> {
   const { row, organizationId, memberId } = args;
   if (row.status !== 'completed' && row.status !== 'no_op') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: ORG_REPLAY_FAILED_MESSAGE });
   }
-  const canonicalResult = row.canonical_result as {
-    updated?: unknown;
-    cleanup?: unknown;
-  } | null;
+  const canonicalResult = row.canonical_result as { updated?: unknown; cleanup?: unknown } | null;
   if (canonicalResult?.cleanup !== ORG_MEMBER_REMOVAL_CLEANUP_COMPLETE) {
-    await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
-    await cleanupRemovedMemberInstances(memberId, organizationId);
-    await markOrgMemberRemovalCleanupComplete(row.id, memberId);
+    await runOrgMemberRemovalCleanup(row.id, organizationId, memberId);
   }
   return {
     success: true,
     updated: typeof canonicalResult?.updated === 'string' ? canonicalResult.updated : memberId,
     replayed: true,
-  } as SuccessResult<{ updated: string }>;
+  };
 }
 
 /**
- * Durably settles a provider-confirmed org outcome as `completed` with the
- * success outbox event inside the SAME transaction as the success audit log.
- * A settle failure must never yield a success receipt for an un-recorded row.
- */
-async function settleOrgCompletedInTransaction(args: {
-  tx: DrizzleTransaction;
-  row: OperationLedgerRow;
-  canonicalResult: Record<string, unknown>;
-  outboxEvent: OutboxEventInput;
-}): Promise<void> {
-  try {
-    await settleOperation(args.tx, {
-      rowId: args.row.id,
-      status: 'completed',
-      outcomeCode: 'ok',
-      canonicalResult: args.canonicalResult,
-      outboxEvent: args.outboxEvent,
-    });
-  } catch (error) {
-    console.error(
-      `Failed to settle completed organization operation ledger row: ${error instanceof Error ? error.message : String(error)}`
-    );
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: ORG_LEDGER_SETTLE_FAILED_MESSAGE,
-      cause: error,
-    });
-  }
-}
-
-type OrgActor = {
-  id: string;
-  google_user_email: string | null;
-  google_user_name: string | null;
-  is_admin: boolean;
-};
-
-/**
- * Runs the role-change helper under an already-admitted row and, after the
- * helper commits, writes the success audit log + terminal settle + outbox in
- * one transaction. A failed helper result settles the row `failed` without a
- * success audit or success outbox.
+ * Runs the role-change helper under an already-admitted row. A failed helper
+ * result settles the row `failed` without a success audit or success outbox.
  */
 async function executeOrgRoleChange(args: {
   row: OperationLedgerRow;
@@ -346,74 +424,99 @@ async function executeOrgRoleChange(args: {
   memberId: string;
   role: OrganizationRole;
   dailyUsageLimitUsd?: number | null;
-  targetMember?: { role: string };
-}): Promise<SuccessResult<{ updated: string }>> {
-  const { organizationId, memberId, role } = args;
-  const distinctId = args.user.google_user_email || args.user.id;
+  currentRole: string;
+}): Promise<OrgWriteResult> {
+  const { row, user, organizationId, memberId, role } = args;
 
   const result = await updateUserRoleInOrganization(organizationId, memberId, role);
   if (!result.success) {
-    await bestEffortOrgLedgerWrite(() =>
-      settleOperation(db, {
-        rowId: args.row.id,
-        status: 'failed',
-        outcomeCode: 'role_change_failed',
-        outboxEvent: orgSettledOutboxEvent({
-          distinctId,
-          intent: 'member_role_change',
-          outcome: 'failed',
-        }),
-      })
-    );
+    await settleOrgWriteFailed({
+      row,
+      user,
+      intent: 'member_role_change',
+      outcomeCode: 'role_change_failed',
+    });
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Failed to update user role',
     });
   }
 
-  if (args.dailyUsageLimitUsd !== undefined && args.targetMember) {
+  if (args.dailyUsageLimitUsd !== undefined) {
     await updateOrganizationUserLimit(organizationId, memberId, args.dailyUsageLimitUsd);
   }
 
-  const updatedUser = await findUserById(memberId);
-  const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
-  const updated = 'role and limit';
-
-  await db.transaction(async tx => {
-    await createAuditLog({
-      action: 'organization.member.change_role',
-      actor_email: args.user.google_user_email,
-      actor_id: args.user.id,
-      actor_name: args.user.google_user_name,
-      message: `Changed role for user ${updatedUserEmail} from ${args.targetMember?.role ?? 'unknown'} to ${role}`,
-      organization_id: organizationId,
-      tx,
-    });
-    await settleOrgCompletedInTransaction({
-      tx,
-      row: args.row,
-      canonicalResult: { updated },
-      outboxEvent: orgSettledOutboxEvent({
-        distinctId,
-        intent: 'member_role_change',
-        outcome: 'completed',
-      }),
-    });
+  await auditAndSettleOrgRoleChange({
+    row,
+    user,
+    organizationId,
+    memberId,
+    fromRole: args.currentRole,
+    toRole: role,
   });
 
-  return successResult({ updated });
+  return successResult({ updated: ORG_ROLE_CHANGE_UPDATED });
+}
+
+/** First (`admitted`) execution of a keyed role change. */
+async function firstOrgRoleChange(args: {
+  row: OperationLedgerRow;
+  ctx: TRPCContext;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+  role: OrganizationRole;
+  dailyUsageLimitUsd?: number | null;
+}): Promise<OrgWriteResult> {
+  const { row, user, organizationId, memberId, role } = args;
+  const targetMember = await readOrgMemberRole(organizationId, memberId);
+
+  // A first-time role change of an absent member settles the row `failed` so a
+  // later same-key retry replays the failure instead of taking over past the
+  // membership check.
+  if (!targetMember) {
+    await settleOrgWriteFailed({
+      row,
+      user,
+      intent: 'member_role_change',
+      outcomeCode: 'member_absent',
+    });
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User is not a member of this organization',
+    });
+  }
+
+  // Only an owner may grant the owner role or act on an existing owner's
+  // membership. Runs after the membership read so the admission stays before
+  // the mutable lookup.
+  await assertKeyedOrgAuthority({
+    row,
+    ctx: args.ctx,
+    user,
+    organizationId,
+    intent: 'member_role_change',
+    target: { currentRole: targetMember.role, nextRole: role },
+  });
+
+  return executeOrgRoleChange({
+    row,
+    user,
+    organizationId,
+    memberId,
+    role,
+    dailyUsageLimitUsd: args.dailyUsageLimitUsd,
+    currentRole: targetMember.role,
+  });
 }
 
 /**
- * Read-back-first takeover repair for a role change: if the read-back shows
- * the target role already applied, the first attempt committed the change
- * without settling — settle completed and replay without re-running the
- * helper (avoiding the NOT_FOUND trap). If the member is gone, the keyed path
- * reads membership only after admission and settles `failed` when the member
- * is absent on first execution, so an absent read-back here means the original
- * success committed and the member was REMOVED later: complete the record as
- * completed and replay instead of failing on the mutable membership state.
- * Otherwise re-run the helper under the same row.
+ * Read-back-first takeover repair for a role change. The target role already
+ * applied means the first attempt committed without settling. An absent
+ * membership means the same thing: the keyed path settles `failed` when the
+ * member is absent on first execution, so the original success committed and
+ * the member was REMOVED later. Both settle completed and replay. Otherwise the
+ * helper re-runs under the same row.
  */
 async function repairOrgRoleChange(args: {
   row: OperationLedgerRow;
@@ -423,100 +526,51 @@ async function repairOrgRoleChange(args: {
   memberId: string;
   role: OrganizationRole;
   dailyUsageLimitUsd?: number | null;
-}): Promise<SuccessResult<{ updated: string }>> {
-  const distinctId = args.user.google_user_email || args.user.id;
+}): Promise<OrgWriteResult> {
+  const { row, user, organizationId, memberId, role } = args;
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
     .where(
       and(
-        eq(organization_memberships.organization_id, args.organizationId),
-        eq(organization_memberships.kilo_user_id, args.memberId)
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
       )
     )
     .limit(1);
 
-  if (!membership) {
-    const updatedUser = await findUserById(args.memberId);
-    const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
-    await db.transaction(async tx => {
-      await createAuditLog({
-        action: 'organization.member.change_role',
-        actor_email: args.user.google_user_email,
-        actor_id: args.user.id,
-        actor_name: args.user.google_user_name,
-        message: `Changed role for user ${updatedUserEmail} from unknown to ${args.role}`,
-        organization_id: args.organizationId,
-        tx,
-      });
-      await settleOrgCompletedInTransaction({
-        tx,
-        row: args.row,
-        canonicalResult: { updated: 'role and limit' },
-        outboxEvent: orgSettledOutboxEvent({
-          distinctId,
-          intent: 'member_role_change',
-          outcome: 'completed',
-        }),
-      });
+  if (!membership || membership.role === role) {
+    await auditAndSettleOrgRoleChange({
+      row,
+      user,
+      organizationId,
+      memberId,
+      fromRole: membership?.role ?? 'unknown',
+      toRole: role,
     });
-    return successResult({ updated: 'role and limit', replayed: true });
+    return successResult({ updated: ORG_ROLE_CHANGE_UPDATED, replayed: true });
   }
 
-  if (membership.role === args.role) {
-    const updatedUser = await findUserById(args.memberId);
-    const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
-    await db.transaction(async tx => {
-      await createAuditLog({
-        action: 'organization.member.change_role',
-        actor_email: args.user.google_user_email,
-        actor_id: args.user.id,
-        actor_name: args.user.google_user_name,
-        message: `Changed role for user ${updatedUserEmail} from ${membership.role} to ${args.role}`,
-        organization_id: args.organizationId,
-        tx,
-      });
-      await settleOrgCompletedInTransaction({
-        tx,
-        row: args.row,
-        canonicalResult: { updated: 'role and limit' },
-        outboxEvent: orgSettledOutboxEvent({
-          distinctId,
-          intent: 'member_role_change',
-          outcome: 'completed',
-        }),
-      });
-    });
-    return successResult({ updated: 'role and limit', replayed: true });
-  }
-
-  // Not applied yet: re-run the helper under the same row (takeover). The
-  // first attempt may have crashed right after admission, so re-check owner
-  // authority before re-running — an admin must never grant the owner role or
-  // act on an existing owner's membership, even through the takeover path. A
-  // definitive authorization rejection settles the row `failed` so a same-key
-  // retry replays the rejection instead of taking over again; an operational
-  // error from the access re-check is rethrown untouched and stays retryable.
-  try {
-    const actorRole = await ensureOrganizationAccess(
-      args.ctx,
-      args.organizationId,
-      ORGANIZATION_MANAGE_ROLES
-    );
-    assertOwnerAuthority(actorRole, { currentRole: membership.role, nextRole: args.role });
-  } catch (error) {
-    if (isOrgAuthorizationRejection(error)) {
-      await settleOrgRoleChangeFailed({
-        row: args.row,
-        distinctId,
-        outcomeCode: 'authorization_failed',
-      });
-    }
-    throw error;
-  }
+  // Not applied yet: re-run the helper under the same row. The first attempt
+  // may have crashed right after admission, so re-check owner authority — an
+  // admin must never grant the owner role nor act on an owner's membership,
+  // even through the takeover path.
+  await assertKeyedOrgAuthority({
+    row,
+    ctx: args.ctx,
+    user,
+    organizationId,
+    intent: 'member_role_change',
+    target: { currentRole: membership.role, nextRole: role },
+  });
   return executeOrgRoleChange({
-    ...args,
-    targetMember: { role: membership.role },
+    row,
+    user,
+    organizationId,
+    memberId,
+    role,
+    dailyUsageLimitUsd: args.dailyUsageLimitUsd,
+    currentRole: membership.role,
   });
 }
 
@@ -558,59 +612,18 @@ async function cleanupRemovedMemberInstances(
   }
 }
 
-/** Transactional success audit + settle + outbox, then existing post-removal side effects. */
-async function completeOrgMemberRemoval(args: {
-  row: OperationLedgerRow;
-  user: OrgActor;
-  organizationId: string;
-  memberId: string;
-}): Promise<SuccessResult<{ updated: string }>> {
-  const distinctId = args.user.google_user_email || args.user.id;
-  const removedUser = await findUserById(args.memberId);
-
-  await db.transaction(async tx => {
-    await createAuditLog({
-      action: 'organization.member.remove',
-      actor_email: args.user.google_user_email,
-      actor_id: args.user.id,
-      actor_name: args.user.google_user_name,
-      message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
-      organization_id: args.organizationId,
-      tx,
-    });
-    await settleOrgCompletedInTransaction({
-      tx,
-      row: args.row,
-      canonicalResult: {
-        updated: args.memberId,
-        cleanup: ORG_MEMBER_REMOVAL_CLEANUP_PENDING,
-      },
-      outboxEvent: orgSettledOutboxEvent({
-        distinctId,
-        intent: 'member_remove',
-        outcome: 'completed',
-      }),
-    });
-  });
-
-  // Required gateway revocation runs after the terminal settle. If it fails,
-  // the settled row keeps `cleanup: 'pending'`, so a same-key replay retries
-  // the cleanup (see `replaySettledOrgMemberRemoval`) instead of replaying a
-  // success that never revoked. KiloClaw instance cleanup behavior is unchanged.
-  await revokeGatewayStateForOrganizationMember(db, args.organizationId, args.memberId);
-  await cleanupRemovedMemberInstances(args.memberId, args.organizationId);
-  await markOrgMemberRemovalCleanupComplete(args.row.id, args.memberId);
-
-  return successResult({ updated: args.memberId });
-}
-
 /**
- * Best-effort marker write after the post-removal cleanup succeeds. A failure
- * here never fails the removal response: it only means a later same-key replay
- * re-runs the idempotent cleanup (an already-complete cleanup is harmless) and
- * tries the marker again.
+ * Required post-removal cleanup, then the `complete` marker. A marker write
+ * failure never fails the removal response: it only means a later same-key
+ * replay re-runs the idempotent cleanup and tries the marker again.
  */
-async function markOrgMemberRemovalCleanupComplete(rowId: string, memberId: string): Promise<void> {
+async function runOrgMemberRemovalCleanup(
+  rowId: string,
+  organizationId: string,
+  memberId: string
+): Promise<void> {
+  await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
+  await cleanupRemovedMemberInstances(memberId, organizationId);
   try {
     await db
       .update(operation_ledgers)
@@ -630,44 +643,35 @@ async function markOrgMemberRemovalCleanupComplete(rowId: string, memberId: stri
   }
 }
 
-/** Best-effort failed settle for a role-change row; never masks the typed rejection. */
-async function settleOrgRoleChangeFailed(args: {
+/** Transactional success audit + settle + outbox, then the post-removal cleanup. */
+async function completeOrgMemberRemoval(args: {
   row: OperationLedgerRow;
-  distinctId: string;
-  outcomeCode: string;
-}): Promise<void> {
-  await bestEffortOrgLedgerWrite(() =>
-    settleOperation(db, {
-      rowId: args.row.id,
-      status: 'failed',
-      outcomeCode: args.outcomeCode,
-      outboxEvent: orgSettledOutboxEvent({
-        distinctId: args.distinctId,
-        intent: 'member_role_change',
-        outcome: 'failed',
-      }),
-    })
-  );
-}
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+}): Promise<OrgWriteResult> {
+  const removedUser = await findUserById(args.memberId);
 
-/** Best-effort failed settle for a member-removal row; never masks the typed rejection. */
-async function settleOrgMemberRemovalFailed(args: {
-  row: OperationLedgerRow;
-  distinctId: string;
-  outcomeCode: string;
-}): Promise<void> {
-  await bestEffortOrgLedgerWrite(() =>
-    settleOperation(db, {
-      rowId: args.row.id,
-      status: 'failed',
-      outcomeCode: args.outcomeCode,
-      outboxEvent: orgSettledOutboxEvent({
-        distinctId: args.distinctId,
-        intent: 'member_remove',
-        outcome: 'failed',
-      }),
-    })
-  );
+  await auditAndSettleOrgCompleted({
+    row: args.row,
+    user: args.user,
+    organizationId: args.organizationId,
+    intent: 'member_remove',
+    action: 'organization.member.remove',
+    message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
+    canonicalResult: {
+      updated: args.memberId,
+      cleanup: ORG_MEMBER_REMOVAL_CLEANUP_PENDING,
+    },
+  });
+
+  // The gateway revocation runs after the terminal settle. If it fails, the
+  // settled row keeps `cleanup: 'pending'`, so a same-key replay retries the
+  // cleanup (see `replaySettledOrgMemberRemoval`) instead of replaying a
+  // success that never revoked.
+  await runOrgMemberRemovalCleanup(args.row.id, args.organizationId, args.memberId);
+
+  return successResult({ updated: args.memberId });
 }
 
 /**
@@ -680,13 +684,13 @@ async function executeOrgMemberRemove(args: {
   user: OrgActor;
   organizationId: string;
   memberId: string;
-}): Promise<SuccessResult<{ updated: string }>> {
-  const distinctId = args.user.google_user_email || args.user.id;
+}): Promise<OrgWriteResult> {
   const result = await removeUserFromOrganization(args.organizationId, args.memberId, args.user.id);
   if (result.rowCount === 0) {
-    await settleOrgMemberRemovalFailed({
+    await settleOrgWriteFailed({
       row: args.row,
-      distinctId,
+      user: args.user,
+      intent: 'member_remove',
       outcomeCode: 'member_absent',
     });
     throw new TRPCError({
@@ -697,64 +701,40 @@ async function executeOrgMemberRemove(args: {
   return completeOrgMemberRemoval(args);
 }
 
-/**
- * Read-back-first takeover repair for a member removal: if the read-back shows
- * the member already gone, the first attempt committed the removal without
- * settling — complete the record (audit + settle + outbox + side effects) and
- * replay without re-running the helper (avoiding the NOT_FOUND trap).
- * Otherwise re-run the helper under the same row.
- *
- * RECORDED REJECTION (Kilobot absent-member takeover finding, round 2): the
- * finding claims an absent read-back can settle `completed` for a
- * never-executed row (the member absent for an unrelated reason) and write a
- * false success audit. The approved plan (P1-A-08e item 7) explicitly accepts
- * this outcome for member removal: on takeover, "the membership row is absent
- * → settle `completed` (`already_applied`)", and item 10 tests the takeover
- * read-back "for an already-removed member (no NOT_FOUND)". The taxonomy is
- * `reconcile-first` for `member_remove`, so a same-key takeover means a prior
- * attempt held the lease and the absent read-back is treated as the committed
- * removal. Adding a committed-write progress signal would deviate from the
- * approved plan, so this finding is rejected and the behavior is unchanged.
- * The role-change twin at `repairOrgRoleChange` follows the same decision.
- */
-async function repairOrgMemberRemove(args: {
+/** First (`admitted`) execution of a keyed member removal. */
+async function firstOrgMemberRemove(args: {
   row: OperationLedgerRow;
   ctx: TRPCContext;
   user: OrgActor;
   organizationId: string;
   memberId: string;
-}): Promise<SuccessResult<{ updated: string; replayed: true }>> {
-  const distinctId = args.user.google_user_email || args.user.id;
-  const [membership] = await db
-    .select({
-      id: organization_memberships.id,
-      role: organization_memberships.role,
-      isBot: kilocode_users.is_bot,
-    })
-    .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, args.organizationId),
-        eq(organization_memberships.kilo_user_id, args.memberId)
-      )
-    )
-    .limit(1);
+}): Promise<OrgWriteResult> {
+  const { row, user, organizationId, memberId } = args;
+  const targetMember = await readOrgMemberWithBotFlag(organizationId, memberId);
 
-  if (!membership) {
-    const completed = await completeOrgMemberRemoval(args);
-    return { ...completed, replayed: true };
+  // A first-time removal of a member that is already gone settles the row
+  // `failed` so a later same-key retry replays the failure instead of taking
+  // over into the removal helper.
+  if (!targetMember) {
+    await settleOrgWriteFailed({
+      row,
+      user,
+      intent: 'member_remove',
+      outcomeCode: 'member_absent',
+    });
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User is not a member of this organization',
+    });
   }
 
-  // Preserve the service-account guard on the takeover repair: a bot member
-  // that is still present must never be removed by the read-back repair path.
-  // Refuse exactly like the first-time path (settle failed + FORBIDDEN) so a
-  // later same-key retry replays the typed rejection instead of re-running
-  // the removal helper.
-  if (membership.isBot) {
-    await settleOrgMemberRemovalFailed({
-      row: args.row,
-      distinctId,
+  // Prevent removal of bot users; the refusal settles the row `failed` so a
+  // later same-key retry cannot take over past the bot check.
+  if (targetMember.isBot) {
+    await settleOrgWriteFailed({
+      row,
+      user,
+      intent: 'member_remove',
       outcomeCode: 'bot_removal_refused',
     });
     throw new TRPCError({
@@ -763,33 +743,134 @@ async function repairOrgMemberRemove(args: {
     });
   }
 
-  // Re-check owner authority before re-running the removal helper: the first
-  // attempt may have crashed right after admission, so the takeover path must
-  // not bypass the rule that only an owner may act on an existing owner's
-  // membership. A definitive authorization rejection settles the row `failed`
-  // so a same-key retry replays the rejection instead of taking over again; an
-  // operational error from the access re-check is rethrown untouched and stays
-  // retryable.
-  try {
-    const actorRole = await ensureOrganizationAccess(
-      args.ctx,
-      args.organizationId,
-      ORGANIZATION_MANAGE_ROLES
-    );
-    assertOwnerAuthority(actorRole, { currentRole: membership.role });
-  } catch (error) {
-    if (isOrgAuthorizationRejection(error)) {
-      await settleOrgMemberRemovalFailed({
-        row: args.row,
-        distinctId,
-        outcomeCode: 'authorization_failed',
-      });
-    }
-    throw error;
+  // Only an owner may act on an existing owner's membership. Runs after the
+  // membership read so the admission stays before the mutable lookup.
+  await assertKeyedOrgAuthority({
+    row,
+    ctx: args.ctx,
+    user,
+    organizationId,
+    intent: 'member_remove',
+    target: { currentRole: targetMember.role },
+  });
+
+  return executeOrgMemberRemove({ row, user, organizationId, memberId });
+}
+
+/**
+ * Read-back-first takeover repair for a member removal: a read-back showing the
+ * member already gone means the first attempt committed the removal without
+ * settling, so complete the record (audit + settle + outbox + cleanup) and
+ * replay instead of re-running the helper into the NOT_FOUND trap. Otherwise
+ * the helper re-runs under the same row.
+ *
+ * Accepted trade-off (approved plan P1-A-08e item 7, Kilobot finding rejected
+ * in round 2): an absent read-back is treated as the committed removal even
+ * though the member could be absent for an unrelated reason. The `member_remove`
+ * taxonomy is `reconcile-first`, so a same-key takeover implies a prior attempt
+ * held the lease. `repairOrgRoleChange` follows the same decision.
+ */
+async function repairOrgMemberRemove(args: {
+  row: OperationLedgerRow;
+  ctx: TRPCContext;
+  user: OrgActor;
+  organizationId: string;
+  memberId: string;
+}): Promise<OrgWriteResult> {
+  const { row, user, organizationId, memberId } = args;
+  const [membership] = await db
+    .select({
+      role: organization_memberships.role,
+      isBot: kilocode_users.is_bot,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return { ...(await completeOrgMemberRemoval(args)), replayed: true };
   }
 
-  const completed = await executeOrgMemberRemove(args);
-  return { ...completed, replayed: true };
+  // Preserve the service-account guard on the takeover repair: a bot member
+  // that is still present must never be removed by the read-back repair path.
+  // Refuse exactly like the first-time path so a later same-key retry replays
+  // the typed rejection instead of re-running the removal helper.
+  if (membership.isBot) {
+    await settleOrgWriteFailed({
+      row,
+      user,
+      intent: 'member_remove',
+      outcomeCode: 'bot_removal_refused',
+    });
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Service account users cannot be removed',
+    });
+  }
+
+  // The first attempt may have crashed right after admission, so the takeover
+  // path must not bypass the rule that only an owner may act on an existing
+  // owner's membership.
+  await assertKeyedOrgAuthority({
+    row,
+    ctx: args.ctx,
+    user,
+    organizationId,
+    intent: 'member_remove',
+    target: { currentRole: membership.role },
+  });
+
+  return { ...(await executeOrgMemberRemove(args)), replayed: true };
+}
+
+/**
+ * Admits a keyed organization write and dispatches the admission outcome: first
+ * execution, read-back repair (`takeover` / claimed `reconcile_pending`), replay
+ * of a settled row, or CONFLICT while another attempt holds the lease. Reuse of
+ * one key for a different intent or resource is rejected before any outcome is
+ * honored.
+ */
+async function runOrgLedgerWrite(args: {
+  user: OrgActor;
+  organizationId: string;
+  intent: OrgLedgerIntent;
+  operationKey: string;
+  resourceKey: string;
+  first: (row: OperationLedgerRow) => Promise<OrgWriteResult>;
+  repair: (row: OperationLedgerRow) => Promise<OrgWriteResult>;
+  replay: (row: OperationLedgerRow) => OrgWriteResult | Promise<OrgWriteResult>;
+}): Promise<OrgWriteResult> {
+  const admission = await admitOperation(db, {
+    userId: args.user.id,
+    orgId: args.organizationId,
+    domain: ORG_LEDGER_DOMAIN,
+    intent: args.intent,
+    operationKey: args.operationKey,
+    resourceKey: args.resourceKey,
+    taxonomy: 'reconcile-first',
+    leaseSeconds: ORG_LEDGER_LEASE_SECONDS,
+  });
+  if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
+    throw new TRPCError({ code: 'CONFLICT', message: ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
+  switch (admission.admission) {
+    case 'admitted':
+      return args.first(admission.row);
+    case 'takeover':
+    case 'duplicate_reconcile_pending':
+      return args.repair(admission.row);
+    case 'duplicate_settled':
+      return args.replay(admission.row);
+    case 'duplicate_in_flight':
+    case 'duplicate_reconcile_in_progress':
+      throw new TRPCError({ code: 'CONFLICT', message: ORG_OPERATION_IN_PROGRESS_MESSAGE });
+  }
 }
 
 export const organizationsMembersRouter = createTRPCRouter({
@@ -818,16 +899,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       // Limit-only update: existing path exactly, no ledger.
       if (role === undefined) {
         if (dailyUsageLimitUsd !== undefined) {
-          const [targetMember] = await db
-            .select({ role: organization_memberships.role })
-            .from(organization_memberships)
-            .where(
-              and(
-                eq(organization_memberships.organization_id, organizationId),
-                eq(organization_memberships.kilo_user_id, memberId)
-              )
-            );
-
+          const targetMember = await readOrgMemberRole(organizationId, memberId);
           if (!targetMember) {
             throw new TRPCError({
               code: 'NOT_FOUND',
@@ -842,16 +914,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       // Role change without an operationKey: existing path exactly.
       if (operationKey === undefined) {
-        const [targetMember] = await db
-          .select({ role: organization_memberships.role })
-          .from(organization_memberships)
-          .where(
-            and(
-              eq(organization_memberships.organization_id, organizationId),
-              eq(organization_memberships.kilo_user_id, memberId)
-            )
-          );
-
+        const targetMember = await readOrgMemberRole(organizationId, memberId);
         if (!targetMember) {
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -877,7 +940,7 @@ export const organizationsMembersRouter = createTRPCRouter({
           actor_email: user.google_user_email,
           actor_id: user.id,
           actor_name: user.google_user_name,
-          message: `Changed role for user ${updatedUserEmail} from ${targetMember?.role} to ${role}`,
+          message: `Changed role for user ${updatedUserEmail} from ${targetMember.role} to ${role}`,
           organization_id: organizationId,
         });
 
@@ -888,121 +951,45 @@ export const organizationsMembersRouter = createTRPCRouter({
           });
         }
 
-        if (dailyUsageLimitUsd !== undefined && targetMember) {
+        if (dailyUsageLimitUsd !== undefined) {
           await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
         }
 
-        return successResult({ updated: 'role and limit' });
+        return successResult({ updated: ORG_ROLE_CHANGE_UPDATED });
       }
 
       // Role change with an operationKey: admit a ledger row BEFORE the mutable
       // membership lookup (P1-A-08e). A settled duplicate must replay even when
       // the member was removed after the original success; the existence read
       // therefore runs only on the `admitted` first execution.
-      const resourceKey = orgMemberRoleResourceKey(organizationId, memberId, role);
-      const admission = await admitOperation(db, {
-        userId: user.id,
-        orgId: organizationId,
-        domain: ORG_LEDGER_DOMAIN,
+      return runOrgLedgerWrite({
+        user,
+        organizationId,
         intent: 'member_role_change',
         operationKey,
-        resourceKey,
-        taxonomy: 'reconcile-first',
-        leaseSeconds: ORG_LEDGER_LEASE_SECONDS,
-      });
-      if (
-        admission.row.intent !== 'member_role_change' ||
-        admission.row.resource_key !== resourceKey
-      ) {
-        throw orgOperationKeyReuseMismatchError();
-      }
-      switch (admission.admission) {
-        case 'admitted': {
-          const distinctId = user.google_user_email || user.id;
-          const [targetMember] = await db
-            .select({ role: organization_memberships.role })
-            .from(organization_memberships)
-            .where(
-              and(
-                eq(organization_memberships.organization_id, organizationId),
-                eq(organization_memberships.kilo_user_id, memberId)
-              )
-            );
-
-          // A first-time role change of an absent member settles the row
-          // `failed` so a later same-key retry replays the failure instead of
-          // taking over past the membership check.
-          if (!targetMember) {
-            await bestEffortOrgLedgerWrite(() =>
-              settleOperation(db, {
-                rowId: admission.row.id,
-                status: 'failed',
-                outcomeCode: 'member_absent',
-                outboxEvent: orgSettledOutboxEvent({
-                  distinctId,
-                  intent: 'member_role_change',
-                  outcome: 'failed',
-                }),
-              })
-            );
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'User is not a member of this organization',
-            });
-          }
-
-          // Only an owner may grant the owner role or act on an existing
-          // owner's membership. Runs after the membership read so the ledger
-          // admission stays before the mutable lookup. A definitive
-          // authorization rejection settles the admitted row `failed` (with the
-          // terminal failure outbox event) so a same-key retry replays the
-          // rejection instead of taking over; an operational error from the
-          // access re-check is rethrown untouched and stays retryable.
-          try {
-            const actorRole = await ensureOrganizationAccess(
-              ctx,
-              organizationId,
-              ORGANIZATION_MANAGE_ROLES
-            );
-            assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
-          } catch (error) {
-            if (isOrgAuthorizationRejection(error)) {
-              await settleOrgRoleChangeFailed({
-                row: admission.row,
-                distinctId,
-                outcomeCode: 'authorization_failed',
-              });
-            }
-            throw error;
-          }
-
-          return executeOrgRoleChange({
-            row: admission.row,
-            user,
-            organizationId,
-            memberId,
-            role,
-            dailyUsageLimitUsd,
-            targetMember,
-          });
-        }
-        case 'takeover':
-        case 'duplicate_reconcile_pending':
-          return repairOrgRoleChange({
-            row: admission.row,
+        resourceKey: orgMemberRoleResourceKey(organizationId, memberId, role),
+        first: row =>
+          firstOrgRoleChange({
+            row,
             ctx,
             user,
             organizationId,
             memberId,
             role,
             dailyUsageLimitUsd,
-          });
-        case 'duplicate_settled':
-          return replaySettledOrgRow(admission.row);
-        case 'duplicate_in_flight':
-        case 'duplicate_reconcile_in_progress':
-          throw orgOperationInProgressError();
-      }
+          }),
+        repair: row =>
+          repairOrgRoleChange({
+            row,
+            ctx,
+            user,
+            organizationId,
+            memberId,
+            role,
+            dailyUsageLimitUsd,
+          }),
+        replay: replaySettledOrgRow,
+      });
     }),
   setChildMemberships: organizationBillingMutationProcedure
     .input(SetChildMembershipsSchema)
@@ -1150,20 +1137,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       // membership lookup (missing-member NOT_FOUND + bot FORBIDDEN) runs
       // before the helper and no ledger row is written.
       if (operationKey === undefined) {
-        const [targetMember] = await db
-          .select({
-            role: organization_memberships.role,
-            isBot: kilocode_users.is_bot,
-          })
-          .from(organization_memberships)
-          .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-          .where(
-            and(
-              eq(organization_memberships.organization_id, organizationId),
-              eq(organization_memberships.kilo_user_id, memberId)
-            )
-          );
-
+        const targetMember = await readOrgMemberWithBotFlag(organizationId, memberId);
         if (!targetMember) {
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -1218,119 +1192,18 @@ export const organizationsMembersRouter = createTRPCRouter({
       // member is already removed; the precondition would otherwise reject the
       // retry with NOT_FOUND before the ledger could repair it. The permission
       // and bot checks are retained for a first-time (`admitted`) removal.
-      const resourceKey = orgMemberRemoveResourceKey(organizationId, memberId);
-      const admission = await admitOperation(db, {
-        userId: user.id,
-        orgId: organizationId,
-        domain: ORG_LEDGER_DOMAIN,
+      return runOrgLedgerWrite({
+        user,
+        organizationId,
         intent: 'member_remove',
         operationKey,
-        resourceKey,
-        taxonomy: 'reconcile-first',
-        leaseSeconds: ORG_LEDGER_LEASE_SECONDS,
+        resourceKey: orgMemberRemoveResourceKey(organizationId, memberId),
+        first: row => firstOrgMemberRemove({ row, ctx, user, organizationId, memberId }),
+        repair: row => repairOrgMemberRemove({ row, ctx, user, organizationId, memberId }),
+        // A settled completed removal whose gateway revocation was not recorded
+        // complete retries the idempotent cleanup before replaying.
+        replay: row => replaySettledOrgMemberRemoval({ row, organizationId, memberId }),
       });
-      if (admission.row.intent !== 'member_remove' || admission.row.resource_key !== resourceKey) {
-        throw orgOperationKeyReuseMismatchError();
-      }
-      switch (admission.admission) {
-        case 'admitted': {
-          const distinctId = user.google_user_email || user.id;
-          const [targetMember] = await db
-            .select({
-              role: organization_memberships.role,
-              isBot: kilocode_users.is_bot,
-            })
-            .from(organization_memberships)
-            .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-            .where(
-              and(
-                eq(organization_memberships.organization_id, organizationId),
-                eq(organization_memberships.kilo_user_id, memberId)
-              )
-            );
-
-          // A first-time removal of a member that is already gone settles the
-          // row `failed` so a later same-key retry replays the failure instead
-          // of taking over into the removal helper.
-          if (!targetMember) {
-            await settleOrgMemberRemovalFailed({
-              row: admission.row,
-              distinctId,
-              outcomeCode: 'member_absent',
-            });
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'User is not a member of this organization',
-            });
-          }
-
-          // Prevent removal of bot users; the refusal settles the row `failed`
-          // so a later same-key retry cannot take over past the bot check.
-          if (targetMember.isBot) {
-            await settleOrgMemberRemovalFailed({
-              row: admission.row,
-              distinctId,
-              outcomeCode: 'bot_removal_refused',
-            });
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Service account users cannot be removed',
-            });
-          }
-
-          // Only an owner may act on an existing owner's membership. Runs after
-          // the membership read so the ledger admission stays before the
-          // mutable lookup. A definitive authorization rejection settles the
-          // admitted row `failed` (with the terminal failure outbox event) so a
-          // same-key retry replays the rejection instead of taking over; an
-          // operational error from the access re-check is rethrown untouched
-          // and stays retryable.
-          try {
-            const actorRole = await ensureOrganizationAccess(
-              ctx,
-              organizationId,
-              ORGANIZATION_MANAGE_ROLES
-            );
-            assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
-          } catch (error) {
-            if (isOrgAuthorizationRejection(error)) {
-              await settleOrgMemberRemovalFailed({
-                row: admission.row,
-                distinctId,
-                outcomeCode: 'authorization_failed',
-              });
-            }
-            throw error;
-          }
-
-          return executeOrgMemberRemove({
-            row: admission.row,
-            user,
-            organizationId,
-            memberId,
-          });
-        }
-        case 'takeover':
-        case 'duplicate_reconcile_pending':
-          return repairOrgMemberRemove({
-            row: admission.row,
-            ctx,
-            user,
-            organizationId,
-            memberId,
-          });
-        case 'duplicate_settled':
-          // A settled completed removal whose gateway revocation was not
-          // recorded complete retries the idempotent cleanup before replaying.
-          return replaySettledOrgMemberRemoval({
-            row: admission.row,
-            organizationId,
-            memberId,
-          });
-        case 'duplicate_in_flight':
-        case 'duplicate_reconcile_in_progress':
-          throw orgOperationInProgressError();
-      }
     }),
   invite: organizationBillingMutationProcedure
     .input(InviteMemberSchema)

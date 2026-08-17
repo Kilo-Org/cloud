@@ -104,11 +104,9 @@ export function classifyCreateSessionResult(
   // result.status === 'rejected'
   const cause: unknown = result.reason;
 
-  // Structured relay error: keep `.code` available; every code maps to
-  // `nonRetryable` EXCEPT `COMMAND_ALREADY_PENDING`, the relay's same-key
-  // in-flight dedupe marker. That marker means the intent is still pending
-  // on the DO, so the caller must keep its operation key and retry to get
-  // the durable replay (see `COMMAND_ALREADY_PENDING_CODE`).
+  // Structured relay error: keep `.code` available. Every code maps to
+  // `nonRetryable` except `COMMAND_ALREADY_PENDING` — the intent is still
+  // pending on the DO, so the caller keeps its key and retries for the replay.
   if (cause instanceof UserWebCommandError) {
     if (cause.code === COMMAND_ALREADY_PENDING_CODE) {
       return {
@@ -223,26 +221,20 @@ export function mergeSpawnOrganizationId(
 // Spawner
 // ---------------------------------------------------------------------------
 
-/**
- * Options for one `spawn` attempt. `operationKey` is the caller's stable
- * per-user-intent key, forwarded to the SDK as `mutationId` so the relay's
- * UserConnectionDO dedupes duplicate sends and replays the durable terminal
- * result under the same key.
- */
 export type CreateSessionSpawnOptions = {
-  /** Stable per-user-intent key; becomes the SDK `mutationId` on the wire. */
+  /**
+   * Stable per-user-intent key; becomes the SDK `mutationId` on the wire, so
+   * the relay's UserConnectionDO dedupes duplicate sends and replays the
+   * durable terminal result under the same key.
+   */
   operationKey?: string;
 };
 
 /**
- * Stable per-spawner identity (UUID v4). Generated once at spawner creation.
- *
- * Server-side dedup for `create_session` rides the caller's per-intent
- * `operationKey`, which the spawner forwards to the SDK as `mutationId`
- * (the relay's UserConnectionDO dedupes by it; see `CreateSessionSpawnOptions`).
- * `creationKey` is NOT that key: it remains a stable per-spawner identifier
- * for in-hook bookkeeping and tests only. Do not build a dedupe layer on top
- * of `creationKey`.
+ * Stable per-spawner identity (UUID v4), generated once at spawner creation.
+ * It is NOT the dedupe key — server-side dedup rides the caller's
+ * `operationKey` (see `CreateSessionSpawnOptions`). Do not build a dedupe
+ * layer on top of `creationKey`.
  */
 export type CreateSessionSpawner = {
   readonly creationKey: string;

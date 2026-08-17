@@ -1,26 +1,18 @@
 /**
- * DEC-05 privacy deny-list for analytics payloads.
+ * DEC-05 privacy deny-list for analytics payload property keys.
  *
- * Prohibited in analytics payloads (hard, enforced by schema and test): raw
- * prompts, message content, URLs, repository names, comments, emails, tokens,
- * secrets, transaction IDs, and resource IDs. Allowed: stable enum strings,
- * integer counts, `duration_ms` integers, booleans.
+ * Prohibited: raw prompts, message content, URLs, repository names, comments,
+ * emails, tokens, secrets, transaction IDs, and resource IDs (any key ending in
+ * `_id`). Allowed: stable enum strings, integer counts, `duration_ms`
+ * integers, booleans.
  *
- * The predicate operates on *property keys*: a payload key that names a
- * prohibited class of data is rejected. Matching is case-insensitive and
- * covers case, separator, acronym, and suffix variants: `Repository`,
- * `raw_prompt`, `apiToken`, `APIToken`, `repo_name`, and `secret_value` all
- * name prohibited data classes. Resource IDs are any key ending in `_id`; the
- * one carve-out is `event_uuid`, the deterministic event identity assigned by
- * the durable outbox (identity, not content).
- *
- * `repo` matches as a standalone segment (`repo_name`, `repo_url`) and as a
- * letter-suffix prefix (`repository`, `repositories`), so repository-content
- * keys are dropped. The one exception is `repo_count`, a count rather than
- * repository content. `repo_id` is caught by the `_id` rule.
+ * Matching is case-, separator-, and acronym-insensitive and covers letter
+ * suffixes, so `Repository`, `raw_prompt`, `APIToken`, `repo_name`, and
+ * `secret_value` are all rejected. The one carve-out is `repo_count`, a count
+ * rather than repository content.
  */
 
-const PROHIBITED_PROPERTY_KEYS: ReadonlySet<string> = new Set([
+const PROHIBITED_TERMS = [
   'email',
   'url',
   'repo',
@@ -31,11 +23,11 @@ const PROHIBITED_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   'transaction',
   'comment',
   'message',
-] as const);
+] as const;
 
-/** Whole keys that stay allowed even though a segment names a prohibited data
- *  class. `repo_count` is a count of repositories, not repository content. */
-const ALLOWED_EXACT_KEYS: ReadonlySet<string> = new Set(['repo_count'] as const);
+/** A key segment that is a prohibited term plus an optional letter suffix
+ *  (`repo`, `repository`, `tokens`). */
+const PROHIBITED_SEGMENT = new RegExp(`^(?:${PROHIBITED_TERMS.join('|')})[a-z]*$`);
 
 /** Lowercases and splits camelCase and acronym boundaries (`apiToken` →
  *  `api_token`, `APIToken` → `api_token`) so separator matching sees one
@@ -51,40 +43,15 @@ function normalizeKey(key: string): string {
 export function isProhibitedPropertyKey(key: string): boolean {
   const normalized = normalizeKey(key);
 
-  if (ALLOWED_EXACT_KEYS.has(normalized)) {
+  if (normalized === 'repo_count') {
     return false;
   }
 
-  if (normalized.endsWith('_id') && normalized !== 'event_uuid') {
+  if (normalized.endsWith('_id')) {
     return true;
   }
 
-  const segments = normalized.split(/[^a-z0-9]+/).filter(Boolean);
-
-  for (const term of PROHIBITED_PROPERTY_KEYS) {
-    if (normalized === term) {
-      return true;
-    }
-    // Separator variant: the term is a standalone word segment
-    // (`raw_prompt`, `api_token`, `repo_name`, `secret_value`).
-    if (segments.includes(term)) {
-      return true;
-    }
-    // Suffix variant: the term is a word prefix followed only by letters
-    // (`repository`, `emails`, `tokens`).
-    if (
-      segments.some(
-        segment =>
-          segment.length > term.length &&
-          segment.startsWith(term) &&
-          /^[a-z]+$/.test(segment.slice(term.length))
-      )
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  return normalized.split(/[^a-z0-9]+/).some(segment => PROHIBITED_SEGMENT.test(segment));
 }
 
 /**
@@ -94,11 +61,7 @@ export function isProhibitedPropertyKey(key: string): boolean {
  * events (the AppsFlyer mirror path).
  */
 export function redactProhibitedProperties<T extends Record<string, unknown>>(properties: T): T {
-  const safe: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(properties)) {
-    if (!isProhibitedPropertyKey(key)) {
-      safe[key] = value;
-    }
-  }
-  return safe as T;
+  return Object.fromEntries(
+    Object.entries(properties).filter(([key]) => !isProhibitedPropertyKey(key))
+  ) as T;
 }

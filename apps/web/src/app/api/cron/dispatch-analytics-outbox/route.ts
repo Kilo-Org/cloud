@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { CRON_SECRET } from '@/lib/config.server';
 import { dispatchQueuedAnalyticsEvents } from '@/lib/analytics-outbox/dispatch';
+import { isCronAuthorizationValid } from '@/lib/cron-auth';
 import { sentryLogger } from '@/lib/utils.server';
 
 if (!CRON_SECRET) {
@@ -10,8 +11,7 @@ if (!CRON_SECRET) {
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
-  const expectedAuth = `Bearer ${CRON_SECRET}`;
-  if (authHeader !== expectedAuth) {
+  if (!isCronAuthorizationValid(authHeader, CRON_SECRET)) {
     sentryLogger(
       'cron',
       'warning'

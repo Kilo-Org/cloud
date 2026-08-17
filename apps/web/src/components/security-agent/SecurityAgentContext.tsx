@@ -561,7 +561,9 @@ function useSecurityAgentProviderValue(
   const toggleEnabledInFlightRef = useRef(false);
   const commandSuccessCallbacksRef = useRef<Map<string, () => void> | null>(null);
 
-  const trackCommand = useCallback((commandId: string, onSuccess?: () => void) => {
+  // A replayed command admission has no command id: there is nothing to track.
+  const trackCommand = useCallback((commandId: string | undefined, onSuccess?: () => void) => {
+    if (!commandId) return;
     if (onSuccess) {
       if (commandSuccessCallbacksRef.current === null) {
         commandSuccessCallbacksRef.current = new Map();
@@ -751,9 +753,7 @@ function useSecurityAgentProviderValue(
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
-        if (data.commandId) {
-          trackCommand(data.commandId);
-        }
+        trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -775,9 +775,7 @@ function useSecurityAgentProviderValue(
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
         toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
-        if (data.commandId) {
-          trackCommand(data.commandId);
-        }
+        trackCommand(data.commandId);
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -853,9 +851,7 @@ function useSecurityAgentProviderValue(
             ? 'Analysis restart queued'
             : securityAgentCommandAdmissionCopy.start_analysis.successTitle
         );
-        if (data.commandId) {
-          trackCommand(data.commandId);
-        }
+        trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -956,9 +952,7 @@ function useSecurityAgentProviderValue(
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
-        if (data.commandId) {
-          trackCommand(data.commandId);
-        }
+        trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -980,9 +974,7 @@ function useSecurityAgentProviderValue(
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
         toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
-        if (data.commandId) {
-          trackCommand(data.commandId);
-        }
+        trackCommand(data.commandId);
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -1168,24 +1160,12 @@ function useSecurityAgentProviderValue(
       if (isOrg && organizationId) {
         orgDismissMutate(
           { organizationId, findingId: finding.id, reason, comment },
-          {
-            onSuccess: data => {
-              if (data.commandId) {
-                trackCommand(data.commandId, onSuccess);
-              }
-            },
-          }
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
         );
       } else {
         personalDismissMutate(
           { findingId: finding.id, reason, comment },
-          {
-            onSuccess: data => {
-              if (data.commandId) {
-                trackCommand(data.commandId, onSuccess);
-              }
-            },
-          }
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
         );
       }
     },

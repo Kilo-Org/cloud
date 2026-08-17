@@ -111,14 +111,6 @@ function badRequestError(): Error {
   return Object.assign(new Error('session_creation_failed'), { data: { code: 'BAD_REQUEST' } });
 }
 
-function transportError(): Error {
-  return new Error('Network request failed');
-}
-
-function transient5xxError(): Error {
-  return Object.assign(new Error('service unavailable'), { data: { code: 'SERVICE_UNAVAILABLE' } });
-}
-
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
     H: unknown;
@@ -246,39 +238,9 @@ describe('useNewSessionCreator operationKey', () => {
     expect(keys[2]).not.toBe(keys[0]);
   });
 
-  it('keeps the same operationKey across a plain transport failure', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(transportError())
-      .mockRejectedValueOnce(transportError());
-    const creator = runCreator({});
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-    await creator.createSessionFromDraft();
-
-    const keys = usedOperationKeys();
-    expect(keys[0]).toBeDefined();
-    // A transport failure is ambiguous: the ledger may have accepted the
-    // attempt, so the same-key retry lets it reconcile instead of spawning a
-    // second session.
-    expect(keys[1]).toBe(keys[0]);
-  });
-
-  it('keeps the same operationKey across a transient typed 5xx failure', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(transient5xxError())
-      .mockRejectedValueOnce(transient5xxError());
-    const creator = runCreator({});
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-    await creator.createSessionFromDraft();
-
-    const keys = usedOperationKeys();
-    expect(keys[0]).toBeDefined();
-    expect(keys[1]).toBe(keys[0]);
-  });
-
+  // The transport-failure and transient-5xx branches of the retryability
+  // predicate are covered in mobile-session-manager.test.ts; the hook only
+  // needs one retryable and one terminal case.
   it('rotates the operationKey after a typed non-retryable rejection', async () => {
     prepareSessionMutate
       .mockRejectedValueOnce(badRequestError())

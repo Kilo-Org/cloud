@@ -67,22 +67,14 @@ export type CloudAgentPrepareSessionInput = {
   // Inline per-session agents. For council runs, one subagent per specialist, each pinned
   // to its own model/effort; cloud-agent-next materializes these into KILO_CONFIG agents.
   runtimeAgents?: RuntimeAgentInput[];
-  /**
-   * Client-generated UUID, stable across retries of one user intent. When
-   * present AND the effective `autoInitiate` is true, cloud-agent-next admits
-   * the create into the operation ledger and dedupes same-key replays.
-   */
+  /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
 };
 
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
-  /**
-   * `true` when this response is a ledger replay of an already-settled
-   * create (same `operationKey`). The canonical session IDs are returned
-   * unchanged; the caller should not create a second session row.
-   */
+  /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };
 

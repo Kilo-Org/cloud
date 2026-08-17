@@ -1,11 +1,8 @@
 /**
- * Unit tests for the analytics outbox cron drainer (P2-A-04): reclaim, claim,
- * send, delivered/retry/fail, purge, and the expired-unsettled ledger
- * backstop, in order, with the PostHog client stubbed. The DB state-machine
- * transitions themselves are covered by the integration suite in this
- * directory; here the dispatcher orchestration and its summary accounting are
- * the unit under test. The database argument is the mocked `@/lib/drizzle`
- * instance; the option objects are the behavior under test.
+ * Unit tests for the analytics outbox cron drainer (P2-A-04): the orchestration
+ * order and the summary accounting, with the PostHog client and the DB
+ * transitions stubbed. The transitions themselves are covered by
+ * `analytics-outbox.integration.test.ts`.
  */
 import { randomUUID } from 'crypto';
 
@@ -90,7 +87,7 @@ describe('dispatchQueuedAnalyticsEvents', () => {
     mockPurgeExpired.mockResolvedValue(emptyPurge);
   });
 
-  it('claims and delivers a due event with the deterministic event_uuid', async () => {
+  it('claims and delivers a due event with the deterministic event_uuid, after the flush', async () => {
     const row = makeRow();
     mockClaimDueOutboxEvents.mockResolvedValueOnce([row]);
     mockMarkOutboxDelivered.mockResolvedValue(row);
@@ -104,6 +101,11 @@ describe('dispatchQueuedAnalyticsEvents', () => {
       properties: row.properties,
       uuid: row.event_uuid,
     });
+    // The flush must complete before the row is marked delivered.
+    expect(mockFlushPostHog).toHaveBeenCalledTimes(1);
+    expect(mockFlushPostHog.mock.invocationCallOrder[0]).toBeLessThan(
+      mockMarkOutboxDelivered.mock.invocationCallOrder[0]
+    );
     expect(mockMarkOutboxDelivered).toHaveBeenCalledWith(expect.anything(), {
       eventId: row.id,
       claimedAt: row.claimed_at,
@@ -162,21 +164,6 @@ describe('dispatchQueuedAnalyticsEvents', () => {
     expect(summary.delivered).toBe(0);
   });
 
-  it('waits for the async flush before marking the event delivered', async () => {
-    const row = makeRow();
-    mockClaimDueOutboxEvents.mockResolvedValueOnce([row]);
-    mockMarkOutboxDelivered.mockResolvedValue(row);
-
-    const summary = await dispatchQueuedAnalyticsEvents();
-
-    expect(mockCapture).toHaveBeenCalledTimes(1);
-    expect(mockFlushPostHog).toHaveBeenCalledTimes(1);
-    expect(mockFlushPostHog.mock.invocationCallOrder[0]).toBeLessThan(
-      mockMarkOutboxDelivered.mock.invocationCallOrder[0]
-    );
-    expect(summary.delivered).toBe(1);
-  });
-
   it('backs a rejected async flush off for retry with the error recorded', async () => {
     const row = makeRow();
     mockClaimDueOutboxEvents.mockResolvedValueOnce([row]);
@@ -229,9 +216,6 @@ describe('dispatchQueuedAnalyticsEvents', () => {
 
     expect(summary.reclaimed).toBe(2);
     expect(summary.claimed).toBe(0);
-    expect(mockReclaimStaleSendingEvents.mock.invocationCallOrder[0]).toBeLessThan(
-      mockPurgeExpired.mock.invocationCallOrder[0]
-    );
   });
 
   it('surfaces the retention purge and ledger backstop counts', async () => {

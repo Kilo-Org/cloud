@@ -117,7 +117,7 @@ export function executionTurnSubmissionFromAcceptedTurn(
       };
 }
 
-export type SessionEstablishmentFailure =
+type SessionEstablishmentFailure =
   | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
   | { stage: 'registration'; code: 'do_registration_rejected' }
   | {
@@ -141,30 +141,25 @@ type NewSessionAllocation = SessionRegistrationResult & {
 type SessionLedgerAllocationFailureStage = 'report' | 'sandbox' | 'ownership_row';
 
 /** Session ledger `failure_stage` values (allocation + DO rejection). */
-export type SessionLedgerFailureStage =
+type SessionLedgerFailureStage =
   | SessionLedgerAllocationFailureStage
   | 'registration'
   | 'initial_admission';
 
 /**
  * Optional ledger hooks threaded through creation so the create effect records
- * progress and settles the operation exactly once. All hooks are best-effort:
- * a ledger write failure must never mask the primary creation outcome.
+ * progress and settles the operation exactly once. Failure hooks are
+ * best-effort: a ledger write failure must never mask the primary creation
+ * outcome. `onSuccess` is not, because a lost settle would report success on a
+ * non-terminal row.
  */
-export type SessionCreationLedgerHooks = {
+type SessionCreationLedgerHooks = {
   db: WorkerDb;
   rowId: string;
-  /** Allocation failed after ID generation (report write, sandbox, ownership row). */
-  onAllocationFailure: (stage: SessionLedgerAllocationFailureStage) => Promise<void>;
+  /** Settle the row `failed` at the given stage. */
+  onFailure: (stage: SessionLedgerFailureStage, outcomeCode: string) => Promise<void>;
   /** The DO RPC threw; the commit outcome is unknown. */
   onTransportFailure: () => Promise<void>;
-  /** The DO explicitly rejected registration or the initial admission. */
-  onExplicitRejection: (
-    failure: Extract<
-      SessionEstablishmentFailure,
-      { stage: 'registration' } | { stage: 'initial_admission' }
-    >
-  ) => Promise<void>;
   /** The DO confirmed registration and initial message admission. */
   onSuccess: (result: StartedSessionResult) => Promise<void>;
 };
@@ -214,66 +209,33 @@ function creationInProgressError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: 'creation_in_progress' });
 }
 
-/** Typed client code for a terminal ledger settle failure after a confirmed success. */
-const SESSION_CREATE_SETTLE_FAILED_CODE = 'SESSION_CREATE_SETTLE_FAILED';
-
 /** Stable message for the typed retryable internal settle-failure error. */
 const SESSION_CREATE_SETTLE_FAILED_MESSAGE = 'session_creation_settle_failed';
 
 /**
- * Typed retryable internal error for a terminal `completed` settle failure
- * after the create effect succeeded (DO registration + initial admission, or
- * an authoritative reconcile). The ledger row stays non-terminal with the
- * canonical IDs recorded by progress, so the same-key retry ladder must
- * reconcile it — the caller must never report success or replay while the row
- * is not terminal. Thrown as a TRPCError so the router's error formatter
- * projects the typed retryable client error.
+ * Terminal settle for an outcome the caller is about to report (a confirmed
+ * success, or a reconcile-confirmed terminal failure). A settle failure must
+ * not be swallowed: the row would stay non-terminal while the client treats the
+ * key as finished. It surfaces a typed retryable internal error instead, and
+ * the canonical IDs recorded by progress keep the same-key retry on the
+ * reconcile ladder.
  */
-function ledgerSettleFailureError(cause: unknown): TRPCError {
-  logger
-    .withFields({ error: cause instanceof Error ? cause.message : String(cause) })
-    .error('Failed to settle session create operation ledger row after a confirmed success');
-  return new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: SESSION_CREATE_SETTLE_FAILED_MESSAGE,
-    cause: {
-      error: SESSION_CREATE_SETTLE_FAILED_CODE,
+async function settleTerminalOutcome(db: WorkerDb, input: SettleOperationInput): Promise<void> {
+  try {
+    await settleOperation(db, input);
+  } catch (error) {
+    logger
+      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .error('Failed to settle session create operation ledger row after a confirmed outcome');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
       message: SESSION_CREATE_SETTLE_FAILED_MESSAGE,
-      retryable: true,
-    },
-  });
-}
-
-/**
- * Terminal `completed` settle for a confirmed-success create. Unlike the
- * best-effort failure hooks, a settle failure here must not be swallowed:
- * the row would stay non-terminal while the caller reports success. It
- * surfaces the typed retryable internal error instead; the canonical IDs
- * already recorded by progress keep the same-key retry on the reconcile
- * ladder.
- */
-async function settleConfirmedSuccess(db: WorkerDb, input: SettleOperationInput): Promise<void> {
-  try {
-    await settleOperation(db, input);
-  } catch (error) {
-    throw ledgerSettleFailureError(error);
-  }
-}
-
-/**
- * Terminal `failed` settle for a reconcile-confirmed terminal initial-message
- * failure. As with `settleConfirmedSuccess`, a settle failure must not be
- * swallowed: the row would stay non-terminal while the caller reports the
- * non-retryable `session_creation_failed`, and the client would clear the key
- * without a durable terminal outcome. It surfaces the typed retryable internal
- * error instead; the same-key retry reconciles the same failed message and
- * re-attempts the terminal settle.
- */
-async function settleConfirmedFailure(db: WorkerDb, input: SettleOperationInput): Promise<void> {
-  try {
-    await settleOperation(db, input);
-  } catch (error) {
-    throw ledgerSettleFailureError(error);
+      cause: {
+        error: 'SESSION_CREATE_SETTLE_FAILED',
+        message: SESSION_CREATE_SETTLE_FAILED_MESSAGE,
+        retryable: true,
+      },
+    });
   }
 }
 
@@ -634,7 +596,7 @@ export async function startNewSession(
     allocation = await allocateNewSession(input, ctx, options, ledger);
   } catch (error) {
     if (ledger && error instanceof SessionAllocationStageError) {
-      await ledger.onAllocationFailure(error.stage);
+      await ledger.onFailure(error.stage, error.stage);
       throw error.cause;
     }
     throw error;
@@ -688,7 +650,7 @@ export async function startNewSession(
       .withFields({ error: admission.error, resultCode: admission.code })
       .error('Failed to register session and admit initial turn in DO');
     if (ledger) {
-      await ledger.onExplicitRejection(failure);
+      await ledger.onFailure(failure.stage, failure.code);
     }
     throwAdmissionError(admission);
   }
@@ -707,18 +669,13 @@ export async function startNewSession(
   return result;
 }
 
-// ----- ledger-guarded session creation (plan P1-A-08b step 3) -----------------
-
-// ----- immutable create-intent fingerprint (same-key dedupe guard) -------------
+// ----- ledger-guarded session creation ----------------------------------------
 
 /**
- * Ledger `canonical_result` key holding the SHA-256 fingerprint of the
- * immutable create intent, recorded with the first admitted create's progress.
- * A same-key retry compares its own intent against this fingerprint before
- * replaying or reconciling the row, so a changed request can never inherit the
- * prior operation's session. Stored data is bounded (64 hex chars) and
- * non-reversible; no raw prompt, system prompt, profile value, repository,
- * model, organization, token, or resource content is persisted.
+ * Ledger `canonical_result` key holding the SHA-256 fingerprint of the immutable
+ * create intent, recorded with the first admitted create's progress. A same-key
+ * retry compares its own intent against it before replaying or reconciling, so a
+ * changed request can never inherit the prior operation's session.
  */
 export const SESSION_CREATE_INTENT_FINGERPRINT_KEY = 'createIntentFingerprint';
 
@@ -776,13 +733,9 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
 }
 
 /**
- * Behavior-changing profile configuration with all credential material
- * removed. The resolved `envVars` and `encryptedSecrets` are excluded so a
- * rotated secret on the same profile is the same create intent; MCP server
- * `environment`/`headers` blocks carry the same credential-only class and are
- * excluded too. Setup commands, MCP server selection (command/url/enabled/
- * timeout), runtime skills, runtime agents, and kilo commands are immutable
- * create inputs sent to the Durable Object and stay in the intent.
+ * Behavior-changing profile configuration with all credential material removed:
+ * `envVars`, `encryptedSecrets`, and MCP `environment`/`headers` are excluded, so
+ * a rotated secret on the same profile is the same create intent.
  */
 function profileCreateIntent(
   profile: SessionCreateRequest['profile']
@@ -826,15 +779,10 @@ function profileCreateIntent(
 
 /**
  * Stable fingerprint of the immutable create intent, compared before replay,
- * reconciliation, or effect execution on a same-key retry. Covers every
- * behavior-changing create input the Durable Object receives: the prompt or
- * command, the agent selection and appended system prompt, the repository
- * identity, the finalization policy, the resolved profile configuration, the
- * organization, and the remaining fixed create inputs (devcontainer, profile
- * id, shallow clone, origin platform). Excluded by design: server-allocated
- * identity, the initial message id, credential-only material (git token,
- * profile envVars/encrypted secrets, MCP server environment/headers), and
- * mutable continuation fields such as `callbackTarget`.
+ * reconciliation, or effect execution on a same-key retry. It covers every
+ * behavior-changing create input the Durable Object receives. Excluded by design:
+ * server-allocated identity, the initial message id, credential-only material,
+ * and mutable continuation fields such as `callbackTarget`.
  */
 export async function sessionCreateIntentFingerprint(
   input: SessionRegistrationInput
@@ -900,20 +848,10 @@ async function assertCreateIntentUnchanged(
 }
 
 /**
- * Creates a session under the operation ledger. Admit only when the caller
- * (the prepare handler) has already gated on `operationKey` present AND
- * effective `autoInitiate` true.
- *
- * Admission outcomes:
- * - `admitted`: run the create effect and settle completed/failed, or mark
- *   reconcile-pending on an unknown transport outcome.
- * - `duplicate_settled`: replay the canonical result with `replayed: true`,
- *   but only when the retry's immutable create intent still matches.
- * - `duplicate_in_flight`: `CONFLICT` `creation_in_progress`.
- * - `duplicate_reconcile_in_progress`: another retry holds the reconciliation
- *   lease; `CONFLICT` `creation_in_progress`.
- * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect,
- *   but only when the retry's immutable create intent still matches.
+ * Creates a session under the operation ledger. Call only when the caller (the
+ * prepare handler) has already gated on `operationKey` present AND effective
+ * `autoInitiate` true. Replay and reconciliation happen only when the retry's
+ * immutable create intent still matches the admitted one.
  */
 export async function createSessionWithLedger(
   input: SessionRegistrationInput,
@@ -959,18 +897,28 @@ async function replaySettledCreate(
   // A changed same-key create intent must never replay the prior session; the
   // typed non-retryable failure lets the client clear the key and start fresh.
   await assertCreateIntentUnchanged(input, row);
-  const canonical = row.canonical_result ?? {};
-  const cloudAgentSessionId =
-    typeof canonical.cloudAgentSessionId === 'string' ? canonical.cloudAgentSessionId : undefined;
-  const kiloSessionId =
-    typeof canonical.kiloSessionId === 'string' ? canonical.kiloSessionId : undefined;
-  if (!cloudAgentSessionId || !kiloSessionId) {
+  const ids = canonicalSessionIds(row);
+  if (!ids) {
     // A completed settle without canonical IDs has no session to replay. Treat
     // the retry as a fresh intent by surfacing a non-retryable typed rejection
     // so the client clears the key.
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
-  return { cloudAgentSessionId, kiloSessionId, replayed: true };
+  return { ...ids, replayed: true };
+}
+
+/** Canonical session IDs recorded by the create's progress write, when present. */
+function canonicalSessionIds(
+  row: OperationLedgerRow
+): { cloudAgentSessionId: string; kiloSessionId: string } | undefined {
+  const canonical = row.canonical_result ?? {};
+  return typeof canonical.cloudAgentSessionId === 'string' &&
+    typeof canonical.kiloSessionId === 'string'
+    ? {
+        cloudAgentSessionId: canonical.cloudAgentSessionId,
+        kiloSessionId: canonical.kiloSessionId,
+      }
+    : undefined;
 }
 
 /**
@@ -994,12 +942,12 @@ async function executeLedgerCreate(
   const hooks: SessionCreationLedgerHooks = {
     db,
     rowId: row.id,
-    onAllocationFailure: stage =>
+    onFailure: (stage, outcomeCode) =>
       bestEffortLedgerWrite(() =>
         settleOperation(db, {
           rowId: row.id,
           status: 'failed',
-          outcomeCode: stage,
+          outcomeCode,
           outboxEvent: sessionCreateSettledOutboxEvent({
             distinctId,
             outcome: 'failed',
@@ -1012,24 +960,8 @@ async function executeLedgerCreate(
       ),
     onTransportFailure: () =>
       bestEffortLedgerWrite(() => markReconcilePending(db, { rowId: row.id })),
-    onExplicitRejection: failure =>
-      bestEffortLedgerWrite(() =>
-        settleOperation(db, {
-          rowId: row.id,
-          status: 'failed',
-          outcomeCode: failure.code,
-          outboxEvent: sessionCreateSettledOutboxEvent({
-            distinctId,
-            outcome: 'failed',
-            admission: admissionKind,
-            failureStage: failure.stage === 'registration' ? 'registration' : 'initial_admission',
-            startedAt: options.startedAt,
-            inOrganization,
-          }),
-        })
-      ),
     onSuccess: result =>
-      settleConfirmedSuccess(db, {
+      settleTerminalOutcome(db, {
         rowId: row.id,
         status: 'completed',
         outcomeCode: 'ok',
@@ -1091,27 +1023,13 @@ async function readSessionMetadata(
 }
 
 /**
- * Takeover / reconcile-pending reconciliation ladder (plan P1-A-08b step 3):
+ * Takeover / reconcile-pending reconciliation ladder. It never deletes the
+ * ownership row and never fresh-creates from absent DO state, because the
+ * original create RPC may still commit and double-admit the initial turn:
  *   a. No progress IDs → nothing external happened → fresh create under the row.
- *   b. IDs recorded, ownership row absent → the DO never registered → fresh
- *      create under the row.
- *   c. Ownership row present, DO metadata absent → perform an authoritative
- *      SECOND metadata read BEFORE touching the ownership row (a single null
- *      read is not proof of no registration). If the second read returns
- *      metadata, the DO committed registration → reconcile initial admission
- *      and settle/replay WITHOUT deleting the ownership row. When BOTH reads
- *      are absent, stay conservative: two absent reads do NOT fence a later
- *      DO registration (the original create RPC may still be in flight), so
- *      the ownership row is preserved and the retry surfaces
- *      `creation_in_progress`; deleting the row and allocating fresh IDs
- *      could double-admit the initial turn.
- *   d. Metadata present → completion requires the recorded `initialMessageId`
- *      to be admitted. Admitted with a status that proves admission without
- *      terminal failure (`queued`, `running`, `completed`) → settle completed
- *      (+ outbox) and replay. A found message with status `failed` or
- *      `interrupted` is a terminal failure → settle the row failed and surface
- *      `session_creation_failed`. Not admitted / not determinable →
- *      `CONFLICT` `creation_in_progress`.
+ *   b. IDs recorded, ownership row absent → the DO never registered → fresh create.
+ *   c. Ownership row present, both metadata reads absent → `creation_in_progress`.
+ *   d. Metadata present → the recorded `initialMessageId` decides the outcome.
  */
 async function reconcileLedgerCreate(
   input: SessionRegistrationInput,
@@ -1124,88 +1042,68 @@ async function reconcileLedgerCreate(
   // fresh create, no ownership-row lookup, and no DO metadata read.
   await assertCreateIntentUnchanged(input, row);
 
-  const canonical = row.canonical_result ?? {};
-  const cloudAgentSessionId =
-    typeof canonical.cloudAgentSessionId === 'string' ? canonical.cloudAgentSessionId : undefined;
-  const kiloSessionId =
-    typeof canonical.kiloSessionId === 'string' ? canonical.kiloSessionId : undefined;
+  const ids = canonicalSessionIds(row);
 
   // (a) No progress IDs recorded → nothing external happened.
-  if (!cloudAgentSessionId || !kiloSessionId) {
+  if (!ids) {
     return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
   }
 
   // (b) Ownership row lookup by kiloSessionId.
-  const ownership = await findCliSessionOwnershipRow(db, ctx.userId, kiloSessionId);
+  const ownership = await findCliSessionOwnershipRow(db, ctx.userId, ids.kiloSessionId);
   if (!ownership) {
     return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
   }
 
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
+  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${ids.cloudAgentSessionId}`);
+  const confirm = () =>
+    confirmInitialMessageAdmitted({
+      ctx,
+      db,
+      row,
+      doId,
+      ids,
+      initialMessageId: row.canonical_result?.initialMessageId,
+      startedAt: options.startedAt,
+      inOrganization: input.options?.kilocodeOrganizationId != null,
+    });
 
   // (c) Ownership present → read the DO state.
-  const metadata = await readSessionMetadata(ctx, doId);
-
-  if (!metadata) {
+  if (!(await readSessionMetadata(ctx, doId))) {
     // A single null metadata read is NOT proof of no registration (a transient
-    // read or a pending deletion intent can hide committed metadata). Perform
-    // an authoritative second metadata read BEFORE deleting the stale
-    // ownership row: if the DO committed concurrently, deleting the row would
-    // orphan a live registered session and a fresh create would double-admit
-    // the initial turn. When the second read returns metadata, reconcile
-    // initial admission and settle/replay; never delete the ownership row.
-    const secondRead = await readSessionMetadata(ctx, doId);
-    if (secondRead) {
-      return confirmInitialMessageAdmitted(
-        input,
-        ctx,
-        options,
-        db,
-        row,
-        cloudAgentSessionId,
-        kiloSessionId,
-        canonical.initialMessageId
-      );
+    // read or a pending deletion intent can hide committed metadata), so read
+    // once more before treating the ownership row as stale.
+    if (await readSessionMetadata(ctx, doId)) {
+      return confirm();
     }
 
-    // Both reads absent. Two absent reads do NOT fence a later DO
-    // registration: the original create RPC may still be in flight and commit
-    // registration plus the initial admission after these reads. Deleting the
-    // ownership row and allocating fresh IDs would then double-admit the
-    // initial turn. Stay conservative: preserve the ownership row, keep the
-    // ledger row non-terminal, and surface `creation_in_progress` so a later
-    // same-key retry reconciles again. Never fresh-create from absence alone.
+    // Both reads absent. They still do not fence a later DO registration: the
+    // original create RPC may commit registration plus the initial admission
+    // after these reads, so deleting the ownership row and allocating fresh IDs
+    // could double-admit the initial turn. Preserve the row, keep the ledger row
+    // non-terminal, and let a later same-key retry reconcile again.
     throw creationInProgressError();
   }
 
   // (d) Metadata present → completion requires the recorded initialMessageId.
-  return confirmInitialMessageAdmitted(
-    input,
-    ctx,
-    options,
-    db,
-    row,
-    cloudAgentSessionId,
-    kiloSessionId,
-    canonical.initialMessageId
-  );
+  return confirm();
 }
 
-async function confirmInitialMessageAdmitted(
-  input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
-  options: SessionLedgerCreateOptions,
-  db: WorkerDb,
-  row: OperationLedgerRow,
-  cloudAgentSessionId: string,
-  kiloSessionId: string,
-  initialMessageId: unknown
-): Promise<LedgerSessionCreateResult> {
+async function confirmInitialMessageAdmitted(args: {
+  ctx: SessionRegistrationContext;
+  db: WorkerDb;
+  row: OperationLedgerRow;
+  doId: DurableObjectId;
+  ids: { cloudAgentSessionId: string; kiloSessionId: string };
+  initialMessageId: unknown;
+  startedAt: number;
+  inOrganization: boolean;
+}): Promise<LedgerSessionCreateResult> {
+  const { ctx, db, row, doId, ids, initialMessageId } = args;
   if (typeof initialMessageId !== 'string' || initialMessageId.length === 0) {
     throw creationInProgressError();
   }
 
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
   let messageResult: MessageResultRPCResponse;
   try {
     messageResult = await withDORetry<
@@ -1225,48 +1123,30 @@ async function confirmInitialMessageAdmitted(
     throw creationInProgressError();
   }
 
-  // A found message with status `failed` or `interrupted` proves the initial
-  // turn was admitted but ended in a terminal failure. Settling the create as
-  // completed would replay a successful session against a dead session, and a
-  // later fresh create would double-admit the turn. Settle the row as a
-  // terminal failure with the session-create failure outcome and surface the
-  // typed non-retryable `session_creation_failed` so the client starts a new
-  // intent. Only `queued`, `running`, or `completed` proves admission without
-  // terminal failure and may replay. A failed settle must never produce that
-  // non-retryable outcome: the row would stay non-terminal while the client
-  // clears the key, so the settle surfaces the typed retryable internal error
-  // and the same-key retry reconciles again.
-  if (messageResult.result.status === 'failed' || messageResult.result.status === 'interrupted') {
-    const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
-    await settleConfirmedFailure(db, {
-      rowId: row.id,
-      status: 'failed',
-      outcomeCode: 'initial_admission_rejected',
-      outboxEvent: sessionCreateSettledOutboxEvent({
-        distinctId,
-        outcome: 'failed',
-        admission: 'takeover',
-        failureStage: 'initial_admission',
-        startedAt: options.startedAt,
-        inOrganization: input.options?.kilocodeOrganizationId != null,
-      }),
-    });
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
-  }
-
+  // Only `queued`, `running`, or `completed` proves admission without a terminal
+  // failure and may replay. `failed`/`interrupted` proves the initial turn was
+  // admitted and then died: replaying success would hand back a dead session and
+  // a later fresh create would double-admit the turn, so settle the row failed
+  // and surface the typed non-retryable failure.
+  const failed =
+    messageResult.result.status === 'failed' || messageResult.result.status === 'interrupted';
   const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
-  await settleConfirmedSuccess(db, {
+  await settleTerminalOutcome(db, {
     rowId: row.id,
-    status: 'completed',
-    outcomeCode: 'ok',
-    canonicalResult: { cloudAgentSessionId, kiloSessionId },
+    status: failed ? 'failed' : 'completed',
+    outcomeCode: failed ? 'initial_admission_rejected' : 'ok',
+    ...(failed ? {} : { canonicalResult: ids }),
     outboxEvent: sessionCreateSettledOutboxEvent({
       distinctId,
-      outcome: 'completed',
+      outcome: failed ? 'failed' : 'completed',
       admission: 'takeover',
-      startedAt: options.startedAt,
-      inOrganization: input.options?.kilocodeOrganizationId != null,
+      ...(failed ? { failureStage: 'initial_admission' as const } : {}),
+      startedAt: args.startedAt,
+      inOrganization: args.inOrganization,
     }),
   });
-  return { cloudAgentSessionId, kiloSessionId, replayed: true };
+  if (failed) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+  }
+  return { ...ids, replayed: true };
 }

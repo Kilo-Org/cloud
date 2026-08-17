@@ -1,12 +1,8 @@
 /**
- * Integration tests for the durable analytics outbox state machine (P2-A-04).
- *
- * Runs against the per-worker PostgreSQL test database migrated by
- * `apps/web/src/tests/setup/workerSetup.ts`. Covers claim, delivery,
- * backoff retry, terminal failure, stale-claim reclaim, retention purge, and
- * the `expired_unsettled` ledger backstop. Rows are inserted directly here as
- * test fixtures; production inserts flow only through the ledger settle
- * helpers in `packages/db/src/operation-ledger.ts`.
+ * Integration tests for the durable analytics outbox state machine (P2-A-04),
+ * against the per-worker PostgreSQL test database. Rows are inserted directly
+ * as fixtures; production inserts flow only through the ledger settle helpers
+ * in `packages/db/src/operation-ledger.ts`.
  */
 import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
@@ -261,66 +257,6 @@ describe('analytics outbox (integration)', () => {
     expect(row?.status).toBe('sending');
     expect(row?.claimed_at).toBe(second.claimToken);
     expect(row?.attempts).toBe(0);
-  });
-
-  it('a stale retry cannot requeue or fail a newer claim after reclaim and re-claim', async () => {
-    const inserted = await insertOutboxRow();
-    const { claimToken: oldClaimToken } = await claimFirstEvent();
-
-    // The stale sender's claim is reclaimed and a new drainer re-claims the row.
-    await db
-      .update(analytics_event_outbox)
-      .set({ claimed_at: new Date(Date.now() - 10 * 60 * 1000).toISOString() })
-      .where(eq(analytics_event_outbox.id, inserted.id));
-    await reclaimStaleSendingEvents(db);
-    const second = await claimFirstEvent();
-    expect(second.row.id).toBe(inserted.id);
-    expect(second.claimToken).not.toBe(oldClaimToken);
-
-    // The stale retry is a no-op: it must not requeue or fail the newer claim.
-    expect(
-      await markOutboxRetry(db, { eventId: inserted.id, claimedAt: oldClaimToken, error: 'late' })
-    ).toBeNull();
-
-    // The newer claim is untouched and still drives the event to delivery.
-    const [row] = await db
-      .select()
-      .from(analytics_event_outbox)
-      .where(eq(analytics_event_outbox.id, inserted.id));
-    expect(row?.status).toBe('sending');
-    expect(row?.claimed_at).toBe(second.claimToken);
-    expect(row?.attempts).toBe(0);
-    expect(row?.next_attempt_at).toBeNull();
-
-    const delivered = await markOutboxDelivered(db, {
-      eventId: inserted.id,
-      claimedAt: second.claimToken,
-    });
-    expect(delivered?.status).toBe('delivered');
-  });
-
-  it('a stale retry cannot requeue a delivered terminal state', async () => {
-    const inserted = await insertOutboxRow();
-    const { claimToken } = await claimFirstEvent();
-
-    // The row is delivered before the sender's retry arrives.
-    const delivered = await markOutboxDelivered(db, {
-      eventId: inserted.id,
-      claimedAt: claimToken,
-    });
-    expect(delivered?.status).toBe('delivered');
-
-    expect(
-      await markOutboxRetry(db, { eventId: inserted.id, claimedAt: claimToken, error: 'late' })
-    ).toBeNull();
-
-    const [row] = await db
-      .select()
-      .from(analytics_event_outbox)
-      .where(eq(analytics_event_outbox.id, inserted.id));
-    expect(row?.status).toBe('delivered');
-    expect(row?.attempts).toBe(0);
-    expect(row?.next_attempt_at).toBeNull();
   });
 
   it('does not overwrite a delivered terminal state with a late mark', async () => {

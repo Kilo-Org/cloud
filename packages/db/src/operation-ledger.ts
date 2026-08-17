@@ -19,9 +19,7 @@
  * serialized bytes; the settle helper rejects larger payloads.
  *
  * Event identity: outbox `event_uuid` is a deterministic UUIDv5 of the UTF-8
- * string `` `${ledger_row_id}:${event_name}` `` under the fixed namespace
- * literal `EVENT_UUID_NAMESPACE`. No `uuid` package is in the lockfile, so
- * the UUIDv5 is computed with a small WebCrypto SHA-1 digest helper.
+ * string `` `${ledger_row_id}:${event_name}` `` under `EVENT_UUID_NAMESPACE`.
  */
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
@@ -69,13 +67,6 @@ export const OPERATION_TERMINAL_STATUSES = [
 export type TerminalOperationStatus = (typeof OPERATION_TERMINAL_STATUSES)[number];
 
 export const OPERATION_NON_TERMINAL_STATUSES = ['admitted', 'reconcile_pending'] as const;
-export type NonTerminalOperationStatus = (typeof OPERATION_NON_TERMINAL_STATUSES)[number];
-
-export const OPERATION_STATUSES = [
-  ...OPERATION_NON_TERMINAL_STATUSES,
-  ...OPERATION_TERMINAL_STATUSES,
-] as const;
-export type OperationStatus = (typeof OPERATION_STATUSES)[number];
 
 export function isTerminalOperationStatus(status: string): status is TerminalOperationStatus {
   return (OPERATION_TERMINAL_STATUSES as readonly string[]).includes(status);
@@ -184,6 +175,23 @@ async function runInTransaction<T>(
   return work(database);
 }
 
+/**
+ * Merges `patch` over the row's stored `canonical_result` and enforces the
+ * `MAX_CANONICAL_RESULT_BYTES` bound. Throws before any write, so an oversized
+ * merge leaves the row unchanged.
+ */
+function mergeCanonicalResult(
+  row: OperationLedgerRow,
+  patch: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  const merged = { ...(row.canonical_result ?? {}), ...(patch ?? {}) };
+  const bytes = new TextEncoder().encode(JSON.stringify(merged)).length;
+  if (bytes > MAX_CANONICAL_RESULT_BYTES) {
+    throw new CanonicalResultTooLargeError(bytes);
+  }
+  return merged;
+}
+
 // ----- admission ----------------------------------------------------------------
 
 function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperationLedgerRow {
@@ -217,7 +225,7 @@ export async function admitOperation(
   database: LedgerDatabase,
   input: AdmitOperationInput
 ): Promise<AdmitOperationResult> {
-  return database.transaction(async tx => admitOperationInTransaction(tx, input));
+  return runInTransaction(database, tx => admitOperationInTransaction(tx, input));
 }
 
 async function admitOperationInTransaction(
@@ -355,6 +363,52 @@ async function evaluateExistingRow(
 // ----- progress and provider reference ------------------------------------------
 
 /**
+ * Locks the row, merges `patch` into `canonical_result`, and writes it back
+ * under a compare-and-set on non-terminal status. Optionally overwrites
+ * `provider_ref` in the same statement, and optionally fences the update on the
+ * `queueSendClaimId` currently stored in `canonical_result`. Returns null when
+ * the row is missing, terminal, or the CAS did not match.
+ */
+async function updateNonTerminalRow(
+  database: LedgerDatabase,
+  rowId: string,
+  patch: Record<string, unknown>,
+  options: { providerRef?: string | null; expectedQueueSendClaimId?: string } = {}
+): Promise<OperationLedgerRow | null> {
+  return runInTransaction(database, async tx => {
+    const [row] = await tx
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, rowId))
+      .for('update');
+
+    if (!row || isTerminalOperationStatus(row.status)) {
+      return null;
+    }
+
+    const [updated] = await tx
+      .update(operation_ledgers)
+      .set({
+        canonical_result: mergeCanonicalResult(row, patch),
+        ...(options.providerRef !== undefined ? { provider_ref: options.providerRef } : {}),
+      })
+      .where(
+        and(
+          eq(operation_ledgers.id, row.id),
+          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES),
+          ...(options.expectedQueueSendClaimId
+            ? [
+                sql`${operation_ledgers.canonical_result}->>'queueSendClaimId' = ${options.expectedQueueSendClaimId}`,
+              ]
+            : [])
+        )
+      )
+      .returning();
+    return updated ?? null;
+  });
+}
+
+/**
  * Merges allocated identifiers into `canonical_result` while the row is
  * non-terminal (`admitted` or `reconcile_pending`). A fresh takeover
  * allocation under a reconcile-pending row must record its new IDs so the next
@@ -370,39 +424,8 @@ export async function recordOperationProgress(
   partialResult: Record<string, unknown>,
   options?: { expectedQueueSendClaimId?: string }
 ): Promise<OperationLedgerRow | null> {
-  return runInTransaction(database, async tx => {
-    const [row] = await tx
-      .select()
-      .from(operation_ledgers)
-      .where(eq(operation_ledgers.id, rowId))
-      .for('update');
-
-    if (!row || isTerminalOperationStatus(row.status)) {
-      return null;
-    }
-
-    const merged = { ...(row.canonical_result ?? {}), ...partialResult };
-    const serialized = JSON.stringify(merged) ?? '{}';
-    const bytes = serializedByteLength(serialized);
-    if (bytes > MAX_CANONICAL_RESULT_BYTES) {
-      throw new CanonicalResultTooLargeError(bytes);
-    }
-
-    const claimCondition = options?.expectedQueueSendClaimId
-      ? sql`${operation_ledgers.canonical_result}->>'queueSendClaimId' = ${options.expectedQueueSendClaimId}`
-      : undefined;
-    const [updated] = await tx
-      .update(operation_ledgers)
-      .set({ canonical_result: merged })
-      .where(
-        and(
-          eq(operation_ledgers.id, row.id),
-          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES),
-          ...(claimCondition ? [claimCondition] : [])
-        )
-      )
-      .returning();
-    return updated ?? null;
+  return updateNonTerminalRow(database, rowId, partialResult, {
+    expectedQueueSendClaimId: options?.expectedQueueSendClaimId,
   });
 }
 
@@ -446,38 +469,8 @@ export async function recordOperationAcceptance(
   database: LedgerDatabase,
   input: RecordAcceptanceInput
 ): Promise<OperationLedgerRow | null> {
-  return runInTransaction(database, async tx => {
-    const [row] = await tx
-      .select()
-      .from(operation_ledgers)
-      .where(eq(operation_ledgers.id, input.rowId))
-      .for('update');
-
-    if (!row || isTerminalOperationStatus(row.status)) {
-      return null;
-    }
-
-    const merged = { ...(row.canonical_result ?? {}), ...input.canonicalResult };
-    const serialized = JSON.stringify(merged) ?? '{}';
-    const bytes = serializedByteLength(serialized);
-    if (bytes > MAX_CANONICAL_RESULT_BYTES) {
-      throw new CanonicalResultTooLargeError(bytes);
-    }
-
-    const [updated] = await tx
-      .update(operation_ledgers)
-      .set({
-        provider_ref: input.providerRef,
-        canonical_result: merged,
-      })
-      .where(
-        and(
-          eq(operation_ledgers.id, row.id),
-          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES)
-        )
-      )
-      .returning();
-    return updated ?? null;
+  return updateNonTerminalRow(database, input.rowId, input.canonicalResult, {
+    providerRef: input.providerRef,
   });
 }
 
@@ -494,7 +487,7 @@ export async function settleOperation(
   database: LedgerDatabase,
   input: SettleOperationInput
 ): Promise<SettleOperationResult> {
-  return runInTransaction(database, async tx => settleOperationInTransaction(tx, input));
+  return runInTransaction(database, tx => settleOperationInTransaction(tx, input));
 }
 
 async function settleOperationInTransaction(
@@ -516,11 +509,7 @@ async function settleOperationInTransaction(
     return { settled: false, row };
   }
 
-  const mergedCanonical = { ...(row.canonical_result ?? {}), ...(input.canonicalResult ?? {}) };
-  const serialized = JSON.stringify(mergedCanonical) ?? '{}';
-  if (serializedByteLength(serialized) > MAX_CANONICAL_RESULT_BYTES) {
-    throw new CanonicalResultTooLargeError(serializedByteLength(serialized));
-  }
+  const mergedCanonical = mergeCanonicalResult(row, input.canonicalResult);
 
   if (input.outboxEvent) {
     validateOutboxEvent(input.outboxEvent);
@@ -623,13 +612,13 @@ function validateOutboxEvent(event: OutboxEventInput): void {
 /**
  * Inserts an outbox row with the deterministic UUIDv5 `event_uuid`. A
  * conflicting `event_uuid` (the same row already emitted this event name) is
- * skipped: one event per (ledger row, event name) by design.
+ * skipped: one event per (ledger row, event name) by design. Callers must run
+ * `validateOutboxEvent` first, before their own writes.
  */
 async function insertOutboxEvent(
   tx: LedgerTransaction,
   params: { rowId: string; event: OutboxEventInput }
 ): Promise<AnalyticsEventOutboxRow | null> {
-  validateOutboxEvent(params.event);
   const eventUuid = await computeEventUuid(params.rowId, params.event.eventName);
 
   const values: NewAnalyticsEventOutboxRow = {
@@ -651,52 +640,22 @@ async function insertOutboxEvent(
 
 // ----- deterministic UUIDv5 ---------------------------------------------------------
 
+const NAMESPACE_BYTES = Uint8Array.from(
+  EVENT_UUID_NAMESPACE.replace(/-/g, '').match(/../g) ?? [],
+  hex => Number.parseInt(hex, 16)
+);
+
 /**
- * Computes the deterministic outbox `event_uuid` for a ledger row and event
- * name: UUIDv5 of the UTF-8 string `${rowId}:${eventName}` under
- * `EVENT_UUID_NAMESPACE`.
+ * Deterministic outbox `event_uuid` for a ledger row and event name: UUIDv5
+ * (SHA-1 name-based, RFC 4122) of `${rowId}:${eventName}` under
+ * `EVENT_UUID_NAMESPACE`. WebCrypto keeps it identical on Node and Workers.
  */
 export async function computeEventUuid(rowId: string, eventName: string): Promise<string> {
-  return uuidv5(EVENT_UUID_NAMESPACE, `${rowId}:${eventName}`);
-}
-
-/**
- * UUIDv5 (SHA-1 name-based) computed with WebCrypto. Implemented here because
- * no `uuid` package is present in the lockfile. Deterministic across Node and
- * Workers runtimes.
- */
-export async function uuidv5(namespace: string, name: string): Promise<string> {
-  const namespaceBytes = parseUuidHex(namespace);
-  const nameBytes = new TextEncoder().encode(name);
-  const data = new Uint8Array(namespaceBytes.length + nameBytes.length);
-  data.set(namespaceBytes, 0);
-  data.set(nameBytes, namespaceBytes.length);
-
-  const digest = await crypto.subtle.digest('SHA-1', data);
+  const name = new TextEncoder().encode(`${rowId}:${eventName}`);
+  const digest = await crypto.subtle.digest('SHA-1', new Uint8Array([...NAMESPACE_BYTES, ...name]));
   const bytes = new Uint8Array(digest).slice(0, 16);
-  // Version 5: set the version nibble to 0101.
-  bytes[6] = (bytes[6] & 0x0f) | 0x50;
-  // RFC 4122 variant: set the two MSBs of byte 8 to 10.
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  return formatUuidHex(bytes);
-}
-
-function parseUuidHex(value: string): Uint8Array {
-  const hex = value.replace(/-/g, '');
-  const bytes = new Uint8Array(16);
-  for (let index = 0; index < 16; index += 1) {
-    bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
-  }
-  return bytes;
-}
-
-const HEX_DIGITS = '0123456789abcdef';
-
-function formatUuidHex(bytes: Uint8Array): string {
-  const hex = Array.from(bytes, byte => HEX_DIGITS[byte >> 4] + HEX_DIGITS[byte & 0x0f]).join('');
+  bytes[6] = (bytes[6] & 0x0f) | 0x50; // version 5
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function serializedByteLength(value: string): number {
-  return new TextEncoder().encode(value).length;
 }

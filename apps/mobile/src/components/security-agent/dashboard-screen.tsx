@@ -91,10 +91,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // only" option list.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
 
-  // A non-retryable sync outcome (missing-configuration rejection, persistence
-  // failure, replay-failed, or a typed rejection) ended the intent: the hook
-  // already rotated the operation key, so a resubmit would be a fresh intent.
-  // Both sync controls disable and the inline copy below explains the state.
+  // A non-retryable sync outcome ended the intent, so both sync controls
+  // disable and the inline copy below explains the state.
   const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
   const syncDisabled = triggerSync.isPending || syncBlocked;
 

@@ -66,13 +66,8 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
 }
 
 /**
- * tRPC codes that are transient enough to keep the same cloud-prepare
- * `operationKey` across a retry. The operation ledger admits/reconciles a
- * same-key retry instead of re-executing, so these must never rotate the
- * key. Everything else with a typed tRPC code (BAD_REQUEST, FORBIDDEN,
- * UNAUTHORIZED, NOT_FOUND, PAYMENT_REQUIRED, PRECONDITION_FAILED, ...) is a
- * typed terminal rejection: the key must rotate so the next submit is a
- * fresh intent and cannot replay the settled failure.
+ * tRPC codes transient enough to keep the same cloud-prepare `operationKey`
+ * across a retry. Any other typed code is a terminal rejection and rotates it.
  */
 const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
   'INTERNAL_SERVER_ERROR',
@@ -88,15 +83,12 @@ const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
 
 /**
  * True when a `prepareSession` failure may be retried with the SAME
- * `operationKey`. Keeps the key across `creation_in_progress` and transient
- * transport/5xx failures; a typed terminal rejection (or an error with no
- * code, which is treated as transport) is the only rotation signal.
+ * `operationKey`: `creation_in_progress`, a transient 5xx, or a codeless
+ * transport failure (the ledger reconciles the ambiguous prior attempt).
  */
 export function isCloudPrepareRetryableError(error: unknown): boolean {
   const code = readFetchSessionErrorCode(error);
   if (code === undefined) {
-    // Transport/network failure — retrying under the same key is safe and
-    // lets the ledger reconcile an ambiguous prior attempt.
     return true;
   }
   if (code === 'CONFLICT') {

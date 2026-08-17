@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Security finding write hooks stay in one module; the dismiss commandId guard is one line over the cap. */
+/* eslint-disable max-lines -- 332 lines: the finding query and write hooks stay in one module. Split the dismiss hook out if this grows again. */
 import {
   getNextSecurityFindingsOffset,
   getRemediationUnavailableCopy,
@@ -102,10 +102,8 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
 // `dismissFinding.isError` inline above the confirm button instead (P2).
 
 /**
- * Deterministic intent fingerprint for a finding dismissal (P1-A-08e). A
- * retry of the SAME scope+finding+reason+comment reuses the hoisted key; a
- * form edit (or a scope change) rotates it so the ledger treats the submit as
- * a fresh intent instead of replaying the previous one's canonical result.
+ * Intent fingerprint for a finding dismissal (P1-A-08e): a form edit or a
+ * scope change is a new intent.
  */
 export function dismissFindingIntentFingerprint(
   scope: string,

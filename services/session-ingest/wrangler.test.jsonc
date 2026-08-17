@@ -24,10 +24,6 @@
         "name": "SESSION_ACCESS_CACHE_DO",
         "class_name": "SessionAccessCacheDO",
       },
-      {
-        "name": "USER_CONNECTION_DO",
-        "class_name": "UserConnectionDO",
-      },
     ],
   },
 
@@ -35,10 +31,6 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["SessionIngestDO", "SessionAccessCacheDO"],
-    },
-    {
-      "tag": "v2",
-      "new_sqlite_classes": ["UserConnectionDO"],
     },
   ],
 

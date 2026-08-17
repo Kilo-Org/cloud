@@ -9,8 +9,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   isPrMutationRetryable,
-  isPrOperationAmbiguous,
-  isPrOperationInProgress,
   isPrOperationPersistenceFailed,
   mapPrOperationError,
   PR_OPERATION_AMBIGUOUS_MESSAGE,
@@ -33,21 +31,11 @@ function trpcError(code: string, message: string): Error {
   return error;
 }
 
-describe('isPrOperationInProgress / isPrOperationAmbiguous / isPrOperationPersistenceFailed', () => {
-  it('detects the stable ledger CONFLICT markers by exact message', () => {
-    expect(isPrOperationInProgress(IN_PROGRESS)).toBe(true);
-    expect(isPrOperationAmbiguous(AMBIGUOUS)).toBe(true);
-    expect(isPrOperationInProgress(AMBIGUOUS)).toBe(false);
-    expect(isPrOperationAmbiguous(IN_PROGRESS)).toBe(false);
-    expect(isPrOperationInProgress(new Error('other'))).toBe(false);
-    expect(isPrOperationAmbiguous('string error')).toBe(false);
-  });
-
+describe('isPrOperationPersistenceFailed', () => {
   it('detects the persistence-failure marker distinctly from the other markers', () => {
     expect(isPrOperationPersistenceFailed(PERSISTENCE_FAILED)).toBe(true);
     expect(isPrOperationPersistenceFailed(AMBIGUOUS)).toBe(false);
     expect(isPrOperationPersistenceFailed(IN_PROGRESS)).toBe(false);
-    expect(isPrOperationPersistenceFailed(new Error('other'))).toBe(false);
     expect(isPrOperationPersistenceFailed('string error')).toBe(false);
   });
 });

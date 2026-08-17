@@ -50,7 +50,7 @@ vi.mock('react-native-appsflyer', () => ({
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
-vi.mock('@/lib/analytics/posthog', () => ({ captureUncataloged: vi.fn() }));
+vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
 vi.mock('@/lib/config', () => ({
   APPSFLYER_DEV_KEY: 'dev-key',
   APPSFLYER_APP_ID: 'app-id',

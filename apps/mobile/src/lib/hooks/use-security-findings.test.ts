@@ -136,11 +136,6 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     vi.clearAllMocks();
   });
 
-  it('mounts a useMutation with a custom mutationFn', () => {
-    useDismissSecurityFinding('personal');
-    expect(lastCapturedOptions?.mutationFn).toBeDefined();
-  });
-
   it('delegates a personal dismissal to securityAgent.dismissFinding.mutate with the hoisted key', async () => {
     const result = { success: true, accepted: true, commandId: 'cmd-1' };
     personalDismissMutateMock.mockResolvedValueOnce(result);
@@ -193,26 +188,9 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });
 
-  it('maps an org in-progress dismissal CONFLICT onto retryable copy', async () => {
-    orgDismissMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
-    useDismissSecurityFinding(ORG_ID);
-
-    await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'A security sync is already in progress. Please try again.',
-    });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
-  it('keeps the key on a retryable network failure (the ledger owns the retry)', async () => {
-    personalDismissMutateMock.mockRejectedValueOnce(new Error('Network request failed'));
-    useDismissSecurityFinding('personal');
-
-    await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'Network request failed',
-    });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
+  // The rest of the retryability matrix belongs to `isSecuritySyncRetryable`
+  // (tested in use-security-agent-mutations.test.ts); the hook only needs one
+  // retryable and one terminal case.
   it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
     const badRequest = new Error('Invalid dismissal reason');
     Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
@@ -221,18 +199,6 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
 
     await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
       message: 'Invalid dismissal reason',
-    });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
-  });
-
-  it('regenerates the key on the persistence-failure marker even though it is CONFLICT', async () => {
-    personalDismissMutateMock.mockRejectedValueOnce(
-      new Error('We could not record this action. Please try again later.')
-    );
-    useDismissSecurityFinding('personal');
-
-    await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'We could not record this action. Please try again later.',
     });
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });

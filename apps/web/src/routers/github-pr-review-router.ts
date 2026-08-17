@@ -197,10 +197,8 @@ const UpdateBranchInput = ownerRepoSchema
   })
   .strict();
 
-const AutoMergeInput = z
-  .object({
-    owner: z.string().regex(ownerRepoRegex),
-    repo: z.string().regex(ownerRepoRegex),
+const AutoMergeInput = ownerRepoSchema
+  .extend({
     number: prNumberSchema,
     prNodeId: z.string().min(1).max(256),
     method: AutoMergeMethodSchema.optional(),
@@ -678,141 +676,79 @@ function requireGraphQlOperation<T>(value: T | null | undefined, operation: stri
 
 // ----- PR operation ledger (P1-A-08c) -----------------------------------------
 
-// Shared per-intent ledger for the four PR write procedures. When the caller
-// supplies an `operationKey`, the procedure admits a `pr`-domain row and only
-// then runs the GitHub effect; every later same-key call dedupes, replays the
-// canonical result, or reconciles before deciding. Deterministic GitHub
-// rejections settle the row `failed`; ambiguous network/timeout/5xx outcomes
-// become `reconcile_pending` and never re-execute the write under the same
-// key. The ledger helpers (`@kilocode/db/operation-ledger`) own admission,
-// lease serialization, and the atomic `pr_operation_settled` outbox write.
+// Shared per-intent ledger for the four PR write procedures. With an
+// `operationKey` the procedure admits a `pr`-domain row and only then runs the
+// GitHub effect; every later same-key call dedupes, replays the canonical
+// result, or reconciles before deciding. Deterministic GitHub rejections settle
+// the row `failed`; ambiguous network/timeout/5xx outcomes become
+// `reconcile_pending` and never re-execute the write under the same key.
 const PR_LEDGER_DOMAIN = 'pr' as const;
-// The in-flight window: while an `admitted` row holds a live lease, same-key
-// retries receive CONFLICT `operation_in_progress` instead of re-executing.
+// While an `admitted` row holds a live lease, same-key retries receive CONFLICT
+// `operation_in_progress` instead of re-executing.
 const PR_LEDGER_LEASE_SECONDS = 120;
 
-const PR_LEDGER_INTENTS = [
-  'merge',
-  'submit_review',
-  'create_review_comment',
-  'reply_comment',
-] as const;
-type PrLedgerIntent = (typeof PR_LEDGER_INTENTS)[number];
+type PrLedgerIntent = 'merge' | 'submit_review' | 'create_review_comment' | 'reply_comment';
 
 // Client-facing CONFLICT markers. `operation_in_progress` keeps the existing
-// pending/retry UI on mobile; the ambiguous copy tells the user to verify the
-// PR before retrying (a retry under the same key never re-executes the write).
-// `operation_key_reuse_mismatch` is the cross-intent rejection: a caller that
-// reuses an existing key for a DIFFERENT intent/resource/request is refused
-// without any effect or replay.
+// mobile pending/retry UI; `operation_key_reuse_mismatch` refuses a key reused
+// for a DIFFERENT intent/resource/request without any effect or replay.
 const OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
 const PR_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR before retrying.";
 const PR_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
 const PR_CONFLICT_MESSAGE = 'GitHub reported a conflict for this PR';
 const PR_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
-// A provider-confirmed outcome whose ledger settle failed: the GitHub effect
-// DID commit, but the row was not settled. The caller must NOT receive a
-// success receipt (the row is still non-terminal, so success would falsely
-// claim a retry-safe replay). Surface a retryable server error instead: a
-// same-key retry reconciles the committed provider outcome and settles the
-// row.
+// The GitHub effect committed but the settle failed: the row is still
+// non-terminal, so a success receipt would falsely claim a retry-safe replay.
+// Surface a retryable server error; a same-key retry reconciles and settles.
 const PR_LEDGER_SETTLE_FAILED_MESSAGE =
   'The action completed, but we could not record the result. Please try again.';
-// An ambiguous outcome whose `reconcile_pending` persistence failed: the row
-// was NOT marked reconcile-pending, so the ambiguous marker (which promises
-// that same-key retries dedupe and reconcile instead of re-executing) must
-// never be surfaced. Return a distinct non-retryable persistence error so the
-// client cannot blind-retry the same key against an admitted row.
+// The `reconcile_pending` write failed, so the ambiguous marker's promise (a
+// same-key retry reconciles instead of re-executing) does not hold. Return a
+// distinct non-retryable error so the client cannot blind-retry the same key.
 const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
-
-function operationInProgressError(): TRPCError {
-  return new TRPCError({ code: 'CONFLICT', message: OPERATION_IN_PROGRESS_MESSAGE });
-}
 
 function ambiguousPrError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: PR_AMBIGUOUS_MESSAGE });
 }
 
-function conflictPrError(): TRPCError {
-  return new TRPCError({ code: 'CONFLICT', message: PR_CONFLICT_MESSAGE });
-}
-
-function operationKeyReuseMismatchError(): TRPCError {
-  return new TRPCError({ code: 'CONFLICT', message: PR_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
-}
-
-/**
- * Deterministic fingerprint of the intent-defining inputs for one PR
- * mutation. The same user intent (retry) always produces the same fingerprint;
- * ANY change to an intent input (comment body, review contents, reply text,
- * merge method/message, resource, fence sha) produces a different one. Folded
- * into the ledger `resource_key` so the admission row comparison can reject
- * cross-intent operation-key reuse (finding: an existing key with a different
- * PR intent/resource/request must never replay the old canonical result).
- */
-function prRequestFingerprint(intent: PrLedgerIntent, input: Record<string, unknown>): string {
-  const resource = [input.owner, input.repo, input.number];
-  const parts =
-    intent === 'create_review_comment'
-      ? {
-          resource,
-          body: input.body,
-          path: input.path,
-          line: input.line,
-          side: input.side,
-          startLine: input.startLine,
-          startSide: input.startSide,
-          commitSha: input.commitSha,
-        }
-      : intent === 'reply_comment'
-        ? {
-            resource,
-            commentId: input.commentId,
-            body: input.body,
-          }
-        : intent === 'submit_review'
-          ? {
-              resource,
-              event: input.event,
-              body: input.body,
-              commitSha: input.commitSha,
-              comments: input.comments,
-            }
-          : {
-              resource,
-              method: input.method,
-              commitTitle: input.commitTitle,
-              commitMessage: input.commitMessage,
-              deleteBranch: input.deleteBranch,
-              expectedHeadSha: input.expectedHeadSha,
-            };
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
-}
+// The intent inputs folded into the ledger fingerprint. Any change to one
+// (comment body, review contents, merge method, fence sha, …) yields a
+// different fingerprint, so a key reused for a different request is rejected
+// instead of replaying the old canonical result. Field ORDER is part of the
+// hash — do not reorder.
+const PR_FINGERPRINT_FIELDS: Record<PrLedgerIntent, readonly string[]> = {
+  create_review_comment: ['body', 'path', 'line', 'side', 'startLine', 'startSide', 'commitSha'],
+  reply_comment: ['commentId', 'body'],
+  submit_review: ['event', 'body', 'commitSha', 'comments'],
+  merge: ['method', 'commitTitle', 'commitMessage', 'deleteBranch', 'expectedHeadSha'],
+};
 
 /**
- * The PR ledger resource identity: the domain resource (`owner/repo#number`)
- * plus the intent fingerprint. Stored verbatim in `resource_key` (never
+ * The PR ledger resource identity: `owner/repo#number` plus a fingerprint of
+ * the intent-defining inputs. Stored verbatim in `resource_key` (never
  * analytics) and compared on every admission so an existing key with a
- * different intent/resource/request is rejected instead of replayed.
- * Exported so router tests can build the exact stored identity.
+ * different intent/resource/request is rejected instead of replayed. Exported
+ * so router tests can build the exact stored identity.
  */
 export function prLedgerResourceKey(
   intent: PrLedgerIntent,
   input: Record<string, unknown>
 ): string {
-  return `${String(input.owner)}/${String(input.repo)}#${String(input.number)}::${prRequestFingerprint(intent, input)}`;
+  const parts: Record<string, unknown> = { resource: [input.owner, input.repo, input.number] };
+  for (const field of PR_FINGERPRINT_FIELDS[intent]) {
+    parts[field] = input[field];
+  }
+  const fingerprint = createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
+  return `${String(input.owner)}/${String(input.repo)}#${String(input.number)}::${fingerprint}`;
 }
 
 /**
- * Best-effort ledger write, reserved for FAILED-status settles only: the
- * caller is already receiving a typed rejection (a deterministic GitHub
- * rejection or a confirmed-absent reconcile), so a ledger write that fails
- * here must never mask the provider outcome — the error is being surfaced
- * regardless and a later same-key retry re-records it. Completed settles and
- * reconcile-pending marks must NOT use this helper: they gate whether the
- * caller is told success or sees the ambiguous marker, so their failures use
- * the durable helpers below instead.
+ * Best-effort ledger write, reserved for FAILED-status settles only: the caller
+ * is already receiving a typed rejection, so a ledger write that fails here
+ * must never mask the provider outcome. Completed settles and
+ * reconcile-pending marks must NOT use it — they gate whether the caller is
+ * told success or sees the ambiguous marker.
  */
 async function bestEffortLedgerWrite(work: () => Promise<unknown>): Promise<void> {
   try {
@@ -832,35 +768,40 @@ function prProviderRefFromCanonical(canonical: Record<string, unknown>): string 
 }
 
 /**
- * Durably settles a provider-confirmed outcome as `completed` (P1-A-08c). The
- * GitHub effect committed, so a settle that fails must never be swallowed:
- * the row would stay `admitted` while the caller receives a success receipt —
- * a false "retry-safe" claim. The caller is NOT told success; instead the
- * canonical provider evidence is preserved on the non-terminal row (atomic
- * `provider_ref` + `canonical_result`, best-effort — the error below is the
- * durable signal) so a same-key retry can reconcile by re-fetching the
- * recorded reference, and a retryable server error is thrown. A committed
- * write is never settled `failed` from this path: that would falsely tell a
- * same-key retry the action did not complete and lose the reconciliation
- * evidence.
+ * Settles a provider-confirmed outcome as `completed`. The GitHub effect
+ * committed, so a settle that fails must never be swallowed: the caller is NOT
+ * told success. The canonical provider evidence is preserved on the still
+ * non-terminal row (atomic `provider_ref` + `canonical_result`) so a same-key
+ * retry can reconcile by re-fetching the recorded reference, and a retryable
+ * server error is thrown. A committed write is never settled `failed` here:
+ * that would falsely tell a retry the action did not complete.
  */
 async function settleCompletedPrRow(args: {
-  rowId: string;
+  row: OperationLedgerRow;
+  intent: PrLedgerIntent;
+  distinctId: string;
+  startedAt: number;
   canonicalResult: Record<string, unknown>;
-  outboxEvent: OutboxEventInput;
+  reconcileResult?: 'confirmed_completed';
 }): Promise<void> {
   try {
     await settleOperation(db, {
-      rowId: args.rowId,
+      rowId: args.row.id,
       status: 'completed',
       outcomeCode: 'ok',
       canonicalResult: args.canonicalResult,
-      outboxEvent: args.outboxEvent,
+      outboxEvent: prSettledOutboxEvent({
+        distinctId: args.distinctId,
+        intent: args.intent,
+        outcome: 'completed',
+        reconcileResult: args.reconcileResult,
+        startedAt: args.startedAt,
+      }),
     });
   } catch (error) {
     await bestEffortLedgerWrite(() =>
       recordOperationAcceptance(db, {
-        rowId: args.rowId,
+        rowId: args.row.id,
         providerRef: prProviderRefFromCanonical(args.canonicalResult),
         canonicalResult: args.canonicalResult,
       })
@@ -876,27 +817,59 @@ async function settleCompletedPrRow(args: {
   }
 }
 
+/** Best-effort `failed` settle; the caller is already surfacing a typed rejection. */
+async function settleFailedPrRow(args: {
+  row: OperationLedgerRow;
+  intent: PrLedgerIntent;
+  distinctId: string;
+  startedAt: number;
+  outcomeCode: string;
+  reconcileResult?: 'confirmed_absent';
+}): Promise<void> {
+  await bestEffortLedgerWrite(() =>
+    settleOperation(db, {
+      rowId: args.row.id,
+      status: 'failed',
+      outcomeCode: args.outcomeCode,
+      outboxEvent: prSettledOutboxEvent({
+        distinctId: args.distinctId,
+        intent: args.intent,
+        outcome: 'failed',
+        reconcileResult: args.reconcileResult,
+        startedAt: args.startedAt,
+      }),
+    })
+  );
+}
+
 /**
- * Durably marks a PR ledger row `reconcile_pending` with the deterministic
- * ambiguous outbox event. The ambiguous CONFLICT is surfaced ONLY after this
- * succeeds: if the persistence fails, the row stays `admitted` and a same-key
- * retry could re-execute a possibly-committed write, so a distinct
+ * Marks a PR ledger row `reconcile_pending` and then throws the ambiguous
+ * CONFLICT — never returns. Every unresolved path goes through here: the
+ * transition makes the reconciliation lease immediately claimable and records
+ * the ambiguous outcome exactly once (the outbox `event_uuid` is a
+ * deterministic UUIDv5 per row+event, so an already-pending row never
+ * double-emits). If the persistence fails the row stays `admitted` and a
+ * same-key retry could re-execute a possibly-committed write, so the distinct
  * non-retryable persistence error is thrown instead of the ambiguous marker.
  */
-async function markPrRowReconcilePendingDurably(args: {
-  rowId: string;
-  outboxEvent: OutboxEventInput;
-}): Promise<void> {
+async function failPrRowAmbiguous(args: {
+  row: OperationLedgerRow;
+  intent: PrLedgerIntent;
+  distinctId: string;
+  startedAt: number;
+}): Promise<never> {
   try {
     const updated = await markReconcilePending(db, {
-      rowId: args.rowId,
-      outboxEvent: args.outboxEvent,
+      rowId: args.row.id,
+      outboxEvent: prSettledOutboxEvent({
+        distinctId: args.distinctId,
+        intent: args.intent,
+        outcome: 'ambiguous',
+        reconcileResult: 'unresolved',
+        startedAt: args.startedAt,
+      }),
     });
     if (!updated || updated.status !== 'reconcile_pending') {
-      // The row is missing or was not `admitted` (for example already
-      // terminal): the reconcile-pending guarantee does not hold, so the
-      // ambiguous marker must never be surfaced. Throw the distinct
-      // non-retryable persistence error instead.
       throw new Error('markReconcilePending did not leave the row reconcile_pending');
     }
   } catch (error) {
@@ -909,35 +882,7 @@ async function markPrRowReconcilePendingDurably(args: {
       cause: error,
     });
   }
-}
-
-/**
- * Marks a PR ledger row `reconcile_pending` with the deterministic ambiguous
- * outbox event. Every unresolved reconciliation path MUST call this before
- * surfacing the ambiguous CONFLICT: the transition makes the reconciliation
- * lease immediately claimable and records the ambiguous outcome exactly once
- * (the outbox `event_uuid` is a deterministic UUIDv5 per row+event, so a row
- * that is already `reconcile_pending` — the event was emitted when the write
- * went ambiguous — is a no-op and never double-emits). A persistence failure
- * propagates as the distinct non-retryable persistence error so the ambiguous
- * marker is never surfaced without the reconcile-pending guarantee.
- */
-async function markPrRowReconcilePending(args: {
-  row: OperationLedgerRow;
-  intent: PrLedgerIntent;
-  distinctId: string;
-  startedAt: number;
-}): Promise<void> {
-  await markPrRowReconcilePendingDurably({
-    rowId: args.row.id,
-    outboxEvent: prSettledOutboxEvent({
-      distinctId: args.distinctId,
-      intent: args.intent,
-      outcome: 'ambiguous',
-      reconcileResult: 'unresolved',
-      startedAt: args.startedAt,
-    }),
-  });
+  throw ambiguousPrError();
 }
 
 /** Resolves the analytics identity channel (user email); falls back to the user id. */
@@ -1005,17 +950,12 @@ type ReplayedResult<T> = T & { replayed: true };
  *   `operation_in_progress` (never re-execute).
  * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
  *
- * Cross-intent key reuse (P1-A-08d): the ledger identity is
- * `(user, domain, operation_key)` and `admitOperation` returns the row for
- * that key regardless of intent. Before ANY outcome is honored — replay,
- * reconcile, in-flight CONFLICT, or a fresh execute — the returned row is
- * compared against the request's intent and resource identity (which embeds
- * the request fingerprint). A mismatch means the same key is being reused for
- * a DIFFERENT PR intent/resource/request: the call is rejected with CONFLICT
- * `operation_key_reuse_mismatch` with no effect and no replay of the old
- * canonical result. Exact retries (same key, intent, and request fingerprint)
- * always match the stored row and keep their existing dedupe/replay/reconcile
- * behavior.
+ * The ledger identity is `(user, domain, operation_key)`, so `admitOperation`
+ * returns the row for that key regardless of intent. Before ANY outcome is
+ * honored the row is compared against the request's intent and resource
+ * identity (which embeds the request fingerprint); a mismatch means the key is
+ * reused for a DIFFERENT intent/resource/request and is refused with no effect
+ * and no replay of the old canonical result (P1-A-08d).
  */
 async function runPrLedgerMutation<T>(
   args: PrLedgerMutationArgs<T>
@@ -1031,7 +971,10 @@ async function runPrLedgerMutation<T>(
   });
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
-    throw operationKeyReuseMismatchError();
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: PR_OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+    });
   }
 
   switch (admission.admission) {
@@ -1041,7 +984,7 @@ async function runPrLedgerMutation<T>(
       return replaySettledPrRow<T>(admission.row);
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
-      throw operationInProgressError();
+      throw new TRPCError({ code: 'CONFLICT', message: OPERATION_IN_PROGRESS_MESSAGE });
     case 'takeover':
     case 'duplicate_reconcile_pending':
       return args.reconcile(admission.row);
@@ -1086,18 +1029,14 @@ function outcomeCodeFromTrpcError(error: unknown): string {
 
 /**
  * Runs the GitHub write under `withGitHubUserTokenRetry` and settles the
- * admitted row. Success settles `completed` at the committed-effect boundary;
- * a settle that fails after the commit surfaces a retryable server error
- * (never a success receipt for an un-recorded row). A deterministic GitHub
- * rejection settles `failed` and rethrows the classified error. An ambiguous
- * network/timeout/5xx failure (classified to BAD_GATEWAY before the existing
- * conversion) becomes `reconcile_pending` and surfaces the ambiguous outcome —
- * the write may have committed, so the row must never settle terminal under
- * this key; if the reconcile-pending persistence fails, a distinct
- * non-retryable persistence error is surfaced instead of the ambiguous marker.
- * A merge NOT_FOUND (the merge begins with an authoritative PR read) is
- * read-unavailable and therefore ambiguous too: it is never treated as a
- * confirmed rejection.
+ * admitted row. Success settles `completed` at the committed-effect boundary. A
+ * deterministic GitHub rejection settles `failed` and rethrows the classified
+ * error. An ambiguous network/timeout/5xx failure (classified to BAD_GATEWAY)
+ * becomes `reconcile_pending`: the write may have committed, so the row must
+ * never settle terminal under this key. A merge NOT_FOUND is ambiguous too —
+ * the merge begins with an authoritative PR read, so NOT_FOUND there is
+ * read-unavailable, never a confirmed rejection. Comment/review writes keep
+ * NOT_FOUND as a deterministic rejection.
  */
 async function executePrWriteWithLedger<T>(args: {
   userId: string;
@@ -1107,6 +1046,12 @@ async function executePrWriteWithLedger<T>(args: {
   runWrite: (octokit: ReturnType<typeof createGitHubPrReviewOctokit>) => Promise<PrWriteOutcome<T>>;
 }): Promise<T> {
   const distinctId = await resolvePrDistinctId(args.userId);
+  const ledgerArgs = {
+    row: args.row,
+    intent: args.intent,
+    distinctId,
+    startedAt: args.startedAt,
+  };
   let outcome: PrWriteOutcome<T>;
   try {
     outcome = await withGitHubUserTokenRetry({
@@ -1114,64 +1059,23 @@ async function executePrWriteWithLedger<T>(args: {
       call: args.runWrite,
     });
   } catch (error) {
-    if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
-      await markPrRowReconcilePending({
-        row: args.row,
-        intent: args.intent,
-        distinctId,
-        startedAt: args.startedAt,
-      });
-      throw ambiguousPrError();
+    const ambiguous =
+      error instanceof TRPCError &&
+      (error.code === 'BAD_GATEWAY' || (args.intent === 'merge' && error.code === 'NOT_FOUND'));
+    if (ambiguous) {
+      return failPrRowAmbiguous(ledgerArgs);
     }
-    // A merge begins with an authoritative PR read (`pulls.get`). A NOT_FOUND
-    // there means the PR state is READ-unavailable, which is ambiguous — the
-    // merge may or may not have committed — and must never settle the row
-    // absent/terminal. Treat merge NOT_FOUND exactly like a failed read:
-    // reconcile-pending + ambiguous, so a same-key retry keeps reconciling.
-    // Comment/review writes keep NOT_FOUND as a deterministic rejection.
-    if (args.intent === 'merge' && error instanceof TRPCError && error.code === 'NOT_FOUND') {
-      await markPrRowReconcilePending({
-        row: args.row,
-        intent: args.intent,
-        distinctId,
-        startedAt: args.startedAt,
-      });
-      throw ambiguousPrError();
-    }
-    await bestEffortLedgerWrite(() =>
-      settleOperation(db, {
-        rowId: args.row.id,
-        status: 'failed',
-        outcomeCode: outcomeCodeFromTrpcError(error),
-        outboxEvent: prSettledOutboxEvent({
-          distinctId,
-          intent: args.intent,
-          outcome: 'failed',
-          startedAt: args.startedAt,
-        }),
-      })
-    );
+    await settleFailedPrRow({ ...ledgerArgs, outcomeCode: outcomeCodeFromTrpcError(error) });
     throw error;
   }
   if (outcome.kind === 'no_settle') {
     return outcome.response;
   }
-  // The write committed: settle completed at the committed-effect boundary.
-  // A settle failure must NEVER be caught by the write-failure path above
-  // (which settles the row `failed` — a false "did not complete" for a
-  // committed write). `settleCompletedPrRow` preserves the canonical evidence
-  // and surfaces the retryable persistence error; a same-key retry reconciles
-  // the committed outcome by the preserved reference.
-  await settleCompletedPrRow({
-    rowId: args.row.id,
-    canonicalResult: outcome.canonical,
-    outboxEvent: prSettledOutboxEvent({
-      distinctId,
-      intent: args.intent,
-      outcome: 'completed',
-      startedAt: args.startedAt,
-    }),
-  });
+  // The write committed: settle completed at the committed-effect boundary. A
+  // settle failure must NEVER reach the failed path above (a false "did not
+  // complete" for a committed write); `settleCompletedPrRow` preserves the
+  // canonical evidence and surfaces the retryable persistence error instead.
+  await settleCompletedPrRow({ ...ledgerArgs, canonicalResult: outcome.canonical });
   return outcome.response;
 }
 
@@ -1183,98 +1087,115 @@ async function executePrWriteWithLedger<T>(args: {
  * - no provider reference was ever recorded (the write response was lost) →
  *   presence cannot be confirmed → stay reconcile-pending, no GitHub write.
  */
-async function reconcileCommentPrRow<T>(args: {
+async function reconcileCommentPrRow<T extends Record<string, unknown>>(args: {
   userId: string;
   row: OperationLedgerRow;
   intent: PrLedgerIntent;
   startedAt: number;
-  providerRefOf: (canonical: Record<string, unknown>) => number | null;
+  /** The canonical-result field holding the GitHub id to re-read. */
+  providerRefKey: 'commentId' | 'reviewId';
   readRef: (
     octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
     providerId: number
-  ) => Promise<{ canonical: Record<string, unknown>; response: T }>;
+  ) => Promise<T>;
 }): Promise<ReplayedResult<T>> {
-  const providerId = args.providerRefOf(args.row.canonical_result ?? {});
+  const recordedRef = (args.row.canonical_result ?? {})[args.providerRefKey];
+  const providerId = typeof recordedRef === 'number' ? recordedRef : null;
   const distinctId = await resolvePrDistinctId(args.userId);
-  if (providerId === null) {
-    // The write response was lost before a provider reference was recorded
-    // (a takeover row or a reconcile-pending row without canonical data).
-    // Presence cannot be confirmed and the write must NOT re-execute under
-    // this key: mark reconcile-pending (emitting the deterministic ambiguous
-    // outbox event) and surface the ambiguous outcome.
-    await markPrRowReconcilePending({
-      row: args.row,
-      intent: args.intent,
-      distinctId,
-      startedAt: args.startedAt,
-    });
-    throw ambiguousPrError();
-  }
-
-  let read:
-    | {
-        confirmed: 'found';
-        canonical: Record<string, unknown>;
-        response: T;
-      }
-    | { confirmed: 'absent' }
-    | { confirmed: 'unresolved' };
-  try {
-    const { canonical, response } = await withGitHubUserTokenRetry({
-      kiloUserId: args.userId,
-      call: octokit => args.readRef(octokit, providerId),
-    });
-    read = { confirmed: 'found', canonical, response };
-  } catch (error) {
-    read =
-      error instanceof TRPCError && error.code === 'NOT_FOUND'
-        ? { confirmed: 'absent' }
-        : { confirmed: 'unresolved' };
-  }
-
-  if (read.confirmed === 'found') {
-    await settleCompletedPrRow({
-      rowId: args.row.id,
-      canonicalResult: read.canonical,
-      outboxEvent: prSettledOutboxEvent({
-        distinctId,
-        intent: args.intent,
-        outcome: 'completed',
-        reconcileResult: 'confirmed_completed',
-        startedAt: args.startedAt,
-      }),
-    });
-    return { ...read.response, replayed: true };
-  }
-  if (read.confirmed === 'absent') {
-    await bestEffortLedgerWrite(() =>
-      settleOperation(db, {
-        rowId: args.row.id,
-        status: 'failed',
-        outcomeCode: 'effect_absent',
-        outboxEvent: prSettledOutboxEvent({
-          distinctId,
-          intent: args.intent,
-          outcome: 'failed',
-          reconcileResult: 'confirmed_absent',
-          startedAt: args.startedAt,
-        }),
-      })
-    );
-    throw ambiguousPrError();
-  }
-  // `unresolved`: the provider reference read failed (network/timeout/5xx/…
-  // anything but a definitive NOT_FOUND). The effect's presence is unknown,
-  // so the row stays reconcile-pending (emitting the deterministic ambiguous
-  // outbox event) and the ambiguous outcome is surfaced — never a terminal
-  // settle from a failed read.
-  await markPrRowReconcilePending({
+  const ledgerArgs = {
     row: args.row,
     intent: args.intent,
     distinctId,
     startedAt: args.startedAt,
+  };
+  if (providerId === null) {
+    // The write response was lost before a provider reference was recorded
+    // (a takeover row or a reconcile-pending row without canonical data).
+    // Presence cannot be confirmed and the write must NOT re-execute under
+    // this key.
+    return failPrRowAmbiguous(ledgerArgs);
+  }
+
+  let read: { confirmed: 'found'; result: T } | { confirmed: 'absent' | 'unresolved' };
+  try {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: args.userId,
+      call: octokit => args.readRef(octokit, providerId),
+    });
+    read = { confirmed: 'found', result };
+  } catch (error) {
+    read = {
+      confirmed: error instanceof TRPCError && error.code === 'NOT_FOUND' ? 'absent' : 'unresolved',
+    };
+  }
+
+  if (read.confirmed === 'found') {
+    await settleCompletedPrRow({
+      ...ledgerArgs,
+      canonicalResult: read.result,
+      reconcileResult: 'confirmed_completed',
+    });
+    return { ...read.result, replayed: true };
+  }
+  if (read.confirmed === 'absent') {
+    await settleFailedPrRow({
+      ...ledgerArgs,
+      outcomeCode: 'effect_absent',
+      reconcileResult: 'confirmed_absent',
+    });
+    throw ambiguousPrError();
+  }
+  // `unresolved`: the provider reference read failed (anything but a definitive
+  // NOT_FOUND). The effect's presence is unknown, so the row stays
+  // reconcile-pending — never a terminal settle from a failed read.
+  return failPrRowAmbiguous(ledgerArgs);
+}
+
+/**
+ * The shared shape of the three non-idempotent comment/review writes. Without
+ * an `operationKey` the write runs exactly as before, unledgered. With one it
+ * admits a `pr` row, settles the canonical result at the committed-effect
+ * boundary, and reconciles a same-key retry by re-reading the recorded GitHub
+ * id instead of writing again (a second write would duplicate the comment).
+ */
+async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
+  userId: string;
+  intent: PrLedgerIntent;
+  input: Record<string, unknown>;
+  operationKey: string | undefined;
+  providerRefKey: 'commentId' | 'reviewId';
+  write: (octokit: ReturnType<typeof createGitHubPrReviewOctokit>) => Promise<T>;
+  readRef: (
+    octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
+    providerId: number
+  ) => Promise<T>;
+}): Promise<T | ReplayedResult<T>> {
+  if (args.operationKey === undefined) {
+    return withGitHubUserTokenRetry({ kiloUserId: args.userId, call: args.write });
+  }
+  const startedAt = Date.now();
+  const ledgerArgs = { userId: args.userId, intent: args.intent, startedAt };
+  return runPrLedgerMutation<T>({
+    ...ledgerArgs,
+    operationKey: args.operationKey,
+    resourceKey: prLedgerResourceKey(args.intent, args.input),
+    execute: row =>
+      executePrWriteWithLedger({
+        ...ledgerArgs,
+        row,
+        runWrite: async octokit => {
+          const canonical = await args.write(octokit);
+          return { kind: 'settle', canonical, response: { ...canonical } };
+        },
+      }),
+    reconcile: row =>
+      reconcileCommentPrRow({
+        ...ledgerArgs,
+        row,
+        providerRefKey: args.providerRefKey,
+        readRef: args.readRef,
+      }),
   });
-  throw ambiguousPrError();
 }
 
 /**
@@ -1341,6 +1262,12 @@ async function reconcileMergePrRow<T>(args: {
   }
 
   const distinctId = await resolvePrDistinctId(args.userId);
+  const ledgerArgs = {
+    row: args.row,
+    intent: 'merge' as const,
+    distinctId,
+    startedAt: args.startedAt,
+  };
   switch (reconcile.kind) {
     case 'merged': {
       const canonical = {
@@ -1349,49 +1276,26 @@ async function reconcileMergePrRow<T>(args: {
         branchDeleted: false,
       };
       await settleCompletedPrRow({
-        rowId: args.row.id,
+        ...ledgerArgs,
         canonicalResult: canonical,
-        outboxEvent: prSettledOutboxEvent({
-          distinctId,
-          intent: 'merge',
-          outcome: 'completed',
-          reconcileResult: 'confirmed_completed',
-          startedAt: args.startedAt,
-        }),
+        reconcileResult: 'confirmed_completed',
       });
       return { ...canonical, replayed: true } as unknown as ReplayedResult<T>;
     }
     case 'closed_unmerged':
     case 'stale_head':
-      await bestEffortLedgerWrite(() =>
-        settleOperation(db, {
-          rowId: args.row.id,
-          status: 'failed',
-          outcomeCode: reconcile.kind === 'closed_unmerged' ? 'already_closed' : 'head_moved',
-          outboxEvent: prSettledOutboxEvent({
-            distinctId,
-            intent: 'merge',
-            outcome: 'failed',
-            reconcileResult: 'confirmed_absent',
-            startedAt: args.startedAt,
-          }),
-        })
-      );
-      throw conflictPrError();
+      await settleFailedPrRow({
+        ...ledgerArgs,
+        outcomeCode: reconcile.kind === 'closed_unmerged' ? 'already_closed' : 'head_moved',
+        reconcileResult: 'confirmed_absent',
+      });
+      throw new TRPCError({ code: 'CONFLICT', message: PR_CONFLICT_MESSAGE });
     case 'lineage_intact':
       return args.execute(args.row);
     case 'unresolved':
-      // The authoritative read failed: the merge may or may not have
-      // committed. Mark reconcile-pending (emitting the deterministic
-      // ambiguous outbox event) and surface the ambiguous outcome; the row
-      // is NEVER settled absent from a failed read.
-      await markPrRowReconcilePending({
-        row: args.row,
-        intent: 'merge',
-        distinctId,
-        startedAt: args.startedAt,
-      });
-      throw ambiguousPrError();
+      // The authoritative read failed: the merge may or may not have committed.
+      // The row is NEVER settled absent from a failed read.
+      return failPrRowAmbiguous(ledgerArgs);
   }
 }
 
@@ -1470,22 +1374,6 @@ async function runMergeWrite(
       branchDeleteError: message,
     };
   }
-}
-
-/** Ledger view of the merge write: declined merges never settle the row. */
-async function runMergeLedgerWrite(
-  octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
-  input: z.infer<typeof MergePullRequestInput>
-): Promise<PrWriteOutcome<MergeWriteResult>> {
-  const result = await runMergeWrite(octokit, input);
-  if (result.merged) {
-    return {
-      kind: 'settle',
-      canonical: { merged: true, sha: result.sha, branchDeleted: result.branchDeleted },
-      response: result,
-    };
-  }
-  return { kind: 'no_settle', response: result };
 }
 
 export const githubPrReviewRouter = createTRPCRouter({
@@ -1692,166 +1580,87 @@ export const githubPrReviewRouter = createTRPCRouter({
   }),
 
   // Post a single immediate review comment (no pending review required).
-  createReviewComment: baseProcedure
-    .input(CreateReviewCommentInput)
-    .mutation(async ({ ctx, input }) => {
-      if (input.operationKey === undefined) {
-        const result = await withGitHubUserTokenRetry({
-          kiloUserId: ctx.user.id,
-          call: async octokit => {
-            const params = buildCreateReviewCommentParams({
-              owner: input.owner,
-              repo: input.repo,
-              number: input.number,
-              body: input.body,
-              commitSha: input.commitSha,
-              path: input.path,
-              line: input.line,
-              side: input.side,
-              startLine: input.startLine,
-              startSide: input.startSide,
-            });
-            const response = await octokit.pulls.createReviewComment(params);
-            return {
-              commentId: response.data.id,
-              nodeId: response.data.node_id,
-            };
-          },
+  createReviewComment: baseProcedure.input(CreateReviewCommentInput).mutation(({ ctx, input }) =>
+    runPrCommentMutation({
+      userId: ctx.user.id,
+      intent: 'create_review_comment',
+      input,
+      operationKey: input.operationKey,
+      providerRefKey: 'commentId',
+      write: async octokit => {
+        const response = await octokit.pulls.createReviewComment(
+          buildCreateReviewCommentParams({
+            owner: input.owner,
+            repo: input.repo,
+            number: input.number,
+            body: input.body,
+            commitSha: input.commitSha,
+            path: input.path,
+            line: input.line,
+            side: input.side,
+            startLine: input.startLine,
+            startSide: input.startSide,
+          })
+        );
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+      readRef: async (octokit, commentId) => {
+        const response = await octokit.pulls.getReviewComment({
+          owner: input.owner,
+          repo: input.repo,
+          comment_id: commentId,
         });
-        return result;
-      }
-
-      const startedAt = Date.now();
-      return runPrLedgerMutation({
-        userId: ctx.user.id,
-        intent: 'create_review_comment',
-        operationKey: input.operationKey,
-        resourceKey: prLedgerResourceKey('create_review_comment', input),
-        startedAt,
-        execute: row =>
-          executePrWriteWithLedger({
-            userId: ctx.user.id,
-            row,
-            intent: 'create_review_comment',
-            startedAt,
-            runWrite: async octokit => {
-              const params = buildCreateReviewCommentParams({
-                owner: input.owner,
-                repo: input.repo,
-                number: input.number,
-                body: input.body,
-                commitSha: input.commitSha,
-                path: input.path,
-                line: input.line,
-                side: input.side,
-                startLine: input.startLine,
-                startSide: input.startSide,
-              });
-              const response = await octokit.pulls.createReviewComment(params);
-              const canonical = { commentId: response.data.id, nodeId: response.data.node_id };
-              return { kind: 'settle', canonical, response: { ...canonical } };
-            },
-          }),
-        reconcile: row =>
-          reconcileCommentPrRow({
-            userId: ctx.user.id,
-            row,
-            intent: 'create_review_comment',
-            startedAt,
-            providerRefOf: canonical =>
-              typeof canonical.commentId === 'number' ? canonical.commentId : null,
-            readRef: async (octokit, providerId) => {
-              const response = await octokit.pulls.getReviewComment({
-                owner: input.owner,
-                repo: input.repo,
-                comment_id: providerId,
-              });
-              const canonical = { commentId: response.data.id, nodeId: response.data.node_id };
-              return { canonical, response: { ...canonical } };
-            },
-          }),
-      });
-    }),
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+    })
+  ),
 
   // Reply to an existing review comment (creates a child comment in the
   // same thread).
-  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(async ({ ctx, input }) => {
-    if (input.operationKey === undefined) {
-      const result = await withGitHubUserTokenRetry({
-        kiloUserId: ctx.user.id,
-        call: async octokit => {
-          const params = buildReplyToCommentParams({
+  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(({ ctx, input }) =>
+    runPrCommentMutation({
+      userId: ctx.user.id,
+      intent: 'reply_comment',
+      input,
+      operationKey: input.operationKey,
+      providerRefKey: 'commentId',
+      write: async octokit => {
+        const response = await octokit.pulls.createReplyForReviewComment(
+          buildReplyToCommentParams({
             owner: input.owner,
             repo: input.repo,
             number: input.number,
             commentId: input.commentId,
             body: input.body,
-          });
-          const response = await octokit.pulls.createReplyForReviewComment(params);
-          return {
-            commentId: response.data.id,
-            nodeId: response.data.node_id,
-          };
-        },
-      });
-      return result;
-    }
-
-    const startedAt = Date.now();
-    return runPrLedgerMutation({
-      userId: ctx.user.id,
-      intent: 'reply_comment',
-      operationKey: input.operationKey,
-      resourceKey: prLedgerResourceKey('reply_comment', input),
-      startedAt,
-      execute: row =>
-        executePrWriteWithLedger({
-          userId: ctx.user.id,
-          row,
-          intent: 'reply_comment',
-          startedAt,
-          runWrite: async octokit => {
-            const params = buildReplyToCommentParams({
-              owner: input.owner,
-              repo: input.repo,
-              number: input.number,
-              commentId: input.commentId,
-              body: input.body,
-            });
-            const response = await octokit.pulls.createReplyForReviewComment(params);
-            const canonical = { commentId: response.data.id, nodeId: response.data.node_id };
-            return { kind: 'settle', canonical, response: { ...canonical } };
-          },
-        }),
-      reconcile: row =>
-        reconcileCommentPrRow({
-          userId: ctx.user.id,
-          row,
-          intent: 'reply_comment',
-          startedAt,
-          providerRefOf: canonical =>
-            typeof canonical.commentId === 'number' ? canonical.commentId : null,
-          readRef: async (octokit, providerId) => {
-            const response = await octokit.pulls.getReviewComment({
-              owner: input.owner,
-              repo: input.repo,
-              comment_id: providerId,
-            });
-            const canonical = { commentId: response.data.id, nodeId: response.data.node_id };
-            return { canonical, response: { ...canonical } };
-          },
-        }),
-    });
-  }),
+          })
+        );
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+      readRef: async (octokit, commentId) => {
+        const response = await octokit.pulls.getReviewComment({
+          owner: input.owner,
+          repo: input.repo,
+          comment_id: commentId,
+        });
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+    })
+  ),
 
   // Submit a pending review with an optional batch of inline comments and
-  // an overall event (APPROVE / REQUEST_CHANGES / COMMENT).
-  submitReview: baseProcedure.input(SubmitReviewInput).mutation(async ({ ctx, input }) => {
-    if (input.operationKey === undefined) {
-      const result = await withGitHubUserTokenRetry({
-        kiloUserId: ctx.user.id,
-        call: async octokit => {
-          const params = buildSubmitReviewParams({
+  // an overall event (APPROVE / REQUEST_CHANGES / COMMENT). The confirmed
+  // `state` is a bounded GitHub enum (not free text), so it is carried in the
+  // canonical result and a replayed submitReview keeps the client's shape.
+  submitReview: baseProcedure.input(SubmitReviewInput).mutation(({ ctx, input }) =>
+    runPrCommentMutation({
+      userId: ctx.user.id,
+      intent: 'submit_review',
+      input,
+      operationKey: input.operationKey,
+      providerRefKey: 'reviewId',
+      write: async octokit => {
+        const response = await octokit.pulls.createReview(
+          buildSubmitReviewParams({
             owner: input.owner,
             repo: input.repo,
             number: input.number,
@@ -1859,82 +1668,29 @@ export const githubPrReviewRouter = createTRPCRouter({
             body: input.body,
             commitSha: input.commitSha,
             comments: input.comments,
-          });
-          const response = await octokit.pulls.createReview(params);
-          return {
-            reviewId: response.data.id,
-            nodeId: response.data.node_id,
-            state: response.data.state,
-          };
-        },
-      });
-      return result;
-    }
-
-    const startedAt = Date.now();
-    return runPrLedgerMutation({
-      userId: ctx.user.id,
-      intent: 'submit_review',
-      operationKey: input.operationKey,
-      resourceKey: prLedgerResourceKey('submit_review', input),
-      startedAt,
-      execute: row =>
-        executePrWriteWithLedger({
-          userId: ctx.user.id,
-          row,
-          intent: 'submit_review',
-          startedAt,
-          runWrite: async octokit => {
-            const params = buildSubmitReviewParams({
-              owner: input.owner,
-              repo: input.repo,
-              number: input.number,
-              event: input.event,
-              body: input.body,
-              commitSha: input.commitSha,
-              comments: input.comments,
-            });
-            const response = await octokit.pulls.createReview(params);
-            // The confirmed `state` is part of the canonical result (a bounded
-            // GitHub enum, not free text) so a replayed submitReview carries
-            // the same shape the client requires on first execution.
-            const canonical = {
-              reviewId: response.data.id,
-              nodeId: response.data.node_id,
-              state: response.data.state,
-            };
-            return {
-              kind: 'settle',
-              canonical,
-              response: { ...canonical },
-            };
-          },
-        }),
-      reconcile: row =>
-        reconcileCommentPrRow({
-          userId: ctx.user.id,
-          row,
-          intent: 'submit_review',
-          startedAt,
-          providerRefOf: canonical =>
-            typeof canonical.reviewId === 'number' ? canonical.reviewId : null,
-          readRef: async (octokit, providerId) => {
-            const response = await octokit.pulls.getReview({
-              owner: input.owner,
-              repo: input.repo,
-              pull_number: input.number,
-              review_id: providerId,
-            });
-            const canonical = {
-              reviewId: response.data.id,
-              nodeId: response.data.node_id,
-              state: response.data.state,
-            };
-            return { canonical, response: { ...canonical } };
-          },
-        }),
-    });
-  }),
+          })
+        );
+        return {
+          reviewId: response.data.id,
+          nodeId: response.data.node_id,
+          state: response.data.state,
+        };
+      },
+      readRef: async (octokit, reviewId) => {
+        const response = await octokit.pulls.getReview({
+          owner: input.owner,
+          repo: input.repo,
+          pull_number: input.number,
+          review_id: reviewId,
+        });
+        return {
+          reviewId: response.data.id,
+          nodeId: response.data.node_id,
+          state: response.data.state,
+        };
+      },
+    })
+  ),
 
   // Resolve a review thread (GraphQL — there is no REST endpoint for this).
   resolveThread: baseProcedure.input(ThreadIdInput).mutation(async ({ ctx, input }) => {
@@ -2020,24 +1776,13 @@ export const githubPrReviewRouter = createTRPCRouter({
     return result;
   }),
 
-  // Merge a pull request. `expectedHeadSha` enforces the optimistic-concurrency
-  // fence — if the head moved since the mobile overview was rendered, GitHub
-  // returns 409 and the caller should re-fetch. The branch delete after a
-  // successful merge is BEST-EFFORT: failures are reported in the result
-  // (never thrown) so the mobile client can surface a banner.
-  //
-  // P0-D-09: the head ref + same-repo identity are derived from
-  // `octokit.pulls.get` rather than the client input. A caller must not be
-  // able to merge PR #N with a valid `expectedHeadSha` and then delete an
-  // arbitrary same-repo ref (e.g. `main`) by spoofing `headRef`. The delete
-  // is fenced on the server-derived head sha matching `expectedHeadSha`,
-  // same-repo identity, and the merge actually completing.
-  //
-  // P1-A-08c: with an `operationKey`, the merge admits a `pr` row and
-  // reconciles same-key retries against authoritative PR state and the
-  // expected head lineage before ever re-merging. A declined merge
-  // (`merged: false`) deliberately leaves the row admitted so a later retry
-  // can reconcile and re-execute instead of blindly re-merging.
+  // Merge a pull request. `expectedHeadSha` is the optimistic-concurrency fence
+  // (a moved head 409s and the caller re-fetches) and, per P0-D-09, also fences
+  // the best-effort branch delete: the head ref and same-repo identity come
+  // from `octokit.pulls.get`, never the client input, so a caller cannot merge
+  // PR #N and then delete an arbitrary ref by spoofing `headRef`. With an
+  // `operationKey` the merge reconciles same-key retries against authoritative
+  // PR state and head lineage before ever re-merging.
   mergePullRequest: baseProcedure.input(MergePullRequestInput).mutation(async ({ ctx, input }) => {
     if (input.operationKey === undefined) {
       return withGitHubUserTokenRetry({
@@ -2053,7 +1798,18 @@ export const githubPrReviewRouter = createTRPCRouter({
         row,
         intent: 'merge',
         startedAt,
-        runWrite: octokit => runMergeLedgerWrite(octokit, input),
+        // A declined merge (`merged: false`) never settles the row, so a later
+        // same-key retry reconciles instead of blindly re-merging.
+        runWrite: async octokit => {
+          const result = await runMergeWrite(octokit, input);
+          return result.merged
+            ? {
+                kind: 'settle',
+                canonical: { merged: true, sha: result.sha, branchDeleted: result.branchDeleted },
+                response: result,
+              }
+            : { kind: 'no_settle', response: result };
+        },
       });
     return runPrLedgerMutation({
       userId: ctx.user.id,

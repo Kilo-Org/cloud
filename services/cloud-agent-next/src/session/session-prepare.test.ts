@@ -214,6 +214,16 @@ function makeRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCrea
   };
 }
 
+const CREATE_OPTIONS = { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 };
+
+/** Runs the ledger-guarded create with the standard operation options. */
+function runCreate(
+  ctx: SessionRegistrationContext,
+  request: SessionCreateRequest = makeRequest({ options: { operationKey: OPERATION_KEY } })
+) {
+  return createSessionWithLedger(request, ctx, CREATE_OPTIONS);
+}
+
 type SettleOptions = { outboxEvent?: { properties?: unknown } };
 
 /** Returns the options argument of the n-th `settleOperation` call, if any. */
@@ -246,11 +256,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 }
-    );
+    const result = await runCreate(ctx);
 
     expect(admitOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -310,12 +316,7 @@ describe('createSessionWithLedger admission ladder', () => {
     createSessionReportMock.mockRejectedValueOnce(new Error('report store unavailable'));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('report store unavailable');
+    await expect(runCreate(ctx)).rejects.toThrow('report store unavailable');
 
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -334,12 +335,7 @@ describe('createSessionWithLedger admission ladder', () => {
     recordOperationProgressMock.mockRejectedValueOnce(new Error('progress write failed'));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('progress write failed');
+    await expect(runCreate(ctx)).rejects.toThrow('progress write failed');
 
     expect(createSessionReportMock).not.toHaveBeenCalled();
     expect(settleOperationMock).toHaveBeenCalledWith(
@@ -359,12 +355,7 @@ describe('createSessionWithLedger admission ladder', () => {
     generateSandboxRoutingTargetMock.mockRejectedValueOnce(new Error('routing failed'));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('routing failed');
+    await expect(runCreate(ctx)).rejects.toThrow('routing failed');
 
     expect(recordSessionFailureMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -390,12 +381,7 @@ describe('createSessionWithLedger admission ladder', () => {
     recordSessionFailureMock.mockRejectedValueOnce(new Error('telemetry down'));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('routing failed');
+    await expect(runCreate(ctx)).rejects.toThrow('routing failed');
 
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -411,12 +397,7 @@ describe('createSessionWithLedger admission ladder', () => {
     recordSandboxIdentityMock.mockRejectedValueOnce(new Error('identity write failed'));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('identity write failed');
+    await expect(runCreate(ctx)).rejects.toThrow('identity write failed');
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(settleOperationMock).toHaveBeenCalledWith(
@@ -433,12 +414,7 @@ describe('createSessionWithLedger admission ladder', () => {
     createCliSessionMock.mockRejectedValueOnce(new Error('session ingest unavailable'));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('session ingest unavailable');
+    await expect(runCreate(ctx)).rejects.toThrow('session ingest unavailable');
 
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -464,12 +440,10 @@ describe('createSessionWithLedger admission ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'registration rejected' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'registration rejected',
+    });
 
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -504,12 +478,7 @@ describe('createSessionWithLedger admission ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -530,12 +499,7 @@ describe('createSessionWithLedger admission ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('rpc timed out');
+    await expect(runCreate(ctx)).rejects.toThrow('rpc timed out');
 
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), {
       rowId: ROW_ID,
@@ -558,12 +522,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({
+    await expect(runCreate(ctx)).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'session_creation_settle_failed',
       cause: expect.objectContaining({
@@ -600,11 +559,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 }
-    );
+    const result = await runCreate(ctx);
 
     expect(result).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
@@ -624,12 +579,10 @@ describe('createSessionWithLedger admission ladder', () => {
     });
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
 
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
@@ -650,12 +603,10 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
 
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
@@ -668,12 +619,10 @@ describe('createSessionWithLedger admission ladder', () => {
     });
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
@@ -686,12 +635,10 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     // The in-progress retry must not run the effect, reconcile, or settle.
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -716,7 +663,6 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     recordOperationProgressMock.mockResolvedValue(undefined);
   });
 
-  const takeoverOptions = { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 };
   const canonicalIds = {
     cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
     kiloSessionId: KILO_SESSION_ID,
@@ -732,11 +678,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      takeoverOptions
-    );
+    const result = await runCreate(ctx);
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(settleOptions(0)?.outboxEvent).toMatchObject({
@@ -758,11 +700,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      takeoverOptions
-    );
+    const result = await runCreate(ctx);
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
@@ -787,13 +725,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     // Both reads ran, then the ladder stopped: no delete, no fresh create, no settle.
     expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
@@ -826,11 +761,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      takeoverOptions
-    );
+    const result = await runCreate(ctx);
 
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
@@ -876,13 +807,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
@@ -911,13 +839,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
     // The empty-only delete is no longer attempted from absent reads alone.
@@ -938,11 +863,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      takeoverOptions
-    );
+    const result = await runCreate(ctx);
 
     expect(doStub.getMetadata).toHaveBeenCalledTimes(1);
     expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
@@ -987,13 +908,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
 
     expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -1040,13 +958,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
 
     expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -1098,13 +1013,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const ctx = makeContext(doStub);
     settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({
+    await expect(runCreate(ctx)).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'session_creation_settle_failed',
       cause: expect.objectContaining({
@@ -1145,13 +1054,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const ctx = makeContext(doStub);
     settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({
+    await expect(runCreate(ctx)).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'session_creation_settle_failed',
       cause: expect.objectContaining({
@@ -1184,13 +1087,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     const ctx = makeContext(doStub);
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     expect(settleOperationMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -1209,13 +1109,10 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     getPgDbMock.mockReturnValue(makeDb([[{ sessionId: KILO_SESSION_ID }]]));
     const ctx = makeContext(makeDoStub());
 
-    await expect(
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      )
-    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
 
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
@@ -1231,11 +1128,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      takeoverOptions
-    );
+    const result = await runCreate(ctx);
 
     expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
     expect(result).toEqual({
@@ -1265,16 +1158,8 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const ctx = makeContext(doStub);
 
     const [winner, loser] = await Promise.all([
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      ),
-      createSessionWithLedger(
-        makeRequest({ options: { operationKey: OPERATION_KEY } }),
-        ctx,
-        takeoverOptions
-      ).then(
+      runCreate(ctx),
+      runCreate(ctx).then(
         () => null,
         (error: unknown) => error
       ),
@@ -1338,12 +1223,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const ctx = makeContext(doStub);
 
     // First retry: fresh allocation, then unknown transport.
-    await expect(
-      createSessionWithLedger(makeRequest({ options: { operationKey: OPERATION_KEY } }), ctx, {
-        operationKey: OPERATION_KEY,
-        startedAt: 1_700_000_000_000,
-      })
-    ).rejects.toThrow('rpc timed out');
+    await expect(runCreate(ctx)).rejects.toThrow('rpc timed out');
 
     // The fresh allocation recorded its new IDs on the reconcile_pending row
     // and the unknown transport kept the row reconcile-pending.
@@ -1358,11 +1238,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
 
     // Second retry: reconciles the freshly recorded IDs; no third allocation.
-    const result = await createSessionWithLedger(
-      makeRequest({ options: { operationKey: OPERATION_KEY } }),
-      ctx,
-      { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 }
-    );
+    const result = await runCreate(ctx);
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
@@ -1405,7 +1281,6 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     recordOperationProgressMock.mockResolvedValue(undefined);
   });
 
-  const createOptions = { operationKey: OPERATION_KEY, startedAt: 1_700_000_000_000 };
   const ORIGINAL_OPTIONS = {
     operationKey: OPERATION_KEY,
     kilocodeOrganizationId: 'org-abc',
@@ -1436,7 +1311,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    await expect(createSessionWithLedger(request, ctx, createOptions)).rejects.toMatchObject({
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: 'session_creation_failed',
     });
@@ -1454,7 +1329,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(request, ctx, createOptions);
+    const result = await runCreate(ctx, request);
 
     expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
@@ -1477,7 +1352,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(request, ctx, createOptions);
+    const result = await runCreate(ctx, request);
 
     expect(result).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
@@ -1488,120 +1363,69 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a replay when the retry changes the prompt', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
+  /**
+   * One case per create input covered by the intent fingerprint. Each case
+   * changes exactly one input on the retry; every one must reject before any
+   * replay, reconciliation, or external effect.
+   */
+  const changedIntentCases: Array<{
+    name: string;
+    admission?: 'duplicate_settled' | 'takeover' | 'duplicate_reconcile_pending';
+    original?: SessionCreateRequest;
+    retry: SessionCreateRequest;
+  }> = [
+    {
+      name: 'the prompt',
+      retry: makeRequest({
         initialTurn: { type: 'prompt', prompt: 'Build something else entirely' },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes the repository', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
+      }),
+    },
+    {
+      name: 'the repository',
+      retry: makeRequest({
         repository: { type: 'github', repo: 'acme/other-repo' },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes the model', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        agent: { mode: 'code', model: 'gpt-4' },
-        options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes the organization', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
+      }),
+    },
+    {
+      name: 'the model',
+      retry: makeRequest({ agent: { mode: 'code', model: 'gpt-4' }, options: ORIGINAL_OPTIONS }),
+    },
+    {
+      name: 'the organization',
+      retry: makeRequest({
         options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: 'org-xyz' },
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes another create input (agent mode)', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
+      }),
+    },
+    {
+      name: 'the agent mode',
+      retry: makeRequest({
         agent: { mode: 'architect', model: 'claude-3' },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes the finalization policy', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        finalization: { autoCommit: true },
+      }),
+    },
+    {
+      name: 'the finalization policy',
+      retry: makeRequest({ finalization: { autoCommit: true }, options: ORIGINAL_OPTIONS }),
+    },
+    {
+      name: 'the appended system prompt',
+      retry: makeRequest({
+        profile: { overrides: { appendSystemPrompt: 'Follow these extra rules' } },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes the appended system prompt', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        profile: {
-          overrides: { appendSystemPrompt: 'Follow these extra rules' },
-        },
+      }),
+    },
+    {
+      name: 'resolved profile setup commands',
+      retry: makeRequest({
+        profile: { resolved: { setupCommands: ['pnpm install'] } },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes resolved profile settings', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        profile: {
-          resolved: { setupCommands: ['pnpm install'] },
-        },
-        options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes a resolved runtime agent', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(originalRequest()),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
+      }),
+    },
+    {
+      name: 'a resolved runtime agent',
+      retry: makeRequest({
         profile: {
           resolved: {
             runtimeAgents: [
@@ -1614,30 +1438,110 @@ describe('createSessionWithLedger changed-intent rejection', () => {
           },
         },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a takeover reconcile when the retry changes finalization', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'takeover',
-      row: makeLedgerRow({
-        canonical_result: {
-          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-          initialMessageId: INITIAL_MESSAGE_ID,
-          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
-            await sessionCreateIntentFingerprint(originalRequest()),
-        },
       }),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
+    },
+    {
+      // MCP `environment`/`headers` are credential-only and excluded, but the
+      // server selection itself is create behavior.
+      name: 'an MCP server url',
+      original: makeRequest({
+        profile: {
+          resolved: {
+            mcpServers: {
+              github: { type: 'remote', url: 'https://mcp.example.com/github', enabled: true },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        profile: {
+          resolved: {
+            mcpServers: {
+              github: { type: 'remote', url: 'https://mcp.example.com/github-v2', enabled: true },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
+      // The remote MCP `timeout` is materialized into KILO_CONFIG_CONTENT.mcp,
+      // so a timeout-only change is a changed create intent.
+      name: 'an MCP server timeout',
+      original: makeRequest({
+        profile: {
+          resolved: {
+            mcpServers: {
+              github: { type: 'remote', url: 'https://mcp.example.com/github', timeout: 30_000 },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        profile: {
+          resolved: {
+            mcpServers: {
+              github: { type: 'remote', url: 'https://mcp.example.com/github', timeout: 60_000 },
+            },
+          },
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
+      name: 'finalization on a takeover reconcile',
+      admission: 'takeover',
+      retry: makeRequest({
         finalization: { condenseOnComplete: true },
         options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
+      }),
+    },
+    {
+      name: 'the prompt on a takeover reconcile',
+      admission: 'takeover',
+      retry: makeRequest({
+        initialTurn: { type: 'prompt', prompt: 'A different prompt' },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
+      name: 'the repository on a reconcile-pending retry',
+      admission: 'duplicate_reconcile_pending',
+      retry: makeRequest({
+        repository: { type: 'github', repo: 'acme/changed-repo' },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+  ];
+
+  it.each(changedIntentCases)(
+    'rejects a same-key retry that changes $name',
+    async ({ admission = 'duplicate_settled', original, retry }) => {
+      const status =
+        admission === 'duplicate_settled'
+          ? 'completed'
+          : admission === 'duplicate_reconcile_pending'
+            ? 'reconcile_pending'
+            : 'admitted';
+      admitOperationMock.mockResolvedValueOnce({
+        admission,
+        row: makeLedgerRow({
+          status,
+          canonical_result: {
+            cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(
+              original ?? originalRequest()
+            ),
+          },
+        }),
+      });
+      await expectRejectedWithoutEffects(retry);
+    }
+  );
 
   it('replays when only credential-only profile material changed between retries', async () => {
     // Rotated envVars, encrypted secrets, and MCP environment/header secrets
@@ -1674,7 +1578,8 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
+    const result = await runCreate(
+      ctx,
       makeRequest({
         profile: {
           id: 'prof-1',
@@ -1698,9 +1603,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
           },
         },
         options: ORIGINAL_OPTIONS,
-      }),
-      ctx,
-      createOptions
+      })
     );
 
     expect(result).toEqual({
@@ -1710,129 +1613,6 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects a replay when the retry changes an MCP server behavior setting', async () => {
-    // MCP server `environment`/`headers` are credential-only and excluded, but
-    // the server selection itself (url/command/enabled) is create behavior.
-    const original = makeRequest({
-      profile: {
-        resolved: {
-          mcpServers: {
-            github: {
-              type: 'remote',
-              url: 'https://mcp.example.com/github',
-              enabled: true,
-            },
-          },
-        },
-      },
-      options: ORIGINAL_OPTIONS,
-    });
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(original),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        profile: {
-          resolved: {
-            mcpServers: {
-              github: {
-                type: 'remote',
-                url: 'https://mcp.example.com/github-v2',
-                enabled: true,
-              },
-            },
-          },
-        },
-        options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a replay when the retry changes only a remote MCP server timeout', async () => {
-    // The remote MCP server `timeout` is behavior-changing create input the
-    // Durable Object receives (materialized into KILO_CONFIG_CONTENT.mcp), so
-    // a timeout-only change on the same key must never replay or reconcile the
-    // prior session: it rejects before any effect execution.
-    const original = makeRequest({
-      profile: {
-        resolved: {
-          mcpServers: {
-            github: {
-              type: 'remote',
-              url: 'https://mcp.example.com/github',
-              timeout: 30_000,
-            },
-          },
-        },
-      },
-      options: ORIGINAL_OPTIONS,
-    });
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: await completedRowFor(original),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        profile: {
-          resolved: {
-            mcpServers: {
-              github: {
-                type: 'remote',
-                url: 'https://mcp.example.com/github',
-                timeout: 60_000,
-              },
-            },
-          },
-        },
-        options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a takeover reconcile before any reconcile step when the intent changed', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'takeover',
-      row: makeLedgerRow({
-        canonical_result: {
-          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-          initialMessageId: INITIAL_MESSAGE_ID,
-          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
-            await sessionCreateIntentFingerprint(originalRequest()),
-        },
-      }),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        initialTurn: { type: 'prompt', prompt: 'A different prompt' },
-        options: ORIGINAL_OPTIONS,
-      })
-    );
-  });
-
-  it('rejects a duplicate_reconcile_pending retry when the intent changed', async () => {
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_reconcile_pending',
-      row: makeLedgerRow({
-        status: 'reconcile_pending',
-        canonical_result: {
-          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-          initialMessageId: INITIAL_MESSAGE_ID,
-          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
-            await sessionCreateIntentFingerprint(originalRequest()),
-        },
-      }),
-    });
-    await expectRejectedWithoutEffects(
-      makeRequest({
-        repository: { type: 'github', repo: 'acme/changed-repo' },
-        options: ORIGINAL_OPTIONS,
-      })
-    );
   });
 
   it('keeps the legacy replay behavior for rows recorded without an intent fingerprint', async () => {
@@ -1851,11 +1631,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const result = await createSessionWithLedger(
-      makeRequest({ options: ORIGINAL_OPTIONS }),
-      ctx,
-      createOptions
-    );
+    const result = await runCreate(ctx, makeRequest({ options: ORIGINAL_OPTIONS }));
 
     expect(result).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,

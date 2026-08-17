@@ -41,12 +41,9 @@ type MergePullRequestInput = {
 };
 
 /**
- * Deterministic intent fingerprint for a merge submit. Every intent-defining
- * input is included: merge method, commit title/message, delete-branch flag,
- * the expected-head fence, and the resource. A retry of the SAME merge reuses
- * the hoisted operation key; changing the method or message (or another input)
- * rotates the key so a changed intent cannot replay the previous merge's
- * canonical ledger result.
+ * Intent fingerprint for a merge submit: the method, commit title/message,
+ * delete-branch flag, expected-head fence, and resource. Any change is a new
+ * intent.
  */
 export function mergePullRequestIntentFingerprint(input: MergePullRequestInput): string {
   return JSON.stringify({
@@ -95,11 +92,8 @@ export function useMergePullRequestMutation(ref: PrRef) {
   // retry. The typed return is preserved so `performSubmit` can read
   // the sha / branchDeleted / branchDeleteError off the resolved value.
   //
-  // P1-A-08c: the hoisted operation key is merged into the input so a
-  // same-key retry reconciles against authoritative PR state before
-  // ever re-merging; it is regenerated after a real merge or a
-  // non-retryable failure. The two ledger outcome markers are mapped
-  // onto the existing per-surface copy for the toast.
+  // P1-A-08c: the hoisted operation key rides the input so a same-key retry
+  // reconciles against authoritative PR state before ever re-merging.
   return useMutation<MergePullRequestResult, Error, MergePullRequestInput>({
     mutationFn: async input => {
       try {

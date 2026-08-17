@@ -144,12 +144,7 @@ export type PrepareSessionInput = {
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
   devcontainer?: boolean;
   initialMessageId?: string | null;
-  /**
-   * Client-generated UUID, stable across retries of one user intent. The
-   * cloud-agent-next worker admits the create into its operation ledger
-   * only when this is present AND the effective `autoInitiate` is true;
-   * otherwise it is ignored (legacy behavior preserved).
-   */
+  /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
 };
 
@@ -158,11 +153,7 @@ export type PrepareSessionOutput = {
   /** The Kilo CLI session ID */
   kiloSessionId: string;
   cloudAgentSessionId: string;
-  /**
-   * `true` when this response is a ledger replay of an already-settled
-   * create (same `operationKey`). The canonical session IDs are returned
-   * unchanged; the caller should not create a second session row.
-   */
+  /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };
 

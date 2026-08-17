@@ -1198,6 +1198,17 @@ const reviewResourceKey = prLedgerResourceKey('submit_review', {
   comments: [{ path: 'src/foo.ts', line: 5, side: 'RIGHT', body: 'fix me' }],
 });
 
+// The stored `resource_key` is the dedupe identity for up to 30 days. Every
+// other ledger test builds both sides with `prLedgerResourceKey`, so a change
+// to the fingerprint would pass unnoticed while rotating every in-flight key.
+// Pin the exact values instead.
+describe('prLedgerResourceKey', () => {
+  it('is stable for the comment and merge intents', () => {
+    expect(commentResourceKey).toBe('octocat/hello#1::12b5525f2df626e1');
+    expect(mergeResourceKey).toBe('octocat/hello#1::bdce24cc30b1ecbf');
+  });
+});
+
 describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
   beforeEach(() => {
     mockAdmitOperation.mockReset();

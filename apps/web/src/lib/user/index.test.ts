@@ -123,7 +123,7 @@ import {
   user_data_export_outbox,
 } from '@kilocode/db/schema';
 
-import { eq, count, sql } from 'drizzle-orm';
+import { eq, count, inArray, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   assertUserCanBeSoftDeleted,
@@ -832,7 +832,7 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
-    it('deletes operation ledger rows by user id and analytics outbox rows by the original email', async () => {
+    it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
       const user = await insertTestUser({ google_user_email: 'ledger-user@example.com' });
       const otherUser = await insertTestUser();
 
@@ -863,7 +863,9 @@ describe('User', () => {
         ])
         .returning();
 
-      const [userOutbox, otherOutbox] = await db
+      // Outbox writers fall back to the user id as distinct_id when the email
+      // lookup fails, so both identities must be deleted.
+      const [userOutbox, fallbackOutbox, otherOutbox] = await db
         .insert(analytics_event_outbox)
         .values([
           {
@@ -874,13 +876,19 @@ describe('User', () => {
           },
           {
             event_uuid: crypto.randomUUID(),
+            event_name: 'organization_write_settled',
+            distinct_id: user.id,
+            properties: { source: 'web' },
+          },
+          {
+            event_uuid: crypto.randomUUID(),
             event_name: 'session_create_settled',
             distinct_id: otherUser.google_user_email,
             properties: { source: 'server' },
           },
         ])
         .returning();
-      if (!userLedger || !otherLedger || !userOutbox || !otherOutbox) {
+      if (!userLedger || !otherLedger || !userOutbox || !fallbackOutbox || !otherOutbox) {
         throw new Error('Failed to seed ledger or outbox rows');
       }
 
@@ -896,58 +904,10 @@ describe('User', () => {
         await db
           .select()
           .from(analytics_event_outbox)
-          .where(eq(analytics_event_outbox.id, userOutbox.id))
-      ).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(analytics_event_outbox)
-          .where(eq(analytics_event_outbox.id, otherOutbox.id))
-      ).toHaveLength(1);
-    });
-
-    it('deletes fallback-identity analytics outbox rows keyed by the user id while preserving another user row', async () => {
-      // Outbox writers fall back to the user id as distinct_id when the email
-      // lookup fails. Those rows are keyed by the user id, not the email, so
-      // the email-only delete never touches them.
-      const user = await insertTestUser({ google_user_email: 'fallback-outbox@example.com' });
-      const otherUser = await insertTestUser();
-
-      const [fallbackOutbox, otherOutbox] = await db
-        .insert(analytics_event_outbox)
-        .values([
-          {
-            event_uuid: crypto.randomUUID(),
-            event_name: 'organization_write_settled',
-            distinct_id: user.id,
-            properties: { source: 'web' },
-          },
-          {
-            event_uuid: crypto.randomUUID(),
-            event_name: 'organization_write_settled',
-            distinct_id: otherUser.google_user_email,
-            properties: { source: 'web' },
-          },
-        ])
-        .returning();
-      if (!fallbackOutbox || !otherOutbox) {
-        throw new Error('Failed to seed fallback-identity outbox rows');
-      }
-
-      await softDeleteUser(user.id);
-
-      expect(
-        await db
-          .select()
-          .from(analytics_event_outbox)
-          .where(eq(analytics_event_outbox.id, fallbackOutbox.id))
-      ).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(analytics_event_outbox)
-          .where(eq(analytics_event_outbox.id, otherOutbox.id))
-      ).toHaveLength(1);
+          .where(
+            inArray(analytics_event_outbox.id, [userOutbox.id, fallbackOutbox.id, otherOutbox.id])
+          )
+      ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {

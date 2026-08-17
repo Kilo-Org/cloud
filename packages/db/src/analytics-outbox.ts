@@ -233,24 +233,18 @@ export async function reclaimStaleSendingEvents(
 
 /**
  * Enforces DEC-01 retention and runs the `expired_unsettled` ledger backstop:
- * - deletes `delivered` outbox rows older than `deliveredRetentionDays` (7);
- * - deletes `failed` outbox rows older than `failedRetentionDays` (30);
+ * - deletes `delivered` outbox rows older than `OUTBOX_DELIVERED_RETENTION_DAYS` (7);
+ * - deletes `failed` outbox rows older than `OUTBOX_FAILED_RETENTION_DAYS` (30);
  * - settles non-terminal ledger rows past `expires_at` as `failed` with
  *   `outcome_code: 'expired_unsettled'` and no outbox event.
  */
-export async function purgeExpired(
-  database: LedgerDatabase,
-  params?: { deliveredRetentionDays?: number; failedRetentionDays?: number }
-): Promise<PurgeExpiredResult> {
-  const deliveredRetentionDays = params?.deliveredRetentionDays ?? OUTBOX_DELIVERED_RETENTION_DAYS;
-  const failedRetentionDays = params?.failedRetentionDays ?? OUTBOX_FAILED_RETENTION_DAYS;
-
+export async function purgeExpired(database: LedgerDatabase): Promise<PurgeExpiredResult> {
   const delivered = await database
     .delete(analytics_event_outbox)
     .where(
       and(
         eq(analytics_event_outbox.status, 'delivered'),
-        sql`${analytics_event_outbox.delivered_at} < now() - make_interval(days => ${deliveredRetentionDays})`
+        sql`${analytics_event_outbox.delivered_at} < now() - make_interval(days => ${OUTBOX_DELIVERED_RETENTION_DAYS})`
       )
     )
     .returning({ id: analytics_event_outbox.id });
@@ -260,7 +254,7 @@ export async function purgeExpired(
     .where(
       and(
         eq(analytics_event_outbox.status, 'failed'),
-        sql`${analytics_event_outbox.created_at} < now() - make_interval(days => ${failedRetentionDays})`
+        sql`${analytics_event_outbox.created_at} < now() - make_interval(days => ${OUTBOX_FAILED_RETENTION_DAYS})`
       )
     )
     .returning({ id: analytics_event_outbox.id });

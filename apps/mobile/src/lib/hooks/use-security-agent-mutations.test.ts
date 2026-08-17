@@ -110,11 +110,6 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     vi.clearAllMocks();
   });
 
-  it('mounts a useMutation with a custom mutationFn', () => {
-    useTriggerSecuritySync('personal');
-    expect(lastCapturedOptions?.mutationFn).toBeDefined();
-  });
-
   it('delegates a personal sync to securityAgent.triggerSync.mutate with the hoisted key', async () => {
     const result = { success: true, accepted: true, commandId: 'cmd-1' };
     personalTriggerSyncMutateMock.mockResolvedValueOnce(result);
@@ -166,30 +161,9 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });
 
-  it('keeps the key on the ambiguous outcome (same-key retry reconciles)', async () => {
-    personalTriggerSyncMutateMock.mockRejectedValueOnce(
-      new Error("Couldn't confirm — check the security review before retrying.")
-    );
-    useTriggerSecuritySync('personal');
-
-    await expect(
-      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
-    ).rejects.toMatchObject({
-      message: "Couldn't confirm — check the security review before retrying.",
-    });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
-  it('keeps the key on a retryable network failure (the ledger owns the retry)', async () => {
-    personalTriggerSyncMutateMock.mockRejectedValueOnce(new Error('Network request failed'));
-    useTriggerSecuritySync('personal');
-
-    await expect(
-      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
-    ).rejects.toMatchObject({ message: 'Network request failed' });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
-  });
-
+  // The rest of the retryability matrix is covered by the
+  // `isSecuritySyncRetryable` unit tests below; the hook only needs one
+  // retryable and one terminal case.
   it('regenerates the key on a non-retryable failure (replay-failed ends the intent)', async () => {
     const replayFailed = new Error('This action did not complete. Please try again.');
     Object.assign(replayFailed, { data: { code: 'BAD_REQUEST' } });
@@ -199,32 +173,6 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     await expect(
       lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
     ).rejects.toMatchObject({ message: 'This action did not complete. Please try again.' });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
-  });
-
-  it('regenerates the key on the persistence-failure marker even though it is INTERNAL_SERVER_ERROR', async () => {
-    const persistenceFailed = new Error('We could not record this action. Please try again later.');
-    Object.assign(persistenceFailed, { data: { code: 'INTERNAL_SERVER_ERROR' } });
-    personalTriggerSyncMutateMock.mockRejectedValueOnce(persistenceFailed);
-    useTriggerSecuritySync('personal');
-
-    await expect(
-      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
-    ).rejects.toMatchObject({
-      message: 'We could not record this action. Please try again later.',
-    });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
-  });
-
-  it('regenerates the key on a missing-configuration rejection (fresh intent next)', async () => {
-    const configError = new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE);
-    Object.assign(configError, { data: { code: 'PRECONDITION_FAILED' } });
-    personalTriggerSyncMutateMock.mockRejectedValueOnce(configError);
-    useTriggerSecuritySync('personal');
-
-    await expect(
-      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
-    ).rejects.toMatchObject({ message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE });
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 

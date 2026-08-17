@@ -16,13 +16,9 @@
 // uses the LATEST head SHA (per the S3 contract) regardless of what
 // SHA each item was queued under; a per-item 422 surfaces inline.
 //
-// P1-A-08c: both hooks hoist one operation key per intent. The key is
-// merged into the mutation input, so retries of the same intent dedupe /
-// replay / reconcile on the server instead of re-executing the write. The
-// key is regenerated after a success or a non-retryable failure (fresh
-// intent) and kept across retryable failures (the ledger owns the retry).
-// The two ledger outcome markers are mapped onto the existing per-surface
-// copy so the inline error boxes and toasts keep their established wording.
+// P1-A-08c: both hooks hoist one operation key per intent, so retries of the
+// same intent dedupe on the server instead of re-executing the write. The
+// ledger markers map onto the existing per-surface copy.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -68,12 +64,7 @@ export type CreateReviewCommentInput = {
   commitSha: string;
 };
 
-/**
- * Deterministic intent fingerprint for a create-comment submit. Every
- * intent-defining input is included: the retry of the SAME input reuses the
- * hoisted operation key, and ANY change (body, path, line, side, commit sha,
- * resource) rotates the key so the ledger treats it as a fresh intent.
- */
+/** Intent fingerprint for a create-comment submit: any changed field is a new intent. */
 export function createReviewCommentIntentFingerprint(input: CreateReviewCommentInput): string {
   return JSON.stringify({
     resource: [input.owner, input.repo, input.number],
@@ -137,11 +128,8 @@ export type SubmitReviewInput = {
 };
 
 /**
- * Deterministic intent fingerprint for a submit-review. Every intent-defining
- * input is included: event, summary body, commit sha, and the full inline
- * comment batch (path/line/side/body). A retry of the SAME review reuses the
- * hoisted key; changing the event, the summary, or any queued comment rotates
- * it so the ledger cannot replay the previous review's canonical result.
+ * Intent fingerprint for a submit-review: the event, summary, commit sha, and
+ * the full queued comment batch. Any change is a new intent.
  */
 export function submitReviewIntentFingerprint(input: SubmitReviewInput): string {
   return JSON.stringify({

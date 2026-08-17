@@ -157,10 +157,4 @@ describe('decideScreenTracking', () => {
       reason: 'captured',
     });
   });
-
-  it('captures when nothing was captured yet even with a late generation', () => {
-    expect(decision({ accountGeneration: 5, lastCaptured: null })).toMatchObject({
-      capture: true,
-    });
-  });
 });

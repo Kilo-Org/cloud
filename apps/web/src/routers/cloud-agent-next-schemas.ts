@@ -377,12 +377,7 @@ export const basePrepareSessionNextSchema = z
     attachments: cloudAgentAttachmentsSchema.optional(),
     images: cloudAgentImagesSchema,
     devcontainer: z.boolean().optional(),
-    /**
-     * Client-generated UUID, stable across retries of one user intent. The
-     * cloud-agent-next worker admits the create into its operation ledger
-     * only when this is present AND the effective `autoInitiate` is true;
-     * otherwise it is ignored (legacy behavior preserved).
-     */
+    /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
     operationKey: z.string().uuid().optional(),
   })
   .refine(
@@ -412,11 +407,7 @@ export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema.ref
 export const basePrepareSessionNextOutputSchema = z.object({
   kiloSessionId: z.string().startsWith('ses_').length(30),
   cloudAgentSessionId: z.string(),
-  /**
-   * `true` when this response is a ledger replay of an already-settled
-   * create (same `operationKey`). The canonical session IDs are returned
-   * unchanged; the caller should not create a second session row.
-   */
+  /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed: z.boolean().optional(),
 });
 

@@ -1,33 +1,23 @@
 /**
  * Shared typed analytics event map and catalog contract (P1-A-07a / DEC-05).
+ * See `docs/analytics-event-catalog.md` for the operational contract.
  *
- * One strict Zod schema per event name. `AnalyticsEventMap` is inferred from
- * the schemas and drives the typed capture helpers in the web and mobile apps
- * and the durable-outbox insert validation (packages/db, Wave 2).
+ * One `.strict()` Zod schema per event name, so unknown keys fail and property
+ * values stay enum strings, numbers, and booleans. `AnalyticsEventMap` is
+ * inferred from the schemas and drives the typed capture helpers in the web and
+ * mobile apps and the durable-outbox insert validation (packages/db).
  *
- * Rules enforced here and by the unit tests:
- * - Every object schema is `.strict()`: unknown keys fail.
- * - Property values are restricted to enum strings, numbers, booleans.
- * - `app_startup` is `.strict()` at runtime (bounded outcome enum and timing
- *   marks only) while its map type keeps the record shape so the mobile
- *   `takeStartupTimings()` payload compiles unchanged.
- * - New catalog event names are snake_case. Existing event names are
- *   grandfathered verbatim in `LEGACY_EVENT_NAMES` (includes the kebab-case
- *   KiloClaw onboarding names, which are locked to AppsFlyer dashboards);
- *   the set is frozen — no additions.
- * - Existing legacy event payloads keep their exact current shapes. They are
- *   never outcome authorities. `session_created` is accepted-phase metadata
- *   (fires after `prepareSession` returns), not a terminal outcome.
- * - New terminal outcome events (`*_settled`) carry the DEC-05 base fields:
- *   `source`, `surface`, `phase: 'terminal'`, `outcome`, and bounded metric
- *   fields.
+ * New event names are snake_case; `LEGACY_EVENT_NAMES` is the frozen exemption
+ * set. Legacy payloads keep their exact current shapes. New terminal outcome
+ * events (`*_settled`) carry the DEC-05 base fields.
  */
 import { z } from 'zod';
+
+import { ORGANIZATION_ROLES } from '../organizations/roles';
 
 // ----- shared enums -------------------------------------------------------
 
 export const ANALYTICS_SOURCES = ['mobile', 'web', 'server'] as const;
-export const ANALYTICS_PHASES = ['terminal', 'accepted'] as const;
 export const ANALYTICS_OUTCOMES = [
   'completed',
   'failed',
@@ -49,7 +39,6 @@ export const INSTANCE_ACTIONS = [
 ] as const;
 export const PERMISSION_RESPONSES = ['once', 'always', 'reject'] as const;
 export const FEEDBACK_SENTIMENTS = ['positive', 'negative'] as const;
-export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
 
 /** App cold-start outcome values (mirrors apps/mobile/src/lib/startup-timing.ts). */
 export const STARTUP_OUTCOMES = [
@@ -158,21 +147,29 @@ export const TERMINAL_PHASE_EVENTS = [
   ORGANIZATION_WRITE_SETTLED_EVENT,
 ] as const;
 
-export type TerminalPhaseEventName = (typeof TERMINAL_PHASE_EVENTS)[number];
-
 // ----- schemas -------------------------------------------------------------
+
+/** Every metric field in the catalog is a non-negative integer (count or ms). */
+const metric = z.number().int().nonnegative();
+
+/** DEC-05 base fields carried by every terminal outcome event. */
+const terminalBase = {
+  source: z.enum(ANALYTICS_SOURCES),
+  phase: z.literal('terminal'),
+  outcome: z.enum(ANALYTICS_OUTCOMES),
+} as const;
 
 export const ANALYTICS_EVENT_SCHEMAS = {
   // --- existing mobile events (payloads unchanged) ---
   [SESSION_VIEWED_EVENT]: z
     .object({
-      surface: z.enum([...ANALYTICS_SURFACES]),
-      via: z.enum([...SESSION_OPENED_VIA]),
+      surface: z.enum(ANALYTICS_SURFACES),
+      via: z.enum(SESSION_OPENED_VIA),
     })
     .strict(),
   [MESSAGE_SENT_EVENT]: z
     .object({
-      surface: z.enum([...ANALYTICS_SURFACES]),
+      surface: z.enum(ANALYTICS_SURFACES),
     })
     .strict(),
   // Accepted-phase metadata, not a terminal outcome (recorded exclusion).
@@ -183,13 +180,13 @@ export const ANALYTICS_EVENT_SCHEMAS = {
     .strict(),
   [PERMISSION_RESPONDED_EVENT]: z
     .object({
-      surface: z.enum([...ANALYTICS_SURFACES]),
-      response: z.enum([...PERMISSION_RESPONSES]),
+      surface: z.enum(ANALYTICS_SURFACES),
+      response: z.enum(PERMISSION_RESPONSES),
     })
     .strict(),
   [QUESTION_ANSWERED_EVENT]: z
     .object({
-      surface: z.enum([...ANALYTICS_SURFACES]),
+      surface: z.enum(ANALYTICS_SURFACES),
       skipped: z.boolean(),
     })
     .strict(),
@@ -201,36 +198,33 @@ export const ANALYTICS_EVENT_SCHEMAS = {
   [INSTANCE_ACTION_EVENT]: z
     .object({
       surface: z.literal('claw'),
-      action: z.enum([...INSTANCE_ACTIONS]),
+      action: z.enum(INSTANCE_ACTIONS),
     })
     .strict(),
   [FEEDBACK_SUBMITTED_EVENT]: z
     .object({
-      sentiment: z.enum([...FEEDBACK_SENTIMENTS]),
+      sentiment: z.enum(FEEDBACK_SENTIMENTS),
     })
     .strict(),
   [ORGANIZATION_MEMBER_INVITED_EVENT]: z
     .object({
-      role: z.enum([...ORGANIZATION_ROLES]),
+      role: z.enum(ORGANIZATION_ROLES),
     })
     .strict(),
   [KILO_PASS_PURCHASE_STARTED_EVENT]: z.object({}).strict(),
   [KILO_PASS_PURCHASE_COMPLETED_EVENT]: z.object({}).strict(),
   [KILO_PASS_PURCHASE_FAILED_EVENT]: z.object({}).strict(),
-  // app_startup: `.strict()` at runtime — only the documented outcome enum and
-  // the bounded numeric timing marks pass; unknown keys and nonnumeric timing
-  // values fail. The map type stays `Record<string, string | number>` so the
-  // mobile `takeStartupTimings()` payload (and the web helper) compile
-  // unchanged.
+  // Strict at runtime, but the map type stays a record so the mobile
+  // `takeStartupTimings()` payload compiles unchanged.
   [APP_STARTUP_EVENT]: z
     .object({
-      outcome: z.enum([...STARTUP_OUTCOMES]),
-      auth_ready: z.number().int().nonnegative().optional(),
-      fonts_ready: z.number().int().nonnegative().optional(),
-      theme_ready: z.number().int().nonnegative().optional(),
-      user_ready: z.number().int().nonnegative().optional(),
-      consent_ready: z.number().int().nonnegative().optional(),
-      splash_hidden: z.number().int().nonnegative().optional(),
+      outcome: z.enum(STARTUP_OUTCOMES),
+      auth_ready: metric.optional(),
+      fonts_ready: metric.optional(),
+      theme_ready: metric.optional(),
+      user_ready: metric.optional(),
+      consent_ready: metric.optional(),
+      splash_hidden: metric.optional(),
     })
     .strict() as z.ZodType<Record<string, string | number>>,
 
@@ -240,12 +234,12 @@ export const ANALYTICS_EVENT_SCHEMAS = {
   [PROVISION_SUCCEEDED_EVENT]: z.object({}).strict(),
   [PROVISION_FAILED_EVENT]: z
     .object({
-      category: z.enum([...PROVISION_FAILED_CATEGORIES]),
+      category: z.enum(PROVISION_FAILED_CATEGORIES),
     })
     .strict(),
   [ACCESS_REQUIRED_SHOWN_EVENT]: z
     .object({
-      subcase: z.enum([...ACCESS_REQUIRED_SUBCASES]),
+      subcase: z.enum(ACCESS_REQUIRED_SUBCASES),
     })
     .strict(),
   [COMPLETION_REACHED_EVENT]: z.object({}).strict(),
@@ -258,47 +252,39 @@ export const ANALYTICS_EVENT_SCHEMAS = {
   // --- new terminal outcome events (DEC-05 base fields) ---
   [SESSION_CREATE_SETTLED_EVENT]: z
     .object({
-      source: z.enum([...ANALYTICS_SOURCES]),
+      ...terminalBase,
       surface: z.literal('session'),
-      phase: z.literal('terminal'),
       creation_target: z.literal('cloud'),
-      outcome: z.enum([...ANALYTICS_OUTCOMES]),
-      admission: z.enum([...SESSION_CREATE_ADMISSIONS]),
-      failure_stage: z.enum([...SESSION_CREATE_FAILURE_STAGES]).optional(),
-      duration_ms: z.number().int().nonnegative(),
+      admission: z.enum(SESSION_CREATE_ADMISSIONS),
+      failure_stage: z.enum(SESSION_CREATE_FAILURE_STAGES).optional(),
+      duration_ms: metric,
       in_organization: z.boolean(),
     })
     .strict(),
   [PR_OPERATION_SETTLED_EVENT]: z
     .object({
-      source: z.enum([...ANALYTICS_SOURCES]),
+      ...terminalBase,
       surface: z.literal('pr'),
-      phase: z.literal('terminal'),
-      intent: z.enum([...PR_INTENTS]),
-      outcome: z.enum([...ANALYTICS_OUTCOMES]),
-      reconcile_result: z.enum([...PR_RECONCILE_RESULTS]).optional(),
-      duration_ms: z.number().int().nonnegative(),
+      intent: z.enum(PR_INTENTS),
+      reconcile_result: z.enum(PR_RECONCILE_RESULTS).optional(),
+      duration_ms: metric,
     })
     .strict(),
   [SECURITY_COMMAND_SETTLED_EVENT]: z
     .object({
-      source: z.enum([...ANALYTICS_SOURCES]),
+      ...terminalBase,
       surface: z.literal('security'),
-      phase: z.literal('terminal'),
-      intent: z.enum([...SECURITY_INTENTS]),
-      outcome: z.enum([...ANALYTICS_OUTCOMES]),
-      repo_count: z.number().int().nonnegative().optional(),
-      error_count: z.number().int().nonnegative().optional(),
-      duration_ms: z.number().int().nonnegative(),
+      intent: z.enum(SECURITY_INTENTS),
+      repo_count: metric.optional(),
+      error_count: metric.optional(),
+      duration_ms: metric,
     })
     .strict(),
   [ORGANIZATION_WRITE_SETTLED_EVENT]: z
     .object({
-      source: z.enum([...ANALYTICS_SOURCES]),
+      ...terminalBase,
       surface: z.literal('organization'),
-      phase: z.literal('terminal'),
-      intent: z.enum([...ORGANIZATION_INTENTS]),
-      outcome: z.enum([...ANALYTICS_OUTCOMES]),
+      intent: z.enum(ORGANIZATION_INTENTS),
     })
     .strict(),
 } as const satisfies Record<string, z.ZodType>;
@@ -309,7 +295,7 @@ export type AnalyticsEventMap = {
 };
 
 /** Event names that deliver via the durable outbox (terminal outcomes only). */
-export type TerminalOutcomeEventName = Extract<keyof AnalyticsEventMap, TerminalPhaseEventName>;
+export type TerminalOutcomeEventName = (typeof TERMINAL_PHASE_EVENTS)[number];
 
 /** Event names that deliver best-effort as accepted-phase metadata. */
-export type AcceptedPhaseEventName = Exclude<keyof AnalyticsEventMap, TerminalPhaseEventName>;
+export type AcceptedPhaseEventName = Exclude<keyof AnalyticsEventMap, TerminalOutcomeEventName>;

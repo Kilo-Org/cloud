@@ -1,4 +1,8 @@
-import { type AnalyticsEventMap, redactProhibitedProperties } from '@kilocode/app-shared/analytics';
+import {
+  type ANALYTICS_SURFACES,
+  type AnalyticsEventMap,
+  redactProhibitedProperties,
+} from '@kilocode/app-shared/analytics';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import PostHog, { PostHogPersistedProperty } from 'posthog-react-native';
@@ -38,9 +42,9 @@ import {
  * `register()`). We do not override the reserved `$device_type`.
  */
 
-// Event names and the mobile surface type come from the shared analytics
-// contract (`./events`). Re-exported here so existing `@/lib/analytics/posthog`
-// imports keep working unchanged.
+// Event names come from the shared analytics contract (P1-A-07a / DEC-05) and
+// are re-exported here so existing `@/lib/analytics/posthog` imports keep
+// working unchanged.
 export {
   APP_STARTUP_EVENT,
   CONVERSATION_CREATED_EVENT,
@@ -55,8 +59,10 @@ export {
   QUESTION_ANSWERED_EVENT,
   SESSION_CREATED_EVENT,
   SESSION_VIEWED_EVENT,
-} from './events';
-export type { AnalyticsSurface } from './events';
+} from '@kilocode/app-shared/analytics';
+
+/** Legacy mobile surface values (existing payloads, unchanged). */
+export type AnalyticsSurface = (typeof ANALYTICS_SURFACES)[number];
 
 // PostHog feature flags. The project is shared with web, so mobile-only flags
 // are prefixed to avoid colliding with web flag keys.
@@ -207,27 +213,6 @@ export function captureEvent<Name extends string>(
   properties?: Record<string, string | number | boolean>
 ): void;
 export function captureEvent(
-  name: string,
-  properties?: Record<string, string | number | boolean>
-): void {
-  captureWithPrivacy(name, properties);
-}
-
-/**
- * Captures an event whose name is not in the catalog (dynamic or
- * AppsFlyer-mirrored names). Applies the same consent and generation gates as
- * `captureEvent`, plus the runtime privacy deny-list: property keys naming a
- * prohibited data class are dropped before capture. The AppsFlyer mirror path
- * (`appsflyer.ts` `trackEvent`) is the only sanctioned caller.
- */
-export function captureUncataloged(
-  name: string,
-  properties?: Record<string, string | number | boolean>
-): void {
-  captureWithPrivacy(name, properties);
-}
-
-function captureWithPrivacy(
   name: string,
   properties?: Record<string, string | number | boolean>
 ): void {

@@ -1,37 +1,17 @@
 /**
- * Pure decision for settled-leaf screen tracking.
- *
- * Decides whether PostHog should capture a `$screen` event for the current
- * route. No React, no side effects: the hook owns the settle timer, the
- * PostHog readiness subscription, and the capture call itself.
- *
- * All of these must hold for a capture:
- * 1. The route has settled: navigation is not stale and the segment array
- *    stayed unchanged for the settle window (computed by the hook).
- * 2. Analytics is ready and will accept the capture: the PostHog client
- *    exists and belongs to the current account generation — a stale client
- *    silently drops the event, so it must not consume a dedupe slot.
- * 3. The consent bootstrap has settled: the account and its consent decision
- *    have loaded without error.
- * 4. The screen is not a redirect-only route (it never renders a real leaf).
- * 5. The screen is not a KiloClaw route (the `(1_kiloclaw)` group or any
- *    `kiloclaw` segment — KiloClaw surfaces are excluded from screen capture).
- * 6. The screen was not already captured for the current account generation.
- *
- * Segment names keep their bracket placeholders (e.g. `chat/[sandbox-id]`),
- * so dynamic values never leave the device.
+ * Pure decision for settled-leaf screen tracking: whether PostHog should
+ * capture a `$screen` event for the current route. No React, no side effects —
+ * the hook owns the settle timer, the readiness subscription, and the capture.
+ * The gates are the `input` fields below plus three route rules: no
+ * redirect-only route, no KiloClaw surface, no duplicate within a generation.
  */
 
 /** How long segments must stay unchanged before a route counts as settled. */
 export const SCREEN_TRACKING_SETTLE_DEBOUNCE_MS = 500;
 
-// Redirect-only route files never render a real screen. `(app)/index` only
-// redirects to the tabs home, so its screen name is never tracked. Expo
-// Router's `getRouteInfoFromState` strips a trailing `index`, so the
-// production `useSegments()` representation of that file is `['(app)']`
-// (screen name `(app)`). Both exact forms are the same redirect file; other
-// `(app)` leaves such as `(app)/onboarding` keep their own names and are
-// never excluded.
+// `(app)/index` only redirects to the tabs home, so it is never tracked. Expo
+// Router strips a trailing `index`, so production `useSegments()` reports the
+// same file as `['(app)']`. Other `(app)` leaves keep their own names.
 const REDIRECT_ONLY_SCREENS: ReadonlySet<string> = new Set(['(app)/index', '(app)']);
 
 export type ScreenTrackingCapture = {

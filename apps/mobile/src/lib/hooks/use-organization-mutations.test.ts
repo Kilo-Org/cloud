@@ -158,11 +158,6 @@ afterEach(() => {
 });
 
 describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
-  it('mounts a useMutation with a custom mutationFn', () => {
-    useOrganizationMutations(ORG_ID);
-    expect(updateMemberOptions()?.mutationFn).toBeDefined();
-  });
-
   it('delegates a role change to members.update.mutate and resolves the result', async () => {
     const result = { success: true, updated: 'role and limit' };
     membersUpdateMutateMock.mockResolvedValueOnce(result);
@@ -226,27 +221,16 @@ describe('useOrganizationMutations updateMember (P1-A-08e role branch)', () => {
     expect(roleKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the key on retryable failures (in-progress, network, settle-failed)', async () => {
-    // Each scenario rejects the role change with a retryable outcome; the
-    // ledger owns the same-key retry, so the hoisted key must survive. The
-    // in-progress marker is mapped onto the retryable copy before surfacing.
-    const retryable: [raw: string, expected: string][] = [
-      ['operation_in_progress', 'This change is still being processed. Please try again.'],
-      ['Network request failed', 'Network request failed'],
-      [
-        'The action completed, but we could not record the result. Please try again.',
-        'The action completed, but we could not record the result. Please try again.',
-      ],
-    ];
+  // The rest of the retryability matrix is covered by the
+  // `isOrganizationMutationRetryable` unit tests below; the hook only needs one
+  // retryable and one terminal case.
+  it('keeps the key on an in-progress CONFLICT and maps it onto retryable copy', async () => {
+    membersUpdateMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
     useOrganizationMutations(ORG_ID);
-    await Promise.all(
-      retryable.map(async ([raw, expected]) => {
-        membersUpdateMutateMock.mockRejectedValueOnce(new Error(raw));
-        await expect(
-          updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
-        ).rejects.toMatchObject({ message: expected });
-      })
-    );
+
+    await expect(
+      updateMemberOptions()?.mutationFn?.({ memberId: 'member-1', role: 'owner' })
+    ).rejects.toMatchObject({ message: 'This change is still being processed. Please try again.' });
     expect(roleKeys.rotateKey).not.toHaveBeenCalled();
   });
 

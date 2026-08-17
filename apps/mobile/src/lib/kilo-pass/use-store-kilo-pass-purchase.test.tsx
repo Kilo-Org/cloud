@@ -596,7 +596,12 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     ]);
 
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
-    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+      platform: 'ios',
+      storefront: 'app_store',
+      product: 'kilo_pass',
+    });
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
@@ -712,7 +717,12 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(result).toBe('restored');
     expect(restorePurchases).toHaveBeenCalledTimes(1);
     expect(getAvailablePurchases).toHaveBeenCalledTimes(1);
-    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+      platform: 'ios',
+      storefront: 'app_store',
+      product: 'kilo_pass',
+    });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
@@ -733,7 +743,12 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(result).toBe('restored');
     expect(loadEnabledAppleProductIds).toHaveBeenCalledTimes(1);
-    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+      platform: 'ios',
+      storefront: 'app_store',
+      product: 'kilo_pass',
+    });
   });
 
   it('returns empty when StoreKit has no active Kilo Pass purchases to restore', async () => {
@@ -1039,6 +1054,9 @@ describe('StoreKiloPassPurchaseProvider', () => {
 
     expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
       signedTransactionJws: 'signed-jws',
+      platform: 'ios',
+      storefront: 'app_store',
+      product: 'kilo_pass',
     });
     expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
       purchase: activePurchase,

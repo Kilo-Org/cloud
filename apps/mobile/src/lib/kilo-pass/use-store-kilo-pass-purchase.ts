@@ -64,7 +64,12 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   }) => Promise<unknown>;
   getAvailablePurchases: () => Promise<Purchase[]>;
   restorePurchases: () => Promise<void>;
-  completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<unknown>;
+  completeAppStorePurchase: (input: {
+    signedTransactionJws: string;
+    platform: 'ios';
+    storefront: 'app_store';
+    product: 'kilo_pass';
+  }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   enabledAppleProductIds: readonly string[];
   loadEnabledAppleProductIds?: () => Promise<readonly string[]>;
@@ -235,7 +240,12 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
   ): Promise<PurchaseCompletionResult> {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
-      await deps.completeAppStorePurchase({ signedTransactionJws });
+      await deps.completeAppStorePurchase({
+        signedTransactionJws,
+        platform: 'ios',
+        storefront: 'app_store',
+        product: 'kilo_pass',
+      });
       if (options.invalidateAfterCompletion ?? true) {
         await deps.invalidateAfterCompletion();
       }

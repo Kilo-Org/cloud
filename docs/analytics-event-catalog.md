@@ -134,7 +134,6 @@ receipt.
 | `session_create_settled` | cloud-agent-next handler | Did cloud session creation settle, and how? | Durable DO registration + initial admission succeeded; allocation-failure stages; takeover reconcile | Enums + counts + `duration_ms` + boolean | Durable outbox |
 | `pr_operation_settled` | github-pr-review router | Did the PR operation (merge/review/comment) settle? | GitHub committed response; ambiguity reconciled (or `unresolved`) | Enums + `duration_ms` | Durable outbox |
 | `security_command_settled` | security-sync worker + web handler | Did the security command (sync/dismiss) settle? | Command status transition to terminal; pre-acceptance definitive failure | Enums + counts + `duration_ms` | Durable outbox |
-| `organization_write_settled` | organization-members router | Did the member role change or removal settle? | Helper's committed transaction; takeover read-back | Enums only | Durable outbox |
 
 ## Recorded exclusions
 
@@ -170,6 +169,11 @@ receipt.
 - `interrupted` and `superseded` outcomes are structurally unused for the
   Security domain in this package; the shared enum reserves them for other
   domains.
+- Organization member writes emit no terminal outcome event. The role UPDATE
+  and the membership DELETE are idempotent under
+  `UQ_organization_memberships_org_user`, so they carry no operation ledger, and
+  only the ledger helpers may insert outbox rows. The audit log
+  (`organization_audit_logs`) stays the record of these writes.
 
 ## Adding an event
 

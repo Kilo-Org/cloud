@@ -6,70 +6,11 @@ import {
   type OrgRole,
   type OrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 const onMutationError = (error: { message: string }) => {
   announcingToast.error(error.message || 'Something went wrong');
 };
-
-// P1-A-08e ledger markers (server contract, mirrored from
-// organization-members-router.ts). `operation_in_progress` is the only raw
-// marker — the server sends user-facing copy for the other ledger outcomes.
-const ORG_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
-const ORG_OPERATION_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
-const ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
-const ORG_LEDGER_SETTLE_FAILED_MESSAGE =
-  'The action completed, but we could not record the result. Please try again.';
-
-/** In-progress surface copy: reads like the existing retryable toasts. */
-const ORG_OPERATION_IN_PROGRESS_COPY = 'This change is still being processed. Please try again.';
-
-/**
- * True when the mutation may be retried under the SAME operation key. The
- * settle-failed marker is retryable: a same-key retry repairs the committed
- * write by read-back.
- */
-export function isOrganizationMutationRetryable(error: unknown): boolean {
-  if (error instanceof Error) {
-    if (error.message === ORG_OPERATION_KEY_REUSE_MISMATCH_MESSAGE) {
-      return false;
-    }
-    if (error.message === ORG_OPERATION_REPLAY_FAILED_MESSAGE) {
-      return false;
-    }
-    if (error.message === ORG_LEDGER_SETTLE_FAILED_MESSAGE) {
-      return true;
-    }
-  }
-  return classifyPrReviewMutationError(error).kind === 'retryable';
-}
-
-/** Maps the raw in-progress marker onto retryable copy; other errors pass through. */
-export function mapOrganizationOperationError(error: unknown): unknown {
-  if (error instanceof Error && error.message === ORG_OPERATION_IN_PROGRESS_MESSAGE) {
-    return new Error(ORG_OPERATION_IN_PROGRESS_COPY);
-  }
-  return error;
-}
-
-/** Intent fingerprint for a role change: a changed member or role is a new intent. */
-export function organizationRoleChangeIntentFingerprint(
-  organizationId: string,
-  memberId: string,
-  role: OrgRole
-): string {
-  return JSON.stringify({ resource: [organizationId, memberId], role });
-}
-
-/** Intent fingerprint for a member removal. */
-export function organizationRemoveMemberIntentFingerprint(
-  organizationId: string,
-  memberId: string
-): string {
-  return JSON.stringify({ resource: [organizationId, memberId] });
-}
 
 type UseOrganizationMutationsOptions = {
   /**
@@ -88,10 +29,6 @@ export function useOrganizationMutations(
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  // One hoisted key per operation family: a removal must not rotate or clear a
-  // pending role change's key, and the reverse.
-  const { getKey: getRoleKey, rotateKey: rotateRoleKey } = useHoistedOperationKey();
-  const { getKey: getRemoveKey, rotateKey: rotateRemoveKey } = useHoistedOperationKey();
 
   const withMembersKey = trpc.organizations.withMembers.queryKey({ organizationId });
   const listKey = trpc.organizations.list.queryKey();
@@ -193,35 +130,12 @@ export function useOrganizationMutations(
     }),
 
     updateMember: useMutation({
-      mutationFn: async (input: {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      mutationFn: (input: {
         memberId: string;
         role?: OrgRole;
         dailyUsageLimitUsd?: number | null;
-      }) => {
-        // Only the role branch is ledger-backed (P1-A-08e), so a limit-only
-        // update carries no key and must not rotate the role-change key.
-        const isKeyedRoleMutation = input.role !== undefined;
-        try {
-          const result = await trpcClient.organizations.members.update.mutate({
-            organizationId,
-            ...input,
-            ...(input.role !== undefined && {
-              operationKey: getRoleKey(
-                organizationRoleChangeIntentFingerprint(organizationId, input.memberId, input.role)
-              ),
-            }),
-          });
-          if (isKeyedRoleMutation) {
-            rotateRoleKey();
-          }
-          return result;
-        } catch (error) {
-          if (isKeyedRoleMutation && !isOrganizationMutationRetryable(error)) {
-            rotateRoleKey();
-          }
-          throw mapOrganizationOperationError(error);
-        }
-      },
+      }) => trpcClient.organizations.members.update.mutate({ organizationId, ...input }),
       ...optimistic<{ memberId: string; role?: OrgRole; dailyUsageLimitUsd?: number | null }>(
         (old, input) => ({
           ...old,
@@ -242,24 +156,9 @@ export function useOrganizationMutations(
     }),
 
     removeMember: useMutation({
-      mutationFn: async (input: { memberId: string }) => {
-        try {
-          const result = await trpcClient.organizations.members.remove.mutate({
-            organizationId,
-            ...input,
-            operationKey: getRemoveKey(
-              organizationRemoveMemberIntentFingerprint(organizationId, input.memberId)
-            ),
-          });
-          rotateRemoveKey();
-          return result;
-        } catch (error) {
-          if (!isOrganizationMutationRetryable(error)) {
-            rotateRemoveKey();
-          }
-          throw mapOrganizationOperationError(error);
-        }
-      },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      mutationFn: (input: { memberId: string }) =>
+        trpcClient.organizations.members.remove.mutate({ organizationId, ...input }),
       ...optimistic<{ memberId: string }>((old, input) => ({
         ...old,
         members: old.members.filter(

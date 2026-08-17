@@ -77,7 +77,6 @@ export const PR_INTENTS = [
   'reply_comment',
 ] as const;
 export const SECURITY_INTENTS = ['manual_sync', 'dismiss_finding'] as const;
-export const ORGANIZATION_INTENTS = ['member_role_change', 'member_remove'] as const;
 export const PR_RECONCILE_RESULTS = [
   'confirmed_completed',
   'confirmed_absent',
@@ -119,7 +118,6 @@ export const LOGIN_EVENT = 'login';
 export const SESSION_CREATE_SETTLED_EVENT = 'session_create_settled';
 export const PR_OPERATION_SETTLED_EVENT = 'pr_operation_settled';
 export const SECURITY_COMMAND_SETTLED_EVENT = 'security_command_settled';
-export const ORGANIZATION_WRITE_SETTLED_EVENT = 'organization_write_settled';
 
 /**
  * Grandfathered event names that are exempt from the snake_case rule. Frozen:
@@ -144,7 +142,6 @@ export const TERMINAL_PHASE_EVENTS = [
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
-  ORGANIZATION_WRITE_SETTLED_EVENT,
 ] as const;
 
 // ----- schemas -------------------------------------------------------------
@@ -278,13 +275,6 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       repo_count: metric.optional(),
       error_count: metric.optional(),
       duration_ms: metric,
-    })
-    .strict(),
-  [ORGANIZATION_WRITE_SETTLED_EVENT]: z
-    .object({
-      ...terminalBase,
-      surface: z.literal('organization'),
-      intent: z.enum(ORGANIZATION_INTENTS),
     })
     .strict(),
 } as const satisfies Record<string, z.ZodType>;

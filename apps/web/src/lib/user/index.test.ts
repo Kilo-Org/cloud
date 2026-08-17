@@ -876,7 +876,7 @@ describe('User', () => {
           },
           {
             event_uuid: crypto.randomUUID(),
-            event_name: 'organization_write_settled',
+            event_name: 'pr_operation_settled',
             distinct_id: user.id,
             properties: { source: 'web' },
           },

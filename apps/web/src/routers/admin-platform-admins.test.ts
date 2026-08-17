@@ -7,6 +7,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 
 const KILO_DOMAIN = hosted_domain_specials.kilocode_admin;
+const ANACONDA_DOMAIN = 'anaconda.com';
 
 async function insertQualifyingAdmin(overrides: Parameters<typeof insertTestUser>[0] = {}) {
   return insertTestUser({
@@ -32,6 +33,17 @@ async function insertEligibleCandidate(overrides: Parameters<typeof insertTestUs
   return insertTestUser({
     google_user_email: `candidate-${crypto.randomUUID()}@kilocode.ai`,
     hosted_domain: KILO_DOMAIN,
+    is_admin: false,
+    ...overrides,
+  });
+}
+
+async function insertAnacondaEligibleCandidate(
+  overrides: Parameters<typeof insertTestUser>[0] = {}
+) {
+  return insertTestUser({
+    google_user_email: `candidate-${crypto.randomUUID()}@anaconda.com`,
+    hosted_domain: ANACONDA_DOMAIN,
     is_admin: false,
     ...overrides,
   });
@@ -111,12 +123,15 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  test('returns only non-admin users satisfying both exact Kilo eligibility rules', async () => {
+  test('returns only non-admin users satisfying an exact allowed-domain email and hosted-domain pair', async () => {
     const searchToken = crypto.randomUUID();
     const admin = await insertQualifyingAdmin();
 
     const eligible = await insertEligibleCandidate({
       google_user_email: `${searchToken}@kilocode.ai`,
+    });
+    const anacondaEligible = await insertAnacondaEligibleCandidate({
+      google_user_email: `${searchToken}@anaconda.com`,
     });
     const alreadyAdmin = await insertTestUser({
       google_user_email: `${searchToken}-already-admin@kilocode.ai`,
@@ -135,6 +150,11 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
     });
     const wrongEmailUser = await insertTestUser({
       google_user_email: `${searchToken}@example.com`,
+      hosted_domain: KILO_DOMAIN,
+      is_admin: false,
+    });
+    const mismatchedAllowedDomainUser = await insertTestUser({
+      google_user_email: `${searchToken}-mismatch@anaconda.com`,
       hosted_domain: KILO_DOMAIN,
       is_admin: false,
     });
@@ -160,11 +180,13 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
     });
 
     const resultIds = results.map(user => user.id);
-    expect(resultIds).toEqual([eligible.id]);
+    expect(resultIds).toEqual(expect.arrayContaining([eligible.id, anacondaEligible.id]));
+    expect(resultIds).toHaveLength(2);
     expect(resultIds).not.toContain(alreadyAdmin.id);
     expect(resultIds).not.toContain(fakeLoginUser.id);
     expect(resultIds).not.toContain(wrongDomainUser.id);
     expect(resultIds).not.toContain(wrongEmailUser.id);
+    expect(resultIds).not.toContain(mismatchedAllowedDomainUser.id);
     expect(resultIds).not.toContain(uppercaseEmailUser.id);
     expect(resultIds).not.toContain(subdomainUser.id);
     expect(resultIds).not.toContain(lookalikeDomainUser.id);
@@ -226,6 +248,20 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0]?.note_content).toBe('Granted platform admin access.');
     expect(notes[0]?.admin_kilo_user_id).toBe(admin.id);
+  });
+
+  test('a superadmin can grant an eligible anaconda.com target', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertAnacondaEligibleCandidate();
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.admin.users.setPlatformAdminAccess({
+      userId: target.id,
+      isAdmin: true,
+    });
+
+    expect(result).toMatchObject({ changed: true, user: { id: target.id, is_admin: true } });
+    expect((await getUser(target.id)).is_admin).toBe(true);
   });
 
   test('rejects granting an ineligible target even if submitted directly', async () => {

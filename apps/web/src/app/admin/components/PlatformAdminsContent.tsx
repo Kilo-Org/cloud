@@ -330,7 +330,7 @@ export function PlatformAdminsContent() {
               : rosterError || permissions.isError
                 ? 'Could not determine your permissions. Reload to try again.'
                 : canManageAdmins
-                  ? 'Search registered kilocode.ai users who are not already admins. New admins receive no subordinate permissions.'
+                  ? 'Search registered kilocode.ai or anaconda.com users who are not already admins. New admins receive no subordinate permissions.'
                   : 'Superadmin access is required to grant platform admin access or manage permissions.'}
           </CardDescription>
         </CardHeader>
@@ -350,7 +350,8 @@ export function PlatformAdminsContent() {
                 id="platform-admin-candidate-search-hint"
                 className="text-muted-foreground text-xs"
               >
-                Only registered kilocode.ai users who are not already admins can be granted access.
+                Only registered kilocode.ai or anaconda.com users who are not already admins can be
+                granted access.
               </p>
             </div>
 
@@ -366,7 +367,7 @@ export function PlatformAdminsContent() {
               </div>
             ) : candidateRows.length === 0 && !isSearching ? (
               <div className="text-muted-foreground py-4 text-center text-sm">
-                No eligible kilocode.ai users matched that search.
+                No eligible kilocode.ai or anaconda.com users matched that search.
               </div>
             ) : (
               <div className="rounded-md border">

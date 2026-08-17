@@ -1,5 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
-import { FileIcon, Share2 } from 'lucide-react-native';
+import { FileIcon, Share2 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 

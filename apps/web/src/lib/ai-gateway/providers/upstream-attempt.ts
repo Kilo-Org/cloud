@@ -21,7 +21,6 @@ type SendUpstreamAttemptInput = {
   sessionId: string | null;
   taskId: string | null;
   delayMs: number;
-  path: string;
   search: string;
   method: string;
   signal?: AbortSignal;
@@ -50,7 +49,6 @@ export async function sendUpstreamAttempt({
   sessionId,
   taskId,
   delayMs,
-  path,
   search,
   method,
   signal,
@@ -87,7 +85,6 @@ export async function sendUpstreamAttempt({
 
   const result = await upstreamRequest({
     chatApi: request.kind,
-    path,
     search,
     method,
     body: request.body,

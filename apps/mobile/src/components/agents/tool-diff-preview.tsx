@@ -1,4 +1,4 @@
-// Read-only diff preview for edit and write tool cards.
+// Read-only diff preview for edit tool cards.
 // Renders every `ParsedDiffLine` from the model through the shared
 // `DiffLine` component with syntax highlighting.
 //

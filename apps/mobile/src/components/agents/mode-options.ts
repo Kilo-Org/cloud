@@ -1,4 +1,11 @@
-import { Bug, Code, HelpCircle, type LucideIcon, NotebookPen, Workflow } from 'lucide-react-native';
+import {
+  Bug,
+  Code,
+  HelpCircle,
+  type LucideIcon,
+  NotebookPen,
+  Workflow,
+} from '@/components/ui/icons';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 

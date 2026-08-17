@@ -23,7 +23,7 @@ vi.mock('expo-haptics', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Brain: 'Brain',
   Check: 'Check',

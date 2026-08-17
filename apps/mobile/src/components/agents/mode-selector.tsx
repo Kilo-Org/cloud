@@ -1,6 +1,6 @@
 import { Pressable } from 'react-native';
 import { type Href, useRouter } from 'expo-router';
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown } from '@/components/ui/icons';
 
 import { getModeIcon, MODE_OPTIONS, normalizeAgentMode } from '@/components/agents/mode-options';
 import { Text } from '@/components/ui/text';

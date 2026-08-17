@@ -90,8 +90,8 @@ describe('model access predicates', () => {
     await expect(isAllowed('x-ai/grok-4.6')).resolves.toBe(true);
   });
 
-  test('latest aliases bypass model restrictions but retain provider availability', async () => {
-    const withProviders = createAllowPredicateFromRestrictions(
+  test('latest aliases remain subject to model restrictions', async () => {
+    const deniedByModelPolicy = createAllowPredicateFromRestrictions(
       {
         requireModelInCurrentSnapshot: true,
         providerAllowList: ['anthropic'],
@@ -99,17 +99,17 @@ describe('model access predicates', () => {
       },
       lookup({})
     );
-    const withoutProviders = createAllowPredicateFromRestrictions(
+    const missingFromSnapshot = createAllowPredicateFromRestrictions(
       {
         requireModelInCurrentSnapshot: true,
-        providerAllowList: [],
-        modelDenyList: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+        providerAllowList: ['anthropic'],
+        modelDenyList: [],
       },
       lookup({})
     );
 
-    await expect(withProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(true);
-    await expect(withoutProviders(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
+    await expect(deniedByModelPolicy(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
+    await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
   test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(

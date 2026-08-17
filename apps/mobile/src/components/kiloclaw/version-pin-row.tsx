@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react-native';
+import { Check } from '@/components/ui/icons';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 

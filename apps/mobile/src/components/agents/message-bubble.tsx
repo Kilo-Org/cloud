@@ -1,5 +1,5 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { Clock } from 'lucide-react-native';
+import { Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 
 import { Bubble } from '@/components/ui/bubble';

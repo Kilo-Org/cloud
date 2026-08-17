@@ -2,7 +2,7 @@
 // `pr-merge-section.tsx` so the section file stays under the
 // repo's 300-line limit.
 
-import { type LucideIcon, RefreshCw } from 'lucide-react-native';
+import { type LucideIcon, RefreshCw } from '@/components/ui/icons';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';

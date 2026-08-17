@@ -3,7 +3,7 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
-import { Brain, Search, Wrench } from 'lucide-react-native';
+import { Brain, Search, Wrench } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 

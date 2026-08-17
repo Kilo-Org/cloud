@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlugZap, RefreshCcw, ShieldAlert } from 'lucide-react-native';
+import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, type AppStateStatus, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

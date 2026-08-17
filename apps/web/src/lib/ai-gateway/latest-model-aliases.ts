@@ -23,9 +23,3 @@ export const LATEST_MODEL_ALIASES = [
   GROK_LATEST_MODEL_ALIAS,
   DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
 ] as const;
-
-const latestModelAliasSet = new Set<string>(LATEST_MODEL_ALIASES);
-
-export function isLatestModelAlias(modelId: string): boolean {
-  return latestModelAliasSet.has(modelId);
-}

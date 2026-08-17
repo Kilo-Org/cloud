@@ -1,4 +1,4 @@
-import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
+import { ArrowUp, Paperclip, Square } from '@/components/ui/icons';
 import { type RefObject } from 'react';
 import {
   ActivityIndicator,

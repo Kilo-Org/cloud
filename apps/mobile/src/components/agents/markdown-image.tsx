@@ -1,4 +1,4 @@
-import { AlertCircle } from 'lucide-react-native';
+import { AlertCircle } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 

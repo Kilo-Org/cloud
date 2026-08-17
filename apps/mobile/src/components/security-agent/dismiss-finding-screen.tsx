@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ShieldOff } from 'lucide-react-native';
+import { ShieldOff } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 

@@ -7,7 +7,7 @@ import {
   Link2,
   SearchX,
   X,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 

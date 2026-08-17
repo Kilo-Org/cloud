@@ -1,5 +1,5 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { CreditCard, Newspaper, Pencil } from 'lucide-react-native';
+import { CreditCard, Newspaper, Pencil } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';

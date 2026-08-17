@@ -33,25 +33,27 @@ describe('upstreamRequest timeout', () => {
   test.each([
     {
       chatApi: 'messages',
-      path: '/messages',
       apiUrlOverrides: { messages: 'https://messages.example.test/v3/v1' },
       expectedUrl: 'https://messages.example.test/v3/v1/messages?beta=true',
     },
     {
       chatApi: 'responses',
-      path: '/responses',
       apiUrlOverrides: {},
       expectedUrl: 'https://gateway.example.test/v3/responses?beta=true',
     },
+    {
+      chatApi: 'chat_completions',
+      apiUrlOverrides: {},
+      expectedUrl: 'https://gateway.example.test/v3/chat/completions?beta=true',
+    },
   ] as const)(
-    'uses the $chatApi API URL override when provided',
-    async ({ chatApi, path, apiUrlOverrides, expectedUrl }) => {
+    'builds the canonical $chatApi URL and uses its override when provided',
+    async ({ chatApi, apiUrlOverrides, expectedUrl }) => {
       const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
       global.fetch = mockFetch;
 
       const result = await upstreamRequest({
         chatApi,
-        path,
         search: '?beta=true',
         method: 'POST',
         body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
@@ -74,7 +76,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -108,7 +109,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -137,7 +137,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -166,7 +165,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -202,7 +200,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -234,7 +231,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -271,7 +267,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -303,7 +298,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '?trace=search-secret',
       method: 'POST',
       body: {
@@ -353,7 +347,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '',
       method: 'POST',
       body: {
@@ -391,7 +384,6 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
-      path: '/chat/completions',
       search: '?trace=search-secret',
       method: 'POST',
       body: {

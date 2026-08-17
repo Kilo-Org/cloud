@@ -1,7 +1,7 @@
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import { CreditCard, ExternalLink } from 'lucide-react-native';
+import { CreditCard, ExternalLink } from '@/components/ui/icons';
 import { Linking, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { toast } from 'sonner-native';

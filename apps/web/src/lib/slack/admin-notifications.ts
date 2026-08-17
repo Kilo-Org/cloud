@@ -20,7 +20,7 @@ export type AdminSlackNotification = {
 
 export class AdminSlackNotificationError extends Error {
   constructor(
-    readonly kind: 'network' | 'upstream',
+    readonly kind: 'configuration' | 'network' | 'upstream',
     readonly status?: number
   ) {
     super('Admin Slack notification request failed');
@@ -35,9 +35,13 @@ export class AdminSlackNotificationError extends Error {
  * handler, or server action; never send the webhook URL to a browser.
  */
 export async function sendAdminSlackNotification(
-  notification: AdminSlackNotification
+  notification: AdminSlackNotification,
+  options: { requireConfigured?: boolean } = {}
 ): Promise<void> {
   if (!SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL) {
+    if (options.requireConfigured) {
+      throw new AdminSlackNotificationError('configuration');
+    }
     console.warn(
       '[AdminSlackNotifications] SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL is not configured; notification skipped'
     );

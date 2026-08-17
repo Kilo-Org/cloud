@@ -1,7 +1,5 @@
 import { type PersistedClient } from '@tanstack/react-query-persist-client';
 
-import { SCHEMA_VERSION } from '@/lib/persist/read-cache';
-
 /**
  * Shared read-cache test fixtures. Lives next to the modules under test so the
  * persister suite and the mount suite build the same persisted-client shape.
@@ -10,11 +8,12 @@ import { SCHEMA_VERSION } from '@/lib/persist/read-cache';
 /** The exact tRPC query key the authoritative user id is read from. */
 export const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query' }];
 
-/** A recent, un-busted persisted client carrying one successful getMe query. */
-export function makePersistedClient(
-  data: unknown,
-  buster = String(SCHEMA_VERSION)
-): PersistedClient {
+/**
+ * A recent, un-busted persisted client carrying one successful getMe query.
+ * The read cache passes no `buster`, so the library's empty default is the
+ * un-busted value.
+ */
+export function makePersistedClient(data: unknown, buster = ''): PersistedClient {
   return {
     timestamp: Date.now(),
     buster,

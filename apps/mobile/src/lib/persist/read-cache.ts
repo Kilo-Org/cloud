@@ -64,23 +64,6 @@ export function readCachedUserId(queryClient: QueryCacheReader): string | null {
   return typeof data?.id === 'string' && data.id.length > 0 ? data.id : null;
 }
 
-/**
- * Paths that must never persist even if they were allowlisted: transcript
- * pages and anything carrying patches, diffs, tokens, or secrets. Kept as an
- * explicit list (in addition to the exact-path allowlist) so the denial is
- * documented and unit-asserted.
- */
-function isHardDeniedPath(path: string): boolean {
-  return (
-    path === 'cliSessionsV2.getSessionMessagesPage' ||
-    path.includes('patch') ||
-    path.includes('diff') ||
-    path.includes('token') ||
-    path.includes('secret') ||
-    path.startsWith('kiloclaw.')
-  );
-}
-
 /** The `input` field of a tRPC query key's meta segment, or undefined. */
 function metaInput(meta: unknown): unknown {
   if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) {
@@ -157,7 +140,11 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
   },
 ];
 
-/** True when a query key is an allowlisted, non-hard-denied tRPC shape. */
+/**
+ * True when a query key is an allowlisted tRPC shape. The exact-path allowlist
+ * is the only filter: every other path — transcript pages, patches, diffs,
+ * tokens, secrets, kiloclaw — is denied because it is not on the list.
+ */
 export function isReadCacheAllowedKey(queryKey: unknown): boolean {
   if (!Array.isArray(queryKey) || queryKey.length < 2) {
     return false;
@@ -169,9 +156,6 @@ export function isReadCacheAllowedKey(queryKey: unknown): boolean {
     return false;
   }
   const path = segments.join('.');
-  if (isHardDeniedPath(path)) {
-    return false;
-  }
   const allowed = ALLOWED_PROCEDURES.find(procedure => procedure.path === path);
   return allowed?.isAllowedInput(queryKey[1]) ?? false;
 }
@@ -313,11 +297,12 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
           : undefined;
       },
     };
+    // No `buster`: the scope segment already carries the schema version, so a
+    // blob written by an older schema lives in another scope and is never read.
     await persistQueryClientRestore({
       queryClient,
       persister: fencedPersister,
       maxAge: READ_CACHE_MAX_AGE_MS,
-      buster: String(SCHEMA_VERSION),
     });
     if (generation !== coldStartGeneration || !isCurrentAuthEpoch(epoch)) {
       // The mount took over, or the auth epoch changed, while the restore was
@@ -368,16 +353,19 @@ export function setSignOutActive(active: boolean): void {
 // ── Sign-out cleanup ───────────────────────────────────────────────────────
 
 /**
- * Removes the signed-out user's read-cache scope, or every `cache:` scope
- * when the identity is unknown — privacy wins over a warm start. Best effort:
- * a storage failure is swallowed so a failed cleanup can never abort sign-out;
- * the stale blob only costs a future warm start.
+ * Removes every read-cache scope of the signed-out user, or every `cache:`
+ * scope when the identity is unknown — privacy wins over a warm start. The
+ * user prefix ends in the scope separator, so it covers every schema version
+ * (a bump would otherwise leave the previous version's blob on the device
+ * forever) and matches neither another user's scope nor the `draft:` scopes.
+ * Best effort: a storage failure is swallowed so a failed cleanup can never
+ * abort sign-out; the stale blob only costs a future warm start.
  */
 export async function clearCacheScopeForSignOut(knownUserId: string | null): Promise<void> {
   try {
-    await (knownUserId
-      ? encryptedKv.clearScope(readCacheScope(knownUserId))
-      : encryptedKv.clearScopePrefix(CACHE_SCOPE_PREFIX));
+    await encryptedKv.clearScopePrefix(
+      knownUserId ? `${CACHE_SCOPE_PREFIX}${knownUserId}:` : CACHE_SCOPE_PREFIX
+    );
   } catch {
     // Best effort: query and auth state reset still run after this returns.
   }

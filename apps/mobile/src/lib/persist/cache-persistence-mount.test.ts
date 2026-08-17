@@ -15,7 +15,6 @@ import {
   createReadCachePersister,
   resetReadCacheForTests,
   restorePersistedCacheOnColdStart,
-  SCHEMA_VERSION,
   setSignOutActive,
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
@@ -139,19 +138,19 @@ describe('CachePersistenceMount', () => {
     // The identity hint for the next cold start was written via the fenced helper.
     expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY, 'u1');
 
-    // One mounted subscription with the schema buster and the allowlist-only
-    // dehydrate filters. The root layout already performed the only cold-start
-    // restore, so the mount subscribes without restoring — no `maxAge` and no
-    // restore promise.
+    // One mounted subscription with the allowlist-only dehydrate filters. The
+    // root layout already performed the only cold-start restore, so the mount
+    // subscribes without restoring — no `maxAge` and no restore promise. The
+    // schema version lives in the scope, so no `buster` is passed.
     expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
     expect(latestPersistOptions()).toMatchObject({
       queryClient,
-      buster: String(SCHEMA_VERSION),
       dehydrateOptions: {
         shouldDehydrateQuery: shouldPersistReadCacheQuery,
         shouldDehydrateMutation: expect.any(Function),
       },
     });
+    expect(latestPersistOptions()?.buster).toBeUndefined();
 
     // The persister is bound to exactly the user's scope for the schema.
     await latestPersistOptions()?.persister.restoreClient();
@@ -359,7 +358,7 @@ describe('CachePersistenceMount', () => {
     const cleanupHeld = new Promise<void>(resolve => {
       cleanupGate.release = resolve;
     });
-    kvMock.clearScope.mockImplementationOnce(async () => {
+    kvMock.clearScopePrefix.mockImplementationOnce(async () => {
       await cleanupHeld;
     });
 
@@ -380,7 +379,7 @@ describe('CachePersistenceMount', () => {
     // The sign-out cleanup starts and is held open.
     const cleanupPromise = clearCacheScopeForSignOut('u1');
     await vi.waitFor(() => {
-      expect(kvMock.clearScope).toHaveBeenCalled();
+      expect(kvMock.clearScopePrefix).toHaveBeenCalled();
     });
 
     // A query update fires a throttled save from the torn-down subscription

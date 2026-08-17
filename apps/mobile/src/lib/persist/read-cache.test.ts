@@ -288,22 +288,16 @@ describe('allowlist filter', () => {
     ).toBe(false);
   });
 
-  it('hard-denies transcript, patch, diff, token, secret, and kiloclaw paths', () => {
+  it('denies unknown, flat, and malformed shapes without throwing', () => {
+    expect(isReadCacheAllowedKey([['unknown', 'procedure'], { type: 'query' }])).toBe(false);
+    // Every sensitive path is off the allowlist, so it is denied for that
+    // reason alone: transcripts, patches, diffs, tokens, secrets, kiloclaw.
     expect(
       isReadCacheAllowedKey([['cliSessionsV2', 'getSessionMessagesPage'], { type: 'query' }])
     ).toBe(false);
     expect(isReadCacheAllowedKey([['git', 'getPatch'], { type: 'query' }])).toBe(false);
-    expect(isReadCacheAllowedKey([['git', 'diff'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey([['auth', 'getToken'], { type: 'query' }])).toBe(false);
-    expect(isReadCacheAllowedKey([['auth', 'getSecret'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey([['kiloclaw', 'list'], { type: 'query' }])).toBe(false);
-    expect(isReadCacheAllowedKey([['kiloclaw', 'sessions', 'list'], { type: 'query' }])).toBe(
-      false
-    );
-  });
-
-  it('denies unknown, flat, and malformed shapes without throwing', () => {
-    expect(isReadCacheAllowedKey([['unknown', 'procedure'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey(FLAT_APPLICATION_KEY)).toBe(false);
     expect(isReadCacheAllowedKey('flat-key')).toBe(false);
     expect(isReadCacheAllowedKey(null)).toBe(false);
@@ -408,7 +402,6 @@ describe('publication budget', () => {
     expect(scope).toBe('cache:u1:1');
     expect(key).toBe('read-cache');
     expect(JSON.parse(value ?? '{}') as PersistedClient).toMatchObject({
-      buster: String(SCHEMA_VERSION),
       clientState: { queries: [{ queryKey: GET_ME_QUERY_KEY }] },
     });
     expect(scopes.get('cache:u1:1')?.get('read-cache')).toBe(value);
@@ -533,19 +526,20 @@ describe('cold-start restore and takeover', () => {
     expect(takeOverColdStartRestore()).toBe('cache:u1:1');
   });
 
-  it('drops a busted blob instead of hydrating it', async () => {
+  it('never restores a blob written by an older schema: it lives in another scope', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    scopes.set(
-      'cache:u1:1',
-      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }, '999'))]])
-    );
+    // The previous schema version wrote into `cache:u1:0`; the current scope is
+    // `cache:u1:1`, so the old blob is never read and never hydrated.
+    const oldSchemaBlob = JSON.stringify(makePersistedClient({ id: 'u1' }));
+    scopes.set('cache:u1:0', new Map([['read-cache', oldSchemaBlob]]));
     const queryClient = new QueryClient();
 
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kv.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kv.getItem).not.toHaveBeenCalledWith('cache:u1:0', 'read-cache');
   });
 
   it('is best effort: a corrupt blob never blocks startup and is discarded', async () => {
@@ -679,13 +673,30 @@ describe('cold-start restore and takeover', () => {
 // mismatch, and no-restore cases are asserted in cache-persistence-mount.test.
 
 describe('sign-out cleanup', () => {
-  it('clears exactly the known user cache scope on sign-out', async () => {
+  it('clears every schema version of the known user cache scope on sign-out', async () => {
     const { kv } = createFakeKv();
 
     await clearCacheScopeForSignOut('u1');
 
-    expect(kv.clearScope).toHaveBeenCalledWith('cache:u1:1');
-    expect(kv.clearScopePrefix).not.toHaveBeenCalled();
+    // The user prefix, not the current version's scope: a schema bump must not
+    // leave the previous version's blob on the device after sign-out.
+    expect(kv.clearScopePrefix).toHaveBeenCalledWith('cache:u1:');
+    expect(kv.clearScope).not.toHaveBeenCalled();
+  });
+
+  it('keeps the other account cache and every draft when one user signs out', async () => {
+    const { scopes } = createFakeKv();
+    scopes.set('cache:u1:0', new Map([['read-cache', 'u1-previous-schema']]));
+    scopes.set('cache:u1:1', new Map([['read-cache', 'u1-current-schema']]));
+    scopes.set('cache:u12:1', new Map([['read-cache', 'other-user']]));
+    scopes.set('draft:u1', new Map([['agent-composer:new', '"unsent text"']]));
+
+    await clearCacheScopeForSignOut('u1');
+
+    expect(scopes.has('cache:u1:0')).toBe(false);
+    expect(scopes.has('cache:u1:1')).toBe(false);
+    expect(scopes.get('cache:u12:1')?.get('read-cache')).toBe('other-user');
+    expect(scopes.get('draft:u1')?.get('agent-composer:new')).toBe('"unsent text"');
   });
 
   it('clears every cache scope when the user id is unknown (privacy wins)', async () => {
@@ -699,10 +710,10 @@ describe('sign-out cleanup', () => {
 
   it('is best effort: a failing scope clear never rejects sign-out cleanup', async () => {
     const { kv } = createFakeKv();
-    kv.clearScope.mockRejectedValueOnce(new Error('kv down'));
+    kv.clearScopePrefix.mockRejectedValueOnce(new Error('kv down'));
 
     await expect(clearCacheScopeForSignOut('u1')).resolves.toBeUndefined();
-    expect(kv.clearScope).toHaveBeenCalledWith('cache:u1:1');
+    expect(kv.clearScopePrefix).toHaveBeenCalledWith('cache:u1:');
   });
 
   it('is best effort when clearing every scope fails', async () => {

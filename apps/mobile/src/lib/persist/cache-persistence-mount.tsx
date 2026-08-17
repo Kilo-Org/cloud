@@ -9,7 +9,6 @@ import { clearScope } from '@/lib/persist/encrypted-kv';
 import {
   createReadCachePersister,
   readCacheScope,
-  SCHEMA_VERSION,
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from '@/lib/persist/read-cache';
@@ -82,10 +81,11 @@ export function CachePersistenceMount() {
     // Subscribe-only persistence: the root layout already performed the single
     // cold-start restore via `restorePersistedCacheOnColdStart`, so the mount
     // must not restore again (a second restore would re-hydrate and rescope).
+    // No `buster`: the scope segment carries the schema version, so a blob from
+    // an older schema lives in another scope and is never read.
     const unsubscribe = persistQueryClientSubscribe({
       queryClient,
       persister,
-      buster: String(SCHEMA_VERSION),
       dehydrateOptions: {
         shouldDehydrateQuery: shouldPersistReadCacheQuery,
         // No mutation ever enters the read cache: the library default would

@@ -8,6 +8,7 @@ import {
   parseReadFileDisplay,
   parseReadOutputFallback,
   resolveMarkdownBody,
+  resolveReadCodeBody,
 } from './read-tool-markdown';
 
 // F1 complete 3-line read (note the trailing space on line 2)
@@ -360,5 +361,91 @@ describe('resolveMarkdownBody', () => {
     const body = resolveMarkdownBody(part);
     expect(body?.text).toBe('');
     expect(body?.footer).toBeUndefined();
+  });
+});
+
+describe('resolveReadCodeBody', () => {
+  it('returns raw text with code fences untouched', () => {
+    const part = makeCompletedPart({
+      filePath: '/repo/notes.ts',
+      metadata: {
+        display: {
+          type: 'file',
+          path: '/repo/notes.ts',
+          text: '```ts\nconst x = 1;\n```',
+          lineStart: 1,
+          lineEnd: 3,
+          totalLines: 3,
+        },
+      },
+    });
+    expect(resolveReadCodeBody(part)).toEqual({
+      text: '```ts\nconst x = 1;\n```',
+      path: '/repo/notes.ts',
+      footer: undefined,
+    });
+  });
+
+  it('carries the resolved path from the metadata display object', () => {
+    const part = makeCompletedPart({
+      filePath: 'input-path.ts',
+      metadata: {
+        display: {
+          type: 'file',
+          path: '/repo/actual.ts',
+          text: 'const x = 1;',
+          lineStart: 1,
+          lineEnd: 1,
+          totalLines: 1,
+        },
+      },
+    });
+    expect(resolveReadCodeBody(part)?.path).toBe('/repo/actual.ts');
+  });
+
+  it('carries the footer for a windowed read', () => {
+    const part = makeCompletedPart({
+      metadata: {
+        display: {
+          type: 'file',
+          path: '/repo/BIG.ts',
+          text: 'const x = 1;',
+          lineStart: 201,
+          lineEnd: 400,
+          totalLines: 1450,
+          truncated: true,
+        },
+      },
+    });
+    expect(resolveReadCodeBody(part)?.footer).toBe('lines 201–400 of 1,450');
+  });
+
+  it('falls back to the output envelope when the display is absent', () => {
+    const part = makeCompletedPart({ output: COMPLETE, metadata: {} });
+    const body = resolveReadCodeBody(part);
+    expect(body?.text).toBe('# Title\n\n- item');
+    expect(body?.path).toBe('/repo/README.md');
+  });
+
+  it('is undefined for a non-completed status', () => {
+    const part: ToolPart = {
+      id: 'part-1',
+      sessionID: 'session-1',
+      messageID: 'message-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'read',
+      state: {
+        status: 'running',
+        input: { filePath: '/repo/foo.ts' },
+        time: { start: 0 },
+      },
+    };
+    expect(resolveReadCodeBody(part)).toBeUndefined();
+  });
+
+  it('is undefined when no display parses', () => {
+    const part = makeCompletedPart({ output: 'no content here', metadata: {} });
+    expect(resolveReadCodeBody(part)).toBeUndefined();
   });
 });

@@ -30,12 +30,52 @@ describe('upstreamRequest timeout', () => {
     global.fetch = originalFetch;
   });
 
+  test.each([
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: { messages: 'https://messages.example.test/v3/v1' },
+      expectedUrl: 'https://messages.example.test/v3/v1/messages?beta=true',
+    },
+    {
+      chatApi: 'responses',
+      apiUrlOverrides: {},
+      expectedUrl: 'https://gateway.example.test/v3/responses?beta=true',
+    },
+    {
+      chatApi: 'chat_completions',
+      apiUrlOverrides: {},
+      expectedUrl: 'https://gateway.example.test/v3/chat/completions?beta=true',
+    },
+  ] as const)(
+    'builds the canonical $chatApi URL and uses its override when provided',
+    async ({ chatApi, apiUrlOverrides, expectedUrl }) => {
+      const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+      global.fetch = mockFetch;
+
+      const result = await upstreamRequest({
+        chatApi,
+        search: '?beta=true',
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: {
+          ...PROVIDERS.OPENROUTER,
+          apiUrl: 'https://gateway.example.test/v3',
+          apiUrlOverrides,
+        },
+      });
+
+      expect(result.type).toBe('success');
+      expect(mockFetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+    }
+  );
+
   it('reports a client disconnect instead of an upstream disconnect when the caller aborts', async () => {
     const controller = new AbortController();
     controller.abort();
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -68,7 +108,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = jest.fn().mockRejectedValue(timeoutError);
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -96,7 +136,7 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -124,7 +164,7 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -159,7 +199,7 @@ describe('upstreamRequest timeout', () => {
     controller.abort();
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -190,7 +230,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -226,7 +266,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -257,7 +297,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '?trace=search-secret',
       method: 'POST',
       body: {
@@ -306,7 +346,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '',
       method: 'POST',
       body: {
@@ -343,7 +383,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
-      path: '/chat/completions',
+      chatApi: 'chat_completions',
       search: '?trace=search-secret',
       method: 'POST',
       body: {

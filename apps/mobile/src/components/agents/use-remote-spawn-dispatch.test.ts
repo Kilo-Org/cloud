@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
@@ -9,10 +10,7 @@ import {
 } from '@/lib/share-payload';
 import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
 
-import {
-  RemoteSpawnInheritanceProvider,
-  useRemoteSpawnDispatch,
-} from './use-remote-spawn-dispatch';
+import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(async () => {
@@ -66,7 +64,6 @@ type ReactInternals = {
 
 type HookDispatcher = {
   useCallback: <T>(callback: T, _deps?: unknown) => T;
-  useContext: <T>(context: React.Context<T>) => T;
   useEffect: (effect: React.EffectCallback, _deps?: unknown) => void;
   useMemo: <T>(factory: () => T, _deps?: unknown) => T;
   useRef: <T>(initial: T) => { current: T };
@@ -83,20 +80,34 @@ const INSTANCE: InstancePickerInstance = {
 const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
 
 /**
+ * Runs `onStart` and returns the arguments the spawn mock was called with.
+ * Extracts the wait-and-capture boilerplate shared by the spawn-input tests.
+ */
+async function captureSpawnCall(onStart: () => void) {
+  onStart();
+  await vi.waitFor(() => {
+    expect(spawnMock).toHaveBeenCalled();
+  });
+  return spawnMock.mock.calls[0];
+}
+
+/** Runs `onStart` and waits for the ready-path navigation to the spawned session. */
+async function runStartAndWaitForReplace(onStart: () => void) {
+  onStart();
+  await vi.waitFor(() => {
+    expect(routerReplace).toHaveBeenCalled();
+  });
+}
+
+/**
  * Minimal React hook runner. Mirrors the fake-dispatcher pattern in
  * `use-interaction-handlers.test.ts` so we can exercise
  * `useRemoteSpawnDispatch` without pulling react-native into vitest.
  */
-function runHookWithProvider(args: {
+function runHook(args: {
   organizationId: string | undefined;
   mode?: string;
-  model?: string;
-  variant?: string;
-  /** When false, omit the Provider — inheritance must not leak fields. */
-  withProvider?: boolean;
-  providerMode?: string;
-  providerModel?: string;
-  providerVariant?: string;
+  selection?: ModelSelection;
   getSubmitPayload?: () => SharePayload | null;
 }) {
   const reactInternals = React as typeof React & ReactInternals;
@@ -104,17 +115,11 @@ function runHookWithProvider(args: {
   const refs: { current: unknown }[] = [];
   let hookIndex = 0;
   let refIndex = 0;
-  let contextValue: { mode?: string; model?: string; variant?: string } = {};
 
   const dispatcher: HookDispatcher = {
     useCallback: hookCallback => {
       hookIndex += 1;
       return hookCallback;
-    },
-    useContext: context => {
-      hookIndex += 1;
-      void context;
-      return contextValue as never;
     },
     useEffect: effect => {
       hookIndex += 1;
@@ -133,9 +138,7 @@ function runHookWithProvider(args: {
     useState: initialValue => {
       const stateIndex = hookIndex;
       hookIndex += 1;
-      if (hookState[stateIndex] === undefined) {
-        hookState[stateIndex] = initialValue;
-      }
+      hookState[stateIndex] ??= initialValue;
       const setState = (
         value: typeof initialValue | ((previous: typeof initialValue) => typeof initialValue)
       ) => {
@@ -150,14 +153,6 @@ function runHookWithProvider(args: {
     },
   };
 
-  if (args.withProvider !== false) {
-    contextValue = {
-      mode: args.providerMode,
-      model: args.providerModel,
-      variant: args.providerVariant,
-    };
-  }
-
   const previousDispatcher =
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
   hookIndex = 0;
@@ -168,8 +163,7 @@ function runHookWithProvider(args: {
     return mountDispatch({
       organizationId: args.organizationId,
       mode: args.mode,
-      model: args.model,
-      variant: args.variant,
+      selection: args.selection,
       runOnInstance: INSTANCE,
       // eslint-disable-next-line no-empty-function -- no-op setter for harness
       setRunOnInstance: (_next: InstancePickerInstance | null) => {},
@@ -192,105 +186,106 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     __resetSharePayloadStoreForTests();
   });
 
-  it('onStart builds agent/model/variant/orgId from inheritance provider fields', async () => {
-    const { onStart } = runHookWithProvider({
+  it('onStart builds agent from explicit mode and wire model from selection', async () => {
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: true,
-      providerMode: 'plan',
-      providerModel: 'kilo-auto/efficient',
-      providerVariant: 'medium',
+      mode: 'plan',
+      selection: { model: { providerID: 'anthropic', modelID: 'claude-x' }, variant: 'high' },
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
-      agent: 'plan',
-      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient', variant: 'medium' },
-      orgId: 'org-xyz',
-    });
-  });
-
-  it('onStart without inheritance yields org-only input — empty context regression', async () => {
-    const { onStart } = runHookWithProvider({
-      organizationId: 'org-xyz',
-      withProvider: false,
-    });
-
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', { orgId: 'org-xyz' });
-  });
-
-  it('explicit mode/model/variant args win over empty context', async () => {
-    const { onStart } = runHookWithProvider({
-      organizationId: undefined,
-      withProvider: false,
-      mode: 'code',
-      model: 'anthropic/claude-sonnet-4',
-      variant: 'high',
-    });
-
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith(
+    expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
-      buildCreateRemoteSessionInput({
-        mode: 'code',
-        model: 'anthropic/claude-sonnet-4',
-        variant: 'high',
-      })
-    );
+      {
+        agent: 'plan',
+        model: { providerID: 'anthropic', modelID: 'claude-x', variant: 'high' },
+        orgId: 'org-xyz',
+      },
+    ]);
+  });
+
+  it('onStart without mode yields org-only input', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual(['conn-abc', { orgId: 'org-xyz' }]);
+  });
+
+  it('explicit mode and selection reach the spawn input', async () => {
+    const { onStart } = runHook({
+      organizationId: undefined,
+      mode: 'code',
+      selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { agent: 'code', model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+    ]);
   });
 
   it('org route passes the route org into useRemoteInstanceSpawn (not inherit)', () => {
-    runHookWithProvider({ organizationId: 'org-route-1', withProvider: false });
+    runHook({ organizationId: 'org-route-1' });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith('org-route-1');
   });
 
   it('personal route (no param) passes null so context org cannot win', () => {
-    runHookWithProvider({ organizationId: undefined, withProvider: false });
+    runHook({ organizationId: undefined });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith(null);
   });
 
-  it('personal-route onStart omits orgId even when only mode/model are set', async () => {
-    const { onStart } = runHookWithProvider({
+  it('personal-route onStart omits orgId when only mode and selection are set', async () => {
+    const { onStart } = runHook({
       organizationId: undefined,
-      withProvider: false,
       mode: 'code',
-      model: 'kilo-auto/efficient',
+      selection: { model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' } },
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      {
+        agent: 'code',
+        model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+      },
+    ]);
+  });
+
+  it('a non-kilo selection reaches spawn as the provider own model with its variant', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'code',
+      selection: { model: { providerID: 'opencode', modelID: 'opencode-model' }, variant: 'xhigh' },
     });
 
-    expect(spawnMock).toHaveBeenCalledWith('conn-abc', {
-      agent: 'code',
-      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      {
+        agent: 'code',
+        model: { providerID: 'opencode', modelID: 'opencode-model', variant: 'xhigh' },
+        orgId: 'org-xyz',
+      },
+    ]);
+  });
+
+  it('an omitted selection reaches spawn with no model key at all', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'code',
     });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { agent: 'code', orgId: 'org-xyz' },
+    ]);
   });
 
   it('ready path stages the press-time payload and navigates with shareId + autoSend', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       getSubmitPayload: () => samplePayload,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(routerReplace).toHaveBeenCalled();
-    });
+    await runStartAndWaitForReplace(onStart);
 
     const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
@@ -305,16 +300,12 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('ready path navigates without share params when press-time payload is null', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       getSubmitPayload: () => null,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(routerReplace).toHaveBeenCalled();
-    });
+    await runStartAndWaitForReplace(onStart);
 
     const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
@@ -325,27 +316,16 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('ready path navigates without share params when getSubmitPayload is omitted', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(routerReplace).toHaveBeenCalled();
-    });
+    await runStartAndWaitForReplace(onStart);
 
     const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
-  });
-});
-
-// Smoke: Provider is a real React context provider (not a no-op export).
-describe('RemoteSpawnInheritanceProvider', () => {
-  it('exposes a Provider component', () => {
-    expect(typeof RemoteSpawnInheritanceProvider).toBe('function');
   });
 });

@@ -4,6 +4,8 @@ import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type AgentMode, ModeSelector } from '@/components/agents/mode-selector';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { type ModelPickerSelection } from '@/lib/picker-bridge';
 import { cn } from '@/lib/utils';
 
 type ChatToolbarOrder = 'mode-first' | 'model-first';
@@ -13,8 +15,8 @@ type ChatToolbarProps = {
   onModeChange: (mode: AgentMode) => void;
   model: string;
   variant: string;
-  modelOptions: ModelOption[];
-  onModelSelect: (modelId: string, variant: string) => void;
+  modelOptions: (ModelOption | SessionModelOption)[];
+  onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
   isLoadingModels?: boolean;
   order?: ChatToolbarOrder;

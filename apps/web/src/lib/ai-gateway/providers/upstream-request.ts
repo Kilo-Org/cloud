@@ -9,7 +9,7 @@ import type {
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
@@ -27,6 +27,11 @@ type UpstreamFetchFailureFamily =
 const TIMEOUT_MS = 10 * 60 * 1000;
 // fetchWithBackoff reserves the next delay before retrying, so 75s yields about one minute.
 const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
+const CHAT_API_PATHS = {
+  chat_completions: '/chat/completions',
+  responses: '/responses',
+  messages: '/messages',
+} as const satisfies Record<GatewayChatApiKind, string>;
 
 function getProviderTargetHost(apiUrl: string): string {
   try {
@@ -190,7 +195,7 @@ function upstreamFetchFailureResponse(
 }
 
 export async function upstreamRequest({
-  path,
+  chatApi,
   search,
   method,
   body,
@@ -199,7 +204,7 @@ export async function upstreamRequest({
   signal,
   vercelRequestId,
 }: {
-  path: string;
+  chatApi: GatewayChatApiKind;
   search: string;
   method: string;
   body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
@@ -220,7 +225,9 @@ export async function upstreamRequest({
     headers.set(key, value);
   });
 
-  const targetUrl = `${provider.apiUrl}${path}${search}`;
+  const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
+  const path = CHAT_API_PATHS[chatApi];
+  const targetUrl = `${apiUrl}${path}${search}`;
 
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
@@ -264,7 +271,7 @@ export async function upstreamRequest({
       failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
         providerId: provider.id,
-        targetHost: getProviderTargetHost(provider.apiUrl),
+        targetHost: getProviderTargetHost(apiUrl),
         path,
         failureFamily,
         errorName,

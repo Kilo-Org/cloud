@@ -481,7 +481,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   // Grafana boots fine without the token; only dashboard queries fail. Treat
   // this as advisory so devs poking around the repo don't get blocked. Check
   // .env.local in addition to the shell so the warning doesn't fire when the
-  // token is set in the file (docker compose picks it up via --env-file).
+  // token is set in the file (docker compose picks it up via the filtered
+  // compose secrets env file built from .env.local).
   if (serviceNames.includes('grafana')) {
     const tokenFromShell = process.env.CF_AE_TOKEN;
     const tokenFromFile = envLocalExists ? readEnvValue(envLocalPath, 'CF_AE_TOKEN') : undefined;
@@ -1115,6 +1116,7 @@ async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
 
 async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   const check = args.includes('--check') || args.includes('check');
+  const missingSecretsOnly = args.includes('--missing-secrets-only');
 
   // Runs before the sync: worker and Next.js env values are derived from this
   // worktree's ports, and a fresh worktree has published none yet.
@@ -1128,6 +1130,7 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   const result = await syncEnvVars({
     repoRoot,
     check,
+    missingSecretsOnly,
     yes,
     targets: targets.length > 0 ? targets : undefined,
   });
@@ -1159,6 +1162,8 @@ Usage:
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
+  dev:env --missing-secrets-only
+                          Create missing Secrets Store entries without refreshing existing ones
 
 Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);

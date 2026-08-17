@@ -7,7 +7,7 @@ import {
   getSupersedingFindingId,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
-import { ExternalLink, GitMerge } from 'lucide-react-native';
+import { ExternalLink, GitMerge } from '@/components/ui/icons';
 import { Linking, Pressable, View } from 'react-native';
 
 import {

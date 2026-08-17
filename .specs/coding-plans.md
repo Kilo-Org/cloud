@@ -48,11 +48,13 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 1.5. The MiniMax token catalog **MUST** contain Token Plan Plus, Token Plan Max, and Token Plan Ultra. All MiniMax token offerings **MUST** share the ordinary MiniMax BYOK provider ID, `minimax`.
 
-1.6. The catalog **MUST** contain BytePlus Coding Plan Lite with Plan ID `byteplus-coding-plan-team-lite`, provider ID `byteplus-coding`, a price of $20 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per subscription period. The plan's supported model IDs are `dola-seed-2.0-pro`, `dola-seed-2.0-lite`, `dola-seed-2.0-code`, `bytedance-seed-code`, `kimi-k2.5`, `glm-5.1`, `glm-5.2`, `deepseek-v4-flash`, `deepseek-v4-pro`, and `gpt-oss-120b`. Upstream Auto, Kimi-K2-Thinking, and GLM-4.7 **MUST NOT** be exposed.
+1.6. The catalog **MUST** contain BytePlus Enterprise Coding Plan Lite with Plan ID `byteplus-coding-plan-team-lite`, provider ID `byteplus-coding`, a price of $20 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 1,900 requests every 5 hours, 12,000 requests per week, and 24,000 requests per subscription period. The plan's supported model IDs are `dola-seed-2.0-pro`, `dola-seed-2.0-lite`, `dola-seed-2.0-code`, `bytedance-seed-code`, `kimi-k2.5`, `glm-5.1`, `glm-5.2`, `deepseek-v4-flash`, `deepseek-v4-pro`, and `gpt-oss-120b`. Upstream Auto, Kimi-K2-Thinking, and GLM-4.7 **MUST NOT** be exposed.
 
-1.7. The catalog **MUST** contain BytePlus Coding Plan Pro with Plan ID `byteplus-coding-plan-team-pro`, provider ID `byteplus-coding`, a price of $100 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per subscription period. Pro **MUST** support exactly the same model IDs as Lite and **MUST NOT** expose Upstream Auto, Kimi-K2-Thinking, or GLM-4.7.
+1.7. The catalog **MUST** contain BytePlus Enterprise Coding Plan Pro with Plan ID `byteplus-coding-plan-team-pro`, provider ID `byteplus-coding`, a price of $100 in Kilo Credits, and a 30-day billing period. Its displayed limits **MUST** be described as approximately 9,500 requests every 5 hours, 60,000 requests per week, and 120,000 requests per subscription period. Pro **MUST** support exactly the same model IDs as Lite and **MUST NOT** expose Upstream Auto, Kimi-K2-Thinking, or GLM-4.7.
 
 1.8. When no assignable Managed Plan Credential exists for an offering, customer-facing catalog responses **MUST** identify the offering as sold out without exposing credential counts or credential metadata.
+
+1.9. BytePlus Enterprise Coding Plan Lite and Pro catalog feature copy **MUST** include `Zero Data Retention: does not retain prompts or train on your data`.
 
 ## 2. Subscription and billing
 
@@ -165,6 +167,11 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 8.3. The initial pilot does not require a Coding Plans audit-log history for admin inventory upload or manual revocation actions. Inventory lifecycle state, Upstream Plan ID, request/completion timestamps, attempt count, and sanitized failure information **MUST** record current disposition without retaining raw credentials after remediation starts.
 
 8.4. Current quota responses and logs **MUST NOT** contain Managed Plan Credentials, Provider Management Credentials, authorization headers, raw provider bodies or messages, inventory metadata, Upstream Plan IDs, Upstream Usage IDs, usernames, fingerprints, ciphertext, or provider-native quota fields. Provider responses **MUST** be bounded, validated, and normalized to an explicit non-secret subscription quota-window contract before leaving the Cloud boundary. The initial quota-window contract **MUST NOT** represent monetary balances or purchased-credit balances as subscription quota.
+
+### 2026-08-11 -- BytePlus Enterprise Coding Plan catalog copy
+
+- Renamed BytePlus catalog offerings to Enterprise Coding Plan Lite and Enterprise Coding Plan Pro.
+- Required both BytePlus offerings to display Zero Data Retention catalog copy.
 
 ### 2026-08-06 -- BytePlus Coding Plan usage integration
 

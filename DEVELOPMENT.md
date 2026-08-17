@@ -168,7 +168,7 @@ The command asks whether the variable is sensitive, defaulting to yes. Sensitive
 
 Answer no for public or otherwise non-secret configuration. `NEXT_PUBLIC_*` variables must be non-sensitive because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
 
-The command prompts for single-line values without echoing them, then asks for a default value for each tracked root and `apps/web` dotenv file. Enter a value directly, or press Return to skip that file. If every file is skipped, the command warns that the application must work without the variable so external contributors can still run it. A tracked default cannot match a remote value; use a non-secret local default instead. Invalid yes/no answers and empty remote values are prompted again instead of terminating the command. For multiline values, use `--development-file`, `--staging-file`, and `--production-file`. Use `--dry-run` to preview the redacted plan.
+The command prompts for single-line values without echoing them, then asks for a default value for each tracked root and `apps/web` dotenv file. Enter the raw secret without surrounding quotes (a matching outer `"` or `'` pair is stripped if present, because quoted values break `vercel env pull`). Enter a value directly, or press Return to skip that file. If every file is skipped, the command warns that the application must work without the variable so external contributors can still run it. A tracked default cannot match a remote value; use a non-secret local default instead. Invalid yes/no answers and empty remote values are prompted again instead of terminating the command. For multiline values, use `--development-file`, `--staging-file`, and `--production-file`. Use `--dry-run` to preview the redacted plan.
 
 Remote updates are sequential rather than transactional. If a provider fails partway through, fix the problem and rerun the same command; it safely upserts every target. The workflow does not deploy, so trigger the appropriate deployment separately.
 
@@ -244,6 +244,7 @@ should pass against the local PostgreSQL database.
 | `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
+| `pnpm dev:env --missing-secrets-only` | Sync env files and create missing local Secrets Store entries without refreshing existing secrets |
 | `pnpm test` | Run web, web environment, and local development-tool tests |
 | `pnpm typecheck` | Run the TypeScript type checker |
 | `pnpm lint` | Lint all source files |
@@ -405,7 +406,9 @@ Most workers require a `.dev.vars` file with secrets like `NEXTAUTH_SECRET` and 
 pnpm dev:env
 ```
 
-The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo and `apps/web/.env.development.local.example`, resolves each variable's value, and writes (or patches) the corresponding generated local env file. Before applying, it shows a diff of what will change and asks for confirmation.
+The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo and `apps/web/.env.development.local.example`, resolves each variable's value, and writes (or patches) the corresponding generated local env file. Before applying, it shows a diff of what will change and asks for confirmation. Local Secrets Store checks and writes run across four independent Worker persistence directories at a time; set `KILO_ENV_SYNC_CONCURRENCY` to an integer from 1 through 32 to override that limit.
+
+For fast worktree setup, pass `--missing-secrets-only`. It creates bindings that are absent from the local Secrets Store while preserving existing source-backed values; a normal `pnpm dev:env` continues to refresh those values from their configured sources.
 
 Values are resolved using annotations in example env file comment lines:
 
@@ -459,7 +462,7 @@ One-time setup:
    ```
 3. `pnpm dev:start observability` — Grafana is available at http://localhost:4000 (default `admin`/`admin`).
 
-The dev runner passes `--env-file dev/.env --env-file .env.local` to `docker compose` when starting infra, so the token reaches the Grafana container via env substitution without being loaded into the runner's `process.env`. Naming any file replaces Compose's default lookup, which is why `dev/.env` — this worktree's Compose project and infra ports — is named too. Shell exports still override file values.
+The dev runner generates a small `dev/.env.compose-secrets` file containing only the `.env.local` keys that `dev/docker-compose.yml` interpolates (including `CF_AE_TOKEN`) and passes it to `docker compose` via `--env-file`, so the token reaches the Grafana container via env substitution without being loaded into the runner's `process.env`. The full Vercel-pulled `.env.local` is not passed to Compose, because its parser rejects JSON values with unescaped inner quotes. Naming any file replaces Compose's default lookup, which is why `dev/.env` — this worktree's Compose project and infra ports — is named too. Shell exports still override file values.
 
 If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries fail. The runner prints an advisory warning at startup. See [dev/grafana/README.md](./dev/grafana/README.md) for full provisioning details and dashboard coverage.
 

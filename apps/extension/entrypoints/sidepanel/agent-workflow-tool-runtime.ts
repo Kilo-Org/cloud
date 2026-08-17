@@ -11,7 +11,11 @@ import {
   searchAgentWorkflows,
   matchesWorkflowScope,
 } from '@/src/shared/agent-workflows';
-import { loadAgentWorkflows, deleteAgentWorkflow } from '@/src/shared/agent-workflows-storage';
+import {
+  deleteAgentWorkflow,
+  loadAgentWorkflows,
+  loadWorkflowSettings,
+} from '@/src/shared/agent-workflows-storage';
 import { runWorkflow } from '@/src/shared/agent-workflow-runner';
 import type { WorkflowRunResult } from '@/src/shared/agent-workflow-runner';
 import type { ApprovalKind, ApprovalOutcome } from './pending-approval';
@@ -47,9 +51,14 @@ const saveWorkflowArgsSchema = z.object({
   params: z.array(agentWorkflowParamSchema).max(MAX_WORKFLOW_PARAM_COUNT).optional(),
   pathPrefix: z.string().optional(),
   scopeOrigin: z.string(),
-  script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH),
+  // Optional so an update (workflowId set) can keep the stored script.
+  script: z.string().max(MAX_WORKFLOW_SCRIPT_LENGTH).optional(),
   startUrl: z.string().optional(),
-  workflowId: z.string().optional(),
+  // A model often sends workflowId: "" for a create; a blank id means "no id", so coerce it to undefined instead of failing the update lookup.
+  workflowId: z
+    .string()
+    .optional()
+    .transform(value => (value === undefined || value.trim() === '' ? undefined : value)),
 });
 
 const searchWorkflowsArgsSchema = z.object({
@@ -75,7 +84,23 @@ const saveMemoryArgsSchema = z.object({
   text: z.string().max(8000),
 });
 
+// ---------- run guidance ----------
+
+// The runs toggle is a permission the model reads through the save result's nextStep.
+// The setting is read when the save completes, so a change during a pending card is reflected.
+// It is never a runtime refusal. The exact strings are pinned by the runtime tests.
+const NEXT_STEP_RUNS_AUTO_APPROVED =
+  'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.';
+const NEXT_STEP_RUNS_ASK_USER =
+  'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.';
+
 // ---------- helpers ----------
+
+// Zod's generic "Invalid input" gives a model nothing to act on for the one field it most often garbles. Field-specific guidance replaces it.
+const ARGS_FIELD_GUIDANCE: Record<string, string> = {
+  script:
+    'script must be a non-empty string: the workflow function body (or a full async function) using the page.* helpers',
+};
 
 /**
  * Format a zod failure into a field-level message the model can act on.
@@ -83,7 +108,11 @@ const saveMemoryArgsSchema = z.object({
 const formatArgsError = (toolName: string, error: z.ZodError): string => {
   const details = error.issues
     .slice(0, 5)
-    .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .map(issue => {
+      const path = issue.path.join('.') || '(root)';
+      const guidance = ARGS_FIELD_GUIDANCE[path];
+      return `${path}: ${guidance ?? issue.message}`;
+    })
     .join('; ');
 
   return `Invalid arguments for ${toolName} — ${details}.`;
@@ -130,7 +159,7 @@ export const formatEmptySearchMessage = (savedCount: number, query: string | und
 };
 
 const validateWorkflowInput = (
-  args: z.infer<typeof saveWorkflowArgsSchema>
+  args: Omit<z.infer<typeof saveWorkflowArgsSchema>, 'script'> & { readonly script: string }
 ): string | undefined => {
   if (args.script.length === 0) {
     return 'Workflow body must not be empty.';
@@ -181,13 +210,16 @@ const validateWorkflowInput = (
  * Map an ApprovalOutcome (from requestApproval) to an EvalTabResult.
  * The mapping is identical for save_workflow and save_memory.
  * `savedId` is keyed as `workflowId` for workflow saves and `memoryId` for memory saves.
+ * `extra` is merged into the approved value only, so the rejected, aborted, and failed
+ * shapes stay byte-identical.
  */
 const approvalOutcomeToToolResult = (
   outcome: ApprovalOutcome,
-  idKey: 'workflowId' | 'memoryId'
+  idKey: 'workflowId' | 'memoryId',
+  extra: Record<string, unknown> = {}
 ): EvalTabResult => {
   if (outcome.status === 'approved') {
-    return { ok: true, value: { [idKey]: outcome.savedId, saved: true } };
+    return { ok: true, value: { [idKey]: outcome.savedId, saved: true, ...extra } };
   }
   if (outcome.status === 'rejected') {
     return { ok: true, value: { reason: 'The user rejected the save.', saved: false } };
@@ -314,9 +346,45 @@ const executeSaveWorkflow = async (
     rawParsed.data.startUrl,
     rawParsed.data.scopeOrigin
   );
+
+  const workflows = await loadAgentWorkflows(ctx.storage);
+  const existing =
+    rawParsed.data.workflowId === undefined
+      ? undefined
+      : workflows.find(item => item.id === rawParsed.data.workflowId);
+
+  // For a Create (no workflowId), check store fullness first.
+  if (rawParsed.data.workflowId === undefined) {
+    if (workflows.length >= MAX_WORKFLOW_COUNT) {
+      return {
+        ok: true,
+        value: {
+          reason: 'Workflow store is full. Delete a workflow first.',
+          saved: false,
+        },
+      };
+    }
+    if (rawParsed.data.script === undefined) {
+      return {
+        error:
+          'save_workflow requires script when creating a workflow: pass the workflow function body (or a full async function) as a string.',
+        ok: false,
+      };
+    }
+  } else if (existing === undefined) {
+    // For an Update, verify the workflow exists.
+    return {
+      error:
+        'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
+      ok: false,
+    };
+  }
+
+  // An update may omit script to keep the stored version.
   const parsed = {
     data: {
       ...rawParsed.data,
+      script: rawParsed.data.script ?? existing?.script ?? '',
       ...(resolvedStartUrl === undefined ? {} : { startUrl: resolvedStartUrl }),
     },
   };
@@ -328,30 +396,6 @@ const executeSaveWorkflow = async (
 
   const { name, description, scopeOrigin, script, pathPrefix, startUrl, workflowId, params } =
     parsed.data;
-
-  // For a Create (no workflowId), check store fullness first.
-  if (workflowId === undefined) {
-    const workflows = await loadAgentWorkflows(ctx.storage);
-    if (workflows.length >= MAX_WORKFLOW_COUNT) {
-      return {
-        ok: true,
-        value: {
-          reason: 'Workflow store is full. Delete a workflow first.',
-          saved: false,
-        },
-      };
-    }
-  } else {
-    // For an Update, verify the workflow exists.
-    const workflows = await loadAgentWorkflows(ctx.storage);
-    if (!workflows.some(item => item.id === workflowId)) {
-      return {
-        error:
-          'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
-        ok: false,
-      };
-    }
-  }
 
   const draft = {
     createdAt: Date.now(),
@@ -377,8 +421,30 @@ const executeSaveWorkflow = async (
         }),
   };
 
+  // The runs toggle is a permission the model reads through the save result's nextStep.
+  // Request approval first, then read the setting when the save completes.
+  // A change made while the card was pending is reflected in the guidance.
   const outcome = await ctx.requestApproval('workflow', draft);
-  return approvalOutcomeToToolResult(outcome, 'workflowId');
+
+  // A failed settings read still permits the save and falls back to the cautious ask-the-user guidance.
+  let runsAutoApproved = false;
+  if (outcome.status === 'approved') {
+    try {
+      const settings = await loadWorkflowSettings(ctx.storage);
+      runsAutoApproved = settings.autoApproveWorkflowRuns;
+    } catch {
+      // The nextStep is guidance only. An unreadable setting falls back to the cautious text.
+    }
+  }
+
+  const extra: Record<string, unknown> =
+    outcome.status === 'approved'
+      ? {
+          autoApproved: outcome.autoApproved,
+          nextStep: runsAutoApproved ? NEXT_STEP_RUNS_AUTO_APPROVED : NEXT_STEP_RUNS_ASK_USER,
+        }
+      : {};
+  return approvalOutcomeToToolResult(outcome, 'workflowId', extra);
 };
 
 const executeRunWorkflow = async (
@@ -449,9 +515,20 @@ const executeDeleteWorkflow = async (
     return { error: formatArgsError('delete_workflow', parsed.error), ok: false };
   }
 
+  const workflows = await loadAgentWorkflows(ctx.storage);
+  const workflow = workflows.find(item => item.id === parsed.data.workflowId);
+
+  if (workflow === undefined) {
+    return {
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    };
+  }
+
   await deleteAgentWorkflow(ctx.storage, parsed.data.workflowId);
 
-  return { ok: true, value: { deleted: true } };
+  // Name the deleted workflow so the transcript and the model can report the change.
+  return { ok: true, value: { deleted: true, name: workflow.name, workflowId: workflow.id } };
 };
 
 const executeSaveMemory = async (

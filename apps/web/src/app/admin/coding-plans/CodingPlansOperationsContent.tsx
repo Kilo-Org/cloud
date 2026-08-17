@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useReducer, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Copy, ExternalLink, RefreshCw, ShieldAlert, Upload } from 'lucide-react';
+import { useEffect, useReducer, useState } from 'react';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { Copy, ExternalLink, RefreshCw, Search, ShieldAlert, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -40,11 +40,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
 import {
+  canSubmitExtensionDays,
+  getCancelSubscriptionDialogCopy,
+  getCodingPlanInsights,
   getCodingPlanProviderDisplayName,
+  getExtendSubscriptionDialogCopy,
+  getInventoryReplacementCompleteToast,
+  getInventoryReplacementDialogCopy,
+  getPlanPerformanceRows,
   getReplacementCompleteToast,
   getReplacementDialogCopy,
   getRevocationCompleteToast,
   getRevocationDialogCopy,
+  getSubscriptionSummaryItems,
+  type InsightsRangeDays,
 } from '@/app/admin/coding-plans/coding-plan-operations';
 import {
   formatCodingPlanPrice,
@@ -57,6 +66,8 @@ import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/i
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { useTRPC } from '@/lib/trpc/utils';
 
+type SubscriptionDisplayStatus = 'active' | 'pending_cancellation' | 'past_due' | 'canceled';
+
 type OperationsState = {
   providerId: UserByokProviderId;
   planId: CodingPlanId;
@@ -64,6 +75,36 @@ type OperationsState = {
   completeSelection: RevocationSelection | null;
   replacementSelection: RevocationSelection | null;
   replacementApiKey: string;
+  inventoryReplacementId: string;
+  inventoryReplacementApiKey: string;
+  inventoryReplacementConfirmOpen: boolean;
+  cancelSelection: AdminCodingPlanSubscriptionItem | null;
+  extendSelection: AdminCodingPlanSubscriptionItem | null;
+  extendDays: string;
+};
+
+const EMPTY_SUBSCRIPTION_SUMMARY = {
+  total: 0,
+  active: 0,
+  pendingCancellation: 0,
+  pastDue: 0,
+};
+
+const EMPTY_INSIGHT_TOTALS = {
+  liveSubscriptions: 0,
+  pendingCancellation: 0,
+  pastDue: 0,
+  mrrKiloCredits: 0,
+  revenueAtRiskKiloCredits: 0,
+  pastDueMrrKiloCredits: 0,
+  createdInRange: 0,
+  createdInPriorRange: 0,
+  canceledInRange: 0,
+  liveAtRangeStart: 0,
+  retainedFromRangeStart: 0,
+  currentWaitersJoinedInRange: 0,
+  currentWaitersJoinedInPriorRange: 0,
+  currentWaitlistTotal: 0,
 };
 
 const INITIAL_OPERATIONS_STATE: OperationsState = {
@@ -73,6 +114,12 @@ const INITIAL_OPERATIONS_STATE: OperationsState = {
   completeSelection: null,
   replacementSelection: null,
   replacementApiKey: '',
+  inventoryReplacementId: '',
+  inventoryReplacementApiKey: '',
+  inventoryReplacementConfirmOpen: false,
+  cancelSelection: null,
+  extendSelection: null,
+  extendDays: '7',
 };
 
 function updateOperationsState(state: OperationsState, update: Partial<OperationsState>) {
@@ -90,7 +137,19 @@ export function CodingPlansOperationsContent() {
     completeSelection,
     replacementSelection,
     replacementApiKey,
+    inventoryReplacementId,
+    inventoryReplacementApiKey,
+    inventoryReplacementConfirmOpen,
+    cancelSelection,
+    extendSelection,
+    extendDays,
   } = state;
+  const [subscriptionPage, setSubscriptionPage] = useState(1);
+  const [subscriptionSearchDraft, setSubscriptionSearchDraft] = useState('');
+  const [subscriptionSearch, setSubscriptionSearch] = useState('');
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionDisplayStatus | 'all'>(
+    'all'
+  );
   const setProviderId = (providerId: UserByokProviderId) => updateState({ providerId });
   const setPlanId = (planId: CodingPlanId) => updateState({ planId });
   const setEntriesText = (entriesText: string) => updateState({ entriesText });
@@ -99,12 +158,33 @@ export function CodingPlansOperationsContent() {
   const setReplacementSelection = (replacementSelection: RevocationSelection | null) =>
     updateState({ replacementSelection });
   const setReplacementApiKey = (replacementApiKey: string) => updateState({ replacementApiKey });
+  const setInventoryReplacementId = (inventoryReplacementId: string) =>
+    updateState({ inventoryReplacementId });
+  const setInventoryReplacementApiKey = (inventoryReplacementApiKey: string) =>
+    updateState({ inventoryReplacementApiKey });
+  const setInventoryReplacementConfirmOpen = (inventoryReplacementConfirmOpen: boolean) =>
+    updateState({ inventoryReplacementConfirmOpen });
+  const setCancelSelection = (cancelSelection: AdminCodingPlanSubscriptionItem | null) =>
+    updateState({ cancelSelection });
+  const setExtendSelection = (extendSelection: AdminCodingPlanSubscriptionItem | null) =>
+    updateState({ extendSelection });
+  const setExtendDays = (extendDays: string) => updateState({ extendDays });
 
   const countsQuery = useQuery(trpc.codingPlans.adminKeyInventory.queryOptions({}));
   const queueQuery = useQuery(trpc.codingPlans.adminRevocationQueue.queryOptions({}));
-  const subscriptionsQuery = useQuery(trpc.codingPlans.adminListSubscriptions.queryOptions({}));
-  const availabilityIntentCountsQuery = useQuery(
-    trpc.codingPlans.adminAvailabilityIntentCounts.queryOptions({})
+  const subscriptionsQuery = useQuery({
+    ...trpc.codingPlans.adminListSubscriptions.queryOptions({
+      page: subscriptionPage,
+      search: subscriptionSearch || undefined,
+      status: subscriptionStatus === 'all' ? undefined : subscriptionStatus,
+    }),
+    placeholderData: keepPreviousData,
+  });
+  const subscriptionOverviewQuery = useQuery(
+    trpc.codingPlans.adminSubscriptionOverview.queryOptions()
+  );
+  const insightsQuery = useQuery(
+    trpc.codingPlans.adminInsights.queryOptions({ rangeDays: insightsRangeDays })
   );
   const catalogQuery = useQuery(trpc.codingPlans.catalog.queryOptions());
 
@@ -113,7 +193,8 @@ export function CodingPlansOperationsContent() {
       countsQuery.refetch(),
       queueQuery.refetch(),
       subscriptionsQuery.refetch(),
-      availabilityIntentCountsQuery.refetch(),
+      subscriptionOverviewQuery.refetch(),
+      insightsQuery.refetch(),
     ]);
   };
 
@@ -152,14 +233,68 @@ export function CodingPlansOperationsContent() {
       onError: error => toast.error(error.message || 'Unable to replace credential.'),
     })
   );
+  const inventoryReplacementMutation = useMutation(
+    trpc.codingPlans.adminReplaceInventoryCredential.mutationOptions({
+      onSuccess: async () => {
+        setInventoryReplacementId('');
+        setInventoryReplacementApiKey('');
+        setInventoryReplacementConfirmOpen(false);
+        toast.success(getInventoryReplacementCompleteToast());
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to replace inventory credential.'),
+    })
+  );
+  const cancelMutation = useMutation(
+    trpc.codingPlans.adminCancelSubscription.mutationOptions({
+      onSuccess: async () => {
+        setCancelSelection(null);
+        toast.success('Subscription cancellation scheduled at period end.');
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to cancel subscription.'),
+    })
+  );
+  const extendMutation = useMutation(
+    trpc.codingPlans.adminExtendSubscriptionPeriod.mutationOptions({
+      onSuccess: async result => {
+        setExtendSelection(null);
+        setExtendDays('7');
+        toast.success(
+          `Current period extended to ${formatDateLabel(result.currentPeriodEnd)}. Renewal now ${formatDateLabel(result.creditRenewalAt)}.`
+        );
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to extend subscription.'),
+    })
+  );
   const submittedEntries = entriesText
     .split('\n')
     .map(entry => entry.trim())
     .filter(entry => entry.length > 0);
+  const canSubmitExtend = canSubmitExtensionDays(extendDays);
+
+  useEffect(() => {
+    const normalizedPage = subscriptionsQuery.data?.pagination.page;
+    if (
+      normalizedPage === undefined ||
+      normalizedPage === subscriptionPage ||
+      subscriptionsQuery.isFetching ||
+      subscriptionsQuery.isPlaceholderData
+    ) {
+      return;
+    }
+    setSubscriptionPage(normalizedPage);
+  }, [
+    subscriptionPage,
+    subscriptionsQuery.data?.pagination.page,
+    subscriptionsQuery.isFetching,
+    subscriptionsQuery.isPlaceholderData,
+  ]);
   const workItems = queueQuery.data ?? [];
   const inventoryCounts = countsQuery.data ?? [];
-  const subscriptions = subscriptionsQuery.data ?? [];
-  const availabilityIntentCounts = availabilityIntentCountsQuery.data ?? [];
+  const subscriptions = subscriptionsQuery.data?.items ?? [];
+  const subscriptionPagination = subscriptionsQuery.data?.pagination;
   const catalog = catalogQuery.data ?? [];
   const providerOptions = Array.from(
     new Map(
@@ -196,48 +331,25 @@ export function CodingPlansOperationsContent() {
       count: countCredentialsByStatus('revocation_pending'),
     },
   ];
-  const countSubscriptionsByDisplayStatus = (status: string) =>
-    subscriptions.reduce(
-      (total, subscription) =>
-        total + (getCodingPlanDisplayStatus(subscription) === status ? 1 : 0),
-      0
-    );
-  const subscriptionSummary = [
-    {
-      label: 'Total subscriptions',
-      count: subscriptions.length,
-    },
-    {
-      label: 'Active subscriptions',
-      count: countSubscriptionsByDisplayStatus('active'),
-    },
-    {
-      label: 'Cancellation pending',
-      count: countSubscriptionsByDisplayStatus('pending_cancellation'),
-    },
-    {
-      label: 'Past due subscriptions',
-      count: countSubscriptionsByDisplayStatus('past_due'),
-    },
-  ];
-  const insights = getCodingPlanInsights(subscriptions, insightsRangeDays);
+  const subscriptionSummary = getSubscriptionSummaryItems(
+    subscriptionOverviewQuery.data ?? EMPTY_SUBSCRIPTION_SUMMARY
+  );
+  const insights = getCodingPlanInsights(
+    insightsQuery.data?.totals ?? EMPTY_INSIGHT_TOTALS,
+    insightsRangeDays
+  );
   const planPerformanceRows = getPlanPerformanceRows({
-    catalog,
-    subscriptions,
+    catalog: catalog.map(plan => ({
+      planId: plan.planId,
+      planName: plan.name,
+      providerName: plan.providerName,
+    })),
     inventoryCounts,
-    availabilityIntentCounts,
-    rangeDays: insightsRangeDays,
+    planInsights: insightsQuery.data?.plans ?? [],
   });
   const insightsLoading =
-    subscriptionsQuery.isLoading ||
-    countsQuery.isLoading ||
-    catalogQuery.isLoading ||
-    availabilityIntentCountsQuery.isLoading;
-  const insightsError =
-    subscriptionsQuery.isError ||
-    countsQuery.isError ||
-    catalogQuery.isError ||
-    availabilityIntentCountsQuery.isError;
+    insightsQuery.isLoading || countsQuery.isLoading || catalogQuery.isLoading;
+  const insightsError = insightsQuery.isError || countsQuery.isError || catalogQuery.isError;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -271,13 +383,15 @@ export function CodingPlansOperationsContent() {
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <p className="text-muted-foreground text-sm">
               Rolling metrics use the selected window. Current-state cards show live totals.
+              Waitlist movement uses join dates for users still waiting; resolved intents are
+              removed.
             </p>
             <InsightsRangeFilter value={insightsRangeDays} onChange={setInsightsRangeDays} />
           </div>
           <KpiCards
             items={insights}
-            isLoading={subscriptionsQuery.isLoading}
-            isError={subscriptionsQuery.isError}
+            isLoading={insightsQuery.isLoading}
+            isError={insightsQuery.isError}
           />
           <PlanPerformanceTable
             rows={planPerformanceRows}
@@ -290,15 +404,35 @@ export function CodingPlansOperationsContent() {
         <TabsContent value="subscriptions" className="mt-0 space-y-6">
           <SummaryCards
             items={subscriptionSummary}
-            isLoading={subscriptionsQuery.isLoading}
-            isError={subscriptionsQuery.isError}
+            isLoading={subscriptionOverviewQuery.isLoading}
+            isError={subscriptionOverviewQuery.isError}
             ariaLabel="Coding Plan subscription summary"
           />
 
           <SubscriptionsTable
             items={subscriptions}
+            pagination={subscriptionPagination}
             isLoading={subscriptionsQuery.isLoading}
+            isFetching={subscriptionsQuery.isFetching}
             isError={subscriptionsQuery.isError}
+            searchDraft={subscriptionSearchDraft}
+            search={subscriptionSearch}
+            status={subscriptionStatus}
+            onSearchDraftChange={setSubscriptionSearchDraft}
+            onSearch={nextSearch => {
+              setSubscriptionSearch(nextSearch);
+              setSubscriptionPage(1);
+            }}
+            onStatusChange={status => {
+              setSubscriptionStatus(status);
+              setSubscriptionPage(1);
+            }}
+            onPageChange={setSubscriptionPage}
+            onCancel={setCancelSelection}
+            onExtend={item => {
+              setExtendSelection(item);
+              setExtendDays('7');
+            }}
           />
         </TabsContent>
 
@@ -353,6 +487,19 @@ export function CodingPlansOperationsContent() {
                 entries: submittedEntries,
               });
             }}
+            inventoryReplacementId={inventoryReplacementId}
+            inventoryReplacementApiKey={inventoryReplacementApiKey}
+            onInventoryReplacementIdChange={setInventoryReplacementId}
+            onInventoryReplacementApiKeyChange={setInventoryReplacementApiKey}
+            onConfirmInventoryReplacement={() => {
+              if (
+                inventoryReplacementId.trim().length === 0 ||
+                inventoryReplacementApiKey.trim().length === 0
+              ) {
+                return;
+              }
+              setInventoryReplacementConfirmOpen(true);
+            }}
           />
         </TabsContent>
       </Tabs>
@@ -373,6 +520,36 @@ export function CodingPlansOperationsContent() {
         onReplace={(inventoryKeyId, apiKey) =>
           replacementMutation.mutate({ inventoryKeyId, apiKey })
         }
+        cancelSelection={cancelSelection}
+        cancelPending={cancelMutation.isPending}
+        onCloseCancel={() => setCancelSelection(null)}
+        onCancel={subscriptionId => cancelMutation.mutate({ subscriptionId })}
+        extendSelection={extendSelection}
+        extendDays={extendDays}
+        extendPending={extendMutation.isPending}
+        canSubmitExtend={canSubmitExtend}
+        onCloseExtend={() => {
+          setExtendSelection(null);
+          setExtendDays('7');
+        }}
+        onExtendDaysChange={setExtendDays}
+        onExtend={(subscriptionId, days) => extendMutation.mutate({ subscriptionId, days })}
+        inventoryReplacementId={inventoryReplacementId}
+        inventoryReplacementConfirmOpen={inventoryReplacementConfirmOpen}
+        inventoryReplacementPending={inventoryReplacementMutation.isPending}
+        onCloseInventoryReplacement={() => setInventoryReplacementConfirmOpen(false)}
+        onReplaceInventoryCredential={() => {
+          if (
+            inventoryReplacementId.trim().length === 0 ||
+            inventoryReplacementApiKey.trim().length === 0
+          ) {
+            return;
+          }
+          inventoryReplacementMutation.mutate({
+            inventoryKeyId: inventoryReplacementId.trim(),
+            apiKey: inventoryReplacementApiKey,
+          });
+        }}
       />
     </div>
   );
@@ -389,22 +566,6 @@ type KpiItem = {
   detail: string;
 };
 
-type InsightsRangeDays = 7 | 14 | 30;
-
-type AdminCodingPlanCatalogItem = {
-  planId: string;
-  providerName: string;
-  name: string;
-  providerId: string;
-  costKiloCredits: number;
-  billingPeriodDays: number;
-};
-
-type AvailabilityIntentCountItem = {
-  planId: string;
-  count: number;
-};
-
 type PlanPerformanceRow = {
   planId: string;
   planName: string;
@@ -415,6 +576,7 @@ type PlanPerformanceRow = {
   canceledSubscriptionsInRange: number;
   availableCredentials: number;
   waitlistIntents: number;
+  currentWaitersJoinedInRange: number;
 };
 
 type InventoryCountItem = {
@@ -435,6 +597,7 @@ type AdminCodingPlanSubscriptionItem = {
   id: string;
   userId: string;
   userName: string;
+  userEmail: string;
   planId: string;
   planName: string;
   providerId: string;
@@ -561,7 +724,11 @@ function KpiCards({
                 <p className="font-mono text-2xl font-semibold tabular-nums">{item.value}</p>
               )}
             </div>
-            <p className="text-muted-foreground text-xs leading-5">{item.detail}</p>
+            {isLoading ? (
+              <Skeleton aria-hidden="true" className="h-8 w-40" />
+            ) : isError ? null : (
+              <p className="text-muted-foreground text-xs leading-5">{item.detail}</p>
+            )}
           </CardContent>
         </Card>
       ))}
@@ -592,11 +759,12 @@ function PlanPerformanceTable({
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto rounded-lg border">
-          <Table className="min-w-[76rem] table-fixed">
+          <Table className="min-w-[88rem] table-fixed">
             <colgroup>
               <col className="w-72" />
               <col className="w-36" />
               <col className="w-36" />
+              <col className="w-48" />
               <col className="w-48" />
               <col className="w-48" />
               <col className="w-48" />
@@ -611,18 +779,19 @@ function PlanPerformanceTable({
                 <TableHead className="text-right">Canceled ({rangeLabel})</TableHead>
                 <TableHead className="text-right">Available inventory</TableHead>
                 <TableHead className="text-right">Waitlist</TableHead>
+                <TableHead className="text-right">Current waiters joined ({rangeLabel})</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isError ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-red-300">
+                  <TableCell colSpan={8} className="h-24 text-center text-red-300">
                     Unable to load plan performance.
                   </TableCell>
                 </TableRow>
-              ) : rows.length === 0 ? (
+              ) : isLoading || rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
+                  <TableCell colSpan={8} className="text-muted-foreground h-24 text-center">
                     {isLoading ? 'Loading plan performance...' : 'No plan performance data.'}
                   </TableCell>
                 </TableRow>
@@ -653,6 +822,9 @@ function PlanPerformanceTable({
                     <TableCell className="text-right font-mono tabular-nums">
                       {formatIntegerValue(row.waitlistIntents)}
                     </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {formatIntegerValue(row.currentWaitersJoinedInRange)}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -662,166 +834,6 @@ function PlanPerformanceTable({
       </CardContent>
     </Card>
   );
-}
-
-function getCodingPlanInsights(
-  subscriptions: AdminCodingPlanSubscriptionItem[],
-  rangeDays: InsightsRangeDays
-): KpiItem[] {
-  const now = new Date();
-  const rangeStart = addDays(now, -rangeDays);
-  const priorRangeStart = addDays(now, -rangeDays * 2);
-  const rangeLabel = `${rangeDays}-day`;
-  const rangeDetailLabel = `last ${rangeDays} days`;
-  const priorRangeDetailLabel = `prior ${rangeDays} days`;
-  const liveSubscriptions = subscriptions.filter(subscription => isLiveSubscription(subscription));
-  const pendingCancellationSubscriptions = liveSubscriptions.filter(
-    subscription => getCodingPlanDisplayStatus(subscription) === 'pending_cancellation'
-  );
-  const pastDueSubscriptions = liveSubscriptions.filter(
-    subscription => subscription.status === 'past_due'
-  );
-  const createdInRange = subscriptions.filter(subscription =>
-    isTimestampBetween(subscription.createdAt, rangeStart, now)
-  );
-  const createdInPriorRange = subscriptions.filter(subscription =>
-    isTimestampBetween(subscription.createdAt, priorRangeStart, rangeStart)
-  );
-  const canceledInRange = subscriptions.filter(
-    subscription =>
-      subscription.status === 'canceled' &&
-      subscription.canceledAt !== null &&
-      isTimestampBetween(subscription.canceledAt, rangeStart, now)
-  );
-  const subscriptionsActiveAtPeriodStart = subscriptions.filter(subscription =>
-    wasSubscriptionLiveAt(subscription, rangeStart)
-  );
-  const retainedSubscriptions = subscriptionsActiveAtPeriodStart.filter(
-    subscription => subscription.status !== 'canceled'
-  );
-  const mrr = liveSubscriptions.reduce(
-    (total, subscription) => total + getMonthlyKiloCreditValue(subscription),
-    0
-  );
-  const revenueAtRisk = [...pendingCancellationSubscriptions, ...pastDueSubscriptions].reduce(
-    (total, subscription) => total + getMonthlyKiloCreditValue(subscription),
-    0
-  );
-  const periodGrowthRate = calculateRate(
-    createdInRange.length - canceledInRange.length,
-    createdInPriorRange.length
-  );
-  const retentionRate = calculateRate(
-    retainedSubscriptions.length,
-    subscriptionsActiveAtPeriodStart.length
-  );
-  const churnRate = calculateRate(canceledInRange.length, subscriptionsActiveAtPeriodStart.length);
-
-  return [
-    {
-      label: 'Active MRR',
-      value: formatCurrencyValue(mrr),
-      detail: `${liveSubscriptions.length} live subscription${liveSubscriptions.length === 1 ? '' : 's'}`,
-    },
-    {
-      label: `${rangeLabel} growth`,
-      value: formatPercentValue(periodGrowthRate),
-      detail: `${formatSignedCount(createdInRange.length - canceledInRange.length)} net in ${rangeDetailLabel}`,
-    },
-    {
-      label: `${rangeLabel} retention`,
-      value: formatPercentValue(retentionRate),
-      detail: `${retainedSubscriptions.length}/${subscriptionsActiveAtPeriodStart.length} retained from ${rangeDays} days ago`,
-    },
-    {
-      label: `${rangeLabel} churn`,
-      value: formatPercentValue(churnRate),
-      detail: `${canceledInRange.length} canceled in ${rangeDetailLabel}`,
-    },
-    {
-      label: 'Revenue at risk',
-      value: formatCurrencyValue(revenueAtRisk),
-      detail: `${pendingCancellationSubscriptions.length} canceling, ${pastDueSubscriptions.length} past due`,
-    },
-    {
-      label: 'New subscriptions',
-      value: formatIntegerValue(createdInRange.length),
-      detail: `${createdInPriorRange.length} created in ${priorRangeDetailLabel}`,
-    },
-    {
-      label: 'Cancellation pending',
-      value: formatPercentValue(
-        calculateRate(pendingCancellationSubscriptions.length, liveSubscriptions.length)
-      ),
-      detail: `${pendingCancellationSubscriptions.length}/${liveSubscriptions.length} live subscriptions`,
-    },
-    {
-      label: 'Past due exposure',
-      value: formatCurrencyValue(
-        pastDueSubscriptions.reduce(
-          (total, subscription) => total + getMonthlyKiloCreditValue(subscription),
-          0
-        )
-      ),
-      detail: `${pastDueSubscriptions.length} subscription${pastDueSubscriptions.length === 1 ? '' : 's'} in recovery`,
-    },
-  ];
-}
-
-function getPlanPerformanceRows({
-  catalog,
-  subscriptions,
-  inventoryCounts,
-  availabilityIntentCounts,
-  rangeDays,
-}: {
-  catalog: AdminCodingPlanCatalogItem[];
-  subscriptions: AdminCodingPlanSubscriptionItem[];
-  inventoryCounts: InventoryCountItem[];
-  availabilityIntentCounts: AvailabilityIntentCountItem[];
-  rangeDays: InsightsRangeDays;
-}): PlanPerformanceRow[] {
-  const now = new Date();
-  const rangeStart = addDays(now, -rangeDays);
-
-  return catalog.map(plan => {
-    const planSubscriptions = subscriptions.filter(
-      subscription => subscription.planId === plan.planId
-    );
-    const liveSubscriptions = planSubscriptions.filter(subscription =>
-      isLiveSubscription(subscription)
-    );
-    const newSubscriptionsInRange = planSubscriptions.filter(subscription =>
-      isTimestampBetween(subscription.createdAt, rangeStart, now)
-    ).length;
-    const canceledSubscriptionsInRange = planSubscriptions.filter(
-      subscription =>
-        subscription.status === 'canceled' &&
-        subscription.canceledAt !== null &&
-        isTimestampBetween(subscription.canceledAt, rangeStart, now)
-    ).length;
-    const availableCredentials = inventoryCounts
-      .filter(item => item.planId === plan.planId && item.status === 'available')
-      .reduce((total, item) => total + item.count, 0);
-    const waitlistIntents =
-      availabilityIntentCounts.find(item => item.planId === plan.planId)?.count ?? 0;
-    const monthlyRecurringValue = liveSubscriptions.reduce(
-      (total, subscription) => total + getMonthlyKiloCreditValue(subscription),
-      0
-    );
-
-    return {
-      planId: plan.planId,
-      planName: plan.name,
-      providerName: plan.providerName,
-      activeSubscriptions: liveSubscriptions.length,
-      monthlyRecurringValue,
-      newSubscriptionsInRange,
-      canceledSubscriptionsInRange,
-      availableCredentials,
-      waitlistIntents,
-    };
-  });
 }
 
 function InventoryCountsTable({
@@ -940,37 +952,6 @@ function getInventoryCountRows(items: InventoryCountItem[]): InventoryCountRow[]
   );
 }
 
-function isLiveSubscription(subscription: AdminCodingPlanSubscriptionItem): boolean {
-  return subscription.status === 'active' || subscription.status === 'past_due';
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function isTimestampBetween(value: string, start: Date, end: Date): boolean {
-  const timestamp = new Date(value).getTime();
-  return timestamp >= start.getTime() && timestamp < end.getTime();
-}
-
-function wasSubscriptionLiveAt(subscription: AdminCodingPlanSubscriptionItem, date: Date): boolean {
-  const createdAt = new Date(subscription.createdAt).getTime();
-  const canceledAt = subscription.canceledAt ? new Date(subscription.canceledAt).getTime() : null;
-  const target = date.getTime();
-
-  return createdAt < target && (canceledAt === null || canceledAt >= target);
-}
-
-function getMonthlyKiloCreditValue(subscription: AdminCodingPlanSubscriptionItem): number {
-  return subscription.costKiloCredits * (30 / subscription.billingPeriodDays);
-}
-
-function calculateRate(numerator: number, denominator: number): number | null {
-  return denominator === 0 ? null : numerator / denominator;
-}
-
 function formatCurrencyValue(value: number): string {
   return value.toLocaleString('en-US', {
     style: 'currency',
@@ -980,46 +961,130 @@ function formatCurrencyValue(value: number): string {
   });
 }
 
-function formatPercentValue(value: number | null): string {
-  if (value === null) {
-    return '—';
-  }
-
-  return value.toLocaleString('en-US', {
-    style: 'percent',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  });
-}
-
 function formatIntegerValue(value: number): string {
   return value.toLocaleString('en-US');
-}
-
-function formatSignedCount(value: number): string {
-  return value > 0 ? `+${formatIntegerValue(value)}` : formatIntegerValue(value);
 }
 
 function formatInsightsRangeLabel(rangeDays: InsightsRangeDays): string {
   return `last ${rangeDays} days`;
 }
 
+const SUBSCRIPTION_STATUS_FILTERS: Array<{
+  value: SubscriptionDisplayStatus | 'all';
+  label: string;
+}> = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'pending_cancellation', label: 'Cancellation pending' },
+  { value: 'past_due', label: 'Past due' },
+  { value: 'canceled', label: 'Canceled' },
+];
+
 function SubscriptionsTable({
   items,
+  pagination,
   isLoading,
+  isFetching,
   isError,
+  searchDraft,
+  search,
+  status,
+  onSearchDraftChange,
+  onSearch,
+  onStatusChange,
+  onPageChange,
+  onCancel,
+  onExtend,
 }: {
   items: AdminCodingPlanSubscriptionItem[];
+  pagination?: { page: number; total: number; totalPages: number };
   isLoading: boolean;
+  isFetching: boolean;
   isError: boolean;
+  searchDraft: string;
+  search: string;
+  status: SubscriptionDisplayStatus | 'all';
+  onSearchDraftChange: (value: string) => void;
+  onSearch: (value: string) => void;
+  onStatusChange: (value: SubscriptionDisplayStatus | 'all') => void;
+  onPageChange: (page: number) => void;
+  onCancel: (item: AdminCodingPlanSubscriptionItem) => void;
+  onExtend: (item: AdminCodingPlanSubscriptionItem) => void;
 }) {
+  const currentPage = pagination?.page ?? 1;
+  const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Subscriptions</CardTitle>
         <CardDescription>Coding Plan subscriptions and billing state.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <form
+          className="flex flex-col gap-3 lg:flex-row lg:items-end"
+          onSubmit={event => {
+            event.preventDefault();
+            onSearch(searchDraft.trim());
+          }}
+        >
+          <div className="space-y-2 lg:w-80">
+            <Label htmlFor="coding-plan-subscription-search">Search</Label>
+            <Input
+              id="coding-plan-subscription-search"
+              value={searchDraft}
+              onChange={event => onSearchDraftChange(event.target.value)}
+              placeholder="User ID or email"
+            />
+          </div>
+          <div className="space-y-2 lg:w-56">
+            <Label htmlFor="coding-plan-subscription-status">Status</Label>
+            <Select
+              value={status}
+              onValueChange={value => onStatusChange(value as SubscriptionDisplayStatus | 'all')}
+            >
+              <SelectTrigger id="coding-plan-subscription-status">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                {SUBSCRIPTION_STATUS_FILTERS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" variant="secondary" size="sm" className="h-9">
+              <Search className="size-4" />
+              Search
+            </Button>
+            {search || searchDraft ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9"
+                onClick={() => {
+                  onSearchDraftChange('');
+                  onSearch('');
+                }}
+              >
+                <X className="size-4" />
+                Clear
+              </Button>
+            ) : null}
+          </div>
+        </form>
+        <p className="text-muted-foreground -mt-2 text-xs">
+          Search matches a user ID or email address.
+        </p>
+        {isFetching && !isLoading ? (
+          <p className="text-muted-foreground flex items-center gap-2 text-xs" role="status">
+            <RefreshCw className="size-3 animate-spin" /> Updating results…
+          </p>
+        ) : null}
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
@@ -1030,18 +1095,19 @@ function SubscriptionsTable({
                 <TableHead>Status</TableHead>
                 <TableHead>Billing date</TableHead>
                 <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isError ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-red-300">
+                  <TableCell colSpan={7} className="h-24 text-center text-red-300">
                     Unable to load subscriptions.
                   </TableCell>
                 </TableRow>
               ) : items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground h-24 text-center">
+                  <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
                     {isLoading ? 'Loading subscriptions...' : 'No subscriptions recorded.'}
                   </TableCell>
                 </TableRow>
@@ -1053,6 +1119,8 @@ function SubscriptionsTable({
                     item.status === 'past_due'
                       ? formatLocalDateTimeLabel(billingDate.date)
                       : formatDateLabel(billingDate.date);
+                  const canCancel = item.status === 'active' && !item.cancelAtPeriodEnd;
+                  const canExtend = item.status === 'active';
 
                   return (
                     <TableRow key={item.id}>
@@ -1063,6 +1131,8 @@ function SubscriptionsTable({
                         >
                           {item.userName}
                         </Link>
+                        <div className="text-muted-foreground mt-1">{item.userEmail}</div>
+                        <div className="text-muted-foreground mt-1">{item.userId}</div>
                       </TableCell>
                       <TableCell className="min-w-56 font-mono text-xs">
                         <div className="flex items-center gap-2">
@@ -1097,12 +1167,51 @@ function SubscriptionsTable({
                           item.planId
                         )}
                       </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          {canExtend ? (
+                            <Button variant="secondary" size="sm" onClick={() => onExtend(item)}>
+                              Extend
+                            </Button>
+                          ) : null}
+                          {canCancel ? (
+                            <Button variant="destructive" size="sm" onClick={() => onCancel(item)}>
+                              Cancel
+                            </Button>
+                          ) : null}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })
               )}
             </TableBody>
           </Table>
+        </div>
+        <div className="flex flex-col items-start justify-between gap-3 text-sm sm:flex-row sm:items-center">
+          <p className="text-muted-foreground">
+            {pagination
+              ? `${pagination.total.toLocaleString()} subscription${pagination.total === 1 ? '' : 's'} · page ${pagination.page} of ${totalPages}`
+              : 'Loading subscription count...'}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage <= 1 || isFetching}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={!pagination || currentPage >= totalPages || isFetching}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -1142,6 +1251,11 @@ function OperationsTabs({
   onPlanChange,
   onEntriesTextChange,
   onUpload,
+  inventoryReplacementId,
+  inventoryReplacementApiKey,
+  onInventoryReplacementIdChange,
+  onInventoryReplacementApiKeyChange,
+  onConfirmInventoryReplacement,
 }: {
   inventorySummary: SummaryItem[];
   inventoryCounts: InventoryCountItem[];
@@ -1166,6 +1280,11 @@ function OperationsTabs({
   onPlanChange: (planId: string) => void;
   onEntriesTextChange: (entriesText: string) => void;
   onUpload: () => void;
+  inventoryReplacementId: string;
+  inventoryReplacementApiKey: string;
+  onInventoryReplacementIdChange: (inventoryKeyId: string) => void;
+  onInventoryReplacementApiKeyChange: (apiKey: string) => void;
+  onConfirmInventoryReplacement: () => void;
 }) {
   const hasSelectedPlan = planOptions.some(plan => plan.planId === selectedPlanId);
   const isBytePlusSelected = selectedProviderId === 'byteplus-coding';
@@ -1176,6 +1295,7 @@ function OperationsTabs({
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="revocation-queue">Pending Key Rotation</TabsTrigger>
         <TabsTrigger value="inventory-upload">Upload validated inventory</TabsTrigger>
+        <TabsTrigger value="replace-credential">Replace credential</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="mt-0 space-y-6">
@@ -1394,6 +1514,55 @@ function OperationsTabs({
           </CardContent>
         </Card>
       </TabsContent>
+
+      <TabsContent value="replace-credential" className="mt-0">
+        <Card>
+          <CardHeader>
+            <CardTitle>Replace inventory credential</CardTitle>
+            <CardDescription>
+              Replace the API key for an available or assigned inventory ID. Kilo validates the key,
+              encrypts it, and updates any assigned BYOK copy.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="inventory-replacement-id">Inventory ID</Label>
+              <Input
+                id="inventory-replacement-id"
+                value={inventoryReplacementId}
+                onChange={event => onInventoryReplacementIdChange(event.target.value)}
+                placeholder="Inventory UUID"
+                autoComplete="off"
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inventory-replacement-api-key">Replacement API key</Label>
+              <Input
+                id="inventory-replacement-api-key"
+                type="password"
+                value={inventoryReplacementApiKey}
+                onChange={event => onInventoryReplacementApiKeyChange(event.target.value)}
+                placeholder={getInventoryReplacementDialogCopy().placeholder}
+                autoComplete="off"
+              />
+            </div>
+            <Alert>
+              <ShieldAlert className="size-4" />
+              <AlertDescription>{getInventoryReplacementDialogCopy().description}</AlertDescription>
+            </Alert>
+            <Button
+              onClick={onConfirmInventoryReplacement}
+              disabled={
+                inventoryReplacementId.trim().length === 0 ||
+                inventoryReplacementApiKey.trim().length === 0
+              }
+            >
+              Review replacement
+            </Button>
+          </CardContent>
+        </Card>
+      </TabsContent>
     </Tabs>
   );
 }
@@ -1409,6 +1578,22 @@ function OperationsDialogs({
   onCloseReplacement,
   onReplacementApiKeyChange,
   onReplace,
+  cancelSelection,
+  cancelPending,
+  onCloseCancel,
+  onCancel,
+  extendSelection,
+  extendDays,
+  extendPending,
+  canSubmitExtend,
+  onCloseExtend,
+  onExtendDaysChange,
+  onExtend,
+  inventoryReplacementId,
+  inventoryReplacementConfirmOpen,
+  inventoryReplacementPending,
+  onCloseInventoryReplacement,
+  onReplaceInventoryCredential,
 }: {
   completeSelection: RevocationSelection | null;
   completePending: boolean;
@@ -1420,6 +1605,22 @@ function OperationsDialogs({
   onCloseReplacement: () => void;
   onReplacementApiKeyChange: (apiKey: string) => void;
   onReplace: (inventoryKeyId: string, apiKey: string) => void;
+  cancelSelection: AdminCodingPlanSubscriptionItem | null;
+  cancelPending: boolean;
+  onCloseCancel: () => void;
+  onCancel: (subscriptionId: string) => void;
+  extendSelection: AdminCodingPlanSubscriptionItem | null;
+  extendDays: string;
+  extendPending: boolean;
+  canSubmitExtend: boolean;
+  onCloseExtend: () => void;
+  onExtendDaysChange: (days: string) => void;
+  onExtend: (subscriptionId: string, days: number) => void;
+  inventoryReplacementId: string;
+  inventoryReplacementConfirmOpen: boolean;
+  inventoryReplacementPending: boolean;
+  onCloseInventoryReplacement: () => void;
+  onReplaceInventoryCredential: () => void;
 }) {
   // Copy derives from the retained selection. The null fallback only applies
   // while a dialog is closed or animating out, so it is never visible.
@@ -1429,17 +1630,26 @@ function OperationsDialogs({
   const replacementCopy = getReplacementDialogCopy(
     replacementSelection?.providerDisplayName ?? 'the provider'
   );
+  const cancelCopy = getCancelSubscriptionDialogCopy(cancelSelection?.userName ?? 'this user');
+  const extendCopy = getExtendSubscriptionDialogCopy(extendSelection?.userName ?? 'this user');
+  const parsedExtendDays = Number(extendDays);
+  const inventoryReplacementCopy = getInventoryReplacementDialogCopy(inventoryReplacementId);
 
   return (
     <>
-      <Dialog open={completeSelection !== null} onOpenChange={open => !open && onCloseComplete()}>
-        <DialogContent>
+      <Dialog
+        open={completeSelection !== null}
+        onOpenChange={open => {
+          if (!open && !completePending) onCloseComplete();
+        }}
+      >
+        <DialogContent showCloseButton={!completePending}>
           <DialogHeader>
             <DialogTitle>{revocationCopy.title}</DialogTitle>
             <DialogDescription>{revocationCopy.description}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="secondary" onClick={onCloseComplete}>
+            <Button variant="secondary" onClick={onCloseComplete} disabled={completePending}>
               Keep pending
             </Button>
             <Button
@@ -1457,9 +1667,11 @@ function OperationsDialogs({
 
       <Dialog
         open={replacementSelection !== null}
-        onOpenChange={open => !open && onCloseReplacement()}
+        onOpenChange={open => {
+          if (!open && !replacementPending) onCloseReplacement();
+        }}
       >
-        <DialogContent>
+        <DialogContent showCloseButton={!replacementPending}>
           <DialogHeader>
             <DialogTitle>{replacementCopy.title}</DialogTitle>
             <DialogDescription>{replacementCopy.description}</DialogDescription>
@@ -1476,7 +1688,7 @@ function OperationsDialogs({
             />
           </div>
           <DialogFooter>
-            <Button variant="secondary" onClick={onCloseReplacement}>
+            <Button variant="secondary" onClick={onCloseReplacement} disabled={replacementPending}>
               Keep pending
             </Button>
             <Button
@@ -1487,6 +1699,103 @@ function OperationsDialogs({
               disabled={replacementApiKey.trim().length === 0 || replacementPending}
             >
               {replacementPending ? 'Validating...' : 'Validate and replace'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={cancelSelection !== null}
+        onOpenChange={open => {
+          if (!open && !cancelPending) onCloseCancel();
+        }}
+      >
+        <DialogContent showCloseButton={!cancelPending}>
+          <DialogHeader>
+            <DialogTitle>{cancelCopy.title}</DialogTitle>
+            <DialogDescription>{cancelCopy.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={onCloseCancel} disabled={cancelPending}>
+              Keep subscription
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelSelection && onCancel(cancelSelection.id)}
+              disabled={cancelPending}
+            >
+              {cancelPending ? 'Scheduling cancellation...' : 'Cancel at period end'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={extendSelection !== null}
+        onOpenChange={open => {
+          if (!open && !extendPending) onCloseExtend();
+        }}
+      >
+        <DialogContent showCloseButton={!extendPending}>
+          <DialogHeader>
+            <DialogTitle>{extendCopy.title}</DialogTitle>
+            <DialogDescription>{extendCopy.description}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="extend-subscription-days">Additional days</Label>
+            <Input
+              id="extend-subscription-days"
+              type="number"
+              min={1}
+              max={90}
+              value={extendDays}
+              onChange={event => onExtendDaysChange(event.target.value)}
+            />
+            {extendSelection ? (
+              <p className="text-muted-foreground text-xs">
+                Current period ends {formatDateLabel(extendSelection.currentPeriodEnd)}. Renewal is{' '}
+                {formatDateLabel(extendSelection.creditRenewalAt)}.
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={onCloseExtend} disabled={extendPending}>
+              Keep dates
+            </Button>
+            <Button
+              onClick={() =>
+                extendSelection && canSubmitExtend && onExtend(extendSelection.id, parsedExtendDays)
+              }
+              disabled={!canSubmitExtend || extendPending}
+            >
+              {extendPending ? 'Extending period...' : 'Extend period'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={inventoryReplacementConfirmOpen}
+        onOpenChange={open => {
+          if (!open && !inventoryReplacementPending) onCloseInventoryReplacement();
+        }}
+      >
+        <DialogContent showCloseButton={!inventoryReplacementPending}>
+          <DialogHeader>
+            <DialogTitle>{inventoryReplacementCopy.title}</DialogTitle>
+            <DialogDescription>{inventoryReplacementCopy.description}</DialogDescription>
+          </DialogHeader>
+          <p className="font-mono text-sm">{inventoryReplacementId.trim()}</p>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={onCloseInventoryReplacement}
+              disabled={inventoryReplacementPending}
+            >
+              Keep current key
+            </Button>
+            <Button onClick={onReplaceInventoryCredential} disabled={inventoryReplacementPending}>
+              {inventoryReplacementPending ? 'Validating...' : 'Validate and replace'}
             </Button>
           </DialogFooter>
         </DialogContent>

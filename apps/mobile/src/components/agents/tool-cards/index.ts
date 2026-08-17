@@ -4,6 +4,7 @@ export { GenericToolCard, GenericToolCardBody } from './generic-tool-card';
 export { GlobToolCard, GlobToolCardBody } from './glob-tool-card';
 export { GrepToolCard, GrepToolCardBody } from './grep-tool-card';
 export { ListToolCard, ListToolCardBody } from './list-tool-card';
+export { PatchToolCard, PatchToolCardBody } from './patch-tool-card';
 export { ReadToolCard, ReadToolCardBody } from './read-tool-card';
 export { TaskToolCard, TaskToolCardBody } from './task-tool-card';
 export { TodoToolCard, TodoToolCardBody } from './todo-tool-card';

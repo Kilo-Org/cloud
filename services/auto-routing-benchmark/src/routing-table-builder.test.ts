@@ -4,7 +4,7 @@ import type {
   BenchmarkModelSummary,
   TaxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
-import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import { RoutingTableSchema, TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import { buildRoutingTable } from './routing-table-builder';
 
 const DECIDER_MODELS: BenchmarkDeciderModel[] = [
@@ -49,7 +49,7 @@ function summariesForEveryRoute(
 describe('buildRoutingTable', () => {
   it('ranks candidates by lowest cost per accuracy for each taxonomy route', () => {
     const table = buildRoutingTable({
-      runId: 'test-run-1',
+      version: 'test-run-1',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
@@ -68,7 +68,7 @@ describe('buildRoutingTable', () => {
   it('excludes a model whose route summary has no cost signal', () => {
     const routeKey = 'implementation/code_generation';
     const table = buildRoutingTable({
-      runId: 'test-run-nocost',
+      version: 'test-run-nocost',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
@@ -87,7 +87,7 @@ describe('buildRoutingTable', () => {
 
   it('carries reasoningEffort from the run snapshot', () => {
     const table = buildRoutingTable({
-      runId: 'test-run-4',
+      version: 'test-run-4',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
@@ -109,7 +109,7 @@ describe('buildRoutingTable', () => {
 
   it('platform table JSON shape has reasoningEffort and no variant key', () => {
     const table = buildRoutingTable({
-      runId: 'test-run-platform-shape',
+      version: 'test-run-platform-shape',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
@@ -131,7 +131,7 @@ describe('buildRoutingTable', () => {
   it('two variants of one model appear as distinct candidates with matched efforts', () => {
     const routeKey = 'implementation/code_generation' as const;
     const table = buildRoutingTable({
-      runId: 'test-run-two-variants',
+      version: 'test-run-two-variants',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.5,
       switchCostFactor: 3,
@@ -172,7 +172,7 @@ describe('buildRoutingTable', () => {
   it('binds reasoningEffort from an exact (model, variant) snapshot match', () => {
     const routeKey = 'implementation/code_generation' as const;
     const table = buildRoutingTable({
-      runId: 'test-run-exact-pair',
+      version: 'test-run-exact-pair',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.5,
       switchCostFactor: 3,
@@ -195,7 +195,7 @@ describe('buildRoutingTable', () => {
 
   it('legacy single-row snapshot binds when summary omits variant', () => {
     const table = buildRoutingTable({
-      runId: 'test-run-legacy-single',
+      version: 'test-run-legacy-single',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
@@ -212,7 +212,7 @@ describe('buildRoutingTable', () => {
   it('throws when multiple snapshot rows exist and none matches the summary pair', () => {
     expect(() =>
       buildRoutingTable({
-        runId: 'test-run-ambiguous-snapshot',
+        version: 'test-run-ambiguous-snapshot',
         generatedAt: '2026-01-01T00:00:00.000Z',
         minAccuracy: 0.5,
         switchCostFactor: 3,
@@ -230,7 +230,7 @@ describe('buildRoutingTable', () => {
   it('throws when any taxonomy route has no candidates', () => {
     expect(() =>
       buildRoutingTable({
-        runId: 'test-run-missing-route',
+        version: 'test-run-missing-route',
         generatedAt: '2026-01-01T00:00:00.000Z',
         minAccuracy: 0.7,
         switchCostFactor: 3,
@@ -243,7 +243,7 @@ describe('buildRoutingTable', () => {
 
   it('ignores classifier-style * route summaries', () => {
     const table = buildRoutingTable({
-      runId: 'test-run-classifier-summary',
+      version: 'test-run-classifier-summary',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
@@ -253,5 +253,44 @@ describe('buildRoutingTable', () => {
     });
 
     expect(table.routes['implementation/code_generation']).toHaveLength(3);
+  });
+
+  it('keeps the exact effort-only shape for an enum reasoningEffort snapshot', () => {
+    const table = buildRoutingTable({
+      version: 'test-run-enum-shape',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: [{ id: 'model/value', variant: null, reasoningEffort: 'medium' }],
+      summaries: TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        ...summary('model/value', routeKey, 0.9, 0.002),
+        variant: 'medium',
+      })),
+    });
+    const cand = table.routes['implementation/code_generation']?.[0];
+    expect(cand?.reasoningEffort).toBe('medium');
+    expect(cand && 'variant' in cand ? cand.variant : undefined).toBeUndefined();
+  });
+
+  it('emits variant for a snapshot entry whose key is outside the effort enum', () => {
+    const table = buildRoutingTable({
+      version: 'test-run-non-enum-variant',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: [{ id: 'model/max', variant: 'max', reasoningEffort: null }],
+      summaries: TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        ...summary('model/max', routeKey, 0.9, 0.002),
+        variant: 'max',
+      })),
+    });
+    const cand = table.routes['implementation/code_generation']?.[0];
+    expect(cand).toBeDefined();
+    expect(cand?.variant).toBe('max');
+    expect(cand?.reasoningEffort).toBeNull();
+    // The published artifact must satisfy the contract schema (variant field allowed).
+    expect(RoutingTableSchema.parse(table)).toEqual(table);
   });
 });

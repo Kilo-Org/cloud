@@ -27,6 +27,7 @@ jest.mock('./direct-byok-definitions', () => ({
     {
       id: 'chutes-byok',
       base_url: 'https://chutes.example.com/v1',
+      base_url_overrides: {},
       models: jest.fn(async () => [
         {
           id: 'supported-model',
@@ -52,6 +53,7 @@ jest.mock('./direct-byok-definitions', () => ({
     {
       id: 'crofai',
       base_url: 'https://crofai.example.com/v1',
+      base_url_overrides: {},
       models: jest.fn(async () => [
         {
           id: 'other-model',

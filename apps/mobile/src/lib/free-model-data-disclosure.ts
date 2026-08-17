@@ -2,7 +2,7 @@ export const BYOK_MODEL_LABEL = 'BYOK';
 export const FREE_MODEL_DATA_LABEL = 'Data collected';
 export const FREE_MODEL_FREE_LABEL = 'Free';
 
-type ModelDataDisclosure = {
+export type ModelDataDisclosure = {
   id: string;
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;

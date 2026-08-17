@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapConfigRows } from './config';
+import { mapConfigRows, toDeciderModelRows } from './config';
 import type { ConfigDeciderModelRow } from './db';
 
 const configRow = {
@@ -15,6 +15,7 @@ const configRow = {
   classifier_max_p95_latency_ms: null,
   auto_decider_min_cost_usd: 12,
   auto_decider_max_cost_usd: 24,
+  user_max_concurrency: 100,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: 'admin@example.com',
 };
@@ -22,6 +23,7 @@ const configRow = {
 const deciderRows: ConfigDeciderModelRow[] = [
   {
     model: 'some/decider',
+    variant: null,
     reasoning_effort: 'high',
   },
 ];
@@ -81,7 +83,7 @@ describe('mapConfigRows', () => {
     const result = mapConfigRows(
       configRow,
       ['some/model'],
-      [{ model: 'auto/model', reasoning_effort: 'medium' }],
+      [{ model: 'auto/model', variant: null, reasoning_effort: 'medium' }],
       autoRows,
       ['auto/model']
     );
@@ -94,7 +96,7 @@ describe('mapConfigRows', () => {
     const result = mapConfigRows(
       configRow,
       ['some/model'],
-      [{ model: 'manual/thinking', reasoning_effort: 'thinking' }],
+      [{ model: 'manual/thinking', variant: null, reasoning_effort: 'thinking' }],
       [
         {
           model: 'auto/none',
@@ -114,5 +116,56 @@ describe('mapConfigRows', () => {
       { id: 'manual/thinking', reasoningEffort: null },
       { id: 'auto/none', reasoningEffort: null },
     ]);
+  });
+
+  it('maps a canonical variant row to variant with reasoningEffort null (never through the effort parser)', () => {
+    const result = mapConfigRows(
+      configRow,
+      ['some/model'],
+      [{ model: 'manual/max', variant: 'max', reasoning_effort: null }],
+      [],
+      []
+    );
+
+    expect(result?.manualDeciderModels).toEqual([
+      { id: 'manual/max', variant: 'max', reasoningEffort: null },
+    ]);
+    expect(result?.deciderModels[0].variant).toBe('max');
+    expect(result?.deciderModels[0].reasoningEffort).toBeNull();
+  });
+
+  it('maps a legacy effort row to reasoningEffort with no variant key', () => {
+    const result = mapConfigRows(
+      configRow,
+      ['some/model'],
+      [{ model: 'manual/high', variant: null, reasoning_effort: 'high' }],
+      [],
+      []
+    );
+
+    const manual = result?.manualDeciderModels?.[0];
+    expect(manual).toEqual({ id: 'manual/high', reasoningEffort: 'high' });
+    // Regression guard for run.ts: a legacy row must not carry `variant` at all;
+    // a present `variant: null` would be read as "no variant" and drop the effort.
+    expect('variant' in (manual ?? {})).toBe(false);
+  });
+});
+
+describe('toDeciderModelRows', () => {
+  it('writes variant for a canonical model and reasoning_effort for a legacy model, never both', () => {
+    const rows = toDeciderModelRows([
+      { id: 'canonical/max', variant: 'max', reasoningEffort: null },
+      { id: 'legacy/high', reasoningEffort: 'high' },
+      { id: 'plain/model', reasoningEffort: null },
+    ]);
+
+    expect(rows).toEqual([
+      { model: 'canonical/max', variant: 'max', reasoning_effort: null },
+      { model: 'legacy/high', variant: null, reasoning_effort: 'high' },
+      { model: 'plain/model', variant: null, reasoning_effort: null },
+    ]);
+    for (const row of rows) {
+      expect(row.variant === null || row.reasoning_effort === null).toBe(true);
+    }
   });
 });

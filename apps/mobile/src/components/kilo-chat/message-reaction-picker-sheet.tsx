@@ -1,5 +1,5 @@
 import { Portal } from '@rn-primitives/portal';
-import { X } from 'lucide-react-native';
+import { X } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { BackHandler, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';

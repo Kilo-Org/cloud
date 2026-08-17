@@ -12,6 +12,7 @@ export type KiloGatewayToolName =
   | 'save_workflow'
   | 'search_memories'
   | 'search_workflows'
+  | 'web_search'
   | `mcp_${string}`;
 
 export type KiloGatewayChatContentPart =
@@ -60,6 +61,8 @@ export interface KiloGatewayToolCallRequest {
 
 export interface KiloGatewayChatCompletion {
   readonly content?: string;
+  /** The last non-null finish_reason the stream reported, verbatim. */
+  readonly finishReason?: string;
   readonly reasoning?: string;
   readonly reasoningDetails?: readonly unknown[];
   readonly toolCalls: KiloGatewayToolCallRequest[];

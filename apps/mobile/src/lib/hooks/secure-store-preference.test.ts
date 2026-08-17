@@ -112,4 +112,34 @@ describe('createSecureStorePreference', () => {
     expect(store.get()).toBe(false);
     unsubscribe();
   });
+
+  it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {
+    const pendingReads: ((raw: string | null) => void)[] = [];
+    getItemAsync.mockReturnValue(
+      new Promise<string | null>(resolve => {
+        pendingReads.push(resolve);
+      })
+    );
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    store.preload();
+    // preload() alone must start the read; otherwise this fails and the
+    // subscribe() below would be the only thing starting it.
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+
+    const unsubscribe = store.subscribe(noopListener);
+    // subscribe() must not start a second read.
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+
+    pendingReads[0]?.('true');
+    await flushMicrotasks();
+
+    expect(store.get()).toBe(true);
+    unsubscribe();
+  });
 });

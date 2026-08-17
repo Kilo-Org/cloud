@@ -41,7 +41,10 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
-import { OrganizationSwitcherView } from '@/app/(app)/components/OrganizationSwitcher';
+import {
+  OrganizationSwitcherView,
+  type OrganizationSwitcherOrganization,
+} from '@/app/(app)/components/OrganizationSwitcher';
 import SidebarMenuList from '@/app/(app)/components/SidebarMenuList';
 import SidebarUserFooter from '@/app/(app)/components/SidebarUserFooter';
 
@@ -78,6 +81,7 @@ const mockUser = {
   google_user_name: 'Jean du Plessis',
   google_user_email: 'jean@kilo.ai',
   google_user_image_url: '',
+  is_admin: true,
 };
 
 const mockOrganizations = [
@@ -91,7 +95,7 @@ const mockOrganizations = [
     organizationName: 'Design Systems',
     role: 'member',
   },
-];
+] satisfies OrganizationSwitcherOrganization[];
 
 const dashboardItems: SidebarStoryItem[] = [
   {

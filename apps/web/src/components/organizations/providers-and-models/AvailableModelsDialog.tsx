@@ -57,10 +57,15 @@ export function AvailableModelsDialog({
           {modelsData && (
             <div className="space-y-2">
               {modelsData.data.map(model => {
-                const promptPricePer1M = (parseFloat(model.pricing.prompt) * 1000).toFixed(2);
-                const completionPricePer1M = (parseFloat(model.pricing.completion) * 1000).toFixed(
-                  2
-                );
+                const promptPrice = parseFloat(model.pricing.prompt);
+                const completionPrice = parseFloat(model.pricing.completion);
+                const hasKnownPrice =
+                  Number.isFinite(promptPrice) &&
+                  promptPrice > 0 &&
+                  Number.isFinite(completionPrice) &&
+                  completionPrice > 0;
+                const promptPricePer1M = (promptPrice * 1000).toFixed(2);
+                const completionPricePer1M = (completionPrice * 1000).toFixed(2);
 
                 return (
                   <div
@@ -69,9 +74,11 @@ export function AvailableModelsDialog({
                   >
                     <div className="flex items-center justify-between gap-4">
                       <code className="font-mono text-sm font-medium">{model.id}</code>
-                      <span className="text-muted-foreground text-xs whitespace-nowrap">
-                        ${promptPricePer1M}/1M prompt, ${completionPricePer1M}/1M completion
-                      </span>
+                      {hasKnownPrice && (
+                        <span className="text-muted-foreground text-xs whitespace-nowrap">
+                          ${promptPricePer1M}/1M prompt, ${completionPricePer1M}/1M completion
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

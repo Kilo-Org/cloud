@@ -73,6 +73,16 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       message: z.string().trim().min(1).max(500),
     }),
   }),
+  z.object({
+    type: z.literal('session_pr_link'),
+    data: z.object({
+      // PR host (e.g. "github"), NOT the OS platform. All three keys are always sent;
+      // any null field clears the whole link.
+      platform: z.string().min(1).max(32).nullable(),
+      prUrl: z.string().min(1).max(2048).nullable(),
+      prNumber: z.number().int().positive().max(2_147_483_647).nullable(),
+    }),
+  }),
 ]);
 
 export type SessionDataItem = z.infer<typeof SessionItemSchema>;

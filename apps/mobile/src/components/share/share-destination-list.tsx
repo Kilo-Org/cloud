@@ -1,17 +1,11 @@
-import { Search, Terminal } from 'lucide-react-native';
+import { Search, Terminal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  TextInput,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { FlatList, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
+import { DestinationOptionRow } from '@/components/destination-option-row';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -88,47 +82,23 @@ function CliInstanceRows({
   instanceRowsDisabled: boolean;
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 }) {
-  const colors = useThemeColors();
-
   return (
     <View>
       <SessionListSectionHeader title="On a connected CLI" count={instances.length} />
-      {instances.map(row => {
-        const isThisSpawning = spawningConnectionId === row.connectionId;
-        const disabled = instanceRowsDisabled;
-        return (
-          <Pressable
-            key={row.connectionId}
-            onPress={
-              disabled
-                ? undefined
-                : () => {
-                    onSpawnInstance(row);
-                  }
-            }
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={`New session on ${row.name}`}
-            accessibilityState={{ disabled }}
-            className={`flex-row items-center gap-3 border-b border-border px-4 py-3.5 ${
-              disabled ? 'opacity-50' : 'active:opacity-70'
-            }`}
-          >
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-secondary">
-              <Terminal size={18} color={colors.foreground} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
-                {row.name}
-              </Text>
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {row.projectName}
-              </Text>
-            </View>
-            {isThisSpawning ? <ActivityIndicator size="small" color={colors.foreground} /> : null}
-          </Pressable>
-        );
-      })}
+      {instances.map(row => (
+        <DestinationOptionRow
+          key={row.connectionId}
+          icon={Terminal}
+          title={row.name}
+          subtitle={row.projectName}
+          accessibilityLabel={`New session on ${row.name}`}
+          disabled={instanceRowsDisabled}
+          busy={spawningConnectionId === row.connectionId}
+          onPress={() => {
+            onSpawnInstance(row);
+          }}
+        />
+      ))}
     </View>
   );
 }

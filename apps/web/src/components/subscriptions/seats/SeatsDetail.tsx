@@ -26,6 +26,7 @@ import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
 import { formatDateLabel, isSeatsTerminal } from '@/components/subscriptions/helpers';
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
+import { formatSeatPrice, getSeatPriceInterval } from './seat-price';
 
 export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
@@ -163,12 +164,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
 
   const paidSeatItemId = subscriptionQuery.data?.paidSeatItemId ?? null;
   const paidSeatItem = subscription.items.data.find(item => item.id === paidSeatItemId) ?? null;
-  const currentInterval =
-    paidSeatItem?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
-  const totalAmount = subscription.items.data.reduce(
-    (sum, item) => sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
-    0
-  );
+  const currentInterval = getSeatPriceInterval(paidSeatItem) === 'year' ? 'annual' : 'monthly';
   const hasPendingCycleChange = subscription.schedule != null;
   const hasKiloPass =
     kiloPassQuery.data?.commercialState === 'active' ||
@@ -200,7 +196,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
             <DetailRow label="Billing cycle" value={capitalize(currentInterval)} />
             <DetailRow
               label="Price"
-              value={`$${(totalAmount / 100).toFixed(2)}/${currentInterval === 'annual' ? 'year' : 'month'}`}
+              value={formatSeatPrice(subscription.items.data, paidSeatItemId)}
             />
             <DetailRow
               label="Next billing"

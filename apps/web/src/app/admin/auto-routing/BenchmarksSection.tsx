@@ -3,25 +3,34 @@
 import {
   AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,
+  BENCHMARK_CONTAINER_BUDGET,
   BenchmarkConfigResponseSchema,
+  BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
+  type AutoBenchmarkDeciderModel,
   type BenchmarkConfig,
+  type BenchmarkDeciderModel,
   type BenchmarkKind,
+  type BenchmarkModelSummary,
+  type BenchmarkQueueSelector,
+  type BenchmarkRegistryQueue,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
-  type BenchmarkModelSummary,
   type RankedCandidate,
-  type ReasoningEffort,
-  type AutoBenchmarkDeciderModel,
 } from '@kilocode/auto-routing-contracts';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronRight, Play, Plus, Save, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,7 +53,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { parseAdminResponse } from './admin-fetch';
 
 // ---------------------------------------------------------------------------
@@ -76,6 +84,31 @@ export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy
 }
 
 // ---------------------------------------------------------------------------
+// Model picker helpers (exported for unit tests)
+// ---------------------------------------------------------------------------
+
+/** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
+export function pinnedModelFor(id: string): ModelOption {
+  return { id, name: id };
+}
+
+/**
+ * Variant keys offered for a decider row: the selected model's catalog keys,
+ * plus a saved key the catalog no longer lists (kept so an existing row stays
+ * editable and round-trips). Hides only when no key exists.
+ */
+export function variantOptionsForModel(
+  modelOption: ModelOption | undefined,
+  savedVariant: string | null
+): string[] {
+  const catalogKeys = modelOption?.variants ?? [];
+  if (savedVariant && !catalogKeys.includes(savedVariant)) {
+    return [...catalogKeys, savedVariant];
+  }
+  return catalogKeys;
+}
+
+// ---------------------------------------------------------------------------
 // Fetch helpers
 // ---------------------------------------------------------------------------
 
@@ -93,18 +126,63 @@ async function saveBenchmarkConfig(config: BenchmarkConfig) {
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
-async function fetchBenchmarkRuns() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-runs');
+/** Run-list filter. Classifier, platform-queue and user-queue runs interleave. */
+export type RunFilter = 'all' | 'classifier' | 'platform' | 'user';
+
+const RUN_FILTER_LABELS: Record<RunFilter, string> = {
+  all: 'All',
+  classifier: 'Classifier',
+  platform: 'Platform queue',
+  user: 'User queue',
+};
+
+export function runFilterQuery(filter: RunFilter): string {
+  if (filter === 'classifier') return '?kind=classifier';
+  if (filter === 'platform') return '?kind=decider&purpose=platform';
+  if (filter === 'user') return '?kind=decider&purpose=user';
+  return '';
+}
+
+/** Human label for a run row: the three kinds of run are named distinctly. */
+export function runTypeLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): string {
+  if (run.kind === 'classifier') return 'Classifier';
+  return run.purpose === 'user' ? 'User queue' : 'Platform queue';
+}
+
+async function fetchBenchmarkRuns(filter: RunFilter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-runs${runFilterQuery(filter)}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
-async function startBenchmarkRun({ kind, force }: { kind: BenchmarkKind; force: boolean }) {
+async function startBenchmarkRun({
+  kind,
+  force,
+  queue,
+}: {
+  kind: BenchmarkKind;
+  force: boolean;
+  queue: BenchmarkQueueSelector;
+}) {
   const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ kind, force }),
+    body: JSON.stringify({ kind, force, queue }),
   });
   return parseAdminResponse(response, StartBenchmarkRunResponseSchema);
+}
+
+async function fetchBenchmarkRegistry() {
+  const response = await fetch('/admin/api/auto-routing/benchmark-registry');
+  return parseAdminResponse(response, BenchmarkRegistryResponseSchema);
+}
+
+async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector) {
+  const response = await fetch('/admin/api/auto-routing/benchmark-registry', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ scope }),
+  });
+  return parseAdminResponse(response, RequeueBenchmarkRegistryResponseSchema);
 }
 
 async function fetchBenchmarkRoutingTable() {
@@ -121,13 +199,13 @@ async function fetchBenchmarkRoutingTable() {
 
 type DeciderModelRow = {
   id: string;
-  reasoningEffort: ReasoningEffort | null;
+  variant: string | null;
 };
 
 type AutoDeciderModelRow = AutoBenchmarkDeciderModel;
 
 export function configToFormState(config: BenchmarkConfig | null): {
-  classifierModels: string;
+  classifierModels: string[];
   deciderModels: DeciderModelRow[];
   autoDeciderModels: AutoDeciderModelRow[];
   excludedAutoDeciderModels: string;
@@ -135,6 +213,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
   maxConcurrency: number;
+  userMaxConcurrency: number;
   benchmarkUserId: string;
   benchmarkOrgId: string;
   classifierRepetitions: number;
@@ -147,14 +226,15 @@ export function configToFormState(config: BenchmarkConfig | null): {
     // No config saved yet: identity fields are overrides, so blank means the
     // worker uses its default benchmark user and org at run time.
     return {
-      classifierModels: '',
+      classifierModels: [],
       deciderModels: [],
       autoDeciderModels: [],
       excludedAutoDeciderModels: '',
       minAccuracy: 0.7,
       switchCostFactor: 3,
       bestAccuracySwitchThreshold: 0.05,
-      maxConcurrency: 100,
+      maxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
+      userMaxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
       benchmarkUserId: '',
       benchmarkOrgId: '',
       classifierRepetitions: 1,
@@ -165,10 +245,12 @@ export function configToFormState(config: BenchmarkConfig | null): {
     };
   }
   return {
-    classifierModels: config.classifierModels.join('\n'),
+    classifierModels: config.classifierModels,
     deciderModels: (config.manualDeciderModels ?? config.deciderModels).map(m => ({
       id: m.id,
-      reasoningEffort: m.reasoningEffort ?? null,
+      // Legacy reasoningEffort-only rows load as the canonical form variant so
+      // a save emits variant-only manual rows.
+      variant: m.variant ?? m.reasoningEffort ?? null,
     })),
     autoDeciderModels: config.autoDeciderModels ?? [],
     excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
@@ -176,6 +258,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     maxConcurrency: config.maxConcurrency,
+    userMaxConcurrency: config.userMaxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
     benchmarkOrgId: config.benchmarkOrgId ?? '',
     classifierRepetitions: config.classifierRepetitions,
@@ -202,12 +285,15 @@ export function effectiveDeciderModels({
   manualDeciderModels: DeciderModelRow[];
   autoDeciderModels: AutoDeciderModelRow[];
   excludedAutoDeciderModels: string[];
-}): DeciderModelRow[] {
+}): BenchmarkDeciderModel[] {
   const manual = manualDeciderModels
     .filter(row => row.id.trim().length > 0)
     .map(row => ({
       id: row.id.trim(),
-      reasoningEffort: row.reasoningEffort ?? null,
+      variant: row.variant ?? null,
+      // The contract type requires the legacy field; it stays null on
+      // variant-only rows (both non-null is malformed).
+      reasoningEffort: null,
     }));
   const manualIds = new Set(manual.map(model => model.id));
   const excludedAuto = new Set(excludedAutoDeciderModels);
@@ -218,6 +304,9 @@ export function effectiveDeciderModels({
       .filter(model => !manualIds.has(model.id))
       .map(model => ({
         id: model.id,
+        // Auto rows stay effort-only: the benchmark worker writes and reads the
+        // legacy reasoningEffort for synced rows, so never emit the canonical
+        // variant key here.
         reasoningEffort: model.reasoningEffort ?? null,
       })),
   ];
@@ -227,11 +316,17 @@ export function formStateToConfig(
   state: ReturnType<typeof configToFormState>,
   base: BenchmarkConfig | null
 ): BenchmarkConfig {
-  const classifierModels = parseModelLines(state.classifierModels);
+  const classifierModels = state.classifierModels.map(id => id.trim()).filter(id => id.length > 0);
   const excludedAutoDeciderModels = parseModelLines(state.excludedAutoDeciderModels);
   const manualDeciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
-    .map(row => ({ id: row.id.trim(), reasoningEffort: row.reasoningEffort ?? null }));
+    .map(row => ({
+      id: row.id.trim(),
+      variant: row.variant ?? null,
+      // Variant-only rows: the legacy effort field is always null so the two
+      // never collide (both non-null is malformed per the contract).
+      reasoningEffort: null,
+    }));
   const deciderModels = effectiveDeciderModels({
     manualDeciderModels,
     autoDeciderModels: state.autoDeciderModels,
@@ -251,6 +346,7 @@ export function formStateToConfig(
     switchCostFactor: state.switchCostFactor,
     bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
     maxConcurrency: state.maxConcurrency,
+    userMaxConcurrency: state.userMaxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
     classifierRepetitions: state.classifierRepetitions,
@@ -270,9 +366,15 @@ export function formStateToConfig(
 function BenchmarkConfigEditor({
   config,
   onSaved,
+  modelOptions,
+  modelsLoading,
+  modelsError,
 }: {
   config: BenchmarkConfig | null;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
+  modelOptions: ModelOption[];
+  modelsLoading: boolean;
+  modelsError?: string;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -319,10 +421,37 @@ function BenchmarkConfigEditor({
     },
   });
 
+  const handleAddClassifierRow = useCallback(() => {
+    updateForm(prev => ({
+      ...prev,
+      classifierModels: [...prev.classifierModels, ''],
+    }));
+  }, [updateForm]);
+
+  const handleRemoveClassifierRow = useCallback(
+    (index: number) => {
+      updateForm(prev => ({
+        ...prev,
+        classifierModels: prev.classifierModels.filter((_, i) => i !== index),
+      }));
+    },
+    [updateForm]
+  );
+
+  const handleClassifierModelChange = useCallback(
+    (index: number, value: string) => {
+      updateForm(prev => ({
+        ...prev,
+        classifierModels: prev.classifierModels.map((id, i) => (i === index ? value : id)),
+      }));
+    },
+    [updateForm]
+  );
+
   const handleAddDeciderRow = useCallback(() => {
     updateForm(prev => ({
       ...prev,
-      deciderModels: [...prev.deciderModels, { id: '', reasoningEffort: null }],
+      deciderModels: [...prev.deciderModels, { id: '', variant: null }],
     }));
   }, [updateForm]);
 
@@ -378,17 +507,62 @@ function BenchmarkConfigEditor({
       <CardContent className="flex flex-col gap-4 p-4 pt-0">
         {/* Classifier models */}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="benchmark-classifier-models" className="text-sm font-medium">
-            Classifier models (one per line)
-          </Label>
-          <Textarea
-            id="benchmark-classifier-models"
-            value={form.classifierModels}
-            onChange={e => updateForm(prev => ({ ...prev, classifierModels: e.target.value }))}
-            rows={4}
-            className="font-mono text-xs"
-            placeholder="openai/gpt-4o-mini"
-          />
+          <Label className="text-sm font-medium">Classifier models</Label>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {form.classifierModels.map((modelId, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="py-2">
+                      <ModelCombobox
+                        variant="compact"
+                        models={modelOptions}
+                        value={modelId}
+                        onValueChange={value => handleClassifierModelChange(index, value)}
+                        pinnedModel={
+                          modelId && !modelOptions.some(option => option.id === modelId)
+                            ? pinnedModelFor(modelId)
+                            : undefined
+                        }
+                        isLoading={modelsLoading}
+                        error={modelsError}
+                        className="w-full"
+                        triggerAriaLabel={`Classifier model ${index + 1}`}
+                      />
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleRemoveClassifierRow(index)}
+                        aria-label={`Remove classifier model ${index + 1}`}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={handleAddClassifierRow}
+          >
+            <Plus className="size-3.5" />
+            Add model
+          </Button>
         </div>
 
         {/* Manual decider models table */}
@@ -398,61 +572,66 @@ function BenchmarkConfigEditor({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model ID</TableHead>
-                  <TableHead className="w-36">Reasoning effort</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="w-36">Variant</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {form.deciderModels.map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="py-2">
-                      <Input
-                        value={row.id}
-                        onChange={e => handleDeciderRowChange(index, { id: e.target.value })}
-                        className="h-8 font-mono text-xs"
-                        placeholder="openai/gpt-4o"
-                        aria-label={`Decider model ${index + 1} ID`}
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Select
-                        value={row.reasoningEffort ?? 'none'}
-                        onValueChange={value =>
-                          handleDeciderRowChange(index, {
-                            reasoningEffort: value === 'none' ? null : (value as ReasoningEffort),
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          className="h-8 text-xs"
-                          aria-label={`Model ${index + 1} reasoning effort`}
+                {form.deciderModels.map((row, index) => {
+                  const rowModel = modelOptions.find(option => option.id === row.id);
+                  const variantOptions = variantOptionsForModel(rowModel, row.variant);
+                  return (
+                    <TableRow key={index}>
+                      <TableCell className="py-2">
+                        <ModelCombobox
+                          variant="compact"
+                          models={modelOptions}
+                          value={row.id}
+                          onValueChange={value =>
+                            handleDeciderRowChange(index, { id: value, variant: null })
+                          }
+                          pinnedModel={
+                            row.id && !modelOptions.some(option => option.id === row.id)
+                              ? pinnedModelFor(row.id)
+                              : undefined
+                          }
+                          isLoading={modelsLoading}
+                          error={modelsError}
+                          className="w-full"
+                          triggerAriaLabel={`Decider model ${index + 1}`}
+                        />
+                      </TableCell>
+                      <TableCell className="py-2">
+                        {variantOptions.length > 0 ? (
+                          <VariantCombobox
+                            variants={variantOptions}
+                            value={row.variant ?? undefined}
+                            onValueChange={value =>
+                              handleDeciderRowChange(index, { variant: value })
+                            }
+                            className="w-full"
+                            triggerAriaLabel={`Decider model ${index + 1} variant`}
+                          />
+                        ) : row.id ? (
+                          <span className="text-muted-foreground text-xs">default</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveDeciderRow(index)}
+                          aria-label={`Remove decider model ${index + 1}`}
                         >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="minimal">minimal</SelectItem>
-                          <SelectItem value="low">low</SelectItem>
-                          <SelectItem value="medium">medium</SelectItem>
-                          <SelectItem value="high">high</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleRemoveDeciderRow(index)}
-                        aria-label={`Remove decider model ${index + 1}`}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -497,7 +676,7 @@ function BenchmarkConfigEditor({
                           {formatUsd(model.avgAttemptCostUsd)}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-xs">
-                          {model.reasoningEffort ?? 'default'}
+                          {model.variant ?? model.reasoningEffort ?? 'default'}
                         </TableCell>
                         <TableCell>
                           <Checkbox
@@ -582,13 +761,13 @@ function BenchmarkConfigEditor({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
-              Max concurrency (1–100)
+              Platform max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
             </Label>
             <Input
               id="benchmark-max-concurrency"
               type="number"
               min={1}
-              max={100}
+              max={BENCHMARK_CONTAINER_BUDGET}
               step={1}
               value={form.maxConcurrency}
               onChange={e =>
@@ -596,6 +775,41 @@ function BenchmarkConfigEditor({
               }
               className="h-8 w-40 tabular-nums"
             />
+            <p className="text-muted-foreground text-xs">
+              Live containers a platform-queue run may hold. Classifier runs use it for parallel
+              OpenRouter calls.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
+              User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
+            </Label>
+            <Input
+              id="benchmark-user-max-concurrency"
+              type="number"
+              min={1}
+              max={BENCHMARK_CONTAINER_BUDGET}
+              step={1}
+              value={form.userMaxConcurrency}
+              onChange={e =>
+                updateForm(prev => ({
+                  ...prev,
+                  userMaxConcurrency: parseInt(e.target.value, 10) || 1,
+                }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+            <p
+              className={
+                form.maxConcurrency + form.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
+                  ? 'text-destructive text-xs'
+                  : 'text-muted-foreground text-xs'
+              }
+            >
+              Live containers a user-queue run may hold. The two queues run at the same time, so
+              both budgets together must stay at or under {BENCHMARK_CONTAINER_BUDGET} (currently{' '}
+              {form.maxConcurrency + form.userMaxConcurrency}).
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-auto-decider-min-cost" className="text-sm font-medium">
@@ -900,7 +1114,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                   }}
                   aria-expanded={expanded}
                   aria-controls={expanded ? summariesId : undefined}
-                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${run.kind} run details`}
+                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${runTypeLabel(run)} run details`}
                   className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex size-5 items-center justify-center rounded focus-visible:ring-2 focus-visible:outline-none"
                 >
                   {expanded ? (
@@ -910,7 +1124,11 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                   )}
                 </button>
               </TableCell>
-              <TableCell className="py-2 capitalize text-sm">{run.kind}</TableCell>
+              <TableCell className="py-2 text-sm">
+                <Badge variant={run.kind === 'classifier' ? 'outline' : 'secondary'}>
+                  {runTypeLabel(run)}
+                </Badge>
+              </TableCell>
               <TableCell className="py-2">
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
                   {run.status}
@@ -967,7 +1185,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                 <TableHeader>
                   <TableRow>
                     <TableHead>Model</TableHead>
-                    <TableHead className="w-36">Reasoning effort</TableHead>
+                    <TableHead className="w-36">Variant</TableHead>
                     <TableHead className="text-right">Accuracy</TableHead>
                     <TableHead className="text-right">Avg cost</TableHead>
                     <TableHead className="text-right">Cost / accuracy</TableHead>
@@ -981,7 +1199,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                         {c.model}
                       </TableCell>
                       <TableCell className="capitalize text-xs">
-                        {c.reasoningEffort ?? 'default'}
+                        {c.variant ?? c.reasoningEffort ?? 'default'}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {formatAccuracy(c.accuracy)}
@@ -1010,12 +1228,78 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
 }
 
 // ---------------------------------------------------------------------------
+// Registry summary
+// ---------------------------------------------------------------------------
+
+const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
+
+function RegistrySummary({
+  data,
+}: {
+  data: {
+    engineIdentity: string;
+    repetitions: number;
+    platform: BenchmarkRegistryQueue;
+    user: BenchmarkRegistryQueue;
+  };
+}) {
+  const queues: { label: string; queue: BenchmarkRegistryQueue }[] = [
+    { label: 'Platform queue', queue: data.platform },
+    { label: 'User queue', queue: data.user },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="overflow-x-auto rounded-md border">
+        <Table className="min-w-max">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Queue</TableHead>
+              {REGISTRY_STATUSES.map(status => (
+                <TableHead key={status} className="text-right capitalize">
+                  {status}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {queues.map(({ label, queue }) => (
+              <TableRow key={label}>
+                <TableCell className="text-sm">{label}</TableCell>
+                {REGISTRY_STATUSES.map(status => (
+                  <TableCell key={status} className="text-right tabular-nums text-sm">
+                    {queue[status]}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Engine <span className="font-mono">{data.engineIdentity}</span>, {data.repetitions}{' '}
+        {data.repetitions === 1 ? 'repetition' : 'repetitions'}. Counts exclude entries measured
+        under an older engine identity. An entry wanted by both queues is counted in both — it is
+        one measurement, shared.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main exported section component
 // ---------------------------------------------------------------------------
 
 export function BenchmarksSection() {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
+  const [runFilter, setRunFilter] = useState<RunFilter>('all');
+
+  const modelsQuery = useModelSelectorList(undefined);
+  const modelOptions = useMemo(
+    () => toEligibleModelOptions(modelsQuery.data?.data ?? [], []),
+    [modelsQuery.data?.data]
+  );
+  const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
 
   const configQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-config'],
@@ -1023,8 +1307,13 @@ export function BenchmarksSection() {
   });
 
   const runsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs'],
-    queryFn: fetchBenchmarkRuns,
+    queryKey: ['auto-routing', 'benchmark-runs', runFilter],
+    queryFn: () => fetchBenchmarkRuns(runFilter),
+  });
+
+  const registryQuery = useQuery({
+    queryKey: ['auto-routing', 'benchmark-registry'],
+    queryFn: fetchBenchmarkRegistry,
   });
 
   const routingTableQuery = useQuery({
@@ -1032,16 +1321,27 @@ export function BenchmarksSection() {
     queryFn: fetchBenchmarkRoutingTable,
   });
 
+  // Run activity drives polling and cache invalidation, so it must not depend
+  // on what the list is filtered to — a platform run finishing while the admin
+  // reads the classifier list is still a completion. On the 'all' filter this
+  // shares its key with runsQuery, so it costs no extra request.
+  const allRunsQuery = useQuery({
+    queryKey: ['auto-routing', 'benchmark-runs', 'all'],
+    queryFn: () => fetchBenchmarkRuns('all'),
+  });
+
   // Poll runs every 30s while any run is 'running'
-  const hasRunningRun = runsQuery.data?.runs.some(r => r.status === 'running') ?? false;
+  const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
   const refetchRuns = runsQuery.refetch;
+  const refetchAllRuns = allRunsQuery.refetch;
   useEffect(() => {
     if (!hasRunningRun) return;
     const id = setInterval(() => {
       void refetchRuns();
+      void refetchAllRuns();
     }, 30_000);
     return () => clearInterval(id);
-  }, [hasRunningRun, refetchRuns]);
+  }, [hasRunningRun, refetchRuns, refetchAllRuns]);
 
   // When the last running run finishes, its completion publishes a routing
   // table / classifier winner. Those live in their own query caches, so
@@ -1055,6 +1355,7 @@ export function BenchmarksSection() {
         queryKey: ['auto-routing', 'benchmark-routing-table'],
       });
       void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-config'] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
     }
     prevHasRunningRun.current = hasRunningRun;
   }, [hasRunningRun, queryClient]);
@@ -1062,18 +1363,45 @@ export function BenchmarksSection() {
   const startRunMutation = useMutation({
     mutationFn: startBenchmarkRun,
     onSuccess: (data, variables) => {
-      const kindLabel = variables.kind === 'classifier' ? 'Classifier' : 'Decider';
-      if (data.enqueuedModels === 0) {
-        toast.success(`All models already have results — republished from existing data`);
+      if (variables.kind === 'classifier') {
+        toast.success(
+          data.enqueuedModels === 0
+            ? 'All classifier models already have results — republished from existing data'
+            : `Classifier benchmark started — ${data.enqueuedModels} models enqueued, ${data.skippedModels.length} skipped`
+        );
+      } else if (data.startedRuns.length === 0) {
+        // Honest empty result: nothing pending, or the queue's slot is busy.
+        toast.success('Nothing to run — no pending registry entries for that queue');
       } else {
         toast.success(
-          `${kindLabel} benchmark started — ${data.enqueuedModels} models enqueued, ${data.skippedModels.length} skipped`
+          data.startedRuns.map(run => `${run.purpose} queue: ${run.entryCount} entries`).join(' · ')
         );
       }
+      // One queue can start while the other is wedged. Say so, or its pending
+      // work looks the same as an empty queue.
+      for (const message of data.drainErrors) {
+        toast.error(`A queue could not start: ${message}`);
+      }
       void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs'] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to start benchmark run');
+    },
+  });
+
+  const requeueMutation = useMutation({
+    mutationFn: requeueBenchmarkRegistry,
+    onSuccess: data => {
+      toast.success(
+        data.requeued === 0
+          ? 'No failed entries to requeue'
+          : `${data.requeued} failed ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
+      );
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to requeue entries');
     },
   });
 
@@ -1083,8 +1411,6 @@ export function BenchmarksSection() {
     },
     [queryClient]
   );
-
-  const anyRunning = hasRunningRun || startRunMutation.isPending;
 
   return (
     <div className="flex flex-col gap-4">
@@ -1109,18 +1435,98 @@ export function BenchmarksSection() {
             : 'Failed to load benchmark config'}
         </div>
       ) : configQuery.data ? (
-        <BenchmarkConfigEditor config={configQuery.data.config} onSaved={handleConfigSaved} />
+        <BenchmarkConfigEditor
+          config={configQuery.data.config}
+          onSaved={handleConfigSaved}
+          modelOptions={modelOptions}
+          modelsLoading={modelsQuery.isLoading}
+          modelsError={modelsError}
+        />
       ) : null}
 
-      {/* Run controls */}
+      {/* Registry + run controls */}
       <Card className="rounded-lg">
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Run Benchmark</CardTitle>
+          <CardTitle className="text-base">Decider Registry</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 p-4 pt-0">
           <p className="text-muted-foreground text-xs">
-            Runs are triggered manually. Models with existing results are skipped unless "Re-run
-            models with existing results" is checked.
+            Every decider measurement lives in one global registry, keyed by model, reasoning effort
+            and engine identity. The platform routing table and each owner pool's table are
+            assembled from it, so a model wanted by both is benchmarked once. A model with no
+            current entry is queued; the two queues run independently, each with its own container
+            budget.
+          </p>
+          {registryQuery.isLoading ? (
+            <Skeleton className="h-20 w-full" />
+          ) : registryQuery.error ? (
+            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+              {registryQuery.error instanceof Error
+                ? registryQuery.error.message
+                : 'Failed to load registry'}
+            </div>
+          ) : registryQuery.data ? (
+            <RegistrySummary data={registryQuery.data} />
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={startRunMutation.isPending}
+              onClick={() =>
+                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'platform' })
+              }
+            >
+              <Play className="size-4" />
+              Run platform queue
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={startRunMutation.isPending}
+              onClick={() =>
+                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
+              }
+            >
+              <Play className="size-4" />
+              Run user queue
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={startRunMutation.isPending}
+              onClick={() =>
+                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
+              }
+            >
+              <Play className="size-4" />
+              Run both queues
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={requeueMutation.isPending}
+              onClick={() => requeueMutation.mutate('both')}
+            >
+              <RotateCcw className="size-4" />
+              Requeue failed
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Queues also drain on a timer. A queue whose run is already active is skipped.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Classifier run controls */}
+      <Card className="rounded-lg">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-base">Run Classifier Benchmark</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 p-4 pt-0">
+          <p className="text-muted-foreground text-xs">
+            Classifier candidates are not registry-tracked: models with existing results are skipped
+            unless "Re-run models with existing results" is checked.
           </p>
           <div className="flex items-center gap-2">
             <Checkbox
@@ -1136,20 +1542,17 @@ export function BenchmarksSection() {
             <Button
               type="button"
               variant="outline"
-              disabled={anyRunning}
-              onClick={() => startRunMutation.mutate({ kind: 'classifier', force: forceRerun })}
+              disabled={startRunMutation.isPending}
+              onClick={() =>
+                startRunMutation.mutate({
+                  kind: 'classifier',
+                  force: forceRerun,
+                  queue: 'platform',
+                })
+              }
             >
               <Play className="size-4" />
               Run classifier benchmark
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={anyRunning}
-              onClick={() => startRunMutation.mutate({ kind: 'decider', force: forceRerun })}
-            >
-              <Play className="size-4" />
-              Run decider benchmark
             </Button>
             {hasRunningRun ? (
               <p className="text-muted-foreground self-center text-xs">
@@ -1162,8 +1565,20 @@ export function BenchmarksSection() {
 
       {/* Runs table */}
       <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 pb-2">
           <CardTitle className="text-base">Benchmark Runs</CardTitle>
+          <Select value={runFilter} onValueChange={value => setRunFilter(value as RunFilter)}>
+            <SelectTrigger className="h-8 w-44 text-xs" aria-label="Filter runs by type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(['all', 'classifier', 'platform', 'user'] as const).map(value => (
+                <SelectItem key={value} value={value}>
+                  {RUN_FILTER_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent className="p-4 pt-0">
           {runsQuery.isLoading ? (
@@ -1179,7 +1594,7 @@ export function BenchmarksSection() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8" />
-                  <TableHead>Kind</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Started</TableHead>
                   <TableHead>Completed</TableHead>

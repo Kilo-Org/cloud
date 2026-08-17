@@ -5,7 +5,7 @@ import {
   GitPullRequest,
   type LucideIcon,
   Plus,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { Image } from '@/components/ui/image';

@@ -40,7 +40,7 @@ import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
 
 // Pre-load tokens at module level so they're available before React mounts
-const preloadedToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
 
 type AuthContextValue = {
@@ -206,7 +206,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const stored = await preloadedToken;
+        const stored = await preloadedAuthToken;
         const storedRefresh = await preloadedRefreshToken;
 
         if (stored) {

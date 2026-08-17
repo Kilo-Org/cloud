@@ -4,7 +4,7 @@ import {
   getRemediationStatusPresentation,
   getRemediationUnavailableCopy,
 } from '@kilocode/app-shared/security-agent';
-import { Wrench } from 'lucide-react-native';
+import { Wrench } from '@/components/ui/icons';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';

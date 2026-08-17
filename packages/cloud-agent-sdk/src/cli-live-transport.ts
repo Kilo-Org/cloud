@@ -5,6 +5,7 @@
 import { normalizeCliEvent, isChatEvent } from './normalizer';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import { parseCreateSessionResponse } from './create-session';
+import { cloudAgentSdkRuntime } from './runtime';
 import { parseExitSessionResponse } from './exit-session';
 import {
   cliConnectionDataSchema,
@@ -875,7 +876,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
-        const mutationId = input?.mutationId ?? crypto.randomUUID();
+        const mutationId = input?.mutationId ?? cloudAgentSdkRuntime.randomUUID();
         const wireData = buildCreateSessionWireData(input);
         const hasExtendedFields =
           wireData.agent !== undefined ||
@@ -895,7 +896,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             result = await sendCommand(
               'create_session',
               { protocolVersion: 1 },
-              crypto.randomUUID()
+              cloudAgentSdkRuntime.randomUUID()
             );
           } else {
             throw error;

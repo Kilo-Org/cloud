@@ -1,4 +1,4 @@
-import { Activity, History, SearchX } from 'lucide-react-native';
+import { Activity, History, SearchX } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 

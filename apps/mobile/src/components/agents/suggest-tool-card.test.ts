@@ -25,7 +25,7 @@ const { resolveSuggestionPresentation, manager, activeSuggestion } = vi.hoisted(
 vi.mock('./suggestion-card-state', () => ({ resolveSuggestionPresentation }));
 vi.mock('./suggestion-card', () => ({ SuggestionCard: 'SuggestionCard' }));
 vi.mock('./fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
-vi.mock('lucide-react-native', () => ({ Sparkles: 'Sparkles' }));
+vi.mock('@/components/ui/icons', () => ({ Sparkles: 'Sparkles' }));
 vi.mock('jotai', () => ({ useAtomValue: () => activeSuggestion }));
 vi.mock('@/components/agents/session-provider', () => ({
   useSessionManager: () => manager,

@@ -1,7 +1,9 @@
-/* eslint-disable max-lines -- renderer host-key, image, and link interaction suites stay in one cohesive unit test file */
+/* eslint-disable max-lines -- renderer host-key, image, link interaction, and empty-fence mount suites stay in one cohesive unit test file */
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { type ReactElement, type ReactNode } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openExternalUrl } from '@/lib/external-link';
@@ -61,6 +63,21 @@ vi.mock('react-native-svg', () => ({
 vi.mock('./markdown-table', () => ({
   MarkdownTable: 'MarkdownTable',
 }));
+vi.mock('./code-block', () => ({
+  CodeBlock: 'CodeBlock',
+}));
+// The empty-fence mount suite un-mocks ./code-block to exercise the real
+// CodeBlock; these transitive stubs keep that real path mountable under node.
+// They are inert for the renderer-props suites above.
+vi.mock('react-native-gesture-handler', () => ({ ScrollView: 'ScrollView' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#FBFAF5', foreground: '#14130F' }),
+}));
+vi.mock('./mono-scroll-block', () => ({ useMonoScrollSheet: () => undefined }));
+vi.mock('./bubble-text-selection-context', () => ({
+  useTranscriptTextSelectable: () => true,
+}));
 vi.mock('./markdown-image', () => ({
   MarkdownImage: 'MarkdownImage',
 }));
@@ -113,6 +130,16 @@ function imageEl(
 ): ReactElement | null {
   return renderer.image(uri, opts?.alt, undefined, opts?.title) as ReactElement | null;
 }
+
+function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: string): unknown {
+  if (!instance) {
+    return undefined;
+  }
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return instance.props[key];
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
 describe('MarkdownRenderer key stability', () => {
   it('two fresh instances produce identical getKey() sequences', async () => {
     const a = await createRenderer();
@@ -353,5 +380,145 @@ describe('MarkdownRenderer link interaction', () => {
     element.props.onPress();
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://example.com', { label: 'label' });
+  });
+});
+
+describe('MarkdownRenderer code override', () => {
+  const containerStyle: Record<string, unknown> = { backgroundColor: '#f0f0f0' };
+
+  function inner(
+    element: ReactElement<Record<string, unknown>>
+  ): ReactElement<Record<string, unknown>> {
+    return element.props.children as ReactElement<Record<string, unknown>>;
+  }
+
+  it('wraps CodeBlock in a View that keeps the container style', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+
+    expect(element.type).toBe('View');
+    expect((element.props as { style?: unknown }).style).toBe(containerStyle);
+    expect(inner(element).type).toBe('CodeBlock');
+  });
+
+  it('normalizes the fence language before passing it to CodeBlock', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.code(
+      'const x = 1;',
+      'TS extra',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+
+    expect((inner(element).props as { language?: unknown }).language).toBe('ts');
+  });
+
+  it('passes an undefined language through as null', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.code(
+      'const x = 1;',
+      undefined,
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+
+    expect((inner(element).props as { language?: unknown }).language).toBeNull();
+  });
+
+  it('passes the renderer selectable flag through to CodeBlock', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const selectable = new RendererClass(palette, true, {});
+    const element = selectable.code('x', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { selectable?: unknown }).selectable).toBe(true);
+
+    const nonSelectable = new RendererClass(palette, false, {});
+    const element2 = nonSelectable.code('x', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element2).props as { selectable?: unknown }).selectable).toBe(false);
+  });
+
+  it('passes baseColor === palette.textColor for assistant and user palettes', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const assistant = new RendererClass(palette, true, {});
+    const assistantElement = assistant.code('x', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(assistantElement).props as { baseColor?: unknown }).baseColor).toBe(
+      palette.textColor
+    );
+
+    const userPalette: MarkdownPalette = {
+      ...palette,
+      textColor: '#1A1A10',
+    };
+    const user = new RendererClass(userPalette, true, {});
+    const userElement = user.code('x', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(userElement).props as { baseColor?: unknown }).baseColor).toBe('#1A1A10');
+  });
+
+  it('passes MARKDOWN_CODE_CHARACTER_CAP as the maxLength', async () => {
+    const { MARKDOWN_CODE_CHARACTER_CAP: cap } = await import('./markdown-renderer');
+    const renderer = await createRenderer();
+    const element = renderer.code('x', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { maxLength?: unknown }).maxLength).toBe(cap);
+  });
+});
+
+describe('MarkdownRenderer empty fence mounting', () => {
+  const containerStyle: Record<string, unknown> = { backgroundColor: '#f0f0f0' };
+
+  it('mounts the real CodeBlock path for an empty fence', async () => {
+    // The renderer-props suites above stub ./code-block; here the real
+    // CodeBlock must render so an empty fence provably mounts end to end.
+    vi.doUnmock('./code-block');
+    vi.resetModules();
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const renderer = new RendererClass(palette, true, {});
+    const element = renderer.code('', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect(element.type).toBe('View');
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(element);
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+    // The real CodeBlock renders its mono Text with no token runs; the mount
+    // itself is the regression guard for an empty fence.
+    const codeTexts = mounted.root.findAll(
+      node => {
+        const className = propOf(node, 'className');
+        return (
+          typeof node.type === 'string' &&
+          typeof className === 'string' &&
+          className.includes('font-mono text-xs')
+        );
+      },
+      { deep: true }
+    );
+    expect(codeTexts).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
+    // Restore the stubbed module graph for any dynamic import that follows.
+    vi.resetModules();
   });
 });

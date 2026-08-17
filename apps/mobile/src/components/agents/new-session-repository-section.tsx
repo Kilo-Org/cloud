@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { ExternalLink, RefreshCw } from 'lucide-react-native';
+import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';

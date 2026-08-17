@@ -16,16 +16,48 @@ import type {
   UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import type { MobileRouter, inferRouterOutputs } from '@kilocode/trpc/mobile';
+import { rememberToolImage } from './agent-tool-images';
 import { getCloudAgentWsUrl } from './cloud-agent-config';
 
 /** Flat 1s cadence — same budget as the session-detail route's spawned retry. */
 const FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS = 1000;
 /** Match the mobile `SPAWNED_NOT_FOUND_MAX_ATTEMPTS` for NOT_FOUND retry parity. */
 const SPAWNED_NOT_FOUND_MAX_ATTEMPTS = 8;
+/**
+ * Safety cap for the running-session history retry. The retry normally ends
+ * when the persisted page carries messages or the session stops running (see
+ * `ACTIVE_HISTORY_RECHECK_INTERVAL`); this bound only limits how long a
+ * genuinely long-running turn can hold the initial history read open.
+ */
+const ACTIVE_HISTORY_MAX_RETRIES = 120;
+/** Re-verify the session is still running every N retry reads. */
+const ACTIVE_HISTORY_RECHECK_INTERVAL = 5;
+/**
+ * Extra reads after the session stops running. The CLI batches session-ingest
+ * until the turn completes, and the ingest can land a moment after the
+ * busy→idle status change, so keep polling briefly before applying the empty
+ * page.
+ */
+const ACTIVE_HISTORY_END_GRACE_READS = 5;
+/**
+ * Bound for the not-yet-listed liveness probe. A running session can miss
+ * its own row in `activeSessions.list` while the row registers or while the
+ * active-sessions read model refreshes. A one-shot miss would latch an empty
+ * page for a session that is actually running, so the gate re-checks liveness
+ * for this many reads before treating the session as inactive.
+ */
+const ACTIVE_HISTORY_LIVENESS_GRACE_READS = 3;
 
 const skipBatchOptions = { context: { skipBatch: true } } as const;
 
 type TrpcClient = ReturnType<typeof createTRPCClient<MobileRouter>>;
+
+/** Shape of the paged `getSessionMessagesPage` query result. */
+type SessionMessagesPageResult = Awaited<
+  ReturnType<TrpcClient['cliSessionsV2']['getSessionMessagesPage']['query']>
+>;
+/** Shape of the `activeSessions.list` query result used for liveness rechecks. */
+type ActiveSessionsResult = Awaited<ReturnType<TrpcClient['activeSessions']['list']['query']>>;
 
 // ---------------------------------------------------------------------------
 // Error code extraction — extension-owned copy of the mobile classifier
@@ -118,41 +150,318 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
 }
 
 /**
+ * True when the page carries no persisted SDK messages yet.
+ *
+ * Both a `null` history (the ingest DO has no session or message rows) and a
+ * page with zero messages (a session row exists but no message has been
+ * materialized) mean session-ingest persistence is still catching up while a
+ * live CLI turn runs. Typed failure variants are not "empty" — they pass
+ * through so the caller can surface retry semantics.
+ */
+function isPageWithoutPersistedMessages(history: KiloSdkMessageHistory | null): boolean {
+  if (history === null) {
+    return true;
+  }
+  return isHistoryPage(history) && history.messages.length === 0;
+}
+
+/**
+ * Read the paged query's history in its server-validated shape. The tRPC
+ * result carries typed failure variants alongside the page, so the shape is
+ * narrowed at the transport boundary.
+ */
+function pageHistory(result: SessionMessagesPageResult): KiloSdkMessageHistory | null {
+  // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
+  return result.history as KiloSdkMessageHistory | null;
+}
+
+/**
+ * Keep reading a running session's history page until it carries persisted
+ * messages, the session stops running, or the safety bound is reached.
+ */
+async function readActiveHistoryWithRetry(
+  initialResult: SessionMessagesPageResult,
+  {
+    fetchActiveSessions,
+    isSessionWorking,
+    queryPage,
+  }: {
+    queryPage: () => Promise<SessionMessagesPageResult>;
+    fetchActiveSessions: () => Promise<ActiveSessionsResult>;
+    isSessionWorking: (active: ActiveSessionsResult) => boolean;
+  }
+): Promise<SessionMessagesPageResult> {
+  let result = initialResult;
+  for (let attempt = 0; attempt < ACTIVE_HISTORY_MAX_RETRIES; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- retry persistence after a fixed delay
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- retries must observe ordered history
+    result = await queryPage();
+    if (!isPageWithoutPersistedMessages(pageHistory(result))) {
+      return result;
+    }
+    if ((attempt + 1) % ACTIVE_HISTORY_RECHECK_INTERVAL === 0) {
+      // eslint-disable-next-line no-await-in-loop -- ordered liveness recheck between retries
+      const current = await fetchActiveSessions();
+      if (!isSessionWorking(current)) {
+        return readPageInEndGraceWindow(result, queryPage);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Extra reads after the session stops running. The CLI batches session-ingest
+ * until the turn completes, and the ingest can land a moment after the
+ * busy→idle status change, so keep polling briefly before applying the empty
+ * page.
+ */
+async function readPageInEndGraceWindow(
+  initialResult: SessionMessagesPageResult,
+  queryPage: () => Promise<SessionMessagesPageResult>
+): Promise<SessionMessagesPageResult> {
+  let result = initialResult;
+  for (let grace = 0; grace < ACTIVE_HISTORY_END_GRACE_READS; grace += 1) {
+    // eslint-disable-next-line no-await-in-loop -- bounded grace reads after turn end
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- bounded grace reads after turn end
+    result = await queryPage();
+    if (!isPageWithoutPersistedMessages(pageHistory(result))) {
+      break;
+    }
+  }
+  return result;
+}
+
+/**
+ * Re-read liveness briefly when the initial page is empty and the session is
+ * not confirmed working.
+ *
+ * A reopened running session can be listed idle or miss its active row while
+ * the active-sessions read model refreshes or while the CLI batches
+ * session-ingest until the turn completes. A one-shot idle or missing read
+ * would latch an empty transcript that later persistence can never fill. This
+ * bounded probe re-checks `activeSessions.list` for a fixed number of reads:
+ * the session becomes busy → run the full active-history retry; the session
+ * stays stably idle (or stays absent) for the whole window → resolve the empty
+ * page. A rejected liveness read leaves the working state unknown, so the
+ * empty page resolves without the probe. It re-reads liveness only; the
+ * history page is not re-read here, so an inactive session still resolves its
+ * empty page without a page retry.
+ */
+async function readActiveHistoryWithLivenessGrace(
+  initialResult: SessionMessagesPageResult,
+  {
+    fetchActiveSessions,
+    isSessionWorking,
+    queryPage,
+  }: {
+    fetchActiveSessions: () => Promise<ActiveSessionsResult>;
+    isSessionWorking: (active: ActiveSessionsResult) => boolean;
+    queryPage: () => Promise<SessionMessagesPageResult>;
+  }
+): Promise<SessionMessagesPageResult> {
+  for (let attempt = 0; attempt < ACTIVE_HISTORY_LIVENESS_GRACE_READS; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    /*
+     * A rejected grace liveness read leaves the session's working state
+     * unknown. Resolve the original empty page without the probe, matching
+     * the rejected initial probe behavior, instead of letting the probe
+     * rejection block the transcript.
+     */
+    // eslint-disable-next-line no-await-in-loop -- bounded liveness re-reads before latching empty
+    const current = await fetchActiveSessions().catch(() => null);
+    if (current === null) {
+      return initialResult;
+    }
+    if (isSessionWorking(current)) {
+      return readActiveHistoryWithRetry(initialResult, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
+    }
+  }
+  return initialResult;
+}
+
+/**
+ * Pin a replayed page to the active kilo session.
+ *
+ * The manager renders the root transcript only for messages whose
+ * `sessionID` equals the adopted root session id, which `onSessionCreated`
+ * seeds from the page's `info.id`. The session-ingest worker can persist
+ * messages under a session id that differs from the one the extension opened
+ * (the session-scoped page fetch is authoritative for the viewer), so without
+ * this normalization every replayed message is filtered out and the reopened
+ * live transcript renders empty. Rewriting the page id and each message and
+ * part session id to the requested `kiloSessionId` keeps live and replayed
+ * messages in the same root transcript while leaving the pagination cursor
+ * and older-message behavior untouched.
+ */
+function pinPageToSession(
+  page: SessionSnapshotPage & { kind: 'success' },
+  kiloSessionId: KiloSessionId
+): SessionSnapshotPage & { kind: 'success' } {
+  return {
+    ...page,
+    info: { ...page.info, id: kiloSessionId },
+    messages: page.messages.map(message => ({
+      info: { ...message.info, sessionID: kiloSessionId },
+      parts: message.parts.map(part => ({ ...part, sessionID: kiloSessionId })),
+    })),
+  };
+}
+
+/**
  * Adapt `cliSessionsV2.getSessionMessagesPage` result to the SDK's
  * `SessionSnapshotPageOutcome` union. Extension-owned; mirrors the mobile
- * `fetchMobileSessionSnapshotPage` adapter.
+ * `fetchMobileSessionSnapshotPage` adapter and pins the replayed page to the
+ * requested `kiloSessionId` so the manager's root transcript filter keeps the
+ * loaded history on screen.
+ *
+ * A running CLI session can read empty for a long stretch: the CLI batches
+ * session-ingest until the turn completes, so the persisted page lags the
+ * live turn. A confirmed-running session resolves that empty page
+ * immediately only when the page carries a usable event-log watermark: the
+ * transport replays every stored event from that watermark, so the snapshot
+ * (and the session switch) is not held for up to `ACTIVE_HISTORY_MAX_RETRIES`
+ * seconds while the page stays empty for the whole turn. Without a watermark
+ * there is no transport replay path, so the bounded history recovery keeps
+ * reading until the page carries the persisted messages or the session stops
+ * running. The liveness-grace recovery still runs for a session that is not
+ * yet confirmed working and turns busy within the liveness window, where
+ * persistence typically catches up quickly.
+ *
+ * Both page outcomes forward the tRPC result's `watermarkEventId` (when the
+ * server returned one) so the transport seeds its first WebSocket connect
+ * with `fromId=0` and the ingest DO replays every stored event. That replay
+ * renders the persisted transcript for a reopened running session whose page
+ * resolved empty.
  */
 async function fetchExtensionSessionSnapshotPage(
   trpcClient: TrpcClient,
   kiloSessionId: KiloSessionId,
-  options: { cursor?: string }
+  options: { cursor?: string; organizationId: string | null }
 ): Promise<SessionSnapshotPageOutcome | null> {
-  const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
-    session_id: kiloSessionId,
-    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-  });
+  const queryPage = (): Promise<SessionMessagesPageResult> =>
+    trpcClient.cliSessionsV2.getSessionMessagesPage.query({
+      session_id: kiloSessionId,
+      ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+    });
+  const fetchActiveSessions = (): Promise<ActiveSessionsResult> =>
+    trpcClient.activeSessions.list.query({
+      includeCloudAgentSessions: true,
+      organizationId: options.organizationId,
+    });
+  const isSessionWorking = (active: ActiveSessionsResult): boolean =>
+    active.sessions.some(session => session.id === kiloSessionId && session.status !== 'idle');
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC result shape is server-validated
-  const history = result.history as KiloSdkMessageHistory | null;
+  let result = await queryPage();
+  if (options.cursor === undefined && isPageWithoutPersistedMessages(pageHistory(result))) {
+    /*
+     * An empty first page can mean a freshly created idle session (empty by
+     * definition, whose first prompt is sent immediately after this page
+     * resolves and rendered via the live CLI echo) or a reopened running
+     * session whose persisted page has not been materialized yet. The CLI
+     * batches session-ingest until the turn completes and the active-sessions
+     * read model can briefly list a starting session as idle or omit it, so a
+     * single idle or missing liveness read must not latch the empty
+     * transcript.
+     *
+     * A confirmed-working session resolves its empty page immediately only
+     * when the page carries a usable event-log watermark: the transport
+     * seeds its first WebSocket connect from that watermark, so every stored
+     * event replays and the persisted transcript renders without the page
+     * retry. Without a watermark there is no replay path — the already
+     * persisted messages would stay invisible — so the bounded history
+     * recovery keeps reading until the page carries them or the session stops
+     * running.
+     *
+     * A session that is not confirmed working gets the bounded liveness
+     * probe: it re-checks `activeSessions.list` for a fixed number of reads
+     * and runs the bounded history recovery when the session becomes busy; a
+     * stably idle or absent session resolves the empty page when the window
+     * expires. A rejected liveness read leaves the working state unknown, so
+     * the empty page is resolved without the probe.
+     */
+    let active: ActiveSessionsResult | null = null;
+    try {
+      active = await fetchActiveSessions();
+    } catch {
+      /*
+       * A rejected liveness read leaves the session's working state unknown.
+       * Treat it as inactive so the empty page stays usable: resolve the
+       * original empty page without a page retry instead of letting the probe
+       * rejection block the transcript. Only the probe is guarded here; the
+       * initial page query and every later retry page query still propagate
+       * their own failures.
+       */
+    }
+    if (active !== null && !isSessionWorking(active)) {
+      result = await readActiveHistoryWithLivenessGrace(result, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
+    } else if (
+      active !== null &&
+      isSessionWorking(active) &&
+      (result.watermarkEventId === null || result.watermarkEventId === undefined)
+    ) {
+      result = await readActiveHistoryWithRetry(result, {
+        fetchActiveSessions,
+        isSessionWorking,
+        queryPage,
+      });
+    }
+  }
+
+  const history = pageHistory(result);
+  /*
+   * Forward the event-log watermark from the tRPC result. The transport
+   * seeds its first WebSocket connect's `fromId` from the page watermark: a
+   * present watermark makes the DO replay every stored event, closing the
+   * gap between the page snapshot and the live stream when session-ingest
+   * materialization lags a running turn. Dropping it here connects with
+   * `replay=false`, and a reopened running session's already-persisted user
+   * message never reaches the renderer even though the message API carries
+   * it. Absent or null watermarks (fresh sessions, failed watermark read)
+   * stay absent to keep `replay=false` for sessions with nothing to replay.
+   */
+  const watermark =
+    result.watermarkEventId === null || result.watermarkEventId === undefined
+      ? {}
+      : { watermarkEventId: result.watermarkEventId };
   if (history === null) {
-    return {
-      info: { id: result.kiloSessionId },
-      kind: 'success',
-      messages: [],
-      nextCursor: null,
-      omittedItemCount: 0,
-    };
+    return pinPageToSession(
+      {
+        info: { id: result.kiloSessionId },
+        kind: 'success',
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+        ...watermark,
+      },
+      kiloSessionId
+    );
   }
 
   if (isHistoryPage(history)) {
-    return {
-      info: { id: result.kiloSessionId },
-      kind: 'success',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated shape
-      messages: history.messages as SessionSnapshotPage['messages'],
-      nextCursor: history.nextCursor,
-      omittedItemCount: history.omittedItemCount,
-    };
+    return pinPageToSession(
+      {
+        info: { id: result.kiloSessionId },
+        kind: 'success',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated shape
+        messages: history.messages as SessionSnapshotPage['messages'],
+        nextCursor: history.nextCursor,
+        omittedItemCount: history.omittedItemCount,
+        ...watermark,
+      },
+      kiloSessionId
+    );
   }
 
   return history;
@@ -334,7 +643,10 @@ export function createExtensionAgentSessionManager({
 
     // ---- fetchSnapshotPage ----
     fetchSnapshotPage: (kiloSessionId, options) =>
-      fetchExtensionSessionSnapshotPage(trpcClient, kiloSessionId, options),
+      fetchExtensionSessionSnapshotPage(trpcClient, kiloSessionId, {
+        ...options,
+        organizationId,
+      }),
 
     // ---- getTicket ----
     getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
@@ -378,6 +690,9 @@ export function createExtensionAgentSessionManager({
     },
 
     lifecycleHooks: createBrowserLifecycleHooks(),
+
+    // Tool attachment bytes are stripped before storage; keep the images here.
+    onToolAttachment: rememberToolImage,
 
     // ---- prepare ----
     prepare: async input => {

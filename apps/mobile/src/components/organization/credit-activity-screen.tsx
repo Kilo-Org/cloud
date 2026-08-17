@@ -1,6 +1,6 @@
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useLocalSearchParams } from 'expo-router';
-import { Receipt } from 'lucide-react-native';
+import { Receipt } from '@/components/ui/icons';
 import { type ReactNode, useEffect } from 'react';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';

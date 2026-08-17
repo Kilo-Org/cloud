@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from 'lucide-react-native';
+import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';

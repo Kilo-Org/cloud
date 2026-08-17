@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { Alert, Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';

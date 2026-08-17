@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
-import { AlertCircle, File as FileIcon, X } from 'lucide-react-native';
+import { AlertCircle, File as FileIcon, X } from '@/components/ui/icons';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';

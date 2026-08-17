@@ -5,10 +5,21 @@ import {
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
+  isVercelRoutingOptOut,
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+
+const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
+
+afterEach(() => {
+  if (originalFriendliApiKey === undefined) {
+    delete process.env.FRIENDLI_API_KEY;
+  } else {
+    process.env.FRIENDLI_API_KEY = originalFriendliApiKey;
+  }
+});
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
@@ -179,6 +190,40 @@ describe('applyVercelSettings BYOK pinning', () => {
     });
     expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
   });
+
+  it('does not add managed Friendli credentials to user BYOK settings', async () => {
+    process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
+    const request = byokRequest([]);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      anthropic: [{ apiKey: 'sk-anthropic' }],
+    });
+  });
+});
+
+describe('applyVercelSettings managed requests', () => {
+  function managedRequest(): GatewayRequest {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'moonshotai/kimi-k3',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+  }
+
+  it('does not add managed Friendli credentials from the environment', async () => {
+    process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
+    const request = managedRequest();
+
+    await applyVercelSettings('moonshotai/kimi-k3', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
 });
 
 describe('passesVercelRoutingPercentage', () => {
@@ -205,5 +250,14 @@ describe('passesVercelRoutingPercentage', () => {
 
     expect(seedsInFinalBucket.some(seed => passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
     expect(seedsInFinalBucket.some(seed => !passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
+  });
+});
+
+describe('isVercelRoutingOptOut', () => {
+  it('only opts out exact model ID matches', () => {
+    const optOutModels = new Set(['moonshotai/kimi-k3']);
+
+    expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
+    expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
   });
 });

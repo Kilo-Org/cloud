@@ -13,6 +13,7 @@ import {
   GlobToolCard,
   GrepToolCard,
   ListToolCard,
+  PatchToolCard,
   ReadToolCard,
   TaskToolCard,
   TodoToolCard,
@@ -77,6 +78,10 @@ export function ToolPartRenderer({
     }
     case 'list': {
       return <ListToolCard part={part} />;
+    }
+    case 'patch':
+    case 'apply_patch': {
+      return <PatchToolCard part={part} />;
     }
     case 'todoread':
     case 'todowrite': {

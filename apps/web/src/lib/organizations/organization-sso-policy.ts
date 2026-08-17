@@ -1,5 +1,6 @@
 import { organizations } from '@kilocode/db/schema';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { isValidDomain } from '@/lib/organizations/company-domain';
@@ -40,6 +41,8 @@ export type SsoDomainAuthority =
     };
 
 type DbOrTransaction = typeof db | DrizzleTransaction;
+
+const parentOrganizations = alias(organizations, 'sso_policy_parent_organizations');
 
 function normalizeSsoDomain(domain: string): string | null {
   const normalized = domain.trim().toLowerCase();
@@ -100,106 +103,178 @@ export async function resolveEffectiveOrganizationSsoPolicy(
   organizationId: string,
   tx?: DrizzleTransaction
 ): Promise<EffectiveOrganizationSsoPolicy> {
+  const policies = await resolveEffectiveOrganizationSsoPolicies([organizationId], tx);
+  const policy = policies.get(organizationId);
+  if (!policy) {
+    throw new Error(`Failed to resolve SSO policy for organization ${organizationId}`);
+  }
+  return policy;
+}
+
+export async function resolveEffectiveOrganizationSsoPolicies(
+  organizationIds: readonly string[],
+  tx?: DrizzleTransaction
+): Promise<Map<string, EffectiveOrganizationSsoPolicy>> {
+  const uniqueOrganizationIds = [...new Set(organizationIds)];
+  if (uniqueOrganizationIds.length === 0) {
+    return new Map();
+  }
+
   const dbOrTx = tx ?? db;
-  const [organization] = await dbOrTx
+  const organizationRows = await dbOrTx
     .select({
       id: organizations.id,
       deletedAt: organizations.deleted_at,
       ssoDomain: organizations.sso_domain,
       parentOrganizationId: organizations.parent_organization_id,
+      parentId: parentOrganizations.id,
+      parentDeletedAt: parentOrganizations.deleted_at,
+      parentSsoDomain: parentOrganizations.sso_domain,
+      parentParentOrganizationId: parentOrganizations.parent_organization_id,
     })
     .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
+    .leftJoin(parentOrganizations, eq(organizations.parent_organization_id, parentOrganizations.id))
+    .where(inArray(organizations.id, uniqueOrganizationIds));
 
-  if (!organization || organization.deletedAt) {
-    return {
-      status: 'misconfigured',
-      organizationId,
-      reason: 'organization_not_found',
-    };
+  const normalizedDomains = new Set<string>();
+  for (const organization of organizationRows) {
+    if (organization.ssoDomain) {
+      const domain = normalizeSsoDomain(organization.ssoDomain);
+      if (domain) normalizedDomains.add(domain);
+    }
+    if (organization.parentSsoDomain) {
+      const domain = normalizeSsoDomain(organization.parentSsoDomain);
+      if (domain) normalizedDomains.add(domain);
+    }
   }
 
-  if (organization.parentOrganizationId && organization.ssoDomain) {
-    return {
-      status: 'misconfigured',
-      organizationId,
-      reason: 'conflicting_child_policy',
-    };
+  const authorityRows = await dbOrTx
+    .select({
+      id: organizations.id,
+      ssoDomain: organizations.sso_domain,
+      parentOrganizationId: organizations.parent_organization_id,
+    })
+    .from(organizations)
+    .where(
+      and(
+        inArray(sql`lower(${organizations.sso_domain})`, [...normalizedDomains]),
+        isNull(organizations.deleted_at)
+      )
+    );
+
+  const authoritiesByDomain = new Map<string, typeof authorityRows>();
+  for (const authority of authorityRows) {
+    if (!authority.ssoDomain) continue;
+    const domain = authority.ssoDomain.toLowerCase();
+    const matches = authoritiesByDomain.get(domain) ?? [];
+    matches.push(authority);
+    authoritiesByDomain.set(domain, matches);
   }
 
-  if (organization.ssoDomain) {
-    const domain = normalizeSsoDomain(organization.ssoDomain);
+  function resolveSourcePolicy(
+    organizationId: string,
+    source: 'self' | 'direct_parent',
+    sourceOrganizationId: string,
+    rawDomain: string
+  ): EffectiveOrganizationSsoPolicy {
+    const domain = normalizeSsoDomain(rawDomain);
     if (!domain) {
       return { status: 'misconfigured', organizationId, reason: 'invalid_domain' };
     }
 
-    const authority = await resolveAuthorityForNormalizedDomain(domain, dbOrTx);
-    if (authority.status === 'misconfigured') {
-      return { status: 'misconfigured', organizationId, reason: authority.reason };
+    const matchingAuthorities = authoritiesByDomain.get(domain) ?? [];
+    if (matchingAuthorities.length > 1) {
+      return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
     }
-    if (authority.status !== 'required' || authority.sourceOrganizationId !== organization.id) {
+
+    const authority = matchingAuthorities[0];
+    if (authority?.parentOrganizationId) {
+      return { status: 'misconfigured', organizationId, reason: 'conflicting_child_policy' };
+    }
+    if (!authority || authority.id !== sourceOrganizationId) {
       return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
     }
 
     return {
       status: 'required',
       organizationId,
-      source: 'self',
-      sourceOrganizationId: organization.id,
+      source,
+      sourceOrganizationId,
       domain,
     };
   }
 
-  if (!organization.parentOrganizationId) {
-    return { status: 'not_required', organizationId };
-  }
+  const organizationsById = new Map(
+    organizationRows.map(organization => [organization.id, organization])
+  );
+  const policies = new Map<string, EffectiveOrganizationSsoPolicy>();
 
-  const [parent] = await dbOrTx
-    .select({
-      id: organizations.id,
-      deletedAt: organizations.deleted_at,
-      ssoDomain: organizations.sso_domain,
-      parentOrganizationId: organizations.parent_organization_id,
-    })
-    .from(organizations)
-    .where(eq(organizations.id, organization.parentOrganizationId))
-    .limit(1);
+  for (const organizationId of uniqueOrganizationIds) {
+    const organization = organizationsById.get(organizationId);
+    if (!organization || organization.deletedAt) {
+      policies.set(organizationId, {
+        status: 'misconfigured',
+        organizationId,
+        reason: 'organization_not_found',
+      });
+      continue;
+    }
 
-  if (!parent || parent.deletedAt) {
-    return { status: 'misconfigured', organizationId, reason: 'deleted_parent' };
-  }
+    if (organization.parentOrganizationId && organization.ssoDomain) {
+      policies.set(organizationId, {
+        status: 'misconfigured',
+        organizationId,
+        reason: 'conflicting_child_policy',
+      });
+      continue;
+    }
 
-  if (parent.parentOrganizationId) {
-    return {
-      status: 'misconfigured',
+    if (organization.ssoDomain) {
+      policies.set(
+        organizationId,
+        resolveSourcePolicy(organizationId, 'self', organization.id, organization.ssoDomain)
+      );
+      continue;
+    }
+
+    if (!organization.parentOrganizationId) {
+      policies.set(organizationId, { status: 'not_required', organizationId });
+      continue;
+    }
+
+    if (!organization.parentId || organization.parentDeletedAt) {
+      policies.set(organizationId, {
+        status: 'misconfigured',
+        organizationId,
+        reason: 'deleted_parent',
+      });
+      continue;
+    }
+
+    if (organization.parentParentOrganizationId) {
+      policies.set(organizationId, {
+        status: 'misconfigured',
+        organizationId,
+        reason: 'unsupported_nested_parent',
+      });
+      continue;
+    }
+
+    if (!organization.parentSsoDomain) {
+      policies.set(organizationId, { status: 'not_required', organizationId });
+      continue;
+    }
+
+    policies.set(
       organizationId,
-      reason: 'unsupported_nested_parent',
-    };
+      resolveSourcePolicy(
+        organizationId,
+        'direct_parent',
+        organization.parentId,
+        organization.parentSsoDomain
+      )
+    );
   }
 
-  if (!parent.ssoDomain) {
-    return { status: 'not_required', organizationId };
-  }
-
-  const domain = normalizeSsoDomain(parent.ssoDomain);
-  if (!domain) {
-    return { status: 'misconfigured', organizationId, reason: 'invalid_domain' };
-  }
-
-  const authority = await resolveAuthorityForNormalizedDomain(domain, dbOrTx);
-  if (authority.status === 'misconfigured') {
-    return { status: 'misconfigured', organizationId, reason: authority.reason };
-  }
-  if (authority.status !== 'required' || authority.sourceOrganizationId !== parent.id) {
-    return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
-  }
-
-  return {
-    status: 'required',
-    organizationId,
-    source: 'direct_parent',
-    sourceOrganizationId: parent.id,
-    domain,
-  };
+  return policies;
 }

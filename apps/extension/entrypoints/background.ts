@@ -113,6 +113,8 @@ const handleTabDebuggerRequest = async ({
           result: await getPageSnapshotInTabWithScripting({
             scriptingApi,
             tabId: request.tabId,
+            ...(request.query === undefined ? {} : { query: request.query }),
+            ...(request.textStart === undefined ? {} : { textStart: request.textStart }),
             ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
           }),
           type: PAGE_SNAPSHOT_MESSAGE,

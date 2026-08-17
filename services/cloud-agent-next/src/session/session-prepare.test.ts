@@ -21,6 +21,8 @@ import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import {
   createSessionWithLedger,
   sessionCreateIntentFingerprint,
+  SESSION_CREATE_ABANDON_AFTER_SECONDS,
+  SESSION_CREATE_ABANDONED_OUTCOME_CODE,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
   type SessionRegistrationContext,
 } from './session-registration.js';
@@ -131,10 +133,13 @@ function makeLedgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLe
     status: 'admitted',
     outcome_code: null,
     canonical_result: null,
-    admitted_at: '2026-08-06T00:00:00.000Z',
+    // Freshly admitted by default: the reconcile ladder abandons a row only
+    // once it is older than `SESSION_CREATE_ABANDON_AFTER_SECONDS`, and every
+    // test except the abandonment one exercises the in-flight-age behavior.
+    admitted_at: new Date().toISOString(),
     settled_at: null,
-    lease_expires_at: '2026-08-06T02:00:00.000Z',
-    expires_at: '2026-09-05T00:00:00.000Z',
+    lease_expires_at: new Date(Date.now() + 120_000).toISOString(),
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     ...overrides,
   };
 }
@@ -850,6 +855,76 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     expect(doStub.getMessageResult).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('(c-keep) keeps conflicting while the row is younger than the abandonment age', async () => {
+    // Just under the threshold: the create RPC can still be in flight, so the
+    // row stays non-terminal and the client keeps its operation key.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: canonicalIds,
+        admitted_at: new Date(
+          Date.now() - (SESSION_CREATE_ABANDON_AFTER_SECONDS - 60) * 1000
+        ).toISOString(),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[{ sessionId: KILO_SESSION_ID }]]));
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = makeContext(doStub);
+
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
+
+    expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('(c-abandon) settles failed and returns the terminal error once the row outlives the abandonment age', async () => {
+    // Past the threshold the original create RPC cannot still be in flight, so
+    // the row is definitively lost. It settles `failed` with the abandonment
+    // outcome code and the client receives the typed non-retryable failure, so
+    // it rotates its operation key instead of conflicting forever.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: canonicalIds,
+        admitted_at: new Date(
+          Date.now() - (SESSION_CREATE_ABANDON_AFTER_SECONDS + 60) * 1000
+        ).toISOString(),
+      }),
+    });
+    // First: ownership present. Second: user email for the settle.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = makeContext(doStub);
+
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+
+    expect(doStub.getMetadata).toHaveBeenCalledTimes(2);
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'failed',
+        outcomeCode: SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+      })
+    );
+    expect(settleOptions(0)?.outboxEvent).toMatchObject({
+      properties: { outcome: 'failed', admission: 'takeover', failure_stage: 'registration' },
+    });
+    // Double-execution protection stays intact: no ownership delete, no fresh create.
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
   it('(d) settles and replays when metadata exists and the initial message is admitted', async () => {

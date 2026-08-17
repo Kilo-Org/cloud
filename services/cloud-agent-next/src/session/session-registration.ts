@@ -182,6 +182,22 @@ export type SessionLedgerCreateOptions = {
 /** Lease for the `admitted` create claim (retry window). */
 const SESSION_CREATE_LEDGER_LEASE_SECONDS = 120;
 
+/**
+ * Row age after which a reconcile that still sees no Durable Object state at all
+ * treats the original `createSessionWithInitialAdmission` RPC as definitively
+ * lost and settles the row `failed`. Below it, the same reconcile keeps
+ * conflicting with `creation_in_progress`.
+ *
+ * 900 seconds is 7.5x the 120-second create lease and far longer than any
+ * Durable Object RPC (or its `withDORetry` budget) can survive, so a merely slow
+ * or in-flight create is never abandoned. One call site, one value: do not make
+ * it configurable.
+ */
+export const SESSION_CREATE_ABANDON_AFTER_SECONDS = 900;
+
+/** Outcome code stored on a row abandoned because the create RPC was lost. */
+export const SESSION_CREATE_ABANDONED_OUTCOME_CODE = 'create_rpc_abandoned';
+
 /** Carries the allocation failure stage so the ledger can settle it. */
 class SessionAllocationStageError extends Error {
   readonly stage: SessionLedgerAllocationFailureStage;
@@ -1024,12 +1040,27 @@ async function readSessionMetadata(
 }
 
 /**
+ * True when the row is older than `SESSION_CREATE_ABANDON_AFTER_SECONDS`. An
+ * unparsable `admitted_at` is never abandoned.
+ */
+function isCreateAbandonable(row: OperationLedgerRow): boolean {
+  const admittedAt = new Date(row.admitted_at).getTime();
+  if (!Number.isFinite(admittedAt)) {
+    return false;
+  }
+  return Date.now() - admittedAt > SESSION_CREATE_ABANDON_AFTER_SECONDS * 1000;
+}
+
+/**
  * Takeover / reconcile-pending reconciliation ladder. It never deletes the
  * ownership row and never fresh-creates from absent DO state, because the
  * original create RPC may still commit and double-admit the initial turn:
  *   a. No progress IDs → nothing external happened → fresh create under the row.
  *   b. IDs recorded, ownership row absent → the DO never registered → fresh create.
- *   c. Ownership row present, both metadata reads absent → `creation_in_progress`.
+ *   c. Ownership row present, both metadata reads absent → `creation_in_progress`
+ *      while the row is younger than `SESSION_CREATE_ABANDON_AFTER_SECONDS`;
+ *      older than that the create RPC is definitively lost, so the row settles
+ *      `failed` and the client receives the typed terminal failure.
  *   d. Metadata present → the recorded `initialMessageId` decides the outcome.
  */
 async function reconcileLedgerCreate(
@@ -1083,6 +1114,33 @@ async function reconcileLedgerCreate(
     // after these reads, so deleting the ownership row and allocating fresh IDs
     // could double-admit the initial turn. Preserve the row, keep the ledger row
     // non-terminal, and let a later same-key retry reconcile again.
+    //
+    // Past the abandonment age the RPC cannot still be in flight, so a row that
+    // never produced DO state is definitively lost. Settle it `failed` and give
+    // the client a terminal outcome; the ownership row is still NOT deleted and
+    // no fresh create is allocated, so nothing can double-admit the initial turn.
+    // The next attempt uses a new operation key, new IDs, and a new DO.
+    if (isCreateAbandonable(row)) {
+      const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
+      await settleTerminalOutcome(db, {
+        rowId: row.id,
+        status: 'failed',
+        outcomeCode: SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+        outboxEvent: sessionCreateSettledOutboxEvent({
+          distinctId,
+          outcome: 'failed',
+          admission: 'takeover',
+          failureStage: 'registration',
+          startedAt: options.startedAt,
+          inOrganization: input.options?.kilocodeOrganizationId != null,
+        }),
+      });
+      logger
+        .withFields({ rowId: row.id, cloudAgentSessionId: ids.cloudAgentSessionId })
+        .error('Abandoned session create: the Durable Object create RPC was never delivered');
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    }
+
     throw creationInProgressError();
   }
 

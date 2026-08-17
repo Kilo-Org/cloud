@@ -77,6 +77,11 @@ import {
 } from '@/components/agents/child-session-sheet-state';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
+import {
+  buildTerminalErrorCopyText,
+  resolveSessionTerminalError,
+} from '@/components/agents/session-terminal-error';
+import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
@@ -1097,27 +1102,55 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    if (shouldBlockMessages) {
-      return <SessionSkeletonMessages />;
-    }
-    if (error && messages.length === 0) {
+    const terminalError = resolveSessionTerminalError({
+      error,
+      statusIndicator,
+      messageCount: messages.length,
+    });
+    if (terminalError) {
+      const copyText = buildTerminalErrorCopyText(
+        sessionId,
+        terminalError.title,
+        terminalError.message
+      );
       return (
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
-            variant="server"
+            variant={terminalError.variant}
             placement="top"
             className="px-0 pt-0"
-            title="Couldn't load this session"
-            message={error}
-            onRetry={() => {
-              void manager.switchSession(sessionId);
-            }}
+            title={terminalError.title}
+            message={terminalError.message}
+            onRetry={
+              terminalError.retryable
+                ? () => {
+                    void manager.switchSession(sessionId);
+                  }
+                : undefined
+            }
+            isRetrying={isLoading}
           />
-          <Button variant="ghost" onPress={handleBackToSessions}>
-            <Text>Back to sessions</Text>
-          </Button>
+          <View className="flex-row gap-3">
+            {terminalError.copyable ? (
+              <Button
+                variant="ghost"
+                accessibilityLabel="Copy error details"
+                onPress={() => {
+                  void performCopy(copyText);
+                }}
+              >
+                <Text>Copy</Text>
+              </Button>
+            ) : null}
+            <Button variant="ghost" onPress={handleBackToSessions}>
+              <Text>Back to sessions</Text>
+            </Button>
+          </View>
         </View>
       );
+    }
+    if (shouldBlockMessages) {
+      return <SessionSkeletonMessages />;
     }
     if (messages.length === 0) {
       return (

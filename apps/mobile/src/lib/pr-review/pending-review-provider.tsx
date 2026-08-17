@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import {
   createContext,
   type ReactNode,
@@ -8,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { clearDraft, loadDraft, saveDraft } from '@/lib/persist/drafts';
+import { clearDraft, loadDraft, prReviewDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 // One queued inline comment in the pending review. The composer fills
@@ -48,11 +49,40 @@ function isPendingReviewItem(value: unknown): value is PendingReviewItem {
 
 /**
  * Runtime shape guard for a persisted pending-review draft. Passed to
- * `loadDraft` so a valid-JSON value that is not a comment array (or holds a
- * malformed item) is discarded as corrupt instead of entering the queue.
+ * `loadDraft` so a valid-JSON value that is not an array is discarded as
+ * corrupt. Item shapes are deliberately NOT checked here: one unrecognized
+ * item must cost one comment, not the whole queue, so the items are filtered
+ * after the load by `keepValidPendingReviewItems`.
  */
-export function isPendingReviewItemArray(value: unknown): value is PendingReviewItem[] {
-  return Array.isArray(value) && value.every(item => isPendingReviewItem(item));
+export function isPendingReviewDraft(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+/**
+ * Keeps the structurally valid restored items and drops only the invalid ones,
+ * so a single corrupt row never destroys the queued review. A drop is reported
+ * to Sentry at warning level (the same treatment a discarded draft gets: no
+ * user action re-reads a draft, so there is nothing to retry).
+ */
+function keepValidPendingReviewItems(restored: unknown[]): PendingReviewItem[] {
+  const valid = restored.filter((item): item is PendingReviewItem => isPendingReviewItem(item));
+  if (valid.length !== restored.length) {
+    Sentry.captureException(new Error('stored pending review dropped invalid items'), {
+      level: 'warning',
+      extra: { dropped: restored.length - valid.length, kept: valid.length },
+    });
+  }
+  return valid;
+}
+
+/**
+ * Draft entity key for one pull request, with both path segments lowercased —
+ * the same normalization `recent-prs.ts` and `viewed-files.ts` apply to their
+ * `owner/repo#number` keys. Reaching one PR through `Kilo-Org/cloud` and
+ * through `kilo-org/cloud` therefore uses ONE queue, not two.
+ */
+export function pendingReviewDraftKey(owner: string, repo: string, number: number): string {
+  return prReviewDraftKey(owner.toLowerCase(), repo.toLowerCase(), number);
 }
 
 type PendingReviewContextValue = {
@@ -117,12 +147,13 @@ export function PendingReviewProvider({
     }
     void (async () => {
       try {
-        const restored = await loadDraft(userId, draftEntityKey, isPendingReviewItemArray);
+        const restored = await loadDraft(userId, draftEntityKey, isPendingReviewDraft);
         if (hydrationGenerationRef.current !== generation) {
           return;
         }
-        if (isPendingReviewItemArray(restored) && restored.length > 0) {
-          setItems(previous => mergePendingReviewItems(previous, restored));
+        const valid = restored === null ? [] : keepValidPendingReviewItems(restored);
+        if (valid.length > 0) {
+          setItems(previous => mergePendingReviewItems(previous, valid));
         }
         setHydrated(true);
       } catch {

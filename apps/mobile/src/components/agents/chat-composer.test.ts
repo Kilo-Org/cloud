@@ -17,6 +17,12 @@ import { type ChatComposer } from './chat-composer';
 const onSendMock = vi.fn(async () => undefined);
 
 // ── React hooks (real useEffect needs rendering context, so mock all hooks) ──
+// `useRef` hands out slots in call order and keeps them across calls of the
+// same instance, so a test can call the component twice to simulate a
+// re-render (`rerender`) with the refs — the composer's live text and its
+// applied-draft flag — intact, and start a fresh instance with `mount`.
+const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor: 0 }));
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
@@ -27,8 +33,10 @@ vi.mock('react', async () => {
     }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
-      const ref: React.RefObject<T> = { current: initial };
-      return ref;
+      const index = refSlots.cursor;
+      refSlots.cursor += 1;
+      refSlots.slots[index] ??= { current: initial };
+      return refSlots.slots[index] as React.RefObject<T>;
     }),
     useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
   };
@@ -266,8 +274,36 @@ function requireInputRowOnSubmit(render: React.ReactElement): () => void {
   return onSubmit;
 }
 
+function requireInputRowOnChangeText(render: React.ReactElement): (text: string) => void {
+  const rowProps = findInputRowProps(render);
+  const onChangeText = rowProps?.onChangeText as ((text: string) => void) | undefined;
+  if (onChangeText === undefined) {
+    throw new Error('ChatComposerInputRow element did not carry an onChangeText handler');
+  }
+  return onChangeText;
+}
+
+async function mount(props: ComposerProps): Promise<React.ReactElement> {
+  refSlots.slots.length = 0;
+  return rerender(props);
+}
+
+async function rerender(props: ComposerProps): Promise<React.ReactElement> {
+  refSlots.cursor = 0;
+  const { ChatComposer } = await import('./chat-composer');
+  return ChatComposer(props);
+}
+
+async function settle(): Promise<void> {
+  await new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  refSlots.slots.length = 0;
+  refSlots.cursor = 0;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -287,9 +323,7 @@ const RESTORE_CASES = [
 
 describe('ChatComposer draft restore', () => {
   it.each(RESTORE_CASES)('$name', async ({ initialDraft, sent }) => {
-    const { ChatComposer } = await import('./chat-composer');
-
-    const render = ChatComposer(
+    const render = await mount(
       makeProps({
         draftKey: 'agent-composer:sess-1',
         initialDraft,
@@ -299,9 +333,7 @@ describe('ChatComposer draft restore', () => {
     // The restore effect runs synchronously under the mocked hooks; submit
     // must read the restored text from the live ref, not the mount-time ''.
     requireInputRowOnSubmit(render)();
-    await new Promise(resolve => {
-      setTimeout(resolve, 0);
-    });
+    await settle();
 
     if (sent === null) {
       expect(onSendMock).not.toHaveBeenCalled();
@@ -309,5 +341,39 @@ describe('ChatComposer draft restore', () => {
     }
     expect(onSendMock).toHaveBeenCalledTimes(1);
     expect(onSendMock).toHaveBeenCalledWith(sent, undefined, undefined);
+  });
+
+  // The host mounts the composer before identity (`user.getMe`) and the draft
+  // load settle, so `initialDraft` is undefined on the first render and arrives
+  // later. Both cases below start from that first render.
+  it('is usable before the draft settles and applies a draft that arrives after mount', async () => {
+    await mount(makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: undefined }));
+
+    const settled = await rerender(
+      makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: 'Restored draft text' })
+    );
+    requireInputRowOnSubmit(settled)();
+    await settle();
+
+    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', undefined, undefined);
+  });
+
+  it('keeps text typed before the draft settles instead of restoring over it', async () => {
+    const pending = await mount(
+      makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: undefined })
+    );
+    requireInputRowOnChangeText(pending)('typed while identity was loading');
+
+    const settled = await rerender(
+      makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: 'Restored draft text' })
+    );
+    requireInputRowOnSubmit(settled)();
+    await settle();
+
+    expect(onSendMock).toHaveBeenCalledWith(
+      'typed while identity was loading',
+      undefined,
+      undefined
+    );
   });
 });

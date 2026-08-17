@@ -3,8 +3,10 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { prReviewDraftKey } from '@/lib/persist/drafts';
-import { PendingReviewProvider } from '@/lib/pr-review/pending-review-provider';
+import {
+  pendingReviewDraftKey,
+  PendingReviewProvider,
+} from '@/lib/pr-review/pending-review-provider';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { parseParam } from '@/lib/route-params';
 
@@ -42,7 +44,9 @@ export default function PrReviewNumberLayout() {
     return <InvalidRouteState backTo={'/(app)/pr-review' as Href} />;
   }
 
-  const draftEntityKey = prReviewDraftKey(owner, repo, number);
+  // Lowercased inside the helper, like the recent-PR and viewed-file stores,
+  // so the same PR reached with different owner/repo casing keeps one queue.
+  const draftEntityKey = pendingReviewDraftKey(owner, repo, number);
 
   const sheetOptions = {
     presentation: 'formSheet' as const,

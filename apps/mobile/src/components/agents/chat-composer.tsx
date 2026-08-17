@@ -143,9 +143,12 @@ type ChatComposerProps = {
    */
   draftKey?: string;
   /**
-   * Restored draft text, seeded once into the empty input on mount through
-   * the existing pendingDraftRestoreRef restore path. The host resolves the
-   * draft before mounting the composer (render only after the load settles).
+   * Restored draft text, applied once into the input through the same restore
+   * path the Stop remount uses. The host mounts the composer immediately, so
+   * this arrives after mount on a cold start: `undefined` means the draft load
+   * has not settled yet, `''` means it settled with nothing stored. A draft is
+   * applied only while the input is still untouched, so it can never overwrite
+   * text the user typed while identity and the draft were still loading.
    */
   initialDraft?: string;
 };
@@ -260,33 +263,16 @@ export function ChatComposer({
   const measureRef = useRef(measure);
   measureRef.current = measure;
 
-  // Seed the host-loaded draft once, before the first restore-effect run, by
-  // reusing the existing pendingDraftRestoreRef path (it also sets text,
-  // selection, hasText, slash-command state, and the measure node). Seeding
-  // is seed-once: the host resolves the draft before mounting the composer,
-  // so a later prop change never re-applies (and never overwrites typing).
-  const initialDraftSeededRef = useRef(false);
-  if (!initialDraftSeededRef.current) {
-    initialDraftSeededRef.current = true;
-    if (initialDraft !== undefined && initialDraft !== '') {
-      pendingDraftRestoreRef.current = initialDraft;
-    }
-  }
-
   // Flush the debounced draft write when the app leaves `active` and on
   // unmount, so a backgrounded-then-killed app (or a navigation away) does
   // not lose the last keystrokes inside the 500 ms window.
   useDraftFlushOnBackground(userId, draftKey, true);
 
-  useEffect(() => {
-    const draft = pendingDraftRestoreRef.current;
-    if (draft === null) {
-      return;
-    }
-    pendingDraftRestoreRef.current = null;
-    if (!draft) {
-      return;
-    }
+  // The one place text is written into the live input from outside a keystroke:
+  // the Stop remount and the host-loaded draft both go through it, so both set
+  // text, selection, hasText, slash-command state, and the measure node the
+  // same way.
+  const restoreTextIntoInput = useCallback((draft: string) => {
     // Sync the live submit-time ref with the restored text: `handleSend`
     // reads `textRef.current`, so an immediate send (before any keystroke)
     // must see the restored draft, not the mount-time empty string.
@@ -299,7 +285,37 @@ export function ChatComposer({
     setHasText(draft.trim().length > 0);
     setSlashCommandInput(getSlashCommandCandidate(draft));
     measureRef.current.setText(draft);
-  }, [inputEpoch]);
+  }, []);
+
+  useEffect(() => {
+    const draft = pendingDraftRestoreRef.current;
+    if (draft === null) {
+      return;
+    }
+    pendingDraftRestoreRef.current = null;
+    if (!draft) {
+      return;
+    }
+    restoreTextIntoInput(draft);
+  }, [inputEpoch, restoreTextIntoInput]);
+
+  // Apply the host-loaded draft once, whenever it arrives. The host renders
+  // the composer before identity and the draft load settle (typing must never
+  // wait on a network query), so `initialDraft` is `undefined` until the load
+  // settles. Nothing is applied once the input holds text: whatever the user
+  // typed while the draft was loading wins, and the stale stored draft is
+  // dropped rather than pasted over the typing.
+  const initialDraftAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialDraftAppliedRef.current || initialDraft === undefined) {
+      return;
+    }
+    initialDraftAppliedRef.current = true;
+    if (initialDraft === '' || textRef.current !== '') {
+      return;
+    }
+    restoreTextIntoInput(initialDraft);
+  }, [initialDraft, restoreTextIntoInput]);
 
   // After Stop, remount the input row once the SDK has restored the composer
   // (Item 14 E2E gate).  The state machine is armed in handleStop and

@@ -70,11 +70,11 @@ function NewSessionScreenBody() {
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
-  // Durable new-session draft. The prompt's `initialPrompt` seeds the
-  // uncontrolled input once, so the route resolves the stored draft (and the
-  // share prefill) BEFORE mounting the form: a draft must never render first
-  // and then be replaced by a late prefill. `undefined` marks the not-settled
-  // state so the form stays on the pre-render state while the local load runs.
+  // Durable new-session draft. The form mounts immediately — typing must never
+  // wait on the `user.getMe` query — and the stored draft settles behind it.
+  // The prompt input is uncontrolled, so a stored draft that arrives after
+  // mount reaches it only through the remount keyed on `promptSeed` below, and
+  // that remount happens only while the user has typed nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
   const draftState = useFencedDraftLoad({
     userId,
@@ -88,9 +88,13 @@ function NewSessionScreenBody() {
   const [sharePrefillText] = useState<string | null>(() =>
     shareId ? (peekSharePayload(shareId)?.text ?? null) : null
   );
-  const initialPrompt = draftState.settled
-    ? resolvePrefillOverDraft(sharePrefillText, draftState.text)
-    : undefined;
+  // The share prefill is known synchronously and always beats a stored draft,
+  // so it seeds the first render; the stored draft only exists once the load
+  // settles.
+  const initialPrompt = resolvePrefillOverDraft(
+    sharePrefillText,
+    draftState.settled ? draftState.text : null
+  );
 
   // Save the new-session draft debounced on every text change, and flush the
   // pending write when the app leaves `active`. The draft's fate on unmount —
@@ -196,25 +200,43 @@ function NewSessionScreenBody() {
   // Seed the route-owned prompt state from the restored draft once the load
   // settles: the prompt input notifies the route only on typing, so without
   // this the creator's `promptRef` stays empty and the Start button stays
-  // disabled (and a remote start would send an empty prompt). Re-armed
-  // whenever the draft leaves the settled state (e.g. an account switch).
-  const promptStateSeededRef = useRef(false);
+  // disabled (and a remote start would send an empty prompt).
+  //
+  // `pending` → the load has not settled; `settled` → the input already holds
+  // the right text (nothing was stored, the user typed first, or the share
+  // prefill seeded the first render); `restore` → a stored draft has to reach
+  // the uncontrolled input, which only a remount can do. Only `restore`
+  // changes the form key, so the settled path never remounts and never
+  // destroys typing.
+  const [promptSeed, setPromptSeed] = useState<'pending' | 'settled' | 'restore'>('pending');
   useEffect(() => {
     if (!draftState.settled) {
-      promptStateSeededRef.current = false;
+      if (promptSeed !== 'pending') {
+        // The identity or entity changed, so the input remounts empty: clear
+        // the route-owned prompt state with it, or Start would submit text the
+        // user can no longer see.
+        promptRef.current = '';
+        setHasPrompt(false);
+        setPromptSeed('pending');
+      }
       return;
     }
-    if (promptStateSeededRef.current) {
+    if (promptSeed !== 'pending') {
       return;
     }
-    promptStateSeededRef.current = true;
+    if (promptRef.current !== '' || !initialPrompt) {
+      setPromptSeed('settled');
+      return;
+    }
     // `hasPrompt` is exactly what `resolveNewSessionPromptForCreate` re-derives
     // on submit, so seeding both from one value keeps the Start gate and the
     // submitted text in agreement.
-    const restored = initialPrompt ?? '';
-    promptRef.current = restored;
-    setHasPrompt(restored.trim().length > 0);
-  }, [draftState.settled, initialPrompt, promptRef]);
+    promptRef.current = initialPrompt;
+    setHasPrompt(initialPrompt.trim().length > 0);
+    // A share prefill already seeded the first render; only a stored draft
+    // needs the remount.
+    setPromptSeed(initialPrompt === sharePrefillText ? 'settled' : 'restore');
+  }, [draftState.settled, initialPrompt, promptRef, promptSeed, sharePrefillText]);
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
     organizationId,
@@ -331,48 +353,45 @@ function NewSessionScreenBody() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="New session" />
-      {!draftState.settled ? (
-        <View className="flex-1" />
-      ) : (
-        <NewSessionConfigureForm
-          attachments={attachments.attachments}
-          attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
-          isCreating={isCreating}
-          isModelsError={isModelsError}
-          isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
-          mode={mode}
-          model={modelView.selectedValue}
-          variant={modelView.selectedVariant}
-          modelOptions={modelView.options}
-          initialPrompt={initialPrompt}
-          onChangeText={handlePromptChange}
-          onModeChange={setMode}
-          onModelSelect={handleModelSelect}
-          onAddAttachment={() => void handleAddAttachment()}
-          onRemoveAttachment={handleRemoveAttachment}
-          onRetryAttachment={handleRetryAttachment}
-          onRefetchModels={() => void refetchModels()}
-          onPrefillAttachments={addCandidates}
-          shareId={shareId}
-          voiceInputSettlerRef={voiceInputSettlerRef}
-          showRunOnSelector={showRunOnSelector}
-          runOnInstance={runOnInstance}
-          instanceList={instanceList}
-          isLoadingInstances={isLoadingInstances}
-          onChangeRunOnInstance={handleRunOnChange}
-          showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
-          view={view}
-          isRetrying={isRetrying}
-          onChangeRepo={setSelectedRepo}
-          onOpenGitHubIntegration={openGitHub}
-          onRefreshRepos={() => void refreshReposForceFresh()}
-          repositories={repositories}
-          selectedRepo={selectedRepo}
-          isStartDisabled={isStartDisabled}
-          isSpawningRemote={remoteSpawn.isSpawningRemote}
-          onStartSession={handleStartSession}
-        />
-      )}
+      <NewSessionConfigureForm
+        key={promptSeed === 'restore' ? 'draft' : 'empty'}
+        attachments={attachments.attachments}
+        attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
+        isCreating={isCreating}
+        isModelsError={isModelsError}
+        isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
+        mode={mode}
+        model={modelView.selectedValue}
+        variant={modelView.selectedVariant}
+        modelOptions={modelView.options}
+        initialPrompt={initialPrompt}
+        onChangeText={handlePromptChange}
+        onModeChange={setMode}
+        onModelSelect={handleModelSelect}
+        onAddAttachment={() => void handleAddAttachment()}
+        onRemoveAttachment={handleRemoveAttachment}
+        onRetryAttachment={handleRetryAttachment}
+        onRefetchModels={() => void refetchModels()}
+        onPrefillAttachments={addCandidates}
+        shareId={shareId}
+        voiceInputSettlerRef={voiceInputSettlerRef}
+        showRunOnSelector={showRunOnSelector}
+        runOnInstance={runOnInstance}
+        instanceList={instanceList}
+        isLoadingInstances={isLoadingInstances}
+        onChangeRunOnInstance={handleRunOnChange}
+        showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+        view={view}
+        isRetrying={isRetrying}
+        onChangeRepo={setSelectedRepo}
+        onOpenGitHubIntegration={openGitHub}
+        onRefreshRepos={() => void refreshReposForceFresh()}
+        repositories={repositories}
+        selectedRepo={selectedRepo}
+        isStartDisabled={isStartDisabled}
+        isSpawningRemote={remoteSpawn.isSpawningRemote}
+        onStartSession={handleStartSession}
+      />
     </View>
   );
 }

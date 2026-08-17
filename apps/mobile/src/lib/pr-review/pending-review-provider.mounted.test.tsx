@@ -4,7 +4,8 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  isPendingReviewItemArray,
+  isPendingReviewDraft,
+  pendingReviewDraftKey,
   type PendingReviewItem,
   PendingReviewProvider,
   usePendingReview,
@@ -15,9 +16,17 @@ const draftsMock = vi.hoisted(() => ({
   saveDraft: vi.fn(async (): Promise<void> => undefined),
   flushDraft: vi.fn(async (): Promise<void> => undefined),
   clearDraft: vi.fn(async (): Promise<void> => undefined),
+  // Mirrors the real key builder so the casing test proves the normalization
+  // this module adds, not the format the drafts module owns.
+  prReviewDraftKey: (owner: string, repo: string, number: number) =>
+    `pr-review:${owner}/${repo}#${number}`,
 }));
 
 vi.mock('@/lib/persist/drafts', () => draftsMock);
+
+const sentryMock = vi.hoisted(() => ({ captureException: vi.fn() }));
+
+vi.mock('@sentry/react-native', () => sentryMock);
 
 const appStateHandlers: ((state: string) => void)[] = [];
 
@@ -134,7 +143,7 @@ describe('PendingReviewProvider persistence', () => {
     expect(draftsMock.loadDraft).toHaveBeenCalledWith(
       'u1',
       'pr-review:acme/kilo#42',
-      isPendingReviewItemArray
+      isPendingReviewDraft
     );
     expect(latest(renders).items).toEqual([]);
 
@@ -171,10 +180,25 @@ describe('PendingReviewProvider persistence', () => {
     expect(draftsMock.saveDraft).not.toHaveBeenCalled();
   });
 
-  it('never lets a shape-invalid restored value enter the queue', async () => {
-    // Belt-and-braces on the provider side: even if a load resolved a
-    // malformed value (the real loadDraft already discards it as corrupt),
-    // the queue stays empty and never reaches rendering or submission.
+  it('keeps the valid restored items and drops only the invalid ones', async () => {
+    // One corrupt row must cost one comment, never the whole queued review:
+    // the valid items survive, the malformed ones never reach rendering or
+    // submission, and the drop is reported.
+    draftsMock.loadDraft.mockResolvedValue([
+      ITEM_A,
+      { id: 42, path: 'a.ts' },
+      'not-an-item',
+      null,
+      ITEM_B,
+    ]);
+    const { renders } = mountProvider({ userId: 'u1', draftEntityKey: 'pr-review:acme/kilo#42' });
+    await flushMicrotasks();
+
+    expect(latest(renders).items).toEqual([ITEM_A, ITEM_B]);
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the queue empty when every restored item is malformed', async () => {
     draftsMock.loadDraft.mockResolvedValue([{ id: 42, path: 'a.ts' }, 'not-an-item', null]);
     const { renders } = mountProvider({ userId: 'u1', draftEntityKey: 'pr-review:acme/kilo#42' });
     await flushMicrotasks();
@@ -271,6 +295,16 @@ describe('PendingReviewProvider persistence', () => {
     });
     await flushMicrotasks();
     expect(draftsMock.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('maps both owner/repo casings of one PR to a single draft key', () => {
+    // The recent-PR and viewed-file stores lowercase both segments; a queue
+    // reached through `Kilo-Org/cloud` must not be a different queue from the
+    // one reached through `kilo-org/cloud`.
+    expect(pendingReviewDraftKey('Kilo-Org', 'Cloud', 42)).toBe(
+      pendingReviewDraftKey('kilo-org', 'cloud', 42)
+    );
+    expect(pendingReviewDraftKey('Kilo-Org', 'Cloud', 42)).toBe('pr-review:kilo-org/cloud#42');
   });
 
   it('flushes the pending save when the app leaves the active state', async () => {

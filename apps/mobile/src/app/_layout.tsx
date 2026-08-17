@@ -92,8 +92,11 @@ installE2EWebSocketLatency();
 
 // DEC-02 consent rule: crash and error reporting is mandatory, so
 // `initSentry(false)` runs at module scope — a crash during bootstrap
-// must still be reported. The optional group is `tracesSampleRate`
-// only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// must still be reported. The optional group is `tracesSampleRate` plus
+// MASKED session replay and error screenshots (DEC-02 amendment, owner
+// decision 2026-08-17); the replay integration is only registered once
+// optional consent is accepted, so no replay code runs before the
+// decision. Account identity is cleared by step 7's `Sentry.setUser(null)`.
 // `enableTombstone` is Android 12+ only; NDK stays on for older devices.
 // `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
 // hangs are not reported twice. Native init in the Expo plugin captures
@@ -118,7 +121,17 @@ function initSentry(optionalConsented: boolean) {
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [expoRouterIntegration, Sentry.deeplinkIntegration()],
+    integrations: optionalConsented
+      ? [
+          expoRouterIntegration,
+          Sentry.deeplinkIntegration(),
+          Sentry.mobileReplayIntegration({
+            maskAllText: true,
+            maskAllImages: true,
+            maskAllVectors: true,
+          }),
+        ]
+      : [expoRouterIntegration, Sentry.deeplinkIntegration()],
     enableNativeFramesTracking: false,
 
     beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],

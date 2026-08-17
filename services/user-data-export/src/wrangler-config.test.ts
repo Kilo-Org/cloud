@@ -19,9 +19,11 @@ describe('wrangler config', () => {
     expect(placeholders).toEqual([]);
   });
 
-  it('binds both the primary replica and the export warehouse', () => {
-    expect(config).toContain('"EXPORT_REPLICA_DB"');
+  // The warehouse is the only database an export source reads. A binding to the primary
+  // would let one back in, and with it a file whose fields are as of different moments.
+  it('binds the export warehouse and no replica of the primary', () => {
     expect(config).toContain('"EXPORT_WAREHOUSE_DB"');
+    expect(config).not.toContain('"EXPORT_REPLICA_DB"');
   });
 
   /**

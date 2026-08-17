@@ -1,9 +1,10 @@
 import * as Sentry from '@sentry/react-native';
 
-// Performance tracing (TTID/TTFD, app start) must not run before the user
-// accepts consent (the consent copy only promises "anonymous performance and
-// crash data" — see consent-card.tsx). Session replay, screenshots, and
-// view-hierarchy capture are never enabled.
+// Performance tracing (TTID/TTFD, app start), session replay, and error
+// screenshots must not run before the user accepts consent. With optional
+// consent accepted, replay and screenshots are captured MASKED (maskAllText/
+// maskAllImages in _layout.tsx; DEC-02 amendment, owner decision 2026-08-17,
+// disclosed in consent-details.tsx). View-hierarchy capture is never enabled.
 // This is the pure decision function; src/app/_layout.tsx re-inits Sentry
 // with these options (via reinitSentryForConsent below) whenever the stored
 // consent state changes.
@@ -30,10 +31,10 @@ export function sentryOptionsForConsent(optionalConsented: boolean): SentryConse
   }
 
   return {
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1,
     tracesSampleRate: 0.1,
-    attachScreenshot: false,
+    attachScreenshot: true,
     attachViewHierarchy: false,
   };
 }

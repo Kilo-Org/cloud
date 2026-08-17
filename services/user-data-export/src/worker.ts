@@ -11,7 +11,7 @@ import {
   type ExportJob,
   type HyperdriveBinding,
 } from './databases';
-import { TerminalExportError } from './errors';
+import { SourceReadError, TerminalExportError } from './errors';
 import {
   createSourceAdapters,
   findPresentWarehouseTables,
@@ -19,6 +19,7 @@ import {
   USER_ONLY_SOURCES,
   type ExportRecord,
   type ExportSubject,
+  type SourcePage,
 } from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
@@ -48,13 +49,14 @@ const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;
 /**
  * The page size for every source that does not override it, which is every NARROW source:
- * the widest of them measured 0.48 KB per row, so 4,000 rows is under 2 MB. The sources
- * whose rows are large enough for that to matter set `pageSize` themselves, and the byte
- * budget all of those are derived from is documented beside them in `source-adapters.ts`.
+ * measured row widths there leave a page of this size inside the byte budget. The sources
+ * whose rows are large enough for that to matter set `pageSize` themselves, and the budget
+ * all of those are derived from is documented beside them in `source-adapters.ts`.
  *
- * Raised from 1,000 on 2026-08-15. A page costs 300-400 ms of fixed round trip before
- * returning a row, so an export's wall clock tracks page COUNT far more than page size,
- * and an organization export was exhausting the 13-minute deadline on round trips alone.
+ * Raised from 1,000 on 2026-08-15. A page costs a few hundred milliseconds of fixed round
+ * trip before returning a row, so an export's wall clock tracks page COUNT far more than
+ * page size, and an organization export was exhausting the 13-minute deadline on round
+ * trips alone.
  */
 const PAGE_SIZE = 4_000;
 
@@ -121,8 +123,6 @@ export async function handleGenerationFailure(input: {
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
-  /** Live primary replica. The profile columns the warehouse does not carry. */
-  EXPORT_REPLICA_DB: HyperdriveBinding;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
@@ -175,6 +175,18 @@ export function isAllowedWebCallbackUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The source after this one, or null at the end. One rule, because the failure path and
+ * the completion path both advance and must agree on what comes next; when they were
+ * written out separately a change to either was a change to only half the loop.
+ */
+export function nextReadableAdapter(
+  adapters: SourceAdapter[],
+  from: SourceAdapter
+): SourceAdapter | null {
+  return adapters.slice(adapters.indexOf(from) + 1).find(item => item.readPage) ?? null;
 }
 
 export function resolveSourceAdapter(
@@ -336,6 +348,30 @@ export function exportHeader(
   })}\n`;
 }
 
+/**
+ * The last line of every file, naming any source that failed while being read.
+ *
+ * A trailer rather than a header field, because the header is written before the first
+ * source is read and cannot be amended once a part has been uploaded. A read failure is
+ * only knowable afterwards, so the only honest place to record it is at the end.
+ *
+ * It is written unconditionally, empty list and all. That gives a consumer something the
+ * file did not previously have: proof it is complete. A file that ends without a trailer
+ * was truncated — the generator died, the deadline fired, R2 rejected a part — and until
+ * now that was indistinguishable from a file that simply had no more to say.
+ *
+ * `failedSources` names the source and nothing else. The underlying error is logged, not
+ * exported: a driver message can carry a table name, a column, or a fragment of a query,
+ * and none of that belongs in a file handed to the person the export is about.
+ */
+export function exportTrailer(failedSources: string[]): string {
+  return `${JSON.stringify({
+    type: 'trailer',
+    complete: failedSources.length === 0,
+    failedSources,
+  })}\n`;
+}
+
 export async function processGenerateMessage(
   env: ExportEnv,
   message: ExportQueueMessage
@@ -408,10 +444,7 @@ export async function processGenerateMessage(
     // page would let a single mis-set field change scope midway through a file.
     const subject = exportSubject(job);
     const warehouseQuery = createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse');
-    const allAdapters = createSourceAdapters({
-      replicaQuery: createReplicaQuery(env.EXPORT_REPLICA_DB, 'replica'),
-      warehouseQuery,
-    });
+    const allAdapters = createSourceAdapters({ warehouseQuery });
 
     // Before anything is written, because the header names what is missing and cannot
     // be amended once the first part has been uploaded. One query, not one per source.
@@ -511,6 +544,12 @@ export async function processGenerateMessage(
     // implicit widening TypeScript would otherwise infer from the assignments below.
     let cursor: ExportCursor | null = null;
     let recordCount = 0;
+    // Sources that failed to read. Named in the trailer, so a file says what is missing
+    // from it rather than leaving a consumer to infer absence from silence.
+    const failedSources: string[] = [];
+    // What could be read at all, which is what "everything failed" has to be measured
+    // against. See the guard after the loop.
+    const readableAdapters = adapters.filter(item => item.readPage);
     let nextSource: string | null = adapter.name;
 
     while (nextSource) {
@@ -532,32 +571,76 @@ export async function processGenerateMessage(
       // cannot also be an object.
       const pageNumber = pageCount + 1;
       const pageLimit = adapter.pageSize ?? PAGE_SIZE;
-      const page = await withSpan(
-        'export_source_page',
-        { 'export.source': adapter.name, 'export.page.number': pageNumber },
-        async span => {
-          const result = await readPage({
-            subject,
-            snapshotAt: job.snapshot_at,
-            cursor,
-            limit: pageLimit,
-          });
-          let pageBytes = 0;
-          for (const record of result.records) {
-            const recordBytes = encoder.encode(jsonLine(record));
-            await activeWriter.write(recordBytes);
-            pageBytes += recordBytes.byteLength;
+      // Captured because the loop reassigns `adapter`, which costs the narrowing inside
+      // the closure below.
+      const sourceName = adapter.name;
+      let page: SourcePage;
+      try {
+        page = await withSpan(
+          'export_source_page',
+          { 'export.source': adapter.name, 'export.page.number': pageNumber },
+          async span => {
+            // Only the read is wrapped: a failure here is one source's problem and the
+            // export moves on without it. Everything below writes to the stream, and a
+            // stream that cannot be written to is the export's problem, so those throw
+            // bare and stay fatal. See `SourceReadError`.
+            let result: SourcePage;
+            try {
+              result = await readPage({
+                subject,
+                snapshotAt: job.snapshot_at,
+                cursor,
+                limit: pageLimit,
+              });
+            } catch (error) {
+              // A terminal error is a decision the adapter has already made about the
+              // whole export — `kilocode_users` raises one when the subject is absent
+              // from the snapshot, carrying the message the requester is meant to see.
+              // Wrapping it would demote that to a skipped source and hand back a file
+              // missing its identity section with nothing saying why.
+              if (error instanceof TerminalExportError) throw error;
+              throw new SourceReadError(sourceName, error);
+            }
+            let pageBytes = 0;
+            for (const record of result.records) {
+              const recordBytes = encoder.encode(jsonLine(record));
+              await activeWriter.write(recordBytes);
+              pageBytes += recordBytes.byteLength;
+            }
+            uncompressedSize += pageBytes;
+            // Records, not database rows: an adapter can fan one row out to several
+            // records, so this deliberately differs from db.response.returned_rows on the
+            // nested read span.
+            span.setAttribute('export.page.records', result.records.length);
+            span.setAttribute('export.page.uncompressed_bytes', pageBytes);
+            span.setAttribute('export.page.has_more', result.nextCursor !== null);
+            return result;
           }
-          uncompressedSize += pageBytes;
-          // Records, not database rows: an adapter can fan one row out to several
-          // records, so this deliberately differs from db.response.returned_rows on the
-          // nested read span.
-          span.setAttribute('export.page.records', result.records.length);
-          span.setAttribute('export.page.uncompressed_bytes', pageBytes);
-          span.setAttribute('export.page.has_more', result.nextCursor !== null);
-          return result;
+        );
+      } catch (error) {
+        // A deadline is the export's, not a source's, and must not be absorbed here: the
+        // loop would carry on past it, one source at a time, until the outer timer fired.
+        if (deadlineError) throw deadlineError;
+        if (!(error instanceof SourceReadError)) throw error;
+        failedSources.push(adapter.name);
+        logExportEvent('warn', 'export_source_failed', {
+          exportId: job.id,
+          generation: job.dispatch_generation,
+          source: adapter.name,
+          // The error itself never reaches the file; it is recorded here instead.
+          ...safeError(error.cause),
+        });
+        const afterFailed = nextReadableAdapter(adapters, adapter);
+        if (!afterFailed) {
+          nextSource = null;
+          cursor = null;
+          break;
         }
-      );
+        adapter = afterFailed;
+        cursor = null;
+        nextSource = adapter.name;
+        continue;
+      }
       pageCount += 1;
       recordCount += page.records.length;
       if (page.nextCursor) {
@@ -565,8 +648,7 @@ export async function processGenerateMessage(
         nextSource = adapter.name;
         continue;
       }
-      const currentIndex = adapters.indexOf(adapter);
-      const nextAdapter = adapters.slice(currentIndex + 1).find(item => item.readPage);
+      const nextAdapter = nextReadableAdapter(adapters, adapter);
       if (!nextAdapter) {
         nextSource = null;
         cursor = null;
@@ -576,6 +658,20 @@ export async function processGenerateMessage(
       cursor = null;
       nextSource = adapter.name;
     }
+    // Every source failing is not a partial export, it is a broken one. Completing here
+    // would hand someone an empty file that claims to be their data, which is a worse
+    // outcome than the failure the retry path exists for.
+    //
+    // Counted against the READABLE adapters rather than all of them. `readPage` is
+    // optional on the type and every other advance here filters on it, so comparing
+    // against the full list would let a single reader-less adapter make this condition
+    // unreachable and turn a total failure into a silently empty file.
+    if (failedSources.length > 0 && failedSources.length === readableAdapters.length) {
+      throw new Error('Every export source failed to read');
+    }
+    const trailer = encoder.encode(exportTrailer(failedSources));
+    await writer.write(trailer);
+    uncompressedSize += trailer.byteLength;
     phase = 'compression_finalize';
     // Draining the compressor is where any part uploads still in flight are awaited, so
     // this span is the wait-on-R2 tail of the export rather than compression cost alone.

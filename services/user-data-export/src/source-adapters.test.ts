@@ -5,11 +5,8 @@ import {
   sourceQueryScopes,
   findPresentWarehouseTables,
   warehouseRequirements,
-  DELETED_COLUMN,
-  SOURCES_WITHOUT_DELETED_COLUMN,
   SCOPE_PREDICATES,
-  WAREHOUSE_PROFILE_FIELDS,
-  WAREHOUSE_ONLY_FIELDS,
+  IDENTITY_FIELDS,
   WAREHOUSE_SOURCE_COLUMNS,
   warehouseQueries,
   type ReplicaQuery,
@@ -20,23 +17,16 @@ import { TerminalExportError } from './errors';
 type Call = { text: string; values: unknown[] };
 
 function harness(rows: Record<string, unknown>[] = [], profileRows?: Record<string, unknown>[]) {
-  const replicaCalls: Call[] = [];
   const warehouseCalls: Call[] = [];
-  const replicaQuery: ReplicaQuery = async (text, values) => {
-    replicaCalls.push({ text, values });
-    return rows;
-  };
   const warehouseQuery: ReplicaQuery = async (text, values) => {
     warehouseCalls.push({ text, values });
     // The identity source reads the warehouse for the profile fields only; every other
     // source reads it for its own rows, which is what `rows` stands in for.
     return profileRows ?? rows;
   };
-  return {
-    replicaCalls,
-    warehouseCalls,
-    adapters: createSourceAdapters({ replicaQuery, warehouseQuery }),
-  };
+  // One query function, because the warehouse is the only database a source reads. That
+  // the primary cannot be reached is now a property of this type rather than an assertion.
+  return { warehouseCalls, adapters: createSourceAdapters({ warehouseQuery }) };
 }
 
 function requireAdapter(adapters: SourceAdapter[], name: string): SourceAdapter {
@@ -80,10 +70,12 @@ const PRIMARY_USER_ROW = {
  */
 function warehouseUserRow(overrides: Record<string, unknown> = {}) {
   return {
+    // Null-filled first so the named values below win: the declared list now includes
+    // `email` and `name`, which it did not when it was warehouse-only columns.
+    ...Object.fromEntries(IDENTITY_FIELDS.map(field => [field, null])),
     user_id: 'user-1',
     email: 'warehouse@example.com',
     name: 'Warehouse Name',
-    ...Object.fromEntries(WAREHOUSE_ONLY_FIELDS.map(field => [field, null])),
     ...overrides,
   };
 }
@@ -228,21 +220,23 @@ describe('warehouse scoping guard', () => {
     }
   );
 
-  // Selecting the deletion column from a table that has none is an undefined-column
-  // error at read time, after the source has already been declared present. This keeps
-  // the list of tables without it tied to what the queries actually select.
-  it.each(Object.entries(sourceQueries))(
-    '%s selects the deletion column only where it exists',
-    (_name, query) => {
-      const readsTableWithoutColumn = SOURCES_WITHOUT_DELETED_COLUMN.some(table =>
-        new RegExp(`FROM ${table}\\b`).test(query)
-      );
-      if (readsTableWithoutColumn) expect(query).not.toContain(DELETED_COLUMN);
-    }
-  );
-
   // The probe is only as good as what it asks about. A column selected by a query but
   // absent from the declaration would be read from a table the probe just called ready.
+  //
+  // Plain column names only. A cast, an alias or a COALESCE is skipped rather than parsed:
+  // this exists to catch a column quietly added to a SELECT list, and a half-built SQL
+  // parser failing on the composite cursors would cost more than it caught. The scope
+  // columns are excluded because `warehouseRequirements` adds those itself, per subject.
+  const SCOPE_COLUMN_NAMES = ['kilo_user_id', 'organization_id'];
+  function plainSelectedColumns(query: string): string[] {
+    const body = query.slice('SELECT '.length, query.indexOf('\nFROM'));
+    return body
+      .split(',')
+      .map(part => part.trim())
+      .filter(part => /^[a-z_][a-z0-9_]*$/.test(part))
+      .filter(part => !SCOPE_COLUMN_NAMES.includes(part));
+  }
+
   it.each(Object.entries(WAREHOUSE_SOURCE_COLUMNS))(
     '%s declares every column its queries select',
     (table, declared) => {
@@ -251,16 +245,18 @@ describe('warehouse scoping guard', () => {
         .map(([, query]) => query);
       expect(queries.length).toBeGreaterThan(0);
       for (const query of queries) {
-        if (query.includes(DELETED_COLUMN)) expect(declared).toContain(DELETED_COLUMN);
+        for (const column of plainSelectedColumns(query)) {
+          expect(declared).toContain(column);
+        }
       }
     }
   );
 
-  it('requires the deletion column exactly where the source carries one', () => {
-    const withoutColumn = new Set<string>(SOURCES_WITHOUT_DELETED_COLUMN);
-    for (const [table, columns] of Object.entries(WAREHOUSE_SOURCE_COLUMNS)) {
-      expect(columns.includes(DELETED_COLUMN)).toBe(!withoutColumn.has(table));
-    }
+  // The column the export used to label deleted rows with. Rows prod has deleted are still
+  // returned; nothing in the file says which they are, and no query reads the column that
+  // would say. Asserted across every query so it cannot return one source at a time.
+  it.each(Object.entries(sourceQueries))('%s never selects the deletion column', (_name, query) => {
+    expect(query).not.toContain('_snowflake_deleted');
   });
 });
 
@@ -292,7 +288,7 @@ describe('warehouse availability probe', () => {
     const { warehouseQuery } = probeHarness({ audiences: ['kilo_user_id'] });
 
     const present = await findPresentWarehouseTables(warehouseQuery, [
-      { table: 'audiences', requiredColumns: ['kilo_user_id', DELETED_COLUMN] },
+      { table: 'audiences', requiredColumns: ['kilo_user_id', 'segment'] },
     ]);
 
     expect([...present]).toEqual([]);
@@ -356,10 +352,13 @@ describe('warehouse availability probe', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'usage_daily',
+      'microdollar_usage_hourly',
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
       'orb_customer',
+      'int_microdollar_usage_enriched',
       'audiences',
       'enrichment_data',
       'user_auth_provider',
@@ -375,9 +374,12 @@ describe('warehouse availability probe', () => {
     expect(sourceQueries.warehouseProfileQuery).not.toContain('load_manifest');
   });
 
-  it('reads the primary profile columns from the primary', () => {
-    expect(sourceQueries.userQuery).toContain('FROM kilocode_users');
-    expect(sourceQueries.userQuery).toContain('WHERE id = $1');
+  // The export no longer reads the primary at all: identity comes entirely from the
+  // warehouse, so every column is as of the same moment as the rest of the file.
+  it('reads no table on the primary', () => {
+    for (const query of Object.values(sourceQueries)) {
+      expect(query).not.toContain('kilocode_users');
+    }
   });
 
   // The warehouse names this column `user_id`; the primary names the same value `id`.
@@ -385,18 +387,15 @@ describe('warehouse availability probe', () => {
   it('reads the warehouse profile fields by the warehouse column names', () => {
     expect(sourceQueries.warehouseProfileQuery).toMatch(/FROM users\b/);
     expect(sourceQueries.warehouseProfileQuery).toContain('WHERE user_id = $1');
-    // Exact, not toContain: a column appended to the SELECT list without a matching entry
-    // in WAREHOUSE_PROFILE_FIELDS would be read from the warehouse and then quietly
-    // discarded in favour of the live value, which is the bug this path exists to remove.
+    // Exact, not toContain: the declared list is the whole identity section, so a column
+    // appended to one without the other would be read and never emitted, or emitted and
+    // never read.
     const selected = sourceQueries.warehouseProfileQuery
       .slice('SELECT '.length, sourceQueries.warehouseProfileQuery.indexOf('\nFROM'))
       .split(', ');
-    expect(selected).toEqual([
-      'user_id',
-      ...Object.values(WAREHOUSE_PROFILE_FIELDS),
-      ...WAREHOUSE_ONLY_FIELDS,
-    ]);
-    // Columns the warehouse does not have. Selecting any of them fails at runtime.
+    expect(selected).toEqual([...IDENTITY_FIELDS]);
+    // Columns the warehouse does not have, and columns dropped from the returned set on
+    // request. Selecting any of them fails at runtime or reintroduces a removed field.
     for (const absent of ['google_user_email', 'google_user_name', 'created_at', 'signup_ip']) {
       expect(sourceQueries.warehouseProfileQuery).not.toContain(absent);
     }
@@ -420,10 +419,13 @@ describe('source adapters', () => {
       'deployment_events',
       'source_embeddings',
       'security_findings',
+      'usage_daily',
+      'microdollar_usage_hourly',
       'external_usage_daily',
       'platform_integrations',
       'microdollar_usage_journal',
       'orb_customer',
+      'int_microdollar_usage_enriched',
       'audiences',
       'enrichment_data',
       'user_auth_provider',
@@ -435,27 +437,20 @@ describe('source adapters', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('reads each identity field from the database that has it', async () => {
-    const { adapters, replicaCalls, warehouseCalls } = harness(
-      [PRIMARY_USER_ROW],
-      [warehouseUserRow()]
-    );
+  // Identity comes entirely from the warehouse now, so it is as of the same moment as
+  // every other source and the primary is not read at all.
+  it('reads identity from the warehouse and never from the primary', async () => {
+    const { adapters, warehouseCalls } = harness([PRIMARY_USER_ROW], [warehouseUserRow()]);
 
     await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
 
-    expect(replicaCalls).toEqual([
-      { text: expect.stringContaining('FROM kilocode_users'), values: ['owner-user'] },
-    ]);
     expect(warehouseCalls).toEqual([
       { text: expect.stringContaining('WHERE user_id = $1'), values: ['owner-user'] },
     ]);
   });
 
-  // The warehouse holds location and analytics-identity columns with no counterpart on
-  // the primary. They were absent only because they arrived after the identity section
-  // shipped, which left the export returning someone's signup IP while withholding the
-  // country derived from it.
-  it('returns the warehouse columns the primary does not hold', async () => {
+  // Every declared column reaches the file, including the two location generations.
+  it('returns every declared identity column', async () => {
     const { adapters } = harness(
       [PRIMARY_USER_ROW],
       [
@@ -472,7 +467,7 @@ describe('source adapters', () => {
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
     // Every declared column reaches the file, not just the ones this fixture populates.
-    for (const field of WAREHOUSE_ONLY_FIELDS) expect(byField.has(field)).toBe(true);
+    for (const field of IDENTITY_FIELDS) expect(byField.has(field)).toBe(true);
     expect(byField.get('posthog_city')).toBe('Amsterdam');
     expect(byField.get('current_posthog_city')).toBe('Rotterdam');
     // Both generations are kept: where someone was and where they are are different facts.
@@ -480,7 +475,7 @@ describe('source adapters', () => {
     // The analytics copy of identity is distinct from the account's own and is not
     // collapsed into it.
     expect(byField.get('posthog_email')).toBe('analytics@example.com');
-    expect(byField.get('google_user_email')).toBe('warehouse@example.com');
+    expect(byField.get('email')).toBe('warehouse@example.com');
     // A blank stays a blank rather than failing the export.
     expect(byField.get('vercel_country')).toBeNull();
   });
@@ -507,37 +502,28 @@ describe('source adapters', () => {
     }
   );
 
-  // The point of the change: the two fields the warehouse carries are reported as of the
-  // snapshot, so a name or email changed after the cutoff does not appear beside five
-  // sources frozen before it.
-  it('prefers the warehouse copy of email and name over the live values', async () => {
+  // The identity section is exactly the declared list. The primary-only columns —
+  // account, billing, links, routing identifiers, signup_ip — were dropped on request.
+  it('returns the declared identity fields and nothing else', async () => {
     const { adapters } = harness([PRIMARY_USER_ROW], [warehouseUserRow()]);
 
     const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
+    const fields = page?.records.map(record => record.field) ?? [];
     const value = (field: string) => page?.records.find(record => record.field === field)?.value;
 
-    expect(value('google_user_email')).toBe('warehouse@example.com');
-    expect(value('google_user_name')).toBe('Warehouse Name');
-    // Everything the warehouse does not carry still comes from the primary row.
-    expect(value('microdollars_used')).toBe(1);
-    expect(value('created_at')).toBe('2026-02-16T19:11:40.809Z');
-  });
-
-  // The warehouse columns are nullable text with no constraint, while the primary's are
-  // NOT NULL. Feeding a null into requiredString would throw a plain Error, which is
-  // retryable, so the export would burn its retries on a value the snapshot has frozen.
-  it.each([
-    ['null', null],
-    ['blank', '   '],
-    ['a non-string', 42],
-  ])('falls back to the live value when the warehouse email is %s', async (_label, bad) => {
-    const { adapters } = harness([PRIMARY_USER_ROW], [warehouseUserRow({ email: bad, name: bad })]);
-
-    const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(READ_PAGE_INPUT);
-    const value = (field: string) => page?.records.find(record => record.field === field)?.value;
-
-    expect(value('google_user_email')).toBe('live@example.com');
-    expect(value('google_user_name')).toBe('Live Name');
+    expect(fields).toEqual([...IDENTITY_FIELDS]);
+    expect(value('email')).toBe('warehouse@example.com');
+    expect(value('name')).toBe('Warehouse Name');
+    for (const dropped of [
+      'google_user_email',
+      'microdollars_used',
+      'created_at',
+      'signup_ip',
+      'openrouter_upstream_safety_identifier',
+      'customer_source',
+    ]) {
+      expect(fields).not.toContain(dropped);
+    }
   });
 
   // A row absent from the warehouse is permanent for the life of a snapshot, so this
@@ -610,12 +596,11 @@ describe('source adapters', () => {
   // The identity row belongs to a person. An organization export reading it would put
   // the requesting admin's email and name in a file about the organization.
   it('reads no identity row for an organization subject', async () => {
-    const { adapters, replicaCalls, warehouseCalls } = harness([PRIMARY_USER_ROW]);
+    const { adapters, warehouseCalls } = harness([PRIMARY_USER_ROW]);
 
     const page = await requireAdapter(adapters, 'kilocode_users').readPage?.(ORG_READ_PAGE_INPUT);
 
     expect(page).toEqual({ records: [], nextCursor: null });
-    expect(replicaCalls).toEqual([]);
     expect(warehouseCalls).toEqual([]);
   });
 
@@ -691,7 +676,7 @@ describe('source adapters', () => {
   });
 
   it('keys repeated journal rows for one session by position, keeping every value', async () => {
-    // 12% of real sessions change values across their journal rows, so the rows are
+    // A meaningful share of real sessions change values across their journal rows, so
     // a timeline rather than duplication. Collapsing them would drop titles and
     // branches the user actually had.
     const { adapters } = harness([
@@ -721,10 +706,8 @@ describe('source adapters', () => {
       { source: 'cli_sessions', id: '10.2', field: 'git_branch', value: 'feature/x' },
     ]);
 
-    // Same session, distinguishable rows.
     const sessionIds = page?.records.filter(record => record.field === 'session_id');
     expect(sessionIds?.map(record => record.value)).toEqual(['session-1', 'session-1']);
-    expect(sessionIds?.map(record => record.id)).toEqual(['10.1', '10.2']);
   });
 
   it('feeds a cli session cursor back as both position bounds', async () => {
@@ -803,14 +786,13 @@ describe('source adapters', () => {
     });
   });
 
-  // All three deletion states in one place, on a source that still carries the column.
-  // This used to be asserted on `app_builder_projects`, which gave the flag up when its
-  // projection was reduced; the guarantee is unchanged, so it moved rather than went.
+  // Deleted rows are RETURNED, they are simply no longer distinguished. The export is a
+  // copy of what the warehouse holds about someone rather than a view of what prod still
+  // serves, so withholding the marker had to not become withholding the row.
   //
-  // Only `true` is meaningful. `false` and `null` both produce no property, because the
-  // warehouse cannot distinguish "live" from "not reloaded yet" and the export must not
-  // pretend otherwise.
-  it('marks a deleted row and leaves a live one unmarked', async () => {
+  // All three source states are fed in — deleted, live, and the unknown a not-yet-reloaded
+  // table produces — because the marker's absence must mean the same thing for each.
+  it('returns a deleted row alongside a live one, marking neither', async () => {
     const { adapters } = harness([
       { system_prompt_prefix_id: '1', cursor_secondary: '-', system_prompt_prefix: 'Live' },
       {
@@ -819,7 +801,6 @@ describe('source adapters', () => {
         system_prompt_prefix: 'Deleted',
         _snowflake_deleted: true,
       },
-      // Unknown state: the table's reload has not run. Not deleted as far as we can say.
       {
         system_prompt_prefix_id: '3',
         cursor_secondary: '-',
@@ -837,7 +818,6 @@ describe('source adapters', () => {
         id: '2.-',
         field: 'system_prompt_prefix',
         value: 'Deleted',
-        softDeleted: true,
       },
       {
         source: 'system_prompt_prefix',
@@ -979,7 +959,7 @@ describe('source adapters', () => {
     expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
   });
 
-  it('marks every field of a manifest row prod has since deleted', async () => {
+  it('returns a manifest row prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...MANIFEST_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'code_indexing_manifest').readPage?.(
@@ -987,7 +967,7 @@ describe('source adapters', () => {
     );
 
     expect(page?.records).toHaveLength(3);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   // Unknown is not deleted: the column is NULL throughout on a table whose reload has not
@@ -1082,13 +1062,13 @@ describe('source adapters', () => {
     expect(JSON.parse(String(metadata))).toEqual(SEARCH_ROW.metadata);
   });
 
-  it('marks every field of a search row prod has since deleted', async () => {
+  it('returns a search row prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...SEARCH_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'code_indexing_search').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toHaveLength(3);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   // Reads fewer rows per page than the default, because a row carries a whole result set.
@@ -1117,7 +1097,6 @@ describe('source adapters', () => {
     build_id: 'build-a',
     event_id: '7',
     deployment_id: 'deploy-a',
-    created_by_user_id: 'creator-user',
     event_type: 'build.succeeded',
     event_timestamp: '2026-07-04T09:15:00.000Z',
     payload: { status: 'ok' },
@@ -1140,30 +1119,25 @@ describe('source adapters', () => {
     // Dropped from the projection on request.
     expect(byField.has('event_type')).toBe(false);
     expect(byField.has('event_timestamp')).toBe(false);
+    expect(byField.has('created_by_user_id')).toBe(false);
     expect(page?.nextCursor).toEqual({ key: ['build-a', '7'] });
   });
 
-  // The one source with a third user column. `created_by_user_id` is provenance, and on
-  // an org-owned deployment it names a member rather than the owner. Scoping a user read
-  // on it would hand that member the organization's deployment history as their own, so
-  // it must appear in the SELECT list and never in the WHERE clause.
-  it('exports the deployment creator without ever scoping on it', async () => {
+  // The table carries a third user column naming whoever created the deployment. It is
+  // neither read nor returned, and it never scoped anything: on an org-owned deployment it
+  // names a member rather than the owner, so a user read keyed on it would have returned
+  // an organization's deployment history as that member's own.
+  it('neither reads nor returns the deployment creator', async () => {
     const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
     const adapter = requireAdapter(adapters, 'deployment_events');
 
-    await adapter.readPage?.(READ_PAGE_INPUT);
+    const page = await adapter.readPage?.(READ_PAGE_INPUT);
     await adapter.readPage?.(ORG_READ_PAGE_INPUT);
 
-    for (const call of warehouseCalls) {
-      expect(call.text).not.toContain('WHERE created_by_user_id');
-      expect(call.text).not.toContain('created_by_user_id = $');
-    }
+    for (const call of warehouseCalls) expect(call.text).not.toContain('created_by_user_id');
+    expect(page?.records.some(record => record.field === 'created_by_user_id')).toBe(false);
     expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
     expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
-    const page = await adapter.readPage?.(READ_PAGE_INPUT);
-    expect(page?.records.find(record => record.field === 'created_by_user_id')?.value).toBe(
-      'creator-user'
-    );
   });
 
   it('scopes each deployment event read to one owner column and never both', async () => {
@@ -1205,13 +1179,13 @@ describe('source adapters', () => {
     expect(warehouseCalls[0].values).toEqual(['owner-user', 'build-a', '7', 100]);
   });
 
-  it('marks every field of a deployment event prod has since deleted', async () => {
+  it('returns a deployment event prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...DEPLOYMENT_EVENT_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'deployment_events').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(4);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    expect(page?.records).toHaveLength(3);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   // The joined columns come from a LEFT JOIN through deployment_builds to deployments, so
@@ -1488,8 +1462,8 @@ describe('source adapters', () => {
     expect(page?.records.find(record => record.field === 'cwe_ids')?.value).toBe('{CWE-1321}');
   });
 
-  // Audit trail, like created_by_user_id on deployment_events. Exported so the person can
-  // see who dismissed a finding, never used to decide whose finding it is.
+  // Audit trail rather than attribution: returned so the person can see who dismissed a
+  // finding, never used to decide whose finding it is.
   it('exports the dismisser without ever scoping on it', async () => {
     const { adapters, warehouseCalls } = harness([
       { ...FINDING_ROW, ignored_by: 'admin-user', ignored_reason: 'accepted risk' },
@@ -1663,8 +1637,9 @@ describe('source adapters', () => {
     }
   });
 
-  // Measured across all 38,849 rows: 36,987 user-only, 1,862 org-only, zero carrying both
-  // and zero carrying neither. Each read still names one owner column and not the other.
+  // Measured across the whole table: every row carries exactly one of the two owners, with
+  // none carrying both and none carrying neither. Each read still names one owner column
+  // and not the other.
   it('scopes each integration read to one owner column and never both', async () => {
     const { adapters, warehouseCalls } = harness([INTEGRATION_ROW]);
     const adapter = requireAdapter(adapters, 'platform_integrations');
@@ -1680,8 +1655,8 @@ describe('source adapters', () => {
     expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
   });
 
-  // 3,005 of 38,849 rows are deleted in the source, so this source does carry the flag.
-  it('marks every field of an integration prod has since deleted', async () => {
+  // The source does hold deleted rows, and this source carries the flag to mark them.
+  it('returns a integration prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...INTEGRATION_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'platform_integrations').readPage?.(
@@ -1689,7 +1664,7 @@ describe('source adapters', () => {
     );
 
     expect(page?.records).toHaveLength(3);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   it('reads a missing integration value as absent rather than failing the export', async () => {
@@ -1709,7 +1684,7 @@ describe('source adapters', () => {
 
   const COUNTRY_ROW = { cursor_owner: 'org-9', geoip_country_code: 'NL' };
 
-  it('emits a country under the owner dimension the scope did not pin', async () => {
+  it('emits the country and nothing else', async () => {
     const { adapters } = harness([COUNTRY_ROW]);
 
     const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.({
@@ -1717,35 +1692,10 @@ describe('source adapters', () => {
       limit: 1,
     });
 
-    // A personal export gains the organization the country was seen under. That column is
-    // a dimension here, not a second owner of the row.
     expect(page?.records).toEqual([
-      {
-        source: 'external_usage_daily',
-        id: 'org-9|NL',
-        field: 'organization_id',
-        value: 'org-9',
-      },
-      {
-        source: 'external_usage_daily',
-        id: 'org-9|NL',
-        field: 'geoip_country_code',
-        value: 'NL',
-      },
+      { source: 'external_usage_daily', id: 'NL', field: 'geoip_country_code', value: 'NL' },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['org-9', 'NL'] });
-  });
-
-  it('emits the member dimension instead when an organization asks', async () => {
-    const { adapters } = harness([{ ...COUNTRY_ROW, cursor_owner: 'member-user' }]);
-
-    const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.(
-      ORG_READ_PAGE_INPUT
-    );
-    const fields = page?.records.map(record => record.field) ?? [];
-
-    expect(fields).toContain('kilo_user_id');
-    expect(fields).not.toContain('organization_id');
   });
 
   // The row has no key of its own: all three columns together are what makes it distinct,
@@ -1767,19 +1717,20 @@ describe('source adapters', () => {
   });
 
   // A NULL inside a tuple comparison yields NULL rather than false, so an uncoalesced
-  // cursor would drop exactly the rows the sentinel exists to keep. The emitted value
-  // stays null: the sentinel is a cursor device, not a fact about the person.
-  it('substitutes the sentinel for an absent dimension in the cursor only', async () => {
+  // cursor would drop exactly the rows the sentinel exists to keep. The sentinel is a
+  // cursor device and never reaches a record.
+  it('substitutes the sentinel in the cursor only', async () => {
     const { adapters } = harness([{ cursor_owner: null, geoip_country_code: 'NL' }]);
 
     const page = await requireAdapter(adapters, 'external_usage_daily').readPage?.({
       ...READ_PAGE_INPUT,
       limit: 1,
     });
-    const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
     expect(page?.nextCursor).toEqual({ key: ['-', 'NL'] });
-    expect(byField.get('organization_id')).toBeNull();
+    expect(page?.records).toEqual([
+      { source: 'external_usage_daily', id: 'NL', field: 'geoip_country_code', value: 'NL' },
+    ]);
   });
 
   it('scopes each country read to one owner column and never both', async () => {
@@ -1822,16 +1773,27 @@ describe('source adapters', () => {
       limit: 1,
     });
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
-
-    // `payload_id` repeats about 7.4 times per review, so it is exported as a field to
-    // group the rows and never used to identify one.
-    expect(new Set(page?.records.map(record => record.id))).toEqual(new Set(['11.2']));
     expect(byField.get('payload_id')).toBe('review-1');
     expect(byField.get('repo_full_name')).toBe('acme/private-api');
     expect(byField.get('pr_title')).toBe('Tighten the auth guard');
     expect(byField.get('base_ref')).toBe('main');
     expect(byField.get('previous_summary_body')).toBe('An earlier summary.');
+    expect(page?.records.every(record => record.id === '11.2')).toBe(true);
     expect(page?.nextCursor).toEqual({ key: ['11', '2'] });
+  });
+
+  it('distinguishes code review journal rows sharing a most-significant position', async () => {
+    const { adapters } = harness([
+      CODE_REVIEW_ROW,
+      { ...CODE_REVIEW_ROW, least_significant_position: '3' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'cloud_agent_code_reviews').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const payloadIds = page?.records.filter(record => record.field === 'payload_id');
+
+    expect(payloadIds?.map(record => record.id)).toEqual(['11.2', '11.3']);
   });
 
   // A keyset on payload_id would skip the rest of a review at any page boundary inside
@@ -1919,51 +1881,27 @@ describe('source adapters', () => {
       limit: 1,
     });
 
-    // The key pair is the record id, not a pair of fields: both were dropped from the
-    // returned set on request and survive only as the thing that identifies the account.
     expect(page?.records).toEqual([
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'email',
-        value: 'person@example.com',
-      },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'display_name',
-        value: 'Example Person',
-      },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'avatar_url',
-        value: 'https://example.test/a.png',
-      },
-      {
-        source: 'user_auth_provider',
-        id: 'google.110581',
-        field: 'hosted_domain',
-        value: 'example.com',
-      },
+      { source: 'user_auth_provider', field: 'email', value: 'person@example.com' },
+      { source: 'user_auth_provider', field: 'display_name', value: 'Example Person' },
+      { source: 'user_auth_provider', field: 'avatar_url', value: 'https://example.test/a.png' },
+      { source: 'user_auth_provider', field: 'hosted_domain', value: 'example.com' },
     ]);
     expect(page?.nextCursor).toEqual({ key: ['google', '110581'] });
   });
 
-  // The point of the source. Someone with Google and GitHub linked has two rows, and the
-  // record id is now the only thing telling them apart, since `provider` itself is no
-  // longer returned. That is why the key pair stays in the query and in the id.
-  it('tells two linked accounts of one person apart', async () => {
+  it('returns every linked account and names neither the provider nor its account id', async () => {
     const { adapters } = harness([
       AUTH_PROVIDER_ROW,
       { ...AUTH_PROVIDER_ROW, provider: 'github', provider_account_id: '4821' },
     ]);
 
     const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
-    const ids = new Set(page?.records.map(record => record.id));
+    const fields = page?.records.map(record => record.field) ?? [];
 
-    expect([...ids]).toEqual(['google.110581', 'github.4821']);
-    expect(page?.records.some(record => record.field === 'provider')).toBe(false);
+    expect(page?.records).toHaveLength(8);
+    expect(fields).not.toContain('provider');
+    expect(fields).not.toContain('provider_account_id');
   });
 
   // `kilo_user_id` repeats once per linked account, so it cannot page. The cursor is the
@@ -2004,14 +1942,14 @@ describe('source adapters', () => {
     expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, 100]);
   });
 
-  // 639 of 1,068,683 rows are deleted in the source, so this source does carry the flag.
-  it('marks every field of a linked account prod has since deleted', async () => {
+  // The source does hold deleted rows, and this source carries the flag to mark them.
+  it('returns a linked account prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...AUTH_PROVIDER_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'user_auth_provider').readPage?.(READ_PAGE_INPUT);
 
     expect(page?.records).toHaveLength(4);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
   });
 
   it('reads a missing linked-account value as absent rather than failing the export', async () => {
@@ -2047,7 +1985,7 @@ describe('source adapters', () => {
     ]);
   });
 
-  // `kilo_user_id` is unique across all 1,068,509 rows, so scoping already selects at most
+  // `kilo_user_id` is unique across the table, so scoping already selects at most
   // one row and there is nothing left to page. A cursor here would page on the same column
   // the WHERE clause has already pinned.
   it('reads the audience row without a cursor and never asks for a second page', async () => {
@@ -2094,7 +2032,6 @@ describe('source adapters', () => {
 
   const ORB_ROW = {
     id: 'orb-cus-1',
-    external_customer_id: 'owner-user',
     additional_emails: ['billing@example.com'],
     billing_address: { line1: '1 Example Street', country: 'NL' },
     email: 'person@example.com',
@@ -2112,7 +2049,7 @@ describe('source adapters', () => {
     });
     const byField = new Map(page?.records.map(record => [record.field, record.value]));
 
-    expect(page?.records).toHaveLength(7);
+    expect(page?.records).toHaveLength(6);
     for (const record of page?.records ?? []) expect(record.id).toBe('orb-cus-1');
     expect(byField.get('email')).toBe('person@example.com');
     expect(byField.get('name')).toBe('A Person');
@@ -2146,12 +2083,313 @@ describe('source adapters', () => {
     ).rejects.toThrow('no organization scope');
   });
 
-  it('marks every field of an orb customer prod has since deleted', async () => {
+  it('returns a orb customer prod has deleted, without marking it', async () => {
     const { adapters } = harness([{ ...ORB_ROW, _snowflake_deleted: true }]);
 
     const page = await requireAdapter(adapters, 'orb_customer').readPage?.(READ_PAGE_INPUT);
 
-    expect(page?.records).toHaveLength(7);
-    for (const record of page?.records ?? []) expect(record.softDeleted).toBe(true);
+    expect(page?.records).toHaveLength(6);
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  const USAGE_ENRICHED_ROW = {
+    id: 'usage-1',
+    project_id: 'project-a',
+    vercel_ip_city_id: '2759794',
+    vercel_ip_country_id: 528,
+    vercel_ip_latitude: '52.3676',
+    vercel_ip_longitude: 4.9041,
+  };
+
+  it('emits the five enriched usage fields, keyed by the usage row', async () => {
+    const { adapters } = harness([USAGE_ENRICHED_ROW]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.records).toHaveLength(5);
+    for (const record of page?.records ?? []) expect(record.id).toBe('usage-1');
+    expect(byField.get('project_id')).toBe('project-a');
+    expect(page?.nextCursor).toEqual({ key: ['usage-1'] });
+  });
+
+  // Every numeric column here arrives as a string or a number depending on the driver's
+  // type parsers: bigint is commonly returned as text to protect precision, double
+  // precision as a number. Reading only one form would drop coordinates on the other.
+  it.each([
+    ['vercel_ip_city_id', 2759794],
+    ['vercel_ip_country_id', 528],
+    ['vercel_ip_latitude', 52.3676],
+    ['vercel_ip_longitude', 4.9041],
+  ])('reads %s as a number whichever form the driver returns', async (field, expected) => {
+    const { adapters } = harness([USAGE_ENRICHED_ROW]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    expect(page?.records.find(record => record.field === field)?.value).toBe(expected);
+  });
+
+  it('scopes each enriched usage read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_ENRICHED_ROW]);
+    const adapter = requireAdapter(adapters, 'int_microdollar_usage_enriched');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[0].text).not.toContain('organization_id');
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, 100]);
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(warehouseCalls[1].text).not.toContain('kilo_user_id');
+    expect(warehouseCalls[1].values).toEqual(['org-1', null, 100]);
+  });
+
+  // A dbt model with no CDC column, so this source can say nothing about deletion.
+  it('never marks an enriched usage record as deleted', async () => {
+    const { adapters } = harness([{ ...USAGE_ENRICHED_ROW, _snowflake_deleted: true }]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.(
+      READ_PAGE_INPUT
+    );
+
+    for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
+  });
+
+  it('reads an unusable coordinate as absent rather than failing the export', async () => {
+    const { adapters } = harness([
+      { ...USAGE_ENRICHED_ROW, vercel_ip_latitude: null, vercel_ip_longitude: 'n/a' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'int_microdollar_usage_enriched').readPage?.(
+      READ_PAGE_INPUT
+    );
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('vercel_ip_latitude')).toBeNull();
+    expect(byField.get('vercel_ip_longitude')).toBeNull();
+    expect(byField.get('project_id')).toBe('project-a');
+  });
+});
+
+describe('microdollar usage hourly', () => {
+  // The coalesced key columns are SELECTed as well as ordered on, which SELECT DISTINCT
+  // requires, so a row carries both the raw values and the cursor values. `key_2` comes
+  // back as a number here and as text elsewhere, since a bigint arrives as either.
+  const HOURLY_ROW = {
+    cursor_owner: 'org-9',
+    project_id: 'project-a',
+    vercel_ip_country_id: 528,
+    vercel_ip_country: 'NL',
+    key_0: 'org-9',
+    key_1: 'project-a',
+    key_2: 528,
+    key_3: 'NL',
+  };
+
+  it('emits the three requested fields and neither owner', async () => {
+    const { adapters } = harness([HOURLY_ROW]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const fields = page?.records.map(record => record.field) ?? [];
+
+    expect(fields).toEqual(['project_id', 'vercel_ip_country_id', 'vercel_ip_country']);
+    expect(fields).not.toContain('kilo_user_id');
+    expect(fields).not.toContain('organization_id');
+  });
+
+  // The load still holds the wider row, so the five requested columns repeat underneath.
+  // Without DISTINCT the projected tuple is not unique and a page boundary landing inside
+  // a run of them skips the rest, which is the defect this file has fixed four times.
+  it('deduplicates in the query, since the load does not', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+
+    await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text.startsWith('SELECT DISTINCT ')).toBe(true);
+  });
+
+  // The scope pins one owner, so the cursor is the other four columns.
+  it('pages on every column the scope did not pin', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'project-a', '528', 'NL'] });
+    expect(warehouseCalls[0].values).toEqual(['owner-user', null, null, null, null, 1]);
+  });
+
+  // Two things at once. The indexes are expression indexes over these exact COALESCE
+  // forms, so the query must match them character for character or it cannot use either.
+  // And Postgres rejects an ORDER BY expression absent from the select list of a DISTINCT
+  // query, so the same expressions have to be selected — verified against the database,
+  // since a text-only assertion cannot see a planner error.
+  it('matches the expression indexes and selects what it orders by', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+
+    await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['org-9', 'project-a', '528', 'NL'] },
+    });
+
+    expect(warehouseCalls[0].text).toContain('COALESCE(vercel_ip_country_id, -1)');
+    expect(warehouseCalls[0].text).toContain("COALESCE(project_id, '-')");
+    expect(warehouseCalls[0].text).toContain("COALESCE(vercel_ip_country, '-')");
+    expect(warehouseCalls[0].text).toContain('$4::bigint');
+    // Every ORDER BY expression appears in the select list, which SELECT DISTINCT requires.
+    const selectList = warehouseCalls[0].text.slice(0, warehouseCalls[0].text.indexOf('\nFROM'));
+    for (const expr of [
+      "COALESCE(organization_id, '-')",
+      "COALESCE(project_id, '-')",
+      'COALESCE(vercel_ip_country_id, -1)',
+      "COALESCE(vercel_ip_country, '-')",
+    ]) {
+      expect(selectList).toContain(expr);
+    }
+    expect(warehouseCalls[0].values).toEqual([
+      'owner-user',
+      'org-9',
+      'project-a',
+      '528',
+      'NL',
+      100,
+    ]);
+  });
+
+  it('substitutes the sentinel in the cursor only', async () => {
+    const { adapters } = harness([
+      { ...HOURLY_ROW, project_id: null, cursor_owner: null, key_0: '-', key_1: '-' },
+    ]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(page?.nextCursor).toEqual({ key: ['-', '-', '528', 'NL'] });
+    expect(byField.get('project_id')).toBeNull();
+  });
+
+  // The numeric column takes the numeric sentinel, or the cursor would hand back a value
+  // the WHERE clause cannot compare against a bigint.
+  it('substitutes the numeric sentinel for an absent country id', async () => {
+    const { adapters } = harness([{ ...HOURLY_ROW, vercel_ip_country_id: null, key_2: -1 }]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'project-a', '-1', 'NL'] });
+  });
+
+  it('scopes each read to one owner column and never both', async () => {
+    const { adapters, warehouseCalls } = harness([HOURLY_ROW]);
+    const adapter = requireAdapter(adapters, 'microdollar_usage_hourly');
+
+    await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+  });
+});
+
+describe('usage daily', () => {
+  const USAGE_DAILY_ROW = { cursor_owner: 'org-9', country_code: 'NL' };
+
+  it('emits the country and neither owner', async () => {
+    const { adapters } = harness([USAGE_DAILY_ROW]);
+
+    const page = await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.records).toEqual([
+      { source: 'usage_daily', id: 'NL', field: 'country_code', value: 'NL' },
+    ]);
+  });
+
+  // Both warehouse indexes are expression indexes over these exact COALESCE forms, in this
+  // order, so comparing the raw columns would scan instead of seeking.
+  it('matches the expression indexes the warehouse built', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+
+    await requireAdapter(adapters, 'usage_daily').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text).toContain(
+      "(COALESCE(organization_id, '-'), COALESCE(country_code, '-')) > ($2::text, $3::text)"
+    );
+    expect(warehouseCalls[0].text).toContain(
+      "ORDER BY COALESCE(organization_id, '-'), COALESCE(country_code, '-')"
+    );
+  });
+
+  // The load has already deduplicated this table, so the grain is unique without our help.
+  // Its sibling microdollar_usage_hourly has not, and carries its own DISTINCT.
+  it('does not deduplicate, the load having done it', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+
+    await requireAdapter(adapters, 'usage_daily').readPage?.(READ_PAGE_INPUT);
+
+    expect(warehouseCalls[0].text.startsWith('SELECT DISTINCT')).toBe(false);
+  });
+
+  it('pages on both columns the scope did not pin', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+
+    const page = await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      cursor: { key: ['org-9', 'NL'] },
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'NL'] });
+    expect(warehouseCalls[1].values).toEqual(['owner-user', 'org-9', 'NL', 100]);
+  });
+
+  it('substitutes the sentinel in the cursor only', async () => {
+    const { adapters } = harness([{ cursor_owner: null, country_code: 'NL' }]);
+
+    const page = await requireAdapter(adapters, 'usage_daily').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['-', 'NL'] });
+    expect(page?.records).toEqual([
+      { source: 'usage_daily', id: 'NL', field: 'country_code', value: 'NL' },
+    ]);
+  });
+
+  // `kilo_user_id` holds anon:<ip> values on this table, so it is a predicate and a cursor
+  // value and never a returned field.
+  it('scopes each read to one owner column and returns neither', async () => {
+    const { adapters, warehouseCalls } = harness([USAGE_DAILY_ROW]);
+    const adapter = requireAdapter(adapters, 'usage_daily');
+
+    const page = await adapter.readPage?.(READ_PAGE_INPUT);
+    await adapter.readPage?.(ORG_READ_PAGE_INPUT);
+    const fields = page?.records.map(record => record.field) ?? [];
+
+    expect(warehouseCalls[0].text).toContain('WHERE kilo_user_id = $1');
+    expect(warehouseCalls[1].text).toContain('WHERE organization_id = $1');
+    expect(fields).not.toContain('kilo_user_id');
+    expect(fields).not.toContain('organization_id');
   });
 });

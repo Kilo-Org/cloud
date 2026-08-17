@@ -5,7 +5,8 @@ export type SafeToolName =
   | 'get_memory'
   | 'get_page_snapshot'
   | 'get_viewport_screenshot'
-  | 'search_memories';
+  | 'search_memories'
+  | 'web_search';
 export type WorkflowToolName =
   | 'delete_workflow'
   | 'get_workflow'
@@ -48,6 +49,7 @@ export type AgentConversationEvent =
       readonly reasoningDetails?: readonly unknown[];
       readonly snapshotId?: string;
       readonly tabId: number;
+      readonly textStart?: number;
       readonly type: 'tool-call';
     }
   | {
@@ -71,8 +73,21 @@ export type AgentConversationEvent =
       readonly type: 'tool-call';
     }
   | {
+      readonly arguments: Record<string, unknown>;
+      readonly id: string;
+      /** The agent's own tool name (`read`, `bash`, …), not an extension tool. */
+      readonly name: string;
+      /** Marks the agent-tool member so the renderer can branch on it. */
+      readonly source: 'agent';
+      /** The tool's own one-line summary of the call. */
+      readonly title?: string;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly error?: string;
       readonly id: string;
+      /** Image bytes for an agent tool result, from `agent-tool-images`. */
+      readonly imageDataUrl?: string;
       readonly ok: boolean;
       readonly toolCallId: string;
       readonly type: 'tool-result';
@@ -98,7 +113,7 @@ export type GroupedConversationItem =
       readonly type: 'event';
     }
   | {
-      readonly result: Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+      readonly result?: Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
       readonly toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
       readonly type: 'tool-exchange';
     };
@@ -117,6 +132,7 @@ interface CreateSafeToolCallOptions {
   readonly query?: string;
   readonly snapshotId?: string;
   readonly tabId: number;
+  readonly textStart?: number;
 }
 
 interface CreateRemoteMcpToolCallOptions {
@@ -196,6 +212,7 @@ export const createSafeToolCall = ({
   query,
   snapshotId,
   tabId,
+  textStart,
 }: CreateSafeToolCallOptions): SafeToolCallEvent => ({
   id: createEventId(),
   name,
@@ -205,6 +222,7 @@ export const createSafeToolCall = ({
   ...(query === undefined ? {} : { query }),
   ...(snapshotId === undefined ? {} : { snapshotId }),
   tabId,
+  ...(textStart === undefined ? {} : { textStart }),
   type: 'tool-call',
 });
 
@@ -290,7 +308,7 @@ export const getConversationScrollKey = (items: GroupedConversationItem[]): stri
   items
     .map(item => {
       if (item.type === 'tool-exchange') {
-        return `${item.toolCall.id}:${item.result.id}`;
+        return `${item.toolCall.id}:${item.result?.id ?? 'running'}`;
       }
 
       const { event } = item;

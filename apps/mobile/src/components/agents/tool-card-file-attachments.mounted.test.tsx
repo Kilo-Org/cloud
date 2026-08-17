@@ -67,7 +67,7 @@ vi.mock('@/lib/share-remote-file', () => ({
 }));
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
-vi.mock('lucide-react-native', () => ({ FileIcon: 'FileIcon', Share2: 'Share2' }));
+vi.mock('@/components/ui/icons', () => ({ FileIcon: 'FileIcon', Share2: 'Share2' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),

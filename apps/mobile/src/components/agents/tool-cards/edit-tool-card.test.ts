@@ -6,7 +6,7 @@ import { EditToolCard, EditToolCardBody } from './edit-tool-card';
 import * as React from 'react';
 
 vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
-vi.mock('lucide-react-native', () => ({ Pencil: 'Pencil' }));
+vi.mock('@/components/ui/icons', () => ({ Pencil: 'Pencil' }));
 // Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');

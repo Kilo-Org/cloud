@@ -1,4 +1,4 @@
-import { Check, X } from 'lucide-react-native';
+import { Check, X } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 

@@ -10,6 +10,7 @@ import {
   GlobToolCardBody,
   GrepToolCardBody,
   ListToolCardBody,
+  PatchToolCardBody,
   ReadToolCardBody,
   TaskToolCardBody,
   TodoToolCardBody,
@@ -21,7 +22,7 @@ import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
-vi.mock('lucide-react-native', () => ({ Terminal: 'Terminal' }));
+vi.mock('@/components/ui/icons', () => ({ Terminal: 'Terminal' }));
 vi.mock('./bubble-text-selection-context', () => ({
   useTranscriptTextSelectable: () => true,
 }));
@@ -51,6 +52,7 @@ vi.mock('./tool-cards', () => ({
   GlobToolCardBody: 'GlobToolCardBody',
   GrepToolCardBody: 'GrepToolCardBody',
   ListToolCardBody: 'ListToolCardBody',
+  PatchToolCardBody: 'PatchToolCardBody',
   ReadToolCardBody: 'ReadToolCardBody',
   TaskToolCardBody: 'TaskToolCardBody',
   TodoToolCardBody: 'TodoToolCardBody',
@@ -185,6 +187,8 @@ const routingTable: [string, ToolBody][] = [
   ['codesearch', WebSearchToolCardBody],
   ['webfetch', WebSearchToolCardBody],
   ['list', ListToolCardBody],
+  ['patch', PatchToolCardBody],
+  ['apply_patch', PatchToolCardBody],
   ['todoread', TodoToolCardBody],
   ['todowrite', TodoToolCardBody],
   ['task', TaskToolCardBody],
@@ -216,6 +220,7 @@ describe('ToolPartDetailBody routing', () => {
       GlobToolCardBody,
       GrepToolCardBody,
       ListToolCardBody,
+      PatchToolCardBody,
       ReadToolCardBody,
       TaskToolCardBody,
       TodoToolCardBody,

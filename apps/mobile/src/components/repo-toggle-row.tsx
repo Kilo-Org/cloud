@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react-native';
+import { Lock } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';

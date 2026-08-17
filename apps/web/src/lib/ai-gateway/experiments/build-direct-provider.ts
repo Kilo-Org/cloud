@@ -1,23 +1,10 @@
-import {
-  addCacheBreakpoints,
-  injectReasoningIntoContent,
-  removeCacheBreakpoints,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { CustomLlmCompression } from '@kilocode/db';
-import { api_request_compress_log, type CustomLlmApiConfig } from '@kilocode/db';
+import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import type { CustomLlmApiConfig } from '@kilocode/db';
 import type {
   GatewayChatApiKind,
   Provider,
   TransformRequestContext,
 } from '@/lib/ai-gateway/providers/types';
-import { compress } from 'headroom-ai';
-import type {
-  GatewayMessagesRequest,
-  GatewayResponsesRequest,
-  OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { logExceptInTest } from '@/lib/utils.server';
-import { db } from '@/lib/drizzle';
 
 /**
  * Plain in-memory shape: a `CustomLlmApiConfig` merged with the decrypted
@@ -34,31 +21,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function setPropertyPath(target: Record<string, unknown>, path: string, value: string) {
-  const segments = path.split('.');
-  const finalSegment = segments.at(-1);
-  if (!finalSegment) {
-    return;
-  }
-
-  let current = target;
-
-  for (const segment of segments.slice(0, -1)) {
-    const existing = current[segment];
-    if (isRecord(existing)) {
-      current = existing;
-      continue;
-    }
-
-    const nested: Record<string, unknown> = {};
-    current[segment] = nested;
-    current = nested;
-  }
-
-  current[finalSegment] = value;
-}
-
-function mapThoughtSignatures(context: TransformRequestContext, path: string) {
+function mapGeminiThoughtSignatures(context: TransformRequestContext) {
   if (context.request.kind !== 'chat_completions') {
     return;
   }
@@ -81,49 +44,98 @@ function mapThoughtSignatures(context: TransformRequestContext, path: string) {
 
       const signature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
-      if (typeof signature === 'string') {
-        setPropertyPath(toolCall, path, signature);
+      if (typeof signature !== 'string') {
+        continue;
       }
+
+      const extraContent = isRecord(toolCall.extra_content) ? toolCall.extra_content : {};
+      const google = isRecord(extraContent.google) ? extraContent.google : {};
+      toolCall.extra_content = {
+        ...extraContent,
+        google: {
+          ...google,
+          thought_signature: signature,
+        },
+      };
     }
   }
 }
 
-async function compressWithHeadroom(
-  context: TransformRequestContext,
-  compression: CustomLlmCompression
-) {
-  const messages =
-    context.request.kind === 'responses'
-      ? context.request.body.input
-      : context.request.body.messages;
-  if (!Array.isArray(messages)) {
-    return messages;
+function applyGeminiReasoningTransform(context: TransformRequestContext, reasoningEffort: unknown) {
+  if (context.request.kind !== 'chat_completions') {
+    return;
   }
+
+  const extra = context.request.body as typeof context.request.body & { google?: unknown };
+  delete extra.reasoning_effort;
+
+  if (reasoningEffort !== 'none') {
+    const existingGoogle = isRecord(extra.google) ? extra.google : {};
+    extra.google = {
+      ...existingGoogle,
+      thinking_config: {
+        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
+        include_thoughts: true,
+      },
+    };
+  }
+
+  mapGeminiThoughtSignatures(context);
+}
+
+function renameJsonRefProperties(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.reduce<boolean>(
+      (changed, item) => renameJsonRefProperties(item) || changed,
+      false
+    );
+  }
+
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  let changed = false;
+  for (const [key, nestedValue] of Object.entries(value)) {
+    changed = renameJsonRefProperties(nestedValue) || changed;
+    if (key === '$ref') {
+      delete value.$ref;
+      value._ref = nestedValue;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function sanitizeJsonRefContent(content: string): string {
   try {
-    const result = await compress(messages, {
-      baseUrl: compression.base_url,
-      apiKey: compression.api_key,
-      model: compression.model_alias,
-      fallback: false,
-    });
-    const logId = await db
-      .insert(api_request_compress_log)
-      .values({
-        kilo_user_id: context.kilo_user_id,
-        organization_id: context.organization_id,
-        session_id: context.session_id,
-        model: context.model,
-        provider: context.provider.id,
-        request: context.request,
-        result,
-      })
-      .returning({ id: api_request_compress_log.id });
-    logExceptInTest('[compressWithHeadroom] Inserted into api_request_compress_log', logId[0].id);
-    return result.messages;
-  } catch (e) {
-    logExceptInTest('[compressWithHeadroom]', e);
+    const result: unknown = JSON.parse(content);
+    return renameJsonRefProperties(result) ? JSON.stringify(result) : content;
+  } catch {
+    return content;
   }
-  return messages;
+}
+
+function sanitizeJsonRefToolResults(context: TransformRequestContext) {
+  if (context.request.kind !== 'chat_completions') {
+    return;
+  }
+
+  for (const message of context.request.body.messages) {
+    if (message.role !== 'tool') {
+      continue;
+    }
+
+    if (typeof message.content === 'string') {
+      message.content = sanitizeJsonRefContent(message.content);
+    } else {
+      for (const part of message.content) {
+        if (part.type === 'text') {
+          part.text = sanitizeJsonRefContent(part.text);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -145,9 +157,19 @@ export function buildDirectProvider(
   return {
     id,
     apiUrl: upstream.base_url,
+    apiUrlOverrides: {},
     apiKey: upstream.api_key,
     supportedChatApis,
+    responseTransforms: upstream.use_gemini_reasoning_transform
+      ? { mapGeminiThoughtContent: true }
+      : null,
     async transformRequest(context) {
+      const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);
+      const reasoningEffort =
+        useGeminiReasoning && context.request.kind === 'chat_completions'
+          ? context.request.body.reasoning_effort
+          : undefined;
+
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;
         for (const key of upstream.remove_from_body) {
@@ -159,27 +181,14 @@ export function buildDirectProvider(
         Object.assign(context.extraHeaders, upstream.extra_headers);
       }
       context.request.body.model = upstream.internal_id;
-      if (upstream.remove_cache_breakpoints) {
-        removeCacheBreakpoints(context.request);
-      }
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
       }
-      if (upstream.inject_reasoning_into_content) {
-        injectReasoningIntoContent(context.request);
+      if (useGeminiReasoning) {
+        applyGeminiReasoningTransform(context, reasoningEffort);
       }
-      if (upstream.compression?.enabled) {
-        const messages = await compressWithHeadroom(context, upstream.compression);
-        if (context.request.kind === 'responses') {
-          context.request.body.input = messages as GatewayResponsesRequest['input'];
-        } else if (context.request.kind === 'messages') {
-          context.request.body.messages = messages as GatewayMessagesRequest['messages'];
-        } else {
-          context.request.body.messages = messages as OpenRouterChatCompletionRequest['messages'];
-        }
-      }
-      if (upstream.thought_signature_mapping) {
-        mapThoughtSignatures(context, upstream.thought_signature_mapping);
+      if (upstream.sanitize_ref_fields) {
+        sanitizeJsonRefToolResults(context);
       }
     },
   };

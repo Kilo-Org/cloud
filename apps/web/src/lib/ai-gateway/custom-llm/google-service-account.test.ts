@@ -1,5 +1,9 @@
 import { GoogleAuth } from 'google-auth-library';
-import { CustomLlmDefinitionSchema, type GoogleServiceAccountKey } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  type GoogleServiceAccountKey,
+} from '@kilocode/db/schema-types';
 import { getGoogleServiceAccountAccessToken } from './google-service-account';
 
 jest.mock('google-auth-library');
@@ -28,32 +32,29 @@ const baseDefinition = {
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
   base_url: 'https://us-central1-aiplatform.googleapis.com/v1',
-  organization_ids: ['org-1'],
+  organization_ids: ['00000000-0000-4000-8000-000000000001'],
 };
 
-describe('CustomLlmDefinitionSchema authentication', () => {
-  it('accepts legacy API key authentication', () => {
+describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
+  it('accepts API key credentials', () => {
     expect(
-      CustomLlmDefinitionSchema.safeParse({ ...baseDefinition, api_key: 'partner-token' }).success
+      CustomLlmCredentialsSchema.safeParse({ type: 'api_key', api_key: 'partner-token' }).success
     ).toBe(true);
   });
 
   it('accepts Google Cloud service account authentication', () => {
-    expect(
-      CustomLlmDefinitionSchema.safeParse({
-        ...baseDefinition,
-        google_service_account: serviceAccount('private-key'),
-      }).success
-    ).toBe(true);
+    expect(CustomLlmCredentialsSchema.safeParse(serviceAccount('private-key')).success).toBe(true);
   });
 
-  it('requires exactly one authentication method', () => {
-    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(false);
+  it('validates custom LLM definition without credentials', () => {
+    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
+  });
+
+  it('rejects non-UUID organization IDs', () => {
     expect(
       CustomLlmDefinitionSchema.safeParse({
         ...baseDefinition,
-        api_key: 'partner-token',
-        google_service_account: serviceAccount('private-key'),
+        organization_ids: ['organization-1'],
       }).success
     ).toBe(false);
   });

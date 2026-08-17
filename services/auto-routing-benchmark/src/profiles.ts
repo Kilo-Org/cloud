@@ -12,7 +12,7 @@ import {
   poolEntryKey,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
@@ -228,7 +228,49 @@ export function buildPendingUpsertValues(
     requested_at: nowIso,
     updated_at: nowIso,
     completed_at: null,
+    // An owner asked for this row. The platform flag is left to the platform
+    // sync — a row can be wanted by both.
+    platform_requested: false,
+    user_requested: true,
   };
+}
+
+/**
+ * Mark every submitted entry as user-requested, whatever its current status.
+ *
+ * Admission alone is not enough: an entry the platform sync already created is
+ * reported (not admitted), so nothing would record that an owner wants it. When
+ * the platform list later drops that model its flag is cleared, and the row
+ * would fall out of both queues — pending forever, in nobody's queue, and not
+ * `failed` so no retry could rescue it.
+ */
+export function claimUserRequestedStatement(
+  orm: ReturnType<typeof drizzle>,
+  entries: readonly PoolEntry[],
+  current: CurrentProfileContext,
+  nowIso: string
+) {
+  if (entries.length === 0) {
+    throw new Error('claimUserRequestedStatement requires at least one entry');
+  }
+  return orm
+    .update(benchmarkProfiles)
+    .set({ user_requested: true, updated_at: nowIso })
+    .where(
+      and(
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        eq(benchmarkProfiles.user_requested, false),
+        or(
+          ...entries.map(entry =>
+            and(
+              eq(benchmarkProfiles.model, entry.model),
+              eq(benchmarkProfiles.variant, variantToStorage(entry.variant))
+            )
+          )
+        )
+      )
+    );
 }
 
 const PROFILE_PK_TARGET = [
@@ -423,7 +465,7 @@ export async function registerProfiles(
   }
 
   const admissions = [...chargedAdmissions, ...freeAdmissions];
-  if (admissions.length > 0) {
+  {
     const stmts: BatchItem<'sqlite'>[] = [];
 
     // Events first so the NOT EXISTS guard sees pre-batch profile state.
@@ -450,7 +492,13 @@ export async function registerProfiles(
       );
     }
 
-    // D1 batch requires a non-empty tuple; admissions.length > 0 guarantees it.
+    // Runs for reported entries too, so an existing platform row records that
+    // an owner wants it. Bounded by MAX_POOL_ENTRIES, so it stays well under
+    // D1's bound-variable ceiling.
+    stmts.push(
+      claimUserRequestedStatement(orm, input.entries, current, nowIso) as BatchItem<'sqlite'>
+    );
+
     await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
   }
 

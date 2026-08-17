@@ -12,7 +12,7 @@
 // zero-pill read-only row renders null.
 
 import * as Haptics from 'expo-haptics';
-import { SmilePlus } from 'lucide-react-native';
+import { SmilePlus } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 

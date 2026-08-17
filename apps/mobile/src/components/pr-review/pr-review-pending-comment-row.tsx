@@ -3,7 +3,7 @@
 // pressable body that opens the comment composer in edit mode.
 
 import { type RefObject } from 'react';
-import { Trash2 } from 'lucide-react-native';
+import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';

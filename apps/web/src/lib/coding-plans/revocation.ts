@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, max, ne, sql } from 'drizzle-orm';
 
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -65,6 +65,18 @@ export async function listManualCredentialRevocations(input: {
     updatedAt: string;
   }>
 > {
+  const latestSubscription = db
+    .select({
+      keyInventoryId: coding_plan_subscriptions.key_inventory_id,
+      subscriptionExpiresAt: max(coding_plan_subscriptions.current_period_end).as(
+        'subscription_expires_at'
+      ),
+    })
+    .from(coding_plan_subscriptions)
+    .where(isNotNull(coding_plan_subscriptions.key_inventory_id))
+    .groupBy(coding_plan_subscriptions.key_inventory_id)
+    .as('latest_subscription');
+
   const rows = await db
     .select({
       inventoryKeyId: coding_plan_key_inventory.id,
@@ -73,7 +85,7 @@ export async function listManualCredentialRevocations(input: {
       upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
       status: coding_plan_key_inventory.status,
       revocationRequestedAt: coding_plan_key_inventory.revocation_requested_at,
-      subscriptionExpiresAt: coding_plan_subscriptions.current_period_end,
+      subscriptionExpiresAt: latestSubscription.subscriptionExpiresAt,
       revokedAt: coding_plan_key_inventory.revoked_at,
       revocationAttemptCount: coding_plan_key_inventory.revocation_attempt_count,
       lastRevocationError: coding_plan_key_inventory.last_revocation_error,
@@ -81,8 +93,8 @@ export async function listManualCredentialRevocations(input: {
     })
     .from(coding_plan_key_inventory)
     .leftJoin(
-      coding_plan_subscriptions,
-      eq(coding_plan_subscriptions.key_inventory_id, coding_plan_key_inventory.id)
+      latestSubscription,
+      eq(latestSubscription.keyInventoryId, coding_plan_key_inventory.id)
     )
     .where(
       and(
@@ -92,7 +104,10 @@ export async function listManualCredentialRevocations(input: {
         input.planId ? eq(coding_plan_key_inventory.plan_id, input.planId) : undefined
       )
     )
-    .orderBy(desc(coding_plan_key_inventory.revocation_requested_at));
+    .orderBy(
+      desc(coding_plan_key_inventory.revocation_requested_at),
+      asc(coding_plan_key_inventory.id)
+    );
 
   return rows.map(row => ({
     ...row,

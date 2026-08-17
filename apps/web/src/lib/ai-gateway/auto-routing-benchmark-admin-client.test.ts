@@ -22,6 +22,7 @@ const configResponse = {
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
     maxConcurrency: 4,
+    userMaxConcurrency: 100,
     benchmarkUserId: null,
     benchmarkOrgId: null,
     classifierRepetitions: 1,
@@ -39,6 +40,7 @@ const runsResponse = {
     {
       id: 'run-1',
       kind: 'classifier',
+      purpose: 'platform',
       status: 'completed',
       startedAt: '2026-06-01T00:00:00Z',
       completedAt: '2026-06-01T01:00:00Z',
@@ -139,16 +141,22 @@ describe('auto routing benchmark admin client', () => {
     });
   });
 
-  it('starts a benchmark run with the given kind and force flag', async () => {
+  it('starts a benchmark run with the given kind, force flag and queue', async () => {
     mockFetch.mockResolvedValue({
       status: 200,
       ok: true,
       json: () => Promise.resolve({ runId: 'run-2', enqueuedModels: 3, skippedModels: [] }),
     });
 
-    await expect(startBenchmarkRun('classifier', false)).resolves.toEqual({
+    await expect(startBenchmarkRun('classifier', false, 'platform')).resolves.toEqual({
       status: 200,
-      body: { runId: 'run-2', enqueuedModels: 3, skippedModels: [] },
+      body: {
+        runId: 'run-2',
+        enqueuedModels: 3,
+        skippedModels: [],
+        startedRuns: [],
+        drainErrors: [],
+      },
     });
 
     expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
@@ -157,19 +165,27 @@ describe('auto routing benchmark admin client', () => {
         authorization: 'Bearer test-internal-secret',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ kind: 'classifier', force: false }),
+      body: JSON.stringify({ kind: 'classifier', force: false, queue: 'platform' }),
     });
   });
 
-  it('starts a benchmark run with force=true to re-run existing models', async () => {
+  it('starts a run for both registry queues', async () => {
     mockFetch.mockResolvedValue({
       status: 200,
       ok: true,
       json: () =>
-        Promise.resolve({ runId: 'run-3', enqueuedModels: 3, skippedModels: ['model-a'] }),
+        Promise.resolve({
+          runId: 'decider-1',
+          enqueuedModels: 5,
+          skippedModels: [],
+          startedRuns: [
+            { runId: 'decider-1', purpose: 'platform', entryCount: 2 },
+            { runId: 'user-1', purpose: 'user', entryCount: 3 },
+          ],
+        }),
     });
 
-    await startBenchmarkRun('decider', true);
+    const result = await startBenchmarkRun('decider', false, 'both');
 
     expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
       method: 'POST',
@@ -177,7 +193,13 @@ describe('auto routing benchmark admin client', () => {
         authorization: 'Bearer test-internal-secret',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ kind: 'decider', force: true }),
+      body: JSON.stringify({ kind: 'decider', force: false, queue: 'both' }),
+    });
+    expect(result.body).toMatchObject({
+      startedRuns: [
+        { runId: 'decider-1', purpose: 'platform', entryCount: 2 },
+        { runId: 'user-1', purpose: 'user', entryCount: 3 },
+      ],
     });
   });
 

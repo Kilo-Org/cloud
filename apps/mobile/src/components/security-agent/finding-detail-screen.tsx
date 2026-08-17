@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { Ban, ShieldOff } from 'lucide-react-native';
+import { useNavigation, useRouter } from 'expo-router';
+import { Ban, ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
@@ -18,6 +18,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +48,7 @@ type FindingDetailScreenProps = {
 
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
   const router = useRouter();
+  const navigation = useNavigation();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
   const [tab, setTab] = useState<FindingTab>('details');
@@ -54,6 +56,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const analysisQuery = useSecurityAnalysis(scope, findingId);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const capability = useSecurityAgentCapability(scope);
+
+  // The back control always renders. With local history it pops normally
+  // (findings-list -> finding returns to the list). A push/deep-link open has
+  // no local history, so `router.back()` is a no-op and back replaces the
+  // whole profile-tab subtree with its root instead. The signal is the nested
+  // Stack's own state index, not `router.canGoBack()` (which is recursive and
+  // also reports parent history).
+  const handleBack = () => {
+    const target = findingDetailBackTarget(findingDetailHasLocalHistory(navigation.getState()));
+    if (target.kind === 'pop') {
+      router.back();
+    } else {
+      router.replace(target.href);
+    }
+  };
 
   // Ref indirection keeps the tracking effects independent of the mutation
   // object's identity (a new object every render), so they only re-fire on
@@ -85,7 +102,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Finding" />
+        <ScreenHeader title="Finding" showBackButton onBack={handleBack} />
         <View className="flex-1" style={{ paddingBottom }}>
           <EmptyState
             icon={ShieldOff}
@@ -101,7 +118,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Finding" />
+        <ScreenHeader title="Finding" showBackButton onBack={handleBack} />
         <View className="flex-1 items-center justify-center" style={{ paddingBottom }}>
           <QueryError
             message="Could not load this finding"
@@ -115,7 +132,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Finding" />
+        <ScreenHeader title="Finding" showBackButton onBack={handleBack} />
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
@@ -134,6 +151,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
       <ScreenHeader
         title="Finding"
         eyebrow={finding.repo_full_name}
+        showBackButton
+        onBack={handleBack}
         headerRight={
           canDismiss ? (
             <Pressable

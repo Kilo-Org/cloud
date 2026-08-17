@@ -42,8 +42,9 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { recordKiloAdminElevation, UNSCOPED_TARGET } from '@/lib/admin/admin-access-log';
 import {
-  fetchPullRequestForBranch,
+  fetchPullRequestByNumber,
   fetchPullRequestReviewDecision,
   GitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
@@ -143,6 +144,9 @@ const associatedPrSchema = z.object({
   // Clients can poll the list endpoint while any row reports pending=true to
   // surface review-decision badges shortly after they become available.
   reviewDecisionPending: z.boolean(),
+  // Host platform of the linked PR (e.g. 'github'). Always present when an
+  // associatedPr is returned.
+  platform: z.string(),
 });
 
 type AssociatedPrRow = {
@@ -156,28 +160,177 @@ type AssociatedPrRow = {
   review_decision_pending: boolean | null;
 };
 
-function formatAssociatedPr(row: AssociatedPrRow): z.infer<typeof associatedPrSchema> | null {
+/**
+ * Flat aliases for the session's own stored PR link, produced by
+ * `commonSessionFieldsWithPr`.
+ */
+type SessionPrRow = {
+  session_pr_platform: string | null;
+  session_pr_url: string | null;
+  session_pr_number: number | null;
+};
+
+/**
+ * The session's stored PR link (cli_sessions_v2.platform / pr_url / pr_number)
+ * plus its updated_at, used for the pending-partial lastSyncedAt.
+ */
+type SessionPrFields = {
+  platform: string | null;
+  pr_url: string | null;
+  pr_number: number | null;
+  updated_at: string | null;
+};
+
+/**
+ * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
+ * `null` for non-GitHub hosts or URLs that do not resolve to
+ * `owner/repo/pull/N`. Accepts a trailing subpath (e.g. `/files`), query
+ * string, and fragment, matching the mobile parser so a pasted PR URL is
+ * never skipped during refresh. A PR URL has more than two path segments,
+ * so `parseGitHubOwnerRepo` cannot parse it.
+ */
+export function parseGitHubPrUrl(
+  url: string
+): { owner: string; repo: string; number: number } | null {
+  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
+  let host: string;
+  let path: string;
+  if (sshMatch) {
+    host = sshMatch[1].toLowerCase();
+    path = sshMatch[2];
+  } else {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return null;
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
+      return null;
+    }
+    host = parsed.hostname.toLowerCase();
+    path = parsed.pathname.replace(/^\/+/, '');
+  }
+
+  if (host !== 'github.com' && host !== 'www.github.com') {
+    return null;
+  }
+
+  const segments = path.replace(/\/+$/, '').split('/').filter(Boolean);
+  if (segments.length < 4 || segments[2] !== 'pull') {
+    return null;
+  }
+  const [owner, repo, , numberStr] = segments;
+  const number = Number(numberStr);
+  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
+    return null;
+  }
+  return { owner, repo, number };
+}
+
+/**
+ * Format a cache row into the associatedPr shape. Returns null when the cache
+ * row has no PR. `platform` is supplied by the caller.
+ */
+function formatCacheRow(
+  cache: AssociatedPrRow,
+  platform: string
+): z.infer<typeof associatedPrSchema> | null {
   if (
-    row.pr_url === null ||
-    row.pr_number === null ||
-    row.pr_state === null ||
-    row.pr_last_synced_at === null
+    cache.pr_url === null ||
+    cache.pr_number === null ||
+    cache.pr_state === null ||
+    cache.pr_last_synced_at === null
   ) {
     return null;
   }
-  const rd = row.pr_review_decision;
+  const rd = cache.pr_review_decision;
   const reviewDecision =
     rd === 'approved' || rd === 'changes_requested' || rd === 'review_required' ? rd : null;
   return {
-    url: row.pr_url,
-    number: row.pr_number,
-    state: row.pr_state,
-    title: row.pr_title,
-    headSha: row.pr_head_sha,
-    lastSyncedAt: row.pr_last_synced_at,
+    url: cache.pr_url,
+    number: cache.pr_number,
+    state: cache.pr_state,
+    title: cache.pr_title,
+    headSha: cache.pr_head_sha,
+    lastSyncedAt: cache.pr_last_synced_at,
     reviewDecision,
-    reviewDecisionPending: row.review_decision_pending === true,
+    reviewDecisionPending: cache.review_decision_pending === true,
+    platform,
   };
+}
+
+/**
+ * Build the pending partial for a session whose stored link has not yet been
+ * synced into the branch cache. Carries only the session's own link fields;
+ * never the other PR's cache fields. Returns `null` when the session has no
+ * `pr_url` (callers only reach this with a stored link, but the schema allows
+ * null).
+ */
+function pendingPartialFromSession(
+  session: SessionPrFields,
+  reviewDecisionPending: boolean
+): z.infer<typeof associatedPrSchema> | null {
+  if (session.pr_url === null) {
+    return null;
+  }
+  const url = session.pr_url;
+  const parsed = parseGitHubPrUrl(url);
+  return {
+    url,
+    number: session.pr_number ?? parsed?.number ?? 0,
+    state: 'unknown',
+    title: null,
+    headSha: null,
+    lastSyncedAt: session.updated_at
+      ? new Date(session.updated_at).toISOString()
+      : new Date().toISOString(),
+    reviewDecision: null,
+    reviewDecisionPending,
+    platform: session.platform ?? 'github',
+  };
+}
+
+/**
+ * Compare two PR URLs as the same pull request, ignoring trailing subpath,
+ * query, fragment, and trailing slash. A stored link like
+ * `.../pull/7/files` names the same PR as the canonical cache URL
+ * `.../pull/7`. Returns `false` when either URL is not a parseable GitHub PR
+ * URL.
+ */
+function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
+  if (sessionUrl === cacheUrl) return true;
+  const s = parseGitHubPrUrl(sessionUrl);
+  const c = parseGitHubPrUrl(cacheUrl);
+  return (
+    s !== null &&
+    c !== null &&
+    s.owner.toLowerCase() === c.owner.toLowerCase() &&
+    s.repo.toLowerCase() === c.repo.toLowerCase() &&
+    s.number === c.number
+  );
+}
+
+/**
+ * Format the associated PR for a session, preferring the session's stored link
+ * over the branch cache. Three rules:
+ *   1. Session link matches the cache PR → live cache fields.
+ *   2. Session link present but cache missing/different → pending partial.
+ *   3. No session link → branch fallback (cache-only).
+ */
+function formatAssociatedPr(
+  session: SessionPrFields,
+  cache: AssociatedPrRow,
+  opts?: { partialReviewDecisionPending?: boolean }
+): z.infer<typeof associatedPrSchema> | null {
+  if (session.pr_url) {
+    if (cache.pr_url !== null && samePullRequest(session.pr_url, cache.pr_url)) {
+      return formatCacheRow(cache, session.platform ?? 'github');
+    }
+    return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
+  }
+  // No session link: branch fallback. A cache PR only exists for GitHub.
+  return formatCacheRow(cache, 'github');
 }
 
 const createdOnPlatformField = z.string().min(1).max(100);
@@ -216,6 +369,11 @@ const commonSessionFieldsWithPr = {
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
+  // Session's own stored PR link (distinct names so they never collide with
+  // the cache aliases above).
+  session_pr_platform: cli_sessions_v2.platform,
+  session_pr_url: cli_sessions_v2.pr_url,
+  session_pr_number: cli_sessions_v2.pr_number,
   total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
 } as const;
 
@@ -244,9 +402,11 @@ const sessionPrJoinPredicate = and(
  * Strip the flat `pr_*` columns produced by `commonSessionFieldsWithPr` and
  * fold them into a single `associatedPr` field on each row.
  */
-function projectAssociatedPr<T extends AssociatedPrRow>(
+function projectAssociatedPr<
+  T extends AssociatedPrRow & SessionPrRow & { updated_at: string | null },
+>(
   row: T
-): Omit<T, keyof AssociatedPrRow> & {
+): Omit<T, keyof AssociatedPrRow | keyof SessionPrRow> & {
   associatedPr: z.infer<typeof associatedPrSchema> | null;
 } {
   const {
@@ -258,20 +418,32 @@ function projectAssociatedPr<T extends AssociatedPrRow>(
     pr_last_synced_at,
     pr_review_decision,
     review_decision_pending,
+    session_pr_platform,
+    session_pr_url,
+    session_pr_number,
     ...rest
   } = row;
   return {
     ...rest,
-    associatedPr: formatAssociatedPr({
-      pr_url,
-      pr_number,
-      pr_state,
-      pr_title,
-      pr_head_sha,
-      pr_last_synced_at,
-      pr_review_decision,
-      review_decision_pending,
-    }),
+    associatedPr: formatAssociatedPr(
+      {
+        platform: session_pr_platform,
+        pr_url: session_pr_url,
+        pr_number: session_pr_number,
+        updated_at: rest.updated_at,
+      },
+      {
+        pr_url,
+        pr_number,
+        pr_state,
+        pr_title,
+        pr_head_sha,
+        pr_last_synced_at,
+        pr_review_decision,
+        review_decision_pending,
+      },
+      { partialReviewDecisionPending: false }
+    ),
   };
 }
 
@@ -454,7 +626,15 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
-    if (!ctx.user.is_admin) {
+    if (ctx.user.is_admin) {
+      // No membership predicate is added at all, so the query spans every
+      // organization's sessions. This is the broadest read in the file and it
+      // never touches `adminProcedure`, so it must be recorded here.
+      await recordKiloAdminElevation(ctx, {
+        reason: 'cli_session_cross_org_query',
+        target: UNSCOPED_TARGET,
+      });
+    } else {
       whereConditions.push(sql`(
         ${cli_sessions_v2.organization_id} IS NULL
         OR EXISTS (
@@ -1035,7 +1215,24 @@ export const cliSessionsV2Router = createTRPCRouter({
         version: session.version,
         total_cost_microdollars: session.total_cost_microdollars,
         runtimeState,
-        associatedPr: formatAssociatedPr(row),
+        associatedPr: formatAssociatedPr(
+          {
+            platform: session.platform,
+            pr_url: session.pr_url,
+            pr_number: session.pr_number,
+            updated_at: session.updated_at,
+          },
+          {
+            pr_url: row.pr_url,
+            pr_number: row.pr_number,
+            pr_state: row.pr_state,
+            pr_title: row.pr_title,
+            pr_head_sha: row.pr_head_sha,
+            pr_last_synced_at: row.pr_last_synced_at,
+            pr_review_decision: row.pr_review_decision,
+            review_decision_pending: row.review_decision_pending,
+          }
+        ),
       };
     }),
 
@@ -1044,8 +1241,13 @@ export const cliSessionsV2Router = createTRPCRouter({
    *
    * Invoked when the user explicitly asks for a refresh (e.g. "Refresh PR info"
    * action in the UI). The webhook handler is the primary path; this mutation
-   * exists to recover from missed webhooks. Throttled to once per minute
-   * per (git_url, git_branch, tenant) to avoid hammering the GitHub API.
+   * exists to recover from missed webhooks.
+   *
+   * Stored-link-first: when the session carries `platform`/`pr_url`/`pr_number`
+   * (set by the CLI when it links a PR), this fetches that PR by number and
+   * only writes the branch cache when the branch identity is complete and the
+   * cache does not already hold a different PR. Sessions without a stored link
+   * fall back to the branch cache.
    */
   refreshAssociatedPullRequest: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
@@ -1054,8 +1256,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       const { sessionId } = input;
 
       // 1. Load session with ownership check, LEFT JOINing the per-tenant PR
-      //    cache so we can evaluate the throttle without a second query. Join
-      //    shape mirrors getWithRuntimeState above.
+      //    cache so we can evaluate the throttle without a second query.
       const [row] = await db
         .select({
           session: cli_sessions_v2,
@@ -1069,26 +1270,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
         })
         .from(cli_sessions_v2)
-        .leftJoin(
-          github_branch_pull_requests,
-          and(
-            eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
-            eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
-            or(
-              and(
-                isNotNull(cli_sessions_v2.organization_id),
-                eq(
-                  github_branch_pull_requests.owned_by_organization_id,
-                  cli_sessions_v2.organization_id
-                )
-              ),
-              and(
-                isNull(cli_sessions_v2.organization_id),
-                eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
-              )
-            )
-          )
-        )
+        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
         .where(
           and(
             eq(cli_sessions_v2.session_id, sessionId),
@@ -1105,40 +1287,59 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
 
       const { session } = row;
-      const gitUrl = session.git_url;
-      const branch = session.git_branch;
-      if (!gitUrl || !branch) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Session is not associated with a git branch',
-        });
-      }
 
-      const parsed = parseGitHubOwnerRepo(gitUrl);
-      if (!parsed) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Session git URL is not a recognized GitHub repository',
-        });
-      }
-
-      // 2. Re-verify current authorization BEFORE any short-circuit. A session
-      //    row with our kilo_user_id stored on it is not proof of current
-      //    access — for org-scoped sessions, a removed member must not receive
-      //    cached PR metadata via the throttle path below.
+      // Re-verify current authorization BEFORE any short-circuit.
       if (session.organization_id) {
         await ensureOrganizationAccess(ctx, session.organization_id);
       }
 
-      // 3. Throttle: if the side table was synced recently, short-circuit.
-      if (row.pr_last_synced_at !== null) {
-        const lastSyncedMs = Date.parse(row.pr_last_synced_at);
+      const sessionPr: SessionPrFields = {
+        platform: session.platform,
+        pr_url: session.pr_url,
+        pr_number: session.pr_number,
+        updated_at: session.updated_at,
+      };
+
+      const cacheRow: AssociatedPrRow = {
+        pr_url: row.pr_url,
+        pr_number: row.pr_number,
+        pr_state: row.pr_state,
+        pr_title: row.pr_title,
+        pr_head_sha: row.pr_head_sha,
+        pr_last_synced_at: row.pr_last_synced_at,
+        pr_review_decision: row.pr_review_decision,
+        review_decision_pending: row.review_decision_pending,
+      };
+
+      // Non-GitHub sessions never call GitHub. Return the pending partial (or
+      // the branch fallback when there is no stored link).
+      if (session.platform !== 'github') {
+        return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
+      }
+
+      // Fetch-by-number requires a parseable PR URL. Sessions without one fall
+      // back to the branch cache / pending partial without a GitHub call.
+      const sessionPrUrl = session.pr_url;
+      const parsed = sessionPrUrl ? parseGitHubPrUrl(sessionPrUrl) : null;
+      if (!sessionPrUrl || !parsed) {
+        return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
+      }
+
+      // Throttle: skip the fetch only when the cache row already matches the
+      // session's stored link and was synced recently. A mismatched cache row
+      // must not short-circuit.
+      if (
+        cacheRow.pr_url !== null &&
+        samePullRequest(sessionPrUrl, cacheRow.pr_url) &&
+        cacheRow.pr_last_synced_at !== null
+      ) {
+        const lastSyncedMs = Date.parse(cacheRow.pr_last_synced_at);
         if (Number.isFinite(lastSyncedMs) && Date.now() - lastSyncedMs < REFRESH_THROTTLE_MS) {
-          return { associatedPr: formatAssociatedPr(row) };
+          return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
         }
       }
 
-      // 4. Resolve the GitHub installation for this session's owner.
+      // Resolve the GitHub installation for this session's owner.
       let integration;
       if (session.organization_id) {
         integration = await getIntegrationForOwner(
@@ -1168,14 +1369,14 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
       const appType = integration.github_app_type ?? 'standard';
 
-      // 5. Call GitHub.
+      // Fetch the PR by number from the stored link.
       let fetched;
       try {
-        fetched = await fetchPullRequestForBranch({
+        fetched = await fetchPullRequestByNumber({
           installationId,
           owner: parsed.owner,
           repo: parsed.repo,
-          branch,
+          number: parsed.number,
           appType,
         });
       } catch (error) {
@@ -1191,7 +1392,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             source: 'cli-sessions-v2-router',
             endpoint: 'refreshAssociatedPullRequest',
           },
-          extra: { sessionId, owner: parsed.owner, repo: parsed.repo, branch },
+          extra: { sessionId, owner: parsed.owner, repo: parsed.repo, number: parsed.number },
         });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -1199,8 +1400,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      // 6. Fetch the rolled-up review decision when we have a PR.
-      //    Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
+      // Fetch the rolled-up review decision when we have a PR.
+      // Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
       let reviewDecision: string | null = null;
       let reviewDecisionFetched = false;
       if (fetched && fetched.number > 0) {
@@ -1214,112 +1415,138 @@ export const cliSessionsV2Router = createTRPCRouter({
           });
           reviewDecisionFetched = true;
         } catch {
-          // Non-fatal: cache row is still written; existing review decision preserved.
+          // Non-fatal.
         }
       }
       const hasPrToRefresh = fetched !== null && fetched.number > 0;
 
-      // 7. Persist the result into the per-tenant cache. Even a null
-      //    (no-PR) result persists a sentinel row so the throttle in step 3
-      //    applies to subsequent refreshes for branches without a PR.
-      //
-      //    Normalize git_url on write to match the webhook path and the
-      //    queue-consumer write path. The conflict target matches whichever
-      //    partial unique index corresponds to the session's tenant column.
-      const prColumns = {
-        pr_url: fetched?.htmlUrl ?? null,
-        pr_number: fetched?.number ?? null,
-        pr_state: fetched?.state ?? null,
-        pr_title: fetched?.title ?? null,
-        pr_head_sha: fetched?.headSha ?? null,
-        pr_review_decision: reviewDecision,
-      };
-
-      // On conflict: only overwrite pr_review_decision when the fetch succeeded.
-      // A transient GraphQL failure must not erase an existing approved/changes_requested badge.
-      const prReviewDecisionConflictSet = reviewDecisionFetched
-        ? sql`excluded.pr_review_decision`
-        : github_branch_pull_requests.pr_review_decision;
-
-      const normalizedGitUrl = normalizeGitUrl(gitUrl);
-
-      const ownerValues = session.organization_id
+      // Map the fetched payload to the schema. Never return the raw adapter object.
+      const mapped: z.infer<typeof associatedPrSchema> | null = fetched
         ? {
-            owned_by_organization_id: session.organization_id,
-            owned_by_user_id: null,
+            url: fetched.htmlUrl,
+            number: fetched.number,
+            state: fetched.state,
+            title: fetched.title,
+            headSha: fetched.headSha,
+            lastSyncedAt: new Date().toISOString(),
+            reviewDecision: reviewDecision as z.infer<typeof associatedPrSchema>['reviewDecision'],
+            reviewDecisionPending: false,
+            platform: 'github',
           }
-        : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
+        : null;
 
-      const conflictTarget = session.organization_id
-        ? [
-            github_branch_pull_requests.git_url,
-            github_branch_pull_requests.git_branch,
-            github_branch_pull_requests.owned_by_organization_id,
-          ]
-        : [
-            github_branch_pull_requests.git_url,
-            github_branch_pull_requests.git_branch,
-            github_branch_pull_requests.owned_by_user_id,
-          ];
+      // Write the cache only when the branch identity is complete and the
+      // existing cache row (if any) matches the session's stored link. A
+      // mismatched cache row holds a different PR and must not be clobbered.
+      const gitUrl = session.git_url;
+      const branch = session.git_branch;
+      if (
+        gitUrl != null &&
+        branch != null &&
+        (cacheRow.pr_url == null || samePullRequest(sessionPrUrl, cacheRow.pr_url))
+      ) {
+        const prColumns = {
+          pr_url: fetched?.htmlUrl ?? null,
+          pr_number: fetched?.number ?? null,
+          pr_state: fetched?.state ?? null,
+          pr_title: fetched?.title ?? null,
+          pr_head_sha: fetched?.headSha ?? null,
+          pr_review_decision: reviewDecision,
+        };
 
-      const conflictTargetWhere = session.organization_id
-        ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
-        : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
+        // On conflict: only overwrite pr_review_decision when the fetch succeeded.
+        // A transient GraphQL failure must not erase an existing approved/changes_requested badge.
+        const prReviewDecisionConflictSet = reviewDecisionFetched
+          ? sql`excluded.pr_review_decision`
+          : github_branch_pull_requests.pr_review_decision;
 
-      // Only mark pending when there is a PR whose review decision we still
-      // need. Writing a sentinel (no-PR) row with pending=true would cause the
-      // batch worker to repeatedly claim it and skip it (it filters out rows
-      // without pr_number), never clearing the flag.
-      const [persisted] = await db
-        .insert(github_branch_pull_requests)
-        .values({
-          git_url: normalizedGitUrl,
-          git_branch: branch,
-          ...ownerValues,
-          ...prColumns,
-          review_decision_pending: hasPrToRefresh && !reviewDecisionFetched,
-          review_decision_fetching_at: null,
-          pr_last_synced_at: sql`now()`,
-        })
-        .onConflictDoUpdate({
-          target: conflictTarget,
-          targetWhere: conflictTargetWhere,
-          set: {
-            pr_url: sql`excluded.pr_url`,
-            pr_number: sql`excluded.pr_number`,
-            pr_state: sql`excluded.pr_state`,
-            pr_title: sql`excluded.pr_title`,
-            pr_head_sha: sql`excluded.pr_head_sha`,
-            pr_review_decision: prReviewDecisionConflictSet,
-            review_decision_pending: reviewDecisionFetched
-              ? false
-              : github_branch_pull_requests.review_decision_pending,
-            review_decision_fetching_at: reviewDecisionFetched
-              ? null
-              : github_branch_pull_requests.review_decision_fetching_at,
+        const normalizedGitUrl = normalizeGitUrl(gitUrl);
+
+        const ownerValues = session.organization_id
+          ? {
+              owned_by_organization_id: session.organization_id,
+              owned_by_user_id: null,
+            }
+          : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
+
+        const conflictTarget = session.organization_id
+          ? [
+              github_branch_pull_requests.git_url,
+              github_branch_pull_requests.git_branch,
+              github_branch_pull_requests.owned_by_organization_id,
+            ]
+          : [
+              github_branch_pull_requests.git_url,
+              github_branch_pull_requests.git_branch,
+              github_branch_pull_requests.owned_by_user_id,
+            ];
+
+        const conflictTargetWhere = session.organization_id
+          ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
+          : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
+
+        // Only mark pending when there is a PR whose review decision we still
+        // need. Writing a sentinel (no-PR) row with pending=true would cause the
+        // batch worker to repeatedly claim it and skip it (it filters out rows
+        // without pr_number), never clearing the flag.
+        const [persisted] = await db
+          .insert(github_branch_pull_requests)
+          .values({
+            git_url: normalizedGitUrl,
+            git_branch: branch,
+            ...ownerValues,
+            ...prColumns,
+            review_decision_pending: hasPrToRefresh && !reviewDecisionFetched,
+            review_decision_fetching_at: null,
             pr_last_synced_at: sql`now()`,
-            updated_at: sql`now()`,
-          },
-        })
-        .returning({
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
-        });
+          })
+          .onConflictDoUpdate({
+            target: conflictTarget,
+            targetWhere: conflictTargetWhere,
+            set: {
+              pr_url: sql`excluded.pr_url`,
+              pr_number: sql`excluded.pr_number`,
+              pr_state: sql`excluded.pr_state`,
+              pr_title: sql`excluded.pr_title`,
+              pr_head_sha: sql`excluded.pr_head_sha`,
+              pr_review_decision: prReviewDecisionConflictSet,
+              review_decision_pending: reviewDecisionFetched
+                ? false
+                : github_branch_pull_requests.review_decision_pending,
+              review_decision_fetching_at: reviewDecisionFetched
+                ? null
+                : github_branch_pull_requests.review_decision_fetching_at,
+              pr_last_synced_at: sql`now()`,
+              updated_at: sql`now()`,
+            },
+          })
+          .returning({
+            pr_url: github_branch_pull_requests.pr_url,
+            pr_number: github_branch_pull_requests.pr_number,
+            pr_state: github_branch_pull_requests.pr_state,
+            pr_title: github_branch_pull_requests.pr_title,
+            pr_head_sha: github_branch_pull_requests.pr_head_sha,
+            pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+            pr_review_decision: github_branch_pull_requests.pr_review_decision,
+            review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          });
 
-      if (!persisted) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Upsert did not return a row',
-        });
+        if (!persisted) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Upsert did not return a row',
+          });
+        }
+
+        return { associatedPr: formatAssociatedPr(sessionPr, persisted) };
       }
 
-      return { associatedPr: formatAssociatedPr(persisted) };
+      // Cannot write the cache: return the fetched payload or the pending
+      // partial for this session only.
+      if (mapped) {
+        return { associatedPr: mapped };
+      }
+      return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
     }),
 
   /**

@@ -1,4 +1,4 @@
-import { type LucideIcon, ShieldCheck, Zap } from 'lucide-react-native';
+import { type LucideIcon, ShieldCheck, Zap } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';

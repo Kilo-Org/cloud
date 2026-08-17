@@ -1,6 +1,20 @@
-/* eslint-disable max-lines, consistent-type-imports, no-unsafe-type-assertion, no-unsafe-assignment, no-useless-undefined, jest/no-untyped-mock-factory, prefer-destructuring, import/first -- test mock factories and fixture coverage */
+/* eslint-disable max-lines, consistent-type-imports, no-unsafe-type-assertion, no-unsafe-assignment, no-useless-undefined, jest/no-untyped-mock-factory, jest/no-conditional-in-test, prefer-destructuring, import/first -- test mock factories and fixture coverage */
 import { describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
+import { getDefaultStore } from 'jotai';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
+import {
+  AGENT_WORKFLOWS_STORAGE_KEY,
+  PENDING_WORKFLOW_SAVE_STORAGE_KEY,
+  WORKFLOW_SETTINGS_STORAGE_KEY,
+} from '@/src/shared/agent-workflows-storage';
+import {
+  applyApprovalDecision,
+  pendingApprovalAtom,
+  pendingLockAtom,
+  requestApproval as realRequestApproval,
+} from './pending-approval';
+import type { ApprovalOutcome } from './pending-approval';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
 import {
   executeWorkflowToolCall,
@@ -48,6 +62,23 @@ const createToolCall = (name: string, args: Record<string, unknown> = {}): Workf
     tabId: 1,
     type: 'tool-call',
   }) as unknown as WorkflowToolCallEvent;
+
+// A requestApproval mock that stays pending until the test settles it.
+// The runtime must read the runs setting only after this resolves.
+// A change during the pending card must be reflected in the nextStep.
+const deferredApproval = (): {
+  requestApproval: Mock<WorkflowToolContext['requestApproval']>;
+  settle: (outcome: ApprovalOutcome) => void;
+} => {
+  const { promise, resolve } = Promise.withResolvers<ApprovalOutcome>();
+  const requestApproval = vi.fn<WorkflowToolContext['requestApproval']>(() => promise);
+  return {
+    requestApproval,
+    settle: (outcome: ApprovalOutcome) => {
+      resolve(outcome);
+    },
+  };
+};
 
 // ---------- search_workflows ----------
 
@@ -133,9 +164,11 @@ describe('get_workflow', () => {
 // ---------- save_workflow ----------
 
 describe('save_workflow', () => {
-  it('approved outcome returns saved:true with workflowId', async () => {
+  it('approved outcome returns saved:true with workflowId and the ask-the-user nextStep', async () => {
     const ctx = createBaseCtx({
-      requestApproval: vi.fn().mockResolvedValue({ savedId: 'new-wf-id', status: 'approved' }),
+      requestApproval: vi
+        .fn()
+        .mockResolvedValue({ autoApproved: false, savedId: 'new-wf-id', status: 'approved' }),
     });
 
     const result = await executeWorkflowToolCall(
@@ -149,7 +182,13 @@ describe('save_workflow', () => {
     );
     expect(result).toStrictEqual({
       ok: true,
-      value: { saved: true, workflowId: 'new-wf-id' },
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
     });
   });
 
@@ -299,6 +338,23 @@ describe('save_workflow', () => {
     });
   });
 
+  it('treats a blank workflowId as a create, not a failed update', async () => {
+    const ctx = createBaseCtx();
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'Created',
+        scopeOrigin: 'https://example.com',
+        script: 'return 2;',
+        workflowId: '',
+      }),
+      ctx
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it('rejects invalid scopeOrigin', async () => {
     const ctx = createBaseCtx();
     const result = await executeWorkflowToolCall(
@@ -444,6 +500,325 @@ describe('save_workflow', () => {
     expect(Object.hasOwn(draftArg, 'pathPrefix')).toBe(false);
     expect(Object.hasOwn(draftArg, 'startUrl')).toBe(false);
   });
+
+  it('approved save reports the start-the-run nextStep when the runs toggle is on', async () => {
+    const ctx = createBaseCtx({
+      requestApproval: vi.fn().mockResolvedValue({
+        autoApproved: false,
+        savedId: 'new-wf-id',
+        status: 'approved',
+      }),
+    });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue({
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: true,
+    });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('approved save reports the ask-the-user nextStep when the runs toggle is off', async () => {
+    const ctx = createBaseCtx({
+      requestApproval: vi.fn().mockResolvedValue({
+        autoApproved: false,
+        savedId: 'new-wf-id',
+        status: 'approved',
+      }),
+    });
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue({
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: false,
+    });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('reports the runs toggle at the completed save, not when the card opened', async () => {
+    // The setting starts ON when the card opens.
+    // The user flips it OFF while the approval is pending.
+    // The nextStep must report the OFF state, never the stale ON.
+    const { requestApproval, settle } = deferredApproval();
+    const ctx = createBaseCtx({ requestApproval });
+    const settingsValue: Record<string, unknown> = {
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: true,
+    };
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue(settingsValue);
+
+    const resultPromise = executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    // Wait for the approval request to be in flight before changing the setting.
+    await vi.waitFor(() => {
+      if (requestApproval.mock.calls.length === 0) {
+        throw new Error('approval not requested yet');
+      }
+    });
+
+    // Flip the toggle while the approval card is pending, then approve.
+    settingsValue['autoApproveWorkflowRuns'] = false;
+    settle({ autoApproved: false, savedId: 'new-wf-id', status: 'approved' });
+
+    const result = await resultPromise;
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('reports a run toggle flipped on while approval is pending', async () => {
+    // The setting starts OFF when the card opens.
+    // The user flips it ON while the approval is pending.
+    // The completed save reports the ON state.
+    const { requestApproval, settle } = deferredApproval();
+    const ctx = createBaseCtx({ requestApproval });
+    const settingsValue: Record<string, unknown> = {
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: false,
+    };
+    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue(settingsValue);
+
+    const resultPromise = executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    // Wait for the approval request to be in flight before changing the setting.
+    await vi.waitFor(() => {
+      if (requestApproval.mock.calls.length === 0) {
+        throw new Error('approval not requested yet');
+      }
+    });
+
+    settingsValue['autoApproveWorkflowRuns'] = true;
+    settle({ autoApproved: false, savedId: 'new-wf-id', status: 'approved' });
+
+    const result = await resultPromise;
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('approved save falls back to the cautious nextStep when the settings read fails', async () => {
+    const ctx = createBaseCtx({
+      requestApproval: vi.fn().mockResolvedValue({
+        autoApproved: false,
+        savedId: 'new-wf-id',
+        status: 'approved',
+      }),
+      storage: {
+        getItem: vi.fn().mockImplementation((key: string) => {
+          if (key === WORKFLOW_SETTINGS_STORAGE_KEY) {
+            return Promise.reject(new Error('settings read failed'));
+          }
+          return Promise.resolve([]);
+        }),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
+
+  it('reaches the real approval card and completes the save when the settings read fails', async () => {
+    // Wire the real requestApproval. When the settings read fails inside it,
+    // The save must fall back to the approval card instead of failing.
+    const controller = new AbortController();
+    const values = new Map<string, unknown>([[AGENT_WORKFLOWS_STORAGE_KEY, []]]);
+    const storage = {
+      getItem: (key: string): Promise<unknown> => {
+        if (key === WORKFLOW_SETTINGS_STORAGE_KEY) {
+          return Promise.reject(new Error('settings read failed'));
+        }
+        return Promise.resolve(values.get(key));
+      },
+      removeItem: (key: string): Promise<void> => {
+        values.delete(key);
+        return Promise.resolve(undefined);
+      },
+      setItem: (key: string, value: unknown): Promise<void> => {
+        values.set(key, value);
+        return Promise.resolve(undefined);
+      },
+    };
+
+    const ctx = createBaseCtx({
+      requestApproval: (kind, draft) =>
+        realRequestApproval(storage, kind, draft, controller.signal),
+      storage,
+    });
+
+    const resultPromise = executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+
+    // Wait for the real requestApproval to persist the draft and show the card.
+    const atomStore = getDefaultStore();
+    await vi.waitFor(() => {
+      if (atomStore.get(pendingApprovalAtom) === undefined) {
+        throw new Error('approval card not shown yet');
+      }
+    });
+
+    const entry = atomStore.get(pendingApprovalAtom);
+    if (entry === undefined) {
+      throw new Error('expected an approval card entry');
+    }
+    expect({
+      draftPersisted: values.has(PENDING_WORKFLOW_SAVE_STORAGE_KEY),
+      kind: entry.kind,
+    }).toStrictEqual({ draftPersisted: true, kind: 'workflow' });
+
+    // Approve on the card through the same path the card uses.
+    const outcome = await applyApprovalDecision(storage, 'workflow', entry.draft, true);
+    if (outcome.status !== 'approved') {
+      throw new Error('expected an approved outcome');
+    }
+    entry.settle(outcome);
+
+    const result = await resultPromise;
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: outcome.savedId,
+      },
+    });
+
+    // The workflow is stored, the draft cleared, and the lock released.
+    const workflows = values.get(AGENT_WORKFLOWS_STORAGE_KEY) as Record<string, unknown>[];
+    expect({
+      count: workflows.length,
+      draftCleared: !values.has(PENDING_WORKFLOW_SAVE_STORAGE_KEY),
+    }).toStrictEqual({ count: 1, draftCleared: true });
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
+  });
+
+  it('approved save reports autoApproved true when the outcome was auto-approved', async () => {
+    const ctx = createBaseCtx({
+      requestApproval: vi.fn().mockResolvedValue({
+        autoApproved: true,
+        savedId: 'new-wf-id',
+        status: 'approved',
+      }),
+    });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('save_workflow', {
+        description: 'desc',
+        name: 'My WF',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+      }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: true,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'new-wf-id',
+      },
+    });
+  });
 });
 
 // ---------- run_workflow ----------
@@ -562,25 +937,57 @@ describe('run_workflow', () => {
 // ---------- delete_workflow ----------
 
 describe('delete_workflow', () => {
-  it('deletes in dangerous mode', async () => {
-    const ctx = createBaseCtx();
-    (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue([
-      {
-        createdAt: 100,
-        description: 'desc',
-        id: 'wf-1',
-        name: 'My WF',
-        scopeOrigin: 'https://example.com',
-        script: 'return 1;',
-        updatedAt: 200,
+  it('deletes in dangerous mode and names the workflow', async () => {
+    const setItem = vi.fn().mockResolvedValue(undefined);
+    const ctx = createBaseCtx({
+      storage: {
+        getItem: vi.fn().mockResolvedValue([
+          {
+            createdAt: 100,
+            description: 'desc',
+            id: 'wf-1',
+            name: 'My WF',
+            scopeOrigin: 'https://example.com',
+            script: 'return 1;',
+            updatedAt: 200,
+          },
+        ]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem,
       },
-    ]);
+    });
 
     const result = await executeWorkflowToolCall(
       createToolCall('delete_workflow', { workflowId: 'wf-1' }),
       ctx
     );
-    expect(result).toStrictEqual({ ok: true, value: { deleted: true } });
+    expect(result).toStrictEqual({
+      ok: true,
+      value: { deleted: true, name: 'My WF', workflowId: 'wf-1' },
+    });
+    // The store no longer holds the workflow.
+    expect(setItem).toHaveBeenCalledWith('local:kiloAgentWorkflows', []);
+  });
+
+  it('returns the actionable error for a missing workflow and deletes nothing', async () => {
+    const setItem = vi.fn().mockResolvedValue(undefined);
+    const ctx = createBaseCtx({
+      storage: {
+        getItem: vi.fn().mockResolvedValue([]),
+        removeItem: vi.fn().mockResolvedValue(undefined),
+        setItem,
+      },
+    });
+
+    const result = await executeWorkflowToolCall(
+      createToolCall('delete_workflow', { workflowId: 'nonexistent' }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
+      ok: false,
+    });
+    expect(setItem).not.toHaveBeenCalled();
   });
 
   it('refuses to delete in safe mode without toggle', async () => {
@@ -843,7 +1250,9 @@ describe('startUrl resolution', () => {
   });
 
   it('accepts a path startUrl in save_workflow and stores it absolute', async () => {
-    const requestApproval = vi.fn().mockResolvedValue({ savedId: 'id-1', status: 'approved' });
+    const requestApproval = vi
+      .fn()
+      .mockResolvedValue({ autoApproved: false, savedId: 'id-1', status: 'approved' });
     const ctx = createBaseCtx({ requestApproval });
 
     const result = await executeWorkflowToolCall(
@@ -857,7 +1266,16 @@ describe('startUrl resolution', () => {
       ctx
     );
 
-    expect(result).toStrictEqual({ ok: true, value: { saved: true, workflowId: 'id-1' } });
+    expect(result).toStrictEqual({
+      ok: true,
+      value: {
+        autoApproved: false,
+        nextStep:
+          'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.',
+        saved: true,
+        workflowId: 'id-1',
+      },
+    });
     expect(requestApproval).toHaveBeenCalledWith(
       'workflow',
       expect.objectContaining({ startUrl: 'https://example.com/search' })

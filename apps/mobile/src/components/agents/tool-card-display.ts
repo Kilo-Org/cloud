@@ -7,6 +7,7 @@ import {
   getGenericToolTitle,
   truncateText,
 } from './tool-card-utils';
+import { listPatchFilePaths } from './tool-patch-model';
 
 export type ToolDisplay = {
   title: string;
@@ -85,6 +86,18 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const path = typeof input.path === 'string' ? input.path : undefined;
       const resolvedPath = filePath ?? path ?? '';
       return { title: 'list', subtitle: resolvedPath ? getDirectoryName(resolvedPath) : 'list' };
+    }
+    case 'patch':
+    case 'apply_patch': {
+      const patchText = typeof input.patchText === 'string' ? input.patchText : '';
+      const files = patchText ? listPatchFilePaths(patchText) : [];
+      let subtitle = 'patch';
+      if (files.length === 1) {
+        subtitle = getFilename(files[0] ?? '');
+      } else if (files.length > 1) {
+        subtitle = `${files.length} files`;
+      }
+      return { title: 'patch', subtitle };
     }
     case 'websearch':
     case 'codesearch':

@@ -1915,40 +1915,15 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
-export const CustomLlmCompressionSchema = z.object({
-  enabled: z.literal(true),
-  base_url: z.url().optional(),
-  api_key: z.string().optional(),
-  model_alias: z.string(),
-});
-
-export type CustomLlmCompression = z.infer<typeof CustomLlmCompressionSchema>;
-
-const CustomLlmPropertyPathSchema = z
-  .string()
-  .min(1)
-  .refine(
-    path =>
-      path
-        .split('.')
-        .every(
-          segment =>
-            segment.length > 0 && !['__proto__', 'constructor', 'prototype'].includes(segment)
-        ),
-    'Must be a dot-separated property path'
-  );
-
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
   add_cache_breakpoints: z.boolean().optional(),
-  remove_cache_breakpoints: z.boolean().optional(),
-  inject_reasoning_into_content: z.boolean().optional(),
+  sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  compression: CustomLlmCompressionSchema.optional(),
-  thought_signature_mapping: CustomLlmPropertyPathSchema.optional(),
+  use_gemini_reasoning_transform: z.boolean().optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -1969,24 +1944,28 @@ export const GoogleServiceAccountKeySchema = z.object({
 
 export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
 
-const CustomLlmDefinitionBaseSchema = z.object({
+export const CustomLlmApiKeyCredentialsSchema = z.object({
+  type: z.literal('api_key'),
+  api_key: z.string().min(1),
+});
+
+export type CustomLlmApiKeyCredentials = z.infer<typeof CustomLlmApiKeyCredentialsSchema>;
+
+export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
+  CustomLlmApiKeyCredentialsSchema,
+  GoogleServiceAccountKeySchema,
+]);
+
+export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
+
+export const CustomLlmDefinitionSchema = z.object({
   ...CustomLlmMetadataSchema.shape,
   ...CustomLlmApiConfigSchema.shape,
   display_name: z.string(),
-  organization_ids: z.array(z.string()),
+  organization_ids: z.array(z.uuid()),
+  group_ids: z.array(z.uuid()).optional(),
   pricing: CustomLlmPricingSchema.optional(),
 });
-
-export const CustomLlmDefinitionSchema = z.union([
-  CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.string(),
-    google_service_account: z.never().optional(),
-  }),
-  CustomLlmDefinitionBaseSchema.extend({
-    api_key: z.never().optional(),
-    google_service_account: GoogleServiceAccountKeySchema,
-  }),
-]);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

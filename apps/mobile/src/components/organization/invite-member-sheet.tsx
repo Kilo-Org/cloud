@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 

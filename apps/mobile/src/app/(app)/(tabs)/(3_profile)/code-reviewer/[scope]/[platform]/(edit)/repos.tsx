@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { FolderGit2 } from 'lucide-react-native';
+import { FolderGit2 } from '@/components/ui/icons';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 

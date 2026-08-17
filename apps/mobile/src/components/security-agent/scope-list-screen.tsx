@@ -1,7 +1,7 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Building2, User } from 'lucide-react-native';
+import { Building2, User } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';

@@ -5,7 +5,7 @@ import {
   SearchX,
   ServerCrash,
   WifiOff,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';

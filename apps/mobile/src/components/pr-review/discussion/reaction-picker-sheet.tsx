@@ -11,7 +11,7 @@
 // through one guard so the parent's `onDismiss` handler fires exactly once,
 // never while the native Modal is still presented.
 
-import { X } from 'lucide-react-native';
+import { X } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { Modal, Platform, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

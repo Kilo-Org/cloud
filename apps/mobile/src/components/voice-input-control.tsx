@@ -1,4 +1,4 @@
-import { Mic, Square } from 'lucide-react-native';
+import { Mic, Square } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';

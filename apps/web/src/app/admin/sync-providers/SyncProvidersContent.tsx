@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { RefreshCw } from 'lucide-react';
+import { Bell, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 type SyncResult = {
   id: number;
   generated_at: string;
+  completed_at?: string;
   total_providers: number;
   total_models: number;
   direct_byok_model_counts: Record<string, number>;
@@ -23,6 +24,17 @@ export function SyncProvidersContent() {
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
 
   const lastSyncQuery = useQuery(trpc.admin.syncProviders.getLastSync.queryOptions());
+
+  const testAlertMutation = useMutation(
+    trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
+      onSuccess: () => {
+        toast.success('Posted a test stale-sync alert to the Cloud alerts channel');
+      },
+      onError: error => {
+        toast.error(error.message || 'Could not post the test alert');
+      },
+    })
+  );
 
   const syncMutation = useMutation(
     trpc.admin.syncProviders.triggerSync.mutationOptions({
@@ -54,13 +66,31 @@ export function SyncProvidersContent() {
       </p>
 
       {lastSync && (
-        <p className="text-muted-foreground text-sm">
-          Last successful sync{' '}
-          <span title={new Date(lastSync.generated_at).toLocaleString()}>
-            {formatDistanceToNow(new Date(lastSync.generated_at), { addSuffix: true })}
-          </span>{' '}
-          — {lastSync.total_providers} providers, {lastSync.total_models} models.
-        </p>
+        <div className="text-muted-foreground flex flex-col gap-1 text-sm">
+          {lastSync.completed_at ? (
+            <p>
+              Last full sync completed{' '}
+              <span
+                className="font-medium text-foreground"
+                title={new Date(lastSync.completed_at).toLocaleString()}
+              >
+                {formatDistanceToNow(new Date(lastSync.completed_at), { addSuffix: true })}
+              </span>{' '}
+              ({new Date(lastSync.completed_at).toLocaleString()})
+            </p>
+          ) : (
+            <p className="text-amber-500">No completed full run timestamp recorded in Redis yet.</p>
+          )}
+          {lastSync.generated_at && (
+            <p>
+              Database snapshot generated{' '}
+              <span title={new Date(lastSync.generated_at).toLocaleString()}>
+                {formatDistanceToNow(new Date(lastSync.generated_at), { addSuffix: true })}
+              </span>{' '}
+              — {lastSync.total_providers} providers, {lastSync.total_models} models.
+            </p>
+          )}
+        </div>
       )}
 
       <Card>
@@ -89,7 +119,15 @@ export function SyncProvidersContent() {
               <p className="font-medium">Last sync result</p>
               <ul className="text-muted-foreground mt-2 space-y-1">
                 <li>Row ID: {lastResult.id}</li>
-                <li>Generated at: {new Date(lastResult.generated_at).toLocaleString()}</li>
+                <li>
+                  Database snapshot generated at:{' '}
+                  {new Date(lastResult.generated_at).toLocaleString()}
+                </li>
+                {lastResult.completed_at && (
+                  <li>
+                    Full sync completed at: {new Date(lastResult.completed_at).toLocaleString()}
+                  </li>
+                )}
                 <li>Providers: {lastResult.total_providers}</li>
                 <li>Models: {lastResult.total_models}</li>
                 {Object.entries(lastResult.direct_byok_model_counts).map(([provider, count]) => (
@@ -101,6 +139,32 @@ export function SyncProvidersContent() {
               </ul>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Test stale-sync alert
+          </CardTitle>
+          <CardDescription>
+            Posts a clearly labeled test message to the Cloud alerts channel in every environment.
+            Automatic stale-sync alerts still post only from production Vercel. Tests do not
+            suppress later automatic alerts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => testAlertMutation.mutate()}
+            disabled={testAlertMutation.isPending}
+            className="w-fit"
+          >
+            <Bell className="h-4 w-4" />
+            {testAlertMutation.isPending ? 'Posting test alert...' : 'Post test alert'}
+          </Button>
         </CardContent>
       </Card>
     </div>

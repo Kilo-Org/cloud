@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive pure-projection suite for getToolDisplay and toolPartHasDetails */
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
@@ -139,6 +140,47 @@ describe('getToolDisplay mapping', () => {
     expect(getDisplay(makeToolPart('list', completed()))).toEqual({
       title: 'list',
       subtitle: 'list',
+    });
+  });
+
+  it('maps a single-file patch to its filename for both patch tool names', () => {
+    const patchText = '*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch';
+    expect(getDisplay(makeToolPart('patch', completed({ patchText })))).toEqual({
+      title: 'patch',
+      subtitle: 'app.ts',
+    });
+    expect(getDisplay(makeToolPart('apply_patch', completed({ patchText })))).toEqual({
+      title: 'patch',
+      subtitle: 'app.ts',
+    });
+  });
+
+  it('maps a multi-file patch to the file count', () => {
+    const patchText =
+      '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n' +
+      '*** Add File: src/b.ts\n+x\n*** Delete File: src/c.ts\n*** End Patch';
+    expect(getDisplay(makeToolPart('apply_patch', completed({ patchText })))).toEqual({
+      title: 'patch',
+      subtitle: '3 files',
+    });
+  });
+
+  it('falls back to the patch label for headerless garbage patchText', () => {
+    expect(
+      getDisplay(makeToolPart('apply_patch', completed({ patchText: 'not a patch' })))
+    ).toEqual({ title: 'patch', subtitle: 'patch' });
+    expect(getDisplay(makeToolPart('apply_patch', completed()))).toEqual({
+      title: 'patch',
+      subtitle: 'patch',
+    });
+  });
+
+  it('labels files from a header scan even when the chunk grammar is corrupt', () => {
+    const patchText =
+      '*** Begin Patch\n*** Update File: src/a.ts\n@@\ngarbage\n*** Update File: src/b.ts\n@@\n-bad\n*** End Patch';
+    expect(getDisplay(makeToolPart('apply_patch', completed({ patchText })))).toEqual({
+      title: 'patch',
+      subtitle: '2 files',
     });
   });
 

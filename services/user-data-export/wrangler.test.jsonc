@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "user-data-export-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+  "vars": {
+    "INTERNAL_API_SECRET": "test-token",
+    "NEXTAUTH_SECRET": "test-nextauth-secret",
+    "R2_ACCESS_KEY_ID": "test-access-key",
+    "R2_SECRET_ACCESS_KEY": "test-secret-key",
+    "R2_ACCOUNT_ID": "test-account",
+    "R2_BUCKET_NAME": "test-user-data-exports",
+  },
+  "r2_buckets": [{ "binding": "EXPORT_BUCKET", "bucket_name": "user-data-export-test" }],
+  "queues": {
+    "producers": [{ "binding": "EXPORT_QUEUE", "queue": "user-data-export-test" }],
+    "consumers": [
+      { "queue": "user-data-export-test", "dead_letter_queue": "user-data-export-test-dlq" },
+      { "queue": "user-data-export-test-dlq" },
+    ],
+  },
+}

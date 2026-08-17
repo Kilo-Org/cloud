@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Check } from 'lucide-react-native';
+import { Check } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';

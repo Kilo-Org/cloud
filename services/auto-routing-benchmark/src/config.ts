@@ -1,4 +1,4 @@
-import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkConfig, BenchmarkDeciderModel } from '@kilocode/auto-routing-contracts';
 import {
   getConfigRows,
   replaceConfig,
@@ -6,6 +6,18 @@ import {
   type ConfigDeciderModelRow,
 } from './db';
 import { parsePersistedReasoningEffort } from './reasoning-effort';
+
+/**
+ * Config rows for the manual decider list. The contract already forbids both
+ * variant and reasoningEffort on one model, so each row writes at most one.
+ */
+export function toDeciderModelRows(models: BenchmarkDeciderModel[]): ConfigDeciderModelRow[] {
+  return models.map(m => ({
+    model: m.id,
+    variant: m.variant ?? null,
+    reasoning_effort: m.reasoningEffort ?? null,
+  }));
+}
 
 // Maps the three normalized config tables to the BenchmarkConfig contract.
 // Null when no admin has saved a config yet — the worker never fabricates
@@ -16,6 +28,7 @@ export function mapConfigRows(
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
     max_concurrency: number;
+    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
@@ -32,10 +45,14 @@ export function mapConfigRows(
   excludedAutoDeciderModels: string[] = []
 ): BenchmarkConfig | null {
   const excludedAuto = new Set(excludedAutoDeciderModels);
-  const manualDeciderModels = deciderModelRows.map(r => ({
-    id: r.model,
-    reasoningEffort: parsePersistedReasoningEffort(r.reasoning_effort),
-  }));
+  const manualDeciderModels: BenchmarkDeciderModel[] = deciderModelRows.map(r =>
+    r.variant != null && r.variant !== ''
+      ? // Canonical row: variant only, never both (contract rejects both-set).
+        { id: r.model, variant: r.variant, reasoningEffort: null }
+      : // Legacy row: leave `variant` ABSENT. Emitting `variant: null` here would
+        // make run.ts treat the entry as "no variant" and drop the saved effort.
+        { id: r.model, reasoningEffort: parsePersistedReasoningEffort(r.reasoning_effort) }
+  );
   const manualIds = new Set(manualDeciderModels.map(model => model.id));
   const autoDeciderModels = autoDeciderModelRows.map(r => ({
     id: r.model,
@@ -62,6 +79,7 @@ export function mapConfigRows(
     switchCostFactor: configRow.switch_cost_factor,
     bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
     maxConcurrency: configRow.max_concurrency,
+    userMaxConcurrency: configRow.user_max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
     benchmarkOrgId: configRow.benchmark_org_id,
     classifierRepetitions: configRow.classifier_repetitions,
@@ -95,10 +113,7 @@ export async function saveBenchmarkConfig(
   const stamped: BenchmarkConfig = { ...config, updatedAt, updatedBy };
 
   const manualDeciderModels = config.manualDeciderModels ?? config.deciderModels;
-  const deciderModelRows: ConfigDeciderModelRow[] = manualDeciderModels.map(m => ({
-    model: m.id,
-    reasoning_effort: m.reasoningEffort ?? null,
-  }));
+  const deciderModelRows = toDeciderModelRows(manualDeciderModels);
 
   await replaceConfig(
     db,
@@ -107,6 +122,7 @@ export async function saveBenchmarkConfig(
       switch_cost_factor: config.switchCostFactor,
       best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
       max_concurrency: config.maxConcurrency,
+      user_max_concurrency: config.userMaxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
       benchmark_org_id: config.benchmarkOrgId,
       classifier_repetitions: config.classifierRepetitions,

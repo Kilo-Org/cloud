@@ -1,4 +1,4 @@
-import { MoreVertical, Shuffle } from 'lucide-react-native';
+import { MoreVertical, Shuffle } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';

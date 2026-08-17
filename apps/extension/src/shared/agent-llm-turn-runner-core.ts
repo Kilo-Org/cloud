@@ -1,10 +1,19 @@
-import { createAssistantMessage, createThinkingBlock } from './agent-conversation';
+/* eslint-disable max-lines, promise/avoid-new, promise/no-multiple-resolved -- Turn loop with a transparent stream-retry tier; the cancellable delay needs a raw, guard-settled promise. */
+import {
+  createAssistantMessage,
+  createThinkingBlock,
+  createUserMessage,
+} from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import { runToolCalls } from './agent-tool-results';
 import type { FetchLike } from './auth';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 import type { KiloGatewayToolCallRequest, KiloGatewayToolDefinition } from './kilo-api-client';
-import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
+import {
+  fetchKiloGatewayChatCompletionStream,
+  KiloGatewayHttpError,
+  KiloGatewayStreamStalledError,
+} from './kilo-api-client';
 import type { EvalTabResult } from './tab-debugger';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
@@ -58,7 +67,86 @@ const withReasoningDetails = <ToolCall extends ToolCallEvent>(
 const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
+const isHighEffort = (thinkingEffort: string | undefined): boolean =>
+  thinkingEffort === 'high' || thinkingEffort === 'xhigh' || thinkingEffort === 'max';
+
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+
+// One transparent retry tier for failures the user cannot act on: a stalled stream, a transient network failure, or a retriable gateway status.
+const MAX_STREAM_ATTEMPTS = 3;
+const STREAM_RETRY_DELAYS_MS = [1000, 4000];
+
+const isRetriableStreamError = (error: unknown): boolean => {
+  if (error instanceof KiloGatewayStreamStalledError || error instanceof TruncatedCompletionError) {
+    return true;
+  }
+  if (error instanceof KiloGatewayHttpError) {
+    return error.status === 429 || error.status >= 500;
+  }
+  // Fetch network failures surface as TypeError ("Failed to fetch").
+  return error instanceof TypeError;
+};
+
+// Mirrors the gateway's own error-class finish reasons. A completion cut short mid-thought (no tool calls to act on) is a provider fault the user cannot fix, so the turn retries it transparently.
+// 'model_context_window_exceeded' is deliberately absent: a prompt that overflowed the context cannot fit on a retry of the same messages, so the turn keeps the partial completion instead of burning identical billed attempts.
+const TRUNCATED_FINISH_REASONS = new Set([
+  'length',
+  'max_tokens',
+  'content_filter',
+  'content-filter',
+  'error',
+  'network_error',
+  'failed',
+  'engine_overloaded',
+  'incomplete',
+]);
+
+class TruncatedCompletionError extends Error {
+  constructor(finishReason: string) {
+    super(`The model response was cut short (finish reason: ${finishReason}).`);
+    this.name = 'TruncatedCompletionError';
+  }
+}
+
+// Some models announce an action ("Creating the workflow…") and then stop, expecting to be re-invoked. A user would type "continue"; the harness sends that once, invisibly, when a tool-using turn ends on a short, question-free announcement of work. The nudge message is never persisted.
+const CONTINUE_NUDGE_TEXT =
+  'Continue: finish the request now, in this turn. If everything is already done, state the final result.';
+const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
+// First-person intent or a progressive verb: the model said what it is about to do rather than what it did.
+const ANNOUNCEMENT_RE =
+  /\b(?:i'?ll|i will|i'?m \w+ing|i am \w+ing|i am going to|let me|now i|next i)\b|^\s*\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
+
+// A real question to the user ends the message with "?"; a mid-text "?" is usually a URL query string (…/search?q=) or code, not a question, so only a trailing "?" suppresses the nudge.
+const endsWithQuestion = (text: string): boolean => text.trimEnd().endsWith('?');
+
+const deservesContinueNudge = (lastAssistantText: string): boolean =>
+  lastAssistantText.length > 0 &&
+  lastAssistantText.length < CONTINUE_NUDGE_MAX_TEXT_LENGTH &&
+  !endsWithQuestion(lastAssistantText) &&
+  ANNOUNCEMENT_RE.test(lastAssistantText);
+
+// A turn that ends with thinking but no assistant text and no tool calls never answered the user; the model spent its completion reasoning and stopped. The finish reason is healthy, so the retry tier never sees it — the nudge does.
+const endedThinkingOnly = (
+  completionEvents: readonly AgentConversationEvent[],
+  lastAssistantText: string
+): boolean => lastAssistantText.length === 0 && completionEvents.length > 0;
+
+// eslint-disable-next-line promise/avoid-new -- A cancellable timer has no promise-returning primitive to defer to.
+const abortableDelay = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
+  new Promise(resolve => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal?.addEventListener('abort', finish, { once: true });
+  });
 
 export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   apiBaseUrl,
@@ -83,6 +171,45 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   updateThinkingBlock,
   onAssistantStreaming,
 }: RunLlmTurnOptions<ToolCall>): Promise<void> => {
+  // A weak model can loop one byte-identical failing tool call for the whole turn (measured: 118 identical run_workflow calls). After the third identical failure the error tells it to stop; a success resets the count.
+  const identicalFailureCounts = new Map<string, number>();
+  // Some models mutate the arguments slightly each round, so byte-identity never collides and the text escalation never lands; interleaved successes of other tools also defeat a consecutive counter (measured: 50 failing run_workflow calls between healthy snapshots). Count TOTAL failures per tool for the turn: across 812 benchmark attempts no passing attempt exceeded 19; runaway loops hit 118-119. At 25 the turn ends instead of burning billed rounds.
+  const MAX_TOOL_FAILURES_PER_TURN = 25;
+  const failureTotals = new Map<string, number>();
+  // Snapshot the message when the cap trips so later results cannot change it.
+  let streakStopMessage: string | undefined = undefined;
+  const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
+    // Key on the call content, not its per-call ids or attached reasoning: repeats must collide.
+    const {
+      id: _id,
+      providerToolCallId: _provider,
+      reasoningDetails: _reasoning,
+      ...callContent
+    } = toolCall as ToolCallEvent & {
+      readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
+    };
+    const key = JSON.stringify(callContent);
+    const result = await executeToolCall(toolCall);
+    if (result.ok) {
+      identicalFailureCounts.delete(key);
+      return result;
+    }
+    const totalFailures = (failureTotals.get(toolCall.name) ?? 0) + 1;
+    failureTotals.set(toolCall.name, totalFailures);
+    if (totalFailures >= MAX_TOOL_FAILURES_PER_TURN) {
+      streakStopMessage = `Stopped: ${toolCall.name} failed ${String(totalFailures)} times this turn. Something is blocking this approach — please adjust the request or try again.`;
+    }
+    const count = (identicalFailureCounts.get(key) ?? 0) + 1;
+    identicalFailureCounts.set(key, count);
+    if (count < 3) {
+      return result;
+    }
+    return {
+      error: `${result.error} — You have sent this exact ${toolCall.name} call ${count} times and it keeps failing. Do not send it again. Change the arguments or take a different approach.`,
+      ok: false,
+    };
+  };
   const getGatewayChatCompletion = (
     nextEvents: AgentConversationEvent[],
     onContentDelta: (delta: string) => void,
@@ -90,6 +217,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   ) =>
     fetchKiloGatewayChatCompletionStream({
       apiBaseUrl,
+      // A high-effort model legitimately streams for minutes; anything else past two minutes is a pathological trickle worth cutting and retrying.
+      completionTimeoutMs: isHighEffort(thinkingEffort) ? 300_000 : 120_000,
       fetch,
       messages: buildGatewayMessagesFromEvents(nextEvents, { supportsImages }),
       model,
@@ -106,6 +235,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     nextEvents: AgentConversationEvent[]
   ): Promise<{
     completionEvents: AgentConversationEvent[];
+    finishReason: string | undefined;
     toolCallEvents: ToolCall[];
   }> => {
     const completionEvents: AgentConversationEvent[] = [];
@@ -114,41 +244,100 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     let streamedThinkingText = '';
     let streamedThinkingEventId: string | undefined = undefined;
     let didStartAssistantStreaming = false;
+    // A retry replaces the streamed text only when its own first delta arrives; a retry that fails outright leaves the previous text in place instead of a permanently empty bubble.
+    let resetStreamedTextOnNextDelta = false;
+    let resetThinkingTextOnNextDelta = false;
 
     try {
-      const completion = await getGatewayChatCompletion(
-        nextEvents,
-        delta => {
-          streamedText += delta;
+      const streamOnce = (): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> =>
+        getGatewayChatCompletion(
+          nextEvents,
+          delta => {
+            if (resetStreamedTextOnNextDelta) {
+              resetStreamedTextOnNextDelta = false;
+              streamedText = '';
+            }
+            streamedText += delta;
 
-          if (streamedAssistantEventId === undefined) {
-            const assistantEvent = createAssistantMessage(streamedText);
+            if (streamedAssistantEventId === undefined) {
+              const assistantEvent = createAssistantMessage(streamedText);
 
-            streamedAssistantEventId = assistantEvent.id;
-            didStartAssistantStreaming = true;
-            onAssistantStreaming?.(assistantEvent.id);
-            completionEvents.push(assistantEvent);
-            appendEvents([assistantEvent]);
-            return;
+              streamedAssistantEventId = assistantEvent.id;
+              didStartAssistantStreaming = true;
+              onAssistantStreaming?.(assistantEvent.id);
+              completionEvents.push(assistantEvent);
+              appendEvents([assistantEvent]);
+              return;
+            }
+
+            updateAssistantMessage(streamedAssistantEventId, streamedText);
+          },
+          delta => {
+            if (resetThinkingTextOnNextDelta) {
+              resetThinkingTextOnNextDelta = false;
+              streamedThinkingText = '';
+            }
+            streamedThinkingText += delta;
+
+            if (streamedThinkingEventId === undefined) {
+              const thinkingEvent = createThinkingBlock(streamedThinkingText);
+
+              streamedThinkingEventId = thinkingEvent.id;
+              completionEvents.push(thinkingEvent);
+              appendEvents([thinkingEvent]);
+              return;
+            }
+
+            updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
           }
+        );
 
-          updateAssistantMessage(streamedAssistantEventId, streamedText);
-        },
-        delta => {
-          streamedThinkingText += delta;
-
-          if (streamedThinkingEventId === undefined) {
-            const thinkingEvent = createThinkingBlock(streamedThinkingText);
-
-            streamedThinkingEventId = thinkingEvent.id;
-            completionEvents.push(thinkingEvent);
-            appendEvents([thinkingEvent]);
-            return;
+      // Retry keeps the already-created streamed events and re-streams into them: text resets to empty, ids stay stable, so the UI never shows a duplicated or half-doubled message.
+      let lastTruncatedCompletion:
+        | Awaited<ReturnType<typeof getGatewayChatCompletion>>
+        | undefined = undefined;
+      const streamWithRetries = async (
+        streamAttempt: number
+      ): Promise<Awaited<ReturnType<typeof getGatewayChatCompletion>>> => {
+        try {
+          const completion = await streamOnce();
+          // A healthy stream always reports a finish_reason; a stream that ends without one died mid-flight. Either way, with no tool calls there is nothing to act on, so the attempt retries.
+          if (
+            completion.toolCalls.length === 0 &&
+            (completion.finishReason === undefined ||
+              TRUNCATED_FINISH_REASONS.has(completion.finishReason))
+          ) {
+            lastTruncatedCompletion = completion;
+            throw new TruncatedCompletionError(completion.finishReason ?? 'missing');
           }
-
-          updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
+          return completion;
+        } catch (error) {
+          if (
+            streamAttempt >= MAX_STREAM_ATTEMPTS ||
+            !isRetriableStreamError(error) ||
+            isSignalAborted(signal)
+          ) {
+            // When every attempt came back truncated, degrade to the last partial text rather than replacing it with a failure message.
+            if (
+              error instanceof TruncatedCompletionError &&
+              lastTruncatedCompletion !== undefined
+            ) {
+              return lastTruncatedCompletion;
+            }
+            throw error;
+          }
+          resetStreamedTextOnNextDelta = true;
+          resetThinkingTextOnNextDelta = true;
+          await abortableDelay(STREAM_RETRY_DELAYS_MS[streamAttempt - 1] ?? 4000, signal);
+          if (isSignalAborted(signal)) {
+            const abortError = new Error('The user aborted a request.');
+            abortError.name = 'AbortError';
+            throw abortError;
+          }
+          return streamWithRetries(streamAttempt + 1);
         }
-      );
+      };
+      const completion = await streamWithRetries(1);
 
       if (completion.usage !== undefined) {
         onUsage?.(completion.usage);
@@ -206,7 +395,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         )
       );
 
-      return { completionEvents, toolCallEvents };
+      return { completionEvents, finishReason: completion.finishReason, toolCallEvents };
     } finally {
       if (didStartAssistantStreaming) {
         // Explicit clear: callers key collapse chrome off this id being undefined.
@@ -217,6 +406,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   };
 
   try {
+    let turnUsedTools = false;
+    let continueNudgeSent = false;
     const continueConversation = async (
       nextConversationEvents: AgentConversationEvent[],
       remainingRounds: number
@@ -226,7 +417,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      const { completionEvents, toolCallEvents } = await appendCompletion(nextConversationEvents);
+      const { completionEvents, finishReason, toolCallEvents } =
+        await appendCompletion(nextConversationEvents);
 
       if (completionEvents.length === 0) {
         appendEvents([createAssistantMessage(noResponseMessage)]);
@@ -236,8 +428,30 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       nextConversationEvents.push(...completionEvents);
 
       if (toolCallEvents.length === 0) {
+        const lastAssistantText =
+          completionEvents
+            .toReversed()
+            .find(
+              (event): event is Extract<AgentConversationEvent, { type: 'message' }> =>
+                event.type === 'message' && event.role === 'assistant'
+            )?.text ?? '';
+        if (
+          !continueNudgeSent &&
+          // An overflowed prompt cannot fit again with a nudge appended; re-sending it would burn a second billed request on a guaranteed overflow.
+          finishReason !== 'model_context_window_exceeded' &&
+          remainingRounds > 1 &&
+          !isSignalAborted(signal) &&
+          (endedThinkingOnly(completionEvents, lastAssistantText) ||
+            (turnUsedTools && deservesContinueNudge(lastAssistantText)))
+        ) {
+          continueNudgeSent = true;
+          // Ephemeral: sent to the model, never appended to the stored conversation.
+          nextConversationEvents.push(createUserMessage(CONTINUE_NUDGE_TEXT));
+          await continueConversation(nextConversationEvents, remainingRounds - 1);
+        }
         return;
       }
+      turnUsedTools = true;
 
       if (isSignalAborted(signal)) {
         appendEvents([createAssistantMessage('Stopped.')]);
@@ -246,7 +460,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
         toolCallEvents,
-        executeToolCall,
+        guardedExecuteToolCall,
         signal
       );
 
@@ -257,6 +471,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       appendEvents(toolResultEvents);
       nextConversationEvents.push(...toolResultEvents);
+
+      if (streakStopMessage !== undefined) {
+        appendEvents([createAssistantMessage(streakStopMessage)]);
+        return;
+      }
 
       await continueConversation(nextConversationEvents, remainingRounds - 1);
     };

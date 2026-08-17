@@ -1,9 +1,8 @@
-// Pure model that converts edit and write tool inputs into
+// Pure model that converts edit tool inputs into
 // `ParsedDiffLine` rows for the shared tool diff preview.
 //
 // Edit: builds deleted rows from `oldString` and added rows from
 // `newString`, numbered independently from one.
-// Write: builds added rows from `content`, numbered from one.
 //
 // Character and line caps bound output size. The model is null when
 // the input is absent, invalid, or carries no diff content.
@@ -16,10 +15,11 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 import { languageForPath } from '@/lib/pr-review/diff/highlight';
 
-const EDIT_CHARACTER_CAP = 1000;
-const EDIT_LINE_CAP = 100;
-const WRITE_CHARACTER_CAP = 2000;
-const WRITE_LINE_CAP = 200;
+// Sized for the scrolling detail sheet: an order of magnitude above the old
+// transcript-preview caps (1000/2000) because the sheet scrolls and only one
+// body renders at a time.
+const EDIT_CHARACTER_CAP = 10_000;
+const EDIT_LINE_CAP = 500;
 
 export type ToolDiffModel = {
   lines: readonly ParsedDiffLine[];
@@ -31,9 +31,9 @@ export type ToolDiffModel = {
 };
 
 /**
- * Convert an edit or write tool part into a diff model.
- * Returns null when the tool is neither edit nor write, the input is
- * absent or invalid, or the diff content is empty.
+ * Convert an edit tool part into a diff model.
+ * Returns null when the tool is not edit, the input is absent or
+ * invalid, or the diff content is empty.
  */
 export function buildToolDiffModel(part: ToolPart): ToolDiffModel | null {
   const tool = part.tool;
@@ -80,43 +80,6 @@ export function buildToolDiffModel(part: ToolPart): ToolDiffModel | null {
         })
       ),
     ];
-
-    return {
-      lines,
-      filePath,
-      language: languageForPath(filePath),
-      truncated,
-      tool,
-    };
-  }
-
-  if (tool === 'write') {
-    const filePath = typeof input.filePath === 'string' ? input.filePath : '';
-    const content = typeof input.content === 'string' ? input.content : '';
-
-    if (!content) {
-      return null;
-    }
-
-    const sliced = content.slice(0, WRITE_CHARACTER_CAP);
-    const textLines = splitTrimTrailingEmpty(sliced);
-
-    if (textLines.length === 0) {
-      return null;
-    }
-
-    const truncated = content.length > WRITE_CHARACTER_CAP || textLines.length > WRITE_LINE_CAP;
-
-    const cappedLines = textLines.slice(0, WRITE_LINE_CAP);
-
-    const lines: ParsedDiffLine[] = cappedLines.map(
-      (text, i): ParsedDiffLine => ({
-        type: 'add',
-        newLine: i + 1,
-        text,
-        noNewlineAtEndOfFile: false,
-      })
-    );
 
     return {
       lines,

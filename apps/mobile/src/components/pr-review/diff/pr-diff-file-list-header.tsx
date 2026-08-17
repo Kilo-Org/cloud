@@ -9,7 +9,7 @@
 // Phones see the navigator entry only. Tablets see both.
 
 import { type Href, useRouter } from 'expo-router';
-import { Columns2, Rows3 } from 'lucide-react-native';
+import { Columns2, Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- modal zoom keeps its gesture and table layout coupled in one component */
-import { Table2, X } from 'lucide-react-native';
+import { Table2, X } from '@/components/ui/icons';
 import {
   type ComponentRef,
   type ComponentType,

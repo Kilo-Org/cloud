@@ -285,7 +285,15 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
         throw new Error(`No Slack installation for platform integration ${platformIntegration.id}`);
       }
 
-      return await slackAdapter.withBotToken(installation.botToken, fn);
+      // `platformAccountId` is the key the installation is stored under (team_id,
+      // or enterprise_id for Enterprise Grid org-wide installs), which is exactly
+      // what the adapter needs to scope its per-installation caches. Without it,
+      // the user-profile cache and display-name mention index fall back to a
+      // global key and can leak one workspace's cached profiles and mention
+      // resolution into another — we post for many workspaces from one process.
+      return await slackAdapter.withBotToken(installation.botToken, fn, {
+        installationId: platformAccountId,
+      });
     },
     async getConversationContext({ thread, triggerMessage }) {
       return await getSlackConversationContext(thread, triggerMessage);

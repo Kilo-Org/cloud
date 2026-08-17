@@ -42,7 +42,7 @@
 // (max-lines extraction). Expansion settle bookkeeping stays here.
 
 import { type FlashListRef } from '@shopify/flash-list';
-import { MessageSquarePlus } from 'lucide-react-native';
+import { MessageSquarePlus } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
 

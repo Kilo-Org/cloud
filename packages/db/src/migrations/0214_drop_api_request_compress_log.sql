@@ -1,0 +1,1 @@
+DROP TABLE "api_request_compress_log" CASCADE;

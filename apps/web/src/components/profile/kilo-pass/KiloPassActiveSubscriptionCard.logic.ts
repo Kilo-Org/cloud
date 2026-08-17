@@ -4,7 +4,7 @@ import {
   computeYearlyCadenceMonthlyBonusUsd,
   getMonthlyPriceUsd,
 } from '@/lib/kilo-pass/bonus';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@/lib/kilo-pass/enums';
 import { getTierName } from './utils';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -15,6 +15,50 @@ type RouterOutputs = inferRouterOutputs<RootRouter>;
 
 export type KiloPassScheduledChange =
   RouterOutputs['kiloPass']['getScheduledChange']['scheduledChange'];
+
+/**
+ * Router-provided current-period bonus state. A referral bonus replaces the
+ * normal bonus for that issuance, so an issued bonus carries its actual granted
+ * amount while an available bonus only carries the formula projection.
+ */
+export type KiloPassCurrentPeriodBonus = KiloPassSubscription['currentPeriodBonus'];
+
+export type CurrentPeriodBonusModel = {
+  /** Amount to display and to use as the bonus share of the usage total. */
+  amountUsd: number;
+  label: 'Referral bonus' | 'Free bonus' | 'Available free bonus';
+  isIssued: boolean;
+};
+
+/**
+ * Resolves the current-period bonus amount and label for the usage progress UI.
+ * Issued bonuses display the actual granted amount (a referral bonus may be lower
+ * or higher than the formula projection); available bonuses display the formula
+ * projection. Missing or non-positive amounts return null so the card hides the
+ * section instead of fabricating credits.
+ */
+export function computeCurrentPeriodBonusModel(
+  currentPeriodBonus: KiloPassCurrentPeriodBonus | null | undefined
+): CurrentPeriodBonusModel | null {
+  if (!currentPeriodBonus) return null;
+
+  if (currentPeriodBonus.status === 'issued') {
+    const amountUsd = currentPeriodBonus.actualAmountUsd;
+    if (typeof amountUsd !== 'number' || amountUsd <= 0) return null;
+    return {
+      amountUsd,
+      label:
+        currentPeriodBonus.kind === KiloPassIssuanceItemKind.ReferralBonus
+          ? 'Referral bonus'
+          : 'Free bonus',
+      isIssued: true,
+    };
+  }
+
+  const amountUsd = currentPeriodBonus.projectedAmountUsd;
+  if (typeof amountUsd !== 'number' || amountUsd <= 0) return null;
+  return { amountUsd, label: 'Available free bonus', isIssued: false };
+}
 
 export type KiloPassActiveSubscriptionCardLogicSubscription = Pick<
   KiloPassSubscription,

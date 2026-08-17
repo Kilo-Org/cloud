@@ -73,4 +73,50 @@ describe('startup-timing', () => {
     expect((payload as Record<string, unknown>).outcome).toBe('consent');
     expect((payload as Record<string, unknown>).splash_hidden).toBe(0);
   });
+
+  it('notifies listeners exactly once on the first completion only', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+
+    const { markStartupComplete, subscribeStartupComplete } = await freshTiming();
+
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeStartupComplete(listener);
+
+    markStartupComplete('app');
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // A later completion must not re-fire listeners.
+    markStartupComplete('login');
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('reports isStartupComplete false before and true after', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+
+    const { isStartupComplete, markStartupComplete } = await freshTiming();
+
+    expect(isStartupComplete()).toBe(false);
+
+    markStartupComplete('app');
+
+    expect(isStartupComplete()).toBe(true);
+  });
+
+  it('does not fire an unsubscribed listener', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+
+    const { markStartupComplete, subscribeStartupComplete } = await freshTiming();
+
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeStartupComplete(listener);
+    unsubscribe();
+
+    markStartupComplete('app');
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

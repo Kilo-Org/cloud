@@ -11,6 +11,8 @@ export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
   delete requestToMutate.body.top_p;
 }
 
+// Partner routing stays pinned when the current Kimi model changes.
+export const PERPLEXITY_KIMI_PUBLIC_ID = 'moonshotai/kimi-k3';
 export const KIMI_CURRENT_MODEL_ID = 'moonshotai/kimi-k3';
 
 export const KIMI_CURRENT_VERCEL_MODEL_ID = KIMI_CURRENT_MODEL_ID;

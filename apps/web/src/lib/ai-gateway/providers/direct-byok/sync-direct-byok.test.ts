@@ -20,6 +20,10 @@ describe('parseOpenAICompatibleProviderModels', () => {
           id: 'morph-minimax3-428b',
           max_model_len: 256000,
         },
+        {
+          id: 'provider-with-null-context',
+          context_length: null,
+        },
       ],
     });
 
@@ -36,6 +40,14 @@ describe('parseOpenAICompatibleProviderModels', () => {
         id: 'morph-minimax3-428b',
         name: undefined,
         context_length: 256000,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+        flags: ['reasoning'],
+      },
+      {
+        id: 'provider-with-null-context',
+        name: undefined,
+        context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: ['reasoning'],

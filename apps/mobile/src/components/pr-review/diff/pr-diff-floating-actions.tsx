@@ -11,7 +11,7 @@
 // 300-line repo cap.
 
 import { type Href, useRouter } from 'expo-router';
-import { MessageCirclePlus } from 'lucide-react-native';
+import { MessageCirclePlus } from '@/components/ui/icons';
 import { type LayoutChangeEvent, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';

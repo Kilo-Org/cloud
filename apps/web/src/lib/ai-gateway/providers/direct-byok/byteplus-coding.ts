@@ -117,6 +117,7 @@ export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
 export default {
   id: BYTEPLUS_CODING_PROVIDER_ID,
   base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
+  base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

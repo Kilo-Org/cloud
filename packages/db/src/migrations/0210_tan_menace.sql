@@ -1,0 +1,1 @@
+ALTER TABLE "custom_llm2" ADD COLUMN "encrypted_api_key" jsonb;

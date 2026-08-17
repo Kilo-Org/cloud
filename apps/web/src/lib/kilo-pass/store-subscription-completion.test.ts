@@ -982,6 +982,24 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(ledgerRow?.outcome_code).toBe('Store transaction already belongs to another user');
   });
 
+  it('rethrows the stored domain error when replaying a failed purchase ledger row', async () => {
+    const firstUser = await insertTestUser();
+    const secondUser = await insertTestUser();
+    const purchase = applePurchase();
+
+    await completeStoreKiloPassPurchase({ user: firstUser, purchase });
+
+    // The first attempt by the second user settles the ledger row `failed`.
+    await expect(completeStoreKiloPassPurchase({ user: secondUser, purchase })).rejects.toThrow(
+      'Store transaction already belongs to another user'
+    );
+
+    // Replaying the same operationKey surfaces the stored domain error, not success.
+    await expect(completeStoreKiloPassPurchase({ user: secondUser, purchase })).rejects.toThrow(
+      'Store transaction already belongs to another user'
+    );
+  });
+
   it('marks the purchase ledger row reconcile-pending on a non-mismatch failure', async () => {
     // Not inserted: lockUserForStoreCompletion throws a non-mismatch error.
     const user = defineTestUser();

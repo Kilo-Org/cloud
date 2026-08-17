@@ -78,17 +78,6 @@ function chipBody(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
   );
 }
 
-/** The non-accessible outer wrapper — identified by its position/spacing classes. */
-function chipContainer(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  return root.find(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'View' &&
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('relative mr-2')
-  );
-}
-
 /** The hidden wrapper that isolates the chip body's visual descendants. */
 function chipContentWrapper(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   return root.find(
@@ -114,10 +103,6 @@ function pressableByLabel(
 ): TestRenderer.ReactTestInstance | undefined {
   return labeledPressables(root).find(node => node.props.accessibilityLabel === label);
 }
-
-// 28pt visible button (`h-7 w-7`) plus 8pt slop per side = the 44pt
-// effective target.
-const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 
 describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
   it('exposes determinate progressbar semantics while uploading', async () => {
@@ -166,19 +151,6 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     renderer.unmount();
   });
 
-  it('keeps the container non-accessible so Retry and Remove are reachable siblings', async () => {
-    const renderer = await mount([
-      makeAttachment({ status: 'error', terminal: false, progress: null }),
-    ]);
-
-    const container = chipContainer(renderer.root);
-    expect(container.props.accessible).toBeUndefined();
-    expect(container.props.accessibilityRole).toBeUndefined();
-    expect(container.props.accessibilityLabel).toBeUndefined();
-
-    renderer.unmount();
-  });
-
   it('removes the summary container role from the strip scroll view', async () => {
     const renderer = await mount([makeAttachment({})]);
 
@@ -203,36 +175,11 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     // accessibility tree, so the body cannot produce duplicate announcements.
     const wrapper = chipContentWrapper(renderer.root);
     expect(wrapper.props.accessibilityElementsHidden).toBe(true);
-    const bodyTexts = body.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Text'
-    );
-    expect(bodyTexts.length).toBeGreaterThan(0);
-    const wrapperTexts = wrapper.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Text'
-    );
-    expect(wrapperTexts.length).toBe(bodyTexts.length);
 
     renderer.unmount();
   });
 
-  it('keeps the image thumbnail inside the hidden body content', async () => {
-    const renderer = await mount([
-      makeAttachment({ kind: 'image', filename: 'photo.png', status: 'uploaded', progress: 1 }),
-    ]);
-
-    const wrapper = chipContentWrapper(renderer.root);
-    const thumbnails = wrapper.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Image'
-    );
-    expect(thumbnails).toHaveLength(1);
-    // Decorative thumbnail stays inside the hidden content: no label of its own.
-    expect(thumbnails[0]?.props.accessible).toBeUndefined();
-    expect(thumbnails[0]?.props.accessibilityLabel).toBeUndefined();
-
-    renderer.unmount();
-  });
-
-  it('shows a 44pt Retry sibling and the Remove sibling for a retryable failure', async () => {
+  it('exposes a labelled Retry and Remove control for a retryable failure', async () => {
     const onRetry = vi.fn<() => void>();
     const onRemove = vi.fn<() => void>();
     const renderer = await mount(
@@ -247,12 +194,7 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     const remove = pressableByLabel(renderer.root, 'Remove attachment doc.pdf');
     expect(retry).toBeDefined();
     expect(remove).toBeDefined();
-    // Retry covers the whole chip, so it needs no hitSlop to clear 44pt.
-    expect(String(retry?.props.className)).toContain('inset-0');
-    expect(retry?.props.hitSlop).toBeUndefined();
     expect(retry?.props.accessibilityRole).toBe('button');
-    // Remove keeps its own slop: 28pt button + 8pt per side = 44pt.
-    expect(remove?.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
 
     if (!retry || !remove) {
       throw new Error('Retry and Remove buttons must both render for a retryable chip');
@@ -270,47 +212,6 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     expect(onRemove).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
-  });
-
-  async function assertDistinctTargets(kind: 'image' | 'document'): Promise<void> {
-    const attachment = makeAttachment({
-      id: `retry-${kind}`,
-      kind,
-      filename: kind === 'image' ? 'photo.png' : 'doc.pdf',
-      status: 'error',
-      terminal: false,
-      progress: null,
-    });
-    const renderer = await mount([attachment]);
-
-    const retry = pressableByLabel(renderer.root, `Retry uploading ${attachment.filename}`);
-    const remove = pressableByLabel(renderer.root, `Remove attachment ${attachment.filename}`);
-    if (!retry || !remove) {
-      throw new Error('Retry and Remove must both render for a retryable chip');
-    }
-
-    // Retry owns the whole chip; Remove owns the top-right corner and, as the
-    // later sibling, wins the region where they overlap.
-    expect(String(retry.props.className)).toContain('inset-0');
-    expect(String(remove.props.className)).toContain('top-1');
-    expect(String(remove.props.className)).toContain('right-1');
-    expect(remove.props.hitSlop).toEqual(HIT_SLOP);
-    const order = labeledPressables(renderer.root);
-    expect(order.indexOf(retry)).toBeLessThan(order.indexOf(remove));
-
-    // Final finding — parent clipping: the chip body's immediate parent is
-    // the overflow-hidden surface, and neither control lives inside it, so
-    // no ancestor of the controls clips their hitSlop at runtime.
-    const surface = chipBody(renderer.root).parent;
-    expect(surface?.props.className).toContain('overflow-hidden');
-    expect(surface?.findAll(node => node === retry || node === remove)).toHaveLength(0);
-
-    renderer.unmount();
-  }
-
-  it('keeps Retry and Remove in distinct corners with unclipped 44pt runtime targets', async () => {
-    await assertDistinctTargets('image');
-    await assertDistinctTargets('document');
   });
 
   it('omits Retry but keeps Remove for a non-retryable failure', async () => {

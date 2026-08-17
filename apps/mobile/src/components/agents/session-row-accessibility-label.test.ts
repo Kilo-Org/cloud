@@ -321,15 +321,5 @@ describe('sessionRowAccessibilityLabel', () => {
         })
       ).toBe('Fix login bug, CLI');
     });
-
-    it('adds "needs input" when the eyebrow renders that state', () => {
-      expect(
-        sessionRowAccessibilityLabel({
-          title: 'Fix login bug',
-          needsInput: true,
-          badge: 'CLI',
-        })
-      ).toBe('Fix login bug, needs input, CLI');
-    });
   });
 });

@@ -6,14 +6,12 @@
 // platform animate keeps `visible` the single source of truth — nothing here
 // has to stay in sync with an animation duration.
 //
-// Focus restore after dismissal: `Modal.onDismiss` is iOS-only in React
-// Native, so on Android a delayed callback fires instead. Both paths run
-// through one guard so the parent's `onDismiss` handler fires exactly once,
-// never while the native Modal is still presented.
+// Focus restore after the sheet closes belongs to the parent, which owns the
+// trigger. Every close path here routes through `onClose` or `onPick`.
 
 import { X } from '@/components/ui/icons';
-import { useCallback, useEffect, useRef } from 'react';
-import { Modal, Platform, Pressable, type Text as RNText, View } from 'react-native';
+import { useRef } from 'react';
+import { Modal, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
@@ -26,11 +24,6 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { cn } from '@/lib/utils';
 
-// Android never fires `Modal.onDismiss` (iOS-only in React Native), so the
-// focus-restore callback waits out the platform's own slide-out before the
-// background accessibility tree is reachable again.
-const ANDROID_DISMISS_SETTLE_MS = 300;
-
 type ReactionPickerSheetProps = {
   readonly visible: boolean;
   readonly reactions: readonly {
@@ -40,8 +33,6 @@ type ReactionPickerSheetProps = {
   }[];
   readonly onClose: () => void;
   readonly onPick: (content: ReviewReactionContent) => void;
-  /** Called once the native Modal has fully dismissed (after the exit animations). */
-  readonly onDismiss?: () => void;
 };
 
 export function ReactionPickerSheet({
@@ -49,47 +40,10 @@ export function ReactionPickerSheet({
   reactions,
   onClose,
   onPick,
-  onDismiss,
 }: Readonly<ReactionPickerSheetProps>) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const titleRef = useRef<RNText | null>(null);
-  const wasVisibleRef = useRef(visible);
-  // Focus restore after dismissal: `Modal.onDismiss` fires on iOS only, so
-  // Android relies on the delayed callback below. Both paths go through
-  // `notifyDismissed`, whose guard lets the parent's focus handler run exactly
-  // once per dismissal no matter which path wins.
-  const dismissedRef = useRef(false);
-  const onDismissRef = useRef(onDismiss);
-
-  useEffect(() => {
-    onDismissRef.current = onDismiss;
-  }, [onDismiss]);
-
-  const notifyDismissed = useCallback(() => {
-    if (dismissedRef.current) {
-      return;
-    }
-    dismissedRef.current = true;
-    onDismissRef.current?.();
-  }, []);
-
-  useEffect(() => {
-    const wasVisible = wasVisibleRef.current;
-    wasVisibleRef.current = visible;
-    if (visible) {
-      dismissedRef.current = false;
-      return undefined;
-    }
-    if (!wasVisible || Platform.OS === 'ios') {
-      // iOS gets the native `onDismiss`, so it needs no timer at all.
-      return undefined;
-    }
-    const timer = setTimeout(notifyDismissed, ANDROID_DISMISS_SETTLE_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [visible, notifyDismissed]);
 
   const reacted = new Set<string>();
   for (const r of reactions) {
@@ -108,11 +62,6 @@ export function ReactionPickerSheet({
       onShow={() => {
         moveA11yFocus(titleRef);
       }}
-      // Focus restore back to the trigger belongs to the parent via this
-      // callback: it fires only after the native Modal is fully dismissed
-      // (native on iOS, delayed post-close callback on Android), when the
-      // background accessibility tree is reachable again.
-      onDismiss={notifyDismissed}
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end bg-black/40">

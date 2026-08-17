@@ -31,6 +31,10 @@ const REACTION_PILL_HIT_SLOP = { top: 10, bottom: 10, left: 2, right: 2 } as con
 // "Add reaction" is ~30pt tall (16pt icon + p-1.5 + border); vertical slop
 // lifts it to >=44pt with the same horizontal cap.
 const ADD_REACTION_HIT_SLOP = { top: 8, bottom: 8, left: 2, right: 2 } as const;
+// Allowance for the platform's own Modal slide-out animation. While the Modal
+// is still presented the background accessibility tree — including the "Add
+// reaction" trigger — is unreachable, so focus can only return after it.
+const SHEET_DISMISS_ANIMATION_MS = 300;
 
 type ReactionsRowProps = {
   // Raw reactions from the DTO — `content` is a plain string (GitHub can
@@ -62,13 +66,14 @@ export function ReactionsRow({
 
   // Centralized close: every picker close path (close button, backdrop,
   // Android back via `onRequestClose`, and picking a reaction) flips the
-  // sheet's `visible` off. Screen-reader focus is NOT restored here: the
-  // native Modal stays presented for the exit animations (~200ms), and while
-  // it is up the background accessibility tree (including the "Add reaction"
-  // trigger) is unreachable. The sheet fires `onDismiss` only after the
-  // native Modal fully dismisses, and that handler moves focus back.
+  // sheet's `visible` off, then returns screen-reader focus to the trigger
+  // once the slide-out has run. The timer needs no cleanup: `moveA11yFocus`
+  // is a no-op once the ref is empty, so an unmounted row does nothing.
   function closePicker() {
     setPickerOpen(false);
+    setTimeout(() => {
+      moveA11yFocus(addReactionRef);
+    }, SHEET_DISMISS_ANIMATION_MS);
   }
 
   if (pills.length === 0 && isReadOnly) {
@@ -118,9 +123,6 @@ export function ReactionsRow({
           void Haptics.selectionAsync();
           onToggle(content);
           closePicker();
-        }}
-        onDismiss={() => {
-          moveA11yFocus(addReactionRef);
         }}
       />
     </View>

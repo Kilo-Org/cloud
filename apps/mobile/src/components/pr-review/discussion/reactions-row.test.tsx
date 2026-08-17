@@ -7,11 +7,8 @@ import { ReactionsRow } from './reactions-row';
 
 const { moveFocus } = vi.hoisted(() => ({ moveFocus: vi.fn() }));
 
-const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
-
 vi.mock('react-native', () => ({
   Modal: 'Modal',
-  Platform: mockedPlatform,
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -43,184 +40,95 @@ const baseReactions = [{ content: 'THUMBS_UP', count: 2, viewerHasReacted: false
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-async function render(element: React.ReactElement): Promise<TestRenderer.ReactTestRenderer> {
+type Props = Record<string, unknown>;
+
+function press(renderer: TestRenderer.ReactTestRenderer, match: (props: Props) => boolean): void {
+  const node = renderer.root.find(
+    n => typeof n.type === 'string' && (n.type as string) === 'Pressable' && match(n.props as Props)
+  );
+  act(() => {
+    (node.props.onPress as () => void)();
+  });
+}
+
+function modalProps(renderer: TestRenderer.ReactTestRenderer): Props {
+  const modal = renderer.root.find(
+    node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+  );
+  return modal.props as Props;
+}
+
+/** Mounts a row and taps "Add reaction" so the picker is open. */
+async function openPicker(): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
     await Promise.resolve();
-    renderer = TestRenderer.create(element);
+    renderer = TestRenderer.create(
+      createElement(ReactionsRow, { reactions: baseReactions, onToggle: vi.fn<() => void>() })
+    );
   });
   // Runtime safety: act() could theoretically fail without assigning.
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
   if (!renderer) {
     throw new Error('Failed to create test renderer');
   }
+  press(renderer, p => p.accessibilityLabel === 'Add reaction');
   return renderer;
 }
 
-function findNode(
-  root: TestRenderer.ReactTestInstance,
-  type: string,
-  match: (props: Record<string, unknown>) => boolean
-): TestRenderer.ReactTestInstance | undefined {
-  return root.find(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === type &&
-      match(node.props as Record<string, unknown>)
-  );
-}
-
-function pressNode(node: TestRenderer.ReactTestInstance): void {
+/** Focus must wait out the slide-out, then land on the trigger exactly once. */
+function expectDelayedFocusRestore(): void {
+  expect(moveFocus).not.toHaveBeenCalled();
   act(() => {
-    (node.props.onPress as () => void)();
+    vi.advanceTimersByTime(300);
   });
-}
-
-function getModalProps(root: TestRenderer.ReactTestInstance): Record<string, unknown> {
-  const modal = root.find(
-    node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-  );
-  return modal.props as Record<string, unknown>;
+  expect(moveFocus).toHaveBeenCalledTimes(1);
 }
 
 describe('ReactionsRow picker dismissal focus', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     moveFocus.mockClear();
-    mockedPlatform.OS = 'ios';
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('restores focus only after the native Modal dismisses on the backdrop close path', async () => {
-    const onToggle = vi.fn<() => void>();
-    const renderer = await render(
-      createElement(ReactionsRow, { reactions: baseReactions, onToggle })
+  it('restores focus to the trigger after the backdrop closes the picker', async () => {
+    const renderer = await openPicker();
+    expect(modalProps(renderer).visible).toBe(true);
+
+    // The backdrop is the labelled pressable without a button role.
+    press(
+      renderer,
+      p => p.accessibilityLabel === 'Close reactions' && p.accessibilityRole === undefined
     );
+    expect(modalProps(renderer).visible).toBe(false);
 
-    const addReaction = findNode(
-      renderer.root,
-      'Pressable',
-      p => p.accessibilityLabel === 'Add reaction'
-    );
-    if (!addReaction) {
-      throw new Error('Add reaction button not found');
-    }
-    pressNode(addReaction);
-    expect(getModalProps(renderer.root).visible).toBe(true);
-
-    const backdrop = findNode(
-      renderer.root,
-      'Pressable',
-      p => p.className === 'flex-1' && p.accessibilityLabel === 'Close reactions'
-    );
-    if (!backdrop) {
-      throw new Error('Backdrop pressable not found');
-    }
-    pressNode(backdrop);
-
-    // `visible` flips at once — the platform animates the dismissal — but the
-    // Modal is still presented, so focus must not move to the trigger yet.
-    expect(getModalProps(renderer.root).visible).toBe(false);
-    expect(moveFocus).not.toHaveBeenCalled();
-
-    // Native dismissal completes: onDismiss fires and focus returns.
-    act(() => {
-      (getModalProps(renderer.root).onDismiss as () => void)();
-    });
-    expect(moveFocus).toHaveBeenCalledTimes(1);
-
-    // No timer runs on iOS, so nothing can restore focus a second time.
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(moveFocus).toHaveBeenCalledTimes(1);
-
+    expectDelayedFocusRestore();
     renderer.unmount();
   });
 
-  it('restores focus only after the native Modal dismisses when a reaction is picked', async () => {
-    const onToggle = vi.fn<() => void>();
-    const renderer = await render(
-      createElement(ReactionsRow, { reactions: baseReactions, onToggle })
-    );
+  it('restores focus to the trigger after a reaction is picked', async () => {
+    const renderer = await openPicker();
 
-    const addReaction = findNode(
-      renderer.root,
-      'Pressable',
-      p => p.accessibilityLabel === 'Add reaction'
-    );
-    if (!addReaction) {
-      throw new Error('Add reaction button not found');
-    }
-    pressNode(addReaction);
+    press(renderer, p => p.accessibilityLabel === 'Thumbs up');
+    expect(modalProps(renderer).visible).toBe(false);
 
-    const thumbsUp = findNode(
-      renderer.root,
-      'Pressable',
-      p => p.accessibilityLabel === 'Thumbs up'
-    );
-    if (!thumbsUp) {
-      throw new Error('Thumbs up picker button not found');
-    }
-    pressNode(thumbsUp);
-    expect(onToggle).toHaveBeenCalledTimes(1);
-    expect(onToggle).toHaveBeenCalledWith('THUMBS_UP');
-    expect(moveFocus).not.toHaveBeenCalled();
-
-    act(() => {
-      (getModalProps(renderer.root).onDismiss as () => void)();
-    });
-    expect(moveFocus).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      vi.advanceTimersByTime(250);
-    });
-
+    expectDelayedFocusRestore();
     renderer.unmount();
   });
 
-  it('moves focus only after the Android fallback delay on the back-button close path', async () => {
-    mockedPlatform.OS = 'android';
-    const onToggle = vi.fn<() => void>();
-    const renderer = await render(
-      createElement(ReactionsRow, { reactions: baseReactions, onToggle })
-    );
+  it('restores focus to the trigger after the Android back button closes the picker', async () => {
+    const renderer = await openPicker();
 
-    const addReaction = findNode(
-      renderer.root,
-      'Pressable',
-      p => p.accessibilityLabel === 'Add reaction'
-    );
-    if (!addReaction) {
-      throw new Error('Add reaction button not found');
-    }
-    pressNode(addReaction);
-    expect(getModalProps(renderer.root).visible).toBe(true);
-
-    // Android back button answers through onRequestClose; `visible` flips at
-    // once and the platform animates the slide-out.
     act(() => {
-      (getModalProps(renderer.root).onRequestClose as () => void)();
+      (modalProps(renderer).onRequestClose as () => void)();
     });
-    expect(getModalProps(renderer.root).visible).toBe(false);
-    expect(moveFocus).not.toHaveBeenCalled();
+    expect(modalProps(renderer).visible).toBe(false);
 
-    // Android never fires Modal.onDismiss, so focus waits out the platform's
-    // slide-out; part-way through, the background tree is still unreachable.
-    act(() => {
-      vi.advanceTimersByTime(299);
-    });
-    expect(moveFocus).not.toHaveBeenCalled();
-
-    // The settle delay elapses and focus returns to the trigger exactly once.
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(moveFocus).toHaveBeenCalledTimes(1);
-
+    expectDelayedFocusRestore();
     renderer.unmount();
   });
 });

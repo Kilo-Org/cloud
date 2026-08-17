@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
@@ -155,6 +156,8 @@ const config: ExpoConfig = {
         url: 'https://sentry.io/',
         project: 'kilo-app',
         organization: 'kilo-code',
+        useNativeInit: true,
+        options: SENTRY_NATIVE_OPTIONS,
       },
     ],
     [

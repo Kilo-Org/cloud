@@ -6,7 +6,9 @@ const { withNativewind } = require('nativewind/metro');
 const monorepoRoot = path.resolve(__dirname, '../..');
 
 /** @type {import('expo/metro-config').MetroConfig} */
-const config = getSentryExpoConfig(__dirname);
+const config = getSentryExpoConfig(__dirname, {
+  autoWrapExpoRouterErrorBoundary: true,
+});
 
 // Allow Metro to resolve workspace files and pnpm's real package paths
 config.watchFolders = [...new Set([...(config.watchFolders || []), monorepoRoot])];

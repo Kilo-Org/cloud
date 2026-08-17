@@ -97,7 +97,7 @@ export function AnimatedSplashOverlay() {
     <>
       {/* TTFD means "the launch's final frame is visible": record after the overlay
           is gone, for every outcome — error screens are the launch's full display too. */}
-      <TimeToFullDisplay record={dismissed} />
+      <TimeToFullDisplay ready={dismissed} />
       {dismissed ? null : (
         <Animated.View pointerEvents="none" className="absolute inset-0">
           <Animated.View className="absolute inset-0 bg-[#FAF74F]" style={bgStyle} />

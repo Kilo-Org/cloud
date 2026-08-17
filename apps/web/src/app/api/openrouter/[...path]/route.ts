@@ -972,7 +972,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const upstreamResult = await upstreamRequest({
     chatApi: requestBodyParsed.kind,
-    path,
     search: url.search,
     method: request.method,
     body: requestBodyParsed.body,

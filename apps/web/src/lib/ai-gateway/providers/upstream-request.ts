@@ -27,6 +27,11 @@ type UpstreamFetchFailureFamily =
 const TIMEOUT_MS = 10 * 60 * 1000;
 // fetchWithBackoff reserves the next delay before retrying, so 75s yields about one minute.
 const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
+const CHAT_API_PATHS = {
+  chat_completions: '/chat/completions',
+  responses: '/responses',
+  messages: '/messages',
+} as const satisfies Record<GatewayChatApiKind, string>;
 
 function getProviderTargetHost(apiUrl: string): string {
   try {
@@ -191,7 +196,6 @@ function upstreamFetchFailureResponse(
 
 export async function upstreamRequest({
   chatApi,
-  path,
   search,
   method,
   body,
@@ -201,7 +205,6 @@ export async function upstreamRequest({
   vercelRequestId,
 }: {
   chatApi: GatewayChatApiKind;
-  path: string;
   search: string;
   method: string;
   body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
@@ -223,6 +226,7 @@ export async function upstreamRequest({
   });
 
   const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
+  const path = CHAT_API_PATHS[chatApi];
   const targetUrl = `${apiUrl}${path}${search}`;
 
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);

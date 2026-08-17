@@ -6,62 +6,7 @@ export type ExportRecord = {
   field: string;
   value: string | number | boolean | null;
   id?: string;
-  /**
-   * Present, and always `true`, on a row prod has deleted since the snapshot.
-   *
-   * The export returns deleted rows rather than hiding them — it is a truthful copy of
-   * what the warehouse holds about someone, not a view of what prod still serves — so
-   * this labels them instead of filtering them. Only a positive deletion says anything:
-   * a live row and a row whose state is unknown both carry no property at all, because
-   * the warehouse cannot tell those two apart. See `SOURCES_WITHOUT_DELETED_COLUMN`.
-   */
-  softDeleted?: true;
 };
-
-/**
- * The warehouse is a CDC copy and keeps rows prod has deleted. Tables reloaded after
- * 2026-08-12 carry `_snowflake_deleted` to mark them; the rest cannot say.
- *
- * Listed so the gap is a recorded fact rather than an omission: `microdollar_usage_metadata`
- * was not reloaded (1.14B rows to mark 5,158), `cli_sessions` is a journal carrying
- * `event_type` instead, `users` has no CDC column, and `enrichment_data`,
- * `microdollar_usage_journal` and `cloud_agent_code_reviews` were narrowed on request,
- * dropping the flag with the rest.
- * Naming the column on any of them is a runtime error, so records from those sources are
- * never labelled.
- *
- * `external_usage_daily` and `audiences` are the odd ones out: both are dbt models rather
- * than CDC copies of prod tables, so no such column was ever going to exist on either.
- *
- * The narrowed tables are where the flag was given up rather than never held, and in each
- * case it was separating nothing. `enrichment_data` carried 5 deleted rows against 16,661
- * live. `security_findings` carried none at all. `microdollar_usage_journal` is
- * insert-only — every one of its 158,433,290 rows is an `IncrementalInsertRows` event — so
- * nothing there can be deleted in the first place.
- *
- * The two app-builder sources are where the flag was dropped from sources that genuinely
- * used it. Both projections were reduced on request — to `id, data` and `id, title` — and
- * both tables hold deleted rows: 224,039 messages and 2,579 projects, counted 2026-08-12.
- * Neither source can distinguish them now, and neither claims to. The records they emit
- * are unlabelled rather than labelled live, which is the honest reading: `deletionMark`
- * already treats an absent mark as "not deleted, or cannot say" precisely so a source
- * losing the column does not start asserting something false.
- */
-export const DELETED_COLUMN = '_snowflake_deleted';
-export const SOURCES_WITHOUT_DELETED_COLUMN = [
-  'microdollar_usage_metadata',
-  'cli_sessions',
-  'users',
-  'enrichment_data',
-  'microdollar_usage_journal',
-  'security_findings',
-  'source_embeddings',
-  'external_usage_daily',
-  'app_builder_messages',
-  'app_builder_projects',
-  'cloud_agent_code_reviews',
-  'audiences',
-] as const;
 
 /**
  * Sources that describe an individual and have no organization reading at all, so an
@@ -88,16 +33,6 @@ export const USER_ONLY_SOURCES: ReadonlySet<string> = new Set([
   'orb_customer',
 ]);
 
-/**
- * `softDeleted: true`, or nothing at all.
- *
- * Only `true` is meaningful. The column is NULL throughout on a table whose reload has
- * not run yet, and NULL means unknown rather than live, so an absent property covers
- * both "not deleted" and "cannot say" — which is the honest reading of the data.
- */
-function deletionMark(value: unknown): { softDeleted: true } | Record<string, never> {
-  return value === true ? { softDeleted: true } : {};
-}
 export type SourcePage = { records: ExportRecord[]; nextCursor: ExportCursor | null };
 
 export type ReplicaQuery = (text: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
@@ -151,66 +86,28 @@ export type SourceAdapter = {
 };
 
 /**
- * The identity section is assembled from both databases, because the profile fields
- * are split across them.
+ * The identity section, and every column of it.
  *
- * `email` and `name` are the fields the export presents as the user's identity, and
- * the warehouse carries its own copy of both. Those are read from the warehouse
- * (`warehouseProfileQuery`) so they are as of the same moment as the other five
- * sources, rather than showing a name the user changed after the snapshot beside
- * data that predates the change.
+ * All from the warehouse, so identity is as of the same moment as every other source
+ * rather than showing a name the person changed after the snapshot beside data that
+ * predates the change. The primary is no longer read at all: the columns it alone held —
+ * account, billing, links, routing identifiers, `signup_ip` — were dropped from the
+ * returned set on request, and nothing left needs it.
  *
- * The remaining columns below have no warehouse equivalent — most were never exported
- * from the source model, and the monetization ones were deliberately dropped from it —
- * so they still come from the live primary. This is a single indexed lookup by primary
- * key, once per export, not the bulk traffic the warehouse exists to absorb.
- */
-const userQuery = `SELECT id, google_user_email, google_user_name, google_user_image_url,
-  created_at, updated_at, hosted_domain, microdollars_used, total_microdollars_acquired,
-  next_credit_expiration_at, auto_top_up_enabled, default_model, completed_welcome_form,
-  linkedin_url, github_url, discord_server_membership_verified_at,
-  openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier,
-  vercel_downstream_safety_identifier, customer_source, signup_ip, normalized_email, email_domain
-FROM kilocode_users
-WHERE id = $1
-LIMIT 1`;
-
-/**
- * Export field name to the warehouse column that supplies it, for the profile fields the
- * warehouse carries. Both the SELECT list and the merge below are derived from this, so a
- * field cannot be read from the warehouse without also being applied: adding a column to
- * one and forgetting the other would silently keep serving the live value, which is the
- * inconsistency this whole path exists to remove.
- *
- * Only email and name are overridden this way, because they are the only two the primary
- * also holds. The warehouse's other columns have no live counterpart and are exported
- * directly, through `WAREHOUSE_ONLY_FIELDS` below.
- */
-export const WAREHOUSE_PROFILE_FIELDS = {
-  google_user_email: 'email',
-  google_user_name: 'name',
-} as const;
-
-/**
- * Warehouse columns the export returns as they are, having no equivalent on the primary.
- *
- * Mostly location: the country, city, region and timezone attributed to the person, in
- * two generations. The `posthog_*` set is what was recorded historically; the
- * `current_posthog_*` set is the value as of the snapshot. Both are kept, because the
- * difference between where someone was and where they are is itself information held
- * about them, and collapsing it would be the export deciding what they get to see.
+ * `user_id` is the warehouse's name for the same value the child tables carry as
+ * `kilo_user_id`.
  *
  * `posthog_email`, `posthog_name` and `posthog_hosted_domain` are the analytics copies of
- * their identity, distinct from the account's own. They can disagree with
- * `google_user_email` and `google_user_name`, which is exactly why they are worth
- * returning rather than deduplicating away.
- *
- * These arrived after the identity section first shipped, which is the only reason they
- * were absent. The export already returned `signup_ip` from the primary, so it was
- * handing someone the address they signed up from while withholding the country derived
- * from it.
+ * the person's identity, distinct from the account's own and able to disagree with it,
+ * which is why they are returned rather than deduplicated away. The location columns come
+ * in two generations: the `posthog_*` set as recorded historically, the `current_posthog_*`
+ * set as of the snapshot. Both are kept, because the difference between where someone was
+ * and where they are is itself information held about them.
  */
-export const WAREHOUSE_ONLY_FIELDS = [
+export const IDENTITY_FIELDS = [
+  'user_id',
+  'email',
+  'name',
   'posthog_email',
   'posthog_name',
   'posthog_hosted_domain',
@@ -230,16 +127,10 @@ export const WAREHOUSE_ONLY_FIELDS = [
 ] as const;
 
 /**
- * The warehouse's copy of those fields. Keyed on `user_id`, which is the warehouse's name
- * for `kilocode_users.id` and the same value the five child tables carry as `kilo_user_id`.
- *
  * The interpolated column list comes from the module constant above, never from caller
  * input, on the same basis as `singleKeyPageQuery` below. The user id is a bind parameter.
  */
-const warehouseProfileQuery = `SELECT user_id, ${[
-  ...Object.values(WAREHOUSE_PROFILE_FIELDS),
-  ...WAREHOUSE_ONLY_FIELDS,
-].join(', ')}
+const warehouseProfileQuery = `SELECT ${IDENTITY_FIELDS.join(', ')}
 FROM users
 WHERE user_id = $1
 LIMIT 1`;
@@ -263,9 +154,9 @@ LIMIT 1`;
  *     prevent. Verified live: on `system_prompt_prefix`, 263 org-scoped rows sort
  *     differently under the two orderings.
  *   - No btree can serve a text ordering of a bigint column, so every page bitmap-scanned
- *     and sorted the whole owner's rowset. Measured on a 115k-row organization:
- *     116,522 startup cost per page against 0.42 for the qualified form, because nothing
- *     could be returned until all of that owner's rows had been scanned and sorted.
+ *     and sorted the whole owner's rowset. Measured on a large organization, the startup
+ *     cost per page was five orders of magnitude above the qualified form, because
+ *     nothing could be returned until all of that owner's rows had been scanned.
  *
  * A qualified name, or any expression such as the `COALESCE` below, is read as an input
  * reference, which is what both the index and the cursor comparison are built on.
@@ -283,30 +174,35 @@ LIMIT 1`;
  * exports. That overlap is correct rather than a leak.
  *
  * The warehouse expresses this two ways, and only one of them is exclusive. Measured
- * 2026-08-13, counting rows carrying an organization but no user:
+ * 2026-08-13, asking whether any row carries an organization but no user:
  *
- *     app_builder_projects          2,143    user XOR org
- *     app_builder_messages        266,095    user XOR org
- *     code_indexing_manifest   20,170,449    user XOR org
- *     deployment_events           513,069    user XOR org
- *     platform_integrations         1,862    user XOR org
- *     cloud_agent_code_reviews     73,767    user XOR org
- *     cli_sessions                      0    both columns set
- *     system_prompt_prefix              0    both columns set
- *     microdollar_usage_metadata        0    both columns set
- *     code_indexing_search              0    both columns set
- *     source_embeddings                 0    both columns set
- *     external_usage_daily              -    org is a dimension, not an owner
- *     microdollar_usage_journal         -    not counted
- *     security_findings                 -    user XOR org, by construction
+ *     app_builder_projects                   user XOR org
+ *     app_builder_messages                   user XOR org
+ *     code_indexing_manifest                 user XOR org
+ *     deployment_events                      user XOR org
+ *     platform_integrations                  user XOR org
+ *     cloud_agent_code_reviews               user XOR org
+ *     cli_sessions                           both columns set
+ *     system_prompt_prefix                   both columns set
+ *     microdollar_usage_metadata             both columns set
+ *     code_indexing_search                   both columns set
+ *     source_embeddings                      both columns set
+ *     external_usage_daily                   org is a dimension, not an owner
+ *     int_microdollar_usage_enriched         user always set, org optional
+ *     microdollar_usage_journal              not measured
+ *     security_findings                      user XOR org, by construction
  *
  * `security_findings` earns its XOR from the table rather than from a count: prod carries
  * one partial unique index per owner column, each conditioned on that column being NOT
  * NULL, so `organization_id` is set exactly when `kilo_user_id` is not.
  *
+ * `int_microdollar_usage_enriched` is a third shape again: `kilo_user_id` is populated on
+ * every row and `organization_id` on a minority of them, so no row can reach an
+ * organization export without also reaching that person's own. See `usageEnrichedQueries`.
+ *
  * `platform_integrations` is the only entry counted from both ends. Measured 2026-08-14
- * across all 38,849 rows: 36,987 user-only, the 1,862 org-only above, and zero rows either
- * carrying both owners or carrying neither. The XOR is exact rather than typical.
+ * across the whole table: every row carries exactly one of the two owners, with none
+ * carrying both and none carrying neither. The XOR is exact rather than typical.
  *
  * `microdollar_usage_journal` carries the same owner pair as the other microdollar
  * tables, but the count above was never rerun for it, so it is left blank rather than
@@ -314,8 +210,8 @@ LIMIT 1`;
  * standard ones and neither matches NULL, so an unowned row reaches nobody either way.
  * The entry is here so the gap is visible rather than looking like an omission.
  *
- * On the first four, an organization can own a row outright with no user attached, so
- * `kilo_user_id = $1` genuinely skips those. On the other four every row names a user,
+ * Where the table says XOR, an organization can own a row outright with no user attached,
+ * so `kilo_user_id = $1` genuinely skips those. Where it says both, every row names a user,
  * so an organization-workspace row matches both predicates. Both outcomes are intended;
  * the difference is in what the source model records, not in the export's rules.
  *
@@ -394,12 +290,7 @@ const projectQueries = subjectPageQueries({
   columns: 'id, title',
 });
 
-/**
- * No sync metadata in the projection, by request. `_snowflake_inserted_at` and
- * `_snowflake_updated_at` were never selected here; `_snowflake_deleted` was, and dropping
- * it means this source can no longer tell a row prod has deleted from a live one. It
- * therefore labels nothing — see `SOURCES_WITHOUT_DELETED_COLUMN`.
- */
+/** No sync metadata in the projection, by request. */
 const messageQueries = subjectPageQueries({
   table: 'app_builder_messages',
   columns: 'id, data',
@@ -412,9 +303,9 @@ const messageQueries = subjectPageQueries({
  * page boundary landed mid-session.
  *
  * Every journal row is exported rather than collapsed to one row per session.
- * Measured on a real account, 12% of sessions carry values that change across their
- * rows, so collapsing would silently drop titles and branches the user actually
- * had. Each record is keyed by its journal position so repeated values read as a
+ * Measured on a real account, a meaningful share of sessions carry values that
+ * change across their rows, so collapsing would silently drop titles and branches
+ * the user actually had. Each record is keyed by its journal position so repeated values read as a
  * timeline instead of looking like duplication, and session_id is exported so rows
  * belonging to one session can be grouped.
  *
@@ -436,9 +327,9 @@ LIMIT $4`;
 
 /**
  * The export's third journal, and the one whose repeating key is worst: `payload_id`
- * carries 63,879 distinct values across 474,678 rows, so a review appears about 7.4 times.
- * A cursor on it would skip the rest of a review at any page boundary inside one. The
- * position pair is the cursor, measured unique across all 474,678 rows and monotonic, and
+ * repeats several times per review, once per journal event. A cursor on it would skip the
+ * rest of a review at any page boundary inside one. The position pair is the cursor,
+ * measured unique across the table and monotonic, and
  * both warehouse indexes lead with an owner column and continue into it.
  *
  * `payload_id` is exported as a field rather than used as a key, so the rows belonging to
@@ -447,7 +338,7 @@ LIMIT $4`;
  *
  * User XOR org: `schema.ts` requires exactly one of the two, corroborated by the
  * account-deletion transaction erasing these rows by `owned_by_user_id`
- * (`user/index.ts:1338`). 73,767 rows carry no user and belong to an organization alone.
+ * (`user/index.ts:1338`). Rows carrying no user belong to an organization alone.
  *
  * The ORDER BY is table-qualified, the fifth table where that matters. Both positions are
  * bigints selected through a `::text` cast under their own names, so a bare name there
@@ -458,15 +349,11 @@ LIMIT $4`;
  * journal envelope — `event_type`, `seen_at`, `sf_metadata` — was dropped when the table
  * was narrowed to ten columns on 2026-08-14, and `event_type` was the only thing that
  * named the single schema-change row, so nothing here can skip it by name. It does not
- * need to. Counted 2026-08-15 over all 474,678 rows:
- *
- *     rows with a NULL `payload_id`                            1
- *     rows carrying neither owner                              1
- *     payload-less rows carrying an owner                      0
- *
- * The payload-less row IS the unowned row, so both scope predicates already exclude it on
- * the same terms as any other unowned row: neither matches NULL. It reaches nobody, and no
- * filter stands in for the column that was dropped.
+ * need to. Measured 2026-08-15 across the table: the sole payload-less row is also the sole
+ * row carrying neither owner, and no payload-less row carries an owner. Both scope
+ * predicates therefore already exclude it on the same terms as any other unowned row,
+ * since neither matches NULL. It reaches nobody, and no filter stands in for the column
+ * that was dropped.
  */
 function cloudAgentCodeReviewPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   return `SELECT payload_id, repo_full_name, pr_url, pr_title, base_ref,
@@ -538,13 +425,20 @@ const cliSessionQueries: Record<ExportSubject['type'], string> = {
  * expression index the warehouse carries for this ordering.
  */
 const NULL_CURSOR_SENTINEL = '-';
+
+/**
+ * The same idea for a `bigint` column, where the text sentinel has no place in the
+ * comparison. `-1` because the warehouse's expression indexes were built on it, and a
+ * cursor expression that differs from the index expression cannot use the index.
+ */
+const NULL_CURSOR_NUMBER = -1;
 function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   // The dimension the scope does not already pin: scoping by user leaves org varying,
   // and scoping by org leaves user varying.
   const cursorColumn = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
   return `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
   COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}') AS cursor_secondary,
-  system_prompt_prefix, _snowflake_deleted
+  system_prompt_prefix
 FROM system_prompt_prefix
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::bigint IS NULL
@@ -571,9 +465,9 @@ const userPromptQueries = subjectPageQueries({
  *     NULL on rows indexed under an organization. It names one person's own work.
  *   - `organization_id` is NOT always an organization. Indexing outside an org falls
  *     through to `getUserUUID(user)` = `uuidv5(user.id, ...)`, so a personal row carries a
- *     uuid DERIVED FROM THE USER. Measured 2026-08-12: 13,010 such ids appear in no
- *     `organizations` row, in strict 1:1 with 13,010 users. A real organization appears
- *     only on rows where `kilo_user_id` is NULL.
+ *     uuid DERIVED FROM THE USER. Verified 2026-08-12: such ids appear in no
+ *     `organizations` row, standing in strict one-to-one correspondence with users. A
+ *     real organization appears only on rows where `kilo_user_id` is NULL.
  *
  * Each subject is therefore scoped by exactly one of the two columns, and never by both.
  * `kilo_user_id = $1` selects that person's personal indexing. `organization_id = $1` is
@@ -585,12 +479,11 @@ const userPromptQueries = subjectPageQueries({
  *
  * Rows with both columns NULL are the source's tombstones, every payload column NULL.
  * Neither predicate matches NULL, so scoping alone excludes them and they never reach the
- * file as id-only records. `_snowflake_deleted` is still selected, because the deleted rows
- * that do carry an owner are labelled rather than hidden.
+ * file as id-only records.
  */
 const codeIndexingQueries = subjectPageQueries({
   table: 'code_indexing_manifest',
-  columns: 'id, project_id, git_branch, file_path, _snowflake_deleted',
+  columns: 'id, project_id, git_branch, file_path',
 });
 
 /**
@@ -613,7 +506,7 @@ const codeIndexingQueries = subjectPageQueries({
  */
 const codeIndexingSearchQueries = subjectPageQueries({
   table: 'code_indexing_search',
-  columns: 'id, project_id, query, metadata, _snowflake_deleted',
+  columns: 'id, project_id, query, metadata',
 });
 
 /**
@@ -621,22 +514,20 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * `deployments`, so the two scope columns are that deployment's owner rather than
  * anything the event itself records. `kilo_user_id` is `deployments.owned_by_user_id`.
  *
- * `created_by_user_id` is a THIRD user column, and it deliberately does not scope
- * anything. It carries provenance only: who pressed the button, as against who owns the
- * result. The warehouse settled that split on two pieces of evidence, both checked
- * 2026-08-11 — `schema.ts` gives `owned_by_user_id` a foreign key to `kilocode_users`
- * while `created_by_user_id` is bare text with none, and `deployments-service.ts` gates
- * every access path on the owner columns and none on the creator.
+ * The table carries a THIRD user column naming whoever created the deployment. It is
+ * neither read nor returned. It never scoped anything either: the warehouse settled that
+ * on two pieces of evidence, both checked 2026-08-11 — `schema.ts` gives
+ * `owned_by_user_id` a foreign key to `kilocode_users` while the creator column is bare
+ * text with none, and `deployments-service.ts` gates every access path on the owner
+ * columns and none on the creator.
  *
- * The distinction only bites on organization-owned deployments, which is exactly where
- * the two disagree: 513,069 rows carry an organization and no user, and their creator is
- * a member. Scoping a user export on the creator would hand that member an
- * organization's deployment history as their own personal data. `kilo_user_id = $1`
- * therefore stays the only user predicate, and the creator is exported as a field so the
- * provenance is still visible without ever selecting on it.
+ * The distinction bites on organization-owned deployments, which is where the two
+ * disagree: rows carrying an organization and no user were created by a member. Scoping a
+ * user export on the creator would have handed that member an organization's deployment
+ * history as their own personal data, so `kilo_user_id = $1` is the only user predicate.
  *
- * A further 99,210 rows have neither owner. Both predicates skip them, as with any other
- * unowned row, so they reach nobody.
+ * Rows with neither owner exist too. Both predicates skip them, as with any other unowned
+ * row, so they reach nobody.
  *
  * The cursor is the composite `(build_id, event_id)`, prod's primary key, because
  * `event_id` is a per-build sequence number rather than a row identifier and repeats
@@ -647,14 +538,13 @@ const codeIndexingSearchQueries = subjectPageQueries({
  * cast under its own name, so a bare name there would sort the page as text while the
  * cursor below compares as bigint, and no index could serve it.
  *
- * One known cost, accepted upstream when the load was designed. The warehouse holds 1,255
- * byte-identical duplicate `(build_id, event_id)` pairs among 9,049,083 rows. A keyset
+ * One known cost, accepted upstream when the load was designed. The warehouse holds a
+ * negligible number of byte-identical duplicate `(build_id, event_id)` pairs. A keyset
  * cursor can drop one copy of a pair if a page boundary falls exactly between the twins.
  * They carry no information the surviving copy does not.
  */
 function deploymentEventPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
-  return `SELECT build_id, event_id::text AS event_id, deployment_id, created_by_user_id,
-  payload, _snowflake_deleted
+  return `SELECT build_id, event_id::text AS event_id, deployment_id, payload
 FROM deployment_events
 WHERE ${SCOPE_COLUMNS[scope]} = $1
   AND ($2::text IS NULL OR (build_id, event_id) > ($2::text, $3::bigint))
@@ -705,14 +595,7 @@ const enrichmentQuery = singleKeyPageQuery({
  * `kilo_user_id` is deliberately absent. It is the scope column, so the subject already
  * implies it, and every other source omits its owner column for the same reason.
  *
- * Split in two on request. `provider` and `provider_account_id` are still SELECTed,
- * because they are this source's cursor and the two halves of its record id, but they are
- * no longer returned as fields. They remain visible in the id, which is what identifies
- * one linked account and keeps a person with Google and GitHub linked from receiving two
- * indistinguishable sets of records.
- *
- * `created_at` is gone entirely: nothing here needs it for a key, so it is not selected
- * either.
+ * Split in two on request: the key columns are read for the cursor and are not returned.
  */
 const USER_AUTH_PROVIDER_KEY = ['provider', 'provider_account_id'] as const;
 
@@ -726,8 +609,7 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * Which identity providers a person signed in with, and the profile each one supplied.
  *
  * One row per linked authentication account, NOT one per user: someone with Google and
- * GitHub linked has two. Counted in the loaded warehouse 2026-08-12 at 1,068,683 rows
- * over roughly 1.06M users, about 1.02 each.
+ * GitHub linked has two, though most people have one.
  *
  * User only, and it is in `USER_ONLY_SOURCES` rather than left to the probe: the table
  * carries no organization column at all, so there is no organization reading to offer.
@@ -747,9 +629,8 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * comparison yield NULL and silently drop the rows it was meant to keep.
  *
  * Warehouse nullability is not prod's, and the difference is the whole reason the readers
- * below are split. `schema.ts` marks six columns `notNull()` — `kilo_user_id`, the cursor
- * pair, `email`, `avatar_url` and `created_at` — but only the cursor pair survives the
- * load as NOT NULL. Every other column arrives nullable, `kilo_user_id` included. So a
+ * below are split. `schema.ts` marks several columns `notNull()`, but only the cursor pair
+ * survives the load as NOT NULL. Every other column arrives nullable, `kilo_user_id` included. So a
  * prod constraint is not something a reader here may lean on, and the two columns that
  * can be read strictly are exactly the two this query pages on.
  *
@@ -757,7 +638,7 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * a cast, so the output and input references are the same column. See `SCOPE_COLUMNS` for
  * the tables where that is not true and the qualifier is load-bearing.
  */
-const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_COLUMNS.join(', ')}, ${DELETED_COLUMN}
+const userAuthProviderQuery = `SELECT ${USER_AUTH_PROVIDER_COLUMNS.join(', ')}
 FROM user_auth_provider
 WHERE ${SCOPE_COLUMNS.user} = $1
   AND ($2::text IS NULL OR (provider, provider_account_id) > ($2::text, $3::text))
@@ -772,8 +653,8 @@ LIMIT $4`;
  * `USER_ONLY_SOURCES`.
  *
  * No cursor, unlike every other paged source. `kilo_user_id` is unique and non-null across
- * all 1,068,509 rows, so the scope already selects at most one row and there is nothing
- * left to page.
+ * the table, so the scope already selects at most one row and there is nothing left to
+ * page.
  *
  * It still orders. Nothing here needs a deterministic sequence today, but the limit is
  * bound rather than fixed at 1 so that a table which stopped being one row per user would
@@ -791,33 +672,95 @@ ORDER BY email
 LIMIT $2`;
 
 /**
+ * Where a usage row was attributed to, geographically: the project it belonged to and the
+ * city, country and coordinates derived from the requesting IP.
+ *
+ * The identity section already returns a country, region and city from analytics; this
+ * source resolves location per usage row instead, down to coordinates.
+ *
+ * CURSOR. `id` alone, and that is measured rather than assumed: an exact
+ * `COUNT(DISTINCT id)` against the source at this cutoff equalled `COUNT(*)`, with no NULL
+ * and no empty value. An earlier approximate count could not settle it — its error margin
+ * was wider than the gap it reported — so the exact one was run. No id repeats globally,
+ * and none repeats within a single `kilo_user_id`, which is the property that actually
+ * governs these queries since every read is already scoped to one owner.
+ *
+ * The uniqueness is a property of the DATA, not a constraint the source enforces. Snowflake
+ * declares no unique key on this table and would not enforce one if it did, so a reload
+ * from a later cutoff could in principle break it. That is the same class of fact as
+ * `microdollar_usage_journal.payload_id`, which is also unique today — the difference is
+ * that the journal has a known mechanism that would break it and a construction-unique
+ * alternative to page on instead, whereas this table has neither. Re-verify on any reload;
+ * `postgres/checks/cursor_uniqueness.sql` answers it from `pg_stats` without scanning.
+ *
+ * INDEXES. The warehouse carries one per scope, each leading with the owner column and
+ * continuing into the cursor — `(kilo_user_id, id)` and `(organization_id, id)` — which is
+ * exactly the shape `WHERE <owner> = $1 AND id > $2 ORDER BY id` reads. Both are partial,
+ * conditioned on their owner being NOT NULL, and that costs these queries nothing: neither
+ * scope predicate matches NULL, so no row an index omits was ever in scope. Same shape and
+ * same reasoning as `source_embeddings`. Neither is created by the bootstrap, so they are
+ * built deliberately rather than as a side effect of provisioning a database.
+ *
+ * OWNERSHIP, measured in the same pass. `kilo_user_id` is populated on every row, with no
+ * NULLs and no empty strings, so every row names an individual. `organization_id` is NULL
+ * on most rows and empty on none; the minority that carry an organization also carry a
+ * user. So the two scopes overlap here rather than partition, and no row is unowned.
+ *
+ * That also settles the missing `NULLIF(col, '')`, which looked like an oversight beside
+ * its dbt siblings and is not one. A model writing empty strings the way
+ * `microdollar_usage_hourly` does would report `organization_id` as present on nearly
+ * every row; this one reports it on a small minority. Absent means NULL on this table, and
+ * the projection is right to leave it alone. `project_id` is the one exception, carrying a
+ * negligible number of empty strings, passed through as the empty strings they are rather
+ * than silently reinterpreted as absent — so `= ''` is not impossible on that column
+ * specifically, even though `IS NULL` is the right test everywhere else here.
+ *
+ * `kilo_user_id` is variable width rather than a fixed-length uuid, so nothing should key
+ * off its length. It is non-NULL and non-empty on every row, so no row is unattributed.
+ *
+ * A dbt model, so there is no CDC column and nothing to mark as deleted.
+ */
+const USAGE_ENRICHED_FIELDS: Record<string, (value: unknown) => string | number | null> = {
+  project_id: warehouseText,
+  // `bigint` and `double precision` in the warehouse. `warehouseNumber` reads both the
+  // string and the number forms, since which one arrives depends on the driver's type
+  // parsers. Geo ids are far below the precision a double loses.
+  vercel_ip_city_id: warehouseNumber,
+  vercel_ip_country_id: warehouseNumber,
+  vercel_ip_latitude: warehouseNumber,
+  vercel_ip_longitude: warehouseNumber,
+};
+
+/** Cursor first, then the declared fields. */
+const USAGE_ENRICHED_COLUMNS = ['id', ...Object.keys(USAGE_ENRICHED_FIELDS)];
+
+const usageEnrichedQueries = subjectPageQueries({
+  table: 'int_microdollar_usage_enriched',
+  columns: USAGE_ENRICHED_COLUMNS.join(', '),
+});
+
+/**
  * The billing customer record Orb holds: postal addresses, tax id, contact emails and
- * name. The most sensitive source in the export, and for that reason one of the ones a
- * person has most claim to see.
+ * name.
  *
  * Third user-only source. Orb has no notion of a Kilo organization, so there is no
  * organization reading. See `USER_ONLY_SOURCES`.
  *
  * `kilo_user_id` is NOT a column on the source table. It is derived by the load, matching
- * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides, and it
- * is the reason `external_customer_id` and the scope hold the same value on every row this
- * source can return. Verified against data on 2026-08-11 rather than from code, because
- * the Orb integration does not live in this repo: 493,815 of 507,061 customers matched a
- * user, and the remaining 13,246 carry a NULL `kilo_user_id` and reach nobody, since the
- * scope predicate does not match NULL. The join cannot fan out — `users.user_id` is
+ * Orb's `external_customer_id` to a Kilo `users.user_id` with a cast on both sides.
+ * Verified against data on 2026-08-11 rather than from code, because
+ * the Orb integration does not live in this repo. Most customers matched a user; those that
+ * did not carry a NULL `kilo_user_id` and reach nobody, since the scope predicate does not
+ * match NULL. The join cannot fan out — `users.user_id` is
  * unique — so the grain stays one row per Orb customer.
  *
- * One case the export relies on being unreachable rather than filtered: 82 matched rows
+ * One case the export relies on being unreachable rather than filtered: some matched rows
  * belong to users Kilo has since deleted, whose own record was scrubbed to
  * `deleted+<uuid>@deleted.invalid` while Orb kept the original name, email and addresses.
  * Nothing here excludes them. They are unreachable because only a current user can request
  * an export, which is a property of the request path rather than of this query.
  */
 const ORB_CUSTOMER_FIELDS: Record<string, (value: unknown) => string | null> = {
-  // Orb's reference to the customer in our system, which is the Kilo user id itself. It
-  // holds the same value the scope was bound to, so this returns the subject their own
-  // identifier rather than anything new.
-  external_customer_id: warehouseText,
   additional_emails: jsonValue,
   billing_address: jsonValue,
   email: warehouseText,
@@ -826,8 +769,8 @@ const ORB_CUSTOMER_FIELDS: Record<string, (value: unknown) => string | null> = {
   shipping_address: jsonValue,
 };
 
-/** Cursor first, then the declared fields, then the deletion flag. */
-const ORB_CUSTOMER_COLUMNS = ['id', ...Object.keys(ORB_CUSTOMER_FIELDS), DELETED_COLUMN];
+/** Cursor first, then the declared fields. */
+const ORB_CUSTOMER_COLUMNS = ['id', ...Object.keys(ORB_CUSTOMER_FIELDS)];
 
 const orbCustomerQuery = singleKeyPageQuery({
   table: 'orb_customer',
@@ -839,7 +782,7 @@ const orbCustomerQuery = singleKeyPageQuery({
  * The second journal in the export, and the one place where the cursor is deliberately
  * NOT the column that would work today.
  *
- * `payload_id` is unique across all 158,433,290 rows, measured 2026-08-11. It would serve
+ * `payload_id` is unique across the table, measured 2026-08-11. It would serve
  * as a cursor on this data. It is unique by luck rather than by construction: the journal
  * emits only `IncrementalInsertRows`, so nothing produces a second row for an entity. The
  * moment an update event appears, `payload_id` repeats and a cursor built on it starts
@@ -883,20 +826,18 @@ const microdollarJournalQueries: Record<ExportSubject['type'], string> = {
  * the same upstream alert can exist independently for more than one Security Agent owner.
  * Ownership is part of a finding's identity here, not a tag on it.
  *
- * `ignored_by` is the third user column of this batch, after `deployment_events`'
- * `created_by_user_id`, and it behaves the same way: audit trail naming whoever dismissed
- * the finding, never attribution. The access path settles it — every read in
- * `security-agent/db/security-findings.ts` goes through `ownerFindingPredicate()`, which
- * matches the owner columns and nothing else. It is exported as a field and never scoped
- * on.
+ * `ignored_by` is a third user column, and it is audit trail rather than attribution:
+ * whoever dismissed the finding, not whoever owns it. The access path settles that — every
+ * read in `security-agent/db/security-findings.ts` goes through `ownerFindingPredicate()`,
+ * which matches the owner columns and nothing else. It is returned as a field and never
+ * scoped on.
  *
  * The cursor is `id`, which both warehouse indexes already lead into as `(owner, id)`.
  *
  * Everything the source held is exported except the two owner columns, which the subject
- * already implies. That includes `raw_data`, the unmodified upstream alert. This is the
- * most sensitive source in the export — unpatched vulnerabilities against named private
- * repositories — which is an argument for handling it carefully, not for withholding it
- * from the person whose repositories they are.
+ * already implies. That includes `raw_data`, the unmodified upstream alert, which is
+ * carried whole rather than picked over: the export returns what is held about the owner
+ * rather than a summary of it.
  *
  * `severity`, `cve_id` and `ghsa_id` are absent because the load dropped them on request.
  * A finding reads as less than it is without them, and that is a gap in the warehouse
@@ -971,9 +912,8 @@ const SECURITY_FINDING_COLUMNS = ['id', ...Object.keys(SECURITY_FINDING_FIELDS)]
  * The organization index is partial, which costs this query nothing: `organization_id =
  * $1` cannot match NULL, so no row the index omits was ever in scope.
  *
- * The `embedding` column is not here. The load dropped it — roughly 13.8 KB per row as
- * text, and essentially all of this table's size — so the vectors are unavailable to any
- * consumer. What remains is which files were indexed, on which branch, for which project.
+ * The `embedding` column is not here. The load dropped it — it was essentially all of this
+ * table's size — so the vectors are unavailable to any consumer. What remains is which files were indexed, on which branch, for which project.
  */
 const sourceEmbeddingQueries = subjectPageQueries({
   table: 'source_embeddings',
@@ -985,9 +925,9 @@ const sourceEmbeddingQueries = subjectPageQueries({
  * repositories that connection reaches.
  *
  * User XOR org, and this one is measured rather than inferred. Counted in Postgres
- * 2026-08-14 across all 38,849 rows: 36,987 name a user and no organization, 1,862 name
- * an organization and no user, and BOTH the both-set and the neither-set counts are zero.
- * No row can reach both exports and none reaches neither.
+ * 2026-08-14 across the whole table: every row names either a user or an organization and
+ * never both, and no row names neither. No row can reach both exports, and none reaches
+ * neither.
  *
  * The warehouse aliases the source's `owned_by_user_id` and `owned_by_organization_id` to
  * the repo convention, and the `owned_by_` naming is the same one already settled on
@@ -1003,7 +943,7 @@ const sourceEmbeddingQueries = subjectPageQueries({
  */
 const platformIntegrationQueries = subjectPageQueries({
   table: 'platform_integrations',
-  columns: 'id, platform, platform_account_login, repositories, _snowflake_deleted',
+  columns: 'id, platform, platform_account_login, repositories',
 });
 
 /**
@@ -1015,18 +955,17 @@ const platformIntegrationQueries = subjectPageQueries({
  * `(kilo_user_id, usage_date)`, was never unique — a daily grain guarantees many rows per
  * user-day, so a page boundary inside one skipped the rest of it. The table now carries
  * `SELECT DISTINCT` over exactly its three columns, so the three together ARE the grain
- * and the cursor is unique by construction. 33,958,723 source rows collapse to roughly
- * 1.1M here, and that collapse is the product rather than a defect.
+ * and the cursor is unique by construction. The source's rows collapse substantially here,
+ * and that collapse is the product rather than a defect.
  *
  * Its two siblings still carry the old defect and are deliberately not sources here. The
  * same reduction is not automatically right for them: country attribution can lose its
  * date, and usage history cannot.
  *
- * The scope pins one column, so the cursor is the other two. `organization_id` is a
- * dimension rather than an alternative owner — this table does not follow "user or org,
- * never both" — so in a personal export it becomes a cursor column and an exported field,
- * which is why both owner columns must be present whichever subject asks. See
- * `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ * The scope pins one column, so the cursor is the other two. This table does not follow
+ * "user or org, never both", so in a personal export the organization column becomes a
+ * cursor column, which is why both owner columns must be present whichever subject asks.
+ * See `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
  *
  * Every column is nullable text, so both cursor columns are coalesced to the sentinel: a
  * NULL inside a tuple comparison yields NULL rather than false, and an uncoalesced cursor
@@ -1035,8 +974,13 @@ const platformIntegrationQueries = subjectPageQueries({
  * the sentinel. No `::text` casts here, so the ORDER BY needs no qualifying — every
  * column is already text and the `COALESCE` expressions are input references.
  *
- * Expect roughly ten rows per person rather than one. People appear from more than one
- * country and in more than one organization.
+ * The same country can arrive more than once, with nothing in the file telling the copies
+ * apart. That is by design, not a defect to collapse. The grain is a country per owner
+ * pair, and only the country is returned, so two rows differing solely by the organization
+ * emit identical records. Both are exported: each line stands for a row that exists, and
+ * de-duplicating would hand back fewer than the source holds. The column that separates
+ * them is read as a cursor column and deliberately not returned. Same shape on
+ * `usage_daily`.
  */
 function externalUsageDailyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
   // The owner the scope has not pinned: scoping by user leaves the org varying, and the
@@ -1059,6 +1003,111 @@ const externalUsageDailyQueries: Record<ExportSubject['type'], string> = {
   organization: externalUsageDailyPageQuery('organization'),
 };
 
+/**
+ * Which countries a person appeared from, per project. Not usage history, despite the
+ * name: the supplied projection carries no hour, model or volume.
+ *
+ * `SELECT DISTINCT` is ours rather than the load's, and it is what makes the cursor valid.
+ * The warehouse table still holds the wider row — hour, session, machine and the rest — so
+ * the five requested columns repeat many times over underneath. Paging on a repeated key
+ * skips rows at any boundary that lands inside a run of them, which is the defect this
+ * file has fixed four times. Deduplicating in the query makes the projected tuple unique,
+ * at the cost of a dedup pass before `LIMIT` applies on each page.
+ *
+ * The scope pins one owner, so the cursor is the other four columns. Both owner columns
+ * must therefore be present whichever subject asks; see `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ *
+ * The `COALESCE` sentinels are not a choice, and they are not only about NULL handling.
+ * Both warehouse indexes are EXPRESSION indexes over exactly these expressions, so a query
+ * comparing the raw columns is not merely less tidy — it cannot use either index and
+ * scans. The expressions here must stay character-for-character what the indexes were
+ * built on, including `-1` for the `bigint` and `'-'` for the text columns, and in the
+ * index's column order.
+ *
+ * `-1` rather than a text sentinel on `vercel_ip_country_id` keeps the comparison numeric,
+ * so the cursor value for it travels as digits and binds as `bigint`.
+ */
+function microdollarUsageHourlyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  const cursorOwner = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  const keyed = [
+    `COALESCE(${cursorOwner}, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(project_id, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(vercel_ip_country_id, ${NULL_CURSOR_NUMBER})`,
+    `COALESCE(vercel_ip_country, '${NULL_CURSOR_SENTINEL}')`,
+  ];
+  // The coalesced forms are SELECTed as well as ordered on, which `SELECT DISTINCT`
+  // requires: Postgres rejects an ORDER BY expression that is not in the select list of a
+  // DISTINCT query, and this read is the only one here that is DISTINCT. Selecting them
+  // changes no grain — each is a function of a column already selected — and it removes
+  // the risk of the cursor's SQL and its reader disagreeing, since the reader now takes
+  // the coalesced value rather than recomputing it.
+  const keyedSelect = keyed.map((expr, index) => `${expr} AS key_${index}`);
+  return `SELECT DISTINCT ${cursorOwner} AS cursor_owner, project_id,
+  vercel_ip_country_id, vercel_ip_country,
+  ${keyedSelect.join(', ')}
+FROM microdollar_usage_hourly
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL
+    OR (${keyed.join(', ')}) > ($2::text, $3::text, $4::bigint, $5::text))
+ORDER BY ${keyed.join(', ')}
+LIMIT $6`;
+}
+
+const microdollarUsageHourlyQueries: Record<ExportSubject['type'], string> = {
+  user: microdollarUsageHourlyPageQuery('user'),
+  organization: microdollarUsageHourlyPageQuery('organization'),
+};
+
+/**
+ * Which countries a person appeared from. Not usage history: no date, no measures. The
+ * date survives only as the load's cutoff predicate, which excludes the cutoff day itself
+ * as a partial one.
+ *
+ * No `DISTINCT` here, unlike `microdollar_usage_hourly`. The load has already reduced this
+ * table to these three columns and deduplicated them, so the three together are the grain
+ * and the cursor is unique by construction. If that ever stops being true the cursor stops
+ * being unique with it.
+ *
+ * The scope pins one owner, so the cursor is the other two columns, in the order the
+ * indexes were built in. Both owner columns must be present whichever subject asks; see
+ * `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+ *
+ * The `COALESCE` sentinels are mandatory rather than defensive. Both warehouse indexes are
+ * EXPRESSION indexes over exactly these forms, so a query comparing the raw columns cannot
+ * use either and scans. They also do the job the sentinel exists for: a NULL inside a tuple
+ * comparison yields NULL rather than false and would drop the rows the coalescing keeps.
+ *
+ * The same country can arrive more than once, with nothing in the file telling the copies
+ * apart, for the reason given on `external_usage_daily`: the organization separating two
+ * such rows is a cursor column and is not returned. Both are exported by design.
+ *
+ * `kilo_user_id` is not reliably a person here — it holds `anon:<ip address>` values,
+ * because someone who signs in keeps the anonymous key they had before. Neither scope can
+ * reach one: a personal read
+ * binds a real user id, which no anonymous key equals, and an organization read was
+ * measured 2026-08-15 to reach none because no anonymous row carries an organization at
+ * all. Nothing here treats the column as an identifier; it is a predicate and a cursor
+ * value, and it is not returned.
+ */
+function usageDailyPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  const cursorOwner = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  const keyed = [
+    `COALESCE(${cursorOwner}, '${NULL_CURSOR_SENTINEL}')`,
+    `COALESCE(country_code, '${NULL_CURSOR_SENTINEL}')`,
+  ];
+  return `SELECT ${cursorOwner} AS cursor_owner, country_code
+FROM usage_daily
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::text IS NULL OR (${keyed.join(', ')}) > ($2::text, $3::text))
+ORDER BY ${keyed.join(', ')}
+LIMIT $4`;
+}
+
+const usageDailyQueries: Record<ExportSubject['type'], string> = {
+  user: usageDailyPageQuery('user'),
+  organization: usageDailyPageQuery('organization'),
+};
+
 const securityFindingQueries = subjectPageQueries({
   table: 'security_findings',
   columns: SECURITY_FINDING_COLUMNS.join(', '),
@@ -1067,18 +1116,17 @@ const securityFindingQueries = subjectPageQueries({
 /**
  * Page sizes, and why each is the number it is.
  *
- * A page costs roughly 300-400 ms of fixed round trip before it has returned a single row,
- * which is most of what a small page costs at all. Measured on an organization export
- * 2026-08-15: 200-row pages took 354-668 ms and 1,000-row pages took 620-1,105 ms, so
- * five times the rows cost under twice the time. Wall clock is therefore governed by page
- * COUNT far more than by page size, and every size below is as large as its row width
- * allows rather than as small as it can be.
+ * A page costs a few hundred milliseconds of fixed round trip before it has returned a
+ * single row, which is most of what a small page costs at all. Measured on an organization
+ * export 2026-08-15, raising the row count several fold cost well under double the time.
+ * Wall clock is therefore governed by page COUNT far more than by page size, and every
+ * size below is as large as its row width allows rather than as small as it can be.
  *
  * That inverts the reasoning these constants originally carried. They were cut to keep
  * large rows from making a page unwieldy, which was right, but the cut was expressed as a
- * row count and row counts are not comparable across sources: 200 rows of
- * `app_builder_messages` is 168 KB and 200 rows of `code_indexing_search` is 1,062 KB.
- * Each size is now that source's MEASURED bytes per row divided into a shared budget.
+ * row count, and a row count is not comparable across sources whose rows differ in width
+ * by an order of magnitude. Each size is now that source's measured bytes per row divided
+ * into a shared budget.
  *
  * The budget is about 2 MB of uncompressed payload per page, against a 128 MB Worker. A
  * page is live three times over at peak — the driver's rows, the mapped rows, the emitted
@@ -1091,32 +1139,32 @@ const securityFindingQueries = subjectPageQueries({
  */
 
 /**
- * Whole conversations, one per row. 0.84 KB per row typical, but the widest page observed
- * held 9.04 KB per row — a 10x spread, the largest of any source here. 500 rows is 420 KB
- * typical and 4.5 MB at that observed worst, which is why this rises by 2.5x rather than
- * the 4x its typical width would allow.
+ * Whole conversations, one per row. Typical rows are modest, but the widest page observed
+ * was an order of magnitude above that — the largest spread of any source here. The size
+ * is set for that worst case rather than the typical one, which is why it rises less than
+ * its typical width alone would allow.
  */
 const MESSAGE_PAGE_SIZE = 500;
 
 /**
  * `metadata` carries the whole result set of a search, not a single value. The widest
- * source measured at 5.42 KB per row typical and 6.42 KB worst, so 400 rows is 2.2 MB
- * typical and 2.6 MB worst. Raised the least of the four, being the one whose rows are
- * genuinely large rather than occasionally large.
+ * source measured here, and with little spread between its typical and worst rows. Raised
+ * the least of the four, being the one whose rows are genuinely large rather than
+ * occasionally large.
  */
 const SEARCH_PAGE_SIZE = 400;
 
 /**
  * A review journal row carries `previous_summary_body`, the whole prior summary text, and
- * about 7.4 rows exist per review. 1.37 KB per row typical, 1.96 KB worst, so 1,000 rows
- * is 1.4 MB typical and 2.0 MB worst.
+ * several rows exist per review. Sized so that a page stays within the shared budget even
+ * at the worst row width observed.
  */
 const CODE_REVIEW_PAGE_SIZE = 1_000;
 
 /**
- * Deployment events carry a payload per event, but the payloads proved uniform: 0.84 KB
- * per row typical against 0.90 KB worst, a 7% spread. A tight distribution is what admits
- * the largest jump, so 2,000 rows is 1.8 MB even at the observed worst.
+ * Deployment events carry a payload per event, but the payloads proved uniform in width.
+ * A tight distribution is what admits the largest jump, since the typical row and the
+ * worst row size a page almost identically.
  */
 const DEPLOYMENT_EVENT_PAGE_SIZE = 2_000;
 
@@ -1174,9 +1222,16 @@ type SystemPromptRow = {
   system_prompt_prefix_id: string;
   cursor_secondary: string;
   system_prompt_prefix: string | null;
-  deleted: unknown;
 };
 type UserPromptRow = { id: string; user_prompt_prefix: string | null };
+type UsageDailyRow = { cursor_owner: string | null; country_code: string | null };
+type MicrodollarUsageHourlyRow = {
+  project_id: string | null;
+  vercel_ip_country_id: string | null;
+  vercel_ip_country: string | null;
+  /** The coalesced cursor values, read from the query rather than recomputed. */
+  key: string[];
+};
 type ExternalUsageDailyRow = {
   cursor_owner: string | null;
   geoip_country_code: string | null;
@@ -1186,7 +1241,6 @@ type PlatformIntegrationRow = {
   platform: string | null;
   platform_account_login: string | null;
   repositories: string | null;
-  deleted: unknown;
 };
 type SourceEmbeddingRow = {
   id: string;
@@ -1210,6 +1264,10 @@ type EnrichmentRow = {
   clay_enrichment_data: string | null;
 };
 type AudienceRow = { email: string | null };
+type UsageEnrichedRow = {
+  id: string;
+  fields: { field: string; value: string | number | null }[];
+};
 /**
  * Keyed by the exported field list, so a field added to `USER_AUTH_PROVIDER_FIELDS`
  * without a reader below is a type error rather than an `undefined` in the file.
@@ -1217,34 +1275,28 @@ type AudienceRow = { email: string | null };
 type UserAuthProviderRow = Record<(typeof USER_AUTH_PROVIDER_FIELDS)[number], string | null> & {
   provider: string;
   provider_account_id: string;
-  deleted: unknown;
 };
 type OrbCustomerRow = {
   id: string;
   fields: { field: string; value: string | null }[];
-  deleted: unknown;
 };
 type DeploymentEventRow = {
   build_id: string;
   event_id: string;
   deployment_id: string | null;
-  created_by_user_id: string | null;
   payload: string | null;
-  deleted: unknown;
 };
 type CodeIndexingSearchRow = {
   id: string;
   project_id: string | null;
   query: string | null;
   metadata: string | null;
-  deleted: unknown;
 };
 type CodeIndexingRow = {
   id: string;
   project_id: string | null;
   git_branch: string | null;
   file_path: string | null;
-  deleted: unknown;
 };
 
 function requiredString(value: unknown, field: string): string {
@@ -1312,24 +1364,6 @@ function nullableTimestamp(value: unknown, field: string): string | null {
   return isoTimestamp(value, field);
 }
 
-function requiredBoolean(value: unknown, field: string): boolean {
-  if (typeof value !== 'boolean') throw new Error(`Replica row has invalid ${field}`);
-  return value;
-}
-
-function safeNumber(value: unknown, field: string): number {
-  let number: unknown = value;
-  if (typeof value === 'bigint') {
-    number = Number(value);
-  } else if (typeof value === 'string' && /^-?\d+$/.test(value)) {
-    number = Number(BigInt(value));
-  }
-  if (typeof number !== 'number' || !Number.isSafeInteger(number)) {
-    throw new Error(`Replica row has unsafe ${field}`);
-  }
-  return number;
-}
-
 /**
  * The cursor for the next page, or null when this page ends the source.
  *
@@ -1367,81 +1401,17 @@ function jsonValue(value: unknown): string | null {
 }
 
 /**
- * Picks the warehouse's copy of a profile field, falling back to the primary's.
- *
- * The warehouse's `users.email` and `users.name` are nullable text with no constraint —
- * the export warehouse declares no keys and its own load checks count nulls rather than
- * forbidding them — while the primary's `google_user_email` and `google_user_name` are
- * NOT NULL. A null or blank warehouse value is therefore a load artifact, not a fact
- * about the user, and the primary value is the true one.
- *
- * Deliberately not passed straight to `requiredString`: that mapper was written for a
- * NOT NULL primary column and throws a plain `Error`, which `handleGenerationFailure`
- * treats as retryable. A null would then spend the queue's four retries on a value
- * frozen in the snapshot that no retry can change — the same waste the missing-row case
- * raises `TerminalExportError` to avoid.
- *
- * Blank counts as absent alongside null: empty string and NULL are not reliably
- * distinguished across this load path, and neither is a usable email or name.
+ * One database, deliberately. The export used to read the primary as well, for profile
+ * columns the warehouse did not carry; those columns are no longer returned, so the
+ * primary is not read at all and every field in a file is as of the same snapshot.
  */
-function warehouseProfileValue(warehouseValue: unknown, primaryValue: unknown): unknown {
-  if (typeof warehouseValue !== 'string' || warehouseValue.trim() === '') return primaryValue;
-  return warehouseValue;
-}
-
-const USER_FIELD_MAPPERS = [
-  ['id', (value: unknown) => requiredString(value, 'id')],
-  ['google_user_email', (value: unknown) => requiredString(value, 'google_user_email')],
-  ['google_user_name', (value: unknown) => requiredString(value, 'google_user_name')],
-  ['google_user_image_url', (value: unknown) => requiredString(value, 'google_user_image_url')],
-  ['created_at', (value: unknown) => isoTimestamp(value, 'created_at')],
-  ['updated_at', (value: unknown) => isoTimestamp(value, 'updated_at')],
-  ['hosted_domain', (value: unknown) => nullableString(value, 'hosted_domain')],
-  ['microdollars_used', (value: unknown) => safeNumber(value, 'microdollars_used')],
-  [
-    'total_microdollars_acquired',
-    (value: unknown) => safeNumber(value, 'total_microdollars_acquired'),
-  ],
-  [
-    'next_credit_expiration_at',
-    (value: unknown) => nullableTimestamp(value, 'next_credit_expiration_at'),
-  ],
-  ['auto_top_up_enabled', (value: unknown) => requiredBoolean(value, 'auto_top_up_enabled')],
-  ['default_model', (value: unknown) => nullableString(value, 'default_model')],
-  ['completed_welcome_form', (value: unknown) => requiredBoolean(value, 'completed_welcome_form')],
-  ['linkedin_url', (value: unknown) => nullableString(value, 'linkedin_url')],
-  ['github_url', (value: unknown) => nullableString(value, 'github_url')],
-  [
-    'discord_server_membership_verified_at',
-    (value: unknown) => nullableTimestamp(value, 'discord_server_membership_verified_at'),
-  ],
-  [
-    'openrouter_upstream_safety_identifier',
-    (value: unknown) => nullableString(value, 'openrouter_upstream_safety_identifier'),
-  ],
-  [
-    'openrouter_downstream_safety_identifier',
-    (value: unknown) => nullableString(value, 'openrouter_downstream_safety_identifier'),
-  ],
-  [
-    'vercel_downstream_safety_identifier',
-    (value: unknown) => nullableString(value, 'vercel_downstream_safety_identifier'),
-  ],
-  ['customer_source', (value: unknown) => nullableString(value, 'customer_source')],
-  ['signup_ip', (value: unknown) => nullableString(value, 'signup_ip')],
-  ['normalized_email', (value: unknown) => nullableString(value, 'normalized_email')],
-  ['email_domain', (value: unknown) => nullableString(value, 'email_domain')],
-] as const;
-
 export type SourceAdapterQueries = {
-  /** Live primary replica. The profile columns the warehouse does not carry. */
-  replicaQuery: ReplicaQuery;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   warehouseQuery: ReplicaQuery;
 };
 
 export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapter[] {
-  const { replicaQuery, warehouseQuery } = queries;
+  const { warehouseQuery } = queries;
 
   return [
     {
@@ -1455,24 +1425,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         // column. An organization export therefore has no identity section; the
         // organization it belongs to is named in the file header instead.
         if (input.subject.type !== 'user') return { records: [], nextCursor: null };
-        const { kiloUserId } = input.subject;
-        const [rows, profileRows] = await Promise.all([
-          replicaQuery(userQuery, [kiloUserId]),
-          warehouseQuery(warehouseProfileQuery, [kiloUserId]),
-        ]);
-        const row = rows[0];
-        if (!row) throw new Error('Export user was not found');
+        const profileRows = await warehouseQuery(warehouseProfileQuery, [input.subject.kiloUserId]);
 
-        // Terminal, not retryable. The primary row above always exists for an
-        // authenticated requester, but the warehouse copy can be genuinely absent — an
+        // Terminal, not retryable. The warehouse copy can be genuinely absent — an
         // account created after the load cutoff, or a gap in the load. No retry makes it
         // appear, so this fails on the first attempt with the real reason instead of
         // spending the queue's retries to arrive at the same place with a generic error.
-        //
-        // Not silently falling back to the primary values: that would put a
-        // current-second name and email beside five sources frozen at the cutoff, which
-        // is the inconsistency reading them from the warehouse exists to remove. A user
-        // absent from the snapshot has nothing to export from it.
         const profile = profileRows[0];
         if (!profile) {
           throw new TerminalExportError(
@@ -1482,31 +1440,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           );
         }
 
-        // The warehouse copy wins for the two fields it carries, so the identity section
-        // is as of the same moment as the rest of the export. Field names are unchanged,
-        // so this is not a schema version change for consumers.
-        const merged: Record<string, unknown> = { ...row };
-        for (const [exportField, warehouseColumn] of Object.entries(WAREHOUSE_PROFILE_FIELDS)) {
-          merged[exportField] = warehouseProfileValue(profile[warehouseColumn], row[exportField]);
-        }
         return {
-          records: [
-            ...USER_FIELD_MAPPERS.map(([field, mapValue]) => ({
-              source: 'kilocode_users',
-              field,
-              value: mapValue(merged[field]),
-            })),
-            // Emitted under the same section: these describe the same person, and the
-            // split between "the primary holds it" and "only the warehouse holds it" is
-            // an implementation detail nobody reading their own export should have to
-            // reason about. Nullable throughout, so a blank stays a blank rather than
-            // failing the export.
-            ...WAREHOUSE_ONLY_FIELDS.map(field => ({
-              source: 'kilocode_users',
-              field,
-              value: warehouseText(profile[field]),
-            })),
-          ],
+          records: IDENTITY_FIELDS.map(field => ({
+            source: 'kilocode_users',
+            field,
+            value: warehouseText(profile[field]),
+          })),
           nextCursor: null,
         };
       },
@@ -1592,8 +1531,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         );
         return {
           records: rows.flatMap(row => {
-            // The journal position identifies the row, so records that repeat a
-            // value are distinguishable rather than looking like duplication.
             const id = `${row.most_significant_position}.${row.least_significant_position}`;
             return [
               { source: 'cli_sessions', id, field: 'session_id', value: row.session_id },
@@ -1639,12 +1576,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the journal envelope went with the narrowing, so this source
-          // cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => {
-            // The position pair identifies the journal row; `payload_id` identifies the
-            // review and repeats about 7.4 times across them, so it is a field rather
-            // than the key. Same division `cli_sessions` makes.
             const id = `${row.most_significant_position}.${row.least_significant_position}`;
             return [
               {
@@ -1695,19 +1627,16 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // so the cursor always has a comparable value to carry forward.
             cursor_secondary: requiredString(row.cursor_secondary, 'cursor_secondary'),
             system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.map(row => ({
             source: 'system_prompt_prefix',
             // The prefix id repeats across the triple, so it cannot identify a row on
-            // its own. The pair that orders the page does, and it is what a deletion
-            // mark has to hang off to mean anything.
+            // its own. The pair that orders the page does.
             id: `${row.system_prompt_prefix_id}.${row.cursor_secondary}`,
             field: 'system_prompt_prefix',
             value: row.system_prompt_prefix,
-            ...deletionMark(row.deleted),
           })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             row.system_prompt_prefix_id,
@@ -1760,7 +1689,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             project_id: warehouseText(row.project_id),
             git_branch: warehouseText(row.git_branch),
             file_path: warehouseText(row.file_path),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1774,21 +1702,18 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'project_id',
               value: row.project_id,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_manifest',
               id: row.id,
               field: 'git_branch',
               value: row.git_branch,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_manifest',
               id: row.id,
               field: 'file_path',
               value: row.file_path,
-              ...deletionMark(row.deleted),
             },
           ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -1818,35 +1743,29 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // hands back a parsed object rather than text. Same handling as
             // `app_builder_messages.data`, the export's other JSON payload.
             metadata: jsonValue(row.metadata),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
           // Three records per search, sharing the row's id, so the query, the project it
-          // ran against and what it returned stay groupable as one search. `created_at`
-          // was dropped from the projection on request; nothing here needs it, so it is
-          // not selected either.
+          // ran against and what it returned stay groupable as one search.
           records: rows.flatMap(row => [
             {
               source: 'code_indexing_search',
               id: row.id,
               field: 'project_id',
               value: row.project_id,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_search',
               id: row.id,
               field: 'query',
               value: row.query,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'code_indexing_search',
               id: row.id,
               field: 'metadata',
               value: row.metadata,
-              ...deletionMark(row.deleted),
             },
           ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -1871,9 +1790,7 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // Everything below is a LEFT JOIN result or an unconstrained warehouse
             // column, so each is read leniently. See the note on `warehouseText`.
             deployment_id: warehouseText(row.deployment_id),
-            created_by_user_id: warehouseText(row.created_by_user_id),
             payload: jsonValue(row.payload),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -1881,25 +1798,15 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // `event_id` is unique only within a build, so the pair identifies the event.
             // The same shape `cli_sessions` uses for its journal positions.
             const id = `${row.build_id}.${row.event_id}`;
-            const mark = deletionMark(row.deleted);
             return [
-              { source: 'deployment_events', id, field: 'build_id', value: row.build_id, ...mark },
+              { source: 'deployment_events', id, field: 'build_id', value: row.build_id },
               {
                 source: 'deployment_events',
                 id,
                 field: 'deployment_id',
                 value: row.deployment_id,
-                ...mark,
               },
-              // Provenance, never a scope. See the note on `deploymentEventPageQuery`.
-              {
-                source: 'deployment_events',
-                id,
-                field: 'created_by_user_id',
-                value: row.created_by_user_id,
-                ...mark,
-              },
-              { source: 'deployment_events', id, field: 'payload', value: row.payload, ...mark },
+              { source: 'deployment_events', id, field: 'payload', value: row.payload },
             ];
           }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.build_id, row.event_id]),
@@ -1923,8 +1830,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the column went with the narrowing to six columns. See
-          // `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => [
             {
               source: 'source_embeddings',
@@ -1968,8 +1873,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the column went with the narrowing, and the table carried no
-          // deleted rows anyway. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row =>
             row.fields.map(({ field, value }) => ({
               source: 'security_findings',
@@ -1983,16 +1886,103 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
       },
     },
     {
+      name: 'usage_daily',
+      warehouseTable: 'usage_daily',
+      async readPage(input): Promise<SourcePage> {
+        const [afterOwner, afterCountry] = keyCursorValues(input.cursor, 2);
+        const rows: UsageDailyRow[] = await warehouseQuery(usageDailyQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
+          afterOwner,
+          afterCountry,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            cursor_owner: warehouseText(row.cursor_owner),
+            country_code: warehouseText(row.country_code),
+          }))
+        );
+        // Must agree exactly with the COALESCE in the query, or a page would resume from
+        // a key the WHERE clause never produced.
+        const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
+        return {
+          records: rows.map(row => ({
+            source: 'usage_daily',
+            id: keyed(row.country_code),
+            field: 'country_code',
+            value: row.country_code,
+          })),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            keyed(row.cursor_owner),
+            keyed(row.country_code),
+          ]),
+        };
+      },
+    },
+    {
+      name: 'microdollar_usage_hourly',
+      warehouseTable: 'microdollar_usage_hourly',
+      async readPage(input): Promise<SourcePage> {
+        const [afterOwner, afterProject, afterCountryId, afterCountry] = keyCursorValues(
+          input.cursor,
+          4
+        );
+        const rows: MicrodollarUsageHourlyRow[] = await warehouseQuery(
+          microdollarUsageHourlyQueries[input.subject.type],
+          [
+            subjectScopeValue(input.subject),
+            afterOwner,
+            afterProject,
+            afterCountryId,
+            afterCountry,
+            input.limit,
+          ]
+        ).then(result =>
+          result.map(row => ({
+            project_id: warehouseText(row.project_id),
+            vercel_ip_country_id:
+              typeof row.vercel_ip_country_id === 'number'
+                ? String(row.vercel_ip_country_id)
+                : warehouseText(row.vercel_ip_country_id),
+            vercel_ip_country: warehouseText(row.vercel_ip_country),
+            key: [0, 1, 2, 3].map(index => {
+              const value = row[`key_${index}`];
+              return typeof value === 'number' ? String(value) : requiredString(value, 'cursor');
+            }),
+          }))
+        );
+        return {
+          records: rows.flatMap(row => {
+            const id = row.key.slice(1).join('|');
+            return [
+              {
+                source: 'microdollar_usage_hourly',
+                id,
+                field: 'project_id',
+                value: row.project_id,
+              },
+              {
+                source: 'microdollar_usage_hourly',
+                id,
+                field: 'vercel_ip_country_id',
+                value: row.vercel_ip_country_id,
+              },
+              {
+                source: 'microdollar_usage_hourly',
+                id,
+                field: 'vercel_ip_country',
+                value: row.vercel_ip_country,
+              },
+            ];
+          }),
+          nextCursor: nextKeyCursor(rows, input.limit, row => row.key),
+        };
+      },
+    },
+    {
       name: 'external_usage_daily',
       warehouseTable: 'external_usage_daily',
       async readPage(input): Promise<SourcePage> {
         const [afterOwner, afterCountry] = keyCursorValues(input.cursor, 2);
-        // The owner the scope did not pin, named by its own column. Which one that is
-        // depends on the subject, so this source's field set does too: a personal export
-        // gains the organization the country was seen under, an organization's gains the
-        // member. Both are dimensions of the row rather than a second owner of it.
-        const cursorOwnerField =
-          input.subject.type === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
         const rows: ExternalUsageDailyRow[] = await warehouseQuery(
           externalUsageDailyQueries[input.subject.type],
           [subjectScopeValue(input.subject), afterOwner, afterCountry, input.limit]
@@ -2006,27 +1996,12 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         // a key the WHERE clause never produced.
         const keyed = (value: string | null): string => value ?? NULL_CURSOR_SENTINEL;
         return {
-          // No deletion mark: a dbt model, not a CDC copy, so it carries no such column.
-          records: rows.flatMap(row => {
-            // The row has no key of its own — its grain is its identity, which is why the
-            // load carries DISTINCT. Both parts are emitted below, so a separator
-            // appearing inside a value costs nothing.
-            const id = [keyed(row.cursor_owner), keyed(row.geoip_country_code)].join('|');
-            return [
-              {
-                source: 'external_usage_daily',
-                id,
-                field: cursorOwnerField,
-                value: row.cursor_owner,
-              },
-              {
-                source: 'external_usage_daily',
-                id,
-                field: 'geoip_country_code',
-                value: row.geoip_country_code,
-              },
-            ];
-          }),
+          records: rows.map(row => ({
+            source: 'external_usage_daily',
+            id: keyed(row.geoip_country_code),
+            field: 'geoip_country_code',
+            value: row.geoip_country_code,
+          })),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
             keyed(row.cursor_owner),
             keyed(row.geoip_country_code),
@@ -2050,7 +2025,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             // jsonb, so the driver returns a parsed value. Serialized whole: which
             // repositories a connection reaches is the substance of it.
             repositories: jsonValue(row.repositories),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -2060,21 +2034,18 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field: 'platform',
               value: row.platform,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'platform_integrations',
               id: row.id,
               field: 'platform_account_login',
               value: row.platform_account_login,
-              ...deletionMark(row.deleted),
             },
             {
               source: 'platform_integrations',
               id: row.id,
               field: 'repositories',
               value: row.repositories,
-              ...deletionMark(row.deleted),
             },
           ]),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -2107,8 +2078,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark: the column went with the narrowing to six columns, so this
-          // source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => {
             // The position pair identifies the event, not `payload_id`. Same shape as
             // `cli_sessions`, and for the reason set out on the query above.
@@ -2156,7 +2125,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               field,
               value: read(row[field]),
             })),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
@@ -2166,7 +2134,36 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
               id: row.id,
               field,
               value,
-              ...deletionMark(row.deleted),
+            }))
+          ),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
+        };
+      },
+    },
+    {
+      name: 'int_microdollar_usage_enriched',
+      warehouseTable: 'int_microdollar_usage_enriched',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: UsageEnrichedRow[] = await warehouseQuery(
+          usageEnrichedQueries[input.subject.type],
+          [subjectScopeValue(input.subject), after, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            fields: Object.entries(USAGE_ENRICHED_FIELDS).map(([field, read]) => ({
+              field,
+              value: read(row[field]),
+            })),
+          }))
+        );
+        return {
+          records: rows.flatMap(row =>
+            row.fields.map(({ field, value }) => ({
+              source: 'int_microdollar_usage_enriched',
+              id: row.id,
+              field,
+              value,
             }))
           ),
           nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
@@ -2228,8 +2225,6 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
           }))
         );
         return {
-          // No deletion mark anywhere here: the column was dropped when the table was
-          // narrowed, so this source cannot say. See `SOURCES_WITHOUT_DELETED_COLUMN`.
           records: rows.flatMap(row => [
             {
               source: 'enrichment_data',
@@ -2280,23 +2275,17 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             display_name: warehouseText(row.display_name),
             avatar_url: warehouseText(row.avatar_url),
             hosted_domain: warehouseText(row.hosted_domain),
-            deleted: row._snowflake_deleted,
           }))
         );
         return {
           records: rows.flatMap(row => {
-            // The key pair identifies the linked account, so the records of one account
-            // stay groupable and two linked accounts never look like duplication.
-            // `AuthProviderId` is a closed set of identifiers none of which contains a
-            // dot, so the first one always separates the halves and this cannot be
-            // ambiguous the way a free-text pair would be.
-            const id = `${row.provider}.${row.provider_account_id}`;
+            // No record key: the pair that could serve as one was dropped from the
+            // returned set, so two linked accounts supplying the same profile produce
+            // indistinguishable records. The pair is still read, for the cursor.
             return USER_AUTH_PROVIDER_FIELDS.map(field => ({
               source: 'user_auth_provider',
-              id,
               field,
               value: row[field],
-              ...deletionMark(row.deleted),
             }));
           }),
           nextCursor: nextKeyCursor(rows, input.limit, row => [
@@ -2352,6 +2341,8 @@ export const warehouseQueries = {
   enrichmentUserQuery: enrichmentQuery,
   // No org counterpart either. See `audienceQuery` and `USER_ONLY_SOURCES`.
   audienceUserQuery: audienceQuery,
+  usageEnrichedUserQuery: usageEnrichedQueries.user,
+  usageEnrichedOrgQuery: usageEnrichedQueries.organization,
   // No org counterpart: Orb has no notion of a Kilo organization.
   orbCustomerUserQuery: orbCustomerQuery,
   microdollarJournalUserQuery: microdollarJournalQueries.user,
@@ -2364,11 +2355,15 @@ export const warehouseQueries = {
   platformIntegrationOrgQuery: platformIntegrationQueries.organization,
   externalUsageDailyUserQuery: externalUsageDailyQueries.user,
   externalUsageDailyOrgQuery: externalUsageDailyQueries.organization,
+  microdollarUsageHourlyUserQuery: microdollarUsageHourlyQueries.user,
+  microdollarUsageHourlyOrgQuery: microdollarUsageHourlyQueries.organization,
+  usageDailyUserQuery: usageDailyQueries.user,
+  usageDailyOrgQuery: usageDailyQueries.organization,
   // No org counterpart, deliberately. See `userAuthProviderQuery` and `USER_ONLY_SOURCES`.
   userAuthProviderUserQuery: userAuthProviderQuery,
 };
 
-export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQuery };
+export const sourceQueries = { ...warehouseQueries, warehouseProfileQuery };
 
 /**
  * Which of the tables an export wants are actually readable by it.
@@ -2379,10 +2374,10 @@ export const sourceQueries = { ...warehouseQueries, userQuery, warehouseProfileQ
  * instead of the file simply ending early.
  *
  * Existence of the table is not sufficient. A table can be present from an earlier load
- * and still lack a column a newer query selects — `_snowflake_deleted` arrived table by
- * table, and a source selecting it against a not-yet-reloaded table fails at read time
- * with an undefined-column error rather than being classified unavailable. So this asks
- * about columns, and a source counts as present only when every column it requires is
+ * and still lack a column a newer query selects: the warehouse is loaded table by table,
+ * and a source selecting a column against a not-yet-reloaded table fails at read time with
+ * an undefined-column error rather than being classified unavailable. So this asks about
+ * columns, and a source counts as present only when every column it requires is
  * there.
  *
  * Reads `information_schema` rather than probing with a real query: a probe that fails
@@ -2410,7 +2405,7 @@ export type WarehouseTableRequirement = { table: string; requiredColumns: readon
  * column, so it takes no addition.
  */
 export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
-  users: ['user_id', ...Object.values(WAREHOUSE_PROFILE_FIELDS), ...WAREHOUSE_ONLY_FIELDS],
+  users: [...IDENTITY_FIELDS],
   app_builder_projects: ['id', 'title'],
   app_builder_messages: ['id', 'data'],
   cli_sessions: [
@@ -2421,8 +2416,7 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
-  // The position pair is declared because the query orders and pages on it. No deletion
-  // column: the journal envelope went with the 2026-08-14 narrowing.
+  // The position pair is declared because the query orders and pages on it.
   cloud_agent_code_reviews: [
     'payload_id',
     'repo_full_name',
@@ -2433,28 +2427,21 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
-  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix', DELETED_COLUMN],
+  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix'],
   microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
-  code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path', DELETED_COLUMN],
-  code_indexing_search: ['id', 'project_id', 'query', 'metadata', DELETED_COLUMN],
-  // `created_by_user_id` is probed because the query selects it as a field, not because
-  // anything scopes on it. The owner columns are covered by `sourceQueryScopes`.
-  deployment_events: [
-    'build_id',
-    'event_id',
-    'deployment_id',
-    'created_by_user_id',
-    'payload',
-    DELETED_COLUMN,
-  ],
-  // No deletion column: dropped when the table was narrowed to four columns. The probe
-  // must not ask for it, or the table would be called absent on every export.
+  code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path'],
+  code_indexing_search: ['id', 'project_id', 'query', 'metadata'],
+  // The owner columns are covered by `sourceQueryScopes` rather than declared here.
+  deployment_events: ['build_id', 'event_id', 'deployment_id', 'payload'],
+  // The whole of the narrowed table bar its owner column, which `sourceQueryScopes`
+  // covers.
   enrichment_data: ['id', 'github_enrichment_data', 'clay_enrichment_data'],
-  // Two columns in the table, one of which is the scope. A dbt model, so no deletion
-  // column exists to declare.
+  // Two columns in the table, one of which is the scope.
   audiences: ['email'],
+  // Derived from the same constant the SELECT list is.
+  int_microdollar_usage_enriched: USAGE_ENRICHED_COLUMNS,
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading.
   orb_customer: ORB_CUSTOMER_COLUMNS,
@@ -2468,28 +2455,25 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'least_significant_position',
   ],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
-  // column the query started reading. No deletion column: it went with the narrowing.
+  // column the query started reading.
   security_findings: SECURITY_FINDING_COLUMNS,
-  // No deletion column: it went with the narrowing to six columns, along with the
-  // `embedding` vector that was almost all of this table's size.
+  // Narrowed to six columns, which took the `embedding` vector with it — that was
+  // almost all of this table's size.
   source_embeddings: ['id', 'project_id', 'file_path', 'git_branch'],
-  // Three of the table's 29 columns, plus the cursor and the deletion flag. The rest is
-  // integration plumbing the export deliberately leaves behind.
-  platform_integrations: [
-    'id',
-    'platform',
-    'platform_account_login',
-    'repositories',
-    DELETED_COLUMN,
-  ],
+  // Three of the table's 29 columns, plus the cursor. The rest is integration plumbing
+  // the export deliberately leaves behind.
+  platform_integrations: ['id', 'platform', 'platform_account_login', 'repositories'],
   // The whole table bar its two owner columns, which `sourceQueryScopes` covers and
-  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of. A dbt model, so there is no
-  // deletion column to declare.
+  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` requires both of.
   external_usage_daily: ['geoip_country_code'],
+  // Both owner columns are required whichever subject asks; see
+  // `TABLES_NEEDING_BOTH_SCOPE_COLUMNS`.
+  microdollar_usage_hourly: ['project_id', 'vercel_ip_country_id', 'vercel_ip_country'],
+  usage_daily: ['country_code'],
   // Derived from the same constant the SELECT list is, so the probe cannot fall behind a
   // column the query started reading. The scope column `kilo_user_id` is added per
   // subject below; the cursor pair needs no addition, being two of the fields already.
-  user_auth_provider: [...USER_AUTH_PROVIDER_COLUMNS, DELETED_COLUMN],
+  user_auth_provider: [...USER_AUTH_PROVIDER_COLUMNS],
 };
 
 /**
@@ -2504,7 +2488,12 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
  * This does couple a personal export to a column only an organization export filters on,
  * which is deliberate — the alternative is a cursor that repeats and drops rows.
  */
-const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set(['system_prompt_prefix', 'external_usage_daily']);
+const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set([
+  'system_prompt_prefix',
+  'external_usage_daily',
+  'microdollar_usage_hourly',
+  'usage_daily',
+]);
 
 /** Sources filtered by a scope column, as opposed to one of their own keys. */
 const SUBJECT_SCOPED_TABLES = new Set(
@@ -2630,6 +2619,8 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   deploymentEventOrgQuery: 'organization_id = $1',
   enrichmentUserQuery: 'kilo_user_id = $1',
   audienceUserQuery: 'kilo_user_id = $1',
+  usageEnrichedUserQuery: 'kilo_user_id = $1',
+  usageEnrichedOrgQuery: 'organization_id = $1',
   orbCustomerUserQuery: 'kilo_user_id = $1',
   microdollarJournalUserQuery: 'kilo_user_id = $1',
   microdollarJournalOrgQuery: 'organization_id = $1',
@@ -2641,7 +2632,10 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   platformIntegrationOrgQuery: 'organization_id = $1',
   externalUsageDailyUserQuery: 'kilo_user_id = $1',
   externalUsageDailyOrgQuery: 'organization_id = $1',
+  microdollarUsageHourlyUserQuery: 'kilo_user_id = $1',
+  microdollarUsageHourlyOrgQuery: 'organization_id = $1',
+  usageDailyUserQuery: 'kilo_user_id = $1',
+  usageDailyOrgQuery: 'organization_id = $1',
   userAuthProviderUserQuery: 'kilo_user_id = $1',
-  userQuery: 'id = $1',
   warehouseProfileQuery: 'user_id = $1',
 };

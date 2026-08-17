@@ -1,27 +1,29 @@
 // Pure tests for the PR operation ledger mobile helpers (P1-A-08c).
 //
-// `useHoistedOperationKey` is React state (useRef) and is covered by the
-// mounted test (`pr-operation-ledger.mounted.test.tsx`). This suite covers
-// the error classification, the ledger-outcome → display-copy mapping, and
-// the toast message selection without any React.
+// This suite covers the error classification, the ledger-outcome →
+// display-copy mapping, and the toast message selection without any React.
+// `useHoistedOperationKey` is React state (useRef) and lives in
+// `@/lib/operation-key`, covered by `operation-key.mounted.test.tsx`.
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { OPERATION_IN_PROGRESS_MESSAGE } from '@/lib/operation-key';
 import {
   isPrMutationRetryable,
   isPrOperationPersistenceFailed,
   mapPrOperationError,
   PR_OPERATION_AMBIGUOUS_MESSAGE,
-  PR_OPERATION_IN_PROGRESS_MESSAGE,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
+// `@/lib/operation-key` imports expo-crypto for the hoisted key, which drags
+// react-native in and does not parse under the pure project.
 vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used-in-pure-tests',
 }));
 
-const IN_PROGRESS = new Error(PR_OPERATION_IN_PROGRESS_MESSAGE);
+const IN_PROGRESS = new Error(OPERATION_IN_PROGRESS_MESSAGE);
 const AMBIGUOUS = new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);
 const PERSISTENCE_FAILED = new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
 

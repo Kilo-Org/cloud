@@ -8,11 +8,11 @@
 // `isPrMutationRetryable` + `mapPrOperationError`) runs inside
 // `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React
 // ref state that needs a mounted renderer, covered by
-// `pr-operation-ledger.mounted.test.tsx`).
+// `operation-key.mounted.test.tsx`).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operation-ledger';
+import type * as OperationKeyModule from '@/lib/operation-key';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import { useReplyToCommentMutation } from './use-review-discussion-mutations';
 
@@ -25,8 +25,8 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
-vi.mock('@/lib/pr-review/merge/pr-operation-ledger', async importOriginal => {
-  const actual = await importOriginal<typeof PrOperationLedgerModule>();
+vi.mock('@/lib/operation-key', async importOriginal => {
+  const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
 

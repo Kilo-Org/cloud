@@ -21,7 +21,7 @@ import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';

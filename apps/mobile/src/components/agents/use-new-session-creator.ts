@@ -10,7 +10,7 @@ import { resolveNewSessionPromptForCreate } from '@/components/agents/new-sessio
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   type AgentAttachmentWire,
   type useAgentAttachmentUpload,

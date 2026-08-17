@@ -33,7 +33,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { putSharePayload } from '@/lib/share-payload';
 import { appendShareParams } from '@/lib/share-navigation';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,

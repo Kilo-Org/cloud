@@ -3,18 +3,20 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
+import {
+  isOperationInProgress,
+  OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+  useHoistedOperationKey,
+} from '@/lib/operation-key';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
 // P1-A-08e ledger markers (server contract, mirrored from shared-handlers.ts).
-// `operation_in_progress` is the only raw marker — the server sends user-facing
-// copy for every other ledger outcome, so it is the only one translated here.
-const SECURITY_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
+// The raw markers are shared in `@/lib/operation-key`; the server sends
+// user-facing copy for every other ledger outcome.
 const SECURITY_OPERATION_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
-const SECURITY_OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
 // Ambiguous transport outcome: the Worker may have accepted the command, so the
 // server reconciles a same-key retry instead of re-submitting blind.
 const SECURITY_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the security review before retrying.";
@@ -54,7 +56,7 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
     if (isSecurityConfigurationError(error)) {
       return false;
     }
-    if (error.message === SECURITY_OPERATION_KEY_REUSE_MISMATCH_MESSAGE) {
+    if (error.message === OPERATION_KEY_REUSE_MISMATCH_MESSAGE) {
       return false;
     }
     if (error.message === SECURITY_OPERATION_REPLAY_FAILED_MESSAGE) {
@@ -74,10 +76,7 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
 }
 
 function mapOperationInProgress(error: unknown, copy: string): unknown {
-  if (error instanceof Error && error.message === SECURITY_OPERATION_IN_PROGRESS_MESSAGE) {
-    return new Error(copy);
-  }
-  return error;
+  return isOperationInProgress(error) ? new Error(copy) : error;
 }
 
 /** Maps the raw in-progress marker onto retryable sync copy; others pass through. */

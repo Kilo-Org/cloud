@@ -1,14 +1,12 @@
 // Mobile-side helpers for the PR operation ledger (P1-A-08c). The web router
 // admits a `pr`-domain ledger row for each mutation carrying an `operationKey`.
-// This module owns the per-intent key (`useHoistedOperationKey`) and the
-// mapping from the server's stable ledger markers onto per-surface copy.
+// This module owns the mapping from the server's stable ledger markers onto
+// per-surface PR copy. The per-intent key and the raw markers live in
+// `@/lib/operation-key`, which every ledgered surface shares.
 
-import * as Crypto from 'expo-crypto';
-import { useRef } from 'react';
-
+import { isOperationInProgress } from '@/lib/operation-key';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 
-export const PR_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
 export const PR_OPERATION_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR before retrying.";
 // The ambiguous outcome could not be recorded as `reconcile_pending`, so the
 // same key must never be retried: this marker is terminal and rotates the key.
@@ -26,10 +24,6 @@ const PR_SURFACE_RETRYABLE_COPY: Record<PrMutationSurface, string> = {
   reply: 'Could not reply.',
   merge: 'Could not merge pull request.',
 };
-
-function isPrOperationInProgress(error: unknown): boolean {
-  return error instanceof Error && error.message === PR_OPERATION_IN_PROGRESS_MESSAGE;
-}
 
 export function isPrOperationAmbiguous(error: unknown): boolean {
   return error instanceof Error && error.message === PR_OPERATION_AMBIGUOUS_MESSAGE;
@@ -59,7 +53,7 @@ export function isPrMutationRetryable(error: unknown): boolean {
  * other error passes through unchanged.
  */
 export function mapPrOperationError(error: unknown, surface: PrMutationSurface): unknown {
-  if (isPrOperationInProgress(error)) {
+  if (isOperationInProgress(error)) {
     return new Error(PR_SURFACE_RETRYABLE_COPY[surface]);
   }
   if (isPrOperationAmbiguous(error)) {
@@ -75,28 +69,4 @@ export function mapPrOperationError(error: unknown, surface: PrMutationSurface):
 export function prOperationToastMessage(error: unknown, surface: PrMutationSurface): string {
   const mapped = mapPrOperationError(error, surface);
   return mapped instanceof Error ? mapped.message : 'Could not complete this action.';
-}
-
-/**
- * Hoists one operation key per intent. `getKey(fingerprint)` is stable across
- * retries of the same fingerprint and rotates as soon as the fingerprint
- * changes, so an edited intent never replays the previous one's ledger result.
- * `rotateKey()` ends the intent after a success or a terminal failure.
- */
-export function useHoistedOperationKey(): {
-  getKey: (fingerprint: string) => string;
-  rotateKey: () => void;
-} {
-  const keyRef = useRef<{ fingerprint: string; key: string } | null>(null);
-  const getKey = (fingerprint: string) => {
-    if (keyRef.current !== null && keyRef.current.fingerprint !== fingerprint) {
-      keyRef.current = null;
-    }
-    keyRef.current ??= { fingerprint, key: Crypto.randomUUID() };
-    return keyRef.current.key;
-  };
-  const rotateKey = () => {
-    keyRef.current = null;
-  };
-  return { getKey, rotateKey };
 }

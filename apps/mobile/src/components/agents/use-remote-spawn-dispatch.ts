@@ -13,7 +13,7 @@ import {
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,

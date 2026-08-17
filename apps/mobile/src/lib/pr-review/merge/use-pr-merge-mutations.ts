@@ -22,11 +22,11 @@ import {
   assertMergeResult,
   type MergePullRequestResult,
 } from '@/lib/pr-review/merge/merge-result-gate';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   isPrMutationRetryable,
   mapPrOperationError,
   prOperationToastMessage,
-  useHoistedOperationKey,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
 type PrRef = { owner: string; repo: string; number: number };

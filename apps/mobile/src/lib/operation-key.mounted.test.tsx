@@ -7,7 +7,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { expect, test, vi } from 'vitest';
 
-import { useHoistedOperationKey } from './pr-operation-ledger';
+import { useHoistedOperationKey } from './operation-key';
 
 vi.mock('expo-crypto', () => {
   let n = 0;

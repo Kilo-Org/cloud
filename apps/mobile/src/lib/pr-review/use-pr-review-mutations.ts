@@ -26,11 +26,11 @@ import { toast } from 'sonner-native';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   isPrMutationRetryable,
   mapPrOperationError,
   prOperationToastMessage,
-  useHoistedOperationKey,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
 type PrRef = { owner: string; repo: string; number: number };

@@ -13,7 +13,7 @@ import {
   isSecuritySyncRetryable,
   mapSecurityDismissOperationError,
 } from '@/lib/hooks/use-security-agent-mutations';
-import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 

@@ -14,7 +14,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operation-ledger';
+import type * as OperationKeyModule from '@/lib/operation-key';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import { useMergePullRequestMutation } from './use-pr-merge-mutations';
@@ -29,8 +29,8 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
-vi.mock('@/lib/pr-review/merge/pr-operation-ledger', async importOriginal => {
-  const actual = await importOriginal<typeof PrOperationLedgerModule>();
+vi.mock('@/lib/operation-key', async importOriginal => {
+  const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
 

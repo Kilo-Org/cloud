@@ -3,9 +3,6 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { Env } from './env';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
 
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
@@ -13,6 +10,7 @@ import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getSessionExport } from './services/session-export';
+import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
@@ -69,38 +67,21 @@ app.use('/internal/cloud-agent/v1/*', kiloJwtAuthMiddleware);
 app.use('/internal/cloud-agent/v1/*', requireValidInternalSecret);
 app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 
-// Public session endpoint: look up a session by public_id and return all ingested DO events.
-app.get('/session/:sessionId', async c => {
-  const sessionId = c.req.param('sessionId');
-  const parsedSessionId = z.uuid().safeParse(sessionId);
-  if (!parsedSessionId.success) {
-    return c.json(
-      { success: false, error: 'Invalid sessionId', issues: parsedSessionId.error.issues },
-      400
-    );
-  }
-
-  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
-  const rows = await db
-    .select({
-      session_id: cli_sessions_v2.session_id,
-      kilo_user_id: cli_sessions_v2.kilo_user_id,
-    })
-    .from(cli_sessions_v2)
-    .where(eq(cli_sessions_v2.public_id, parsedSessionId.data))
-    .limit(1);
-
-  const row = rows[0];
-
-  if (!row) {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
+// Public session endpoint: resolve the purpose-bound share token, then return
+// all ingested DO events for the current session generation.
+app.get('/session/:shareToken', async c => {
+  const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
+  if (!sharedSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404, {
+      'cache-control': 'no-store',
+    });
   }
 
   const stream = await withDORetry(
     () =>
       getSessionIngestDO(c.env, {
-        kiloUserId: row.kilo_user_id,
-        sessionId: row.session_id,
+        kiloUserId: sharedSession.kiloUserId,
+        sessionId: sharedSession.sessionId,
       }),
     s => s.getAllStream(),
     'SessionIngestDO.getAllStream'
@@ -108,7 +89,27 @@ app.get('/session/:sessionId', async c => {
 
   return c.body(stream, 200, {
     'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
   });
+});
+
+app.get('/session/:shareToken/metadata', async c => {
+  const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
+  if (!sharedSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404, {
+      'cache-control': 'no-store',
+    });
+  }
+
+  return c.json(
+    {
+      success: true,
+      title: sharedSession.title,
+      owner_name: sharedSession.ownerName,
+    },
+    200,
+    { 'cache-control': 'no-store' }
+  );
 });
 
 app.post('/internal/session-access/invalidate', async c => {

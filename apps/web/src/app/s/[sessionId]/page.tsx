@@ -1,11 +1,8 @@
-import { db } from '@/lib/drizzle';
-import { eq } from 'drizzle-orm';
-import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import { notFound } from 'next/navigation';
-import { validate as isValidUUID } from 'uuid';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import { CopyableCommand } from '@/components/CopyableCommand';
 import { APP_URL } from '@/lib/constants';
+import { fetchSharedSessionMetadata } from '@/lib/session-ingest-client';
 import { OpenInCliButton } from '@/app/share/[shareId]/open-in-cli-button';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -17,29 +14,14 @@ export default async function SharedSessionPage({
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
-  const { sessionId } = await params;
+  const { sessionId: shareToken } = await params;
+  const session = await fetchSharedSessionMetadata(shareToken);
 
-  // Validate sessionId is a valid UUID before querying the database
-  if (!isValidUUID(sessionId)) {
+  if (!session) {
     return notFound();
   }
 
-  const sessionResult = await db
-    .select({
-      ownerName: kilocode_users.google_user_name,
-      title: cli_sessions_v2.title,
-    })
-    .from(cli_sessions_v2)
-    .leftJoin(kilocode_users, eq(cli_sessions_v2.kilo_user_id, kilocode_users.id))
-    .where(eq(cli_sessions_v2.public_id, sessionId))
-    .limit(1);
-
-  if (sessionResult.length === 0) {
-    return notFound();
-  }
-
-  const session = sessionResult[0];
-  const shareUrl = `${APP_URL}/s/${sessionId}`;
+  const shareUrl = `${APP_URL}/s/${shareToken}`;
   const importCommand = `kilo import ${shareUrl}`;
 
   return (
@@ -78,7 +60,7 @@ export default async function SharedSessionPage({
                     </div>
                   </div>
                   <div className="flex justify-start sm:justify-end">
-                    <OpenInEditorButton sessionId={sessionId} pathOverride={`/s/${sessionId}`} />
+                    <OpenInEditorButton sessionId={shareToken} pathOverride={`/s/${shareToken}`} />
                   </div>
                 </div>
               </div>

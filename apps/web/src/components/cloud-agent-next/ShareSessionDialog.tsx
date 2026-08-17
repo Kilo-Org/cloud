@@ -40,7 +40,7 @@ export function ShareSessionDialog({ open, onOpenChange, kiloSessionId }: ShareS
         session_id: kiloSessionId,
       });
 
-      const url = `${window.location.origin}/s/${result.public_id}`;
+      const url = `${window.location.origin}/s/${result.share_token}`;
       setShareUrl(url);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to share session';

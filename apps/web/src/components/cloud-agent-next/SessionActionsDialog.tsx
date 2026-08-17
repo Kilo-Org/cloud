@@ -49,7 +49,7 @@ export function SessionActionsDialog({
         session_id: kiloSessionId,
       });
 
-      const url = new URL(`/s/${result.public_id}`, window.location.origin).toString();
+      const url = new URL(`/s/${result.share_token}`, window.location.origin).toString();
       setShareUrl(url);
       toast.success('Session shared successfully');
     } catch (error) {

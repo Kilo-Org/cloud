@@ -5,7 +5,12 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { sanitizeAnalyticsUrl, sanitizeAnalyticsUrlValue } from '@/lib/sanitize-analytics-url';
+import {
+  isSessionSharePath,
+  sanitizeAnalyticsPathname,
+  sanitizeAnalyticsUrl,
+  sanitizeAnalyticsUrlValue,
+} from '@/lib/sanitize-analytics-url';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -33,6 +38,10 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
           properties: {
             ...event.properties,
             $current_url: sanitizeAnalyticsUrlValue(event.properties.$current_url),
+            $pathname:
+              typeof event.properties.$pathname === 'string'
+                ? sanitizeAnalyticsPathname(event.properties.$pathname)
+                : event.properties.$pathname,
             $referrer: sanitizeAnalyticsUrlValue(event.properties.$referrer),
             $referring_domain: sanitizeAnalyticsUrlValue(event.properties.$referring_domain),
           },
@@ -81,7 +90,7 @@ function PostHogPageView() {
   const posthog = usePostHog();
 
   useEffect(() => {
-    if (pathname && posthog) {
+    if (pathname && posthog && !isSessionSharePath(pathname)) {
       const url = sanitizeAnalyticsUrl(window.origin, pathname, searchParams.toString());
       posthog.capture('$pageview', { $current_url: url });
     }

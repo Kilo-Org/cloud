@@ -804,7 +804,7 @@ describe('cli-sessions-v2-router', () => {
       });
 
       fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ success: true, public_id: 'test-public-uuid' }), {
+        new Response(JSON.stringify({ success: true, share_token: 'test.share.token' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
@@ -825,7 +825,7 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result).toEqual({
-        share_id: 'test-public-uuid',
+        share_token: 'test.share.token',
         session_id: v2SessionId,
       });
 
@@ -866,7 +866,7 @@ describe('cli-sessions-v2-router', () => {
           kilo_session_id: v2SessionId,
           trigger_id: testTriggerId,
         })
-      ).rejects.toThrow('Session share failed: 500 Internal Server Error');
+      ).rejects.toThrow('Session ingest share failed: 500 Internal Server Error');
     });
 
     it('should throw NOT_FOUND when session belongs to a different user (personal trigger)', async () => {
@@ -1211,7 +1211,7 @@ describe('cli-sessions-v2-router', () => {
 
     it('share rejects an organization session before publishing after its creator loses membership', async () => {
       const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ success: true, public_id: 'test-public-uuid' }), {
+        new Response(JSON.stringify({ success: true, share_token: 'test.share.token' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })

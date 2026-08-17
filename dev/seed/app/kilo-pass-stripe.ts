@@ -38,6 +38,20 @@ function getStripe(): Stripe {
   return cachedStripe;
 }
 
+// Validates the Stripe env needed to seed the subscription. Must run before any
+// destructive action (cancel + delete) so a config error never leaves the user
+// without a pass row.
+function validateStripeEnv(): string {
+  getStripe(); // throws if STRIPE_SECRET_KEY is missing or not a test key
+  const priceId = process.env.STRIPE_KILO_PASS_TIER_49_MONTHLY_PRICE_ID;
+  if (!priceId) {
+    throw new Error(
+      'STRIPE_KILO_PASS_TIER_49_MONTHLY_PRICE_ID is required to seed the Kilo Pass subscription'
+    );
+  }
+  return priceId;
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:kilo-pass-stripe ${usage}`);
   console.log('');
@@ -130,6 +144,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`email is not a valid address: ${email}`);
   }
 
+  // Validate Stripe env before any delete so a config error does not cancel a
+  // subscription or delete a row first.
+  const priceId = validateStripeEnv();
+
   const db = getSeedDb();
   const trimmedEmail = email.trim();
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
@@ -190,31 +208,44 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       .where(eq(kilocode_users.id, userId));
   }
 
-  const priceId = process.env.STRIPE_KILO_PASS_TIER_49_MONTHLY_PRICE_ID;
-  if (!priceId) {
-    throw new Error(
-      'STRIPE_KILO_PASS_TIER_49_MONTHLY_PRICE_ID is required to seed the Kilo Pass subscription'
-    );
-  }
-
   const subscription = await createKiloPassSubscription({
     stripeCustomerId,
     priceId,
     kiloUserId: userId,
   });
 
-  await db.insert(kilo_pass_subscriptions).values({
-    kilo_user_id: userId,
-    payment_provider: KiloPassPaymentProvider.Stripe,
-    provider_subscription_id: subscription.id,
-    stripe_subscription_id: subscription.id,
-    tier: KiloPassTier.Tier49,
-    cadence: KiloPassCadence.Monthly,
-    status: 'active',
-    cancel_at_period_end: false,
-    started_at: new Date().toISOString(),
-    ended_at: null,
-  });
+  // Upsert on the unique `stripe_subscription_id`: the local `stripe listen`
+  // webhook may have already written this row for the same subscription. A plain
+  // insert would fail on the unique key.
+  await db
+    .insert(kilo_pass_subscriptions)
+    .values({
+      kilo_user_id: userId,
+      payment_provider: KiloPassPaymentProvider.Stripe,
+      provider_subscription_id: subscription.id,
+      stripe_subscription_id: subscription.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+      cancel_at_period_end: false,
+      started_at: new Date().toISOString(),
+      ended_at: null,
+    })
+    .onConflictDoUpdate({
+      target: kilo_pass_subscriptions.stripe_subscription_id,
+      set: {
+        kilo_user_id: userId,
+        payment_provider: KiloPassPaymentProvider.Stripe,
+        provider_subscription_id: subscription.id,
+        stripe_subscription_id: subscription.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: new Date().toISOString(),
+        ended_at: null,
+      },
+    });
 
   console.log('This fixture represents a web-managed (Stripe) Kilo Pass subscription.');
   console.log('Suggested next step: fake-login as the user and open the Kilo Pass screen.');

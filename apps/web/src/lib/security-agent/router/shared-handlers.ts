@@ -1563,7 +1563,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const submitParams = {
           owner: securityOwner,
-          actor: { id: ctx.user.id },
+          actor: { id: ctx.user.id, email: ctx.user.google_user_email },
           findingId: input.findingId,
           installationId,
           reason: input.reason,

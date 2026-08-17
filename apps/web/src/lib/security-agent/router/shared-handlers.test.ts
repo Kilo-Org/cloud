@@ -581,7 +581,7 @@ describe('queue-backed handlers', () => {
       })
     ).resolves.toMatchObject({ success: true, accepted: true, commandId });
     expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
-      expect.objectContaining({ actor: { id: 'user-123' } })
+      expect.objectContaining({ actor: { id: 'user-123', email: 'owner@example.com' } })
     );
   });
 

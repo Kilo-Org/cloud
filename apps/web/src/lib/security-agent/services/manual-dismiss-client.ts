@@ -12,7 +12,7 @@ type DismissReason = 'fix_started' | 'no_bandwidth' | 'tolerable_risk' | 'inaccu
 
 type SubmitManualFindingDismissalParams = {
   owner: ManualFindingDismissalOwner;
-  actor: { id: string };
+  actor: { id: string; email?: string | null };
   findingId: string;
   installationId: string;
   reason: DismissReason;

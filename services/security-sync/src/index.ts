@@ -42,10 +42,6 @@ const SecuritySyncActorSchema = z.object({
   name: z.string().min(1).nullable().optional(),
 });
 
-const SecuritySyncActorIdSchema = z.object({
-  id: z.string().min(1),
-});
-
 const SecuritySyncMessageSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -87,7 +83,7 @@ const DependabotDismissReasonSchema = z.enum([
 const ManualFindingDismissalCommandSchema = z.object({
   schemaVersion: z.literal(1),
   owner: SecuritySyncOwnerSchema,
-  actor: SecuritySyncActorIdSchema,
+  actor: SecuritySyncActorSchema,
   findingId: z.string().uuid(),
   installationId: z.string().min(1),
   reason: DependabotDismissReasonSchema,

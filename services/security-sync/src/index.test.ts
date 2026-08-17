@@ -589,7 +589,7 @@ describe('manual dismissal dispatch', () => {
         body: JSON.stringify({
           schemaVersion: 1,
           owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-          actor: { id: 'user-123' },
+          actor: { id: 'user-123', email: 'owner@example.com' },
           findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           installationId: 'installation-123',
           reason: 'not_used',
@@ -612,7 +612,7 @@ describe('manual dismissal dispatch', () => {
     expect(queuedBatches[0]?.[0]?.body).toMatchObject({
       kind: 'dismiss',
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      actor: { id: 'user-123' },
+      actor: { id: 'user-123', email: 'owner@example.com' },
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       installationId: 'installation-123',
       reason: 'not_used',
@@ -697,7 +697,7 @@ describe('manual dismissal dispatch', () => {
               messageId: 'dismiss-message-123',
               dispatchedAt: '2026-05-18T08:30:00.000Z',
               owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-              actor: { id: 'user-123' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
               findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
               installationId: 'installation-123',
               reason: 'not_used',
@@ -796,7 +796,7 @@ describe('manual dismissal dispatch', () => {
               messageId: 'dismiss-message-123',
               dispatchedAt: '2026-05-18T08:30:00.000Z',
               owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-              actor: { id: 'user-123' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
               findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
               installationId: 'installation-123',
               reason: 'not_used',
@@ -822,6 +822,7 @@ describe('manual dismissal dispatch', () => {
         rowId: 'ledger-row-id',
         status: 'failed',
         outcomeCode: 'QUEUE_RETRIES_EXHAUSTED',
+        outboxEvent: expect.objectContaining({ distinctId: 'owner@example.com' }),
       })
     );
     expect(vi.mocked(settleOperation).mock.invocationCallOrder[0]).toBeLessThan(

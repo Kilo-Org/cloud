@@ -43,6 +43,7 @@ import {
 import { generateSandboxRoutingTarget, isOrgInList, type SandboxSelection } from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
+import { sha256Hex } from '../utils/sha256.js';
 import { createMessageId } from './message-id.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
@@ -679,16 +680,16 @@ export async function startNewSession(
  */
 export const SESSION_CREATE_INTENT_FINGERPRINT_KEY = 'createIntentFingerprint';
 
-/** SHA-256 hex digest of the given value. */
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 /**
  * Deterministic JSON serialization: object keys are sorted and undefined
  * values are dropped (JSON semantics), so field order or an explicit
  * `undefined` never changes a fingerprint.
+ *
+ * Deliberately not shared with the stricter `canonicalJson` in
+ * `workspace-backup-cache.ts`: that one rejects (returns null) where this one
+ * serializes — a top-level `undefined`, an `undefined` array element, a
+ * non-finite number, or an exotic object. Swapping it in here rotates every
+ * live create-intent fingerprint, so the two stay separate.
  */
 function canonicalJson(value: unknown): string {
   if (value === undefined || value === null) {

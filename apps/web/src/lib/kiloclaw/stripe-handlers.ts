@@ -30,7 +30,7 @@ import {
 } from '@/lib/kiloclaw/instance-lifecycle';
 import { sentryLogger } from '@/lib/utils.server';
 import PostHogClient from '@/lib/posthog';
-import { after } from 'next/server';
+import { runAfterResponse } from '@/lib/after-response';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
 import {
@@ -421,15 +421,6 @@ async function clearTransferredStripeOwnership(params: {
     before: params.row.subscription,
     after: after ?? null,
   });
-}
-
-async function runAfterResponse(work: () => Promise<void>) {
-  if (IS_IN_AUTOMATED_TEST) {
-    await work();
-    return;
-  }
-
-  after(work);
 }
 
 function timestampsEqual(

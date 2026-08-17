@@ -2,6 +2,7 @@ import type { DirectoryBackup } from '@cloudflare/sandbox';
 import * as z from 'zod';
 
 import { WRAPPER_VERSION } from './shared/wrapper-version.js';
+import { sha256Hex } from './utils/sha256.js';
 
 const CACHE_SCHEMA = 'workspace-backup-v1';
 const CACHE_OBJECT_PREFIX = 'workspace-backups/v1';
@@ -102,6 +103,13 @@ function canonicalizeRepository(repository: WorkspaceBackupRepository | undefine
   }
 }
 
+/**
+ * Cycle-safe deterministic JSON serialization. Returns null for anything it
+ * refuses to serialize: a cycle, a non-finite number, a sparse array, or a
+ * non-plain object. Not shared with the looser `canonicalJson` in
+ * `session/session-registration.ts`, which serializes those cases instead;
+ * merging the two would rotate that file's create-intent fingerprints.
+ */
 function canonicalJson(value: unknown): string | null {
   const ancestors = new WeakSet<object>();
 
@@ -154,12 +162,6 @@ function canonicalJson(value: unknown): string | null {
   }
 }
 
-async function sha256(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value);
-  const hash = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 function ownersEqual(left: WorkspaceBackupOwner, right: WorkspaceBackupOwner): boolean {
   if (left.type !== right.type) return false;
   if (left.type === 'organization' && right.type === 'organization') {
@@ -199,7 +201,7 @@ export async function buildWorkspaceBackupCandidate(
   const canonicalKey = canonicalJson(key);
   if (canonicalKey === null) return null;
 
-  const digest = await sha256(canonicalKey);
+  const digest = await sha256Hex(canonicalKey);
   return {
     digest,
     objectKey: `${CACHE_OBJECT_PREFIX}/${digest}.json`,

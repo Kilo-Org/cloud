@@ -7,10 +7,8 @@
  */
 import 'server-only';
 
-import { after } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import PostHogClient from '@/lib/posthog';
 import type { KiloPassCadence, KiloPassTier } from './enums';
 
@@ -42,18 +40,10 @@ export type TrackKiloPassPurchaseCompletedParams =
 const posthogClient = PostHogClient();
 
 /**
- * Copied from apps/web/src/lib/kiloclaw/stripe-handlers.ts:426.
- * Keeps the serverless function alive until the capture is enqueued on
- * provider-webhook paths.
+ * Re-exported so existing store-notification and webhook call sites keep their
+ * import path. The implementation lives in `@/lib/after-response`.
  */
-export async function runAfterResponse(work: () => Promise<void>): Promise<void> {
-  if (IS_IN_AUTOMATED_TEST) {
-    await work();
-    return;
-  }
-
-  after(work);
-}
+export { runAfterResponse } from '@/lib/after-response';
 
 export function trackKiloPassPurchaseCompleted(params: TrackKiloPassPurchaseCompletedParams): void {
   const baseProperties = {

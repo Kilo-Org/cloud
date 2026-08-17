@@ -10,8 +10,28 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     user_id: string;
   };
 }>(async (c, next) => {
+  // One-use web ticket path. The /api/user/web websocket upgrade consumes an
+  // opaque ticket minted by POST /api/user/web-ticket. This branch runs before
+  // the JWT path so a missing ticket is not mistaken for a missing JWT, and so
+  // the Authorization header / ?token= query are never read on this path.
+  if (c.req.header('Upgrade') === 'websocket' && c.req.path === '/api/user/web') {
+    const ticket = c.req.query('ticket');
+    if (!ticket) {
+      return c.json({ success: false, error: 'Missing or invalid ticket' }, 401);
+    }
+
+    const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
+    const consumed = await stub.consume();
+    if (!consumed) {
+      return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
+    }
+
+    c.set('user_id', consumed.userId);
+    return next();
+  }
+
   let token = extractBearerToken(c.req.header('Authorization'));
-  if (!token && c.req.header('Upgrade') === 'websocket' && c.req.path !== '/api/user/web') {
+  if (!token && c.req.header('Upgrade') === 'websocket') {
     token = c.req.query('token') ?? null;
   }
 

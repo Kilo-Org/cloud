@@ -27,6 +27,41 @@ vi.mock('@kilocode/db/client', () => ({
   }),
 }));
 
+type TicketStore = {
+  tickets: Map<string, { userId: string; expiresAt: number }>;
+  mint: (userId: string, expiresAt: number) => string;
+  namespace: {
+    idFromName: (name: string) => string;
+    get: (id: string) => { consume: () => Promise<{ userId: string } | null> };
+  };
+};
+
+function makeTicketStore(): TicketStore {
+  const tickets = new Map<string, { userId: string; expiresAt: number }>();
+  return {
+    tickets,
+    mint(userId: string, expiresAt: number): string {
+      const ticket = crypto.randomUUID();
+      tickets.set(ticket, { userId, expiresAt });
+      return ticket;
+    },
+    namespace: {
+      idFromName: (name: string) => name,
+      get: (id: string) => ({
+        consume: async () => {
+          const entry = tickets.get(id);
+          if (!entry || entry.expiresAt <= Date.now()) {
+            tickets.delete(id);
+            return null;
+          }
+          tickets.delete(id);
+          return { userId: entry.userId };
+        },
+      }),
+    },
+  };
+}
+
 type TestEnv = {
   NEXTAUTH_SECRET_PROD: {
     get: () => Promise<string>;
@@ -34,14 +69,16 @@ type TestEnv = {
   HYPERDRIVE: {
     connectionString: string;
   };
+  CONNECTION_TICKET_DO: TicketStore['namespace'];
 };
 
-function makeEnv(secret: string): TestEnv {
+function makeEnv(secret: string, ticketStore: TicketStore = makeTicketStore()): TestEnv {
   return {
     NEXTAUTH_SECRET_PROD: {
       get: async () => secret,
     },
     HYPERDRIVE: { connectionString: 'postgres://test' },
+    CONNECTION_TICKET_DO: ticketStore.namespace,
   };
 }
 
@@ -190,7 +227,84 @@ describe('kiloJwtAuthMiddleware', () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       success: false,
-      error: 'Missing or malformed Authorization header',
+      error: 'Missing or invalid ticket',
+    });
+  });
+
+  it('rejects a raw bearer on a websocket upgrade to /api/user/web', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/user/web', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Missing or invalid ticket',
+    });
+  });
+
+  it('accepts a fresh ticket on a websocket upgrade to /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() + 60_000);
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('rejects a replay of the same ticket on /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() + 60_000);
+
+    const first = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+    expect(first.status).toBe(200);
+
+    const replay = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(replay.status).toBe(401);
+    expect(await replay.json()).toEqual({
+      success: false,
+      error: 'Invalid or expired ticket',
+    });
+  });
+
+  it('rejects an expired ticket on /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() - 1);
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Invalid or expired ticket',
     });
   });
 });

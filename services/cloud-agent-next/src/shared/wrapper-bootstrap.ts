@@ -186,6 +186,11 @@ export type WrapperCloneTelemetry = {
  * than a member of it: `workspaceReady` carries `gitToken`, so nesting telemetry there
  * would make the object unsafe to log wholesale. Everything here is safe to log.
  */
+export type WrapperRestoreTelemetry = {
+  path: 'warm' | 'cold' | 'backup';
+  diffs?: { applied: number; skipped: number; total: number };
+};
+
 export type WrapperBootstrapTelemetry = {
   workspaceWasWarm: boolean;
   /**
@@ -198,6 +203,7 @@ export type WrapperBootstrapTelemetry = {
    */
   restoredFromBackup: boolean;
   clone?: WrapperCloneTelemetry;
+  restore?: WrapperRestoreTelemetry;
 };
 
 export type WrapperSessionReadySuccessResponse = {

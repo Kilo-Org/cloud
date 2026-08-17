@@ -1381,6 +1381,44 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ).toBe(true);
   });
 
+  it('continues bootstrap and reports an incomplete cold restore', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.materialized.setupCommands = [];
+    const progress = mock(() => {});
+
+    const result = await prepareWrapperBootstrapWorkspace(request, progress, {
+      git: async args => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 1, total: 2 },
+      }),
+    });
+
+    expect(result.restore).toEqual({
+      path: 'cold',
+      diffs: { applied: 1, skipped: 1, total: 2 },
+    });
+    expect(progress).toHaveBeenCalledWith(
+      'kilo_session',
+      'Cold restore incomplete, 1/2 files restored'
+    );
+    expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
+    expect(
+      fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
+    ).toBe(true);
+  });
+
   it('reclones unfinished workspaces that have no bootstrap marker', async () => {
     const request = makeRequest(tmpDir);
     await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
@@ -1525,6 +1563,8 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const result = await prepareWrapperBootstrapWorkspace(request, progress, deps);
 
     expect(result.workspaceWasWarm).toBe(true);
+    expect(result.restore).toEqual({ path: 'warm' });
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Warm workspace reused');
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
     expect(gitCalls).toEqual([
       ['remote', 'set-url', 'origin', 'https://oauth2:gitlab-token@gitlab.com/acme/repo.git'],

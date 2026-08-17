@@ -451,7 +451,8 @@ function formatError(err: unknown): string {
 // ---------------------------------------------------------------------------
 
 function isMessageStreaming(msg: StoredMessage): boolean {
-  if (msg.info.role === 'assistant' && !msg.info.time.completed && !msg.info.error) return true;
+  if (msg.info.role === 'assistant' && msg.info.error) return false;
+  if (msg.info.role === 'assistant' && !msg.info.time.completed) return true;
   return msg.parts.some(part => {
     if (part.type === 'text') return part.time !== undefined && part.time.end === undefined;
     if (part.type === 'reasoning') return part.time.end === undefined;

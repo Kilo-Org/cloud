@@ -140,6 +140,23 @@ function getAssistantTextContent(parts: Part[]): string {
 /**
  * Extract a human-readable error message from an AssistantMessage error field.
  */
+function getAssistantErrorName(
+  error: NonNullable<AssistantMessage['error']> | string
+): string | undefined {
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return typeof error.name === 'string' ? error.name : undefined;
+  }
+  return undefined;
+}
+
+function isAssistantInterruptError(
+  error: NonNullable<AssistantMessage['error']> | string
+): boolean {
+  if (getAssistantErrorName(error) === 'MessageAbortedError') return true;
+  const message = typeof error === 'string' ? error : getAssistantErrorMessage(error);
+  return /messageabortederror|user[_ -]?interrupt|interrupted by the user/i.test(message);
+}
+
 function getAssistantErrorMessage(error: NonNullable<AssistantMessage['error']> | string): string {
   if (typeof error === 'string') return error;
 
@@ -261,7 +278,13 @@ export function MessageBubble({
   if (isAssistantMessage(message.info)) {
     const { error } = message.info;
     const showError = !isStreaming && error !== undefined;
-    const errorMessage = error ? getAssistantErrorMessage(error) : undefined;
+    const interrupted = error !== undefined && isAssistantInterruptError(error);
+    const errorMessage = error
+      ? interrupted
+        ? undefined
+        : getAssistantErrorMessage(error)
+      : undefined;
+    const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
 
     return (
       <div className="group/msg py-2">
@@ -282,11 +305,11 @@ export function MessageBubble({
             />
           ))}
         </div>
-        {showError && errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
+        {showError && errorMessage && <p className={`${statusClass} text-sm`}>{errorMessage}</p>}
         {showError && (
-          <span className="text-destructive flex items-center gap-1 text-xs">
+          <span className={`${statusClass} flex items-center gap-1 text-xs`}>
             <AlertCircle className="h-3 w-3" />
-            Failed
+            {interrupted ? 'Interrupted' : 'Failed'}
           </span>
         )}
       </div>

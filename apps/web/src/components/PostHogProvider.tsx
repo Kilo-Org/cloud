@@ -31,6 +31,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
+      disable_session_recording: isSessionSharePath(window.location.pathname),
       before_send: event => {
         if (!event?.properties) return event;
         return {
@@ -90,10 +91,13 @@ function PostHogPageView() {
   const posthog = usePostHog();
 
   useEffect(() => {
-    if (pathname && posthog && !isSessionSharePath(pathname)) {
-      const url = sanitizeAnalyticsUrl(window.origin, pathname, searchParams.toString());
-      posthog.capture('$pageview', { $current_url: url });
+    if (!pathname || !posthog) return;
+    if (isSessionSharePath(pathname)) {
+      posthog.stopSessionRecording();
+      return;
     }
+    const url = sanitizeAnalyticsUrl(window.origin, pathname, searchParams.toString());
+    posthog.capture('$pageview', { $current_url: url });
   }, [pathname, searchParams, posthog]);
 
   return null;

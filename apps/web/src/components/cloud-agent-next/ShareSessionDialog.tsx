@@ -84,7 +84,7 @@ export function ShareSessionDialog({ open, onOpenChange, kiloSessionId }: ShareS
         </DialogHeader>
 
         {shareUrl && (
-          <div className="flex items-center gap-2 overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
+          <div className="ph-no-capture flex items-center gap-2 overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
             <a
               href={shareUrl}
               target="_blank"

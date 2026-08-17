@@ -127,7 +127,7 @@ export function SessionActionsDialog({
 
             {shareUrl ? (
               <div className="space-y-2">
-                <div className="overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
+                <div className="ph-no-capture overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
                   <a
                     href={shareUrl}
                     target="_blank"

@@ -57,35 +57,6 @@ describe.each([
     expect(provider.supportedChatApis).toEqual(['chat_completions', 'messages']);
   });
 
-  test('maps reasoning details to reasoning content on chat completions requests', async () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: requestedModel,
-        messages: [
-          { role: 'user', content: 'hello' },
-          {
-            role: 'assistant',
-            content: 'hi',
-            reasoning_details: [
-              { type: 'reasoning.text' as const, text: 'thinking ', signature: null },
-              { type: 'reasoning.encrypted' as const, data: 'opaque-blob' },
-              { type: 'reasoning.text' as const, text: 'hard' },
-            ],
-          } as never,
-        ],
-      },
-    };
-
-    await provider.transformRequest({ request } as TransformRequestContext);
-
-    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
-    expect('reasoning_details' in assistant).toBe(false);
-    expect(assistant.reasoning_content).toBe('thinking hard');
-    expect(request.body.model).toBe(upstreamModel);
-    expect(request.body.provider).toBeUndefined();
-  });
-
   test('enables the reasoning details response transform', () => {
     expect(provider.responseTransforms).toEqual({
       mapGeminiThoughtContent: false,

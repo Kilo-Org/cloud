@@ -1,8 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import {
-  isReasoningExplicitlyDisabled,
-  mapReasoningDetailsToReasoningContent,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -100,9 +97,6 @@ export default {
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
       delete context.request.body.provider;
-      if (context.request.kind === 'chat_completions') {
-        mapReasoningDetailsToReasoningContent(context.request.body);
-      }
     },
   },
   PERPLEXITY_KIMI: {
@@ -118,9 +112,6 @@ export default {
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';
       delete context.request.body.provider;
-      if (context.request.kind === 'chat_completions') {
-        mapReasoningDetailsToReasoningContent(context.request.body);
-      }
     },
   },
   STREAMLAKE: {

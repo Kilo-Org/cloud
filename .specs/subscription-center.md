@@ -32,6 +32,7 @@ Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan ex
 Updated 2026-08-05 -- BytePlus Coding Plan Pro catalog requirements.
 Updated 2026-08-05 -- closed fresh KiloClaw instance provisioning surfaces.
 Updated 2026-08-06 -- BytePlus Coding Plan quota integration.
+Updated 2026-08-11 -- BytePlus Enterprise Coding Plan catalog copy.
 
 ## Conventions
 
@@ -352,12 +353,14 @@ Commit names, prices, invoices, and credit deductions.
     offering with provider name, plan name, recurring USD price, billing
     period, payment source, and catalog feature copy. MiniMax token offerings
     MUST include Token Plan Plus, Token Plan Max, and Token Plan Ultra.
-    BytePlus offerings MUST include Coding Plan Lite at $20 per 30 days and
-    Coding Plan Pro at $100 per 30 days. Lite MUST display approximately 1,900
-    requests every 5 hours, 12,000 per week, and 24,000 per subscription
-    period. Pro MUST display approximately 9,500 requests every 5 hours,
-    60,000 per week, and 120,000 per subscription period. Both offerings MUST
-    use the model IDs and exclusions defined in `.specs/coding-plans.md`.
+    BytePlus offerings MUST include Enterprise Coding Plan Lite at $20 per 30
+    days and Enterprise Coding Plan Pro at $100 per 30 days. Lite MUST display
+    approximately 1,900 requests every 5 hours, 12,000 per week, and 24,000 per
+    subscription period. Pro MUST display approximately 9,500 requests every 5
+    hours, 60,000 per week, and 120,000 per subscription period. Both offerings
+    MUST display `Zero Data Retention: does not retain prompts or train on your
+    data` and MUST use the model IDs and exclusions defined in
+    `.specs/coding-plans.md`.
     An offering with assignable credential capacity MUST show a subscribe action.
     Purchase messaging MUST explain automatic BYOK setup for the selected
     provider, and purchase MUST be blocked when any personal BYOK key for that
@@ -515,6 +518,11 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-08-11 -- BytePlus Enterprise Coding Plan catalog copy
+
+- Renamed BytePlus catalog offerings to Enterprise Coding Plan Lite and Enterprise Coding Plan Pro.
+- Required both BytePlus offerings to display Zero Data Retention catalog copy.
 
 ### 2026-08-06 -- BytePlus Coding Plan quota integration
 

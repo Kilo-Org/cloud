@@ -5,8 +5,8 @@ import type { JSX } from 'react';
 import type { AgentWorkflow, PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
 import { loadAgentWorkflows, loadPendingWorkflowDraft } from '@/src/shared/agent-workflows-storage';
 import { applyApprovalDecision, pendingApprovalAtom } from './pending-approval';
-import { CollapsibleCodeBlock } from './collapsible-code-block.tsx';
 import { deriveWorkflowSaveCardState } from './pending-workflow-save-card-state';
+import { WorkflowScriptDiff } from './workflow-script-diff.tsx';
 
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle';
@@ -24,60 +24,77 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
   const [storedWorkflow, setStoredWorkflow] = useState<AgentWorkflow | undefined>();
   const settledRef = useRef(false);
   const lastDraftKeyRef = useRef<string | null>(null);
+  const loadFailedRef = useRef(false);
 
-  // Load draft and atom on mount.
+  // Load draft and atom on mount. Ignore results and errors from superseded runs.
   useEffect(() => {
-    void (async () => {
-      // If atom has an entry for workflow kind, use it.
-      if (approvalEntry !== undefined && approvalEntry.kind === 'workflow') {
-        const { draft } = approvalEntry;
+    let cancelled = false;
 
-        const draftKey = `${draft.createdAt}:${draft.script}`;
-        if (lastDraftKeyRef.current !== null && lastDraftKeyRef.current !== draftKey) {
-          // New draft arrived — reset settled guard, stale errors, and stored workflow.
-          settledRef.current = false;
-          setSaveError(undefined);
-          setLoadError(undefined);
-          setStoredWorkflow(undefined);
-        }
-        lastDraftKeyRef.current = draftKey;
-
-        setPendingDraft(draft);
-
-        // For updates, also load the stored workflow for old-script comparison.
-        if (draft.workflowId !== undefined) {
-          const workflows = await loadAgentWorkflows(storage);
-          const existing = workflows.find(wf => wf.id === draft.workflowId);
-          if (existing === undefined) {
-            setLoadError('The original workflow was deleted. This update cannot be saved.');
-          } else {
-            setStoredWorkflow(existing);
-          }
-        }
-
-        setLoaded(true);
+    const loadStoredWorkflow = async (workflowId: string): Promise<void> => {
+      const workflows = await loadAgentWorkflows(storage);
+      if (cancelled) {
         return;
       }
+      const existing = workflows.find(wf => wf.id === workflowId);
+      if (existing === undefined) {
+        setLoadError('The original workflow was deleted. This update cannot be saved.');
+      } else {
+        setStoredWorkflow(existing);
+      }
+    };
 
-      // Reload path: check stored draft.
-      const storedDraft = await loadPendingWorkflowDraft(storage);
-      if (storedDraft !== undefined) {
-        setPendingDraft(storedDraft);
+    void (async () => {
+      try {
+        if (approvalEntry !== undefined && approvalEntry.kind === 'workflow') {
+          const { draft } = approvalEntry;
+          const draftKey = `${draft.createdAt}:${draft.script}`;
+          if (lastDraftKeyRef.current !== draftKey || loadFailedRef.current) {
+            // New draft or a recovery from a reload-path failure: reset stale state.
+            settledRef.current = false;
+            loadFailedRef.current = false;
+            setSaveError(undefined);
+            setLoadError(undefined);
+            setStoredWorkflow(undefined);
+          }
+          lastDraftKeyRef.current = draftKey;
+          setPendingDraft(draft);
 
-        // If it's an update, load the stored workflow for comparison.
-        if (storedDraft.workflowId !== undefined) {
-          const workflows = await loadAgentWorkflows(storage);
-          const existing = workflows.find(wf => wf.id === storedDraft.workflowId);
-          if (existing === undefined) {
-            setLoadError('The original workflow was deleted. This update cannot be saved.');
-          } else {
-            setStoredWorkflow(existing);
+          if (draft.workflowId !== undefined) {
+            await loadStoredWorkflow(draft.workflowId);
+          }
+
+          return;
+        }
+
+        // Reload path: check stored draft.
+        const storedDraft = await loadPendingWorkflowDraft(storage);
+        if (cancelled) {
+          return;
+        }
+        if (storedDraft !== undefined) {
+          lastDraftKeyRef.current = `${storedDraft.createdAt}:${storedDraft.script}`;
+          setPendingDraft(storedDraft);
+          if (storedDraft.workflowId !== undefined) {
+            await loadStoredWorkflow(storedDraft.workflowId);
           }
         }
+      } catch {
+        if (!cancelled) {
+          loadFailedRef.current = true;
+          setLoadError(
+            "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoaded(true);
+        }
       }
-
-      setLoaded(true);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [approvalEntry]);
 
   const handleCancel = async (): Promise<void> => {
@@ -92,6 +109,7 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
       setPendingDraft(undefined);
     }
     setSaveError(undefined);
+    setLoadError(undefined);
   };
 
   const handleApprove = async (): Promise<void> => {
@@ -239,29 +257,14 @@ export const PendingWorkflowSaveCard = (): JSX.Element | null => {
                   </div>
                 )}
 
-                {isUpdate && storedWorkflow !== undefined ? (
-                  <>
-                    <div className="space-y-1">
-                      <p className="type-label text-foreground-muted">Approved script</p>
-                      <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
-                        <CollapsibleCodeBlock code={storedWorkflow.script} forceExpanded={false} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="type-label text-foreground-muted">New script (replaces it)</p>
-                      <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
-                        <CollapsibleCodeBlock code={pendingDraft.script} forceExpanded={false} />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="type-label text-foreground-muted">Script</p>
-                    <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
-                      <CollapsibleCodeBlock code={pendingDraft.script} forceExpanded={false} />
-                    </div>
+                <div className="space-y-1">
+                  <div className="rounded bg-surface-inset p-2 font-mono text-xs leading-4 text-foreground-muted">
+                    <WorkflowScriptDiff
+                      newScript={pendingDraft.script}
+                      oldScript={storedWorkflow?.script}
+                    />
                   </div>
-                )}
+                </div>
               </div>
             </div>
 

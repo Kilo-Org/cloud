@@ -4,6 +4,7 @@ import * as React from 'react';
 import { atom, type createStore } from 'jotai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 type JotaiStore = ReturnType<typeof createStore>;
 
@@ -237,7 +238,7 @@ type ContinueSessionResult = ReturnType<typeof useContinueSession>;
 
 function runContinueSession(args: {
   organizationId?: string;
-  models?: { id: string; variants: string[] }[];
+  models?: SessionModelOption[];
 }): ContinueSessionResult {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];

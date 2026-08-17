@@ -1,4 +1,4 @@
-import { WifiOff } from 'lucide-react-native';
+import { WifiOff } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -21,7 +21,8 @@ export function OfflineBanner() {
 
   // Announce committed transitions only, never the initial state: the first
   // run records the current value without announcing. A cold-start offline
-  // device announces once when the first NetInfo commit lands (~1 s in).
+  // device announces once when the first NetInfo commit lands, one
+  // OFFLINE_BANNER_SHOW_DELAY_MS after launch.
   useEffect(() => {
     if (prevRef.current !== null && prevRef.current !== isOffline) {
       announceForA11y(isOffline ? 'No internet connection' : 'Internet connection restored');

@@ -943,73 +943,60 @@ function isRateLimitError(error: unknown): boolean {
 }
 
 /**
- * Look up the pull request associated with a `(repo, branch)` pair using an
- * installation token. Returns the most recently updated PR whose head ref
- * matches `branch`, preferring `open` PRs when multiple exist.
+ * Look up a pull request by its number using an installation token.
  *
- * This helper is only invoked from the manual "Refresh PR info" mutation; the
- * webhook path updates the DB directly. Intentionally no caching or dedup —
- * the mutation is throttled server-side to once per 60 s per (git_url, branch, tenant).
+ * Used by the stored-link-first refresh path: the session carries a concrete
+ * PR URL, so we fetch that exact PR instead of searching by branch.
  *
- * @returns The associated PR, or `null` if no PR matches (or the repo is no
+ * @returns The PR, or `null` when the PR does not exist (or the repo is no
  *   longer accessible to this installation).
  * @throws {GitHubRateLimitError} when GitHub rate-limits the request.
  */
-export async function fetchPullRequestForBranch(params: {
+export async function fetchPullRequestByNumber(params: {
   installationId: number;
   owner: string;
   repo: string;
-  branch: string;
+  number: number;
   appType: GitHubAppType;
 }): Promise<AssociatedPullRequest | null> {
-  const { installationId, owner, repo, branch, appType } = params;
+  const { installationId, owner, repo, number, appType } = params;
 
   const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
-    const { data: prs } = await octokit.pulls.list({
+    const { data: pr } = await octokit.pulls.get({
       owner,
       repo,
-      head: `${owner}:${branch}`,
-      state: 'all',
-      per_page: 10,
-      sort: 'updated',
-      direction: 'desc',
+      pull_number: number,
     });
 
-    if (prs.length === 0) {
-      return null;
-    }
-
-    const chosen = prs.find(pr => pr.state === 'open') ?? prs[0];
-
     const state: AssociatedPullRequest['state'] =
-      chosen.merged_at != null
+      pr.merged_at != null
         ? 'merged'
-        : chosen.state === 'open' && chosen.draft
+        : pr.state === 'open' && pr.draft
           ? 'draft'
-          : chosen.state === 'open'
+          : pr.state === 'open'
             ? 'open'
             : 'closed';
 
     return {
-      number: chosen.number,
-      htmlUrl: chosen.html_url,
+      number: pr.number,
+      htmlUrl: pr.html_url,
       state,
-      title: chosen.title,
-      headSha: chosen.head.sha,
-      updatedAt: chosen.updated_at,
+      title: pr.title,
+      headSha: pr.head.sha,
+      updatedAt: pr.updated_at,
     };
   } catch (error) {
     if (isRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     if (isHttpError(error) && error.status === 404) {
-      warnExceptInTest('[fetchPullRequestForBranch] Repo not accessible or deleted', {
+      warnExceptInTest('[fetchPullRequestByNumber] PR not found or repo not accessible', {
         owner,
         repo,
-        branch,
+        number,
       });
       return null;
     }

@@ -1,13 +1,15 @@
 import { describe, expect, test } from '@jest/globals';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import {
+  computeCurrentPeriodBonusModel,
   computeRenewInfoRowModel,
   computeUsageProgressModel,
   computeNextBillingDateRowDateLabel,
 } from './KiloPassActiveSubscriptionCard.logic';
 import type {
   KiloPassActiveSubscriptionCardLogicSubscription,
+  KiloPassCurrentPeriodBonus,
   KiloPassScheduledChange,
 } from './KiloPassActiveSubscriptionCard.logic';
 import { KiloPassScheduledChangeStatus } from '@/lib/kilo-pass/enums';
@@ -392,6 +394,156 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       expect(model?.isOverAvailable).toBe(false);
       expect(model?.statusClass).toBe('text-emerald-300');
       expect(model?.bonusFillPct).toBeGreaterThan(0);
+    });
+  });
+
+  describe('computeCurrentPeriodBonusModel()', () => {
+    function buildCurrentPeriodBonus(
+      overrides: Partial<KiloPassCurrentPeriodBonus>
+    ): KiloPassCurrentPeriodBonus {
+      return {
+        status: 'issued',
+        kind: KiloPassIssuanceItemKind.Bonus,
+        actualAmountUsd: 7.6,
+        projectedAmountUsd: 7.6,
+        ...overrides,
+      };
+    }
+
+    test('returns null when currentPeriodBonus is null or undefined', () => {
+      expect(computeCurrentPeriodBonusModel(null)).toBeNull();
+      expect(computeCurrentPeriodBonusModel(undefined)).toBeNull();
+    });
+
+    test('issued referral bonus lower than the normal projection displays the actual amount', () => {
+      // Referral bonus snapshots 50% of the referee's tier, which can be lower
+      // than the subscriber's own projected bonus (e.g. tier_199 subscriber,
+      // tier_19 referee: $9.50 actual vs $79.60 projected).
+      const model = computeCurrentPeriodBonusModel(
+        buildCurrentPeriodBonus({
+          kind: KiloPassIssuanceItemKind.ReferralBonus,
+          actualAmountUsd: 9.5,
+          projectedAmountUsd: 79.6,
+        })
+      );
+
+      expect(model).toEqual({
+        amountUsd: 9.5,
+        label: 'Referral bonus',
+        isIssued: true,
+      });
+    });
+
+    test('issued referral bonus higher than the normal projection displays the actual amount', () => {
+      // Streak month 1 projection is 5% ($0.95 at tier_19); the referral bonus
+      // replaces it at $9.50.
+      const model = computeCurrentPeriodBonusModel(
+        buildCurrentPeriodBonus({
+          kind: KiloPassIssuanceItemKind.ReferralBonus,
+          actualAmountUsd: 9.5,
+          projectedAmountUsd: 0.95,
+        })
+      );
+
+      expect(model).toEqual({
+        amountUsd: 9.5,
+        label: 'Referral bonus',
+        isIssued: true,
+      });
+    });
+
+    test.each([
+      KiloPassIssuanceItemKind.Bonus,
+      KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+      null,
+    ] as const)('issued non-referral kind %s is labeled Free bonus', kind => {
+      const model = computeCurrentPeriodBonusModel(buildCurrentPeriodBonus({ kind }));
+
+      expect(model?.label).toBe('Free bonus');
+      expect(model?.amountUsd).toBe(7.6);
+      expect(model?.isIssued).toBe(true);
+    });
+
+    test.each([null, 0, -1])(
+      'issued bonus with missing or non-positive actual amount returns null instead of fabricating credits',
+      actualAmountUsd => {
+        expect(
+          computeCurrentPeriodBonusModel(buildCurrentPeriodBonus({ actualAmountUsd }))
+        ).toBeNull();
+      }
+    );
+
+    test('available bonus displays the projection labeled Available free bonus', () => {
+      const model = computeCurrentPeriodBonusModel(
+        buildCurrentPeriodBonus({
+          status: 'available',
+          kind: KiloPassIssuanceItemKind.Bonus,
+          actualAmountUsd: null,
+          projectedAmountUsd: 19.6,
+        })
+      );
+
+      expect(model).toEqual({
+        amountUsd: 19.6,
+        label: 'Available free bonus',
+        isIssued: false,
+      });
+    });
+
+    test.each([null, 0, -1])(
+      'available bonus with missing or non-positive projection returns null instead of fabricating credits',
+      projectedAmountUsd => {
+        expect(
+          computeCurrentPeriodBonusModel(
+            buildCurrentPeriodBonus({
+              status: 'available',
+              actualAmountUsd: null,
+              projectedAmountUsd,
+            })
+          )
+        ).toBeNull();
+      }
+    );
+
+    test('usage progress denominator uses the actual amount once a referral bonus is issued', () => {
+      const bonus = computeCurrentPeriodBonusModel(
+        buildCurrentPeriodBonus({
+          kind: KiloPassIssuanceItemKind.ReferralBonus,
+          actualAmountUsd: 9.5,
+          projectedAmountUsd: 79.6,
+        })
+      );
+
+      const model = computeUsageProgressModel({
+        baseUsd: 199,
+        bonusUsd: bonus?.amountUsd,
+        usageUsd: 0,
+        isBonusUnlocked: true,
+        isBonusAvailableToUnlock: false,
+      });
+
+      expect(model?.totalAvailableUsd).toBeCloseTo(208.5, 5);
+    });
+
+    test('usage progress denominator uses the projection only while the bonus is available to unlock', () => {
+      const bonus = computeCurrentPeriodBonusModel(
+        buildCurrentPeriodBonus({
+          status: 'available',
+          kind: KiloPassIssuanceItemKind.Bonus,
+          actualAmountUsd: null,
+          projectedAmountUsd: 0.95,
+        })
+      );
+
+      const model = computeUsageProgressModel({
+        baseUsd: 19,
+        bonusUsd: bonus?.amountUsd,
+        usageUsd: 0,
+        isBonusUnlocked: false,
+        isBonusAvailableToUnlock: true,
+      });
+
+      expect(model?.totalAvailableUsd).toBeCloseTo(19.95, 5);
     });
   });
 

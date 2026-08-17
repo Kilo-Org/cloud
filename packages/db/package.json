@@ -15,6 +15,8 @@
     "./kiloclaw-commit-retirement": "./src/kiloclaw-commit-retirement.ts",
     "./kiloclaw-organization-trial-expiry-candidates": "./src/kiloclaw-organization-trial-expiry-candidates.ts",
     "./client": "./src/client.ts",
+    "./organization-export-access": "./src/organization-export-access.ts",
+    "./user-data-export-file": "./src/user-data-export-file.ts",
     "./user-soft-delete": "./src/user-soft-delete.ts",
     "./operation-ledger": "./src/operation-ledger.ts",
     "./analytics-outbox": "./src/analytics-outbox.ts"

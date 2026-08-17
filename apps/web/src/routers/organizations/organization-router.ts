@@ -8,7 +8,10 @@ import { db, readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import { successResult } from '@/lib/maybe-result';
 import { captureMessage } from '@sentry/nextjs';
-import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationWithMembers,
+  UserOrganizationWithInheritedChildren,
+} from '@/lib/organizations/organization-types';
 import {
   OrganizationNameSchema,
   UsageStatsSchema,
@@ -31,6 +34,7 @@ import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
   organizationMemberProcedure,
+  organizationAdminMutationProcedure,
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
 } from '@/routers/organizations/utils';
@@ -71,7 +75,9 @@ import { organizationBitbucketRouter } from '@/routers/organizations/organizatio
 import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
 import { organizationKiloPassRouter } from '@/routers/organizations/organization-kilo-pass-router';
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
+import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -79,6 +85,10 @@ const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
 
 const OrganizationSeatsUpdateSchema = OrganizationIdInputSchema.extend({
   seatsRequired: z.boolean(),
+});
+
+const OrganizationCreateChildSchema = OrganizationIdInputSchema.extend({
+  name: OrganizationNameSchema,
 });
 
 const OrganizationOnboardingSummarySchema = z.object({
@@ -135,10 +145,58 @@ export const organizationsRouter = createTRPCRouter({
   funds: organizationFundsRouter,
   kiloPass: organizationKiloPassRouter,
   groups: organizationGroupsRouter,
+  subOrganizations: organizationSubOrganizationsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
-    return await getUserOrganizationsWithSeats(user.id);
+    const directOrganizations = await getUserOrganizationsWithSeats(user.id);
+    const eligibleParents = directOrganizations.filter(
+      org => org.role === 'owner' || org.role === 'billing_manager'
+    );
+    const eligibleParentIds = eligibleParents.map(org => org.organizationId);
+
+    const inheritedChildren =
+      eligibleParentIds.length > 0
+        ? await db
+            .select({
+              organizationId: organizations.id,
+              organizationName: organizations.name,
+              parentOrganizationId: organizations.parent_organization_id,
+            })
+            .from(organizations)
+            .where(
+              and(
+                inArray(organizations.parent_organization_id, eligibleParentIds),
+                isNull(organizations.deleted_at)
+              )
+            )
+            .orderBy(asc(organizations.name))
+        : [];
+
+    const parentRoles = new Map(eligibleParents.map(org => [org.organizationId, org.role]));
+    const childrenByParentId = new Map<
+      string,
+      UserOrganizationWithInheritedChildren['inheritedChildren']
+    >();
+    for (const child of inheritedChildren) {
+      if (!child.parentOrganizationId) continue;
+      const role = parentRoles.get(child.parentOrganizationId);
+      if (!role) continue;
+      const children = childrenByParentId.get(child.parentOrganizationId) ?? [];
+      children.push({
+        organizationId: child.organizationId,
+        organizationName: child.organizationName,
+        role,
+      });
+      childrenByParentId.set(child.parentOrganizationId, children);
+    }
+
+    return directOrganizations.map(
+      (organization): UserOrganizationWithInheritedChildren => ({
+        ...organization,
+        inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
+      })
+    );
   }),
 
   create: baseProcedure.input(OrganizationCreateRequestSchema).mutation(async opts => {
@@ -252,118 +310,129 @@ export const organizationsRouter = createTRPCRouter({
       return successResult();
     }),
 
-  withMembers: organizationMemberProcedure.query<OrganizationWithMembers>(async opts => {
-    const organizationId = opts.input.organizationId;
+  withMembers: baseProcedure
+    .input(OrganizationIdInputSchema)
+    .query<OrganizationWithMembers>(async opts => {
+      const organizationId = opts.input.organizationId;
+      const callerRole = await ensureOrganizationAccess(opts.ctx, organizationId);
 
-    let organization = await getOrganizationById(organizationId);
+      let organization = await getOrganizationById(organizationId);
 
-    if (!organization) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
-
-    // Process pending credit expirations before returning stale balance
-    if (
-      organization.next_credit_expiration_at &&
-      new Date() >= new Date(organization.next_credit_expiration_at)
-    ) {
-      const expiryResult = await processOrganizationExpirations(
-        {
-          id: organizationId,
-          microdollars_used: organization.microdollars_used,
-          next_credit_expiration_at: organization.next_credit_expiration_at,
-          total_microdollars_acquired: organization.total_microdollars_acquired,
-        },
-        new Date()
-      );
-      if (expiryResult) {
-        organization = (await getOrganizationById(organizationId)) ?? organization;
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
       }
-    }
 
-    const [members, ssoPolicy, childOrganizations] = await Promise.all([
-      getOrganizationMembers(organizationId),
-      resolveEffectiveOrganizationSsoPolicy(organizationId),
-      db
-        .select({ id: organizations.id, name: organizations.name })
-        .from(organizations)
-        .where(
-          and(
-            eq(organizations.parent_organization_id, organizationId),
-            isNull(organizations.deleted_at)
-          )
-        )
-        .orderBy(organizations.name),
-    ]);
+      // Process pending credit expirations before returning stale balance
+      if (
+        organization.next_credit_expiration_at &&
+        new Date() >= new Date(organization.next_credit_expiration_at)
+      ) {
+        const expiryResult = await processOrganizationExpirations(
+          {
+            id: organizationId,
+            microdollars_used: organization.microdollars_used,
+            next_credit_expiration_at: organization.next_credit_expiration_at,
+            total_microdollars_acquired: organization.total_microdollars_acquired,
+          },
+          new Date()
+        );
+        if (expiryResult) {
+          organization = (await getOrganizationById(organizationId)) ?? organization;
+        }
+      }
 
-    const activeMemberIds = members.flatMap(member =>
-      member.status === 'active' ? [member.id] : []
-    );
-    const childOrganizationIds = childOrganizations.map(child => child.id);
-    const childMembershipRows =
-      activeMemberIds.length > 0 && childOrganizationIds.length > 0
-        ? await db
-            .select({
-              userId: organization_memberships.kilo_user_id,
-              organizationId: organization_memberships.organization_id,
-              role: organization_memberships.role,
-            })
-            .from(organization_memberships)
-            .where(
-              and(
-                inArray(organization_memberships.kilo_user_id, activeMemberIds),
-                inArray(organization_memberships.organization_id, childOrganizationIds)
-              )
+      const [members, ssoPolicy, childOrganizations] = await Promise.all([
+        getOrganizationMembers(organizationId),
+        resolveEffectiveOrganizationSsoPolicy(organizationId),
+        db
+          .select({ id: organizations.id, name: organizations.name })
+          .from(organizations)
+          .where(
+            and(
+              eq(organizations.parent_organization_id, organizationId),
+              isNull(organizations.deleted_at)
             )
-        : [];
-    const childOrganizationsById = new Map(childOrganizations.map(child => [child.id, child]));
-    const childMembershipsByUserId = new Map<
-      string,
-      Array<{ id: string; name: string; role: (typeof childMembershipRows)[number]['role'] }>
-    >();
-    for (const row of childMembershipRows) {
-      const childOrganization = childOrganizationsById.get(row.organizationId);
-      if (!childOrganization) continue;
-      const existing = childMembershipsByUserId.get(row.userId) ?? [];
-      existing.push({ ...childOrganization, role: row.role });
-      childMembershipsByUserId.set(row.userId, existing);
-    }
+          )
+          .orderBy(organizations.name),
+      ]);
 
-    const membersWithChildOrganizations = members.map(member => {
-      if (member.status !== 'active') return member;
+      const activeMemberIds = members.flatMap(member =>
+        member.status === 'active' ? [member.id] : []
+      );
+      const childOrganizationIds = childOrganizations.map(child => child.id);
+      const childMembershipRows =
+        activeMemberIds.length > 0 && childOrganizationIds.length > 0
+          ? await db
+              .select({
+                userId: organization_memberships.kilo_user_id,
+                organizationId: organization_memberships.organization_id,
+                role: organization_memberships.role,
+              })
+              .from(organization_memberships)
+              .where(
+                and(
+                  inArray(organization_memberships.kilo_user_id, activeMemberIds),
+                  inArray(organization_memberships.organization_id, childOrganizationIds)
+                )
+              )
+          : [];
+      const childOrganizationsById = new Map(childOrganizations.map(child => [child.id, child]));
+      const childMembershipsByUserId = new Map<
+        string,
+        Array<{ id: string; name: string; role: (typeof childMembershipRows)[number]['role'] }>
+      >();
+      for (const row of childMembershipRows) {
+        const childOrganization = childOrganizationsById.get(row.organizationId);
+        if (!childOrganization) continue;
+        const existing = childMembershipsByUserId.get(row.userId) ?? [];
+        existing.push({ ...childOrganization, role: row.role });
+        childMembershipsByUserId.set(row.userId, existing);
+      }
+
+      const membersWithChildOrganizations = members.map(member => {
+        if (member.status !== 'active') return member;
+        return {
+          ...member,
+          childOrganizationMemberships: (childMembershipsByUserId.get(member.id) ?? []).sort(
+            (a, b) => a.name.localeCompare(b.name)
+          ),
+        };
+      });
+
       return {
-        ...member,
-        childOrganizationMemberships: (childMembershipsByUserId.get(member.id) ?? []).sort((a, b) =>
-          a.name.localeCompare(b.name)
-        ),
+        ...organization,
+        callerRole,
+        members: membersWithChildOrganizations,
+        childOrganizations,
+        effectiveSsoPolicy:
+          ssoPolicy.status === 'required'
+            ? {
+                required: true,
+                source: ssoPolicy.source,
+                domain: ssoPolicy.domain,
+                configurationError: false,
+              }
+            : {
+                required: false,
+                source: null,
+                domain: null,
+                configurationError: ssoPolicy.status === 'misconfigured',
+              },
       };
-    });
+    }),
 
-    return {
-      ...organization,
-      members: membersWithChildOrganizations,
-      childOrganizations,
-      effectiveSsoPolicy:
-        ssoPolicy.status === 'required'
-          ? {
-              required: true,
-              source: ssoPolicy.source,
-              domain: ssoPolicy.domain,
-              configurationError: false,
-            }
-          : {
-              required: false,
-              source: null,
-              domain: null,
-              configurationError: ssoPolicy.status === 'misconfigured',
-            },
-    };
-  }),
+  createChild: organizationAdminMutationProcedure
+    .input(OrganizationCreateChildSchema)
+    .mutation(async ({ input }) => {
+      const organization = await createChildOrganization(input.name, input.organizationId);
+      return { organization };
+    }),
 
-  // Child organizations parented by this organization. Restricted to
-  // owner/billing_manager because only those roles inherit access to children.
+  // Child organizations parented by this organization. Restricted to roles
+  // that inherit access to children: owner, admin, and billing manager.
   childOrganizations: organizationBillingProcedure.query(async opts => {
     return await db
       .select({

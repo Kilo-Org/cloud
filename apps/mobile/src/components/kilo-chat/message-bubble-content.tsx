@@ -1,5 +1,5 @@
 import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
-import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, XCircle } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';

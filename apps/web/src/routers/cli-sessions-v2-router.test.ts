@@ -14,7 +14,11 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo, computeSearchNextCursor } from '@/routers/cli-sessions-v2-router';
+import {
+  parseGitHubOwnerRepo,
+  parseGitHubPrUrl,
+  computeSearchNextCursor,
+} from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -77,7 +81,7 @@ jest.mock('@sentry/nextjs', () => {
 });
 
 // SWC compiles ESM exports as non-configurable, so `jest.spyOn` on re-exported
-// module members fails. Replace `fetchPullRequestForBranch` on the already-mocked
+// module members fails. Replace `fetchPullRequestByNumber` on the already-mocked
 // adapter module with a fresh `jest.fn()` so individual tests can drive it.
 jest.mock('@/lib/integrations/platforms/github/adapter', () => {
   const actual: Record<string, unknown> = jest.requireActual(
@@ -85,7 +89,7 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => {
   );
   return {
     ...actual,
-    fetchPullRequestForBranch: jest.fn(),
+    fetchPullRequestByNumber: jest.fn(),
   };
 });
 
@@ -110,9 +114,9 @@ async function flushAfterCallbacks(): Promise<void> {
   await Promise.all(pending.map(fn => Promise.resolve(fn())));
 }
 
-const mockedFetchPullRequestForBranch =
-  githubAdapter.fetchPullRequestForBranch as jest.MockedFunction<
-    typeof githubAdapter.fetchPullRequestForBranch
+const mockedFetchPullRequestByNumber =
+  githubAdapter.fetchPullRequestByNumber as jest.MockedFunction<
+    typeof githubAdapter.fetchPullRequestByNumber
   >;
 
 let regularUser: User;
@@ -1309,6 +1313,45 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('parseGitHubPrUrl', () => {
+    it('parses https PR URLs', () => {
+      expect(parseGitHubPrUrl('https://github.com/Kilo/repo/pull/42')).toEqual({
+        owner: 'Kilo',
+        repo: 'repo',
+        number: 42,
+      });
+    });
+    it('parses trailing subpaths, query strings, fragments, and trailing slashes (matching the mobile parser)', () => {
+      expect(parseGitHubPrUrl('https://github.com/Kilo/repo/pull/42/files')).toEqual({
+        owner: 'Kilo',
+        repo: 'repo',
+        number: 42,
+      });
+      expect(parseGitHubPrUrl('https://github.com/Kilo/repo/pull/42/files?diff=split')).toEqual({
+        owner: 'Kilo',
+        repo: 'repo',
+        number: 42,
+      });
+      expect(parseGitHubPrUrl('https://github.com/Kilo/repo/pull/42#issuecomment-123')).toEqual({
+        owner: 'Kilo',
+        repo: 'repo',
+        number: 42,
+      });
+      expect(parseGitHubPrUrl('https://github.com/Kilo/repo/pull/42/')).toEqual({
+        owner: 'Kilo',
+        repo: 'repo',
+        number: 42,
+      });
+    });
+    it('rejects URLs that are not PR URLs', () => {
+      expect(parseGitHubPrUrl('https://github.com/kilo/repo')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/repo/tree/main')).toBeNull();
+      expect(parseGitHubPrUrl('https://gitlab.com/kilo/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
+      expect(parseGitHubPrUrl('not-a-url')).toBeNull();
+    });
+  });
+
   describe('getWithRuntimeState associatedPr', () => {
     const sessionWithPr = 'ses_assoc_pr_present_1234';
     const sessionWithoutPr = 'ses_assoc_pr_absent_1234';
@@ -1442,6 +1485,130 @@ describe('cli-sessions-v2-router', () => {
         await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
       }
     });
+
+    it('uses live cache fields when the session link matches the branch cache', async () => {
+      // Give sessionWithPr a stored link that matches the cache row (pull/42).
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42',
+          pr_number: 42,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add feature X',
+        headSha: 'deadbeefcafe',
+        platform: 'github',
+      });
+    });
+
+    it('uses live cache fields when the stored link has a trailing subpath', async () => {
+      // Stored link names the same PR (pull/42) as the cache row, with a
+      // trailing subpath. Raw string equality fails; normalized comparison wins.
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42/files',
+          pr_number: 42,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add feature X',
+        headSha: 'deadbeefcafe',
+        platform: 'github',
+      });
+    });
+
+    it('uses live cache fields when the stored link has mixed-case owner/repo', async () => {
+      // Stored link names the same PR (pull/42) as the canonical lowercase
+      // cache URL, but with mixed-case owner/repo. Owner and repo compare
+      // case-insensitively.
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/Kilo/Repo/pull/42',
+          pr_number: 42,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add feature X',
+        headSha: 'deadbeefcafe',
+        platform: 'github',
+      });
+    });
+
+    it('returns the session partial (not the other PR) when the session link disagrees with the branch cache', async () => {
+      // Session link points at a different PR than the branch cache (pull/42).
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/999',
+          pr_number: 999,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/999',
+        number: 999,
+        state: 'unknown',
+        title: null,
+        headSha: null,
+        reviewDecision: null,
+        reviewDecisionPending: true,
+        platform: 'github',
+      });
+    });
+
+    it('uses the branch fallback when the session has no stored link', async () => {
+      // sessionWithPr has no pr_url; the branch cache row (pull/42) is used.
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionWithPr,
+      });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/42',
+        number: 42,
+        state: 'open',
+        platform: 'github',
+      });
+    });
   });
 
   describe('list / search associatedPr', () => {
@@ -1513,6 +1680,50 @@ describe('cli-sessions-v2-router', () => {
       });
       expect(typeof withPr?.associatedPr?.lastSyncedAt).toBe('string');
       expect(withoutPr?.associatedPr).toBeNull();
+    });
+
+    it('list returns live cache fields when the stored link has a trailing subpath', async () => {
+      // Stored link names the same PR (pull/77) as the cache row, with a
+      // trailing subpath. Normalized comparison must yield live cache fields.
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77/files',
+          pr_number: 77,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+
+      const row = result.cliSessions.find(s => s.session_id === sessionWithPr);
+      expect(row?.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/77',
+        number: 77,
+        state: 'open',
+        title: 'List endpoint feature',
+        headSha: 'cafef00d',
+      });
+    });
+
+    it('search returns live cache fields when the stored link has a trailing subpath', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77/files',
+          pr_number: 77,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+      });
+
+      const row = result.results.find(s => s.session_id === sessionWithPr);
+      expect(row?.associatedPr).toMatchObject({ number: 77, state: 'open' });
     });
 
     it.each([
@@ -1640,6 +1851,138 @@ describe('cli-sessions-v2-router', () => {
       expect(withPr?.associatedPr).toMatchObject({ number: 77, state: 'open' });
       expect(withoutPr?.associatedPr).toBeNull();
     });
+
+    it('list returns the session partial (not the other cache PR) when the stored link disagrees', async () => {
+      // Session link points at a different PR than the branch cache (pull/77).
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/999',
+          pr_number: 999,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({});
+
+      const row = result.cliSessions.find(s => s.session_id === sessionWithPr);
+
+      expect(row?.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/999',
+        number: 999,
+        state: 'unknown',
+        title: null,
+        headSha: null,
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+      });
+    });
+
+    it('search returns the session partial (not the other cache PR) when the stored link disagrees', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/999',
+          pr_number: 999,
+        })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+      });
+
+      const row = result.results.find(s => s.session_id === sessionWithPr);
+
+      expect(row?.associatedPr).toMatchObject({
+        url: 'https://github.com/kilo/repo/pull/999',
+        number: 999,
+        state: 'unknown',
+        reviewDecisionPending: false,
+        platform: 'github',
+      });
+    });
+
+    it('list row count does not increase when two cache rows share a PR URL', async () => {
+      // Two sessions on different branches whose cache rows point at the same
+      // PR URL. The JOIN is on (git_url, git_branch, tenant), not pr_url, so
+      // each session must appear exactly once (no fan-out).
+      const sharedPrUrl = 'https://github.com/kilo/repo/pull/77';
+      const secondSessionId = 'ses_list_pr_shared_url_5678';
+      const secondBranch = 'feature/list-b';
+
+      await db.insert(cli_sessions_v2).values({
+        session_id: secondSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: CACHE_GIT_URL,
+        git_branch: secondBranch,
+        title: 'second session shared PR',
+      });
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: secondBranch,
+        owned_by_user_id: regularUser.id,
+        pr_url: sharedPrUrl,
+        pr_number: 77,
+        pr_state: 'open',
+        pr_title: 'List endpoint feature',
+        pr_head_sha: 'cafef00d',
+      });
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.list({});
+
+        const ids = result.cliSessions.map(s => s.session_id);
+        expect(ids.filter(id => id === sessionWithPr)).toHaveLength(1);
+        expect(ids.filter(id => id === secondSessionId)).toHaveLength(1);
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, secondSessionId));
+      }
+    });
+
+    it('search row count does not increase when two cache rows share a PR URL', async () => {
+      // Same fan-out guard as the list case: the JOIN is on (git_url,
+      // git_branch, tenant), not pr_url, so each session must appear exactly
+      // once in search results even when both cache rows point at one PR URL.
+      const sharedPrUrl = 'https://github.com/kilo/repo/pull/77';
+      const secondSessionId = 'ses_search_pr_shared_url_5678';
+      const secondBranch = 'feature/list-c';
+
+      await db.insert(cli_sessions_v2).values({
+        session_id: secondSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: CACHE_GIT_URL,
+        git_branch: secondBranch,
+        title: 'second session shared PR',
+      });
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: secondBranch,
+        owned_by_user_id: regularUser.id,
+        pr_url: sharedPrUrl,
+        pr_number: 77,
+        pr_state: 'open',
+        pr_title: 'List endpoint feature',
+        pr_head_sha: 'cafef00d',
+      });
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.search({ search_string: 'session' });
+
+        const ids = result.results.map(s => s.session_id);
+        expect(ids.filter(id => id === sessionWithPr)).toHaveLength(1);
+        expect(ids.filter(id => id === secondSessionId)).toHaveLength(1);
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, secondSessionId));
+      }
+    });
   });
 
   describe('refreshAssociatedPullRequest', () => {
@@ -1649,6 +1992,9 @@ describe('cli-sessions-v2-router', () => {
     // cache JOIN can match.
     const SESSION_GIT_URL = 'https://github.com/kilo/repo';
     const SESSION_BRANCH = 'feature/z';
+    // The session's stored PR link, set by the CLI when it links a PR.
+    const SESSION_PR_URL = 'https://github.com/kilo/repo/pull/7';
+    const SESSION_PR_NUMBER = 7;
     let integrationId: string;
 
     async function readCacheRows(opts: { orgId?: string | null } = {}) {
@@ -1674,6 +2020,9 @@ describe('cli-sessions-v2-router', () => {
         created_on_platform: 'cloud-agent',
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
+        platform: 'github',
+        pr_url: SESSION_PR_URL,
+        pr_number: SESSION_PR_NUMBER,
       });
 
       const [integration] = await db
@@ -1689,7 +2038,7 @@ describe('cli-sessions-v2-router', () => {
         .returning({ id: platform_integrations.id });
       integrationId = integration.id;
 
-      mockedFetchPullRequestForBranch.mockReset();
+      mockedFetchPullRequestByNumber.mockReset();
     });
 
     afterEach(async () => {
@@ -1707,10 +2056,10 @@ describe('cli-sessions-v2-router', () => {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
     });
 
-    it('upserts when GitHub returns a PR', async () => {
-      mockedFetchPullRequestForBranch.mockResolvedValue({
+    it('upserts when GitHub returns the stored-link PR', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue({
         number: 7,
-        htmlUrl: 'https://github.com/kilo/repo/pull/7',
+        htmlUrl: SESSION_PR_URL,
         state: 'open',
         title: 'Feature Z',
         headSha: 'abc123',
@@ -1722,20 +2071,21 @@ describe('cli-sessions-v2-router', () => {
         sessionId,
       });
 
-      expect(mockedFetchPullRequestForBranch).toHaveBeenCalledTimes(1);
-      expect(mockedFetchPullRequestForBranch).toHaveBeenCalledWith({
+      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledTimes(1);
+      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledWith({
         installationId: 12345,
         owner: 'kilo',
         repo: 'repo',
-        branch: 'feature/z',
+        number: 7,
         appType: 'standard',
       });
       expect(result.associatedPr).toMatchObject({
-        url: 'https://github.com/kilo/repo/pull/7',
+        url: SESSION_PR_URL,
         number: 7,
         state: 'open',
         title: 'Feature Z',
         headSha: 'abc123',
+        platform: 'github',
       });
 
       const [persisted] = await readCacheRows();
@@ -1744,94 +2094,16 @@ describe('cli-sessions-v2-router', () => {
         git_branch: SESSION_BRANCH,
         owned_by_user_id: regularUser.id,
         owned_by_organization_id: null,
-        pr_url: 'https://github.com/kilo/repo/pull/7',
+        pr_url: SESSION_PR_URL,
         pr_number: 7,
         pr_state: 'open',
       });
     });
 
-    it('clears the PR data when GitHub returns null while retaining a sentinel row for throttling', async () => {
-      await db.insert(github_branch_pull_requests).values({
-        git_url: SESSION_GIT_URL,
-        git_branch: SESSION_BRANCH,
-        owned_by_user_id: regularUser.id,
-        pr_url: 'https://github.com/kilo/repo/pull/1',
-        pr_number: 1,
-        pr_state: 'open',
-        pr_title: 'stale',
-        pr_head_sha: 'old',
-        // Make the stored row old so the throttle does not kick in.
-        pr_last_synced_at: new Date(Date.now() - 60_000).toISOString(),
-      });
-      mockedFetchPullRequestForBranch.mockResolvedValue(null);
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-
-      expect(result.associatedPr).toBeNull();
-      const rows = await readCacheRows();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        pr_url: null,
-        pr_number: null,
-        pr_state: null,
-        pr_title: null,
-        pr_head_sha: null,
-        // No PR → nothing to fetch a review decision for. Must not leave the
-        // row flagged pending, or the batch worker would repeatedly claim it
-        // and skip it (it filters out rows without pr_number) without ever
-        // clearing the flag.
-        review_decision_pending: false,
-      });
-      // Sentinel row's pr_last_synced_at is fresh, so the next refresh would
-      // short-circuit on the throttle.
-      const syncedMs = Date.parse(rows[0].pr_last_synced_at);
-      expect(Date.now() - syncedMs).toBeLessThan(5_000);
-    });
-
-    it('throttles repeated refreshes even when there is no PR for the branch', async () => {
-      mockedFetchPullRequestForBranch.mockResolvedValue(null);
-
-      const caller = await createCallerForUser(regularUser.id);
-      // First call persists a sentinel row with fresh pr_last_synced_at.
-      await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
-      expect(mockedFetchPullRequestForBranch).toHaveBeenCalledTimes(1);
-
-      // Second call within the throttle window short-circuits.
-      const second = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-      expect(mockedFetchPullRequestForBranch).toHaveBeenCalledTimes(1);
-      expect(second.associatedPr).toBeNull();
-    });
-
-    it('short-circuits on the recent-sync throttle without calling GitHub', async () => {
-      await db.insert(github_branch_pull_requests).values({
-        git_url: SESSION_GIT_URL,
-        git_branch: SESSION_BRANCH,
-        owned_by_user_id: regularUser.id,
-        pr_url: 'https://github.com/kilo/repo/pull/99',
-        pr_number: 99,
-        pr_state: 'open',
-        pr_title: 'recent',
-        pr_head_sha: 'fresh',
-      });
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-
-      expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
-      expect(result.associatedPr).toMatchObject({ number: 99, state: 'open' });
-    });
-
     it('writes one cache row per (url, branch, tenant) across repeated refreshes', async () => {
-      mockedFetchPullRequestForBranch.mockResolvedValue({
-        number: 11,
-        htmlUrl: 'https://github.com/kilo/repo/pull/11',
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
         state: 'open',
         title: 'x',
         headSha: 's1',
@@ -1842,8 +2114,6 @@ describe('cli-sessions-v2-router', () => {
       await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
 
       // Move pr_last_synced_at back so the throttle releases, then refresh again.
-      // Subtract more than REFRESH_THROTTLE_MS so the second call is allowed
-      // through to the GitHub adapter mock.
       await db
         .update(github_branch_pull_requests)
         .set({ pr_last_synced_at: new Date(Date.now() - 90_000).toISOString() })
@@ -1855,9 +2125,9 @@ describe('cli-sessions-v2-router', () => {
           )
         );
 
-      mockedFetchPullRequestForBranch.mockResolvedValue({
-        number: 11,
-        htmlUrl: 'https://github.com/kilo/repo/pull/11',
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
         state: 'open',
         title: 'x',
         headSha: 's2',
@@ -1870,9 +2140,188 @@ describe('cli-sessions-v2-router', () => {
       expect(rows[0].pr_head_sha).toBe('s2');
     });
 
+    it('does not overwrite a different branch-cache PR when refreshing by number', async () => {
+      // Branch cache holds a DIFFERENT PR than the session's stored link.
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: 'https://github.com/kilo/repo/pull/99',
+        pr_number: 99,
+        pr_state: 'open',
+        pr_title: 'other PR',
+        pr_head_sha: 'other-sha',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Feature Z',
+        headSha: 'abc123',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      // Fetched the session's own PR by number...
+      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledWith({
+        installationId: 12345,
+        owner: 'kilo',
+        repo: 'repo',
+        number: 7,
+        appType: 'standard',
+      });
+      // ...and returned it for this session only.
+      expect(result.associatedPr).toMatchObject({
+        url: SESSION_PR_URL,
+        number: 7,
+        state: 'open',
+      });
+
+      // The branch cache row for the other PR is untouched.
+      const rows = await readCacheRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        pr_url: 'https://github.com/kilo/repo/pull/99',
+        pr_number: 99,
+      });
+    });
+
+    it('returns the pending partial for a non-GitHub session without calling GitHub', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ platform: 'gitlab' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toMatchObject({
+        state: 'unknown',
+        title: null,
+        headSha: null,
+        reviewDecision: null,
+        reviewDecisionPending: true,
+        platform: 'gitlab',
+      });
+    });
+
+    it('fetches by number but does not write the cache when git_url/git_branch are missing', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ git_url: null, git_branch: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Feature Z',
+        headSha: 'abc123',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      // Fetch-by-number still runs (pr_url parses)...
+      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledTimes(1);
+      // ...returns the fetched payload for this session only...
+      expect(result.associatedPr).toMatchObject({
+        url: SESSION_PR_URL,
+        number: 7,
+        state: 'open',
+        platform: 'github',
+      });
+      // ...with reviewDecisionPending false: no cache row is written on this
+      // path, so no batch worker can ever clear a pending flag.
+      expect(result.associatedPr?.reviewDecisionPending).toBe(false);
+      // ...and writes no cache row (no branch identity).
+      const rows = await readCacheRows();
+      expect(rows).toHaveLength(0);
+    });
+
+    it('short-circuits on the recent-sync throttle when the cache matches the stored link', async () => {
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
+        pr_state: 'open',
+        pr_title: 'recent',
+        pr_head_sha: 'fresh',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+    });
+
+    it('updates the matching cache row when the stored link has a trailing subpath', async () => {
+      // Cache row holds the same PR (canonical URL) with stale fields.
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
+        pr_state: 'open',
+        pr_title: 'stale',
+        pr_head_sha: 'old-sha',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+
+      // Session stores a subpath link that names the same PR.
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_url: 'https://github.com/kilo/repo/pull/7/files' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Feature Z',
+        headSha: 'new-sha',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+
+      // The write guard treated the subpath link as the same PR and updated the
+      // existing row in place — no duplicate row and no stale fields.
+      const rows = await readCacheRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
+        pr_head_sha: 'new-sha',
+      });
+    });
+
     it('maps GitHubRateLimitError to TOO_MANY_REQUESTS', async () => {
       const resetAt = new Date('2099-01-01T00:00:00Z');
-      mockedFetchPullRequestForBranch.mockRejectedValue(
+      mockedFetchPullRequestByNumber.mockRejectedValue(
         new githubAdapter.GitHubRateLimitError(resetAt)
       );
 
@@ -1889,33 +2338,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(
         caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
       ).rejects.toThrow('Session not found');
-      expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
-    });
-
-    it('throws BAD_REQUEST when the session has no git branch', async () => {
-      await db
-        .update(cli_sessions_v2)
-        .set({ git_url: null, git_branch: null })
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-
-      const caller = await createCallerForUser(regularUser.id);
-      await expect(
-        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-      expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
-    });
-
-    it('throws BAD_REQUEST for non-GitHub git URLs', async () => {
-      await db
-        .update(cli_sessions_v2)
-        .set({ git_url: 'https://gitlab.com/kilo/repo' })
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-
-      const caller = await createCallerForUser(regularUser.id);
-      await expect(
-        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-      expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
     });
 
     it('rejects org-scoped refreshes for a user who is not a current org member', async () => {
@@ -1939,7 +2362,7 @@ describe('cli-sessions-v2-router', () => {
         await expect(
           caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
         ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-        expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
+        expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
       } finally {
         await db
           .update(cli_sessions_v2)
@@ -1984,7 +2407,7 @@ describe('cli-sessions-v2-router', () => {
         await expect(
           caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
         ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-        expect(mockedFetchPullRequestForBranch).not.toHaveBeenCalled();
+        expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
       } finally {
         await db
           .update(cli_sessions_v2)

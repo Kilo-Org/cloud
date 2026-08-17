@@ -55,6 +55,7 @@ export function generateOrganization(): OrganizationWithMembers {
   return {
     ...base,
     name: `Company ${randomInt(rng, 0, 999)} ${companyType}`,
+    callerRole: 'owner',
     childOrganizations: [
       { id: randomId(rng, 'org'), name: 'Platform Team' },
       { id: randomId(rng, 'org'), name: 'Product Team' },

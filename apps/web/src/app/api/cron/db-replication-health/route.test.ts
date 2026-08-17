@@ -8,6 +8,7 @@ jest.mock('@/lib/config.server', () => ({
 
 jest.mock('@/lib/replication-health', () => ({
   collectReplicationHealth: jest.fn(),
+  isReplicationSlotMonitored: (slotName: string) => !slotName.startsWith('snowflake_'),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -138,7 +139,7 @@ describe('GET /api/cron/db-replication-health', () => {
         healthy: false,
         slots: [
           {
-            slot_name: 'snowflake_connector_gfqyzuertw',
+            slot_name: 'other_logical_consumer',
             slot_type: 'logical',
             active: false,
             wal_status: 'lost',
@@ -153,8 +154,32 @@ describe('GET /api/cron/db-replication-health', () => {
 
     const body = await response.json();
     expect(body.problems).toEqual([
-      expect.stringContaining('slot snowflake_connector_gfqyzuertw: wal_status=lost'),
+      expect.stringContaining('slot other_logical_consumer: wal_status=lost'),
     ]);
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not alert for an at-risk Snowflake slot while replication is disabled', async () => {
+    mockCollect.mockResolvedValue(
+      report({
+        slots: [
+          {
+            slot_name: 'snowflake_backend_slot',
+            slot_type: 'logical',
+            active: false,
+            wal_status: 'lost',
+            retained_wal_bytes: '0',
+            at_risk: true,
+          },
+        ],
+      })
+    );
+
+    const response = await GET(createRequest({ authorization: 'Bearer cron-secret' }));
+
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ healthy: true, problems: [] })
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

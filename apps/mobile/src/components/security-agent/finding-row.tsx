@@ -3,7 +3,7 @@ import {
   getSecurityDeadlinePresentation,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
-import { ExternalLink } from 'lucide-react-native';
+import { ExternalLink } from '@/components/ui/icons';
 import { ActivityIndicator, Linking, Pressable, View } from 'react-native';
 
 import {

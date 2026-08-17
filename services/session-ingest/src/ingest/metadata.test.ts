@@ -36,6 +36,7 @@ import { notifyUserSessionEvent } from '../session-events';
 import {
   applyMetadataChanges,
   CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+  computeSessionMetadataUpdates,
   resetAttentionStatusOnCliDisconnect,
 } from './metadata';
 
@@ -766,5 +767,112 @@ describe('applyMetadataChanges', () => {
       })
     );
     expect(db.updateSets).toEqual([]);
+  });
+
+  it('persists the PR-link triple and emits session.updated', async () => {
+    const db = createApplyMetadataDb();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        platform: 'github',
+        pr_url: 'https://github.com/acme/widgets/pull/42',
+        pr_number: 42,
+      }),
+    ]);
+    const written = db.updateSets[0] as Record<string, unknown>;
+    expect(written).not.toHaveProperty('created_on_platform');
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({ type: 'session.updated' }),
+      undefined
+    );
+  });
+
+  it('clears the PR-link triple and emits session.updated', async () => {
+    const db = createApplyMetadataDb();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', null],
+        ['prUrl', null],
+        ['prNumber', null],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        platform: null,
+        pr_url: null,
+        pr_number: null,
+      }),
+    ]);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({ type: 'session.updated' }),
+      undefined
+    );
+  });
+});
+
+describe('computeSessionMetadataUpdates PR link', () => {
+  const fixedNow = () => '2026-05-05T00:00:00.000Z';
+
+  it('maps the triple to platform/pr_url/pr_number with Number conversion', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+      ]),
+      fixedNow
+    );
+    expect(updates.platform).toBe('github');
+    expect(updates.pr_url).toBe('https://github.com/acme/widgets/pull/42');
+    expect(updates.pr_number).toBe(42);
+  });
+
+  it('clears all three columns on a clear triple', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['prPlatform', null],
+        ['prUrl', null],
+        ['prNumber', null],
+      ]),
+      fixedNow
+    );
+    expect(updates.platform).toBeNull();
+    expect(updates.pr_url).toBeNull();
+    expect(updates.pr_number).toBeNull();
+  });
+
+  it('does not write the PR-link columns when the change is absent', () => {
+    const updates = computeSessionMetadataUpdates(new Map([['title', 'hello']]), fixedNow);
+    expect('platform' in updates).toBe(false);
+    expect('pr_url' in updates).toBe(false);
+    expect('pr_number' in updates).toBe(false);
+  });
+
+  it('does not touch created_on_platform from prPlatform', () => {
+    const updates = computeSessionMetadataUpdates(new Map([['prPlatform', 'github']]), fixedNow);
+    expect(updates.platform).toBe('github');
+    expect('created_on_platform' in updates).toBe(false);
   });
 });

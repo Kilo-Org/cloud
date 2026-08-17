@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import { Check, Share as ShareIcon } from 'lucide-react-native';
+import { Check, Share as ShareIcon } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 

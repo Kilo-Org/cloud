@@ -39,29 +39,6 @@ function makeEditToolPart(overrides: {
   };
 }
 
-function makeWriteToolPart(overrides: { filePath?: string; content?: string }): ToolPart {
-  const input: Record<string, unknown> = {
-    filePath: overrides.filePath ?? 'src/new.ts',
-    content: overrides.content ?? '',
-  };
-  return {
-    id: 'write-1',
-    sessionID: 'session-1',
-    messageID: 'message-1',
-    type: 'tool' as const,
-    callID: 'call-1',
-    tool: 'write',
-    state: {
-      status: 'completed',
-      input,
-      output: '',
-      title: 'write',
-      metadata: {},
-      time: { start: 0, end: 1 },
-    },
-  };
-}
-
 describe('buildToolDiffModel — edit tool', () => {
   it('returns deleted and added numbered DiffLine rows for a valid edit', () => {
     const part = makeEditToolPart({
@@ -160,19 +137,19 @@ describe('buildToolDiffModel — edit tool', () => {
   });
 
   it('truncates oldString and newString at the character cap', () => {
-    const longOld = 'a'.repeat(EDIT_CHAR_CAP + 50);
-    const longNew = 'b'.repeat(EDIT_CHAR_CAP + 10);
+    const longOld = 'a'.repeat(EDIT_CHARACTER_CAP + 50);
+    const longNew = 'b'.repeat(EDIT_CHARACTER_CAP + 10);
     const part = makeEditToolPart({ oldString: longOld, newString: longNew });
     const model = mustBe(buildToolDiffModel(part), 'model');
     expect(model.truncated).toBe(true);
 
-    // Each side capped: no line exceeds EDIT_CHAR_CAP combined.
+    // Each side capped: no line exceeds EDIT_CHARACTER_CAP combined.
     const oldLines = model.lines.filter(l => l.type === 'del');
     const newLines = model.lines.filter(l => l.type === 'add');
     const oldChars = oldLines.reduce((sum, l) => sum + l.text.length, 0);
     const newChars = newLines.reduce((sum, l) => sum + l.text.length, 0);
-    expect(oldChars).toBeLessThanOrEqual(EDIT_CHAR_CAP);
-    expect(newChars).toBeLessThanOrEqual(EDIT_CHAR_CAP);
+    expect(oldChars).toBeLessThanOrEqual(EDIT_CHARACTER_CAP);
+    expect(newChars).toBeLessThanOrEqual(EDIT_CHARACTER_CAP);
   });
 
   it('truncates at the line cap', () => {
@@ -206,106 +183,6 @@ describe('buildToolDiffModel — edit tool', () => {
     expect(bareModel.lines[1]).toMatchObject({ type: 'del', oldLine: 2, text: 'two' });
     expect(bareModel.lines[2]).toMatchObject({ type: 'add', newLine: 1, text: 'three' });
     expect(bareModel.lines[3]).toMatchObject({ type: 'add', newLine: 2, text: 'four' });
-  });
-});
-
-describe('buildToolDiffModel — write tool', () => {
-  it('returns added numbered DiffLine rows for a valid write', () => {
-    const part = makeWriteToolPart({ content: 'line1\nline2\nline3' });
-    const model = mustBe(buildToolDiffModel(part), 'model');
-    expect(model.tool).toBe('write');
-    expect(model.truncated).toBe(false);
-
-    const { lines } = model;
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toEqual({
-      type: 'add',
-      newLine: 1,
-      text: 'line1',
-      noNewlineAtEndOfFile: false,
-    });
-    expect(lines[1]).toEqual({
-      type: 'add',
-      newLine: 2,
-      text: 'line2',
-      noNewlineAtEndOfFile: false,
-    });
-    expect(lines[2]).toEqual({
-      type: 'add',
-      newLine: 3,
-      text: 'line3',
-      noNewlineAtEndOfFile: false,
-    });
-  });
-
-  it('resolves language for .js files to javascript', () => {
-    const part = makeWriteToolPart({ filePath: 'src/foo.js', content: 'x' });
-    const model = mustBe(buildToolDiffModel(part), 'model');
-    expect(model.language).toBe('javascript');
-  });
-
-  it('resolves language to null for unknown extensions', () => {
-    const part = makeWriteToolPart({ filePath: 'Makefile', content: 'x' });
-    const model = mustBe(buildToolDiffModel(part), 'model');
-    expect(model.language).toBeNull();
-  });
-
-  it('returns null when content is empty', () => {
-    const part = makeWriteToolPart({ content: '' });
-    expect(buildToolDiffModel(part)).toBeNull();
-  });
-
-  it('returns a valid model for whitespace-only content (blank lines)', () => {
-    const part = makeWriteToolPart({ content: '\n\n' });
-    // splitTrimTrailingEmpty removes the final empty, but keeps \n lines.
-    const model = buildToolDiffModel(part);
-    // Two non-empty entries from ["", ""] after trailing pop.
-    expect(model).not.toBeNull();
-  });
-
-  it('returns null when content is missing (undefined treated as empty)', () => {
-    const part = makeWriteToolPart({ content: undefined });
-    expect(buildToolDiffModel(part)).toBeNull();
-  });
-
-  it('truncates content at the character cap', () => {
-    const longContent = 'x'.repeat(WRITE_CHAR_CAP + 100);
-    const part = makeWriteToolPart({ content: longContent });
-    const model = mustBe(buildToolDiffModel(part), 'model');
-    expect(model.truncated).toBe(true);
-    const totalChars =
-      model.lines.reduce((sum, l) => sum + l.text.length, 0) + (model.lines.length - 1);
-    expect(totalChars).toBeLessThanOrEqual(WRITE_CHAR_CAP);
-  });
-
-  it('truncates at the line cap', () => {
-    const manyLines = Array.from({ length: WRITE_LINE_CAP + 10 }, (_, i) => `line${i}`).join('\n');
-    const part = makeWriteToolPart({ content: manyLines });
-    const model = mustBe(buildToolDiffModel(part), 'model');
-    expect(model.truncated).toBe(true);
-    expect(model.lines).toHaveLength(WRITE_LINE_CAP);
-  });
-
-  it('strips CR from CRLF, bare-CR, and mixed write content', () => {
-    const crlfPart = makeWriteToolPart({ content: 'alpha\r\nbeta\r\ncharlie' });
-    const crlfModel = mustBe(buildToolDiffModel(crlfPart), 'model');
-    expect(crlfModel.lines).toHaveLength(3);
-    expect(crlfModel.lines[0]).toMatchObject({ type: 'add', newLine: 1, text: 'alpha' });
-    expect(crlfModel.lines[1]).toMatchObject({ type: 'add', newLine: 2, text: 'beta' });
-    expect(crlfModel.lines[2]).toMatchObject({ type: 'add', newLine: 3, text: 'charlie' });
-
-    const barePart = makeWriteToolPart({ content: 'one\rtwo' });
-    const bareModel = mustBe(buildToolDiffModel(barePart), 'model');
-    expect(bareModel.lines).toHaveLength(2);
-    expect(bareModel.lines[0]).toMatchObject({ type: 'add', newLine: 1, text: 'one' });
-    expect(bareModel.lines[1]).toMatchObject({ type: 'add', newLine: 2, text: 'two' });
-
-    const mixedPart = makeWriteToolPart({ content: 'line1\nline2\r\nline3' });
-    const mixedModel = mustBe(buildToolDiffModel(mixedPart), 'model');
-    expect(mixedModel.lines).toHaveLength(3);
-    expect(mixedModel.lines[0]).toMatchObject({ type: 'add', newLine: 1, text: 'line1' });
-    expect(mixedModel.lines[1]).toMatchObject({ type: 'add', newLine: 2, text: 'line2' });
-    expect(mixedModel.lines[2]).toMatchObject({ type: 'add', newLine: 3, text: 'line3' });
   });
 });
 
@@ -352,7 +229,5 @@ describe('buildToolDiffModel — non-diff tools', () => {
 });
 
 // Constants from the model, duplicated here for focused assertion.
-const EDIT_CHAR_CAP = 1000;
-const EDIT_LINE_CAP = 100;
-const WRITE_CHAR_CAP = 2000;
-const WRITE_LINE_CAP = 200;
+const EDIT_CHARACTER_CAP = 10_000;
+const EDIT_LINE_CAP = 500;

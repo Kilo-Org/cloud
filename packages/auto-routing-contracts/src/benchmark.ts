@@ -20,6 +20,27 @@ export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
 
 /**
+ * Which registry queue a run drains. Decider measurements all land in the one
+ * global Benchmark-profile registry; the purpose only records who asked for the
+ * entries — the saved platform decider list ('platform') or owner pools
+ * ('user'). Each purpose owns its own decider slot and container budget, so the
+ * two queues run independently. Classifier runs are always 'platform'.
+ */
+export const BenchmarkRunPurposeSchema = z.enum(['platform', 'user']);
+export type BenchmarkRunPurpose = z.infer<typeof BenchmarkRunPurposeSchema>;
+
+/** Queue selector for a manual decider run. 'both' starts one run per queue. */
+export const BenchmarkQueueSelectorSchema = z.enum(['platform', 'user', 'both']);
+export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema>;
+
+/**
+ * Total live decider containers the benchmark runner may hold (wrangler
+ * `max_instances`). Platform and profile runs are independent, so their
+ * configured lane budgets must sum to at most this.
+ */
+export const BENCHMARK_CONTAINER_BUDGET = 200;
+
+/**
  * Decider model identity for a benchmark run. Platform/admin config still
  * selects one legacy `reasoningEffort` per model. Profile runs (and exact
  * Pool-entry identity) use canonical `variant`. Both non-null is malformed —
@@ -90,9 +111,17 @@ export const BenchmarkConfigSchema = z
     excludedAutoDeciderModels: z.array(z.string().trim().min(1)).optional(),
     // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
-    // Benchmark-wide parallelism budget. Decider runs use it as a live
+    // Platform parallelism budget. Platform decider runs use it as a live
     // container budget; classifier runs use it for parallel OpenRouter calls.
-    maxConcurrency: z.number().int().min(1).max(100),
+    maxConcurrency: z.number().int().min(1).max(BENCHMARK_CONTAINER_BUDGET),
+    // Live container budget for user-queue runs. Separate from maxConcurrency so
+    // a user-queue run and a platform-queue run can hold containers at once.
+    userMaxConcurrency: z
+      .number()
+      .int()
+      .min(1)
+      .max(BENCHMARK_CONTAINER_BUDGET)
+      .default(BENCHMARK_CONTAINER_BUDGET / 2),
     // Optional override for the Kilo user whose identity/billing the decider
     // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
     benchmarkUserId: z.string().trim().min(1).nullable(),
@@ -153,6 +182,15 @@ export const BenchmarkConfigSchema = z
         message: 'Auto decider max cost must be greater than or equal to min cost',
       });
     }
+    // Platform-queue and user-queue runs can hold containers at the same time,
+    // so the two budgets share one hard platform cap.
+    if (config.maxConcurrency + config.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['userMaxConcurrency'],
+        message: `Max concurrency + user max concurrency must be at most ${BENCHMARK_CONTAINER_BUDGET}`,
+      });
+    }
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
@@ -204,6 +242,8 @@ export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 export const BenchmarkRunSchema = z.object({
   id: z.string(),
   kind: BenchmarkKindSchema,
+  // Defaulted so run payloads persisted before the field existed still parse.
+  purpose: BenchmarkRunPurposeSchema.default('platform'),
   status: BenchmarkRunStatusSchema,
   startedAt: z.string(),
   completedAt: z.string().nullable(),
@@ -220,13 +260,57 @@ export const BenchmarkConfigResponseSchema = z.object({
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   kind: BenchmarkKindSchema,
-  // Re-run every configured model even when prior results exist.
+  // Re-run every configured model even when prior results exist. Classifier
+  // only — decider dedup is the registry's job.
   force: z.boolean().default(false),
+  // Which registry queue a decider run drains. Ignored for classifier runs.
+  queue: BenchmarkQueueSelectorSchema.default('platform'),
 });
-export const StartBenchmarkRunResponseSchema = z.object({
+export const StartedBenchmarkRunSchema = z.object({
   runId: z.string(),
+  purpose: BenchmarkRunPurposeSchema,
+  entryCount: z.number().int(),
+});
+export type StartedBenchmarkRun = z.infer<typeof StartedBenchmarkRunSchema>;
+export const StartBenchmarkRunResponseSchema = z.object({
+  // Null when a queue drain found no pending work — nothing was started.
+  runId: z.string().nullable(),
   enqueuedModels: z.number().int(),
   skippedModels: z.array(z.string()).default([]),
+  // One entry per run actually started. 'both' can start two.
+  startedRuns: z.array(StartedBenchmarkRunSchema).default([]),
+  // One entry per queue that could not start. Reported even when another queue
+  // did start, or a wedged queue would read as "nothing pending".
+  drainErrors: z.array(z.string()).default([]),
+});
+
+/** Registry row counts for one queue, under the live engine identity. */
+export const BenchmarkRegistryQueueSchema = z.object({
+  pending: z.number().int(),
+  running: z.number().int(),
+  ready: z.number().int(),
+  failed: z.number().int(),
+});
+export type BenchmarkRegistryQueue = z.infer<typeof BenchmarkRegistryQueueSchema>;
+
+/**
+ * Snapshot of the global decider registry. A pair wanted by both the platform
+ * list and an owner pool is counted in both queues — it is one row, measured
+ * once, and shared.
+ */
+export const BenchmarkRegistryResponseSchema = z.object({
+  engineIdentity: z.string(),
+  repetitions: z.number().int(),
+  platform: BenchmarkRegistryQueueSchema,
+  user: BenchmarkRegistryQueueSchema,
+});
+export type BenchmarkRegistryResponse = z.infer<typeof BenchmarkRegistryResponseSchema>;
+
+export const RequeueBenchmarkRegistryRequestSchema = z.object({
+  scope: BenchmarkQueueSelectorSchema,
+});
+export const RequeueBenchmarkRegistryResponseSchema = z.object({
+  requeued: z.number().int(),
 });
 
 export const BenchmarkRoutingTableResponseSchema = z.object({

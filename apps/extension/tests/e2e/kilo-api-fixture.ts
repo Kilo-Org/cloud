@@ -43,8 +43,16 @@ const getToolResultHtmlLength = (body: unknown): string => {
   return toolResult.success ? String(toolResult.data.value) : 'unknown';
 };
 
-const chatCompletionStreamResponse = (events: unknown[]): string =>
-  `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+// The real gateway always reports a finish_reason; a canned completion without one would look like a truncated stream and trigger the turn runner's transparent retry. Append the terminal chunk unless the fixture pins its own.
+const hasFinishReason = (events: unknown[]): boolean =>
+  events.some(event => JSON.stringify(event).includes('"finish_reason"'));
+
+const chatCompletionStreamResponse = (events: unknown[]): string => {
+  const terminal = hasFinishReason(events)
+    ? []
+    : [{ choices: [{ delta: {}, finish_reason: 'stop' }] }];
+  return `${[...events, ...terminal].map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+};
 
 const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
@@ -59,6 +67,7 @@ export const safeToolNames = [
   'get_page_snapshot',
   'get_element_details',
   'find_in_page',
+  'web_search',
   'search_memories',
   'get_memory',
   ...workflowToolNames,
@@ -67,6 +76,7 @@ export const dangerousToolNames = [
   'get_page_snapshot',
   'get_element_details',
   'find_in_page',
+  'web_search',
   'search_memories',
   'get_memory',
   'eval',

@@ -14,7 +14,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-import { api_request_compress_log, api_request_log } from '@kilocode/db/schema';
+import { api_request_log } from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
@@ -50,26 +50,10 @@ async function insertApiRequestLogRecords(count: number, created_at: string) {
   );
 }
 
-async function insertApiRequestCompressLogRecord(created_at: string) {
-  const [row] = await db
-    .insert(api_request_compress_log)
-    .values({
-      created_at,
-      kilo_user_id: 'test-user',
-      provider: 'test-provider',
-      model: 'test-model',
-      request: {},
-      result: {},
-    })
-    .returning();
-  return row;
-}
-
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     await db.delete(api_request_log).where(sql`true`);
-    await db.delete(api_request_compress_log).where(sql`true`);
   });
 
   it('rejects requests without authorization header', async () => {
@@ -93,7 +77,6 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
       outcome: 'succeeded',
       deleted_api_request_log_count: 0,
-      deleted_api_request_compress_log_count: 0,
       deleted_count: 0,
       batch_size: BATCH_SIZE,
       has_more: false,
@@ -115,29 +98,11 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
       expect.objectContaining({
         outcome: 'succeeded',
         deleted_api_request_log_count: 2,
-        deleted_api_request_compress_log_count: 0,
         deleted_count: 2,
       })
     );
 
     const remaining = await db.select().from(api_request_log);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].id).toBe(recent.id);
-  });
-
-  it('deletes expired compression records and preserves recent records', async () => {
-    await insertApiRequestCompressLogRecord(daysAgo(45));
-    await insertApiRequestCompressLogRecord(daysAgo(31));
-    const recent = await insertApiRequestCompressLogRecord(daysAgo(1));
-
-    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.deletedCount).toBe(2);
-    expect(body.hasMore).toBe(false);
-
-    const remaining = await db.select().from(api_request_compress_log);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe(recent.id);
   });

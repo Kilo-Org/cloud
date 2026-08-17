@@ -2,7 +2,7 @@
 import * as Sentry from '@sentry/react-native';
 import { useMutation } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { ChevronDown, ChevronRight, ChevronUp, MapPin } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp, MapPin } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';

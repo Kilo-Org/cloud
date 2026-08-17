@@ -1,4 +1,8 @@
-import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type ModelSelection,
+  type UserWebConnection,
+} from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: these two runtime imports must come from their
 // narrow subpaths, not the `cloud-agent-sdk` barrel. The barrel's index.ts
 // also re-exports web-only transport code (`cloud-agent-connection.ts` ->
@@ -151,26 +155,26 @@ export function classifyCreateSessionResult(
 // ---------------------------------------------------------------------------
 
 /**
- * Map the new-session screen's picker strings into the SDK
- * `CreateRemoteSessionInput` shape. Empty strings are omitted. Mobile model
- * options are gateway models; `kilo` is their provider (same mapping
- * `getRemoteModelFields` uses for legacy overrides).
+ * Map the new-session screen's picker state into the SDK
+ * `CreateRemoteSessionInput` shape. The caller resolves the picker's model
+ * choice into a `ModelSelection` (provider + model + optional variant); this
+ * builder forwards the selected provider and model as-is, without any
+ * hard-coded provider mapping. Empty strings are omitted.
  */
 export function buildCreateRemoteSessionInput(fields: {
   mode?: string;
-  model?: string;
-  variant?: string;
+  selection?: ModelSelection;
   organizationId?: string | null;
 }): CreateRemoteSessionInput | undefined {
   const input: CreateRemoteSessionInput = {};
   if (fields.mode) {
     input.agent = fields.mode;
   }
-  if (fields.model) {
+  if (fields.selection) {
     input.model = {
-      providerID: 'kilo',
-      modelID: fields.model,
-      ...(fields.variant ? { variant: fields.variant } : {}),
+      providerID: fields.selection.model.providerID,
+      modelID: fields.selection.model.modelID,
+      ...(fields.selection.variant ? { variant: fields.selection.variant } : {}),
     };
   }
   if (fields.organizationId) {

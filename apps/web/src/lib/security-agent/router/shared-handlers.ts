@@ -1,4 +1,9 @@
 import type { TRPCContext } from '@/lib/trpc/init';
+import {
+  organizationTarget,
+  recordKiloAdminElevation,
+  userTarget,
+} from '@/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import {
   type getIntegrationForOwner,
@@ -231,6 +236,17 @@ async function assembleAuditReportResponse<TExtra>(params: {
     params.ctx,
     params.deps.resolveOwner(params.ctx, params.input)
   );
+
+  if (params.ctx.user.is_admin) {
+    // `isRequestingUserKiloAdmin` below unmasks Kilo-admin and unattributed
+    // actors that a customer would see as "Kilo Admin"/"Masked user". Recorded
+    // before the query so an over-budget or failed report still attributes the
+    // attempt; the DB-backed security audit log is written on success only.
+    await recordKiloAdminElevation(params.ctx, {
+      reason: 'security_agent_audit_report',
+      target: owner.type === 'organization' ? organizationTarget(owner.id) : userTarget(owner.id),
+    });
+  }
 
   try {
     const report = await getSecurityAgentAuditReport({

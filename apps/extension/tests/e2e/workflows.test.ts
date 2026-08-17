@@ -14,10 +14,20 @@ import {
 
 const AGENT_WORKFLOWS_KEY = 'kiloAgentWorkflows';
 const AGENT_MEMORIES_KEY = 'kiloAgentMemories';
+const WORKFLOW_SETTINGS_KEY = 'kiloWorkflowSettings';
+const AGENT_CONVERSATIONS_KEY = 'kiloAgentConversations';
 
 const SIMPLE_HEADING_SCRIPT = `
   const heading = await page.text('h1');
   return { done: true, result: { heading } };
+`;
+
+// A one-line change on top of SIMPLE_HEADING_SCRIPT.
+// The update diff must render at least one removed row and one added row.
+const HEADING_SUBTITLE_SCRIPT = `
+  const heading = await page.text('h1');
+  const subtitle = await page.text('h2');
+  return { done: true, result: { heading, subtitle } };
 `;
 
 const SELECTOR_MISSING_SCRIPT = `
@@ -106,6 +116,61 @@ const seedApprovedWorkflow = async (
   };
   await setExtensionStorage(sidePanel, { [AGENT_WORKFLOWS_KEY]: [workflow] });
   return workflow.id;
+};
+
+/**
+ * Seed the workflow settings record into extension storage. Every key is set
+ * explicitly because the settings schema requires allowWorkflowsInSafeMode,
+ * which has no default.
+ */
+const seedWorkflowSettings = async (
+  sidePanel: Page,
+  overrides: {
+    allowWorkflowsInSafeMode?: boolean;
+    autoApproveWorkflowChanges?: boolean;
+    autoApproveWorkflowRuns?: boolean;
+  } = {}
+): Promise<void> => {
+  await setExtensionStorage(sidePanel, {
+    [WORKFLOW_SETTINGS_KEY]: {
+      allowWorkflowsInSafeMode: overrides.allowWorkflowsInSafeMode ?? false,
+      autoApproveWorkflowChanges: overrides.autoApproveWorkflowChanges ?? false,
+      autoApproveWorkflowRuns: overrides.autoApproveWorkflowRuns ?? false,
+    },
+  });
+};
+
+/**
+ * Check the persisted conversation for a save_workflow tool result that
+ * reports the saved workflow id with saved: true and autoApproved: true.
+ * Reads storage, never the DOM.
+ */
+const hasStoredAutoApprovedSave = async (
+  sidePanel: Page,
+  expectedWorkflowId: string
+): Promise<boolean> => {
+  const store = (await readExtensionLocalStorage(sidePanel, AGENT_CONVERSATIONS_KEY)) as
+    | {
+        conversations?: { events?: { ok?: boolean; type?: string; value?: unknown }[] }[];
+      }
+    | undefined;
+  const events = (store?.conversations ?? []).flatMap(conversation => conversation.events ?? []);
+  const found = events.find(event => {
+    if (event.type !== 'tool-result' || event.ok !== true) {
+      return false;
+    }
+    const { value } = event;
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+    const record = value as Record<string, unknown>;
+    return (
+      record['saved'] === true &&
+      record['autoApproved'] === true &&
+      record['workflowId'] === expectedWorkflowId
+    );
+  });
+  return found !== undefined;
 };
 
 interface TestContext {
@@ -259,8 +324,12 @@ test('create workflow, approve card, and dry-run', async () => {
       await sidePanel.getByLabel('Message agent').press('Enter');
 
       // Assert the dry-run recorded actions in the tool exchange.
+      // The save_workflow details body also mentions run_workflow (nextStep guidance).
+      // Filter on the summary suffix so the bare-name match stays unambiguous.
       await expect(sidePanel.getByText('run_workflow completed')).toBeVisible();
-      const dryRunDetails = sidePanel.locator('details').filter({ hasText: 'run_workflow' });
+      const dryRunDetails = sidePanel
+        .locator('details')
+        .filter({ hasText: 'run_workflow completed' });
       await dryRunDetails.locator('summary').click();
       // Dry-run records the click and fill actions without executing them.
       const dryRunText = await dryRunDetails.textContent();
@@ -859,4 +928,267 @@ document.getElementById('search').addEventListener('click', function () {
     await paramsFixture.close();
     await rm(launched.userDataDir, { force: true, recursive: true });
   }
+});
+
+// ── Scenario A: fresh settings defaults and persistence ────────────────────
+
+test('workflow settings toggles start off and persist clicks', async () => {
+  await withTestContext(async ({ context: { context, extensionId } }) => {
+    // Auth validation hits /api/user, so the mock must be installed first.
+    await mockKiloApi(context, {});
+
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+    await openSettings(sidePanel);
+
+    const changesToggle = sidePanel.getByRole('switch', {
+      name: 'Auto-approve workflow changes',
+    });
+    const runsToggle = sidePanel.getByRole('switch', { name: 'Auto-approve workflow runs' });
+
+    // Fresh profile: both new switches are visible and start off.
+    await expect(changesToggle).toBeEnabled();
+    await expect(changesToggle).toHaveAttribute('aria-checked', 'false');
+    await expect(runsToggle).toHaveAttribute('aria-checked', 'false');
+
+    // Click the changes toggle and wait for storage, not the DOM, to confirm.
+    await changesToggle.click();
+    await expect(changesToggle).toHaveAttribute('aria-checked', 'true');
+    await expect
+      .poll(async () => {
+        const settings = (await readExtensionLocalStorage(sidePanel, WORKFLOW_SETTINGS_KEY)) as {
+          autoApproveWorkflowChanges?: boolean;
+        };
+        return settings?.autoApproveWorkflowChanges === true;
+      })
+      .toBe(true);
+    // The save gate must re-enable the row before the next click is accepted.
+    await expect(changesToggle).toBeEnabled();
+
+    await runsToggle.click();
+    await expect(runsToggle).toHaveAttribute('aria-checked', 'true');
+    await expect
+      .poll(async () => {
+        const settings = (await readExtensionLocalStorage(sidePanel, WORKFLOW_SETTINGS_KEY)) as {
+          autoApproveWorkflowRuns?: boolean;
+        };
+        return settings?.autoApproveWorkflowRuns === true;
+      })
+      .toBe(true);
+
+    const persisted = (await readExtensionLocalStorage(sidePanel, WORKFLOW_SETTINGS_KEY)) as Record<
+      string,
+      unknown
+    >;
+    expect(persisted).toMatchObject({
+      allowWorkflowsInSafeMode: false,
+      autoApproveWorkflowChanges: true,
+      autoApproveWorkflowRuns: true,
+    });
+  });
+});
+
+// ── Scenario B: auto-approved save (no card, honest tool result) ───────────
+
+test('auto-approved workflow save stores a result with autoApproved: true', async () => {
+  test.setTimeout(60_000);
+
+  await withTestContext(async ({ context: { context, extensionId }, fixture }) => {
+    await mockKiloApi(context, {
+      // Turn 1: save_workflow create call. Auto-approve stores it with no card.
+      firstCompletionEvents: [
+        { choices: [{ delta: { content: "I'll save this workflow." } }] },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    function: {
+                      arguments: JSON.stringify({
+                        description: 'Read the page heading.',
+                        name: 'Heading reader',
+                        scopeOrigin: new URL(fixture.url).origin,
+                        script: SIMPLE_HEADING_SCRIPT,
+                      }),
+                      name: 'save_workflow',
+                    },
+                    id: 'call_save_wf_auto_1',
+                    index: 0,
+                    type: 'function',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      // Turn 1 continuation after the stored save.
+      secondCompletionEvents: contentOnlyCompletion('Workflow saved.'),
+      toolNames: safeToolNames,
+    });
+
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+
+    await seedWorkflowSettings(sidePanel, { autoApproveWorkflowChanges: true });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
+
+    await sidePanel.getByLabel('Message agent').fill('Save a workflow for this page');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    // The workflow lands in storage with a non-empty approved hash.
+    await expect
+      .poll(
+        async () => {
+          const workflows = (await readExtensionLocalStorage(sidePanel, AGENT_WORKFLOWS_KEY)) as
+            | { approvedScriptHash?: string }[]
+            | undefined;
+          const hash = workflows?.[0]?.approvedScriptHash;
+          return typeof hash === 'string' && hash.length > 0;
+        },
+        { timeout: 15_000 }
+      )
+      .toBe(true);
+
+    // The approval card never appears, and the ack still streams.
+    await expect(sidePanel.getByRole('dialog', { name: 'Save workflow' })).toHaveCount(0);
+    await expect(sidePanel.getByText('Workflow saved.')).toBeVisible({ timeout: 15_000 });
+
+    const workflows = (await readExtensionLocalStorage(sidePanel, AGENT_WORKFLOWS_KEY)) as {
+      id: string;
+    }[];
+    const savedId = workflows[0]!.id;
+
+    // Read the provenance from the stored conversation, not the DOM.
+    await expect
+      .poll(() => hasStoredAutoApprovedSave(sidePanel, savedId), { timeout: 15_000 })
+      .toBe(true);
+  });
+});
+
+// ── Scenario C: unified diff on update with the changes toggle off ─────────
+
+test('workflow update with changes toggle off shows a unified diff', async () => {
+  test.setTimeout(60_000);
+
+  await withTestContext(async ({ context: { context, extensionId }, fixture }) => {
+    // Turn 1: save_workflow update call. Arguments are patched after seeding.
+    const updateEvents: unknown[] = [
+      { choices: [{ delta: { content: "I'll update this workflow." } }] },
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  function: {
+                    arguments: '',
+                    name: 'save_workflow',
+                  },
+                  id: 'call_update_wf_1',
+                  index: 0,
+                  type: 'function',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ];
+
+    await mockKiloApi(context, {
+      firstCompletionEvents: updateEvents,
+      secondCompletionEvents: contentOnlyCompletion('Workflow updated.'),
+      toolNames: safeToolNames,
+    });
+
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+
+    // The changes toggle is explicitly off, so the update must show the card.
+    await seedWorkflowSettings(sidePanel);
+
+    const workflowId = await seedApprovedWorkflow(sidePanel, {
+      description: 'Read the page heading.',
+      name: 'Heading reader',
+      scopeOrigin: new URL(fixture.url).origin,
+      script: SIMPLE_HEADING_SCRIPT,
+    });
+
+    // Patch the update call to target the seeded workflow with a changed script.
+    (
+      updateEvents[1] as {
+        choices: { delta: { tool_calls: { function: { arguments: string } }[] } }[];
+      }
+    ).choices[0]!.delta.tool_calls[0]!.function.arguments = JSON.stringify({
+      description: 'Read the heading and the subtitle.',
+      name: 'Heading reader',
+      scopeOrigin: new URL(fixture.url).origin,
+      script: HEADING_SUBTITLE_SCRIPT,
+      workflowId,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
+
+    await sidePanel.getByLabel('Message agent').fill('Update the workflow to read the subtitle');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    const saveCard = sidePanel.getByRole('dialog', { name: 'Save workflow' });
+    await expect(saveCard).toBeVisible({ timeout: 15_000 });
+
+    // The changed update renders one unified diff with plus and minus rows.
+    const diffRegion = saveCard.locator('[aria-label="Script changes"]');
+    await expect(diffRegion).toBeVisible();
+    await expect(diffRegion.getByText(/^\+/u).first()).toBeVisible();
+    await expect(diffRegion.getByText(/^-/u).first()).toBeVisible();
+  });
+});
+
+// ── Scenario D: one-click delete with the changes toggle on ────────────────
+
+test('workflow delete with changes toggle on removes the row on first click', async () => {
+  await withTestContext(async ({ context: { context, extensionId } }) => {
+    await mockKiloApi(context, {});
+
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+
+    await seedWorkflowSettings(sidePanel, { autoApproveWorkflowChanges: true });
+
+    await seedApprovedWorkflow(sidePanel, {
+      description: 'Will be deleted.',
+      name: 'Doomed workflow',
+    });
+
+    await openSettings(sidePanel);
+    const workflowRegion = sidePanel.getByRole('region', { name: 'Workflows' });
+    await expect(workflowRegion).toBeVisible();
+
+    const deleteButton = sidePanel.getByRole('button', {
+      name: 'Delete workflow "Doomed workflow"',
+    });
+    await expect(deleteButton).toBeVisible();
+
+    // One click deletes: the confirm state is never entered with the toggle on.
+    await deleteButton.click();
+
+    // The storage watcher refreshes the list, so the row leaves the rendered list.
+    await expect(deleteButton).toHaveCount(0, { timeout: 10_000 });
+
+    await expect
+      .poll(
+        async () => {
+          const workflows = (await readExtensionLocalStorage(sidePanel, AGENT_WORKFLOWS_KEY)) as
+            | unknown[]
+            | undefined;
+          return (workflows ?? []).length === 0;
+        },
+        { timeout: 10_000 }
+      )
+      .toBe(true);
+  });
 });

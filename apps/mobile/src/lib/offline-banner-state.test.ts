@@ -4,7 +4,7 @@ import { type ConnectivityState } from '@/lib/connectivity-online';
 import {
   type ConnectivitySource,
   createOfflineBannerStore,
-  OFFLINE_BANNER_DEBOUNCE_MS,
+  OFFLINE_BANNER_SHOW_DELAY_MS,
   type OfflineBannerStore,
   type OfflineBannerTimer,
 } from '@/lib/offline-banner-state';
@@ -91,7 +91,7 @@ describe('createOfflineBannerStore', () => {
     expect(store.isOffline()).toBe(false);
   });
 
-  it('commits offline only after the debounce and notifies once', () => {
+  it('commits offline only after the show delay and notifies once', () => {
     const { store, source, timer } = createStore();
     const listener = vi.fn(() => undefined);
     store.subscribe(listener);
@@ -101,7 +101,7 @@ describe('createOfflineBannerStore', () => {
     expect(store.isOffline()).toBe(false);
     expect(listener).not.toHaveBeenCalled();
 
-    expect(timer.scheduled[0]?.delayMs).toBe(OFFLINE_BANNER_DEBOUNCE_MS);
+    expect(timer.scheduled[0]?.delayMs).toBe(OFFLINE_BANNER_SHOW_DELAY_MS);
 
     timer.firePending();
 
@@ -123,7 +123,7 @@ describe('createOfflineBannerStore', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('stays offline until the debounce after a committed offline, then notifies once', () => {
+  it('hides immediately when the connection returns after a committed offline', () => {
     const { store, source, timer } = createStore();
     const listener = vi.fn(() => undefined);
     store.subscribe(listener);
@@ -134,12 +134,10 @@ describe('createOfflineBannerStore', () => {
     expect(listener).toHaveBeenCalledTimes(1);
 
     source.emit(onlineState);
-    expect(store.isOffline()).toBe(true);
-
-    timer.firePending();
 
     expect(store.isOffline()).toBe(false);
     expect(listener).toHaveBeenCalledTimes(2);
+    expect(timer.scheduled.filter(entry => !entry.cancelled)).toEqual([]);
   });
 
   it('commits exactly once for rapid alternation, matching the final quiet state', () => {

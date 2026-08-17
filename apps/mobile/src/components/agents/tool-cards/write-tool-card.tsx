@@ -1,36 +1,49 @@
-import { useMemo } from 'react';
 import { View } from 'react-native';
-import { FilePlus } from 'lucide-react-native';
+import { FilePlus } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { SelectableText } from '@/components/ui/selectable-text';
+import { Text } from '@/components/ui/text';
+import { languageForPath } from '@/lib/pr-review/diff/highlight';
 
+import { CodeBlock } from '../code-block';
 import { FixedPartRow } from '../fixed-part-row';
-import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
+import { ReadMarkdownBody } from '../read-markdown-body';
+import { isMarkdownPath } from '../read-tool-markdown';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
-import { buildToolDiffModel } from '../tool-diff-model';
-import { ToolDiffPreview } from '../tool-diff-preview';
+
+const WRITE_CODE_CHARACTER_CAP = 50_000;
 
 /**
- * Sheet body for a write tool part: the diff preview when the model exists,
- * else the content block, plus the error. Renders only inside the detail sheet
- * — attachments and the pending/running status line live in
+ * Sheet body for a write tool part: markdown or highlighted code from
+ * `input.content`, plus the error. Diff preview is gone. Renders only inside
+ * the detail sheet — attachments and the pending/running status line live in
  * `ToolPartDetailBody`.
  */
 export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
+  const filePath = typeof input.filePath === 'string' ? input.filePath : '';
   const content = typeof input.content === 'string' ? input.content : '';
-
   const error = part.state.status === 'error' ? part.state.error : undefined;
-
-  const diffModel = useMemo(() => buildToolDiffModel(part), [part]);
+  const isFinal = part.state.status === 'completed' || part.state.status === 'error';
 
   let body: React.ReactNode = null;
-  if (diffModel) {
-    body = <ToolDiffPreview model={diffModel} partId={part.id} />;
-  } else if (content.length > 0) {
-    body = <MonoScrollBlock content={content} textClassName="text-foreground" />;
+  if (content === '' && !isFinal) {
+    // Pending or running: the write has not finished, so the file is not yet
+    // known to be empty. `ToolPartDetailBody` already shows the status line.
+  } else if (isMarkdownPath(filePath)) {
+    body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
+  } else if (content === '') {
+    body = <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+  } else {
+    body = (
+      <CodeBlock
+        code={content}
+        language={languageForPath(filePath)}
+        maxLength={WRITE_CODE_CHARACTER_CAP}
+      />
+    );
   }
 
   return (

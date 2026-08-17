@@ -135,30 +135,34 @@ describe('classifyCreateSessionResult', () => {
 });
 
 describe('buildCreateRemoteSessionInput', () => {
-  it('returns undefined when every field is empty or absent', () => {
+  it('returns undefined when no fields are provided', () => {
     expect(buildCreateRemoteSessionInput({})).toBeUndefined();
-    expect(buildCreateRemoteSessionInput({ mode: '', model: '', variant: '' })).toBeUndefined();
+    expect(buildCreateRemoteSessionInput({ mode: '' })).toBeUndefined();
   });
 
   it('maps mode to agent when non-empty', () => {
     expect(buildCreateRemoteSessionInput({ mode: 'code' })).toEqual({ agent: 'code' });
   });
 
-  it('maps model to kilo provider modelID without variant when variant is empty', () => {
-    expect(buildCreateRemoteSessionInput({ model: 'kilo-auto/efficient', variant: '' })).toEqual({
-      model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
-    });
-  });
-
-  it('includes variant only when non-empty', () => {
+  it('emits a kilo selection without a variant when the selection has none', () => {
     expect(
       buildCreateRemoteSessionInput({
-        model: 'anthropic/claude-sonnet-4',
-        variant: 'high',
+        selection: { model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' } },
+      })
+    ).toEqual({ model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' } });
+  });
+
+  it('emits a non-kilo selection with its variant', () => {
+    expect(
+      buildCreateRemoteSessionInput({
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'anthropic/claude-sonnet-4' },
+          variant: 'high',
+        },
       })
     ).toEqual({
       model: {
-        providerID: 'kilo',
+        providerID: 'anthropic',
         modelID: 'anthropic/claude-sonnet-4',
         variant: 'high',
       },
@@ -171,12 +175,14 @@ describe('buildCreateRemoteSessionInput', () => {
     });
   });
 
-  it('combines mode, model, variant, and organizationId', () => {
+  it('combines mode, selection, and organizationId', () => {
     expect(
       buildCreateRemoteSessionInput({
         mode: 'plan',
-        model: 'kilo-auto/efficient',
-        variant: 'medium',
+        selection: {
+          model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+          variant: 'medium',
+        },
         organizationId: 'org-xyz',
       })
     ).toEqual({
@@ -188,10 +194,6 @@ describe('buildCreateRemoteSessionInput', () => {
       },
       orgId: 'org-xyz',
     });
-  });
-
-  it('omits model when only variant is set', () => {
-    expect(buildCreateRemoteSessionInput({ variant: 'high' })).toBeUndefined();
   });
 });
 

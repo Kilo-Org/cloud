@@ -3,7 +3,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { resolveVault, resolveVercelContexts, setVaultValue } from './shared.js';
+import {
+  resolveVault,
+  resolveVercelContexts,
+  setVaultValue,
+  stripSurroundingQuotes,
+} from './shared.js';
 
 // These tests mutate shared process.env (PATH and FAKE_OP_*) and restore it in a
 // `finally`. That is only safe because node:test runs the top-level tests in a
@@ -96,6 +101,18 @@ async function captureOpInvocations(existing: boolean): Promise<Invocation[]> {
     rmSync(directory, { recursive: true, force: true });
   }
 }
+
+void test('stripSurroundingQuotes removes one matching outer quote pair', () => {
+  assert.equal(stripSurroundingQuotes('"secret"'), 'secret');
+  assert.equal(stripSurroundingQuotes("'secret'"), 'secret');
+  assert.equal(stripSurroundingQuotes('secret'), 'secret');
+  assert.equal(stripSurroundingQuotes('"already"quoted"'), 'already"quoted');
+  assert.equal(stripSurroundingQuotes('""'), '');
+  assert.equal(stripSurroundingQuotes('"'), '"');
+  assert.equal(stripSurroundingQuotes(`"line\nwith\nnewlines"`), 'line\nwith\nnewlines');
+  assert.equal(stripSurroundingQuotes(`'keeps "inner" double'`), 'keeps "inner" double');
+  assert.equal(stripSurroundingQuotes(`"mismatched'`), `"mismatched'`);
+});
 
 void test('setVaultValue creates an item from a template without sending the secret through stdin', async () => {
   const invocations = await captureOpInvocations(false);

@@ -1,6 +1,8 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { withProcessLockAsync } from '../process-lock';
+import { mapWithConcurrency, resolveEnvSyncConcurrency } from './concurrency';
 import type {
   DevVarsFileChange,
   EnvLocalAutoCreate,
@@ -261,32 +263,56 @@ function applyEnvLocalAutoCreates(creates: EnvLocalAutoCreate[], repoRoot: strin
 // Secrets store creation
 // ---------------------------------------------------------------------------
 
-function createSecretsStoreSecret(
+type WranglerResult = {
+  status: number;
+  stderr: string;
+  stdout: string;
+};
+
+type WranglerRunner = typeof runWrangler;
+
+type ApplyPlanOptions = {
+  concurrency?: number;
+  missingSecretsOnly?: boolean;
+  runWrangler?: WranglerRunner;
+};
+
+function runWrangler(
+  repoRoot: string,
+  workerDir: string,
+  args: string[],
+  input?: string
+): Promise<WranglerResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('pnpm', ['wrangler', ...args], {
+      cwd: path.join(repoRoot, workerDir),
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', chunk => (stdout += chunk));
+    child.stderr.on('data', chunk => (stderr += chunk));
+    child.once('error', reject);
+    child.once('close', code => resolve({ status: code ?? 1, stderr, stdout }));
+    child.stdin.end(input);
+  });
+}
+
+async function createSecretsStoreSecret(
   repoRoot: string,
   workerDir: string,
   storeId: string,
   secretName: string,
-  value: string
-): void {
-  const result = spawnSync(
-    'pnpm',
-    [
-      'wrangler',
-      'secrets-store',
-      'secret',
-      'create',
-      storeId,
-      '--name',
-      secretName,
-      '--scopes',
-      'workers',
-    ],
-    {
-      cwd: path.join(repoRoot, workerDir),
-      encoding: 'utf-8',
-      input: `${value}\n`, // Complete Wrangler's prompt without exposing the value in argv.
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }
+  value: string,
+  runner: WranglerRunner = runWrangler
+): Promise<void> {
+  const result = await runner(
+    repoRoot,
+    workerDir,
+    ['secrets-store', 'secret', 'create', storeId, '--name', secretName, '--scopes', 'workers'],
+    `${value}\n` // Complete Wrangler's prompt without exposing the value in argv.
   );
   if (result.status !== 0) {
     const errorOutput = result.stderr.trim();
@@ -296,25 +322,92 @@ function createSecretsStoreSecret(
   }
 }
 
-function applySecretsStoreAutoCreates(creates: SecretStoreAutoCreate[], repoRoot: string): void {
-  if (creates.length === 0) return;
-
-  console.log('\nCreating secrets store secrets...');
-  for (const create of creates) {
-    createSecretsStoreSecret(
-      repoRoot,
-      create.workerDir,
-      create.binding.store_id,
-      create.binding.secret_name,
-      create.value
-    );
-    console.log(`  ✓ ${create.binding.secret_name}`);
+function resolveWranglerPersistenceDir(repoRoot: string, workerDir: string): string {
+  const wranglerDir = path.join(repoRoot, workerDir, '.wrangler');
+  try {
+    return fs.realpathSync(wranglerDir);
+  } catch {
+    return wranglerDir;
   }
 }
 
-function applyPlan(plan: EnvSyncPlan, repoRoot: string): void {
+async function secretExists(
+  create: SecretStoreAutoCreate,
+  repoRoot: string,
+  runner: WranglerRunner = runWrangler
+): Promise<boolean> {
+  const result = await runner(repoRoot, create.workerDir, [
+    'secrets-store',
+    'secret',
+    'list',
+    create.binding.store_id,
+  ]);
+  if (result.status !== 0) {
+    const errorOutput = result.stderr.trim();
+    throw new Error(
+      `Failed to list Secrets Store secrets for ${create.workerDir}${errorOutput ? `: ${errorOutput}` : ''}`
+    );
+  }
+  return result.stdout.includes(create.binding.secret_name);
+}
+
+async function applySecretsStoreAutoCreates(
+  creates: SecretStoreAutoCreate[],
+  repoRoot: string,
+  options: ApplyPlanOptions = {}
+): Promise<void> {
+  if (creates.length === 0) return;
+
+  console.log('\nCreating secrets store secrets...');
+  const groups = new Map<string, SecretStoreAutoCreate[]>();
+  for (const create of creates) {
+    const persistenceDir = resolveWranglerPersistenceDir(repoRoot, create.workerDir);
+    const group = groups.get(persistenceDir) ?? [];
+    group.push(create);
+    groups.set(persistenceDir, group);
+  }
+
+  await mapWithConcurrency(
+    [...groups.entries()],
+    options.concurrency ?? resolveEnvSyncConcurrency(),
+    async ([persistenceDir, group]) => {
+      const lockPath = path.join(persistenceDir, '.env-sync-secrets.lock');
+      await withProcessLockAsync(
+        lockPath,
+        `Secrets Store for ${group[0]?.workerDir ?? persistenceDir}`,
+        async () => {
+          for (const create of group) {
+            if (
+              options.missingSecretsOnly &&
+              (await secretExists(create, repoRoot, options.runWrangler))
+            ) {
+              console.log(`  ✓ ${create.binding.secret_name} already exists`);
+              continue;
+            }
+            await createSecretsStoreSecret(
+              repoRoot,
+              create.workerDir,
+              create.binding.store_id,
+              create.binding.secret_name,
+              create.value,
+              options.runWrangler
+            );
+            console.log(`  ✓ ${create.binding.secret_name}`);
+          }
+        },
+        30_000
+      );
+    }
+  );
+}
+
+async function applyPlan(
+  plan: EnvSyncPlan,
+  repoRoot: string,
+  options: ApplyPlanOptions = {}
+): Promise<void> {
   // Create secrets store secrets first
-  applySecretsStoreAutoCreates(plan.secretStoreAutoCreates, repoRoot);
+  await applySecretsStoreAutoCreates(plan.secretStoreAutoCreates, repoRoot, options);
 
   for (const change of plan.devVarsChanges) {
     const devVarsPath = path.join(repoRoot, change.workerDir, '.dev.vars');

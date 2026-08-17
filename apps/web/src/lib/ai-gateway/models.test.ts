@@ -2,9 +2,13 @@ import { describe, test, expect } from '@jest/globals';
 import {
   autoFreeModels,
   findKiloExclusiveModel,
+  getKiloExclusiveInferenceProviderRestriction,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
+  preferredModels,
   selectAutoFreeCandidate,
+  shouldRedactErrorResponse,
+  shouldRedactModelNameInMicrodollarUsage,
 } from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
@@ -14,9 +18,11 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
+import { deepseek_v4_pro_discounted_model } from './providers/deepseek';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
+import { longcat_2_free_model } from './providers/longcat';
 import { getRandomNumber } from './getRandomNumber';
 
 describe('rate-limited Kilo-exclusive models', () => {
@@ -82,6 +88,24 @@ describe('isFreeModel', () => {
       expect(autoFreeModels.map(({ model }) => model)).not.toContain(
         tencent_hy3_free_model.public_id
       );
+    });
+
+    test('retains the disabled LongCat 2.0 configuration for later enablement', async () => {
+      expect(kiloExclusiveModels).toContain(longcat_2_free_model);
+      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBeNull();
+      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(false);
+      expect(longcat_2_free_model).toMatchObject({
+        internal_id: 'LongCat-2.0',
+        gateway: 'longcat',
+        context_length: 1_048_756,
+        max_completion_tokens: 131_072,
+        status: 'disabled',
+      });
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
+        longcat_2_free_model.public_id
+      );
+      expect(preferredModels).not.toContain(longcat_2_free_model.public_id);
+      expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBe('openai-compatible');
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
@@ -292,5 +316,71 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('anthropic/claude-sonnet-4')).toBe(
       false
     );
+  });
+});
+
+describe('shouldRedactErrorResponse', () => {
+  test('does not redact errors for custom models', () => {
+    expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
+  });
+
+  test('redacts errors for experiment provider', () => {
+    expect(shouldRedactErrorResponse('experiment', 'some-experiment-model')).toBe(true);
+  });
+
+  test('redacts errors for stealth models regardless of provider', () => {
+    expect(shouldRedactErrorResponse('openrouter', claude_opus_4_7_stealth_model.public_id)).toBe(
+      true
+    );
+    expect(shouldRedactErrorResponse('martian', gpt_5_6_sol_stealth_model.public_id)).toBe(true);
+  });
+
+  test('does not redact errors for regular models and providers', () => {
+    expect(shouldRedactErrorResponse('openrouter', 'anthropic/claude-3.5-sonnet')).toBe(false);
+    expect(shouldRedactErrorResponse('vercel', 'openai/gpt-4o')).toBe(false);
+  });
+});
+
+describe('shouldRedactModelNameInMicrodollarUsage', () => {
+  test('redacts model name for custom provider', () => {
+    expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
+      true
+    );
+  });
+
+  test('redacts model name for experiment provider', () => {
+    expect(shouldRedactModelNameInMicrodollarUsage('experiment', 'some-experiment-model')).toBe(
+      true
+    );
+  });
+
+  test('redacts model name for stealth models', () => {
+    expect(
+      shouldRedactModelNameInMicrodollarUsage('openrouter', claude_opus_4_7_stealth_model.public_id)
+    ).toBe(true);
+  });
+});
+
+describe('getKiloExclusiveInferenceProviderRestriction', () => {
+  test('returns the routing allow-list for restricted exclusive models', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(deepseek_v4_pro_discounted_model.public_id)
+    ).toEqual(new Set(['deepseek']));
+    expect(getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)).toEqual(
+      new Set(['tencent'])
+    );
+  });
+
+  test('does not treat unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_stealth_model.public_id)
+    ).toBeUndefined();
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
+    ).toBeUndefined();
+    expect(
+      getKiloExclusiveInferenceProviderRestriction('deepseek/deepseek-v4-pro')
+    ).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviderRestriction('unknown/model')).toBeUndefined();
   });
 });

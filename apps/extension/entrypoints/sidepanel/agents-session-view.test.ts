@@ -4,230 +4,24 @@
 import { createElement as h, StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
-import type {
-  StandaloneQuestion,
-  StandalonePermission,
-  StoredMessage,
-  UserMessage,
-  AssistantMessage,
-} from '@kilocode/cloud-agent-sdk';
+import type { StandalonePermission, StandaloneQuestion } from '@kilocode/cloud-agent-sdk';
 import { AgentsBlockingCards } from './agents-blocking-cards';
 import { AgentsComposer } from './agents-composer';
-import { AgentsMessageList, toolErrorSummary } from './agents-message-list';
+import { AgentsMessageList } from './agents-message-list';
 
 // ---- AgentsMessageList rendering ----
 
 describe('agents message list rendering', () => {
+  /*
+   * Transcript rendering is covered elsewhere: the pure mapping in
+   * agents-conversation-adapter.test.ts, the shared item markup in
+   * agent-conversation-events.test.tsx, and the composed result in the Chrome
+   * E2E (tests/e2e/agents-mode.test.ts). The virtualizer produces no rows
+   * under jsdom, so no unit test asserts message text through AgentsMessageList.
+   */
   it('renders empty state when no messages', () => {
     const { container } = render(h(AgentsMessageList, { messages: [] }));
     expect(container.textContent).toContain('No messages yet');
-  });
-
-  it('renders user message as right-aligned', () => {
-    const messages: StoredMessage[] = [
-      {
-        info: {
-          id: 'msg-1',
-          sessionID: 'ses-1',
-          role: 'user',
-          time: { created: 1000 },
-          agent: '',
-          model: { providerID: 'kilo', modelID: 'test' },
-        } satisfies UserMessage,
-        parts: [
-          {
-            id: 'p-1',
-            sessionID: 'ses-1',
-            messageID: 'msg-1',
-            type: 'text' as const,
-            text: 'Hello',
-          },
-        ],
-      },
-    ];
-
-    const { container } = render(h(AgentsMessageList, { messages }));
-    expect(container.querySelector('.justify-end')).not.toBeNull();
-    expect(container.textContent).toContain('Hello');
-  });
-
-  it('renders assistant message as left-aligned markdown', () => {
-    const messages: StoredMessage[] = [
-      {
-        info: {
-          id: 'msg-2',
-          sessionID: 'ses-1',
-          role: 'assistant',
-          time: { created: 2000, completed: 2000 },
-          parentID: 'msg-1',
-          modelID: 'test',
-          providerID: 'kilo',
-          mode: 'code',
-          agent: '',
-          path: { cwd: '/', root: '/' },
-          cost: 0,
-          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        } satisfies AssistantMessage,
-        parts: [
-          {
-            id: 'p-2',
-            sessionID: 'ses-1',
-            messageID: 'msg-2',
-            type: 'text' as const,
-            text: '**bold**',
-          },
-        ],
-      },
-    ];
-
-    const { container } = render(h(AgentsMessageList, { messages }));
-    expect(container.querySelector('strong')).not.toBeNull();
-  });
-
-  it('renders tool parts as name + status row', () => {
-    const messages: StoredMessage[] = [
-      {
-        info: {
-          id: 'msg-3',
-          sessionID: 'ses-1',
-          role: 'assistant',
-          time: { created: 3000 },
-          parentID: 'msg-2',
-          modelID: 'test',
-          providerID: 'kilo',
-          mode: 'code',
-          agent: '',
-          path: { cwd: '/', root: '/' },
-          cost: 0,
-          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        } satisfies AssistantMessage,
-        parts: [
-          {
-            id: 'p-3',
-            sessionID: 'ses-1',
-            messageID: 'msg-3',
-            type: 'tool' as const,
-            callID: 'call-1',
-            tool: 'read_file',
-            state: {
-              status: 'completed' as const,
-              input: {},
-              output: '',
-              title: '',
-              metadata: {},
-              time: { start: 3000, end: 3100 },
-            },
-          },
-        ],
-      },
-    ];
-
-    const { container } = render(h(AgentsMessageList, { messages }));
-    expect(container.textContent).toContain('read_file');
-    expect(container.textContent).toContain('completed');
-  });
-
-  it("shows the tool's own title and surfaces a failed tool's reason", () => {
-    const info = {
-      id: 'msg-tool',
-      sessionID: 'ses-1',
-      role: 'assistant',
-      time: { created: 3000, completed: 3200 },
-      parentID: 'msg-2',
-      modelID: 'test',
-      providerID: 'kilo',
-      mode: 'code',
-      agent: '',
-      path: { cwd: '/', root: '/' },
-      cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    } satisfies AssistantMessage;
-    const messages: StoredMessage[] = [
-      {
-        info,
-        parts: [
-          {
-            id: 'p-ok',
-            sessionID: 'ses-1',
-            messageID: 'msg-tool',
-            type: 'tool' as const,
-            callID: 'call-ok',
-            tool: 'read',
-            state: {
-              status: 'completed' as const,
-              input: {},
-              output: 'contents',
-              title: 'README.md',
-              metadata: {},
-              time: { start: 3000, end: 3100 },
-            },
-          },
-          {
-            id: 'p-err',
-            sessionID: 'ses-1',
-            messageID: 'msg-tool',
-            type: 'tool' as const,
-            callID: 'call-err',
-            tool: 'read',
-            state: {
-              status: 'error' as const,
-              input: {},
-              error: 'ENOENT: no such file or directory\n    at open (fs.js:1)',
-              time: { start: 3100, end: 3150 },
-            },
-          },
-        ],
-      },
-    ];
-
-    const { container } = render(h(AgentsMessageList, { messages }));
-    // The title says which file, so the row is not just "read completed".
-    expect(container.textContent).toContain('README.md');
-    // A failed tool states its reason instead of a bare "error".
-    expect(container.textContent).toContain('ENOENT: no such file or directory');
-    // The stack frame is dropped.
-    expect(container.textContent).not.toContain('at open (fs.js:1)');
-  });
-
-  it('hides reasoning parts on a completed message and shows the tail while streaming', () => {
-    const completedInfo = {
-      id: 'msg-4',
-      sessionID: 'ses-1',
-      role: 'assistant',
-      time: { created: 4000, completed: 4000 },
-      parentID: 'msg-3',
-      modelID: 'test',
-      providerID: 'kilo',
-      mode: 'code',
-      agent: '',
-      path: { cwd: '/', root: '/' },
-      cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    } satisfies AssistantMessage;
-    const reasoningParts = [
-      {
-        id: 'p-4',
-        sessionID: 'ses-1',
-        messageID: 'msg-4',
-        type: 'reasoning' as const,
-        text: 'Let me think...',
-        time: { start: 4000, end: 4100 },
-      },
-    ];
-    const messages: StoredMessage[] = [{ info: completedInfo, parts: reasoningParts }];
-
-    // Completed message: reasoning is noise and stays hidden.
-    const { container } = render(h(AgentsMessageList, { messages }));
-    expect(container.textContent).not.toContain('Reasoning');
-
-    // Streaming message: the trailing reasoning part renders as a live label.
-    const streamingInfo = {
-      ...completedInfo,
-      time: { created: 4000 },
-    } satisfies AssistantMessage;
-    const streaming: StoredMessage[] = [{ info: streamingInfo, parts: reasoningParts }];
-    const { container: streamingContainer } = render(h(AgentsMessageList, { messages: streaming }));
-    expect(streamingContainer.textContent).toContain('Reasoning');
   });
 });
 
@@ -292,6 +86,57 @@ describe('agents composer rendering', () => {
       })
     );
     expect(container.textContent).toContain('Stop');
+  });
+
+  it('enables Send while streaming when canSend is true and the draft is non-empty', () => {
+    const { container } = render(
+      h(AgentsComposer, {
+        canSend: true,
+        canInterrupt: true,
+        isStreaming: true,
+        isReadOnly: false,
+        isLoading: false,
+        onSend: () => {},
+        onStop: () => {},
+      })
+    );
+    const textarea = container.querySelector('textarea');
+    expect(textarea).not.toBeNull();
+    fireEvent.change(textarea!, { target: { value: 'hello' } });
+
+    const sendBtn = [...container.querySelectorAll('button')].find(
+      b => b.textContent === 'Send message'
+    );
+    expect(sendBtn).not.toBeNull();
+    expect(sendBtn!.getAttribute('disabled')).toBeNull();
+
+    const stopBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Stop');
+    expect(stopBtn).not.toBeNull();
+    expect(stopBtn!.getAttribute('disabled')).toBeNull();
+  });
+
+  it('disables Send while streaming with a blank draft and keeps Stop enabled', () => {
+    const { container } = render(
+      h(AgentsComposer, {
+        canSend: true,
+        canInterrupt: true,
+        isStreaming: true,
+        isReadOnly: false,
+        isLoading: false,
+        onSend: () => {},
+        onStop: () => {},
+      })
+    );
+
+    const sendBtn = [...container.querySelectorAll('button')].find(
+      b => b.textContent === 'Send message'
+    );
+    expect(sendBtn).not.toBeNull();
+    expect(sendBtn!.getAttribute('disabled')).not.toBeNull();
+
+    const stopBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Stop');
+    expect(stopBtn).not.toBeNull();
+    expect(stopBtn!.getAttribute('disabled')).toBeNull();
   });
 
   it('renders Stop button when isStreaming is true regardless of canSend', () => {
@@ -1601,25 +1446,5 @@ describe('agents session view integration', () => {
     expect(mockManager.destroy).toHaveBeenCalledOnce();
 
     vi.useRealTimers();
-  });
-});
-
-describe('toolErrorSummary helper', () => {
-  it('returns a short single-line error unchanged', () => {
-    expect(toolErrorSummary('ENOENT: no such file')).toBe('ENOENT: no such file');
-  });
-
-  it('keeps only the first meaningful line of a stack trace', () => {
-    expect(toolErrorSummary('\n  Error: boom\n    at foo (bar.ts:1)\n')).toBe('Error: boom');
-  });
-
-  it('clamps a very long line so the transcript stays readable', () => {
-    const summary = toolErrorSummary('x'.repeat(500));
-    expect(summary).toHaveLength(201);
-    expect(summary.endsWith('…')).toBe(true);
-  });
-
-  it('returns an empty string for whitespace-only errors', () => {
-    expect(toolErrorSummary('   \n  ')).toBe('');
   });
 });

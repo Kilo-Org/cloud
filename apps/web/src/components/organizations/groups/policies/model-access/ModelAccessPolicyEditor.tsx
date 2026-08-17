@@ -307,7 +307,7 @@ export function ModelAccessPolicyEditor({
           </Tabs>
         )}
         <p className="type-label text-muted-foreground">
-          Direct BYOK models and custom LLMs remain available organization-wide.
+          Direct BYOK models remain available organization-wide.
         </p>
       </div>
       <PolicyEditorFooter

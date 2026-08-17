@@ -7,9 +7,11 @@
     ".": "./src/index.ts",
     "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
     "./gitlab-credential": "./src/gitlab-credential.ts",
+    "./slack-credential": "./src/slack-credential.ts",
     "./internal-service-token-audiences": "./src/internal-service-token-audiences.ts",
     "./instance-id": "./src/instance-id.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
+    "./kilo-token": "./src/kilo-token.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
@@ -32,7 +34,8 @@
     "./client-error": "./src/client-error.ts",
     "./review-agents": "./src/review-agents.ts",
     "./code-review-council": "./src/code-review-council.ts",
-    "./scheduled-job-observability": "./src/scheduled-job-observability.ts"
+    "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
+    "./r2-client": "./src/r2-client.ts"
   },
   "scripts": {
     "test": "vitest run",

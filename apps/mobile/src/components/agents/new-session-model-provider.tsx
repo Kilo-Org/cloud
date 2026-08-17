@@ -12,7 +12,6 @@ import {
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { resolvePrefillModel } from '@/components/agents/new-session-prefill';
 import { useNewSessionPrefill } from '@/components/agents/use-new-session-prefill';
-import { RemoteSpawnInheritanceProvider } from '@/components/agents/use-remote-spawn-dispatch';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 
@@ -63,8 +62,6 @@ export function NewSessionModelProvider({
   );
 
   return (
-    <RemoteSpawnInheritanceProvider mode={mode} model={model} variant={variant}>
-      <NewSessionModelContext.Provider value={state}>{children}</NewSessionModelContext.Provider>
-    </RemoteSpawnInheritanceProvider>
+    <NewSessionModelContext.Provider value={state}>{children}</NewSessionModelContext.Provider>
   );
 }

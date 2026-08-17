@@ -58,14 +58,17 @@ export function AvailableProductCard({
   return (
     <Card className="border-border/60 relative flex h-full flex-col p-4 text-left shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-start gap-2">
           <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-lg">
             {icon}
           </div>
-          <h3 className="truncate text-sm font-semibold">{title}</h3>
+          <h3 className="min-w-0 text-sm leading-5 font-semibold text-pretty">{title}</h3>
         </div>
         {status ? (
-          <Badge variant="secondary-outline" className="text-muted-foreground rounded-full px-3">
+          <Badge
+            variant="secondary-outline"
+            className="text-muted-foreground shrink-0 rounded-full px-3"
+          >
             {status}
           </Badge>
         ) : null}

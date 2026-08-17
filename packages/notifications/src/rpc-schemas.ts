@@ -283,6 +283,7 @@ export const internalDispatchSecurityFindingRequestSchema = z.object({
   severity: z.string().min(1),
   repoFullName: z.string().min(1),
   title: z.string().min(1),
+  ghsaId: z.string().min(1).nullable().optional(),
 });
 export type InternalDispatchSecurityFindingRequest = z.infer<
   typeof internalDispatchSecurityFindingRequestSchema

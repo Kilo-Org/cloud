@@ -5,7 +5,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useRouter } from 'expo-router';
-import { RefreshCw, Settings, ShieldAlert } from 'lucide-react-native';
+import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { toast } from 'sonner-native';

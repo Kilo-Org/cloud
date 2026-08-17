@@ -424,6 +424,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   if (hasConstraints || configuredPool !== null) {
     capabilities = await getModelCapabilities(c.env, {
       codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
+      waitUntil: promise => c.executionCtx.waitUntil(promise),
       ...(configuredPool !== null
         ? { additionalModelIds: configuredPool.map(entry => entry.model) }
         : {}),

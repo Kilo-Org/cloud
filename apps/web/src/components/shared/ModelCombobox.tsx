@@ -64,6 +64,8 @@ export type ModelComboboxProps = {
    * cannot be scrolled.
    */
   modal?: boolean;
+  /** Optional aria-label for the trigger button, overriding the default accessible name */
+  triggerAriaLabel?: string;
 };
 
 export function ModelCombobox({
@@ -85,6 +87,7 @@ export function ModelCombobox({
   disabled = false,
   pinnedModel,
   modal = false,
+  triggerAriaLabel,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -128,6 +131,7 @@ export function ModelCombobox({
               type="button"
               variant="outline"
               size="sm"
+              aria-label={triggerAriaLabel}
               className={cn('h-9 border-red-400/50 text-red-400', className)}
               disabled
             >
@@ -159,6 +163,7 @@ export function ModelCombobox({
           type="button"
           variant="outline"
           size="sm"
+          aria-label={triggerAriaLabel}
           className={cn('text-muted-foreground h-9', className)}
           disabled
         >
@@ -194,6 +199,7 @@ export function ModelCombobox({
             variant="outline"
             size="sm"
             role="combobox"
+            aria-label={triggerAriaLabel}
             aria-expanded={open}
             disabled={disabled}
             className={cn('h-9 justify-between gap-1.5', className)}
@@ -256,6 +262,7 @@ export function ModelCombobox({
             type="button"
             variant="outline"
             role="combobox"
+            aria-label={triggerAriaLabel}
             aria-expanded={open}
             disabled={disabled}
             className={cn('w-full justify-between', className)}

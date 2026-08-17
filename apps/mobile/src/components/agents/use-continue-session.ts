@@ -2,19 +2,20 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from 'jotai';
 import { toast } from 'sonner-native';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
+import { listInstanceModels } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 
 import {
   buildContinuationSeed,
+  buildContinueRemoteSpawnInput,
   type ContinuationDestination,
   resolveContinuationDestinations,
-  resolveContinueRemoteModel,
 } from '@/components/agents/continuation-seed';
+import { setContinuePickerBridge } from '@/components/agents/continue-picker-bridge';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import {
@@ -27,12 +28,11 @@ import {
   getSpawnedAgentSessionPath,
 } from '@/components/agents/session-detail-routes';
 import { type useSessionManager } from '@/components/agents/session-provider';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { putSharePayload } from '@/lib/share-payload';
 import { appendShareParams } from '@/lib/share-navigation';
-import {
-  buildCreateRemoteSessionInput,
-  useRemoteInstanceSpawn,
-} from '@/lib/hooks/use-remote-instance-spawn';
+import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
@@ -51,7 +51,7 @@ type InstancesResult = RouterOutputs['activeSessions']['listInstances'];
 export function useContinueSession(args: {
   organizationId: string | undefined;
   manager: ReturnType<typeof useSessionManager>;
-  models: { id: string; variants: string[] }[];
+  models: SessionModelOption[];
   modelsLoading: boolean;
 }): {
   continueSession: (input: {
@@ -66,7 +66,7 @@ export function useContinueSession(args: {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const store = useStore();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const connection = useUserWebConnection();
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);
@@ -170,23 +170,25 @@ export function useContinueSession(args: {
           }
           return;
         }
-        const remoteModel = resolveContinueRemoteModel(fields.model, fields.variant, args.models);
         const remoteOperationKeyValue = remoteOperationKey.getKey(
           JSON.stringify({
             connectionId: dest.instance.connectionId,
             seed,
-            model: remoteModel.model || undefined,
-            variant: remoteModel.variant || undefined,
+            model: fields.model,
+            variant: fields.variant,
             mode: fields.mode,
             organizationId: args.organizationId ?? null,
           })
         );
+        const catalogResult = await listInstanceModels(connection, dest.instance.connectionId);
         const outcome = await spawn(
           dest.instance.connectionId,
-          buildCreateRemoteSessionInput({
+          buildContinueRemoteSpawnInput({
             mode: fields.mode,
-            model: remoteModel.model,
-            variant: remoteModel.variant,
+            model: fields.model,
+            variant: fields.variant,
+            options: args.models,
+            catalogResult,
             organizationId: args.organizationId,
           }),
           { operationKey: remoteOperationKeyValue }
@@ -219,7 +221,15 @@ export function useContinueSession(args: {
         setIsContinuing(false);
       }
     },
-    [args.organizationId, args.models, router, runCloudCreate, spawn, remoteOperationKey]
+    [
+      args.organizationId,
+      args.models,
+      connection,
+      router,
+      runCloudCreate,
+      spawn,
+      remoteOperationKey,
+    ]
   );
 
   const fallback = useCallback(
@@ -330,30 +340,18 @@ export function useContinueSession(args: {
         }
 
         handedOff = true;
-        const labels = destinations.map(d =>
-          d.kind === 'cloud-agent' ? 'Cloud Agent' : d.instance.name
-        );
-        showActionSheetWithOptions(
-          {
-            title: 'Continue in a new session',
-            options: [...labels, 'Cancel'],
-            cancelButtonIndex: labels.length,
-          },
-          selected => {
-            if (selected === undefined || selected >= labels.length) {
-              busyRef.current = false;
-              setIsContinuing(false);
-              return;
-            }
-            const dest = destinations[selected];
-            if (!dest) {
-              busyRef.current = false;
-              setIsContinuing(false);
-              return;
-            }
+        const release = () => {
+          busyRef.current = false;
+          setIsContinuing(false);
+        };
+        setContinuePickerBridge({
+          destinations,
+          onSelect: dest => {
             void execute(dest, seed, fields);
-          }
-        );
+          },
+          onCancel: release,
+        });
+        router.push('/(app)/agent-chat/continue-picker' as Href);
       } finally {
         if (!handedOff) {
           busyRef.current = false;
@@ -371,7 +369,7 @@ export function useContinueSession(args: {
       queryClient,
       trpc,
       execute,
-      showActionSheetWithOptions,
+      router,
     ]
   );
 

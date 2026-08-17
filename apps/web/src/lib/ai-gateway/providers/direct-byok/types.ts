@@ -1,6 +1,10 @@
 import * as z from 'zod';
 import type { DirectByokProviderMetaId } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
-import type { GatewayChatApiKind, TransformRequestContext } from '@/lib/ai-gateway/providers/types';
+import type {
+  GatewayChatApiKind,
+  ProviderApiUrlOverrides,
+  TransformRequestContext,
+} from '@/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';
 import { OpenCodeVariantSchema } from '@kilocode/db/schema-types';
 
@@ -24,6 +28,7 @@ export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 export type DirectByokProvider = {
   id: DirectByokProviderMetaId;
   base_url: string;
+  base_url_overrides: ProviderApiUrlOverrides;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
   supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
   default_ai_sdk_provider: CustomLlmProvider;

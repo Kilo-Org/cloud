@@ -74,7 +74,13 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
   return {
     userId,
     presenceContext: null,
-    idempotencyKey: `security-finding:${input.notificationId}`,
+    // Sibling finding rows for one advisory (per manifest, per scope) must
+    // collapse to one push per recipient; the DO instance is already per
+    // recipient. `notificationKind` stays in the key so `new_finding` and SLA
+    // pushes stay distinct.
+    idempotencyKey: input.ghsaId
+      ? `security-finding:${input.repoFullName}:${input.ghsaId}:${input.notificationKind}`
+      : `security-finding:${input.notificationId}`,
     badge: null,
     push: {
       title,

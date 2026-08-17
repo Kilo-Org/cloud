@@ -77,6 +77,10 @@ const stringifyToolValue = (value: unknown): string => {
 const getToolCallDetail = (
   event: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>
 ): string | undefined => {
+  if ('source' in event) {
+    return stringifyToolValue(event.arguments);
+  }
+
   if (event.name === 'eval') {
     return event.code;
   }
@@ -168,6 +172,8 @@ export const compactConversationEvents = async ({
 
   const completion = await fetchKiloGatewayChatCompletionStream({
     apiBaseUrl,
+    // A long conversation legitimately takes long to summarize.
+    completionTimeoutMs: 300_000,
     fetch,
     messages: buildSummarizationMessages(toSummarize),
     model,

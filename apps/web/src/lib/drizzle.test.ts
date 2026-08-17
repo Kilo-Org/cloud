@@ -1,4 +1,10 @@
-import { pool, db, selectReplicaUrl } from '@/lib/drizzle';
+import {
+  pool,
+  db,
+  selectReplicaUrl,
+  selectUsageReplicaUrl,
+  shouldExitOnPoolError,
+} from '@/lib/drizzle';
 
 describe('drizzle', () => {
   describe('pool', () => {
@@ -32,6 +38,24 @@ describe('drizzle', () => {
       } finally {
         consoleSpy.mockRestore();
       }
+    });
+
+    it('exits on a primary pool error outside test mode', () => {
+      // A dead primary pool means the process cannot serve traffic at all.
+      expect(shouldExitOnPoolError('primary', 'production')).toBe(true);
+    });
+
+    it('does not exit on a replica pool error outside test mode', () => {
+      // Regression guard: exiting here escalated a replica-only outage into 107
+      // instance terminations on 2026-08-12 while the primary was healthy.
+      // The replica is a read-path optimisation with a primary fallback, so a
+      // broken replica must degrade reads rather than kill the process.
+      expect(shouldExitOnPoolError('replica', 'production')).toBe(false);
+    });
+
+    it('never exits in test mode, so pool.end() cleanup cannot kill the runner', () => {
+      expect(shouldExitOnPoolError('primary', 'test')).toBe(false);
+      expect(shouldExitOnPoolError('replica', 'test')).toBe(false);
     });
   });
 
@@ -86,6 +110,39 @@ describe('drizzle', () => {
           random: () => 0.75,
         })
       ).toBe('postgres://eu-2');
+    });
+
+    it('uses the dedicated usage replica when configured', () => {
+      expect(
+        selectUsageReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'production',
+          usageReplicaUrl: 'postgres://eu-2',
+          fallbackReplicaUrl: 'postgres://eu-1',
+        })
+      ).toBe('postgres://eu-2');
+    });
+
+    it('falls back to the standard replica when the usage replica is unset', () => {
+      expect(
+        selectUsageReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'production',
+          usageReplicaUrl: undefined,
+          fallbackReplicaUrl: 'postgres://eu-1',
+        })
+      ).toBe('postgres://eu-1');
+    });
+
+    it('uses the primary for usage reads in local development', () => {
+      expect(
+        selectUsageReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'development',
+          usageReplicaUrl: 'postgres://eu-2',
+          fallbackReplicaUrl: 'postgres://eu-1',
+        })
+      ).toBe(primaryUrl);
     });
 
     it('falls back to the primary when the regional replica is unavailable', () => {

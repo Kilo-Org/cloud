@@ -267,6 +267,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
       severity: 'high',
       repoFullName: 'acme/api',
       title: 'Prototype Pollution in lodash',
+      ghsaId: 'GHSA-aaaa-bbbb-cccc',
     });
   });
 
@@ -289,6 +290,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
       severity: 'high',
       repoFullName: 'acme/api',
       title: 'Prototype Pollution in lodash',
+      ghsaId: 'GHSA-aaaa-bbbb-cccc',
     });
   });
 

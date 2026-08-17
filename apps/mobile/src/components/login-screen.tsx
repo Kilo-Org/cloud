@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { ExternalLink } from 'lucide-react-native';
+import { ExternalLink } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,

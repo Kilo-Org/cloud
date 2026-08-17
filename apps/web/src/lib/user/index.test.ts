@@ -64,6 +64,7 @@ import {
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_notification_preferences,
+  user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
   agent_environment_profiles,
@@ -90,6 +91,8 @@ import {
   platform_integrations,
   model_eval_ingestions,
   microdollar_usage,
+  microdollar_usage_metadata,
+  system_prompt_prefix,
   model_experiment,
   model_experiment_variant,
   model_experiment_variant_version,
@@ -115,6 +118,9 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  user_data_exports,
+  user_data_export_parts,
+  user_data_export_outbox,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -170,6 +176,9 @@ describe('User', () => {
     await db.delete(deployments_ephemeral);
     await db.delete(operation_ledgers);
     await db.delete(analytics_event_outbox);
+    await db.delete(user_data_export_parts);
+    await db.delete(user_data_export_outbox);
+    await db.delete(user_data_exports);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -226,6 +235,7 @@ describe('User', () => {
     await db.delete(model_experiment_variant_version);
     await db.delete(model_experiment_variant);
     await db.delete(model_experiment);
+    await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
     await db.delete(cloud_agent_feedback);
@@ -938,6 +948,133 @@ describe('User', () => {
           .from(analytics_event_outbox)
           .where(eq(analytics_event_outbox.id, otherOutbox.id))
       ).toHaveLength(1);
+    });
+
+    it('deletes user data export state and dependent multipart and outbox rows', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+          r2_object_key: `exports/${crypto.randomUUID()}/kilo-data-export.jsonl.gz`,
+        })
+        .returning();
+      if (!exportJob) throw new Error('Failed to create user data export');
+
+      await db.insert(user_data_export_parts).values({
+        export_id: exportJob.id,
+        part_number: 1,
+        etag: 'part-etag',
+        size_bytes: 1,
+      });
+      await db.insert(user_data_export_outbox).values({
+        export_id: exportJob.id,
+        generation: 0,
+        operation: 'generate',
+      });
+
+      await softDeleteUser(user.id);
+      if (!exportJob.r2_object_key) throw new Error('Export object key was not created');
+
+      expect(
+        await db.select().from(user_data_exports).where(eq(user_data_exports.id, exportJob.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_parts)
+          .where(eq(user_data_export_parts.export_id, exportJob.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_object_deletions)
+          .where(eq(user_data_export_object_deletions.object_key, exportJob.r2_object_key))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(user_data_export_outbox)
+          .where(eq(user_data_export_outbox.export_id, exportJob.id))
+      ).toHaveLength(0);
+    });
+
+    it('preserves in-flight multipart details for Worker cleanup', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+          multipart_upload_id: 'multipart-upload-id',
+          next_part_number: 2,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(tombstone?.multipart_upload_id).toBe('multipart-upload-id');
+    });
+
+    it('creates a deterministic cleanup tombstone before an export starts uploading', async () => {
+      const user = await insertTestUser();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({ kilo_user_id: user.id, snapshot_at: new Date().toISOString() })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(tombstone).toMatchObject({ multipart_upload_id: null });
+    });
+
+    it('delays deterministic object cleanup until an active export lease expires', async () => {
+      const user = await insertTestUser();
+      const leaseExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const [exportJob] = await db
+        .insert(user_data_exports)
+        .values({
+          kilo_user_id: user.id,
+          snapshot_at: new Date().toISOString(),
+          status: 'processing',
+          lease_token: crypto.randomUUID(),
+          lease_expires_at: leaseExpiresAt,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(user_data_export_object_deletions)
+        .where(
+          eq(
+            user_data_export_object_deletions.object_key,
+            `exports/${exportJob.id}/kilo-data-export.jsonl.gz`
+          )
+        );
+      expect(new Date(tombstone?.available_at ?? '').toISOString()).toBe(
+        new Date(leaseExpiresAt).toISOString()
+      );
     });
 
     it('anonymizes recommendation dismissal actor references', async () => {
@@ -2677,6 +2814,96 @@ describe('User', () => {
 
       expect(anonymized?.promoterEmail).toBe(`deleted+${promoter.id}@deleted.invalid`);
       expect(retained?.promoterEmail).toBe(otherPromoter.google_user_email);
+    });
+
+    it('should nullify user_prompt_prefix and system_prompt_prefix_id in microdollar_usage_metadata for soft-deleted user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      const [spp] = await db
+        .insert(system_prompt_prefix)
+        .values({ system_prompt_prefix: `Test system prompt prefix ${randomUUID()}` })
+        .returning({ id: system_prompt_prefix.system_prompt_prefix_id });
+      if (!spp) throw new Error('Failed to insert system prompt prefix');
+
+      const user1UsageId = randomUUID();
+      const user2UsageId = randomUUID();
+
+      await db.insert(microdollar_usage).values([
+        {
+          id: user1UsageId,
+          kilo_user_id: user1.id,
+          cost: 1000,
+          input_tokens: 100,
+          output_tokens: 50,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: new Date().toISOString(),
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet',
+          has_error: false,
+        },
+        {
+          id: user2UsageId,
+          kilo_user_id: user2.id,
+          cost: 2000,
+          input_tokens: 200,
+          output_tokens: 100,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: new Date().toISOString(),
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet',
+          has_error: false,
+        },
+      ]);
+
+      await db.insert(microdollar_usage_metadata).values([
+        {
+          id: user1UsageId,
+          message_id: 'msg-1',
+          user_prompt_prefix: 'My private user prompt prefix 1',
+          system_prompt_prefix_id: spp.id,
+          system_prompt_length: 500,
+          max_tokens: 4096,
+          latency: 1.25,
+        },
+        {
+          id: user2UsageId,
+          message_id: 'msg-2',
+          user_prompt_prefix: 'My private user prompt prefix 2',
+          system_prompt_prefix_id: spp.id,
+          system_prompt_length: 500,
+          max_tokens: 4096,
+          latency: 2.5,
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      const [user1Meta] = await db
+        .select()
+        .from(microdollar_usage_metadata)
+        .where(eq(microdollar_usage_metadata.id, user1UsageId));
+      expect(user1Meta).toBeDefined();
+      expect(user1Meta?.user_prompt_prefix).toBeNull();
+      expect(user1Meta?.system_prompt_prefix_id).toBeNull();
+      expect(user1Meta?.max_tokens).toBe(4096);
+      expect(user1Meta?.latency).toBe(1.25);
+
+      const [user2Meta] = await db
+        .select()
+        .from(microdollar_usage_metadata)
+        .where(eq(microdollar_usage_metadata.id, user2UsageId));
+      expect(user2Meta).toBeDefined();
+      expect(user2Meta?.user_prompt_prefix).toBe('My private user prompt prefix 2');
+      expect(user2Meta?.system_prompt_prefix_id).toBe(spp.id);
+
+      const [retainedSpp] = await db
+        .select()
+        .from(system_prompt_prefix)
+        .where(eq(system_prompt_prefix.system_prompt_prefix_id, spp.id));
+      expect(retainedSpp).toBeDefined();
     });
 
     it('should anonymize kiloclaw admin audit logs where user is target', async () => {

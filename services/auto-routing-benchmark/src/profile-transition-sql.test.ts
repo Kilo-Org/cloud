@@ -20,6 +20,8 @@ const SCHEMA_SQL = `
     requested_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT,
+    platform_requested INTEGER NOT NULL DEFAULT 0,
+    user_requested INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (model, variant, engine_identity, repetitions)
   );
 `;

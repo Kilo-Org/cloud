@@ -1,7 +1,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
-import { MessageSquare, MoreVertical } from 'lucide-react-native';
+import { MessageSquare, MoreVertical } from '@/components/ui/icons';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

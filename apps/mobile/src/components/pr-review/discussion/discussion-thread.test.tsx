@@ -59,7 +59,7 @@ vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
 }));
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   CheckCheck: 'CheckCheck',
   ChevronDown: 'ChevronDown',

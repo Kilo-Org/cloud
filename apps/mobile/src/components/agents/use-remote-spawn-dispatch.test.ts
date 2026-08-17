@@ -1,6 +1,6 @@
-/* eslint-disable max-lines -- spawn input-chain suite pins key reuse/rotation in one coherent run. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
@@ -8,32 +8,18 @@ import {
   peekSharePayload,
   type SharePayload,
 } from '@/lib/share-payload';
-import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { UserWebCommandError } from '@kilocode/cloud-agent-sdk/user-web-connection';
-import {
-  buildCreateRemoteSessionInput,
-  type CreateSessionOutcome,
-} from '@/lib/hooks/remote-instance-spawn-classifier';
+import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
 
-import {
-  RemoteSpawnInheritanceProvider,
-  useRemoteSpawnDispatch,
-} from './use-remote-spawn-dispatch';
+import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
-  vi.fn(
-    async (
-      _connectionId: string,
-      _opts?: unknown,
-      _options?: unknown
-    ): Promise<CreateSessionOutcome> => {
-      await Promise.resolve();
-      return {
-        status: 'ready',
-        sessionID: 'ses_12345678901234567890123456' as KiloSessionId,
-      };
-    }
-  )
+  vi.fn(async () => {
+    await Promise.resolve();
+    return {
+      status: 'ready' as const,
+      sessionID: 'ses_12345678901234567890123456',
+    };
+  })
 );
 
 const useRemoteInstanceSpawnMock = vi.hoisted(() =>
@@ -53,15 +39,7 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 
-vi.mock('expo-crypto', () => {
-  let n = 0;
-  return {
-    randomUUID: () => {
-      n += 1;
-      return `uuid-${n}`;
-    },
-  };
-});
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'share-id-fixed' }));
 
 vi.mock('expo-file-system/legacy', () => ({
   cacheDirectory: null,
@@ -86,7 +64,6 @@ type ReactInternals = {
 
 type HookDispatcher = {
   useCallback: <T>(callback: T, _deps?: unknown) => T;
-  useContext: <T>(context: React.Context<T>) => T;
   useEffect: (effect: React.EffectCallback, _deps?: unknown) => void;
   useMemo: <T>(factory: () => T, _deps?: unknown) => T;
   useRef: <T>(initial: T) => { current: T };
@@ -103,20 +80,34 @@ const INSTANCE: InstancePickerInstance = {
 const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
 
 /**
+ * Runs `onStart` and returns the arguments the spawn mock was called with.
+ * Extracts the wait-and-capture boilerplate shared by the spawn-input tests.
+ */
+async function captureSpawnCall(onStart: () => void) {
+  onStart();
+  await vi.waitFor(() => {
+    expect(spawnMock).toHaveBeenCalled();
+  });
+  return spawnMock.mock.calls[0];
+}
+
+/** Runs `onStart` and waits for the ready-path navigation to the spawned session. */
+async function runStartAndWaitForReplace(onStart: () => void) {
+  onStart();
+  await vi.waitFor(() => {
+    expect(routerReplace).toHaveBeenCalled();
+  });
+}
+
+/**
  * Minimal React hook runner. Mirrors the fake-dispatcher pattern in
  * `use-interaction-handlers.test.ts` so we can exercise
  * `useRemoteSpawnDispatch` without pulling react-native into vitest.
  */
-function runHookWithProvider(args: {
+function runHook(args: {
   organizationId: string | undefined;
   mode?: string;
-  model?: string;
-  variant?: string;
-  /** When false, omit the Provider — inheritance must not leak fields. */
-  withProvider?: boolean;
-  providerMode?: string;
-  providerModel?: string;
-  providerVariant?: string;
+  selection?: ModelSelection;
   getSubmitPayload?: () => SharePayload | null;
 }) {
   const reactInternals = React as typeof React & ReactInternals;
@@ -124,17 +115,11 @@ function runHookWithProvider(args: {
   const refs: { current: unknown }[] = [];
   let hookIndex = 0;
   let refIndex = 0;
-  let contextValue: { mode?: string; model?: string; variant?: string } = {};
 
   const dispatcher: HookDispatcher = {
     useCallback: hookCallback => {
       hookIndex += 1;
       return hookCallback;
-    },
-    useContext: context => {
-      hookIndex += 1;
-      void context;
-      return contextValue as never;
     },
     useEffect: effect => {
       hookIndex += 1;
@@ -153,9 +138,7 @@ function runHookWithProvider(args: {
     useState: initialValue => {
       const stateIndex = hookIndex;
       hookIndex += 1;
-      if (hookState[stateIndex] === undefined) {
-        hookState[stateIndex] = initialValue;
-      }
+      hookState[stateIndex] ??= initialValue;
       const setState = (
         value: typeof initialValue | ((previous: typeof initialValue) => typeof initialValue)
       ) => {
@@ -170,14 +153,6 @@ function runHookWithProvider(args: {
     },
   };
 
-  if (args.withProvider !== false) {
-    contextValue = {
-      mode: args.providerMode,
-      model: args.providerModel,
-      variant: args.providerVariant,
-    };
-  }
-
   const previousDispatcher =
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
   hookIndex = 0;
@@ -188,8 +163,7 @@ function runHookWithProvider(args: {
     return mountDispatch({
       organizationId: args.organizationId,
       mode: args.mode,
-      model: args.model,
-      variant: args.variant,
+      selection: args.selection,
       runOnInstance: INSTANCE,
       // eslint-disable-next-line no-empty-function -- no-op setter for harness
       setRunOnInstance: (_next: InstancePickerInstance | null) => {},
@@ -212,146 +186,137 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     __resetSharePayloadStoreForTests();
   });
 
-  it('onStart builds agent/model/variant/orgId from inheritance provider fields', async () => {
-    const { onStart } = runHookWithProvider({
+  it('onStart builds agent from explicit mode and wire model from selection', async () => {
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: true,
-      providerMode: 'plan',
-      providerModel: 'kilo-auto/efficient',
-      providerVariant: 'medium',
+      mode: 'plan',
+      selection: { model: { providerID: 'anthropic', modelID: 'claude-x' }, variant: 'high' },
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith(
+    expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       {
         agent: 'plan',
-        model: { providerID: 'kilo', modelID: 'kilo-auto/efficient', variant: 'medium' },
+        model: { providerID: 'anthropic', modelID: 'claude-x', variant: 'high' },
         orgId: 'org-xyz',
       },
-      { operationKey: expect.any(String) }
-    );
+      { operationKey: expect.any(String) },
+    ]);
   });
 
-  it('onStart without inheritance yields org-only input — empty context regression', async () => {
-    const { onStart } = runHookWithProvider({
+  it('onStart without mode yields org-only input', async () => {
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith(
+    expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       { orgId: 'org-xyz' },
-      { operationKey: expect.any(String) }
-    );
+      { operationKey: expect.any(String) },
+    ]);
   });
 
-  it('explicit mode/model/variant args win over empty context', async () => {
-    const { onStart } = runHookWithProvider({
+  it('explicit mode and selection reach the spawn input', async () => {
+    const { onStart } = runHook({
       organizationId: undefined,
-      withProvider: false,
       mode: 'code',
-      model: 'anthropic/claude-sonnet-4',
-      variant: 'high',
+      selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith(
+    expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
-      buildCreateRemoteSessionInput({
-        mode: 'code',
-        model: 'anthropic/claude-sonnet-4',
-        variant: 'high',
-      }),
-      { operationKey: expect.any(String) }
-    );
+      { agent: 'code', model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      { operationKey: expect.any(String) },
+    ]);
   });
 
   it('org route passes the route org into useRemoteInstanceSpawn (not inherit)', () => {
-    runHookWithProvider({ organizationId: 'org-route-1', withProvider: false });
+    runHook({ organizationId: 'org-route-1' });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith('org-route-1');
   });
 
   it('personal route (no param) passes null so context org cannot win', () => {
-    runHookWithProvider({ organizationId: undefined, withProvider: false });
+    runHook({ organizationId: undefined });
     expect(useRemoteInstanceSpawnMock).toHaveBeenCalledWith(null);
   });
 
-  it('personal-route onStart omits orgId even when only mode/model are set', async () => {
-    const { onStart } = runHookWithProvider({
+  it('personal-route onStart omits orgId when only mode and selection are set', async () => {
+    const { onStart } = runHook({
       organizationId: undefined,
-      withProvider: false,
       mode: 'code',
-      model: 'kilo-auto/efficient',
+      selection: { model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' } },
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalled();
-    });
-
-    expect(spawnMock).toHaveBeenCalledWith(
+    expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       {
         agent: 'code',
         model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
       },
-      { operationKey: expect.any(String) }
-    );
+      { operationKey: expect.any(String) },
+    ]);
+  });
+
+  it('a non-kilo selection reaches spawn as the provider own model with its variant', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'code',
+      selection: { model: { providerID: 'opencode', modelID: 'opencode-model' }, variant: 'xhigh' },
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      {
+        agent: 'code',
+        model: { providerID: 'opencode', modelID: 'opencode-model', variant: 'xhigh' },
+        orgId: 'org-xyz',
+      },
+      { operationKey: expect.any(String) },
+    ]);
+  });
+
+  it('an omitted selection reaches spawn with no model key at all', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'code',
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { agent: 'code', orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
+    ]);
   });
 
   it('ready path stages the press-time payload and navigates with shareId + autoSend', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       getSubmitPayload: () => samplePayload,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(routerReplace).toHaveBeenCalled();
-    });
+    await runStartAndWaitForReplace(onStart);
 
-    const calledWith = routerReplace.mock.calls[0]?.[0] as string;
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
-    expect(calledWith).toMatch(/shareId=uuid-\d+/);
+    expect(calledWith).toContain('shareId=share-id-fixed');
     expect(calledWith).toContain('autoSend=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
 
-    const shareIdMatch = /shareId=([^&]+)/.exec(calledWith);
-    expect(shareIdMatch).not.toBeNull();
-    const stored = peekSharePayload(decodeURIComponent(shareIdMatch?.[1] ?? ''));
+    const stored = peekSharePayload('share-id-fixed');
     expect(stored).not.toBeNull();
     expect(stored?.text).toBe('hello');
   });
 
   it('ready path navigates without share params when press-time payload is null', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
       getSubmitPayload: () => null,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(routerReplace).toHaveBeenCalled();
-    });
+    await runStartAndWaitForReplace(onStart);
 
-    const calledWith = routerReplace.mock.calls[0]?.[0] as string;
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
@@ -360,141 +325,16 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
   });
 
   it('ready path navigates without share params when getSubmitPayload is omitted', async () => {
-    const { onStart } = runHookWithProvider({
+    const { onStart } = runHook({
       organizationId: 'org-xyz',
-      withProvider: false,
     });
 
-    onStart();
-    await vi.waitFor(() => {
-      expect(routerReplace).toHaveBeenCalled();
-    });
+    await runStartAndWaitForReplace(onStart);
 
-    const calledWith = routerReplace.mock.calls[0]?.[0] as string;
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
-  });
-
-  it('reuses the same operationKey across retryable spawn outcomes', async () => {
-    const retryable = {
-      status: 'retryable' as const,
-      reason: 'Connection destroyed',
-      cause: new Error('Connection destroyed'),
-    };
-    spawnMock.mockResolvedValueOnce(retryable).mockResolvedValueOnce(retryable);
-    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
-
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-    });
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(2);
-    });
-
-    const first = spawnMock.mock.calls[0]?.[2] as { operationKey?: string } | undefined;
-    const second = spawnMock.mock.calls[1]?.[2] as { operationKey?: string } | undefined;
-    expect(first?.operationKey).toBeDefined();
-    expect(second?.operationKey).toBe(first?.operationKey);
-  });
-
-  it('keeps the same operationKey for a COMMAND_ALREADY_PENDING in-flight dedupe', async () => {
-    // The relay rejects a same-key duplicate while the command is in flight
-    // with this structured error. The classifier maps it to `retryable`, so
-    // the dispatch must KEEP the key: a rotation would mint a new mutation
-    // identity and let the relay dispatch a second command instead of
-    // replaying the durable terminal result under the same identity.
-    const alreadyPending = {
-      status: 'retryable' as const,
-      reason: 'Command is already in flight',
-      cause: new UserWebCommandError({
-        code: 'COMMAND_ALREADY_PENDING',
-        message: 'Command is already in flight',
-      }),
-    };
-    spawnMock.mockResolvedValueOnce(alreadyPending).mockResolvedValueOnce(alreadyPending);
-    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
-
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-    });
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(2);
-    });
-
-    const first = spawnMock.mock.calls[0]?.[2] as { operationKey?: string } | undefined;
-    const second = spawnMock.mock.calls[1]?.[2] as { operationKey?: string } | undefined;
-    expect(first?.operationKey).toBeDefined();
-    expect(second?.operationKey).toBe(first?.operationKey);
-  });
-
-  it('rotates the operationKey after a ready outcome', async () => {
-    const retryable = {
-      status: 'retryable' as const,
-      reason: 'Connection destroyed',
-      cause: new Error('Connection destroyed'),
-    };
-    spawnMock
-      .mockResolvedValueOnce(retryable)
-      .mockResolvedValueOnce({
-        status: 'ready',
-        sessionID: 'ses_12345678901234567890123456' as KiloSessionId,
-      })
-      .mockResolvedValueOnce(retryable);
-    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
-
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-    });
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(2);
-    });
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(3);
-    });
-
-    const keys = spawnMock.mock.calls.map(
-      call => (call[2] as { operationKey?: string } | undefined)?.operationKey
-    );
-    expect(keys[1]).toBe(keys[0]);
-    expect(keys[2]).not.toBe(keys[0]);
-  });
-
-  it('rotates the operationKey after a nonRetryable outcome', async () => {
-    const nonRetryable = {
-      status: 'nonRetryable' as const,
-      reason: 'CLI_UPGRADE_REQUIRED',
-      cause: new Error('CLI_UPGRADE_REQUIRED'),
-    };
-    spawnMock.mockResolvedValueOnce(nonRetryable).mockResolvedValueOnce(nonRetryable);
-    const { onStart } = runHookWithProvider({ organizationId: 'org-xyz', withProvider: false });
-
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-    });
-    onStart();
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(2);
-    });
-
-    const first = spawnMock.mock.calls[0]?.[2] as { operationKey?: string } | undefined;
-    const second = spawnMock.mock.calls[1]?.[2] as { operationKey?: string } | undefined;
-    expect(second?.operationKey).not.toBe(first?.operationKey);
-  });
-});
-
-// Smoke: Provider is a real React context provider (not a no-op export).
-describe('RemoteSpawnInheritanceProvider', () => {
-  it('exposes a Provider component', () => {
-    expect(typeof RemoteSpawnInheritanceProvider).toBe('function');
   });
 });

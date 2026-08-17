@@ -29,6 +29,7 @@ import {
   isToolPart,
   isFilePart,
   isReasoningPart,
+  shouldRenderReasoningPart,
   isStepStartPart,
   isStepFinishPart,
   isSubtaskPart,
@@ -323,6 +324,10 @@ function ReasoningPartRenderer({
   const [isExpanded, setIsExpanded] = useState(false);
   const streaming = isStreaming ?? isPartStreaming(part);
 
+  if (!shouldRenderReasoningPart(part)) {
+    return null;
+  }
+
   return (
     <div className="border-muted bg-muted/30 rounded-md border">
       <button
@@ -474,6 +479,9 @@ export function PartRenderer({
 
   // Reasoning parts -> collapsible reasoning display
   if (isReasoningPart(part)) {
+    if (!shouldRenderReasoningPart(part)) {
+      return null;
+    }
     return (
       <MessageErrorBoundary fallback={<PartErrorFallback partType="reasoning" />}>
         <ReasoningPartRenderer part={part} isStreaming={isStreaming} />

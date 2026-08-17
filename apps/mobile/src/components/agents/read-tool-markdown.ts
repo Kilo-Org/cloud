@@ -16,6 +16,15 @@ export type MarkdownBody = {
   footer: string | undefined;
 };
 
+export type ReadCodeBody = {
+  /** Raw file text for the highlighted code body; fences are NOT balanced. */
+  text: string;
+  /** Resolved path, used to pick the highlight language. */
+  path: string;
+  /** e.g. 'lines 201–400 of 1,450'. Undefined for a complete, untruncated read. */
+  footer: string | undefined;
+};
+
 export function isMarkdownPath(filePath: string): boolean {
   return /\.mdx?$/i.test(filePath.trim());
 }
@@ -196,15 +205,28 @@ function buildFooter(display: ReadFileDisplay): string | undefined {
   return `lines ${a}–${b} of ${n}`;
 }
 
-export function resolveMarkdownBody(part: ToolPart): MarkdownBody | undefined {
+/** Shared completed-status display lookup for the markdown and code bodies. */
+function resolveReadDisplay(part: ToolPart): ReadFileDisplay | undefined {
   if (part.state.status !== 'completed') {
     return undefined;
   }
-  const display =
-    parseReadFileDisplay(part.state.metadata) ?? parseReadOutputFallback(part.state.output);
+  return parseReadFileDisplay(part.state.metadata) ?? parseReadOutputFallback(part.state.output);
+}
+
+export function resolveMarkdownBody(part: ToolPart): MarkdownBody | undefined {
+  const display = resolveReadDisplay(part);
   if (!display) {
     return undefined;
   }
 
   return { text: balanceCodeFences(display.text), footer: buildFooter(display) };
+}
+
+export function resolveReadCodeBody(part: ToolPart): ReadCodeBody | undefined {
+  const display = resolveReadDisplay(part);
+  if (!display) {
+    return undefined;
+  }
+
+  return { text: display.text, path: display.path, footer: buildFooter(display) };
 }

@@ -1,5 +1,5 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { Clock } from 'lucide-react-native';
+import { Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 
 import { Bubble } from '@/components/ui/bubble';
@@ -141,12 +141,15 @@ export function MessageBubble({
     );
   }
 
-  // Assistant messages: render parts sequentially without a bubble
+  // Assistant messages: render parts sequentially without a bubble.
+  // Row-rhythm contract: py-1 on each of two adjacent wrappers sums to the
+  // same value as the gap-2 between parts of one message and the user
+  // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
   const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: false, canCopy: true });
 
   return (
-    <Pressable className="px-4 py-2" onLongPress={handleLongPress} accessible={a11y.accessible}>
+    <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
       <InMessageBubbleContext.Provider value>
         <View className="gap-2">
           {message.parts.map(part => (

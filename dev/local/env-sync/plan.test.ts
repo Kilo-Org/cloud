@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
-import { computePlan } from './plan';
+import { computePlan, computePlanAsync } from './plan';
 import { resolveAnnotatedValue } from './parse';
 import type { ExampleEntry } from './types';
 import { serviceUrl } from '../mobile-env';
@@ -152,6 +152,30 @@ test('generates the auto routing worker URL for local Next.js', () => {
         key: 'AUTO_ROUTING_WORKER_URL',
         oldValue: undefined,
         newValue: `http://localhost:${getService('auto-routing').port}`,
+      }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('generates the user data export Worker URL for local Next.js', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+
+    assert.deepEqual(
+      plan.envDevLocalChanges.find(change => change.key === 'USER_DATA_EXPORT_WORKER_URL'),
+      {
+        key: 'USER_DATA_EXPORT_WORKER_URL',
+        oldValue: undefined,
+        newValue: `http://localhost:${getService('user-data-export').port}`,
       }
     );
   } finally {
@@ -601,6 +625,63 @@ test('check mode accepts an existing source-backed local Secrets Store secret', 
       const plan = computePlan(repo.root, new Set(['event-service']), false);
       assert.deepEqual(plan.secretStoreAutoCreates, []);
     });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('checks independent local Secrets Store persistence directories concurrently', async () => {
+  const repo = createRepo({
+    '.env.local': [
+      'NEXTAUTH_SECRET=local-nextauth-secret',
+      'INTERNAL_API_SECRET=local-internal-secret',
+      '',
+    ].join('\n'),
+    'services/event-service/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/event-service/wrangler.jsonc': `{
+      "secrets_store_secrets": [{
+        "binding": "NEXTAUTH_SECRET",
+        "store_id": "store-id",
+        "secret_name": "NEXTAUTH_SECRET_PROD"
+      }]
+    }`,
+    'services/model-eval-ingest/package.json': JSON.stringify({
+      scripts: { dev: 'wrangler dev' },
+    }),
+    'services/model-eval-ingest/wrangler.jsonc': `{
+      "secrets_store_secrets": [{
+        "binding": "INTERNAL_API_SECRET",
+        "store_id": "store-id",
+        "secret_name": "INTERNAL_API_SECRET_DEV"
+      }]
+    }`,
+  });
+  let active = 0;
+  let maxActive = 0;
+  const calls: string[] = [];
+  try {
+    const plan = await computePlanAsync(
+      repo.root,
+      new Set(['event-service', 'cloudflare-model-eval-ingest']),
+      false,
+      {
+        concurrency: 2,
+        listSecrets: async (_repoRoot, workerDir) => {
+          calls.push(workerDir);
+          active++;
+          maxActive = Math.max(maxActive, active);
+          await new Promise(resolve => setTimeout(resolve, 20));
+          active--;
+          return workerDir === 'services/event-service'
+            ? 'NEXTAUTH_SECRET_PROD\n'
+            : 'INTERNAL_API_SECRET_DEV\n';
+        },
+      }
+    );
+
+    assert.equal(maxActive, 2);
+    assert.deepEqual(calls.sort(), ['services/event-service', 'services/model-eval-ingest']);
+    assert.deepEqual(plan.secretStoreAutoCreates, []);
   } finally {
     repo.cleanup();
   }

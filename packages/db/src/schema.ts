@@ -6759,6 +6759,12 @@ export const security_agent_commands = pgTable(
     }),
     finding_id: uuid().references(() => security_findings.id, { onDelete: 'set null' }),
     repo_full_name: text(),
+    /**
+     * Stable per-intent key from the client. A same-key request resolves to
+     * this command instead of running the effect twice. Null for scheduled and
+     * keyless commands.
+     */
+    operation_key: text(),
     status: text().$type<SecurityAgentCommandStatus>().notNull().default('accepted'),
     result_code: text(),
     result_metadata: jsonb().$type<Record<string, unknown>>(),
@@ -6805,6 +6811,18 @@ export const security_agent_commands = pgTable(
       table.finding_id,
       table.created_at.desc()
     ),
+    // Retry identity, one index per owner branch: an operation key is unique
+    // per owner only, and the owner column of the other branch is NULL, which
+    // a single composite unique index would treat as distinct and never
+    // enforce. Both are partial so keyless commands stay unconstrained.
+    uniqueIndex('UQ_security_agent_commands_org_operation_key')
+      .on(table.owned_by_organization_id, table.operation_key)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.operation_key} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_security_agent_commands_user_operation_key')
+      .on(table.owned_by_user_id, table.operation_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.operation_key} IS NOT NULL`),
   ]
 );
 

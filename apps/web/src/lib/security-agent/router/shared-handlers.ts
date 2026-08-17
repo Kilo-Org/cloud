@@ -30,6 +30,7 @@ import {
   listActiveSecurityAgentCommands,
   createApplyAutoRemediationCommand,
   markApplyAutoRemediationCommandAdmissionFailed,
+  type SecurityAgentCommandStatusResponse,
 } from '@/lib/security-agent/db/security-commands';
 import {
   canStartAnalysis,
@@ -65,10 +66,15 @@ import {
   countEligibleForAutoDismiss,
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
-import { organizations, type OperationLedgerRow, type SecurityFinding } from '@kilocode/db/schema';
+import {
+  operation_ledgers,
+  organizations,
+  type OperationLedgerRow,
+  type SecurityFinding,
+} from '@kilocode/db/schema';
 import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
 import { db } from '@/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -122,6 +128,7 @@ import {
 } from '@/lib/security-agent/services/audit-log-service';
 import {
   admitOperation,
+  isTerminalOperationStatus,
   markReconcilePending,
   recordOperationAcceptance,
   settleOperation,
@@ -277,12 +284,13 @@ async function assembleAuditReportResponse<TExtra>(params: {
 // `operationKey`. When present, the handler admits a `security`-domain ledger
 // row BEFORE submitting to the security-sync Worker, and only then runs the
 // submission. Later same-key calls dedupe, replay the canonical result, or
-// conflict, and the Worker joins the terminal outcome by the stored
-// `provider_ref` (the Worker's `messageId`). A definitive pre-acceptance
-// rejection (4xx, disabled routing, unconfigured service) settles the row
-// `failed`; an ambiguous transport outcome (network/5xx/lost correlation ids)
-// marks the row `reconcile_pending` so a same-key retry re-submits instead of
-// re-executing blind.
+// conflict. The Worker dedupes the command itself by `operation_key`, so the
+// ledger row is settled here, from the terminal command state `getCommandStatus`
+// reads, joined by the stored `provider_ref` (the Worker's `commandId`). A
+// definitive pre-acceptance rejection (4xx, disabled routing, unconfigured
+// service) settles the row `failed`; an ambiguous transport outcome
+// (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
+// same-key retry re-submits instead of re-executing blind.
 
 type SecurityLedgerIntent = 'manual_sync' | 'dismiss_finding';
 
@@ -302,7 +310,7 @@ type SecurityCommandResult =
 function securitySettledOutboxEvent(params: {
   distinctId: string;
   intent: SecurityLedgerIntent;
-  outcome: 'completed' | 'failed' | 'ambiguous';
+  outcome: 'completed' | 'failed' | 'no_op' | 'ambiguous';
   startedAt: number;
 }): OutboxEventInput {
   return {
@@ -448,13 +456,15 @@ async function executeSecurityCommandSubmit(args: {
     throw error;
   }
   // The Worker accepted, so an unrecorded provider reference must never yield a
-  // success receipt: surface a retryable error and let a same-key retry re-submit.
+  // success receipt: surface a retryable error and let a same-key retry
+  // re-submit. `provider_ref` holds the `commandId`, which is what the terminal
+  // command state is later joined back to this row by.
   await requireLedgerWrite(
     'The action completed, but we could not record the result. Please try again.',
     async () =>
       (await recordOperationAcceptance(db, {
         rowId: args.row.id,
-        providerRef: accepted.messageId,
+        providerRef: accepted.commandId,
         canonicalResult: {
           commandId: accepted.commandId,
           runId: accepted.runId,
@@ -521,6 +531,70 @@ async function runSecurityLedgerSubmit(args: {
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
       throw new TRPCError({ code: 'CONFLICT', message: 'operation_in_progress' });
+  }
+}
+
+/** Command status → ledger terminal status; a non-terminal command has none. */
+const SECURITY_COMMAND_TERMINAL_STATUS = {
+  succeeded: 'completed',
+  failed: 'failed',
+  no_op: 'no_op',
+} as const;
+
+/**
+ * Settles the ledger row of a terminal command, which is where the terminal
+ * analytics event is emitted. The row is joined by `provider_ref` (the Worker
+ * `commandId`) recorded at acceptance and scoped to the admitting user, so a
+ * poll never settles another user's row. The settle is a compare-and-set, so
+ * later polls are no-ops and the event is emitted exactly once. A settle
+ * failure must not fail the status read: the next poll retries it.
+ */
+async function settleSecurityLedgerForTerminalCommand(params: {
+  ctx: TRPCContext;
+  command: SecurityAgentCommandStatusResponse;
+}): Promise<void> {
+  const status =
+    SECURITY_COMMAND_TERMINAL_STATUS[
+      params.command.status as keyof typeof SECURITY_COMMAND_TERMINAL_STATUS
+    ];
+  if (!status) return;
+
+  try {
+    const [row] = await db
+      .select({
+        id: operation_ledgers.id,
+        intent: operation_ledgers.intent,
+        status: operation_ledgers.status,
+        admitted_at: operation_ledgers.admitted_at,
+      })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.domain, 'security'),
+          eq(operation_ledgers.kilo_user_id, params.ctx.user.id),
+          eq(operation_ledgers.provider_ref, params.command.id)
+        )
+      )
+      .limit(1);
+    if (!row || isTerminalOperationStatus(row.status)) return;
+    if (row.intent !== 'manual_sync' && row.intent !== 'dismiss_finding') return;
+
+    await settleOperation(db, {
+      rowId: row.id,
+      status,
+      outcomeCode: params.command.resultCode,
+      outboxEvent: securitySettledOutboxEvent({
+        distinctId: params.ctx.user.google_user_email || params.ctx.user.id,
+        intent: row.intent,
+        outcome: status,
+        startedAt: new Date(row.admitted_at).getTime(),
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to settle the security operation ledger row from the command state', {
+      command_id: params.command.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -1813,6 +1887,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         if (!command) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Security Agent command not found' });
         }
+        await settleSecurityLedgerForTerminalCommand({ ctx, command });
         return command;
       },
     },

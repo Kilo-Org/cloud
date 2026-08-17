@@ -365,15 +365,14 @@ async function evaluateExistingRow(
 /**
  * Locks the row, merges `patch` into `canonical_result`, and writes it back
  * under a compare-and-set on non-terminal status. Optionally overwrites
- * `provider_ref` in the same statement, and optionally fences the update on the
- * `queueSendClaimId` currently stored in `canonical_result`. Returns null when
- * the row is missing, terminal, or the CAS did not match.
+ * `provider_ref` in the same statement. Returns null when the row is missing,
+ * terminal, or the CAS did not match.
  */
 async function updateNonTerminalRow(
   database: LedgerDatabase,
   rowId: string,
   patch: Record<string, unknown>,
-  options: { providerRef?: string | null; expectedQueueSendClaimId?: string } = {}
+  options: { providerRef?: string | null } = {}
 ): Promise<OperationLedgerRow | null> {
   return runInTransaction(database, async tx => {
     const [row] = await tx
@@ -395,12 +394,7 @@ async function updateNonTerminalRow(
       .where(
         and(
           eq(operation_ledgers.id, row.id),
-          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES),
-          ...(options.expectedQueueSendClaimId
-            ? [
-                sql`${operation_ledgers.canonical_result}->>'queueSendClaimId' = ${options.expectedQueueSendClaimId}`,
-              ]
-            : [])
+          inArray(operation_ledgers.status, OPERATION_NON_TERMINAL_STATUSES)
         )
       )
       .returning();
@@ -421,12 +415,9 @@ async function updateNonTerminalRow(
 export async function recordOperationProgress(
   database: LedgerDatabase,
   rowId: string,
-  partialResult: Record<string, unknown>,
-  options?: { expectedQueueSendClaimId?: string }
+  partialResult: Record<string, unknown>
 ): Promise<OperationLedgerRow | null> {
-  return updateNonTerminalRow(database, rowId, partialResult, {
-    expectedQueueSendClaimId: options?.expectedQueueSendClaimId,
-  });
+  return updateNonTerminalRow(database, rowId, partialResult);
 }
 
 export type RecordAcceptanceInput = {

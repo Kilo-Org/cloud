@@ -5,7 +5,10 @@ import type * as manualSyncClientModule from '../services/manual-sync-client';
 import type * as manualDismissClientModule from '../services/manual-dismiss-client';
 import type * as manualAnalysisClientModule from '../services/manual-analysis-client';
 import type * as manualRemediationClientModule from '../services/manual-remediation-client';
-import type { OperationLedgerRow } from '@kilocode/db/schema';
+import { randomUUID } from 'crypto';
+import { sql } from 'drizzle-orm';
+import { db } from '@/lib/drizzle';
+import { operation_ledgers, type OperationLedgerRow } from '@kilocode/db/schema';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -57,6 +60,7 @@ const mockAdmitOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockMarkReconcilePending = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -74,6 +78,8 @@ jest.mock('../services/manual-remediation-client', () => ({
 }));
 jest.mock('@kilocode/db/operation-ledger', () => ({
   admitOperation: mockAdmitOperation,
+  isTerminalOperationStatus: (status: string) =>
+    ['completed', 'failed', 'no_op', 'interrupted', 'superseded'].includes(status),
   markReconcilePending: mockMarkReconcilePending,
   recordOperationAcceptance: mockRecordOperationAcceptance,
   settleOperation: mockSettleOperation,
@@ -123,7 +129,7 @@ jest.mock('../db/security-remediation', () => ({
   getRemediationAttemptHistory: mockGetRemediationAttemptHistory,
 }));
 jest.mock('../db/security-commands', () => ({
-  getSecurityAgentCommandStatus: jest.fn(),
+  getSecurityAgentCommandStatus: mockGetSecurityAgentCommandStatus,
   listActiveSecurityAgentCommands: jest.fn(),
 }));
 jest.mock('../db/dashboard-stats', () => ({ getDashboardStats: jest.fn() }));
@@ -696,7 +702,7 @@ describe('security operation ledger (P1-A-08e)', () => {
     });
     expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
-      providerRef: messageId,
+      providerRef: commandId,
       canonicalResult: { commandId, runId, messageId },
     });
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
@@ -776,7 +782,7 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
-      providerRef: messageId,
+      providerRef: commandId,
       canonicalResult: { commandId, runId, messageId },
     });
   });
@@ -908,7 +914,7 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockRecordOperationAcceptance).toHaveBeenCalledTimes(1);
     expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
-      providerRef: messageId,
+      providerRef: commandId,
       canonicalResult: { commandId, runId, messageId },
     });
   });
@@ -1042,7 +1048,7 @@ describe('security operation ledger (P1-A-08e)', () => {
     });
     expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
       rowId: 'ledger-row-id',
-      providerRef: 'dismiss-message-123',
+      providerRef: commandId,
       canonicalResult: { commandId, runId, messageId: 'dismiss-message-123' },
     });
     expect(mockSubmitManualFindingDismissal).toHaveBeenCalledTimes(1);
@@ -1270,5 +1276,162 @@ describe('remediation action tracking', () => {
     ).rejects.toThrow('not cancellable');
 
     expect(mockTrackSecurityAgentRemediationAction).not.toHaveBeenCalled();
+  });
+});
+
+describe('terminal command ledger settle', () => {
+  const settleCommandId = 'aaaabbbb-cccc-4ddd-8eee-ffff00001111';
+
+  function terminalCommand(overrides: Record<string, unknown> = {}) {
+    return {
+      id: settleCommandId,
+      commandType: 'sync',
+      origin: 'dashboard_refresh',
+      findingId: null,
+      repoFullName: 'kilo/repo',
+      status: 'succeeded',
+      resultCode: 'SYNC_COMPLETED',
+      resultMetadata: null,
+      lastErrorRedacted: null,
+      acceptedAt: '2026-06-17T10:00:00.000Z',
+      startedAt: '2026-06-17T10:00:01.000Z',
+      completedAt: '2026-06-17T10:00:09.000Z',
+      updatedAt: '2026-06-17T10:00:09.000Z',
+      ...overrides,
+    };
+  }
+
+  async function insertLedgerRow(overrides: Partial<OperationLedgerRow> = {}) {
+    const [row] = await db
+      .insert(operation_ledgers)
+      .values({
+        operation_key: `settle-key-${randomUUID()}`,
+        domain: 'security',
+        intent: 'manual_sync',
+        kilo_user_id: 'user-123',
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        provider_ref: settleCommandId,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+        ...overrides,
+      })
+      .returning();
+    return row!;
+  }
+
+  beforeEach(async () => {
+    await db.delete(operation_ledgers).where(sql`true`);
+  });
+
+  afterAll(async () => {
+    await db.delete(operation_ledgers).where(sql`true`);
+  });
+
+  it('settles the admitting user row and emits the terminal event once the command succeeds', async () => {
+    const row = await insertLedgerRow();
+    mockGetSecurityAgentCommandStatus.mockResolvedValue(terminalCommand());
+
+    await expect(
+      createHandlers().getCommandStatus.handler({
+        ctx: context,
+        input: { commandId: settleCommandId },
+      })
+    ).resolves.toMatchObject({ id: settleCommandId, status: 'succeeded' });
+
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+    expect(mockSettleOperation.mock.calls[0]?.[1]).toEqual({
+      rowId: row.id,
+      status: 'completed',
+      outcomeCode: 'SYNC_COMPLETED',
+      outboxEvent: {
+        eventName: 'security_command_settled',
+        distinctId: 'owner@example.com',
+        properties: {
+          source: 'web',
+          surface: 'security',
+          phase: 'terminal',
+          intent: 'manual_sync',
+          outcome: 'completed',
+          duration_ms: expect.any(Number),
+        },
+      },
+    });
+  });
+
+  it('maps a no-op command to a no_op settle', async () => {
+    await insertLedgerRow();
+    mockGetSecurityAgentCommandStatus.mockResolvedValue(
+      terminalCommand({ status: 'no_op', resultCode: 'CONFIG_DISABLED' })
+    );
+
+    await createHandlers().getCommandStatus.handler({
+      ctx: context,
+      input: { commandId: settleCommandId },
+    });
+
+    expect(mockSettleOperation.mock.calls[0]?.[1]).toMatchObject({
+      status: 'no_op',
+      outcomeCode: 'CONFIG_DISABLED',
+      outboxEvent: expect.objectContaining({
+        properties: expect.objectContaining({ outcome: 'no_op' }),
+      }),
+    });
+  });
+
+  it('does not settle again once the row is terminal, so the event is emitted once', async () => {
+    await insertLedgerRow({ status: 'completed', settled_at: '2026-06-17T10:00:09.000Z' });
+    mockGetSecurityAgentCommandStatus.mockResolvedValue(terminalCommand());
+
+    await createHandlers().getCommandStatus.handler({
+      ctx: context,
+      input: { commandId: settleCommandId },
+    });
+
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('never settles another user row from a poll', async () => {
+    await insertLedgerRow({ kilo_user_id: 'other-user' });
+    mockGetSecurityAgentCommandStatus.mockResolvedValue(terminalCommand());
+
+    await createHandlers().getCommandStatus.handler({
+      ctx: context,
+      input: { commandId: settleCommandId },
+    });
+
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('does not read the ledger while the command is still running', async () => {
+    await insertLedgerRow();
+    mockGetSecurityAgentCommandStatus.mockResolvedValue(
+      terminalCommand({ status: 'running', resultCode: null })
+    );
+
+    await createHandlers().getCommandStatus.handler({
+      ctx: context,
+      input: { commandId: settleCommandId },
+    });
+
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('returns the command state even when the settle throws', async () => {
+    await insertLedgerRow();
+    mockGetSecurityAgentCommandStatus.mockResolvedValue(terminalCommand());
+    mockSettleOperation.mockRejectedValueOnce(new Error('settle failed'));
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      createHandlers().getCommandStatus.handler({
+        ctx: context,
+        input: { commandId: settleCommandId },
+      })
+    ).resolves.toMatchObject({ id: settleCommandId });
+
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 });

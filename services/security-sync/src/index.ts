@@ -1,24 +1,19 @@
 import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import {
+  createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,
   isTerminalSecurityAgentCommandTransitionOutcome,
   markSecurityAgentCommandQueueAdmissionFailed,
   markSecurityAgentCommandRetriesExhausted,
   requireSecurityAgentCommandTransitionOrTerminal,
   transitionSecurityAgentCommandWithCurrentState,
+  type CreateSecurityAgentCommandInput,
   type SecurityAgentCommandOwner,
   type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { agent_configs, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
-import {
-  isTerminalOperationStatus,
-  recordOperationAcceptance,
-  recordOperationProgress,
-  settleOperation,
-  type LedgerTransaction,
-} from '@kilocode/db/operation-ledger';
+import { agent_configs } from '@kilocode/db/schema';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -213,102 +208,15 @@ async function timingSafeEqual(left: string, right: string): Promise<boolean> {
   return nodeTimingSafeEqual(new Uint8Array(leftDigest), new Uint8Array(rightDigest));
 }
 
-// ----- security operation ledger dedupe (P1-A-08e) ---------------------------
+// ----- same-key command dedupe (P1-A-08e) ------------------------------------
 //
-// A command carrying the web's stable `operationKey` locks the row the web
-// admitted (`FOR UPDATE`) and either reuses the recorded acceptance or creates
-// the command and records `provider_ref` plus `canonical_result` in the SAME
-// transaction, before the queue send. Every post-acceptance ledger write is
-// fenced on the `queueSendClaimId` recorded at acceptance, so a stale sender
-// cannot clear or confirm a newer claim. A queue-send failure releases the
-// claim, so a same-key retry re-sends the original command instead of creating
-// a second one. Scheduled syncs and keyless commands never touch this path.
-
-const SECURITY_LEDGER_DOMAIN = 'security';
-const QUEUE_SEND_LEASE_MS = 60_000;
-
-type SecurityLedgerLookupRow = {
-  id: string;
-  intent: string;
-  status: string;
-  provider_ref: string | null;
-  canonical_result: Record<string, unknown> | null;
-};
-
-type SecurityLedgerAcceptance = {
-  commandId: string;
-  runId: string;
-  messageId: string;
-  queueAdmitted: boolean;
-  queueSendClaimedUntil?: string;
-  queueSendClaimId?: string;
-};
-
-/**
- * Locks the ledger row admitted for an operation key inside the caller's
- * transaction, so concurrent same-key requests serialize and the loser reuses
- * the committed acceptance instead of creating a second command.
- */
-async function lockSecurityLedgerRow(
-  tx: LedgerTransaction,
-  params: { operationKey: string; userId: string }
-): Promise<SecurityLedgerLookupRow | null> {
-  const rows = await tx
-    .select({
-      id: operation_ledgers.id,
-      intent: operation_ledgers.intent,
-      status: operation_ledgers.status,
-      provider_ref: operation_ledgers.provider_ref,
-      canonical_result: operation_ledgers.canonical_result,
-    })
-    .from(operation_ledgers)
-    .where(
-      and(
-        eq(operation_ledgers.domain, SECURITY_LEDGER_DOMAIN),
-        eq(operation_ledgers.operation_key, params.operationKey),
-        eq(operation_ledgers.kilo_user_id, params.userId)
-      )
-    )
-    .for('update')
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-/** The recorded acceptance (original command identifiers) of a matching row. */
-function securityLedgerAcceptanceFromRow(
-  row: SecurityLedgerLookupRow,
-  intent: 'manual_sync' | 'dismiss_finding'
-): SecurityLedgerAcceptance | null {
-  if (row.intent !== intent || !row.provider_ref || !row.canonical_result) {
-    return null;
-  }
-  const canonical = row.canonical_result;
-  if (
-    typeof canonical.commandId === 'string' &&
-    typeof canonical.runId === 'string' &&
-    typeof canonical.messageId === 'string'
-  ) {
-    return {
-      commandId: canonical.commandId,
-      runId: canonical.runId,
-      messageId: canonical.messageId,
-      queueAdmitted: canonical.queueAdmitted === true || isTerminalOperationStatus(row.status),
-      queueSendClaimedUntil:
-        typeof canonical.queueSendClaimedUntil === 'string'
-          ? canonical.queueSendClaimedUntil
-          : undefined,
-      queueSendClaimId:
-        typeof canonical.queueSendClaimId === 'string' ? canonical.queueSendClaimId : undefined,
-    };
-  }
-  return null;
-}
+// A command carrying the web's stable `operationKey` is created-or-found by
+// that key on `security_agent_commands`, whose partial unique index on
+// (owner, operation_key) arbitrates the race. A same-key request resolves to
+// the existing command and sends no second queue message, so the effect runs
+// once. Scheduled syncs and keyless commands carry no key and always create.
 
 type KeyedEnqueueIds = { commandId: string; runId: string; messageId: string };
-
-type KeyedLedgerAdmission =
-  | { reused: true; ids: KeyedEnqueueIds }
-  | { reused: false; ids: KeyedEnqueueIds; rowId: string; queueSendClaimId: string };
 
 function buildManualSyncQueueMessage(
   command: z.infer<typeof ManualSecuritySyncCommandSchema>,
@@ -352,174 +260,50 @@ function buildDismissQueueMessage(
 }
 
 /**
- * Transaction-safe enqueue for a keyed command (P1-A-08e). A keyed request
- * requires the ledger row the web admitted before calling the Worker: a
- * missing row or a failed acceptance update fails the request without creating
- * a command, sending a queue message, or returning 202. The matching ledger row
- * is locked with `FOR UPDATE`; a row that already carries a complete acceptance
- * reuses the original identifiers, and otherwise the command is created and the
- * acceptance (`provider_ref` + `canonical_result`) is recorded in the SAME
- * transaction. The queue send claim is committed before the queue send. A
- * retry reuses the command and message identity until queue admission is
- * confirmed, then command processing deduplicates any crash-window replay.
+ * Creates the command row and sends its queue message. With an `operationKey`
+ * the row is created-or-found by that key (P1-A-08e): a same-key retry returns
+ * the original command and sends no second message, so the effect runs once.
+ * A queue-send failure marks the fresh command failed before rethrowing, so no
+ * command is left waiting for a message that was never sent.
  */
-async function enqueueKeyedSecurityCommand(
+async function enqueueSecurityCommand(
   db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   params: {
-    operationKey: string;
-    userId: string;
-    intent: 'manual_sync' | 'dismiss_finding';
+    operationKey?: string;
+    create: CreateSecurityAgentCommandInput;
     runId: string;
     messageId: string;
-    createCommand: (tx: LedgerTransaction) => Promise<{ id: string }>;
     buildMessage: (ids: KeyedEnqueueIds) => MessageSendRequest<SecuritySyncQueueMessage>;
   }
 ): Promise<KeyedEnqueueIds> {
-  const admission: KeyedLedgerAdmission = await db.transaction(async tx => {
-    const row = await lockSecurityLedgerRow(tx, {
-      operationKey: params.operationKey,
-      userId: params.userId,
-    });
-    if (!row) {
-      throw new Error(
-        `Security operation ledger row not found for operation key ${params.operationKey}`
-      );
-    }
-    if (row.intent !== params.intent) {
-      throw new Error(
-        `Security operation ledger intent mismatch for operation key ${params.operationKey}`
-      );
-    }
-    const reused = securityLedgerAcceptanceFromRow(row, params.intent);
-    // `NaN > now` is false, so a missing or unparsable claim lease never counts
-    // as live.
-    const claimedUntil = Date.parse(reused?.queueSendClaimedUntil ?? '');
-    if (reused && (reused.queueAdmitted || claimedUntil > Date.now())) {
-      return {
-        reused: true,
-        ids: {
-          commandId: reused.commandId,
-          runId: reused.runId,
-          messageId: reused.messageId,
-        },
-      };
-    }
-    const nextQueueSendClaimedUntil = new Date(Date.now() + QUEUE_SEND_LEASE_MS).toISOString();
-    const queueSendClaimId = crypto.randomUUID();
-    const ids = reused ?? {
-      commandId: (await params.createCommand(tx)).id,
-      runId: params.runId,
-      messageId: params.messageId,
-    };
-    if (!reused) {
-      const updated = await recordOperationAcceptance(tx, {
-        rowId: row.id,
-        providerRef: ids.messageId,
-        canonicalResult: {
-          commandId: ids.commandId,
-          runId: ids.runId,
-          messageId: ids.messageId,
-          queueAdmitted: false,
-          queueSendClaimedUntil: nextQueueSendClaimedUntil,
-          queueSendClaimId,
-        },
-      });
-      if (!updated) {
-        throw new Error(
-          `Security operation ledger acceptance was not recorded for operation key ${params.operationKey}`
-        );
-      }
-    } else {
-      const claimed = await recordOperationProgress(
-        tx,
-        row.id,
-        {
-          queueAdmitted: false,
-          queueSendClaimedUntil: nextQueueSendClaimedUntil,
-          queueSendClaimId,
-        },
-        { expectedQueueSendClaimId: reused.queueSendClaimId }
-      );
-      if (!claimed) {
-        throw new Error(
-          `Security operation ledger queue claim was not recorded for operation key ${params.operationKey}`
-        );
-      }
-    }
-    return {
-      reused: false,
-      ids: {
-        commandId: ids.commandId,
-        runId: ids.runId,
-        messageId: ids.messageId,
-      },
-      rowId: row.id,
-      queueSendClaimId,
-    };
-  });
+  const { command, created } =
+    params.operationKey === undefined
+      ? { command: await createSecurityAgentCommand(db, params.create), created: true }
+      : await createOrFindSecurityAgentCommandByOperationKey(db, {
+          ...params.create,
+          operationKey: params.operationKey,
+        });
 
-  if (admission.reused) {
-    console.info('Security command reused from operation ledger acceptance', {
-      intent: params.intent,
+  const ids = { commandId: command.id, runId: params.runId, messageId: params.messageId };
+
+  if (!created) {
+    console.info('Security command reused for an existing operation key', {
+      command_type: params.create.commandType,
       operation_key: params.operationKey,
-      command_id: admission.ids.commandId,
-      run_id: admission.ids.runId,
-      message_id: admission.ids.messageId,
+      command_id: command.id,
     });
-    return admission.ids;
+    return ids;
   }
 
   try {
-    await queue.sendBatch([params.buildMessage(admission.ids)]);
+    await queue.sendBatch([params.buildMessage(ids)]);
   } catch (error) {
-    try {
-      const released = await recordOperationProgress(
-        db,
-        admission.rowId,
-        {
-          queueAdmitted: false,
-          queueSendClaimedUntil: new Date(0).toISOString(),
-          queueSendClaimId: null,
-        },
-        { expectedQueueSendClaimId: admission.queueSendClaimId }
-      );
-      if (!released) {
-        console.info('Security queue-send claim was replaced after queue failure', {
-          operation_key: params.operationKey,
-          row_id: admission.rowId,
-        });
-      }
-    } catch (releaseError) {
-      console.error('Failed to release security queue-send claim', {
-        operation_key: params.operationKey,
-        row_id: admission.rowId,
-        error_type: releaseError instanceof Error ? releaseError.name : 'UnknownError',
-      });
-      throw new Error(
-        'Security operation ledger queue claim could not be released after queue failure'
-      );
-    }
+    await markSecurityAgentCommandQueueAdmissionFailed(db, command.id, 'Queue admission failed');
     throw error;
   }
 
-  const queued = await recordOperationProgress(
-    db,
-    admission.rowId,
-    {
-      queueAdmitted: true,
-      queueSendClaimedUntil: new Date(0).toISOString(),
-      queueSendClaimId: null,
-    },
-    { expectedQueueSendClaimId: admission.queueSendClaimId }
-  );
-  if (!queued) {
-    console.info('Security queue-send claim was replaced after queue success', {
-      operation_key: params.operationKey,
-      row_id: admission.rowId,
-    });
-  }
-  return admission.ids;
+  return ids;
 }
 
 async function enqueueManualSyncCommand(
@@ -529,51 +313,19 @@ async function enqueueManualSyncCommand(
 ): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
   const ownerKey = createOwnerKey(command.owner);
-  const messageId = `${runId}:${ownerKey}:manual`;
 
-  if (command.operationKey !== undefined) {
-    return enqueueKeyedSecurityCommand(db, queue, {
-      operationKey: command.operationKey,
-      userId: command.actor.id,
-      intent: 'manual_sync',
-      runId,
-      messageId,
-      createCommand: tx =>
-        createSecurityAgentCommand(tx, {
-          commandType: 'sync',
-          origin: command.origin,
-          owner: toCommandOwner(command.owner),
-          repoFullName: command.repoFullName,
-        }),
-      buildMessage: ids => buildManualSyncQueueMessage(command, ids, ownerKey),
-    });
-  }
-
-  const ledgerCommand = await createSecurityAgentCommand(db, {
-    commandType: 'sync',
-    origin: command.origin,
-    owner: toCommandOwner(command.owner),
-    repoFullName: command.repoFullName,
+  return enqueueSecurityCommand(db, queue, {
+    operationKey: command.operationKey,
+    create: {
+      commandType: 'sync',
+      origin: command.origin,
+      owner: toCommandOwner(command.owner),
+      repoFullName: command.repoFullName,
+    },
+    runId,
+    messageId: `${runId}:${ownerKey}:manual`,
+    buildMessage: ids => buildManualSyncQueueMessage(command, ids, ownerKey),
   });
-
-  try {
-    await queue.sendBatch([
-      buildManualSyncQueueMessage(
-        command,
-        { commandId: ledgerCommand.id, runId, messageId },
-        ownerKey
-      ),
-    ]);
-  } catch (error) {
-    await markSecurityAgentCommandQueueAdmissionFailed(
-      db,
-      ledgerCommand.id,
-      'Queue admission failed'
-    );
-    throw error;
-  }
-
-  return { commandId: ledgerCommand.id, runId, messageId };
 }
 
 async function enqueueDismissFindingCommand(
@@ -582,47 +334,19 @@ async function enqueueDismissFindingCommand(
   command: z.infer<typeof ManualFindingDismissalCommandSchema>
 ): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
-  const messageId = `${runId}:${command.findingId}:dismiss`;
 
-  if (command.operationKey !== undefined) {
-    return enqueueKeyedSecurityCommand(db, queue, {
-      operationKey: command.operationKey,
-      userId: command.actor.id,
-      intent: 'dismiss_finding',
-      runId,
-      messageId,
-      createCommand: tx =>
-        createSecurityAgentCommand(tx, {
-          commandType: 'dismiss_finding',
-          origin: 'manual',
-          owner: toCommandOwner(command.owner),
-          findingId: command.findingId,
-        }),
-      buildMessage: ids => buildDismissQueueMessage(command, ids),
-    });
-  }
-
-  const ledgerCommand = await createSecurityAgentCommand(db, {
-    commandType: 'dismiss_finding',
-    origin: 'manual',
-    owner: toCommandOwner(command.owner),
-    findingId: command.findingId,
+  return enqueueSecurityCommand(db, queue, {
+    operationKey: command.operationKey,
+    create: {
+      commandType: 'dismiss_finding',
+      origin: 'manual',
+      owner: toCommandOwner(command.owner),
+      findingId: command.findingId,
+    },
+    runId,
+    messageId: `${runId}:${command.findingId}:dismiss`,
+    buildMessage: ids => buildDismissQueueMessage(command, ids),
   });
-
-  try {
-    await queue.sendBatch([
-      buildDismissQueueMessage(command, { commandId: ledgerCommand.id, runId, messageId }),
-    ]);
-  } catch (error) {
-    await markSecurityAgentCommandQueueAdmissionFailed(
-      db,
-      ledgerCommand.id,
-      'Queue admission failed'
-    );
-    throw error;
-  }
-
-  return { commandId: ledgerCommand.id, runId, messageId };
 }
 
 async function enqueueOwners(
@@ -706,159 +430,6 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
   return { status: 'succeeded', resultCode: 'SYNC_COMPLETED' };
 }
 
-// ----- security operation ledger join (P1-A-08e) ----------------------------
-//
-// A keyed command stores the Worker `messageId` in
-// `operation_ledgers.provider_ref` at acceptance. On a terminal command state
-// the Worker joins that row by provider reference and settles it with the
-// outbox event. Scheduled syncs and keyless commands have no row and skip.
-
-const SECURITY_TERMINAL_STATUS_MAP = {
-  succeeded: 'completed',
-  failed: 'failed',
-  no_op: 'no_op',
-} as const;
-
-function isTerminalSecurityLedgerStatus(
-  status: string
-): status is keyof typeof SECURITY_TERMINAL_STATUS_MAP {
-  return status in SECURITY_TERMINAL_STATUS_MAP;
-}
-
-/** Resolves the analytics identity channel (user email) for the outbox event. */
-async function resolveSecuritySettleDistinctId(
-  db: WorkerDb,
-  params: { userId?: string; email?: string | null }
-): Promise<string> {
-  if (params.email) return params.email;
-  if (!params.userId) return 'unknown';
-  try {
-    const [user] = await db
-      .select({ email: kilocode_users.google_user_email })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, params.userId))
-      .limit(1);
-    return user?.email ?? params.userId;
-  } catch (error) {
-    console.error('Failed to resolve security settle distinct id', {
-      error_type: error instanceof Error ? error.name : 'UnknownError',
-    });
-    return params.userId;
-  }
-}
-
-/**
- * Settles the ledger row joined by `provider_ref = messageId`. A missing row
- * skips; a failed lookup or settle re-throws so the caller leaves the queue
- * message unacknowledged and the settlement is retried.
- */
-async function settleSecurityLedgerByProviderRef(
-  db: WorkerDb,
-  params: {
-    providerRef: string;
-    intent: 'manual_sync' | 'dismiss_finding';
-    status: 'succeeded' | 'failed' | 'no_op';
-    resultCode: string;
-    userId?: string;
-    actorEmail?: string | null;
-    dispatchedAt: string;
-    repoCount?: number;
-    errorCount?: number;
-  }
-): Promise<void> {
-  const status = SECURITY_TERMINAL_STATUS_MAP[params.status];
-  const counts = {
-    ...(params.repoCount !== undefined ? { repo_count: params.repoCount } : {}),
-    ...(params.errorCount !== undefined ? { error_count: params.errorCount } : {}),
-  };
-  const dispatched = new Date(params.dispatchedAt).getTime();
-  const durationMs = Number.isFinite(dispatched) ? Math.max(0, Date.now() - dispatched) : 0;
-
-  try {
-    const [row] = await db
-      .select({ id: operation_ledgers.id })
-      .from(operation_ledgers)
-      .where(eq(operation_ledgers.provider_ref, params.providerRef))
-      .limit(1);
-    if (!row) {
-      console.info('Security operation ledger row not found for provider ref; skipping settle', {
-        provider_ref: params.providerRef,
-        intent: params.intent,
-        result_code: params.resultCode,
-      });
-      return;
-    }
-
-    await settleOperation(db, {
-      rowId: row.id,
-      status,
-      outcomeCode: params.resultCode,
-      canonicalResult: counts,
-      outboxEvent: {
-        eventName: 'security_command_settled',
-        distinctId: await resolveSecuritySettleDistinctId(db, {
-          userId: params.userId,
-          email: params.actorEmail,
-        }),
-        properties: {
-          source: 'server',
-          surface: 'security',
-          phase: 'terminal',
-          intent: params.intent,
-          outcome: status,
-          ...counts,
-          duration_ms: durationMs,
-        },
-      },
-    });
-    console.info('Security operation ledger row settled', {
-      row_id: row.id,
-      provider_ref: params.providerRef,
-      intent: params.intent,
-      status,
-      result_code: params.resultCode,
-    });
-  } catch (error) {
-    console.error('Failed to settle security operation ledger row', {
-      provider_ref: params.providerRef,
-      status,
-      result_code: params.resultCode,
-      error_type: error instanceof Error ? error.name : 'UnknownError',
-    });
-    throw error;
-  }
-}
-
-/** Extracts the ledger join identity from a queue message body, if present. */
-function ledgerSettleIdentityFromMessage(body: unknown): {
-  providerRef: string;
-  intent: 'manual_sync' | 'dismiss_finding';
-  dispatchedAt: string;
-  userId?: string;
-  actorEmail?: string | null;
-} | null {
-  const dismiss = SecurityDismissMessageSchema.safeParse(body);
-  if (dismiss.success) {
-    return {
-      providerRef: dismiss.data.messageId,
-      intent: 'dismiss_finding',
-      dispatchedAt: dismiss.data.dispatchedAt,
-      userId: dismiss.data.actor.id,
-    };
-  }
-  const sync = SecuritySyncMessageSchema.safeParse(body);
-  if (sync.success) {
-    return {
-      providerRef: sync.data.messageId,
-      intent: 'manual_sync',
-      dispatchedAt: sync.data.dispatchedAt,
-      userId: sync.data.actor?.id,
-      actorEmail: sync.data.actor?.email,
-    };
-  }
-  return null;
-}
-
 async function processSecurityDismissMessage(
   message: Message<SecuritySyncQueueMessage>,
   env: CloudflareEnv
@@ -880,16 +451,6 @@ async function processSecurityDismissMessage(
       result_code: running.command?.result_code,
       attempts: message.attempts,
     });
-    if (running.command && isTerminalSecurityLedgerStatus(running.command.status)) {
-      await settleSecurityLedgerByProviderRef(db, {
-        providerRef: parsed.data.messageId,
-        intent: 'dismiss_finding',
-        status: running.command.status,
-        resultCode: running.command.result_code ?? 'UNKNOWN',
-        userId: parsed.data.actor.id,
-        dispatchedAt: parsed.data.dispatchedAt,
-      });
-    }
     message.ack();
     return true;
   }
@@ -905,14 +466,6 @@ async function processSecurityDismissMessage(
     resultCode: result.resultCode,
   });
   requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
-  await settleSecurityLedgerByProviderRef(db, {
-    providerRef: parsed.data.messageId,
-    intent: 'dismiss_finding',
-    status: result.commandStatus,
-    resultCode: result.resultCode,
-    userId: parsed.data.actor.id,
-    dispatchedAt: parsed.data.dispatchedAt,
-  });
   console.info('Security Agent dismissal command completed', {
     command_id: parsed.data.commandId,
     command_type: 'dismiss_finding',
@@ -966,17 +519,6 @@ async function processSecuritySyncMessage(
         result_code: running.command?.result_code,
         attempts: message.attempts,
       });
-      if (running.command && isTerminalSecurityLedgerStatus(running.command.status)) {
-        await settleSecurityLedgerByProviderRef(db, {
-          providerRef: body.messageId,
-          intent: 'manual_sync',
-          status: running.command.status,
-          resultCode: running.command.result_code ?? 'UNKNOWN',
-          userId: body.actor?.id,
-          actorEmail: body.actor?.email,
-          dispatchedAt: body.dispatchedAt,
-        });
-      }
       message.ack();
       return;
     }
@@ -1005,21 +547,6 @@ async function processSecuritySyncMessage(
       resultCode: terminal.resultCode,
     });
     requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
-  }
-  // Only a manual sync can have a ledger row (the web admits it before calling
-  // the Worker), so a scheduled run must never pay the lookup.
-  if (body.trigger === 'manual') {
-    await settleSecurityLedgerByProviderRef(db, {
-      providerRef: body.messageId,
-      intent: 'manual_sync',
-      status: terminal.status,
-      resultCode: terminal.resultCode,
-      userId: body.actor?.id,
-      actorEmail: body.actor?.email,
-      dispatchedAt: body.dispatchedAt,
-      repoCount: result.synced,
-      errorCount: result.errors,
-    });
   }
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
@@ -1252,18 +779,6 @@ export default {
               correlation.commandId
             );
             if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
-              const settleIdentity = ledgerSettleIdentityFromMessage(message.body);
-              if (settleIdentity) {
-                await settleSecurityLedgerByProviderRef(db, {
-                  providerRef: settleIdentity.providerRef,
-                  intent: settleIdentity.intent,
-                  status: 'failed',
-                  resultCode: 'QUEUE_RETRIES_EXHAUSTED',
-                  userId: settleIdentity.userId,
-                  actorEmail: settleIdentity.actorEmail,
-                  dispatchedAt: settleIdentity.dispatchedAt,
-                });
-              }
               console.info('Security Agent command delivery already terminal after failure', {
                 command_id: correlation.commandId,
                 command_type: correlation.commandType,

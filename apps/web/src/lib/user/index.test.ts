@@ -121,6 +121,10 @@ import {
   user_data_exports,
   user_data_export_parts,
   user_data_export_outbox,
+  content_moderation_reports,
+  user_moderation_blocks,
+  user_moderation_mutes,
+  user_terms_acceptances,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
@@ -4850,6 +4854,120 @@ describe('User', () => {
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       const userAfter = await findUserById(user.id);
       expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('deletes moderation reports, blocks, mutes, and terms acceptances for the user only', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      const [report] = await db
+        .insert(content_moderation_reports)
+        .values({
+          kilo_user_id: user.id,
+          surface: 'ai_output',
+          target_kind: 'message',
+          target_id: 'msg-1',
+          reason: 'other',
+          context_json: { platform: 'mobile' },
+        })
+        .returning();
+      const [otherReport] = await db
+        .insert(content_moderation_reports)
+        .values({
+          kilo_user_id: otherUser.id,
+          surface: 'ai_output',
+          target_kind: 'message',
+          target_id: 'msg-2',
+          reason: 'other',
+          context_json: { platform: 'mobile' },
+        })
+        .returning();
+
+      const [block] = await db
+        .insert(user_moderation_blocks)
+        .values({ blocker_user_id: user.id, blocked_github_login: 'alice' })
+        .returning();
+      const [otherBlock] = await db
+        .insert(user_moderation_blocks)
+        .values({ blocker_user_id: otherUser.id, blocked_github_login: 'bob' })
+        .returning();
+
+      const [mute] = await db
+        .insert(user_moderation_mutes)
+        .values({ blocker_user_id: user.id, muted_github_login: 'carol' })
+        .returning();
+      const [otherMute] = await db
+        .insert(user_moderation_mutes)
+        .values({ blocker_user_id: otherUser.id, muted_github_login: 'dave' })
+        .returning();
+
+      const [terms] = await db
+        .insert(user_terms_acceptances)
+        .values({ kilo_user_id: user.id, terms_version: 'ugc-2026-08-17', age_posture: '13_plus' })
+        .returning();
+      const [otherTerms] = await db
+        .insert(user_terms_acceptances)
+        .values({
+          kilo_user_id: otherUser.id,
+          terms_version: 'ugc-2026-08-17',
+          age_posture: '13_plus',
+        })
+        .returning();
+
+      if (!report || !otherReport || !block || !otherBlock || !mute || !otherMute || !terms || !otherTerms) {
+        throw new Error('Failed to seed moderation rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(content_moderation_reports)
+          .where(eq(content_moderation_reports.id, report.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(content_moderation_reports)
+          .where(eq(content_moderation_reports.id, otherReport.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(user_moderation_blocks)
+          .where(eq(user_moderation_blocks.id, block.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_moderation_blocks)
+          .where(eq(user_moderation_blocks.id, otherBlock.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(user_moderation_mutes)
+          .where(eq(user_moderation_mutes.id, mute.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_moderation_mutes)
+          .where(eq(user_moderation_mutes.id, otherMute.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(user_terms_acceptances)
+          .where(eq(user_terms_acceptances.id, terms.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_terms_acceptances)
+          .where(eq(user_terms_acceptances.id, otherTerms.id))
+      ).toHaveLength(1);
     });
   });
 

@@ -10525,3 +10525,93 @@ export const compute_usage_charge = pgTable(
 
 export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
 export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
+
+// Content moderation reports. `context_json` holds only minimized metadata
+// (surface, ids, model id, platform) — never a message or comment body.
+export const content_moderation_reports = pgTable(
+  'content_moderation_reports',
+  {
+    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    kilo_user_id: text().notNull(),
+    surface: text().notNull(),
+    target_kind: text().notNull(),
+    target_id: text().notNull(),
+    model_id: text(),
+    session_id: text(),
+    reason: text().notNull(),
+    context_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    receipt_id: uuid().default(sql`pg_catalog.gen_random_uuid()`).notNull().unique(),
+    triage_status: text().notNull().default('received'),
+    appeal_status: text().notNull().default('none'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_content_moderation_reports_user_created').on(table.kilo_user_id, table.created_at),
+    index('IDX_content_moderation_reports_target').on(table.target_kind, table.target_id),
+  ]
+);
+
+export type ContentModerationReport = typeof content_moderation_reports.$inferSelect;
+export type NewContentModerationReport = typeof content_moderation_reports.$inferInsert;
+
+export const user_moderation_blocks = pgTable(
+  'user_moderation_blocks',
+  {
+    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    blocker_user_id: text().notNull(),
+    blocked_github_login: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_moderation_blocks_blocker_login').on(
+      table.blocker_user_id,
+      table.blocked_github_login
+    ),
+  ]
+);
+
+export type UserModerationBlock = typeof user_moderation_blocks.$inferSelect;
+export type NewUserModerationBlock = typeof user_moderation_blocks.$inferInsert;
+
+export const user_moderation_mutes = pgTable(
+  'user_moderation_mutes',
+  {
+    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    blocker_user_id: text().notNull(),
+    muted_github_login: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_moderation_mutes_blocker_login').on(
+      table.blocker_user_id,
+      table.muted_github_login
+    ),
+  ]
+);
+
+export type UserModerationMute = typeof user_moderation_mutes.$inferSelect;
+export type NewUserModerationMute = typeof user_moderation_mutes.$inferInsert;
+
+export const user_terms_acceptances = pgTable(
+  'user_terms_acceptances',
+  {
+    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    kilo_user_id: text().notNull(),
+    terms_version: text().notNull(),
+    age_posture: text().notNull().default('13_plus'),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_terms_acceptances_user_version').on(
+      table.kilo_user_id,
+      table.terms_version
+    ),
+  ]
+);
+
+export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
+export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;

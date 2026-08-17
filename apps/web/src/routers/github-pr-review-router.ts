@@ -3,12 +3,14 @@ import 'server-only';
 import * as z from 'zod';
 import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
+import { and, eq } from 'drizzle-orm';
 
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { type OperationLedgerRow } from '@kilocode/db/schema';
+import { user_terms_acceptances, type OperationLedgerRow } from '@kilocode/db/schema';
 import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import { prIntentFingerprint, type PrLedgerIntent } from '@kilocode/app-shared/pr-review';
+import { CURRENT_UGC_TERMS_VERSION } from '@kilocode/app-shared/moderation';
 import {
   admitOperation,
   markReconcilePending,
@@ -915,6 +917,27 @@ type PrLedgerMutationArgs<T> = {
 type ReplayedResult<T> = T & { replayed: true };
 
 /**
+ * UGC gate: a user must have accepted the current Terms before any PR write.
+ * Runs before `admitOperation` so a missing acceptance never creates a ledger
+ * row. Throws PRECONDITION_FAILED `terms_required` when absent.
+ */
+async function assertTermsAccepted(userId: string): Promise<void> {
+  const [row] = await db
+    .select({ id: user_terms_acceptances.id })
+    .from(user_terms_acceptances)
+    .where(
+      and(
+        eq(user_terms_acceptances.kilo_user_id, userId),
+        eq(user_terms_acceptances.terms_version, CURRENT_UGC_TERMS_VERSION)
+      )
+    )
+    .limit(1);
+  if (!row) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'terms_required' });
+  }
+}
+
+/**
  * Ledger orchestration for a PR mutation (P1-A-08c):
  * - `admitted`: run the effect and settle completed / failed / reconcile-pending.
  * - `duplicate_settled`: replay the sanitized canonical result marked replayed.
@@ -1559,81 +1582,88 @@ export const githubPrReviewRouter = createTRPCRouter({
   }),
 
   // Post a single immediate review comment (no pending review required).
-  createReviewComment: baseProcedure.input(CreateReviewCommentInput).mutation(({ ctx, input }) =>
-    runPrCommentMutation({
-      userId: ctx.user.id,
-      distinctId: ctx.user.google_user_email ?? ctx.user.id,
-      intent: 'create_review_comment',
-      input,
-      operationKey: input.operationKey,
-      providerRefKey: 'commentId',
-      write: async octokit => {
-        const response = await octokit.pulls.createReviewComment(
-          buildCreateReviewCommentParams({
+  createReviewComment: baseProcedure.input(CreateReviewCommentInput).mutation(
+    async ({ ctx, input }) => {
+      await assertTermsAccepted(ctx.user.id);
+      return runPrCommentMutation({
+        userId: ctx.user.id,
+        distinctId: ctx.user.google_user_email ?? ctx.user.id,
+        intent: 'create_review_comment',
+        input,
+        operationKey: input.operationKey,
+        providerRefKey: 'commentId',
+        write: async octokit => {
+          const response = await octokit.pulls.createReviewComment(
+            buildCreateReviewCommentParams({
+              owner: input.owner,
+              repo: input.repo,
+              number: input.number,
+              body: input.body,
+              commitSha: input.commitSha,
+              path: input.path,
+              line: input.line,
+              side: input.side,
+              startLine: input.startLine,
+              startSide: input.startSide,
+            })
+          );
+          return { commentId: response.data.id, nodeId: response.data.node_id };
+        },
+        readRef: async (octokit, commentId) => {
+          const response = await octokit.pulls.getReviewComment({
             owner: input.owner,
             repo: input.repo,
-            number: input.number,
-            body: input.body,
-            commitSha: input.commitSha,
-            path: input.path,
-            line: input.line,
-            side: input.side,
-            startLine: input.startLine,
-            startSide: input.startSide,
-          })
-        );
-        return { commentId: response.data.id, nodeId: response.data.node_id };
-      },
-      readRef: async (octokit, commentId) => {
-        const response = await octokit.pulls.getReviewComment({
-          owner: input.owner,
-          repo: input.repo,
-          comment_id: commentId,
-        });
-        return { commentId: response.data.id, nodeId: response.data.node_id };
-      },
-    })
+            comment_id: commentId,
+          });
+          return { commentId: response.data.id, nodeId: response.data.node_id };
+        },
+      });
+    }
   ),
 
   // Reply to an existing review comment (creates a child comment in the
   // same thread).
-  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(({ ctx, input }) =>
-    runPrCommentMutation({
-      userId: ctx.user.id,
-      distinctId: ctx.user.google_user_email ?? ctx.user.id,
-      intent: 'reply_comment',
-      input,
-      operationKey: input.operationKey,
-      providerRefKey: 'commentId',
-      write: async octokit => {
-        const response = await octokit.pulls.createReplyForReviewComment(
-          buildReplyToCommentParams({
+  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(
+    async ({ ctx, input }) => {
+      await assertTermsAccepted(ctx.user.id);
+      return runPrCommentMutation({
+        userId: ctx.user.id,
+        distinctId: ctx.user.google_user_email ?? ctx.user.id,
+        intent: 'reply_comment',
+        input,
+        operationKey: input.operationKey,
+        providerRefKey: 'commentId',
+        write: async octokit => {
+          const response = await octokit.pulls.createReplyForReviewComment(
+            buildReplyToCommentParams({
+              owner: input.owner,
+              repo: input.repo,
+              number: input.number,
+              commentId: input.commentId,
+              body: input.body,
+            })
+          );
+          return { commentId: response.data.id, nodeId: response.data.node_id };
+        },
+        readRef: async (octokit, commentId) => {
+          const response = await octokit.pulls.getReviewComment({
             owner: input.owner,
             repo: input.repo,
-            number: input.number,
-            commentId: input.commentId,
-            body: input.body,
-          })
-        );
-        return { commentId: response.data.id, nodeId: response.data.node_id };
-      },
-      readRef: async (octokit, commentId) => {
-        const response = await octokit.pulls.getReviewComment({
-          owner: input.owner,
-          repo: input.repo,
-          comment_id: commentId,
-        });
-        return { commentId: response.data.id, nodeId: response.data.node_id };
-      },
-    })
+            comment_id: commentId,
+          });
+          return { commentId: response.data.id, nodeId: response.data.node_id };
+        },
+      });
+    }
   ),
 
   // Submit a pending review with an optional batch of inline comments and
   // an overall event (APPROVE / REQUEST_CHANGES / COMMENT). The confirmed
   // `state` is a bounded GitHub enum (not free text), so it is carried in the
   // canonical result and a replayed submitReview keeps the client's shape.
-  submitReview: baseProcedure.input(SubmitReviewInput).mutation(({ ctx, input }) =>
-    runPrCommentMutation({
+  submitReview: baseProcedure.input(SubmitReviewInput).mutation(async ({ ctx, input }) => {
+    await assertTermsAccepted(ctx.user.id);
+    return runPrCommentMutation({
       userId: ctx.user.id,
       distinctId: ctx.user.google_user_email ?? ctx.user.id,
       intent: 'submit_review',
@@ -1671,8 +1701,8 @@ export const githubPrReviewRouter = createTRPCRouter({
           state: response.data.state,
         };
       },
-    })
-  ),
+    });
+  }),
 
   // Resolve a review thread (GraphQL — there is no REST endpoint for this).
   resolveThread: baseProcedure.input(ThreadIdInput).mutation(async ({ ctx, input }) => {

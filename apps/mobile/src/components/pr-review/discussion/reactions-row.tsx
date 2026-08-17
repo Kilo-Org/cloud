@@ -33,8 +33,10 @@ const REACTION_PILL_HIT_SLOP = { top: 10, bottom: 10, left: 2, right: 2 } as con
 const ADD_REACTION_HIT_SLOP = { top: 8, bottom: 8, left: 2, right: 2 } as const;
 // Allowance for the platform's own Modal slide-out animation. While the Modal
 // is still presented the background accessibility tree — including the "Add
-// reaction" trigger — is unreachable, so focus can only return after it.
-const SHEET_DISMISS_ANIMATION_MS = 300;
+// reaction" trigger — is unreachable, so focus can only return after it. The
+// slide runs ~300ms on both platforms; the extra margin keeps a slow frame
+// from landing the focus call while the sheet is still up, where it no-ops.
+const SHEET_DISMISS_ANIMATION_MS = 400;
 
 type ReactionsRowProps = {
   // Raw reactions from the DTO — `content` is a plain string (GitHub can
@@ -59,6 +61,7 @@ export function ReactionsRow({
   const colors = useThemeColors();
   const [pickerOpen, setPickerOpen] = useState(false);
   const addReactionRef = useRef<View>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pills = selectReactionPills(reactions);
   const isDisabled = Boolean(disabled);
   const isReadOnly = Boolean(readOnly);
@@ -67,11 +70,17 @@ export function ReactionsRow({
   // Centralized close: every picker close path (close button, backdrop,
   // Android back via `onRequestClose`, and picking a reaction) flips the
   // sheet's `visible` off, then returns screen-reader focus to the trigger
-  // once the slide-out has run. The timer needs no cleanup: `moveA11yFocus`
-  // is a no-op once the ref is empty, so an unmounted row does nothing.
+  // once the slide-out has run. Reopening cancels a pending restore, so a
+  // fast close-reopen never pulls focus to the trigger behind the sheet. An
+  // unmounted row needs no cleanup: `moveA11yFocus` no-ops on an empty ref.
+  function openPicker() {
+    clearTimeout(focusTimerRef.current);
+    setPickerOpen(true);
+  }
+
   function closePicker() {
     setPickerOpen(false);
-    setTimeout(() => {
+    focusTimerRef.current = setTimeout(() => {
       moveA11yFocus(addReactionRef);
     }, SHEET_DISMISS_ANIMATION_MS);
   }
@@ -104,7 +113,7 @@ export function ReactionsRow({
           disabled={isDisabled}
           onPress={() => {
             void Haptics.selectionAsync();
-            setPickerOpen(true);
+            openPicker();
           }}
           hitSlop={ADD_REACTION_HIT_SLOP}
           className={cn(

@@ -80,7 +80,7 @@ async function openPicker(): Promise<TestRenderer.ReactTestRenderer> {
 function expectDelayedFocusRestore(): void {
   expect(moveFocus).not.toHaveBeenCalled();
   act(() => {
-    vi.advanceTimersByTime(300);
+    vi.advanceTimersByTime(400);
   });
   expect(moveFocus).toHaveBeenCalledTimes(1);
 }
@@ -117,6 +117,25 @@ describe('ReactionsRow picker dismissal focus', () => {
     expect(modalProps(renderer).visible).toBe(false);
 
     expectDelayedFocusRestore();
+    renderer.unmount();
+  });
+
+  it('cancels a pending focus restore when the picker reopens inside the window', async () => {
+    const renderer = await openPicker();
+
+    press(
+      renderer,
+      p => p.accessibilityLabel === 'Close reactions' && p.accessibilityRole === undefined
+    );
+    press(renderer, p => p.accessibilityLabel === 'Add reaction');
+    expect(modalProps(renderer).visible).toBe(true);
+
+    // The stale timer must not pull focus to the trigger behind the sheet.
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(moveFocus).not.toHaveBeenCalled();
+
     renderer.unmount();
   });
 

@@ -33,11 +33,12 @@ const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
   },
 };
 
-export function hasCustomizedProviderOptions(request: GatewayRequest) {
+function isPartnerProviderAllowed(request: GatewayRequest, providerId: Provider['id']) {
   const provider = request.body.provider;
-  // Direct partners do not support advanced provider routing, so customized options cannot be
-  // forwarded safely even when they look compatible at face value. An empty object is harmless.
-  return provider !== undefined && Object.keys(provider).length > 0;
+  return (
+    (!provider?.only || provider.only.includes(providerId)) &&
+    (!provider?.ignore || !provider.ignore.includes(providerId))
+  );
 }
 
 function getEligiblePartnerRoute(input: PercentageRoutedPartnerInput): PartnerRoute | null {
@@ -48,7 +49,7 @@ function getEligiblePartnerRoute(input: PercentageRoutedPartnerInput): PartnerRo
     route.provider.apiKey.trim().length === 0 ||
     hasUserByok ||
     (sourceProviderId !== 'vercel' && sourceProviderId !== 'openrouter') ||
-    hasCustomizedProviderOptions(request) ||
+    !isPartnerProviderAllowed(request, route.provider.id) ||
     !route.provider.supportedChatApis.includes(request.kind)
   ) {
     return null;

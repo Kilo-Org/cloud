@@ -240,7 +240,10 @@ async function routeToUserKiloFacade(
 
 async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
   const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, nextAuthSecret);
+  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, {
+    secret: nextAuthSecret,
+    connectionString: c.env.HYPERDRIVE.connectionString,
+  });
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }

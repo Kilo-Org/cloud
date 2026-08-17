@@ -93,6 +93,18 @@ vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
 
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: () => ({
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ api_token_pepper: null, blocked_reason: null }],
+        }),
+      }),
+    }),
+  }),
+}));
+
 const { default: worker } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -102,6 +114,7 @@ type MockEnv = {
   Sandbox: unknown;
   SandboxSmall: unknown;
   WS_ALLOWED_ORIGINS?: string;
+  HYPERDRIVE: { connectionString: string };
   CLOUD_AGENT_SESSION: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -117,6 +130,7 @@ function createEnv(): MockEnv {
     NEXTAUTH_SECRET: secret,
     Sandbox: {},
     SandboxSmall: {},
+    HYPERDRIVE: { connectionString: 'postgres://test' },
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(),
       get: vi.fn(),

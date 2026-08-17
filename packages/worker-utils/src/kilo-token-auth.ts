@@ -7,6 +7,7 @@ import { verifyKiloToken } from './kilo-token';
 
 export type KiloBearerAuthResult = {
   userId: string;
+  botId?: string;
 };
 
 export type KiloSecretBinding = {
@@ -40,8 +41,8 @@ export async function findKiloUserPepper(
 
 export async function verifyKiloBearerAgainstCurrentPepper(params: {
   token: string | null;
-  nextAuthSecret: KiloSecretBinding;
-  workerEnv: string;
+  nextAuthSecret: KiloSecretBinding | string;
+  workerEnv?: string;
   connectionString: string;
   getUserPepper?: GetKiloUserPepper;
 }): Promise<KiloBearerAuthResult | null> {
@@ -50,9 +51,15 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
   const getUserPepper = params.getUserPepper ?? findKiloUserPepper;
 
   try {
-    const secret = await getCachedSecret(params.nextAuthSecret, 'NEXTAUTH_SECRET');
+    const secret =
+      typeof params.nextAuthSecret === 'string'
+        ? params.nextAuthSecret
+        : await getCachedSecret(params.nextAuthSecret, 'NEXTAUTH_SECRET');
     const payload = await verifyKiloToken(params.token, secret);
-    if (payload.env !== params.workerEnv) {
+
+    // Env check is skipped only when the caller does not pass a workerEnv.
+    // When workerEnv is set, a token without env (or with a mismatched env) fails.
+    if (params.workerEnv && payload.env !== params.workerEnv) {
       return null;
     }
 
@@ -61,16 +68,21 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
       return null;
     }
 
-    const tokenPepper = payload.apiTokenPepper ?? null;
-    if (result.pepper !== tokenPepper) {
-      return null;
-    }
-
     if (result.blockedReason !== null) {
       return null;
     }
 
-    return { userId: payload.kiloUserId };
+    // Pepper equality is skipped only when the claim is absent (internal
+    // service tokens). A present claim — string or null — is always compared.
+    if (payload.apiTokenPepper !== undefined && result.pepper !== payload.apiTokenPepper) {
+      return null;
+    }
+
+    const authResult: KiloBearerAuthResult = { userId: payload.kiloUserId };
+    if (payload.botId) {
+      authResult.botId = payload.botId;
+    }
+    return authResult;
   } catch {
     return null;
   }

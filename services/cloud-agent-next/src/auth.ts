@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
@@ -60,11 +61,16 @@ export async function resolveSecret(
 
 export async function validateKiloToken(
   authHeader: string | null,
-  secret: string | null | undefined
+  params: {
+    secret: string | null | undefined;
+    connectionString: string;
+    workerEnv?: string;
+  }
 ): Promise<
   | { success: true; userId: string; token: string; botId?: string }
   | { success: false; error: string }
 > {
+  const { secret, connectionString, workerEnv } = params;
   if (!secret) {
     return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
   }
@@ -74,13 +80,18 @@ export async function validateKiloToken(
     return { success: false, error: 'Missing or malformed Authorization header' };
   }
 
-  try {
-    const payload = await verifyKiloToken(token, secret);
-    return { success: true, userId: payload.kiloUserId, token, botId: payload.botId };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'JWT verification failed';
-    return { success: false, error: message };
+  const auth = await verifyKiloBearerAgainstCurrentPepper({
+    token,
+    nextAuthSecret: secret,
+    connectionString,
+    ...(workerEnv ? { workerEnv } : {}),
+  });
+
+  if (!auth) {
+    return { success: false, error: 'Invalid or expired token' };
   }
+
+  return { success: true, userId: auth.userId, token, botId: auth.botId };
 }
 
 export function validateStreamTicket(

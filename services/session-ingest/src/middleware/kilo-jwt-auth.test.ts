@@ -1,92 +1,196 @@
 import { Hono } from 'hono';
 import { SignJWT } from 'jose';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
 
 import { kiloJwtAuthMiddleware } from './kilo-jwt-auth';
+
+const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
+
+const userRowByUserId = vi.hoisted(
+  () => new Map<string, { pepper: string | null; blockedReason: string | null }>()
+);
+
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: () => ({
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => {
+            const row = userRowByUserId.get('usr_123');
+            if (!row) return [];
+            return [{ api_token_pepper: row.pepper, blocked_reason: row.blockedReason }];
+          },
+        }),
+      }),
+    }),
+  }),
+}));
 
 type TestEnv = {
   NEXTAUTH_SECRET_PROD: {
     get: () => Promise<string>;
-  };
-  USER_EXISTS_CACHE: {
-    get: (key: string) => Promise<string | null>;
-    put: (key: string, value: string, options?: { expirationTtl: number }) => Promise<void>;
   };
   HYPERDRIVE: {
     connectionString: string;
   };
 };
 
-function makeEnv(secret: string, opts?: { cachedUserState?: '1' | '0' | null }): TestEnv {
+function makeEnv(secret: string): TestEnv {
   return {
     NEXTAUTH_SECRET_PROD: {
       get: async () => secret,
     },
-    USER_EXISTS_CACHE: {
-      get: async () => opts?.cachedUserState ?? null,
-      put: async () => {},
-    },
-    // Not used when the KV cache returns a hit.
-    HYPERDRIVE: { connectionString: '' },
+    HYPERDRIVE: { connectionString: 'postgres://test' },
   };
 }
 
-async function sign(payload: Record<string, unknown>, secret: string): Promise<string> {
-  return new SignJWT(payload)
+function makeApp() {
+  const app = new Hono<{ Bindings: TestEnv; Variables: { user_id: string } }>();
+  app.use('/api/*', kiloJwtAuthMiddleware);
+  app.get('/api/me', c => c.json({ user_id: c.get('user_id') }));
+  app.get('/api/user/cli', c => c.json({ user_id: c.get('user_id') }));
+  app.get('/api/user/web', c => c.json({ user_id: c.get('user_id') }));
+  return app;
+}
+
+async function signUserToken(pepper: string): Promise<string> {
+  const { token } = await signKiloToken({
+    userId: 'usr_123',
+    pepper,
+    secret: TEST_JWT_SECRET,
+    expiresInSeconds: 3600,
+    env: 'production',
+    extra: { tokenSource: 'kilo-chat' },
+  });
+  return token;
+}
+
+async function signInternalToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({ version: 3, kiloUserId: 'usr_123' })
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(new TextEncoder().encode(secret));
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(new TextEncoder().encode(TEST_JWT_SECRET));
 }
 
 describe('kiloJwtAuthMiddleware', () => {
-  it('rejects missing Authorization header', async () => {
-    const app = new Hono<{ Bindings: TestEnv; Variables: { user_id: string } }>();
-    app.use('/api/*', kiloJwtAuthMiddleware);
-    app.get('/api/me', c => c.json({ user_id: c.get('user_id') }));
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    userRowByUserId.clear();
+  });
 
-    const res = await app.fetch(new Request('http://local/api/me'), makeEnv('secret'));
+  it('rejects missing Authorization header', async () => {
+    const res = await makeApp().fetch(new Request('http://local/api/me'), makeEnv(TEST_JWT_SECRET));
     expect(res.status).toBe(401);
   });
 
-  it('accepts valid v3 token when user exists in cache', async () => {
-    const secret = 'test-secret';
-    const token = await sign({ kiloUserId: 'usr_123', version: 3 }, secret);
+  it('accepts a token with the current pepper for an active account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
 
-    const app = new Hono<{ Bindings: TestEnv; Variables: { user_id: string } }>();
-    app.use('/api/*', kiloJwtAuthMiddleware);
-    app.get('/api/me', c => c.json({ user_id: c.get('user_id') }));
-
-    const res = await app.fetch(
+    const res = await makeApp().fetch(
       new Request('http://local/api/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }),
-      makeEnv(secret, { cachedUserState: '1' })
+      makeEnv(TEST_JWT_SECRET)
     );
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ user_id: 'usr_123' });
   });
 
-  it('rejects valid v3 token when user is cached as not-found', async () => {
-    const secret = 'test-secret';
-    const token = await sign({ kiloUserId: 'deleted_user', version: 3 }, secret);
+  it('rejects a stale pepper even when the user exists', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-stale');
 
-    const app = new Hono<{ Bindings: TestEnv; Variables: { user_id: string } }>();
-    app.use('/api/*', kiloJwtAuthMiddleware);
-    app.get('/api/me', c => c.json({ user_id: c.get('user_id') }));
-
-    const res = await app.fetch(
+    const res = await makeApp().fetch(
       new Request('http://local/api/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }),
-      makeEnv(secret, { cachedUserState: '0' })
+      makeEnv(TEST_JWT_SECRET)
     );
 
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ success: false, error: 'User account not found' });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
+  it('rejects a blocked account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'manual block' });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
+  it('accepts an internal token (no pepper) for an active account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signInternalToken();
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('rejects an internal token (no pepper) for a blocked account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'manual block' });
+    const token = await signInternalToken();
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
+  it('reads ?token= on a websocket upgrade to /api/user/cli', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/cli?token=${token}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('does not read ?token= on a websocket upgrade to /api/user/web', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?token=${token}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Missing or malformed Authorization header',
+    });
   });
 });

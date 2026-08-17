@@ -10,7 +10,10 @@ export const authMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
     const authHeader = c.req.header('authorization');
     const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    const result = await validateKiloToken(authHeader ?? null, nextAuthSecret);
+    const result = await validateKiloToken(authHeader ?? null, {
+      secret: nextAuthSecret,
+      connectionString: c.env.HYPERDRIVE.connectionString,
+    });
 
     if (!result.success) {
       logger.withFields({ error: result.error }).warn('Authentication failed');

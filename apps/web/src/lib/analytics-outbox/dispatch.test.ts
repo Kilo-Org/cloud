@@ -5,6 +5,7 @@
  * `analytics-outbox.integration.test.ts`.
  */
 import { randomUUID } from 'crypto';
+import { captureMessage } from '@sentry/nextjs';
 
 import { dispatchQueuedAnalyticsEvents } from '@/lib/analytics-outbox/dispatch';
 import {
@@ -158,6 +159,8 @@ describe('dispatchQueuedAnalyticsEvents', () => {
       error: 'posthog unavailable',
     });
     expect(mockMarkOutboxDelivered).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalled();
+    expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain(row.distinct_id);
     expect(summary.claimed).toBe(1);
     expect(summary.retried).toBe(1);
     expect(summary.failed).toBe(0);

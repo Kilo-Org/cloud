@@ -260,8 +260,9 @@ function buildDismissQueueMessage(
 /**
  * Creates the command row and sends its queue message. With an `operationKey`
  * the row is created-or-found by that key (P1-A-08e): a same-key retry returns
- * the original command and sends no second message, so the effect runs once.
- * A queue-send failure marks the fresh command failed before rethrowing, so no
+ * the original command. A command whose first queue admission failed is reset
+ * and enqueued again; every other existing command sends no second message.
+ * A queue-send failure marks the command failed before rethrowing, so no
  * command is left waiting for a message that was never sent.
  */
 async function enqueueSecurityCommand(
@@ -285,7 +286,19 @@ async function enqueueSecurityCommand(
 
   const ids = { commandId: command.id, runId: params.runId, messageId: params.messageId };
 
-  if (!created) {
+  let shouldEnqueue = created;
+  if (!created && command.status === 'failed' && command.result_code === 'QUEUE_ADMISSION_FAILED') {
+    const retry = await transitionSecurityAgentCommandWithCurrentState(db, {
+      commandId: command.id,
+      fromStatuses: ['failed'],
+      status: 'accepted',
+      resultCode: null,
+      lastErrorRedacted: null,
+    });
+    shouldEnqueue = retry.transitioned;
+  }
+
+  if (!shouldEnqueue) {
     console.info('Security command reused for an existing operation key', {
       command_type: params.create.commandType,
       operation_key: params.operationKey,

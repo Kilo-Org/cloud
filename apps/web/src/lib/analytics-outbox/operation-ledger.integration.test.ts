@@ -194,7 +194,7 @@ describe('operation ledger (integration)', () => {
     expect(await db.select().from(analytics_event_outbox)).toHaveLength(0);
   });
 
-  it('emits only one outbox event per (ledger row, event name)', async () => {
+  it('emits the ambiguous phase and the later terminal outcome once each', async () => {
     const admitted = await admitSession('dedupe-event-user');
     if (admitted.admission !== 'admitted') return;
     const rowId = admitted.row.id;
@@ -210,8 +210,14 @@ describe('operation ledger (integration)', () => {
     });
 
     const outboxRows = await db.select().from(analytics_event_outbox);
-    expect(outboxRows).toHaveLength(1);
-    expect(outboxRows[0]?.properties).toMatchObject({ outcome: 'ambiguous' });
+    expect(outboxRows).toHaveLength(2);
+    expect(outboxRows.map(row => row.properties)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ outcome: 'ambiguous' }),
+        expect.objectContaining({ outcome: 'completed' }),
+      ])
+    );
+    expect(new Set(outboxRows.map(row => row.event_uuid)).size).toBe(2);
   });
 
   it('rejects a canonical_result over the serialized bound and leaves the row admitted', async () => {

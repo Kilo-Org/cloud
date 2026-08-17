@@ -569,6 +569,23 @@ describe('useNewSessionCreator onCreated', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
+  it('contains a throwing onCreated callback and still navigates', async () => {
+    const onCreated = vi.fn(() => {
+      throw new Error('host callback failed');
+    });
+    const resultRef = mountCreator(createInput({ organizationId: 'org-1', onCreated }));
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'Hello agent';
+
+    await act(async () => {
+      await createSessionFromDraft();
+    });
+
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith(expect.stringContaining('agent-chat/sess-1'));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
   it('never fires onCreated when prepareSession rejects, and preserves the draft', async () => {
     prepareSessionMutate.mockRejectedValueOnce(new Error('boom'));
     const onCreated = vi.fn(() => undefined);

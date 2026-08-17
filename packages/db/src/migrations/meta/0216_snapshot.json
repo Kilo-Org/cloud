@@ -1,5 +1,5 @@
 {
-  "id": "83c888dd-e367-451e-811e-33ef6e0b30e1",
+  "id": "3228e9a7-60c9-45b4-b228-47c127c6ec61",
   "prevId": "2f7c0c18-3e2d-4e0f-8ab8-2efe1ee763a8",
   "version": "7",
   "dialect": "postgresql",
@@ -29716,7 +29716,7 @@
           ],
           "isUnique": true,
           "where": "\"security_agent_commands\".\"owned_by_organization_id\" IS NOT NULL AND \"security_agent_commands\".\"operation_key\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -29738,7 +29738,7 @@
           ],
           "isUnique": true,
           "where": "\"security_agent_commands\".\"owned_by_user_id\" IS NOT NULL AND \"security_agent_commands\".\"operation_key\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }

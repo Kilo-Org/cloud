@@ -24,7 +24,7 @@ export type CreateSecurityAgentCommandInput = {
 
 export type CreateOrFindSecurityAgentCommandResult = {
   command: SecurityAgentCommand;
-  /** False when a same-key request already created the command. */
+  /** False when a same-key request already created the command row. */
   created: boolean;
 };
 
@@ -107,8 +107,8 @@ export async function createSecurityAgentCommand(
  * request already created. The partial unique indexes on
  * `(owner, operation_key)` arbitrate concurrent inserts, so the loser reads the
  * committed winner instead of raising a unique violation, and a conflict always
- * implies the same owner. `created: false` means the effect already ran and
- * must not run again.
+ * implies the same owner. The caller must inspect an existing command whose
+ * initial queue admission failed before it returns an accepted response.
  */
 export async function createOrFindSecurityAgentCommandByOperationKey(
   db: SecurityAgentCommandDb,
@@ -158,7 +158,7 @@ export async function transitionSecurityAgentCommand(
         input.status === 'running'
           ? sql`COALESCE(${security_agent_commands.started_at}, now())`
           : undefined,
-      completed_at: isTerminalStatus(input.status) ? sql`now()` : undefined,
+      completed_at: isTerminalStatus(input.status) ? sql`now()` : null,
       updated_at: sql`now()`,
     })
     .where(

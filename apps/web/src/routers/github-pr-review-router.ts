@@ -835,9 +835,9 @@ async function settleFailedPrRow(args: {
  * Marks a PR ledger row `reconcile_pending` and then throws the ambiguous
  * CONFLICT — never returns. Every unresolved path goes through here: the
  * transition makes the reconciliation lease immediately claimable and records
- * the ambiguous outcome exactly once (the outbox `event_uuid` is a
- * deterministic UUIDv5 per row+event, so an already-pending row never
- * double-emits). If the persistence fails the row stays `admitted` and a
+ * the ambiguous outcome exactly once (its outbox identity has an ambiguous
+ * qualifier, so an already-pending row never double-emits). If persistence
+ * fails the row stays `admitted` and a
  * same-key retry could re-execute a possibly-committed write, so the distinct
  * non-retryable persistence error is thrown instead of the ambiguous marker.
  */

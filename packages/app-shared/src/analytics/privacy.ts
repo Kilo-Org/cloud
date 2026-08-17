@@ -8,8 +8,8 @@
  *
  * Matching is case-, separator-, and acronym-insensitive and covers letter
  * suffixes, so `Repository`, `raw_prompt`, `APIToken`, `repo_name`, and
- * `secret_value` are all rejected. The one carve-out is `repo_count`, a count
- * rather than repository content.
+ * `secret_value` are all rejected. The `repo_count` and `auth_ready` metrics
+ * are explicit carve-outs.
  */
 
 const PROHIBITED_TERMS = [
@@ -20,6 +20,11 @@ const PROHIBITED_TERMS = [
   'content',
   'token',
   'secret',
+  'password',
+  'passwd',
+  'auth',
+  'key',
+  'credential',
   'transaction',
   'comment',
   'message',
@@ -43,7 +48,7 @@ function normalizeKey(key: string): string {
 export function isProhibitedPropertyKey(key: string): boolean {
   const normalized = normalizeKey(key);
 
-  if (normalized === 'repo_count') {
+  if (normalized === 'repo_count' || normalized === 'auth_ready') {
     return false;
   }
 

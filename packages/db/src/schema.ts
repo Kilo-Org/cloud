@@ -6817,11 +6817,13 @@ export const security_agent_commands = pgTable(
     // enforce. Both are partial so keyless commands stay unconstrained.
     uniqueIndex('UQ_security_agent_commands_org_operation_key')
       .on(table.owned_by_organization_id, table.operation_key)
+      .concurrently()
       .where(
         sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.operation_key} IS NOT NULL`
       ),
     uniqueIndex('UQ_security_agent_commands_user_operation_key')
       .on(table.owned_by_user_id, table.operation_key)
+      .concurrently()
       .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.operation_key} IS NOT NULL`),
   ]
 );

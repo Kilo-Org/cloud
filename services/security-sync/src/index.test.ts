@@ -1054,6 +1054,37 @@ describe('same-key command dedupe (P1-A-08e)', () => {
     );
   });
 
+  it('re-enqueues a same-key command whose first queue admission failed', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    vi.mocked(createOrFindSecurityAgentCommandByOperationKey).mockResolvedValue({
+      command: {
+        id: 'command-1',
+        status: 'failed',
+        result_code: 'QUEUE_ADMISSION_FAILED',
+      },
+      created: false,
+    } as never);
+
+    const response = await worker.fetch(
+      manualSyncRequest('retry-safe-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+
+    expect(response.status).toBe(202);
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledWith(
+      {},
+      {
+        commandId: 'command-1',
+        fromStatuses: ['failed'],
+        status: 'accepted',
+        resultCode: null,
+        lastErrorRedacted: null,
+      }
+    );
+    expect(queuedBatches).toHaveLength(1);
+    expect(queuedBatches[0]?.[0]?.body).toMatchObject({ commandId: 'command-1' });
+  });
+
   it('propagates a rejected operation key without creating a command or a queue message', async () => {
     const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
     vi.mocked(createOrFindSecurityAgentCommandByOperationKey).mockRejectedValue(

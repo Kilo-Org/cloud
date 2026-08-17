@@ -18,8 +18,9 @@
  * `canonical_result` is bounded at `MAX_CANONICAL_RESULT_BYTES` (4096)
  * serialized bytes; the settle helper rejects larger payloads.
  *
- * Event identity: outbox `event_uuid` is a deterministic UUIDv5 of the UTF-8
- * string `` `${ledger_row_id}:${event_name}` `` under `EVENT_UUID_NAMESPACE`.
+ * Event identity: a definitive outbox `event_uuid` is a deterministic UUIDv5
+ * of `` `${ledger_row_id}:${event_name}` ``. An ambiguous phase adds the
+ * `:ambiguous` suffix, so later reconciliation can emit the terminal outcome.
  */
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
@@ -584,16 +585,19 @@ function validateOutboxEvent(event: OutboxEventInput): void {
 }
 
 /**
- * Inserts an outbox row with the deterministic UUIDv5 `event_uuid`. A
- * conflicting `event_uuid` (the same row already emitted this event name) is
- * skipped: one event per (ledger row, event name) by design. Callers must run
- * `validateOutboxEvent` first, before their own writes.
+ * Inserts an outbox row with the deterministic UUIDv5 `event_uuid`. Ambiguous
+ * and definitive outcomes have separate identities. A conflict skips a repeat
+ * of the same outcome phase. Callers must run `validateOutboxEvent` first.
  */
 async function insertOutboxEvent(
   tx: LedgerTransaction,
   params: { rowId: string; event: OutboxEventInput }
 ): Promise<AnalyticsEventOutboxRow | null> {
-  const eventUuid = await computeEventUuid(params.rowId, params.event.eventName);
+  const eventIdentity =
+    params.event.properties.outcome === 'ambiguous'
+      ? `${params.event.eventName}:ambiguous`
+      : params.event.eventName;
+  const eventUuid = await computeEventUuid(params.rowId, eventIdentity);
 
   const values: NewAnalyticsEventOutboxRow = {
     event_uuid: eventUuid,

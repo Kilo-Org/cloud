@@ -10,10 +10,9 @@ the recorded exclusions.
 
 - One source of truth for event names and payload shapes:
   `ANALYTICS_EVENT_SCHEMAS` in `packages/app-shared/src/analytics/event-map.ts`.
-  The inferred `AnalyticsEventMap` types drive the typed capture helpers in
-  the mobile app (`apps/mobile/src/lib/analytics/posthog.ts`) and the web app
-  (`apps/web/src/lib/analytics-outbox/capture.ts`) and the durable-outbox
-  insert validation (`packages/db`, Wave 2).
+  The inferred `AnalyticsEventMap` types drive the typed mobile capture helper
+  (`apps/mobile/src/lib/analytics/posthog.ts`) and durable-outbox validation
+  (`packages/db/src/operation-ledger.ts`, Wave 2).
 - Every object schema is `.strict()`; values are restricted to stable enum
   strings, integer counts, `duration_ms` integers, and booleans. The single
   exception is `app_startup`, a bounded record of numeric timing marks.
@@ -31,6 +30,8 @@ the recorded exclusions.
 - The deterministic outbox `event_uuid` (Wave 2) is event identity for
   at-least-once delivery and deduplication, not content. It is allowed because
   the resource-ID rule matches only keys ending in `_id`.
+- An ambiguous phase uses a distinct qualified identity. Reconciliation can
+  then emit the definitive event without duplicating either phase.
 
 ## Privacy deny-list (DEC-05)
 
@@ -38,22 +39,22 @@ Prohibited in analytics payloads (enforced by schema and test): raw prompts,
 message content, URLs, repository names, comments, emails, tokens, secrets,
 transaction IDs, and resource IDs. The predicate (`privacy.ts`) rejects any key
 segment named `email`, `url`, `repo`, `prompt`, `content`, `token`, `secret`,
-`transaction`, `comment`, or `message` (with optional letter suffix, so
-`repository` and `tokens` match too), and any key ending in `_id`. The one
-carve-out is `repo_count`. Allowed: stable enum strings, integer counts,
-`duration_ms` integers, and booleans.
+`password`, `passwd`, `auth`, `key`, `credential`, `transaction`, `comment`, or
+`message` (with optional letter suffix), and any key ending in `_id`. The
+`repo_count` and `auth_ready` metrics are explicit carve-outs. Allowed: stable
+enum strings, integer counts, `duration_ms` integers, and booleans.
 
 Two enforcement layers:
 
 - Compile time: the strict object schemas cannot carry a prohibited key.
-- Runtime: `captureUncataloged` (mobile, AppsFlyer mirror only) and the
-  `app_startup` record payload redact prohibited keys before capture.
+- Runtime: the uncataloged `captureEvent` overload (mobile AppsFlyer mirror
+  only) and the `app_startup` record redact prohibited keys before capture.
 
 ## Delivery model
 
 | Phase | Event class | Delivery | Duplication semantics | Owner of truth |
 |---|---|---|---|---|
-| Accepted | Every non-`*_settled` event | Best-effort: client SDK direct (mobile) or `captureCatalogEvent` after the response (web). No outbox row. | Client SDKs and PostHog deduplicate where supported; best-effort may drop under transport failure. | Authoritative boundary of the underlying action (e.g. UI action, post-commit acceptance). Never an outcome authority. |
+| Accepted | Every non-`*_settled` event | Best-effort: client SDK direct (mobile) or an existing server helper such as `trackKiloPassPurchaseCompleted` (web). No outbox row. | Client SDKs and PostHog deduplicate where supported; best-effort may drop under transport failure. | Authoritative boundary of the underlying action (e.g. UI action, post-commit acceptance). Never an outcome authority. |
 | Terminal | `*_settled` events | Durable outbox (Wave 2): insert in the same transaction as the ledger settle, drained by the web cron. | At-least-once. Deterministic `event_uuid` (UUIDv5) dedupes; duplicates possible only in the crash window between send and mark. | The authoritative acceptance boundary per domain (see event table). |
 
 `phase: 'accepted'` events are explicitly best-effort and never insert outbox
@@ -78,8 +79,8 @@ not a terminal outcome.
 
 Columns: name — owner — business question — authoritative source boundary —
 privacy class — delivery. "Best-effort (SDK)" means the mobile PostHog SDK
-captures at the client action. "Best-effort (server)" means
-`captureCatalogEvent` on the web.
+captures at the client action. "Best-effort (server)" uses the owning web
+helper, such as `apps/web/src/lib/kilo-pass/posthog-tracking.ts`.
 
 ### Existing mobile events (grandfathered names and shapes)
 
@@ -102,8 +103,8 @@ captures at the client action. "Best-effort (server)" means
 ### KiloClaw onboarding events (legacy kebab-case, AppsFlyer-locked)
 
 Names are locked because they feed AppsFlyer dashboards; do not rename.
-Captured through the AppsFlyer SDK and mirrored into PostHog via
-`captureUncataloged`.
+Captured through the AppsFlyer SDK and mirrored into PostHog via the uncataloged
+`captureEvent` overload in `apps/mobile/src/lib/analytics/posthog.ts`.
 
 | Event | Owner | Business question | Source boundary | Privacy class | Delivery |
 |---|---|---|---|---|---|
@@ -150,10 +151,9 @@ receipt.
 - `app_startup` payload stays a bounded record of numeric timing marks (the
   single record-schema exception); its keys are checked against the deny-list
   at runtime capture.
-- `captureUncataloged` (mobile) is sanctioned for the AppsFlyer mirror path
-  only (`appsflyer.ts` `trackEvent`, which forwards arbitrary locked funnel
-  names). No other caller may use it; it applies consent, generation, and
-  privacy redaction.
+- The uncataloged mobile `captureEvent` overload is sanctioned for the
+  AppsFlyer mirror path only. `appsflyer.ts` `trackEvent` forwards the locked
+  funnel names through consent, generation, and privacy checks.
 - KiloClaw component call sites keep calling the typed `captureEvent`; their
   event names have exact map entries and compile unedited. KiloClaw files are
   never edited by the analytics contract.

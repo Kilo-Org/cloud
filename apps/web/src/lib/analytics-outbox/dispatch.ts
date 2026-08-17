@@ -126,7 +126,6 @@ function outboxLogFields(row: AnalyticsEventOutboxRow): Record<string, unknown> 
     analytics_event_id: row.id,
     analytics_event_uuid: row.event_uuid,
     analytics_event_name: row.event_name,
-    distinct_id: row.distinct_id,
     status: row.status,
     attempts: row.attempts,
     dispatch_source: 'cron',

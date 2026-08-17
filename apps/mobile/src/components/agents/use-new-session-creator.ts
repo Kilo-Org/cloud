@@ -145,7 +145,11 @@ export function useNewSessionCreator({
         // Signal the host (e.g. clear the new-session draft) before navigating,
         // so the draft is gone by the time the route unmounts and can never be
         // flushed back by an unmount write.
-        onCreated?.();
+        try {
+          onCreated?.();
+        } catch {
+          // The session exists; a host callback failure must not skip navigation.
+        }
         // Contained on its own so a rejected haptics call still navigates.
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

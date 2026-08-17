@@ -1006,17 +1006,21 @@ async function processSecuritySyncMessage(
     });
     requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
   }
-  await settleSecurityLedgerByProviderRef(db, {
-    providerRef: body.messageId,
-    intent: 'manual_sync',
-    status: terminal.status,
-    resultCode: terminal.resultCode,
-    userId: body.actor?.id,
-    actorEmail: body.actor?.email,
-    dispatchedAt: body.dispatchedAt,
-    repoCount: result.synced,
-    errorCount: result.errors,
-  });
+  // Only a manual sync can have a ledger row (the web admits it before calling
+  // the Worker), so a scheduled run must never pay the lookup.
+  if (body.trigger === 'manual') {
+    await settleSecurityLedgerByProviderRef(db, {
+      providerRef: body.messageId,
+      intent: 'manual_sync',
+      status: terminal.status,
+      resultCode: terminal.resultCode,
+      userId: body.actor?.id,
+      actorEmail: body.actor?.email,
+      dispatchedAt: body.dispatchedAt,
+      repoCount: result.synced,
+      errorCount: result.errors,
+    });
+  }
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
     command_type: body.commandId ? 'sync' : undefined,

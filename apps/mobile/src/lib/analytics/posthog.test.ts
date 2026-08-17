@@ -280,6 +280,27 @@ describe('captureEvent privacy and gates', () => {
     });
   });
 
+  it('warns in development and names every dropped key', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.stubGlobal('__DEV__', true);
+    try {
+      const { initPostHog, captureEvent } = await loadModule();
+      initPostHog();
+      captureEvent(dynamicName('onboarding-entered'), {
+        surface: 'claw',
+        repo_name: 'acme/app',
+        session_id: 'x',
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        'Analytics onboarding-entered: redacted prohibited properties repo_name, session_id'
+      );
+    } finally {
+      vi.stubGlobal('__DEV__', false);
+      warn.mockRestore();
+    }
+  });
+
   it('keeps every allowed key on an uncataloged payload', async () => {
     const { initPostHog, captureEvent } = await loadModule();
     initPostHog();

@@ -26,6 +26,7 @@ import {
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { ORGANIZATION_WRITE_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
@@ -178,7 +179,7 @@ function orgSettledOutboxEvent(params: {
   outcome: 'completed' | 'failed';
 }): OutboxEventInput {
   return {
-    eventName: 'organization_write_settled',
+    eventName: ORGANIZATION_WRITE_SETTLED_EVENT,
     // Identity channel (the user's email), not an event property.
     distinctId: params.user.google_user_email || params.user.id,
     properties: {
@@ -356,23 +357,31 @@ async function auditAndSettleOrgCompleted(args: {
   });
 }
 
-/** Audit + settle + outbox for a completed role change. */
-async function auditAndSettleOrgRoleChange(args: {
+/**
+ * Audit + settle + outbox for a completed role change. The `reconciled` variant
+ * is the takeover repair: it read the role back and never observed the actor's
+ * original write, so the audit message must not claim a `from` role it saw.
+ */
+type OrgRoleChangeAuditArgs = {
   row: OperationLedgerRow;
   user: OrgActor;
   organizationId: string;
   memberId: string;
-  fromRole: string;
   toRole: OrganizationRole;
-}): Promise<void> {
+} & ({ reconciled: true } | { reconciled?: false; fromRole: string });
+
+async function auditAndSettleOrgRoleChange(args: OrgRoleChangeAuditArgs): Promise<void> {
   const updatedUser = await findUserById(args.memberId);
+  const email = updatedUser?.google_user_email || 'unknown';
   await auditAndSettleOrgCompleted({
     row: args.row,
     user: args.user,
     organizationId: args.organizationId,
     intent: 'member_role_change',
     action: 'organization.member.change_role',
-    message: `Changed role for user ${updatedUser?.google_user_email || 'unknown'} from ${args.fromRole} to ${args.toRole}`,
+    message: args.reconciled
+      ? `Reconciled role for user ${email} to ${args.toRole}; the original role change was not confirmed`
+      : `Changed role for user ${email} from ${args.fromRole} to ${args.toRole}`,
     canonicalResult: { updated: ORG_ROLE_CHANGE_UPDATED },
   });
 }
@@ -545,8 +554,8 @@ async function repairOrgRoleChange(args: {
       user,
       organizationId,
       memberId,
-      fromRole: membership?.role ?? 'unknown',
       toRole: role,
+      reconciled: true,
     });
     return successResult({ updated: ORG_ROLE_CHANGE_UPDATED, replayed: true });
   }

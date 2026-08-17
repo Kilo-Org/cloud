@@ -429,23 +429,6 @@ export async function recordOperationProgress(
   });
 }
 
-/**
- * Overwrites the `provider_ref` column (for example the security provider's
- * `messageId`). Used after acceptance and on takeover re-submits so the
- * worker can join terminal outcomes by provider reference.
- */
-export async function setOperationProviderRef(
-  database: LedgerDatabase,
-  input: { rowId: string; providerRef: string | null }
-): Promise<OperationLedgerRow | null> {
-  const [updated] = await database
-    .update(operation_ledgers)
-    .set({ provider_ref: input.providerRef })
-    .where(eq(operation_ledgers.id, input.rowId))
-    .returning();
-  return updated ?? null;
-}
-
 export type RecordAcceptanceInput = {
   rowId: string;
   /** The provider reference (for example the worker `messageId`) to store. */

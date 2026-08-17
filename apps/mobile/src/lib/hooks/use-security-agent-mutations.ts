@@ -41,6 +41,9 @@ export function isSecurityConfigurationError(error: unknown): boolean {
 
 /** In-progress surface copy: reads like the existing retryable toasts. */
 const SECURITY_SYNC_IN_PROGRESS_COPY = 'A security sync is already in progress. Please try again.';
+/** Same shape, right noun for the dismiss sheet. */
+const SECURITY_DISMISS_IN_PROGRESS_COPY =
+  'This dismissal is already in progress. Please try again.';
 
 /**
  * True when the mutation may be retried under the SAME operation key. Also
@@ -70,12 +73,21 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
   return classifyPrReviewMutationError(error).kind === 'retryable';
 }
 
-/** Maps the raw in-progress marker onto retryable copy; other errors pass through. */
-export function mapSecuritySyncOperationError(error: unknown): unknown {
+function mapOperationInProgress(error: unknown, copy: string): unknown {
   if (error instanceof Error && error.message === SECURITY_OPERATION_IN_PROGRESS_MESSAGE) {
-    return new Error(SECURITY_SYNC_IN_PROGRESS_COPY);
+    return new Error(copy);
   }
   return error;
+}
+
+/** Maps the raw in-progress marker onto retryable sync copy; others pass through. */
+export function mapSecuritySyncOperationError(error: unknown): unknown {
+  return mapOperationInProgress(error, SECURITY_SYNC_IN_PROGRESS_COPY);
+}
+
+/** Same marker, dismissal copy: the dismiss sheet must not talk about a sync. */
+export function mapSecurityDismissOperationError(error: unknown): unknown {
+  return mapOperationInProgress(error, SECURITY_DISMISS_IN_PROGRESS_COPY);
 }
 
 /** Intent fingerprint for a manual sync: a changed scope or repo is a new intent. */

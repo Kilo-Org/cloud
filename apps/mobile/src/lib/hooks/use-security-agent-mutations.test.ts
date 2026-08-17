@@ -14,6 +14,7 @@ import type * as PrOperationLedgerModule from '@/lib/pr-review/merge/pr-operatio
 import {
   isSecurityConfigurationError,
   isSecuritySyncRetryable,
+  mapSecurityDismissOperationError,
   mapSecuritySyncOperationError,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   securitySyncIntentFingerprint,
@@ -249,6 +250,26 @@ describe('isSecuritySyncRetryable (P1-A-08e key-rotation policy)', () => {
     const byCode = new Error('Security service is not configured');
     Object.assign(byCode, { data: { code: 'PRECONDITION_FAILED' } });
     expect(isSecuritySyncRetryable(byCode)).toBe(false);
+  });
+});
+
+describe('in-progress copy per surface (same server marker)', () => {
+  it('maps the marker onto sync copy for a sync', () => {
+    expect(mapSecuritySyncOperationError(new Error('operation_in_progress'))).toMatchObject({
+      message: 'A security sync is already in progress. Please try again.',
+    });
+  });
+
+  it('maps the marker onto dismissal copy for a dismissal', () => {
+    expect(mapSecurityDismissOperationError(new Error('operation_in_progress'))).toMatchObject({
+      message: 'This dismissal is already in progress. Please try again.',
+    });
+  });
+
+  it('passes any other error through unchanged on both paths', () => {
+    const other = new Error('Network request failed');
+    expect(mapSecuritySyncOperationError(other)).toBe(other);
+    expect(mapSecurityDismissOperationError(other)).toBe(other);
   });
 });
 

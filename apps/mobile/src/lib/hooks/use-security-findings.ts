@@ -11,7 +11,7 @@ import { toast } from 'sonner-native';
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import {
   isSecuritySyncRetryable,
-  mapSecuritySyncOperationError,
+  mapSecurityDismissOperationError,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useHoistedOperationKey } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type SecurityAnalysis } from '@/lib/security-agent';
@@ -140,8 +140,8 @@ export function useDismissSecurityFinding(scope: string) {
           rotateKey();
         }
         // Map the raw `operation_in_progress` CONFLICT marker onto retryable
-        // copy before the form renders it inline (P2).
-        throw mapSecuritySyncOperationError(error);
+        // dismissal copy before the form renders it inline (P2).
+        throw mapSecurityDismissOperationError(error);
       }
     },
     onSuccess: result => {

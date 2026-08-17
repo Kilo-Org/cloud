@@ -1585,6 +1585,25 @@ describe('security operation ledger provider_ref join', () => {
     });
   });
 
+  it('performs no ledger read for a scheduled sync', async () => {
+    // Only a manual sync has a ledger row, so a scheduled run must not query
+    // `operation_ledgers` at all.
+    const select = vi.fn();
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 2, errors: 0, staleRepos: 0 } as never);
+
+    const { ack, retry } = await processSyncMessage({
+      trigger: 'scheduled',
+      commandId: undefined,
+      actor: undefined,
+    });
+
+    expect(select).not.toHaveBeenCalled();
+    expect(settleOperation).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it('settles a failed manual sync row as failed with the partial-failure result code', async () => {
     vi.mocked(getWorkerDb).mockReturnValue(ledgerLookupDb([{ id: 'ledger-row-id' }]));
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 2, staleRepos: 0 } as never);

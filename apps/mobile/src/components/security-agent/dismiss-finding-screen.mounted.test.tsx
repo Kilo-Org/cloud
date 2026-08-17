@@ -17,7 +17,7 @@ const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
   () => 'We could not record this action. Please try again later.'
 );
 const IN_PROGRESS_COPY = vi.hoisted(
-  () => 'A security sync is already in progress. Please try again.'
+  () => 'This dismissal is already in progress. Please try again.'
 );
 const CONFIGURATION_ERROR_MESSAGE = vi.hoisted(() => 'Security service is not configured');
 const CONFIGURATION_COPY = vi.hoisted(

@@ -19,7 +19,6 @@ import {
   markReconcilePending,
   recordOperationProgress,
   recordOperationAcceptance,
-  setOperationProviderRef,
   computeEventUuid,
   CanonicalResultTooLargeError,
   OutboxEventValidationError,
@@ -511,18 +510,6 @@ describe('operation ledger (integration)', () => {
     );
     expect(current?.canonical_result).toMatchObject({ queueAdmitted: true });
     expect(current?.canonical_result?.queueSendClaimId).toBeNull();
-  });
-
-  it('overwrites the provider ref', async () => {
-    const admitted = await admitSession('provider-ref-user');
-    if (admitted.admission !== 'admitted') return;
-    const rowId = admitted.row.id;
-
-    const updated = await setOperationProviderRef(db, { rowId, providerRef: 'prov-1' });
-    expect(updated?.provider_ref).toBe('prov-1');
-
-    const cleared = await setOperationProviderRef(db, { rowId, providerRef: null });
-    expect(cleared?.provider_ref).toBeNull();
   });
 
   it('records provider_ref and canonical_result atomically in one acceptance call', async () => {

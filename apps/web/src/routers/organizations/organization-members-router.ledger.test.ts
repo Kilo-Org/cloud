@@ -513,8 +513,15 @@ describe('organizations members ledger (P1-A-08e)', () => {
 
       expect(result).toEqual({ success: true, updated: 'role and limit', replayed: true });
       expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
+      // The repair never observed the original write, so the audit message says
+      // the role was reconciled instead of claiming an observed `from` role.
       expect(mockCreateAuditLog).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'organization.member.change_role', tx })
+        expect.objectContaining({
+          action: 'organization.member.change_role',
+          message:
+            'Reconciled role for user member@example.com to member; the original role change was not confirmed',
+          tx,
+        })
       );
       expect(mockSettleOperation).toHaveBeenCalledWith(
         tx,
@@ -537,7 +544,12 @@ describe('organizations members ledger (P1-A-08e)', () => {
       expect(result).toEqual({ success: true, updated: 'role and limit', replayed: true });
       expect(mockUpdateUserRoleInOrganization).not.toHaveBeenCalled();
       expect(mockCreateAuditLog).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'organization.member.change_role', tx })
+        expect.objectContaining({
+          action: 'organization.member.change_role',
+          message:
+            'Reconciled role for user member@example.com to member; the original role change was not confirmed',
+          tx,
+        })
       );
       expect(mockSettleOperation).toHaveBeenCalledWith(
         tx,

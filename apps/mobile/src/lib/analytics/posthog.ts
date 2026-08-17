@@ -223,6 +223,16 @@ export function captureEvent(
   // are deny-list-safe by schema); it guards the record-shaped `app_startup`
   // payload and every uncataloged dynamic payload at runtime.
   const safe = properties === undefined ? undefined : redactProhibitedProperties(properties);
+  if (__DEV__ && properties !== undefined && safe !== undefined) {
+    // A silently dropped key is invisible in production, so name the drops in
+    // development. `__DEV__` is React Native only; the shared package stays
+    // platform-neutral and never warns.
+    const dropped = Object.keys(properties).filter(key => !(key in safe));
+    if (dropped.length > 0) {
+      // eslint-disable-next-line no-console -- dev-only visibility for silent redaction
+      console.warn(`Analytics ${name}: redacted prohibited properties ${dropped.join(', ')}`);
+    }
+  }
   client?.capture(name, safe);
 }
 

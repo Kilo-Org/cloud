@@ -161,6 +161,12 @@ receipt.
 - `login` is a raw string at the auth call site (AppsFlyer-mirrored); it is
   cataloged with an empty schema because the mirror values are dynamic and
   runtime-redacted.
+- Mobile screen tracking never reports the redirect-only routes `(app)` and
+  `(app)/index` (`apps/mobile/src/lib/hooks/screen-tracking-decision.ts:15`).
+- Mobile screen tracking never reports a route whose segments contain
+  `kiloclaw` (same file, line 72). `$screen` volume steps down at the release
+  that ships this, and any dashboard that counts KiloClaw screens loses those
+  rows.
 - `interrupted` and `superseded` outcomes are structurally unused for the
   Security domain in this package; the shared enum reserves them for other
   domains.

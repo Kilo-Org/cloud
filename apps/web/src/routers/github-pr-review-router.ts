@@ -3,11 +3,11 @@ import 'server-only';
 import * as z from 'zod';
 import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
 
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kilocode_users, type OperationLedgerRow } from '@kilocode/db/schema';
+import { type OperationLedgerRow } from '@kilocode/db/schema';
+import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import {
   admitOperation,
   markReconcilePending,
@@ -885,23 +885,6 @@ async function failPrRowAmbiguous(args: {
   throw ambiguousPrError();
 }
 
-/** Resolves the analytics identity channel (user email); falls back to the user id. */
-async function resolvePrDistinctId(userId: string): Promise<string> {
-  try {
-    const [user] = await db
-      .select({ email: kilocode_users.google_user_email })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, userId))
-      .limit(1);
-    return user?.email ?? userId;
-  } catch (error) {
-    console.error(
-      `Failed to resolve user email for PR outbox event: ${error instanceof Error ? error.message : String(error)}`
-    );
-    return userId;
-  }
-}
-
 /** `pr_operation_settled` outbox payload (DEC-05): no free text, no resource keys. */
 function prSettledOutboxEvent(params: {
   distinctId: string;
@@ -911,7 +894,7 @@ function prSettledOutboxEvent(params: {
   startedAt: number;
 }): OutboxEventInput {
   return {
-    eventName: 'pr_operation_settled',
+    eventName: PR_OPERATION_SETTLED_EVENT,
     distinctId: params.distinctId,
     properties: {
       source: 'web',
@@ -1040,16 +1023,17 @@ function outcomeCodeFromTrpcError(error: unknown): string {
  */
 async function executePrWriteWithLedger<T>(args: {
   userId: string;
+  /** Analytics identity channel, from `ctx.user` — never re-queried here. */
+  distinctId: string;
   row: OperationLedgerRow;
   intent: PrLedgerIntent;
   startedAt: number;
   runWrite: (octokit: ReturnType<typeof createGitHubPrReviewOctokit>) => Promise<PrWriteOutcome<T>>;
 }): Promise<T> {
-  const distinctId = await resolvePrDistinctId(args.userId);
   const ledgerArgs = {
     row: args.row,
     intent: args.intent,
-    distinctId,
+    distinctId: args.distinctId,
     startedAt: args.startedAt,
   };
   let outcome: PrWriteOutcome<T>;
@@ -1089,6 +1073,8 @@ async function executePrWriteWithLedger<T>(args: {
  */
 async function reconcileCommentPrRow<T extends Record<string, unknown>>(args: {
   userId: string;
+  /** Analytics identity channel, from `ctx.user` — never re-queried here. */
+  distinctId: string;
   row: OperationLedgerRow;
   intent: PrLedgerIntent;
   startedAt: number;
@@ -1101,11 +1087,10 @@ async function reconcileCommentPrRow<T extends Record<string, unknown>>(args: {
 }): Promise<ReplayedResult<T>> {
   const recordedRef = (args.row.canonical_result ?? {})[args.providerRefKey];
   const providerId = typeof recordedRef === 'number' ? recordedRef : null;
-  const distinctId = await resolvePrDistinctId(args.userId);
   const ledgerArgs = {
     row: args.row,
     intent: args.intent,
-    distinctId,
+    distinctId: args.distinctId,
     startedAt: args.startedAt,
   };
   if (providerId === null) {
@@ -1160,6 +1145,8 @@ async function reconcileCommentPrRow<T extends Record<string, unknown>>(args: {
  */
 async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
   userId: string;
+  /** Analytics identity channel, from `ctx.user` — never re-queried here. */
+  distinctId: string;
   intent: PrLedgerIntent;
   input: Record<string, unknown>;
   operationKey: string | undefined;
@@ -1182,6 +1169,7 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
     execute: row =>
       executePrWriteWithLedger({
         ...ledgerArgs,
+        distinctId: args.distinctId,
         row,
         runWrite: async octokit => {
           const canonical = await args.write(octokit);
@@ -1191,6 +1179,7 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
     reconcile: row =>
       reconcileCommentPrRow({
         ...ledgerArgs,
+        distinctId: args.distinctId,
         row,
         providerRefKey: args.providerRefKey,
         readRef: args.readRef,
@@ -1210,6 +1199,8 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
  */
 async function reconcileMergePrRow<T>(args: {
   userId: string;
+  /** Analytics identity channel, from `ctx.user` — never re-queried here. */
+  distinctId: string;
   row: OperationLedgerRow;
   startedAt: number;
   owner: string;
@@ -1261,11 +1252,10 @@ async function reconcileMergePrRow<T>(args: {
     // true`) settles the row absent.
   }
 
-  const distinctId = await resolvePrDistinctId(args.userId);
   const ledgerArgs = {
     row: args.row,
     intent: 'merge' as const,
-    distinctId,
+    distinctId: args.distinctId,
     startedAt: args.startedAt,
   };
   switch (reconcile.kind) {
@@ -1583,6 +1573,7 @@ export const githubPrReviewRouter = createTRPCRouter({
   createReviewComment: baseProcedure.input(CreateReviewCommentInput).mutation(({ ctx, input }) =>
     runPrCommentMutation({
       userId: ctx.user.id,
+      distinctId: ctx.user.google_user_email ?? ctx.user.id,
       intent: 'create_review_comment',
       input,
       operationKey: input.operationKey,
@@ -1620,6 +1611,7 @@ export const githubPrReviewRouter = createTRPCRouter({
   replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(({ ctx, input }) =>
     runPrCommentMutation({
       userId: ctx.user.id,
+      distinctId: ctx.user.google_user_email ?? ctx.user.id,
       intent: 'reply_comment',
       input,
       operationKey: input.operationKey,
@@ -1654,6 +1646,7 @@ export const githubPrReviewRouter = createTRPCRouter({
   submitReview: baseProcedure.input(SubmitReviewInput).mutation(({ ctx, input }) =>
     runPrCommentMutation({
       userId: ctx.user.id,
+      distinctId: ctx.user.google_user_email ?? ctx.user.id,
       intent: 'submit_review',
       input,
       operationKey: input.operationKey,
@@ -1792,9 +1785,11 @@ export const githubPrReviewRouter = createTRPCRouter({
     }
 
     const startedAt = Date.now();
+    const distinctId = ctx.user.google_user_email ?? ctx.user.id;
     const execute = (row: OperationLedgerRow) =>
       executePrWriteWithLedger({
         userId: ctx.user.id,
+        distinctId,
         row,
         intent: 'merge',
         startedAt,
@@ -1821,6 +1816,7 @@ export const githubPrReviewRouter = createTRPCRouter({
       reconcile: row =>
         reconcileMergePrRow({
           userId: ctx.user.id,
+          distinctId,
           row,
           startedAt,
           owner: input.owner,

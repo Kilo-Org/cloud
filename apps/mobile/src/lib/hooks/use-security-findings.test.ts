@@ -183,7 +183,7 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     useDismissSecurityFinding('personal');
 
     await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'A security sync is already in progress. Please try again.',
+      message: 'This dismissal is already in progress. Please try again.',
     });
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });

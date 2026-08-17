@@ -307,8 +307,45 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.choices[0].message).toEqual({
         role: 'assistant',
         content: 'answer',
-        reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'full thought', index: 0, format: 'unknown' },
+        ],
       });
+    });
+
+    test('leaves reasoning_content alone when reasoning_details are already present', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'answer',
+              reasoning_content: 'full thought',
+              reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        { type: 'reasoning.text', text: 'full thought', index: 0 },
+      ]);
     });
 
     test('leaves reasoning_content alone when the transform is disabled', async () => {
@@ -479,10 +516,14 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       }>;
 
       expect(chunk.choices[0].delta).toEqual({
-        reasoning_details: [{ type: 'reasoning.text', text: 'first ', index: 0 }],
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'first ', index: 0, format: 'unknown' },
+        ],
       });
       expect(chunk.choices[1].delta).toEqual({
-        reasoning_details: [{ type: 'reasoning.text', text: 'thought', index: 0 }],
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'thought', index: 0, format: 'unknown' },
+        ],
       });
       expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
     });

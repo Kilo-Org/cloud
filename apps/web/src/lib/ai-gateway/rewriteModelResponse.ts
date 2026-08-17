@@ -1,6 +1,6 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import {
-  ReasoningDetailText,
+  type ReasoningDetailText,
   ReasoningDetailType,
 } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';

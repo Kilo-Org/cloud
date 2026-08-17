@@ -160,20 +160,16 @@ export function useRemoteSpawnDispatch({
     runOnInstanceRef.current = runOnInstance;
   }, [runOnInstance]);
 
+  // Read the press-time inputs through refs so `onStart` stays stable across
+  // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useRef(getSubmitPayload);
   const spawnFieldsRef = useRef({ mode, selection, organizationId });
+  const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
     spawnFieldsRef.current = { mode, selection, organizationId };
-  }, [getSubmitPayload, mode, selection, organizationId]);
-
-  // Read through a ref so `onStart` stays stable across renders while the
-  // route's callback always reflects the latest value (same pattern as
-  // `getSubmitPayloadRef` above).
-  const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
-  useEffect(() => {
     onSpawnAdmittedRef.current = onSpawnAdmitted;
-  }, [onSpawnAdmitted]);
+  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {

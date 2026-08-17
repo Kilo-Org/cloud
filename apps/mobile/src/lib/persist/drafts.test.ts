@@ -13,9 +13,7 @@ const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
-  listEntries: vi.fn(
-    async (_scope: string): Promise<{ k: string; bytes: number; updatedAt: number }[]> => []
-  ),
+  listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
 }));
 
 vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
@@ -104,11 +102,7 @@ beforeEach(() => {
     [...kvStore.values()]
       .filter(entry => entry.scope === scope)
       .toSorted((a, b) => a.updatedAt - b.updatedAt)
-      .map(entry => ({
-        k: entry.k,
-        bytes: new TextEncoder().encode(entry.v).length,
-        updatedAt: entry.updatedAt,
-      }))
+      .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
   );
 });
 

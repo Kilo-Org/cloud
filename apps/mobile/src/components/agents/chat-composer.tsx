@@ -66,7 +66,8 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
-import { clearDraft as clearStoredDraft, flushDraft, saveDraft } from '@/lib/persist/drafts';
+import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import {
@@ -274,22 +275,8 @@ export function ChatComposer({
 
   // Flush the debounced draft write when the app leaves `active` and on
   // unmount, so a backgrounded-then-killed app (or a navigation away) does
-  // not lose the last keystrokes inside the 500 ms window. The drafts module
-  // epoch-fences the write, so a sign-out that bumped the epoch skips it.
-  useEffect(() => {
-    if (!draftKey || !userId) {
-      return undefined;
-    }
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState !== 'active') {
-        void flushDraft(userId, draftKey);
-      }
-    });
-    return () => {
-      subscription.remove();
-      void flushDraft(userId, draftKey);
-    };
-  }, [draftKey, userId]);
+  // not lose the last keystrokes inside the 500 ms window.
+  useDraftFlushOnBackground(userId, draftKey, true);
 
   useEffect(() => {
     const draft = pendingDraftRestoreRef.current;

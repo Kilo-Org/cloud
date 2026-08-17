@@ -9,6 +9,7 @@ import {
 
 import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 import { utf8ByteLength } from '@/lib/utf8-utils';
 
@@ -22,10 +23,6 @@ import { utf8ByteLength } from '@/lib/utf8-utils';
  * auth epoch and the cached authoritative user id captured at persister
  * creation, bounded to 2 MB of serialized JSON (an oversized blob is dropped
  * and the previous blob for the scope is removed), and expires after 24 h.
- *
- * The module is pure (no native imports) so its logic runs in node tests; the
- * SQLCipher KV adapter is bound once by the root layout via
- * {@link bindReadCacheKv} and injected as the persister's `kv`.
  */
 
 /** Bump on any breaking change to a persisted query shape. */
@@ -42,35 +39,10 @@ export function readCacheScope(userId: string): string {
   return `${CACHE_SCOPE_PREFIX}${userId}:${SCHEMA_VERSION}`;
 }
 
-/** The encrypted-kv surface the read cache uses; injected for node tests. */
-export type ReadCacheKv = {
-  getItem: (scope: string, k: string) => Promise<string | null>;
-  setItem: (scope: string, k: string, v: string) => Promise<void>;
-  removeItem: (scope: string, k: string) => Promise<void>;
-  clearScope: (scope: string) => Promise<void>;
-  clearScopePrefix: (prefix: string) => Promise<void>;
-};
-
-// Late-bound production KV adapter. The root layout binds it at module scope
-// so auth-context can clear cache scopes on sign-out and the cold-start
-// restore can hydrate, without auth-context importing the native chain.
-let boundKv: ReadCacheKv | null = null;
-
-/** Binds the production SQLCipher KV adapter, from the root layout. */
-export function bindReadCacheKv(kv: ReadCacheKv): void {
-  boundKv = kv;
-}
-
-/** Returns the bound KV adapter, or null before the root layout binds it. */
-export function getBoundReadCacheKv(): ReadCacheKv | null {
-  return boundKv;
-}
-
-// Test-only: resets the late-bound adapter, the cold-start restore state, and
-// the sign-out flag so a test can drive each lifecycle from a clean module
-// (the same pattern as `resetEncryptedKvOpenForTests` in encrypted-kv.ts).
+// Test-only: resets the cold-start restore state and the sign-out flag so a
+// test can drive each lifecycle from a clean module (the same pattern as
+// `resetEncryptedKvOpenForTests` in encrypted-kv.ts).
 export function resetReadCacheForTests(): void {
-  boundKv = null;
   coldStartGeneration = 0;
   coldStartRestoredScope = null;
   signOutActive = false;
@@ -204,21 +176,6 @@ export function isReadCacheAllowedKey(queryKey: unknown): boolean {
   return allowed?.isAllowedInput(queryKey[1]) ?? false;
 }
 
-/** True when the meta segment marks an infinite query. */
-function isInfiniteQueryMeta(meta: unknown): boolean {
-  if (typeof meta !== 'object' || meta === null) {
-    return false;
-  }
-  return (meta as { type?: unknown }).type === 'infinite';
-}
-
-/** True when an allowlisted infinite query holds only its first page. */
-function isFirstPageOnly(query: Query): boolean {
-  const data = query.state.data as { pageParams?: unknown[] } | undefined;
-  const loadedPages = data?.pageParams?.length ?? 1;
-  return loadedPages <= 1;
-}
-
 /**
  * Persist only successful queries on allowlisted shapes. An allowlisted
  * infinite query persists only while it holds the first page: the tRPC
@@ -230,14 +187,18 @@ export function shouldPersistReadCacheQuery(query: Query): boolean {
   if (query.state.status !== 'success' || !isReadCacheAllowedKey(query.queryKey)) {
     return false;
   }
-  const meta = Array.isArray(query.queryKey) ? query.queryKey[1] : undefined;
-  return isInfiniteQueryMeta(meta) ? isFirstPageOnly(query) : true;
+  // The allowlist guarantees an array key with a meta segment.
+  const meta = query.queryKey[1] as { type?: unknown } | null | undefined;
+  if (meta?.type !== 'infinite') {
+    return true;
+  }
+  const data = query.state.data as { pageParams?: unknown[] } | undefined;
+  return (data?.pageParams?.length ?? 1) <= 1;
 }
 
 // ── Persister ──────────────────────────────────────────────────────────────
 
 type ReadCachePersisterOptions = {
-  kv: ReadCacheKv;
   queryClient: QueryClient;
   userId: string;
   epoch: number;
@@ -250,7 +211,7 @@ type ReadCachePersisterOptions = {
  * land in the previous account's scope.
  */
 export function createReadCachePersister(options: ReadCachePersisterOptions): Persister {
-  const { kv, queryClient, userId, epoch } = options;
+  const { queryClient, userId, epoch } = options;
   const scope = readCacheScope(userId);
 
   // Publication fence: every sign-in and sign-out bumps the epoch, and the
@@ -264,7 +225,7 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
 
   const storage: AsyncStorage = {
     getItem: async k => {
-      const value = await kv.getItem(scope, k);
+      const value = await encryptedKv.getItem(scope, k);
       return value;
     },
     setItem: async (k, v) => {
@@ -273,15 +234,16 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
       if (!isPublicationAllowed()) {
         return;
       }
-      await kv.setItem(scope, k, v);
+      await encryptedKv.setItem(scope, k, v);
     },
     removeItem: async k => {
-      await kv.removeItem(scope, k);
+      await encryptedKv.removeItem(scope, k);
     },
   };
   const base = createAsyncStoragePersister({ storage, key: READ_CACHE_KEY });
 
   return {
+    ...base,
     persistClient: async client => {
       if (!isPublicationAllowed()) {
         return;
@@ -296,8 +258,6 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
       }
       await base.persistClient(client);
     },
-    restoreClient: base.restoreClient,
-    removeClient: base.removeClient,
   };
 }
 
@@ -325,16 +285,11 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
   // epoch moved — including after a logout that cleared the query client.
   const epoch = currentAuthEpoch();
   try {
-    const kv = getBoundReadCacheKv();
-    if (!kv) {
-      return;
-    }
     const hintUserId = await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
     if (generation !== coldStartGeneration || !hintUserId || !isCurrentAuthEpoch(epoch)) {
       return;
     }
     const persister = createReadCachePersister({
-      kv,
       queryClient,
       userId: hintUserId,
       epoch,
@@ -387,21 +342,6 @@ export function takeOverColdStartRestore(): string | null {
   return scope;
 }
 
-/**
- * The restored scope to clear when it belongs to another account than the
- * authoritative `userId`; null when there is nothing to clear. The hint only
- * survives an interrupted teardown, and authoritative identity wins.
- */
-export function mismatchedRestoredScope(
-  restoredScope: string | null,
-  userId: string
-): string | null {
-  if (restoredScope === null || restoredScope === readCacheScope(userId)) {
-    return null;
-  }
-  return restoredScope;
-}
-
 // ── Sign-out fence ─────────────────────────────────────────────────────────
 
 let signOutActive = false;
@@ -434,14 +374,10 @@ export function setSignOutActive(active: boolean): void {
  * the stale blob only costs a future warm start.
  */
 export async function clearCacheScopeForSignOut(knownUserId: string | null): Promise<void> {
-  const kv = getBoundReadCacheKv();
-  if (!kv) {
-    return;
-  }
   try {
     await (knownUserId
-      ? kv.clearScope(readCacheScope(knownUserId))
-      : kv.clearScopePrefix(CACHE_SCOPE_PREFIX));
+      ? encryptedKv.clearScope(readCacheScope(knownUserId))
+      : encryptedKv.clearScopePrefix(CACHE_SCOPE_PREFIX));
   } catch {
     // Best effort: query and auth state reset still run after this returns.
   }

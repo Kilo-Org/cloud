@@ -87,13 +87,7 @@ export function DeviceSessionsScreen() {
   // the toast type and whether the authoritative list refetches; only the
   // generic error keeps the row without a refetch.
   const applyRevokeOutcome = (outcome: RevokeOutcome) => {
-    if (outcome.toast === 'success') {
-      toast.success(outcome.message);
-    } else if (outcome.toast === 'info') {
-      toast.info(outcome.message);
-    } else {
-      toast.error(outcome.message);
-    }
+    toast[outcome.toast](outcome.message);
     if (outcome.refetch) {
       void refetch();
     }

@@ -19,6 +19,13 @@ export async function writeAccountMetadata(key: string, write: () => Promise<voi
   });
 }
 
+/** Epoch-fenced, per-key serialized write of one string value. */
+export async function setAccountMetadata(key: string, value: string): Promise<void> {
+  await writeAccountMetadata(key, async () => {
+    await SecureStore.setItemAsync(key, value);
+  });
+}
+
 /**
  * Per-key serialized SecureStore delete with NO epoch fence: deletes must
  * always run, and FIFO per key guarantees a delete lands after any in-flight

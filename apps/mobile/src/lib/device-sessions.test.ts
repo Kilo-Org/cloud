@@ -69,79 +69,70 @@ describe('sortDeviceSessions', () => {
 });
 
 describe('mapRevokeOutcome', () => {
-  it('maps a fulfilled revoked result to a success toast and a refetch', () => {
-    expect(mapRevokeOutcome({ outcome: 'revoked' }, undefined)).toEqual({
-      kind: 'revoked',
-      toast: 'success',
-      message: 'Session signed out.',
-      refetch: true,
-    });
-  });
-
-  it('maps a fulfilled already_revoked result to an info toast and a refetch', () => {
-    expect(mapRevokeOutcome({ outcome: 'already_revoked' }, undefined)).toEqual({
-      kind: 'already_revoked',
-      toast: 'info',
-      message: 'Session was already signed out',
-      refetch: true,
-    });
-  });
-
-  it('maps a NOT_FOUND error to a terminal toast and a refetch', () => {
-    expect(
-      mapRevokeOutcome(undefined, { message: 'Device session not found', code: 'NOT_FOUND' })
-    ).toEqual({
-      kind: 'not_found',
-      toast: 'error',
-      message: 'This session is no longer active.',
-      refetch: true,
-    });
-  });
-
-  it('maps any other error to error.message and keeps the row', () => {
-    expect(mapRevokeOutcome(undefined, { message: 'Network request failed' })).toEqual({
-      kind: 'error',
-      toast: 'error',
-      message: 'Network request failed',
-      refetch: false,
-    });
+  it.each([
+    {
+      name: 'a fulfilled revoked result → success toast and refetch',
+      result: { outcome: 'revoked' } as const,
+      error: undefined,
+      expected: { toast: 'success', message: 'Session signed out.', refetch: true },
+    },
+    {
+      name: 'a fulfilled already_revoked result → info toast and refetch',
+      result: { outcome: 'already_revoked' } as const,
+      error: undefined,
+      expected: { toast: 'info', message: 'Session was already signed out', refetch: true },
+    },
+    {
+      name: 'a NOT_FOUND error → terminal toast and refetch',
+      result: undefined,
+      error: { message: 'Device session not found', code: 'NOT_FOUND' },
+      expected: { toast: 'error', message: 'This session is no longer active.', refetch: true },
+    },
+    {
+      name: 'any other error → error.message and keeps the row',
+      result: undefined,
+      error: { message: 'Network request failed' },
+      expected: { toast: 'error', message: 'Network request failed', refetch: false },
+    },
+  ])('maps $name', ({ result, error, expected }) => {
+    expect(mapRevokeOutcome(result, error)).toEqual(expected);
   });
 });
 
 describe('classifyDeviceSessionsState', () => {
   const rows = [makeSession({ id: 'a' })];
 
-  it('classifies loading ahead of stale data', () => {
-    expect(classifyDeviceSessionsState({ isLoading: true, isError: false, data: rows })).toBe(
-      'loading'
-    );
-  });
-
-  it('classifies a query error as retryable error', () => {
-    expect(classifyDeviceSessionsState({ isLoading: false, isError: true, data: undefined })).toBe(
-      'error'
-    );
-  });
-
-  it('classifies zero rows as empty', () => {
-    expect(classifyDeviceSessionsState({ isLoading: false, isError: false, data: [] })).toBe(
-      'empty'
-    );
-  });
-
-  it('classifies rows with a current row as happy', () => {
-    expect(
-      classifyDeviceSessionsState({
+  it.each([
+    {
+      name: 'loading ahead of stale data',
+      args: { isLoading: true, isError: false, data: rows },
+      expected: 'loading',
+    },
+    {
+      name: 'a query error as retryable error',
+      args: { isLoading: false, isError: true, data: undefined },
+      expected: 'error',
+    },
+    {
+      name: 'zero rows as empty',
+      args: { isLoading: false, isError: false, data: [] },
+      expected: 'empty',
+    },
+    {
+      name: 'rows with a current row as happy',
+      args: {
         isLoading: false,
         isError: false,
         data: [makeSession({ id: 'b', isCurrent: true }), ...rows],
-      })
-    ).toBe('happy');
-  });
-
-  it('classifies rows without a current row as no-current, never empty', () => {
-    expect(classifyDeviceSessionsState({ isLoading: false, isError: false, data: rows })).toBe(
-      'no-current'
-    );
+      },
+      expected: 'happy',
+    },
+    {
+      name: 'rows without a current row as no-current, never empty',
+      args: { isLoading: false, isError: false, data: rows },
+      expected: 'no-current',
+    },
+  ])('classifies $name', ({ args, expected }) => {
+    expect(classifyDeviceSessionsState(args)).toBe(expected);
   });
 });

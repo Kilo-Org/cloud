@@ -120,9 +120,7 @@ import {
   MissingSQLCipherError,
   removeItem,
   resetEncryptedKvOpenForTests,
-  scopeBytes,
   setItem,
-  utf8ByteLength,
   validateItemKey,
   validateScope,
 } from './encrypted-kv';
@@ -150,7 +148,6 @@ describe('scope and key validation', () => {
     await expect(removeItem('', 'k')).rejects.toThrow(TypeError);
     await expect(clearScope('')).rejects.toThrow(TypeError);
     await expect(clearScopePrefix('')).rejects.toThrow(TypeError);
-    await expect(scopeBytes('')).rejects.toThrow(TypeError);
     await expect(listEntries('')).rejects.toThrow(TypeError);
   });
 
@@ -259,82 +256,92 @@ describe('single-flight open contract', () => {
     await setItem('s', 'a', 'x');
     const createSql = execLog.find(sql => sql.startsWith('CREATE TABLE IF NOT EXISTS kv'));
     expect(createSql).toContain('PRIMARY KEY (scope, k)');
-    expect(createSql).toContain('bytes INTEGER NOT NULL');
+    expect(createSql).toContain('updated_at INTEGER NOT NULL');
   });
 });
 
-describe('probe failure recovery', () => {
-  it('deletes, regenerates the key, reopens, and reports the reset to Sentry', async () => {
-    failNextProbe = true;
-    await setItem('s', 'a', 'x');
+describe('open failure recovery', () => {
+  it.each([
+    {
+      seam: 'probe',
+      failOnce: () => {
+        failNextProbe = true;
+      },
+    },
+    {
+      seam: 'PRAGMA key',
+      failOnce: () => {
+        failNextPragma = true;
+      },
+    },
+  ])(
+    'a failing $seam deletes, regenerates the key, reopens, and reports the reset to Sentry',
+    async ({ failOnce }) => {
+      failOnce();
+      await setItem('s', 'a', 'x');
 
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
-    // A fresh key was generated and stored over the old one.
-    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
-    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    // Only the first handle was closed; the recovery-opened one stays open.
-    expect(closeCallCount).toBe(1);
+      // Only the first handle was closed; the recovery-opened one stays open.
+      expect(closeCallCount).toBe(1);
+      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+      // A fresh key was generated and stored over the old one.
+      expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+      expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
 
-    // The store works on the recovered database.
-    await expect(getItem('s', 'a')).resolves.toBe('x');
-  });
+      // The store works on the recovered database.
+      await expect(getItem('s', 'a')).resolves.toBe('x');
+    }
+  );
 
-  it('rejects every later caller with the same failure, without reopening', async () => {
-    failNextProbe = true;
-    failEveryProbe = true;
-    await expect(setItem('s', 'a', 'x')).rejects.toThrow();
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    // Both the first handle and the recovery-opened handle were closed.
-    expect(closeCallCount).toBe(2);
+  // The probe failure is reported from the reset path; a PRAGMA failure on the
+  // recovery open rethrows before that report, so the count differs per seam.
+  it.each([
+    {
+      seam: 'probe',
+      failAlways: () => {
+        failNextProbe = true;
+        failEveryProbe = true;
+      },
+      recover: () => {
+        failEveryProbe = false;
+      },
+      sentryReports: 1,
+    },
+    {
+      seam: 'PRAGMA key',
+      failAlways: () => {
+        failEveryPragma = true;
+      },
+      recover: () => {
+        failEveryPragma = false;
+      },
+      sentryReports: 0,
+    },
+  ])(
+    'a $seam that fails on recovery too closes both handles and rejects every later caller',
+    async ({ failAlways, recover, sentryReports }) => {
+      failAlways();
+      await expect(setItem('s', 'a', 'x')).rejects.toThrow();
 
-    // The failed open stays memoized: no second delete, no second key, no
-    // second Sentry report, however many callers arrive.
-    failEveryProbe = false;
-    await expect(setItem('s', 'a', 'x')).rejects.toThrow();
-    await expect(getItem('s', 'a')).rejects.toThrow();
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(2);
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      // Both the first handle and the recovery-opened handle were closed.
+      expect(closeCallCount).toBe(2);
+      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledTimes(sentryReports);
 
-    // A relaunch (a fresh module) opens cleanly again.
-    resetEncryptedKvOpenForTests();
-    await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
-  });
-});
+      // The failed open stays memoized: no second open, no second delete, no
+      // second Sentry report, however many callers arrive.
+      recover();
+      await expect(setItem('s', 'a', 'x')).rejects.toThrow();
+      await expect(getItem('s', 'a')).rejects.toThrow();
+      expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(2);
+      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledTimes(sentryReports);
 
-describe('PRAGMA failure recovery', () => {
-  it('closes the opened handle when the PRAGMA key fails, then recovers', async () => {
-    failNextPragma = true;
-    await setItem('s', 'a', 'x');
-
-    // The PRAGMA-failed handle was closed before the recovery delete, and the
-    // recovery-opened one stays open.
-    expect(closeCallCount).toBe(1);
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
-    // A fresh key was generated and stored over the old one.
-    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
-    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-
-    // The store works on the recovered database.
-    await expect(getItem('s', 'a')).resolves.toBe('x');
-  });
-
-  it('closes both handles when the PRAGMA key fails on recovery too, then stays failed', async () => {
-    failEveryPragma = true;
-    await expect(setItem('s', 'a', 'x')).rejects.toThrow();
-
-    // Both the initial handle and the recovery-opened handle were closed.
-    expect(closeCallCount).toBe(2);
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
-
-    // The failed open stays memoized: no reopen, no second delete.
-    failEveryPragma = false;
-    await expect(setItem('s', 'a', 'x')).rejects.toThrow();
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(2);
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
-  });
+      // A relaunch (a fresh module) opens cleanly again.
+      resetEncryptedKvOpenForTests();
+      await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
+    }
+  );
 });
 
 describe('database key validation', () => {
@@ -352,38 +359,31 @@ describe('database key validation', () => {
     expect(isValidDbKey('not-a-hex-key')).toBe(false);
   });
 
-  it('never interpolates a tampered SecureStore key and recovers with a fresh key', async () => {
-    store.set(PERSIST_DB_KEY, 'tampered-key-not-hex');
-    await setItem('s', 'a', 'x');
+  it.each([
+    { kind: 'non-hex', tamperedKey: 'tampered-key-not-hex', forbidden: "x'tampered-key-not-hex'" },
+    { kind: 'non-lowercase hex', tamperedKey: 'A'.repeat(64), forbidden: 'AAAAAAAA' },
+    { kind: 'wrong-length hex', tamperedKey: 'a'.repeat(32), forbidden: "x'a".repeat(32) },
+  ])(
+    'never interpolates a $kind key and recovers with a fresh key',
+    async ({ tamperedKey, forbidden }) => {
+      store.set(PERSIST_DB_KEY, tamperedKey);
+      await setItem('s', 'a', 'x');
 
-    // The tampered key never reached PRAGMA interpolation.
-    expect(execLog.some(sql => sql.includes("x'tampered-key-not-hex'"))).toBe(false);
-    // Recovery deleted the database, generated a fresh key, and reopened.
-    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
-    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
-    const stored = store.get(PERSIST_DB_KEY);
-    expect(stored).toMatch(/^[0-9a-f]{64}$/);
-    expect(execLog).toContain(`PRAGMA key = "x'${stored}'"`);
-    // No handle was opened for the tampered key, so only the fresh one is open.
-    expect(closeCallCount).toBe(0);
+      // The tampered key never reached PRAGMA interpolation.
+      expect(execLog.some(sql => sql.includes(forbidden))).toBe(false);
+      // Recovery deleted the database, generated a fresh key, and reopened.
+      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+      expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+      const stored = store.get(PERSIST_DB_KEY);
+      expect(stored).toMatch(/^[0-9a-f]{64}$/);
+      expect(execLog).toContain(`PRAGMA key = "x'${stored}'"`);
+      // No handle was opened for the tampered key, so only the fresh one is open.
+      expect(closeCallCount).toBe(0);
 
-    // The store works on the recovered database.
-    await expect(getItem('s', 'a')).resolves.toBe('x');
-  });
-
-  it('treats a non-lowercase hex key as tampered and recovers', async () => {
-    store.set(PERSIST_DB_KEY, 'A'.repeat(64));
-    await setItem('s', 'a', 'x');
-    expect(execLog.some(sql => sql.includes('AAAAAAAA'))).toBe(false);
-    expect(store.get(PERSIST_DB_KEY)).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it('treats a wrong-length hex key as tampered and recovers', async () => {
-    store.set(PERSIST_DB_KEY, 'a'.repeat(32));
-    await setItem('s', 'a', 'x');
-    expect(store.get(PERSIST_DB_KEY)).toMatch(/^[0-9a-f]{64}$/);
-    expect(execLog.some(sql => sql.includes("x'a".repeat(32)))).toBe(false);
-  });
+      // The store works on the recovered database.
+      await expect(getItem('s', 'a')).resolves.toBe('x');
+    }
+  );
 });
 
 describe('kv behavior', () => {
@@ -396,14 +396,13 @@ describe('kv behavior', () => {
     await expect(getItem('draft:u1', 'missing')).resolves.toBeNull();
   });
 
-  it('upserts in place: value, bytes, and updated_at update, row count stays one', async () => {
+  it('upserts in place: value and updated_at update, row count stays one', async () => {
     await setItem('s', 'k', 'one');
     const before = await listEntries('s');
     await setItem('s', 'k', 'two');
     await expect(getItem('s', 'k')).resolves.toBe('two');
     const after = await listEntries('s');
     expect(after).toHaveLength(1);
-    expect(after[0]?.bytes).toBe(utf8ByteLength('two'));
     expect(after[0]?.updatedAt).toBeGreaterThanOrEqual(before[0]?.updatedAt ?? 0);
   });
 
@@ -462,22 +461,12 @@ describe('kv behavior', () => {
     await expect(getItem('cache:u12:1', 'a')).resolves.toBe('y');
   });
 
-  it('scopeBytes sums stored UTF-8 byte lengths and is 0 when empty', async () => {
-    await expect(scopeBytes('s')).resolves.toBe(0);
-    await setItem('s', 'a', 'hi');
-    await setItem('s', 'b', 'héllo');
-    await setItem('s', 'c', '🎉');
-    await expect(scopeBytes('s')).resolves.toBe(2 + 6 + 4);
-    await expect(scopeBytes('other')).resolves.toBe(0);
-  });
-
-  it('listEntries returns k, bytes, and updatedAt without values', async () => {
+  it('listEntries returns k and updatedAt without values', async () => {
     await setItem('s', 'oldest', 'a');
     await setItem('s', 'newest', 'b');
     const entries = await listEntries('s');
     expect(entries).toHaveLength(2);
-    expect(Object.keys(entries[0] ?? {})).toEqual(['k', 'bytes', 'updatedAt']);
-    expect(entries[0]?.bytes).toBe(1);
+    expect(Object.keys(entries[0] ?? {})).toEqual(['k', 'updatedAt']);
     expect(typeof entries[0]?.updatedAt).toBe('number');
   });
 
@@ -497,11 +486,5 @@ describe('kv behavior', () => {
 
   it('listEntries returns an empty array for an absent scope', async () => {
     await expect(listEntries('nope')).resolves.toEqual([]);
-  });
-
-  it('utf8ByteLength counts UTF-8 bytes', () => {
-    expect(utf8ByteLength('hi')).toBe(2);
-    expect(utf8ByteLength('héllo')).toBe(6);
-    expect(utf8ByteLength('🎉')).toBe(4);
   });
 });

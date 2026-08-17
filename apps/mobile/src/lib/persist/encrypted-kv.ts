@@ -36,30 +36,25 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS kv (
   scope TEXT NOT NULL,
   k TEXT NOT NULL,
   v TEXT NOT NULL,
-  bytes INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (scope, k)
 )`;
 
 const SELECT_ITEM_SQL = 'SELECT v FROM kv WHERE scope = ? AND k = ?';
-const UPSERT_ITEM_SQL = `INSERT INTO kv (scope, k, v, bytes, updated_at) VALUES (?, ?, ?, ?, ?)
+const UPSERT_ITEM_SQL = `INSERT INTO kv (scope, k, v, updated_at) VALUES (?, ?, ?, ?)
 ON CONFLICT(scope, k) DO UPDATE SET
   v = excluded.v,
-  bytes = excluded.bytes,
   updated_at = excluded.updated_at`;
 const DELETE_ITEM_SQL = 'DELETE FROM kv WHERE scope = ? AND k = ?';
 const DELETE_SCOPE_SQL = 'DELETE FROM kv WHERE scope = ?';
 const DELETE_SCOPE_PREFIX_SQL = `DELETE FROM kv WHERE scope LIKE ? || '%'`;
-const SCOPE_BYTES_SQL = 'SELECT COALESCE(SUM(bytes), 0) AS total FROM kv WHERE scope = ?';
-const LIST_ENTRIES_SQL =
-  'SELECT k, bytes, updated_at FROM kv WHERE scope = ? ORDER BY updated_at ASC';
+const LIST_ENTRIES_SQL = 'SELECT k, updated_at FROM kv WHERE scope = ? ORDER BY updated_at ASC';
 const PROBE_SQL = 'SELECT count(*) FROM sqlite_master';
 const CIPHER_VERSION_SQL = 'PRAGMA cipher_version';
 
 /** One entry of {@link listEntries}; values are intentionally not returned. */
 export type KVPair = {
   k: string;
-  bytes: number;
   updatedAt: number;
 };
 
@@ -82,11 +77,6 @@ function validateValue(v: string): void {
   if (typeof v !== 'string') {
     throw new TypeError('encrypted-kv: value must be a string');
   }
-}
-
-/** UTF-8 byte length of `value`; the `bytes` column records this. */
-export function utf8ByteLength(value: string): number {
-  return new TextEncoder().encode(value).length;
 }
 
 async function generateHexKey(): Promise<string> {
@@ -253,14 +243,12 @@ export async function getItem(scope: string, k: string): Promise<string | null> 
   return row?.v ?? null;
 }
 
-/** Writes or overwrites one value, recording its UTF-8 byte length and `Date.now()`. */
+/** Writes or overwrites one value, recording `Date.now()`. */
 export async function setItem(scope: string, k: string, v: string): Promise<void> {
   validateItemKey(scope, k);
   validateValue(v);
   const db = await openDatabase();
-  const bytes = utf8ByteLength(v);
-  const updatedAt = Date.now();
-  await db.runAsync(UPSERT_ITEM_SQL, scope, k, v, bytes, updatedAt);
+  await db.runAsync(UPSERT_ITEM_SQL, scope, k, v, Date.now());
 }
 
 /** Removes one value; a missing key is not an error. */
@@ -284,14 +272,6 @@ export async function clearScopePrefix(prefix: string): Promise<void> {
   await db.runAsync(DELETE_SCOPE_PREFIX_SQL, prefix);
 }
 
-/** Sum of the stored UTF-8 byte lengths in one scope; 0 when the scope is empty. */
-export async function scopeBytes(scope: string): Promise<number> {
-  validateScope(scope);
-  const db = await openDatabase();
-  const row = await db.getFirstAsync<{ total: number }>(SCOPE_BYTES_SQL, scope);
-  return row?.total ?? 0;
-}
-
 /**
  * Lists one scope's entries oldest-first (by `updated_at`), without values —
  * the eviction read path.
@@ -299,9 +279,6 @@ export async function scopeBytes(scope: string): Promise<number> {
 export async function listEntries(scope: string): Promise<KVPair[]> {
   validateScope(scope);
   const db = await openDatabase();
-  const rows = await db.getAllAsync<{ k: string; bytes: number; updated_at: number }>(
-    LIST_ENTRIES_SQL,
-    scope
-  );
-  return rows.map(row => ({ k: row.k, bytes: row.bytes, updatedAt: row.updated_at }));
+  const rows = await db.getAllAsync<{ k: string; updated_at: number }>(LIST_ENTRIES_SQL, scope);
+  return rows.map(row => ({ k: row.k, updatedAt: row.updated_at }));
 }

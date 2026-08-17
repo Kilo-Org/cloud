@@ -7,29 +7,48 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
-import {
-  bindReadCacheKv,
-  clearCacheScopeForSignOut,
-  createReadCachePersister,
-  isReadCacheAllowedKey,
-  mismatchedRestoredScope,
-  READ_CACHE_MAX_AGE_MS,
-  READ_CACHE_MAX_BYTES,
-  readCachedUserId,
-  type ReadCacheKv,
-  readCacheScope,
-  resetReadCacheForTests,
-  restorePersistedCacheOnColdStart,
-  SCHEMA_VERSION,
-  setSignOutActive,
-  shouldPersistReadCacheQuery,
-  takeOverColdStartRestore,
-} from './read-cache';
 
-// The exact tRPC key shapes the app builds, including the flat application key
-// that must be denied without throwing.
-const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query' }];
-const FLAT_APPLICATION_KEY: readonly unknown[] = ['org-default-model', 'model-1'];
+// The read cache calls the encrypted-kv module directly; the mock below is an
+// in-memory per-scope store with the real map semantics, and it also keeps the
+// native SQLCipher chain out of this node suite.
+const kvMock = vi.hoisted(() => {
+  const scopes = new Map<string, Map<string, string>>();
+  return {
+    scopes,
+    getItem: vi.fn<(scope: string, k: string) => Promise<string | null>>(
+      async (scope, k) => scopes.get(scope)?.get(k) ?? null
+    ),
+    setItem: vi.fn(async (scope: string, k: string, v: string) => {
+      let bucket = scopes.get(scope);
+      if (!bucket) {
+        bucket = new Map<string, string>();
+        scopes.set(scope, bucket);
+      }
+      bucket.set(k, v);
+    }),
+    removeItem: vi.fn(async (scope: string, k: string) => {
+      scopes.get(scope)?.delete(k);
+    }),
+    clearScope: vi.fn(async (scope: string) => {
+      scopes.delete(scope);
+    }),
+    clearScopePrefix: vi.fn(async (prefix: string) => {
+      for (const scope of scopes.keys()) {
+        if (scope.startsWith(prefix)) {
+          scopes.delete(scope);
+        }
+      }
+    }),
+  };
+});
+
+vi.mock('@/lib/persist/encrypted-kv', () => ({
+  getItem: kvMock.getItem,
+  setItem: kvMock.setItem,
+  removeItem: kvMock.removeItem,
+  clearScope: kvMock.clearScope,
+  clearScopePrefix: kvMock.clearScopePrefix,
+}));
 
 const store = new Map<string, string>();
 
@@ -43,51 +62,32 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
-/** A fake encrypted KV surface with real per-scope map semantics. */
-function createFakeKv(): { kv: ReadCacheKv; scopes: Map<string, Map<string, string>> } {
-  const scopes = new Map<string, Map<string, string>>();
-  const kv: ReadCacheKv = {
-    getItem: vi.fn<ReadCacheKv['getItem']>(async (scope, k) => scopes.get(scope)?.get(k) ?? null),
-    setItem: vi.fn<ReadCacheKv['setItem']>(async (scope, k, v) => {
-      let bucket = scopes.get(scope);
-      if (!bucket) {
-        bucket = new Map();
-        scopes.set(scope, bucket);
-      }
-      bucket.set(k, v);
-    }),
-    removeItem: vi.fn<ReadCacheKv['removeItem']>(async (scope, k) => {
-      scopes.get(scope)?.delete(k);
-    }),
-    clearScope: vi.fn<ReadCacheKv['clearScope']>(async scope => {
-      scopes.delete(scope);
-    }),
-    clearScopePrefix: vi.fn<ReadCacheKv['clearScopePrefix']>(async prefix => {
-      for (const scope of scopes.keys()) {
-        if (scope.startsWith(prefix)) {
-          scopes.delete(scope);
-        }
-      }
-    }),
-  };
-  return { kv, scopes };
-}
+/* eslint-disable import/first */
+import {
+  clearCacheScopeForSignOut,
+  createReadCachePersister,
+  isReadCacheAllowedKey,
+  READ_CACHE_MAX_AGE_MS,
+  READ_CACHE_MAX_BYTES,
+  readCachedUserId,
+  readCacheScope,
+  resetReadCacheForTests,
+  restorePersistedCacheOnColdStart,
+  SCHEMA_VERSION,
+  setSignOutActive,
+  shouldPersistReadCacheQuery,
+  takeOverColdStartRestore,
+} from './read-cache';
+import { GET_ME_QUERY_KEY, makePersistedClient } from './test-fixtures';
+/* eslint-enable import/first */
 
-/** A recent, un-busted persisted client carrying one successful getMe query. */
-function makePersistedClient(data: unknown, buster = String(SCHEMA_VERSION)): PersistedClient {
-  return {
-    timestamp: Date.now(),
-    buster,
-    clientState: {
-      mutations: [],
-      queries: [
-        {
-          queryKey: GET_ME_QUERY_KEY,
-          state: { status: 'success', data, dataUpdatedAt: Date.now() },
-        },
-      ],
-    },
-  } as unknown as PersistedClient;
+// The flat application key that must be denied without throwing.
+const FLAT_APPLICATION_KEY: readonly unknown[] = ['org-default-model', 'model-1'];
+
+/** The shared encrypted-kv mock, with an empty store for one test. */
+function createFakeKv(): { kv: typeof kvMock; scopes: Map<string, Map<string, string>> } {
+  kvMock.scopes.clear();
+  return { kv: kvMock, scopes: kvMock.scopes };
 }
 
 function queryLike(state: Partial<Query['state']>, queryKey: unknown): Query {
@@ -396,7 +396,6 @@ describe('publication budget', () => {
     const { kv, scopes } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
     const persister = createReadCachePersister({
-      kv,
       queryClient,
       userId: 'u1',
       epoch: currentAuthEpoch(),
@@ -420,7 +419,6 @@ describe('publication budget', () => {
     const queryClient = makeAuthoritativeQueryClient('u1');
     scopes.set('cache:u1:1', new Map([['read-cache', 'stale-blob']]));
     const persister = createReadCachePersister({
-      kv,
       queryClient,
       userId: 'u1',
       epoch: currentAuthEpoch(),
@@ -436,14 +434,13 @@ describe('publication budget', () => {
   });
 
   it('restores from the scope even when the publication fence would block a write', async () => {
-    const { kv, scopes } = createFakeKv();
+    const { scopes } = createFakeKv();
     const queryClient = new QueryClient();
     scopes.set(
       'cache:u1:1',
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const persister = createReadCachePersister({
-      kv,
       queryClient,
       userId: 'u1',
       epoch: currentAuthEpoch(),
@@ -460,7 +457,7 @@ describe('publication fence', () => {
     const { kv } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
     const epoch = currentAuthEpoch();
-    const persister = createReadCachePersister({ kv, queryClient, userId: 'u1', epoch });
+    const persister = createReadCachePersister({ queryClient, userId: 'u1', epoch });
 
     bumpAuthEpoch();
     await persister.persistClient(makePersistedClient({ id: 'u1' }));
@@ -472,7 +469,6 @@ describe('publication fence', () => {
     const { kv } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u2');
     const persister = createReadCachePersister({
-      kv,
       queryClient,
       userId: 'u1',
       epoch: currentAuthEpoch(),
@@ -487,7 +483,7 @@ describe('publication fence', () => {
     const { kv } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
     const epoch = currentAuthEpoch();
-    const persister = createReadCachePersister({ kv, queryClient, userId: 'u1', epoch });
+    const persister = createReadCachePersister({ queryClient, userId: 'u1', epoch });
 
     // Sign-out flips the fence while the epoch and the cached user id still
     // look current — the exact window in which the old mount resubscribed and
@@ -505,8 +501,7 @@ describe('publication fence', () => {
 
 describe('cold-start restore and takeover', () => {
   it('restores the hint user scope and reports it to the authenticated mount', async () => {
-    const { kv, scopes } = createFakeKv();
-    bindReadCacheKv(kv);
+    const { scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
       'cache:u1:1',
@@ -525,7 +520,6 @@ describe('cold-start restore and takeover', () => {
 
   it('drops an expired blob instead of hydrating it', async () => {
     const { kv, scopes } = createFakeKv();
-    bindReadCacheKv(kv);
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     const expired = makePersistedClient({ id: 'u1' });
     expired.timestamp = Date.now() - READ_CACHE_MAX_AGE_MS - 1;
@@ -541,7 +535,6 @@ describe('cold-start restore and takeover', () => {
 
   it('drops a busted blob instead of hydrating it', async () => {
     const { kv, scopes } = createFakeKv();
-    bindReadCacheKv(kv);
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
       'cache:u1:1',
@@ -557,7 +550,6 @@ describe('cold-start restore and takeover', () => {
 
   it('is best effort: a corrupt blob never blocks startup and is discarded', async () => {
     const { kv, scopes } = createFakeKv();
-    bindReadCacheKv(kv);
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set('cache:u1:1', new Map([['read-cache', 'not-json']]));
     const queryClient = new QueryClient();
@@ -569,8 +561,7 @@ describe('cold-start restore and takeover', () => {
   });
 
   it('abandons a still-pending restore once the authenticated mount takes over', async () => {
-    const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
+    createFakeKv();
     const hintRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
     vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(
       async () =>
@@ -592,14 +583,13 @@ describe('cold-start restore and takeover', () => {
 
   it('never hydrates when the mount takes over while the restore read is in flight', async () => {
     const { kv, scopes } = createFakeKv();
-    bindReadCacheKv(kv);
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
       'cache:u1:1',
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
-    vi.mocked(kv.getItem).mockImplementationOnce(
+    kv.getItem.mockImplementationOnce(
       async () =>
         new Promise<string | null>(resolve => {
           restoreRead.resolve = resolve;
@@ -623,14 +613,13 @@ describe('cold-start restore and takeover', () => {
 
   it('never hydrates when the auth epoch changes while the restore read is in flight', async () => {
     const { kv, scopes } = createFakeKv();
-    bindReadCacheKv(kv);
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
       'cache:u1:1',
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
-    vi.mocked(kv.getItem).mockImplementationOnce(
+    kv.getItem.mockImplementationOnce(
       async () =>
         new Promise<string | null>(resolve => {
           restoreRead.resolve = resolve;
@@ -655,7 +644,6 @@ describe('cold-start restore and takeover', () => {
 
   it('never restores when the auth epoch changes while the hint read is in flight', async () => {
     const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
     const hintRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
     vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(
       async () =>
@@ -676,19 +664,8 @@ describe('cold-start restore and takeover', () => {
     expect(takeOverColdStartRestore()).toBeNull();
   });
 
-  it('does nothing when no KV adapter is bound yet', async () => {
-    store.set(ACTIVE_USER_ID_KEY, 'u1');
-    const queryClient = new QueryClient();
-
-    await restorePersistedCacheOnColdStart(queryClient);
-
-    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(takeOverColdStartRestore()).toBeNull();
-  });
-
   it('does nothing when the identity hint is absent', async () => {
     const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
     const queryClient = new QueryClient();
 
     await restorePersistedCacheOnColdStart(queryClient);
@@ -698,18 +675,12 @@ describe('cold-start restore and takeover', () => {
   });
 });
 
-describe('mismatch recovery', () => {
-  it('reports a restored scope from another account for clearing', () => {
-    expect(mismatchedRestoredScope('cache:u1:1', 'u2')).toBe('cache:u1:1');
-    expect(mismatchedRestoredScope('cache:u1:1', 'u1')).toBeNull();
-    expect(mismatchedRestoredScope(null, 'u1')).toBeNull();
-  });
-});
+// The restored-scope mismatch now lives inline in the mount; the match,
+// mismatch, and no-restore cases are asserted in cache-persistence-mount.test.
 
 describe('sign-out cleanup', () => {
   it('clears exactly the known user cache scope on sign-out', async () => {
     const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
 
     await clearCacheScopeForSignOut('u1');
 
@@ -719,7 +690,6 @@ describe('sign-out cleanup', () => {
 
   it('clears every cache scope when the user id is unknown (privacy wins)', async () => {
     const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
 
     await clearCacheScopeForSignOut(null);
 
@@ -727,19 +697,9 @@ describe('sign-out cleanup', () => {
     expect(kv.clearScope).not.toHaveBeenCalled();
   });
 
-  it('does nothing when no KV adapter is bound', async () => {
-    const { kv } = createFakeKv();
-
-    await clearCacheScopeForSignOut('u1');
-
-    expect(kv.clearScope).not.toHaveBeenCalled();
-    expect(kv.clearScopePrefix).not.toHaveBeenCalled();
-  });
-
   it('is best effort: a failing scope clear never rejects sign-out cleanup', async () => {
     const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
-    vi.mocked(kv.clearScope).mockRejectedValueOnce(new Error('kv down'));
+    kv.clearScope.mockRejectedValueOnce(new Error('kv down'));
 
     await expect(clearCacheScopeForSignOut('u1')).resolves.toBeUndefined();
     expect(kv.clearScope).toHaveBeenCalledWith('cache:u1:1');
@@ -747,8 +707,7 @@ describe('sign-out cleanup', () => {
 
   it('is best effort when clearing every scope fails', async () => {
     const { kv } = createFakeKv();
-    bindReadCacheKv(kv);
-    vi.mocked(kv.clearScopePrefix).mockRejectedValueOnce(new Error('kv down'));
+    kv.clearScopePrefix.mockRejectedValueOnce(new Error('kv down'));
 
     await expect(clearCacheScopeForSignOut(null)).resolves.toBeUndefined();
     expect(kv.clearScopePrefix).toHaveBeenCalledWith('cache:');

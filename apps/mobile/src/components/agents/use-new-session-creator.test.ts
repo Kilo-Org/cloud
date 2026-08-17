@@ -6,12 +6,9 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import {
-  useFencedDraftLoad,
-  useNewSessionCreator,
-  useRemoteSpawnDraftCleanup,
-} from './use-new-session-creator';
+import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
+import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 
 const routerPushMock = vi.hoisted(() => vi.fn());
 const navigationDispatchMock = vi.hoisted(() => vi.fn());
@@ -243,24 +240,6 @@ describe('restored new-session submit', () => {
 
 type DraftLoadState = { settled: boolean; text: string | null };
 
-function NewSessionDraftHarness({
-  userId,
-  isIdentityLoading,
-  onRender,
-}: {
-  userId: string | undefined;
-  isIdentityLoading: boolean;
-  onRender: (state: DraftLoadState) => void;
-}) {
-  const state = useFencedDraftLoad({
-    userId,
-    isIdentityLoading,
-    entityKey: 'agent-composer:new',
-  });
-  onRender(state);
-  return null;
-}
-
 function FencedDraftHarness({
   userId,
   isIdentityLoading,
@@ -277,119 +256,84 @@ function FencedDraftHarness({
   return null;
 }
 
-describe('new-session draft generation fencing', () => {
-  it('never publishes an old account load after an account switch', async () => {
-    const firstLoad = deferred<string | null>();
-    const secondLoad = deferred<string | null>();
-    vi.mocked(loadDraft)
-      .mockImplementationOnce(async () => firstLoad.promise)
-      .mockImplementationOnce(async () => secondLoad.promise);
-
-    const renders: DraftLoadState[] = [];
-    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(NewSessionDraftHarness, {
-          userId: 'u1',
-          isIdentityLoading: false,
-          onRender: state => {
-            renders.push(state);
-          },
-        })
-      );
-    });
-
-    // Switch accounts while the first account's load is still in flight.
-    act(() => {
-      renderer?.update(
-        createElement(NewSessionDraftHarness, {
-          userId: 'u2',
-          isIdentityLoading: false,
-          onRender: state => {
-            renders.push(state);
-          },
-        })
-      );
-    });
-
-    // The old account's load resolves late: it must not publish into the new
-    // account's screen.
-    await act(async () => {
-      firstLoad.resolve('old account draft');
-    });
-    await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: false, text: null });
-
-    // The new account's load resolves: it publishes.
-    await act(async () => {
-      secondLoad.resolve('new account draft');
-    });
-    await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: true, text: 'new account draft' });
-    expect(vi.mocked(loadDraft)).toHaveBeenCalledWith(
-      'u2',
-      'agent-composer:new',
-      expect.anything()
-    );
-  });
-});
+// The fence must hold for both generation sources: switching accounts and
+// switching the entity key (session). Only the changing field differs, so one
+// table drives the identical three steps.
+const FENCE_CASES = [
+  {
+    name: 'an account switch',
+    first: { userId: 'u1', entityKey: 'agent-composer:new' },
+    second: { userId: 'u2', entityKey: 'agent-composer:new' },
+    staleText: 'old account draft',
+    freshText: 'new account draft',
+  },
+  {
+    name: 'the entity key changes',
+    first: { userId: 'u1', entityKey: 'agent-composer:sess-1' },
+    second: { userId: 'u1', entityKey: 'agent-composer:sess-2' },
+    staleText: 'old session draft',
+    freshText: 'new session draft',
+  },
+] as const;
 
 describe('useFencedDraftLoad generation fencing', () => {
-  it('never publishes an old session load after the entity key changes', async () => {
-    const firstLoad = deferred<string | null>();
-    const secondLoad = deferred<string | null>();
-    vi.mocked(loadDraft)
-      .mockImplementationOnce(async () => firstLoad.promise)
-      .mockImplementationOnce(async () => secondLoad.promise);
+  it.each(FENCE_CASES)(
+    'never publishes an old load after $name',
+    async ({ first, second, staleText, freshText }) => {
+      const firstLoad = deferred<string | null>();
+      const secondLoad = deferred<string | null>();
+      vi.mocked(loadDraft)
+        .mockImplementationOnce(async () => firstLoad.promise)
+        .mockImplementationOnce(async () => secondLoad.promise);
 
-    const renders: DraftLoadState[] = [];
-    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(FencedDraftHarness, {
-          userId: 'u1',
-          isIdentityLoading: false,
-          entityKey: 'agent-composer:sess-1',
-          onRender: state => {
-            renders.push(state);
-          },
-        })
+      const renders: DraftLoadState[] = [];
+      let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+      act(() => {
+        renderer = TestRenderer.create(
+          createElement(FencedDraftHarness, {
+            ...first,
+            isIdentityLoading: false,
+            onRender: state => {
+              renders.push(state);
+            },
+          })
+        );
+      });
+
+      // The generation changes while the first load is still in flight.
+      act(() => {
+        renderer?.update(
+          createElement(FencedDraftHarness, {
+            ...second,
+            isIdentityLoading: false,
+            onRender: state => {
+              renders.push(state);
+            },
+          })
+        );
+      });
+
+      // The superseded load resolves late: it must not publish into the
+      // newest generation's screen.
+      await act(async () => {
+        firstLoad.resolve(staleText);
+      });
+      await flushMicrotasks();
+      expect(renders.at(-1)).toEqual({ settled: false, text: null });
+
+      // The current generation's load resolves: it publishes.
+      await act(async () => {
+        secondLoad.resolve(freshText);
+      });
+      await flushMicrotasks();
+      expect(renders.at(-1)).toEqual({ settled: true, text: freshText });
+      expect(vi.mocked(loadDraft)).toHaveBeenCalledWith(
+        second.userId,
+        second.entityKey,
+        expect.anything()
       );
-    });
-
-    // The route swaps to another session while the first load is in flight.
-    act(() => {
-      renderer?.update(
-        createElement(FencedDraftHarness, {
-          userId: 'u1',
-          isIdentityLoading: false,
-          entityKey: 'agent-composer:sess-2',
-          onRender: state => {
-            renders.push(state);
-          },
-        })
-      );
-    });
-
-    // The old session's load resolves late: it must not publish.
-    await act(async () => {
-      firstLoad.resolve('old session draft');
-    });
-    await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: false, text: null });
-
-    // The current session's load resolves: it publishes.
-    await act(async () => {
-      secondLoad.resolve('new session draft');
-    });
-    await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: true, text: 'new session draft' });
-    expect(vi.mocked(loadDraft)).toHaveBeenCalledWith(
-      'u1',
-      'agent-composer:sess-2',
-      expect.anything()
-    );
-  });
+    }
+  );
 
   it('never publishes a load that resolves after unmount', async () => {
     const gate = deferred<string | null>();

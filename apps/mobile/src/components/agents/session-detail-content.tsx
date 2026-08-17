@@ -58,7 +58,6 @@ import {
   useCliSessionPresence,
 } from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
-import { useFencedDraftLoad } from '@/components/agents/use-new-session-creator';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
@@ -99,6 +98,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {

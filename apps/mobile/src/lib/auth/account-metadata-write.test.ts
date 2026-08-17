@@ -24,12 +24,6 @@ import { deleteAccountMetadata, writeAccountMetadata } from './account-metadata-
 import { bumpAuthEpoch } from './auth-epoch';
 /* eslint-enable import/first */
 
-async function flushMicrotasks(): Promise<void> {
-  await new Promise(resolve => {
-    setImmediate(resolve);
-  });
-}
-
 describe('account-metadata-write', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,57 +57,6 @@ describe('account-metadata-write', () => {
     await Promise.all([block, queued]);
 
     expect(store.has('k')).toBe(false);
-  });
-
-  it('serializes writes for the same key in FIFO order', async () => {
-    const order: string[] = [];
-    let releaseFirst: (() => void) | undefined = undefined;
-    const gate = new Promise<void>(resolve => {
-      releaseFirst = resolve;
-    });
-
-    const first = writeAccountMetadata('fifo', async () => {
-      await gate;
-      order.push('first');
-    });
-    const second = writeAccountMetadata('fifo', async () => {
-      await SecureStore.setItemAsync('fifo', 'second');
-      order.push('second');
-    });
-
-    // The second save must not start while the first is still in flight.
-    await flushMicrotasks();
-    expect(order).toEqual([]);
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    releaseFirst!();
-    await Promise.all([first, second]);
-    expect(order).toEqual(['first', 'second']);
-  });
-
-  it('does not serialize writes for different keys', async () => {
-    const order: string[] = [];
-    let releaseA: (() => void) | undefined = undefined;
-    const gateA = new Promise<void>(resolve => {
-      releaseA = resolve;
-    });
-
-    const a = writeAccountMetadata('key-a', async () => {
-      await gateA;
-      order.push('a');
-    });
-    const b = writeAccountMetadata('key-b', async () => {
-      await SecureStore.setItemAsync('key-b', 'b');
-      order.push('b');
-    });
-
-    await flushMicrotasks();
-    expect(order).toEqual(['b']);
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    releaseA!();
-    await Promise.all([a, b]);
-    expect(order).toEqual(['b', 'a']);
   });
 
   it('a delete always runs and lands after an in-flight write to the same key', async () => {

@@ -3,8 +3,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 /** One active device session as returned by `user.listDeviceSessions`. */
 export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDeviceSessions'][number];
 
-type DeviceSessionList = DeviceSession[];
-export type RevokeDeviceSessionResult =
+type RevokeDeviceSessionResult =
   inferRouterOutputs<MobileRouter>['user']['revokeDeviceSessionById'];
 
 const UNKNOWN_DEVICE_LABEL = 'Unknown device';
@@ -26,31 +25,23 @@ export function deviceSessionLabel(userAgent: string | null | undefined): string
   if (trimmed.startsWith('Mozilla/')) {
     return 'Web browser';
   }
-  const firstToken = trimmed.split(/\s+/)[0];
-  if (!firstToken) {
-    return UNKNOWN_DEVICE_LABEL;
-  }
-  // "Kilo-Code/1.2.3" → "Kilo-Code" (drop the version after the slash).
-  const name = firstToken.split('/')[0]?.trim();
-  return name ?? UNKNOWN_DEVICE_LABEL;
+  // "Kilo-Code/1.2.3 (darwin; arm64)" → "Kilo-Code" (drop the version and the rest).
+  return trimmed.split(/[\s/]/)[0] ?? UNKNOWN_DEVICE_LABEL;
 }
 
 /**
- * Order sessions for display: the current device first, then the server's
- * `last_seen_at` descending order. `sort` on a copied array is stable (ES2019,
- * Hermes included), so the server order of the remaining rows is preserved.
- * The copy keeps the readonly input untouched — `toSorted` is not available
- * on Hermes.
+ * Order sessions for display: the current device first, then the rest in the
+ * server's `last_seen_at` descending order. Both partitions keep the input
+ * order, and the new array leaves the readonly input untouched.
  */
 export function sortDeviceSessions(sessions: readonly DeviceSession[]): DeviceSession[] {
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already prevents mutation of the source
-  return [...sessions].sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent));
+  return [
+    ...sessions.filter(session => session.isCurrent),
+    ...sessions.filter(session => !session.isCurrent),
+  ];
 }
 
-type RevokeOutcomeKind = 'revoked' | 'already_revoked' | 'not_found' | 'error';
-
 export type RevokeOutcome = {
-  kind: RevokeOutcomeKind;
   toast: 'success' | 'info' | 'error';
   message: string;
   /** When true the list refetches to show the server's authoritative truth. */
@@ -69,38 +60,27 @@ export function mapRevokeOutcome(
   error: RevokeMutationError | undefined
 ): RevokeOutcome {
   if (result?.outcome === 'revoked') {
-    return { kind: 'revoked', toast: 'success', message: 'Session signed out.', refetch: true };
+    return { toast: 'success', message: 'Session signed out.', refetch: true };
   }
   if (result?.outcome === 'already_revoked') {
-    return {
-      kind: 'already_revoked',
-      toast: 'info',
-      message: 'Session was already signed out',
-      refetch: true,
-    };
+    return { toast: 'info', message: 'Session was already signed out', refetch: true };
   }
   if (error?.code === 'NOT_FOUND') {
-    return {
-      kind: 'not_found',
-      toast: 'error',
-      message: 'This session is no longer active.',
-      refetch: true,
-    };
+    return { toast: 'error', message: 'This session is no longer active.', refetch: true };
   }
   return {
-    kind: 'error',
     toast: 'error',
     message: error?.message ?? 'Could not sign out this device.',
     refetch: false,
   };
 }
 
-export type DeviceSessionsQueryState = 'loading' | 'error' | 'empty' | 'happy' | 'no-current';
+type DeviceSessionsQueryState = 'loading' | 'error' | 'empty' | 'happy' | 'no-current';
 
 type ClassifyArgs = {
   isLoading: boolean;
   isError: boolean;
-  data: DeviceSessionList | undefined;
+  data: DeviceSession[] | undefined;
 };
 
 /**

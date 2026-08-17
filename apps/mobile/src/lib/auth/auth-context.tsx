@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- cohesive auth-context module: refresh rotation, epoch fencing, the serialized credential write queue, and provider teardown stay together */
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import {
@@ -21,9 +20,8 @@ import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
-  invalidateRefreshSession,
   performRefresh,
-  persistSignInCredentials,
+  persistSignInCredentialsAtEpoch,
   REFRESH_MARGIN_MS,
   writeCredentials,
 } from '@/lib/auth/credentials';
@@ -76,8 +74,6 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-export { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [token, setToken] = useState<string | undefined>();
@@ -148,10 +144,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // full teardown, and a sign-out queued behind a sign-in signs that new
       // session out (documented, correct FIFO semantics).
       await chainSave('auth-transition', async () => {
-        invalidateRefreshSession();
+        bumpAuthEpoch();
         setAuthEpoch(currentAuthEpoch());
         const epoch = currentAuthEpoch();
-        const published = await persistSignInCredentials(tokenValue, refreshTokenValue, expiresIn);
+        const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
+          expiresIn,
+        });
         // A sign-in superseded by a newer sign-in or sign-out while its
         // credential write was fenced must not clear the signed-out guard,
         // update React auth state, or run login side effects.
@@ -300,8 +298,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     return setTrpcUnauthorizedHandler(handler);
   }, [signOut]);
 
-  const REFRESH_MARGIN = REFRESH_MARGIN_MS;
-
   // Proactive refresh: when the app returns to foreground and the token is
   // expiring within the margin, rotate before the next request hits a 401.
   useEffect(() => {
@@ -323,7 +319,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         }
 
         const expiresAt = Number(expiresAtStr);
-        if (Date.now() <= expiresAt - REFRESH_MARGIN) {
+        if (Date.now() <= expiresAt - REFRESH_MARGIN_MS) {
           return;
         }
 
@@ -345,7 +341,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     return () => {
       subscription.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- REFRESH_MARGIN_MS is module-level constant
   }, [token]);
 
   const value = useMemo<AuthContextValue>(

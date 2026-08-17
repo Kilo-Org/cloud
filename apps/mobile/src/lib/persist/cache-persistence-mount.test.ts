@@ -4,17 +4,13 @@
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { type Mutation } from '@tanstack/react-query';
-import {
-  type PersistedClient,
-  type PersistedQueryClientSaveOptions,
-} from '@tanstack/react-query-persist-client';
+import { type PersistedQueryClientSaveOptions } from '@tanstack/react-query-persist-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { CachePersistenceMount } from './cache-persistence-mount';
 import { queryClient } from '@/lib/query-client';
 import {
-  bindReadCacheKv,
   clearCacheScopeForSignOut,
   createReadCachePersister,
   resetReadCacheForTests,
@@ -24,6 +20,7 @@ import {
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from './read-cache';
+import { GET_ME_QUERY_KEY, makePersistedClient } from './test-fixtures';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 type Identity = {
@@ -133,29 +130,8 @@ function mutationLike(state: Partial<Mutation['state']>): Mutation {
   return { state } as unknown as Mutation;
 }
 
-// The exact tRPC query key the authoritative user id is read from.
-const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query' }];
-
-/** A recent, un-busted persisted client carrying one successful getMe query. */
-function makePersistedClient(data: unknown): PersistedClient {
-  return {
-    timestamp: Date.now(),
-    buster: String(SCHEMA_VERSION),
-    clientState: {
-      mutations: [],
-      queries: [
-        {
-          queryKey: GET_ME_QUERY_KEY,
-          state: { status: 'success', data, dataUpdatedAt: Date.now() },
-        },
-      ],
-    },
-  } as unknown as PersistedClient;
-}
-
 describe('CachePersistenceMount', () => {
   it('resolves identity, writes the hint, and subscribes one scoped persister', async () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     const renderer = mount();
     await flushMicrotasks();
@@ -181,13 +157,15 @@ describe('CachePersistenceMount', () => {
     await latestPersistOptions()?.persister.restoreClient();
     expect(kvMock.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
 
+    // No cold-start restore claimed a scope, so nothing is cleared.
+    expect(kvMock.clearScope).not.toHaveBeenCalled();
+
     act(() => {
       renderer.unmount();
     });
   });
 
   it('regression: a failed identity-hint write never escapes as an unhandled rejection', async () => {
-    bindReadCacheKv(kvMock);
     const unhandled: unknown[] = [];
     const onUnhandledRejection = (reason: unknown) => {
       unhandled.push(reason);
@@ -218,7 +196,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('does nothing while identity is loading', () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: undefined, isLoading: true, isError: false };
     const renderer = mount();
 
@@ -230,7 +207,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('does nothing when identity resolution errored', () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: undefined, isLoading: false, isError: true };
     const renderer = mount();
 
@@ -242,7 +218,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('does nothing before a userId resolves', () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: undefined, isLoading: false, isError: false };
     const renderer = mount();
 
@@ -252,18 +227,7 @@ describe('CachePersistenceMount', () => {
     });
   });
 
-  it('does nothing when the KV adapter is not bound yet', () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-
-    expect(persistQueryClientSubscribeMock).not.toHaveBeenCalled();
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
   it('keeps a restored scope that matches the authoritative user', async () => {
-    bindReadCacheKv(kvMock);
     secureStoreMock.getItemAsync.mockResolvedValue('u1');
     await restorePersistedCacheOnColdStart(queryClient);
 
@@ -285,7 +249,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('clears a mismatched restored scope and the query client before rescoping', async () => {
-    bindReadCacheKv(kvMock);
     secureStoreMock.getItemAsync.mockResolvedValue('user-a');
     await restorePersistedCacheOnColdStart(queryClient);
 
@@ -309,7 +272,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('unsubscribes the previous persister when the user changes', async () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     const renderer = mount();
     await flushMicrotasks();
@@ -329,7 +291,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('unsubscribes the persister on unmount', async () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     const renderer = mount();
     await flushMicrotasks();
@@ -342,7 +303,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('denies every mutation from the persisted client, including paused ones', async () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     const renderer = mount();
     await flushMicrotasks();
@@ -360,7 +320,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('unsubscribes and resubscribes when the auth epoch changes and the user stays equal', async () => {
-    bindReadCacheKv(kvMock);
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     authMock.value = { authEpoch: 1, isSigningOut: false };
     const renderer = mount();
@@ -384,7 +343,6 @@ describe('CachePersistenceMount', () => {
   });
 
   it('regression: sign-out unsubscribes the mount and a query update during delayed cleanup never rewrites the old user blob', async () => {
-    bindReadCacheKv(kvMock);
     // The old user id stays cached for the whole sign-out teardown (the query
     // client is only cleared at the end of sign-out).
     queryClient.setQueryData(GET_ME_QUERY_KEY, { id: 'u1' });
@@ -438,7 +396,6 @@ describe('CachePersistenceMount', () => {
     // while sign-out is active, so cleanup is final: a save after the clear
     // also writes nothing.
     const freshPersister = createReadCachePersister({
-      kv: kvMock,
       queryClient,
       userId: 'u1',
       epoch: currentAuthEpoch(),

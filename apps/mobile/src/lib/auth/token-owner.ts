@@ -3,12 +3,6 @@ import * as SecureStore from 'expo-secure-store';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 
-type ActiveTokenState = {
-  token: string;
-  expiresAtMs: number | null;
-  epoch: number;
-};
-
 export type ActiveToken = {
   token: string;
   expiresAtMs: number | null;
@@ -16,7 +10,7 @@ export type ActiveToken = {
 
 export type ActiveTokenSnapshot = ActiveToken & { epoch: number };
 
-let activeToken: ActiveTokenState | null = null;
+let activeToken: ActiveTokenSnapshot | null = null;
 
 // Sign-out teardown guard: set synchronously when sign-out starts and cleared
 // only when a sign-in publishes credentials. While it is set the stored
@@ -42,10 +36,11 @@ export function setActiveToken(token: string, expiresAtMs: number | null): void 
 
 /** Returns the held token and expiry, or null when unset or when the epoch moved. */
 export function getActiveToken(): ActiveToken | null {
-  if (!activeToken || !isCurrentAuthEpoch(activeToken.epoch)) {
+  const snapshot = getActiveTokenSnapshot();
+  if (!snapshot) {
     return null;
   }
-  return { token: activeToken.token, expiresAtMs: activeToken.expiresAtMs };
+  return { token: snapshot.token, expiresAtMs: snapshot.expiresAtMs };
 }
 
 export function getActiveTokenSnapshot(): ActiveTokenSnapshot | null {
@@ -109,8 +104,10 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
   if (published) {
     return published.token;
   }
-  if (token && isCurrentAuthEpoch(epoch) && !isSignOutTeardownActive()) {
+  // One read for both decisions: the flag cannot change between them.
+  const tearingDown = isSignOutTeardownActive();
+  if (token && isCurrentAuthEpoch(epoch) && !tearingDown) {
     setActiveToken(token, null);
   }
-  return isSignOutTeardownActive() ? null : token;
+  return tearingDown ? null : token;
 }

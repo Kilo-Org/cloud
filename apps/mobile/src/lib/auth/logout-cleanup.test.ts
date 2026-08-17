@@ -33,6 +33,17 @@ vi.mock('@/lib/auth/token-owner', () => ({
   getActiveToken: vi.fn(),
 }));
 
+// The cleanup reads the cached user id from the read cache, which calls the
+// encrypted-kv module; the mock keeps the native SQLCipher chain out of this
+// node suite.
+vi.mock('@/lib/persist/encrypted-kv', () => ({
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clearScope: vi.fn(),
+  clearScopePrefix: vi.fn(),
+}));
+
 import { readLogoutCleanupTombstone, runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { getActiveToken } from '@/lib/auth/token-owner';
@@ -198,67 +209,39 @@ describe('runLogoutCleanup', () => {
     });
   });
 
-  it('discards a persisted tombstone that omits a required field', async () => {
-    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ deviceSessionId: 'session-1' }));
+  // An omitted userId must not be read as `undefined` (which would become a
+  // different-user skip), and a non-finite failedAt must not survive: an
+  // invalid record is discarded as absent.
+  it.each([
+    ['omits every required field', { deviceSessionId: 'session-1' }, null],
+    [
+      'has a wrong field type',
+      { userId: 'u1', pushToken: null, needsPushUnregister: 'yes', failedAt: 1_700_000_000_000 },
+      null,
+    ],
+    [
+      'has a non-numeric failedAt',
+      { userId: null, pushToken: null, needsPushUnregister: false, failedAt: 'soon' },
+      null,
+    ],
+    [
+      'has a null failedAt (JSON.stringify writes a non-finite number as null)',
+      { userId: null, pushToken: null, needsPushUnregister: false, failedAt: Infinity },
+      null,
+    ],
+    [
+      'is fully valid',
+      { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
+      { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
+    ],
+    [
+      'is valid with a null userId (identity unknown)',
+      { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
+      { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
+    ],
+  ])('reads a persisted tombstone that %s', async (_label, persisted, expected) => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(persisted));
 
-    // An omitted userId must not be read as `undefined` (which would become a
-    // different-user skip): the record is invalid and discarded as absent.
-    await expect(readLogoutCleanupTombstone()).resolves.toBeNull();
-  });
-
-  it('discards a persisted tombstone with a wrong field type', async () => {
-    store.set(
-      LOGOUT_CLEANUP_TOMBSTONE_KEY,
-      JSON.stringify({
-        userId: 'u1',
-        pushToken: null,
-        needsPushUnregister: 'yes',
-        failedAt: Date.now(),
-      })
-    );
-
-    await expect(readLogoutCleanupTombstone()).resolves.toBeNull();
-  });
-
-  it('discards a persisted tombstone with a non-finite failedAt', async () => {
-    store.set(
-      LOGOUT_CLEANUP_TOMBSTONE_KEY,
-      JSON.stringify({
-        userId: null,
-        pushToken: null,
-        needsPushUnregister: false,
-        failedAt: 'soon',
-      })
-    );
-
-    await expect(readLogoutCleanupTombstone()).resolves.toBeNull();
-  });
-
-  it('accepts a fully valid persisted tombstone', async () => {
-    const valid = {
-      userId: 'u1',
-      pushToken: null,
-      needsPushUnregister: false,
-      failedAt: Date.now(),
-    };
-    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(valid));
-
-    await expect(readLogoutCleanupTombstone()).resolves.toEqual(valid);
-  });
-
-  it('accepts a valid persisted tombstone with a null userId (identity unknown)', async () => {
-    store.set(
-      LOGOUT_CLEANUP_TOMBSTONE_KEY,
-      JSON.stringify({
-        userId: null,
-        pushToken: 'push-1',
-        needsPushUnregister: true,
-        failedAt: Date.now(),
-      })
-    );
-
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone?.userId).toBeNull();
-    expect(tombstone?.pushToken).toBe('push-1');
+    await expect(readLogoutCleanupTombstone()).resolves.toEqual(expected);
   });
 });

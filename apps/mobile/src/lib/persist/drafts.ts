@@ -84,41 +84,43 @@ export function resolvePrefillOverDraft(
   return draftText ?? undefined;
 }
 
-type PendingSave = {
-  timer: ReturnType<typeof setTimeout>;
+/** The epoch-fenced write payload for one draft write. */
+type DraftWritePayload = {
   epoch: number;
   userId: string;
   entityKey: string;
   serialized: string;
 };
 
-/** The epoch-fenced write payload captured together with the debounce timer. */
-type DraftWritePayload = Omit<PendingSave, 'timer'>;
+type PendingSave = {
+  timer: ReturnType<typeof setTimeout>;
+  epoch: number;
+  serialized: string;
+};
 
-// One pending debounced write per full storage key. The timer, epoch, user,
-// key, and value are captured together so a later save for a different key
-// (or a different account with the same entity key) can never retarget it.
+// One pending debounced write per full storage key. The timer, epoch, and
+// value are captured together under the full key, so a later save for a
+// different key (or a different account with the same entity key) can never
+// retarget it.
 const pendingSaves = new Map<string, PendingSave>();
 
 function fullKey(userId: string, entityKey: string): string {
   return `${draftScope(userId)}\u0000${entityKey}`;
 }
 
-function reportCorruptDraft(reason: string, userId: string, entityKey: string): void {
-  Sentry.captureException(new Error(reason), {
-    level: 'warning',
-    extra: { scope: draftScope(userId), entityKey, reason: 'draft read discarded' },
-  });
-}
+const DRAFT_READ_DISCARDED = 'draft read discarded';
+const DRAFT_WRITE_FAILED = 'draft write failed';
 
-function reportDraftWriteFailure(error: unknown, userId: string, entityKey: string): void {
-  Sentry.captureException(
-    new Error(error instanceof Error ? error.message : 'draft write failed'),
-    {
-      level: 'warning',
-      extra: { scope: draftScope(userId), entityKey, reason: 'draft write failed' },
-    }
-  );
+function reportDraftFailure(report: {
+  message: string;
+  reason: string;
+  userId: string;
+  entityKey: string;
+}): void {
+  Sentry.captureException(new Error(report.message), {
+    level: 'warning',
+    extra: { scope: draftScope(report.userId), entityKey: report.entityKey, reason: report.reason },
+  });
 }
 
 /**
@@ -143,21 +145,32 @@ export async function loadDraft<T>(
       return null;
     }
     if (utf8ByteLength(raw) > DRAFT_MAX_BYTES) {
-      reportCorruptDraft('stored draft exceeds the 64 KB cap', userId, entityKey);
+      reportDraftFailure({
+        message: 'stored draft exceeds the 64 KB cap',
+        reason: DRAFT_READ_DISCARDED,
+        userId,
+        entityKey,
+      });
       return null;
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isValid(parsed)) {
-      reportCorruptDraft('stored draft does not match its expected shape', userId, entityKey);
+      reportDraftFailure({
+        message: 'stored draft does not match its expected shape',
+        reason: DRAFT_READ_DISCARDED,
+        userId,
+        entityKey,
+      });
       return null;
     }
     return parsed;
   } catch (error) {
-    reportCorruptDraft(
-      error instanceof Error ? error.message : 'stored draft is not valid JSON',
+    reportDraftFailure({
+      message: error instanceof Error ? error.message : 'stored draft is not valid JSON',
+      reason: DRAFT_READ_DISCARDED,
       userId,
-      entityKey
-    );
+      entityKey,
+    });
     return null;
   }
 }
@@ -191,7 +204,12 @@ async function writeDraftSafely(payload: DraftWritePayload): Promise<void> {
   try {
     await writeDraft(payload);
   } catch (error) {
-    reportDraftWriteFailure(error, payload.userId, payload.entityKey);
+    reportDraftFailure({
+      message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
+      reason: DRAFT_WRITE_FAILED,
+      userId: payload.userId,
+      entityKey: payload.entityKey,
+    });
   }
 }
 
@@ -222,18 +240,19 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
   if (!userId) {
     return;
   }
-  // JSON.stringify produces no string for these top-level values, so reject
-  // them before the byte-cap check, which requires a string.
-  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
-    reportDraftWriteFailure(
-      new TypeError('draft value cannot be serialized to JSON'),
-      userId,
-      entityKey
-    );
-    return;
-  }
   try {
-    const serialized = JSON.stringify(value);
+    // JSON.stringify produces no string for a top-level undefined, function,
+    // or symbol; reject those before the byte-cap check, which needs a string.
+    const serialized = JSON.stringify(value) as string | undefined;
+    if (serialized === undefined) {
+      reportDraftFailure({
+        message: 'draft value cannot be serialized to JSON',
+        reason: DRAFT_WRITE_FAILED,
+        userId,
+        entityKey,
+      });
+      return;
+    }
     if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
       return;
     }
@@ -247,11 +266,16 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
       pendingSaves.delete(key);
       void writeDraftSafely({ epoch, userId, entityKey, serialized });
     }, DRAFT_DEBOUNCE_MS);
-    pendingSaves.set(key, { timer, epoch, userId, entityKey, serialized });
+    pendingSaves.set(key, { timer, epoch, serialized });
   } catch (error) {
     // Serialization and byte sizing run before any timer exists; contain
     // every failure here so saveDraft never throws synchronously.
-    reportDraftWriteFailure(error, userId, entityKey);
+    reportDraftFailure({
+      message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
+      reason: DRAFT_WRITE_FAILED,
+      userId,
+      entityKey,
+    });
   }
 }
 
@@ -272,7 +296,7 @@ export async function flushDraft(userId: string, entityKey: string): Promise<voi
   }
   clearTimeout(pending.timer);
   pendingSaves.delete(key);
-  await writeDraftSafely(pending);
+  await writeDraftSafely({ ...pending, userId, entityKey });
 }
 
 /**
@@ -298,7 +322,12 @@ export async function clearDraft(userId: string, entityKey: string): Promise<voi
       await encryptedKv.removeItem(draftScope(userId), entityKey);
     });
   } catch (error) {
-    reportDraftWriteFailure(error, userId, entityKey);
+    reportDraftFailure({
+      message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
+      reason: DRAFT_WRITE_FAILED,
+      userId,
+      entityKey,
+    });
   }
 }
 

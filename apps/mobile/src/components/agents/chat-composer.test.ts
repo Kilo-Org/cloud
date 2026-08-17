@@ -270,14 +270,29 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// The restore contract has one axis: whether the host resolved a draft. Both
+// cases run the identical mount → submit sequence, so one table drives them.
+const RESTORE_CASES = [
+  {
+    name: 'sends the restored draft immediately on submit, before any keystroke',
+    initialDraft: 'Restored draft text',
+    sent: 'Restored draft text',
+  },
+  {
+    name: 'does not send when there is no restored draft',
+    initialDraft: undefined,
+    sent: null,
+  },
+] as const;
+
 describe('ChatComposer draft restore', () => {
-  it('sends the restored draft immediately on submit, before any keystroke', async () => {
+  it.each(RESTORE_CASES)('$name', async ({ initialDraft, sent }) => {
     const { ChatComposer } = await import('./chat-composer');
 
     const render = ChatComposer(
       makeProps({
         draftKey: 'agent-composer:sess-1',
-        initialDraft: 'Restored draft text',
+        initialDraft,
       })
     );
 
@@ -288,25 +303,11 @@ describe('ChatComposer draft restore', () => {
       setTimeout(resolve, 0);
     });
 
+    if (sent === null) {
+      expect(onSendMock).not.toHaveBeenCalled();
+      return;
+    }
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', undefined, undefined);
-  });
-
-  it('does not send when there is no restored draft', async () => {
-    const { ChatComposer } = await import('./chat-composer');
-
-    const render = ChatComposer(
-      makeProps({
-        draftKey: 'agent-composer:sess-1',
-        initialDraft: undefined,
-      })
-    );
-
-    requireInputRowOnSubmit(render)();
-    await new Promise(resolve => {
-      setTimeout(resolve, 0);
-    });
-
-    expect(onSendMock).not.toHaveBeenCalled();
+    expect(onSendMock).toHaveBeenCalledWith(sent, undefined, undefined);
   });
 });

@@ -1222,7 +1222,6 @@ function authError(status: number, error: string, kiloUserId: string) {
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
-    deviceSessionId: undefined,
   };
 }
 

@@ -1,9 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
-import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 
@@ -21,9 +22,6 @@ import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service
 // Single-flight refresh lock. Only the first caller initiates the rotation;
 // concurrent callers await the same promise.
 let refreshPromise: Promise<RefreshOutcome> | null = null;
-let credentialWrite: Promise<void> = new Promise<void>(resolve => {
-  resolve();
-});
 
 type RefreshSuccess = {
   ok: true;
@@ -40,22 +38,10 @@ export type RefreshOutcome = RefreshSuccess | RefreshRefused | RefreshTransient 
 // Proactive refresh window: refresh when the token expires within 5 minutes.
 export const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-export function invalidateRefreshSession(): void {
-  bumpAuthEpoch();
-}
-
+/** Serializes every credential write on one FIFO chain. */
 export async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
-  const previous = credentialWrite;
-  let release = undefined as (() => void) | undefined;
-  credentialWrite = new Promise<void>(resolve => {
-    release = resolve;
-  });
-  await previous;
-  try {
-    return await write();
-  } finally {
-    release?.();
-  }
+  const result = await chainSave('credentials', write);
+  return result;
 }
 
 /**
@@ -70,15 +56,6 @@ type PersistCredentialsOptions = {
   expectedEpoch?: number;
 };
 
-export async function persistSignInCredentials(
-  token: string,
-  refreshToken?: string,
-  expiresIn?: number
-): Promise<boolean> {
-  const published = await persistSignInCredentialsAtEpoch(token, refreshToken, { expiresIn });
-  return published;
-}
-
 export async function persistSignInCredentialsAtEpoch(
   token: string,
   refreshToken: string | undefined,
@@ -87,7 +64,7 @@ export async function persistSignInCredentialsAtEpoch(
   const epoch = options.expectedEpoch ?? currentAuthEpoch();
   const expiresIn = options.expiresIn;
   const expiresAtMs = refreshToken && expiresIn ? Date.now() + expiresIn * 1000 : null;
-  const hasPair = Boolean(refreshToken && expiresIn);
+  const hasPair = expiresAtMs !== null;
 
   // Wipe every credential key a fenced write may already have committed.
   // Runs inside the serialized write queue, so it cannot remove the keys of

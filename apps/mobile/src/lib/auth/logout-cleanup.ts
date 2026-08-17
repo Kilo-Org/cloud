@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
+import * as z from 'zod';
 
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { readCachedUserId } from '@/lib/persist/read-cache';
@@ -23,34 +24,22 @@ import { trpcClient } from '@/lib/trpc';
  * deliberately NOT epoch-fenced: it must survive sign-out by design, and
  * sign-out must never delete it.
  */
-export type LogoutCleanupTombstone = {
-  /** getMe cache identity at logout, or null when the query had not resolved. */
-  userId: string | null;
-  /** Device push token at logout; null when lookup failed or permission missing. */
-  pushToken: string | null;
-  needsPushUnregister: boolean;
-  /** Epoch ms of the failed logout; reconciliation discards past 30 days. */
-  failedAt: number;
-};
-
 /**
- * Runtime guard for a persisted tombstone. Every field is validated so a
- * malformed record is discarded instead of being interpreted as a
- * different-user skip or driving unsafe remote cleanup.
+ * Every field is validated so a malformed record is discarded instead of being
+ * interpreted as a different-user skip or driving unsafe remote cleanup.
+ * `z.number()` rejects NaN and Infinity, so `failedAt` is always finite.
  */
-function isLogoutCleanupTombstone(value: unknown): value is LogoutCleanupTombstone {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return (
-    (record.userId === null || typeof record.userId === 'string') &&
-    (record.pushToken === null || typeof record.pushToken === 'string') &&
-    typeof record.needsPushUnregister === 'boolean' &&
-    typeof record.failedAt === 'number' &&
-    Number.isFinite(record.failedAt)
-  );
-}
+const logoutCleanupTombstoneSchema = z.object({
+  /** getMe cache identity at logout, or null when the query had not resolved. */
+  userId: z.string().nullable(),
+  /** Device push token at logout; null when lookup failed or permission missing. */
+  pushToken: z.string().nullable(),
+  needsPushUnregister: z.boolean(),
+  /** Epoch ms of the failed logout; reconciliation discards past 30 days. */
+  failedAt: z.number(),
+});
+
+export type LogoutCleanupTombstone = z.infer<typeof logoutCleanupTombstoneSchema>;
 
 export async function readLogoutCleanupTombstone(): Promise<LogoutCleanupTombstone | null> {
   try {
@@ -58,14 +47,14 @@ export async function readLogoutCleanupTombstone(): Promise<LogoutCleanupTombsto
     if (!raw) {
       return null;
     }
-    const parsed: unknown = JSON.parse(raw);
-    if (!isLogoutCleanupTombstone(parsed)) {
+    const parsed = logoutCleanupTombstoneSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) {
       // A corrupt or invalid tombstone is discarded as absent: nothing is
       // actionable, the next failed logout writes a fresh one, and the record
       // can never become a different-user skip or trigger remote cleanup.
       return null;
     }
-    return parsed;
+    return parsed.data;
   } catch {
     // A corrupt tombstone is discarded: nothing actionable, and the next
     // failed logout writes a fresh one.

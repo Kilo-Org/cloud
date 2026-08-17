@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { LAST_ACTIVE_INSTANCE_KEY } from '@/lib/storage-keys';
 
 let cached: string | null = null;
@@ -16,9 +16,7 @@ export function getLastActiveInstance(): string | null {
 
 export async function setLastActiveInstance(sandboxId: string): Promise<void> {
   cached = sandboxId;
-  await writeAccountMetadata(LAST_ACTIVE_INSTANCE_KEY, async () => {
-    await SecureStore.setItemAsync(LAST_ACTIVE_INSTANCE_KEY, sandboxId);
-  });
+  await setAccountMetadata(LAST_ACTIVE_INSTANCE_KEY, sandboxId);
 }
 
 export async function clearLastActiveInstance(): Promise<void> {

@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 
-import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
 
 /**
  * Module-level store for a SecureStore-backed preference so every hook
@@ -49,9 +49,7 @@ export function createSecureStorePreference<T>(options: {
 
   const persist = async (next: T) => {
     try {
-      await writeAccountMetadata(key, async () => {
-        await SecureStore.setItemAsync(key, serialize(next));
-      });
+      await setAccountMetadata(key, serialize(next));
     } catch {
       // Keep the in-memory preference so the session still works, but the
       // change won't survive relaunch — tell the user so it's not a silent

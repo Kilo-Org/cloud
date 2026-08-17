@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the route coordinates the new-session draft, model selection, and submit lifecycle. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
@@ -8,11 +8,7 @@ import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
-import {
-  useFencedDraftLoad,
-  useNewSessionCreator,
-  useRemoteSpawnDraftCleanup,
-} from '@/components/agents/use-new-session-creator';
+import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import {
   NewSessionModelProvider,
   useNewSessionModelState,
@@ -31,11 +27,12 @@ import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options
 import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
 import {
   clearDraft,
-  flushDraft,
   NEW_SESSION_DRAFT_KEY,
   resolvePrefillOverDraft,
   saveDraft,
 } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
@@ -99,19 +96,7 @@ function NewSessionScreenBody() {
   // pending write when the app leaves `active`. The draft's fate on unmount —
   // flush to preserve, or clear after a consumed remote spawn — is owned by
   // `useRemoteSpawnDraftCleanup`.
-  useEffect(() => {
-    if (!userId) {
-      return undefined;
-    }
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState !== 'active') {
-        void flushDraft(userId, NEW_SESSION_DRAFT_KEY);
-      }
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [userId]);
+  useDraftFlushOnBackground(userId, NEW_SESSION_DRAFT_KEY, false);
 
   const {
     models,

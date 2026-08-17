@@ -128,6 +128,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
   return tokenResponse.data;
 }
 
+/**
+ * The stable per-device Expo push token, or null when the permission is not
+ * granted (denied or undetermined), so the device never obtained a token this
+ * install. Rejects when either expo call throws — the caller decides how to
+ * treat a failed lookup.
+ */
 export async function getDevicePushToken(): Promise<string | null> {
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== Notifications.PermissionStatus.GRANTED) {
@@ -154,14 +160,8 @@ export type DevicePushTokenOutcome =
  */
 export async function getDevicePushTokenOutcome(): Promise<DevicePushTokenOutcome> {
   try {
-    const { status } = await Notifications.getPermissionsAsync();
-    if (status !== Notifications.PermissionStatus.GRANTED) {
-      return { kind: 'none' };
-    }
-    const tokenResponse = await Notifications.getExpoPushTokenAsync({
-      projectId: getProjectId(),
-    });
-    return { kind: 'token', token: tokenResponse.data };
+    const token = await getDevicePushToken();
+    return token === null ? { kind: 'none' } : { kind: 'token', token };
   } catch {
     return { kind: 'lookup-failed' };
   }

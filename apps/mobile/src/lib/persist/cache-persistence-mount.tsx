@@ -5,33 +5,16 @@ import { useEffect } from 'react';
 import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import {
-  clearScope,
-  clearScopePrefix,
-  getItem,
-  removeItem,
-  setItem,
-} from '@/lib/persist/encrypted-kv';
+import { clearScope } from '@/lib/persist/encrypted-kv';
 import {
   createReadCachePersister,
-  getBoundReadCacheKv,
-  mismatchedRestoredScope,
-  type ReadCacheKv,
+  readCacheScope,
   SCHEMA_VERSION,
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
-
-/** Production SQLCipher KV binding shared by the mount and the root layout. */
-export const productionReadCacheKv: ReadCacheKv = {
-  getItem,
-  setItem,
-  removeItem,
-  clearScope,
-  clearScopePrefix,
-};
 
 /**
  * Owner of the encrypted read cache for the authenticated identity. Renders
@@ -61,22 +44,19 @@ export function CachePersistenceMount() {
     // the teardown below runs and the body returns early instead of
     // resubscribing while the old user id is still cached.
     const epoch = authEpoch;
-    const kv = getBoundReadCacheKv();
-    if (!kv) {
-      return undefined;
-    }
 
     // Authoritative identity takes over from the cold-start hint: a still-
     // pending restore is abandoned, and a completed restore reports the scope
     // it hydrated. A scope from another account is cleared together with the
     // query client, so restored data can never render under the wrong user.
+    // The hint only survives an interrupted teardown, and authoritative
+    // identity wins.
     const restoredScope = takeOverColdStartRestore();
-    const mismatchedScope = mismatchedRestoredScope(restoredScope, userId);
-    if (mismatchedScope !== null) {
+    if (restoredScope !== null && restoredScope !== readCacheScope(userId)) {
       queryClient.clear();
       void (async () => {
         try {
-          await kv.clearScope(mismatchedScope);
+          await clearScope(restoredScope);
         } catch {
           // Best effort: a failed scope clear only costs a future warm start.
         }
@@ -98,7 +78,7 @@ export function CachePersistenceMount() {
       }
     })();
 
-    const persister = createReadCachePersister({ kv, queryClient, userId, epoch });
+    const persister = createReadCachePersister({ queryClient, userId, epoch });
     // Subscribe-only persistence: the root layout already performed the single
     // cold-start restore via `restorePersistedCacheOnColdStart`, so the mount
     // must not restore again (a second restore would re-hydrate and rescope).

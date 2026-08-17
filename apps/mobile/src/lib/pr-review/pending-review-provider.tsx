@@ -8,9 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppState } from 'react-native';
-
-import { clearDraft, flushDraft, loadDraft, saveDraft } from '@/lib/persist/drafts';
+import { clearDraft, loadDraft, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 // One queued inline comment in the pending review. The composer fills
 // this in when the user taps "Add to review"; the submit sheet drains
@@ -157,20 +156,7 @@ export function PendingReviewProvider({
 
   // Flush the debounced save when the app leaves `active` and on unmount so
   // a backgrounded-then-killed app (or navigating away) keeps the last edit.
-  useEffect(() => {
-    if (!userId || !draftEntityKey) {
-      return undefined;
-    }
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState !== 'active') {
-        void flushDraft(userId, draftEntityKey);
-      }
-    });
-    return () => {
-      subscription.remove();
-      void flushDraft(userId, draftEntityKey);
-    };
-  }, [userId, draftEntityKey]);
+  useDraftFlushOnBackground(userId, draftEntityKey, true);
 
   const addComment = useCallback((item: PendingReviewItem) => {
     setItems(previous => [...previous, item]);

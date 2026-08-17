@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 import { useAuth } from '@/lib/auth/auth-context';
-import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 type OrganizationContextValue = {
@@ -61,9 +61,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   const setOrganizationId = useCallback((id: string | null) => {
     setOrgState(id);
     if (id) {
-      void writeAccountMetadata(ORGANIZATION_STORAGE_KEY, async () => {
-        await SecureStore.setItemAsync(ORGANIZATION_STORAGE_KEY, id);
-      });
+      void setAccountMetadata(ORGANIZATION_STORAGE_KEY, id);
     } else {
       void deleteAccountMetadata(ORGANIZATION_STORAGE_KEY);
     }

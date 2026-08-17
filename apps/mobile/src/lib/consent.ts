@@ -34,19 +34,16 @@ function notifyConsentChange(change: ConsentChange) {
   }
 }
 
-/**
- * Per-key serialized SecureStore write for one consent record (DEC-01 class
- * `account-metadata (persistent)`). Consent deliberately SURVIVES sign-out,
- * so these writes use the shared per-key `chainSave` serializer WITHOUT the
- * auth-epoch fence: a consent choice made before a sign-out must still land
- * after it. Serialization prevents concurrent mutations of one user's record
- * (e.g. `setOptionalConsent` racing `revokeConsent`) from interleaving.
- * Returns the write's result so callers can observe whether the write ran.
+/*
+ * Every consent write below runs through `chainSave(keyFor(userId), ...)`: one
+ * SecureStore record per user, serialized per key (DEC-01 class
+ * `account-metadata (persistent)`). Consent deliberately SURVIVES sign-out, so
+ * these writes carry NO auth-epoch fence: a consent choice made before a
+ * sign-out must still land after it. Serialization prevents concurrent
+ * mutations of one user's record (e.g. `setOptionalConsent` racing
+ * `revokeConsent`) from interleaving, and the chain's result tells the caller
+ * whether the write ran.
  */
-// eslint-disable-next-line typescript-eslint/require-await -- the chain's promise is returned directly; awaiting it here would trip return-await
-async function serializeConsentWrite<T>(userId: string, write: () => Promise<T>): Promise<T> {
-  return chainSave(keyFor(userId), write);
-}
 
 export function subscribeToConsentChanges(listener: ConsentChangeListener): () => void {
   listeners.add(listener);
@@ -93,7 +90,7 @@ export async function readConsent(
     // Delete it and force re-consent. Best-effort: a failed delete must not
     // throw or block the consent check.
     try {
-      await serializeConsentWrite(userId, async () => {
+      await chainSave(keyFor(userId), async () => {
         await SecureStore.deleteItemAsync(legacyKeyFor(userId));
       });
     } catch {
@@ -110,7 +107,7 @@ export async function hasAcceptedConsent(userId: string): Promise<boolean> {
 }
 
 export async function acceptConsent(userId: string, optional = false): Promise<void> {
-  await serializeConsentWrite(userId, async () => {
+  await chainSave(keyFor(userId), async () => {
     await SecureStore.setItemAsync(
       keyFor(userId),
       JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional })
@@ -123,7 +120,7 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
   // Read and write decision inside the same per-user chain: the update reads
   // the record left by the previous serialized write, so a concurrent revoke
   // queued ahead of it deletes first and cannot be undone by a stale update.
-  const wrote = await serializeConsentWrite(userId, async () => {
+  const wrote = await chainSave(keyFor(userId), async () => {
     const stored = await readCurrentConsent(userId);
     if (!stored.mandatory) {
       return false;
@@ -140,7 +137,7 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
 }
 
 export async function revokeConsent(userId: string): Promise<void> {
-  await serializeConsentWrite(userId, async () => {
+  await chainSave(keyFor(userId), async () => {
     await SecureStore.deleteItemAsync(keyFor(userId));
     await SecureStore.deleteItemAsync(legacyKeyFor(userId));
   });

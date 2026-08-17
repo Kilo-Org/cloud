@@ -36,6 +36,7 @@ import {
 } from './apple-store-sdk';
 import {
   completeStoreKiloPassPurchase,
+  isStorePurchaseMismatchError,
   type CompleteStoreKiloPassPurchaseResult,
 } from './store-subscription-completion';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
@@ -727,8 +728,28 @@ export async function processAppStoreKiloPassNotification(params: {
       }
     } else {
       let completionResult: CompleteStoreKiloPassPurchaseResult | null = null;
+      let purchaseMismatch = false;
       await db.transaction(async tx => {
-        completionResult = await completeStoreKiloPassPurchase({ dbOrTx: tx, user, purchase });
+        try {
+          completionResult = await completeStoreKiloPassPurchase({ dbOrTx: tx, user, purchase });
+        } catch (error) {
+          // A permanent provider/user mismatch settles `failed` inside the
+          // completion, so this event must be marked processed and never retried.
+          if (isStorePurchaseMismatchError(error)) {
+            purchaseMismatch = true;
+            await tx
+              .update(kilo_pass_store_events)
+              .set({ processed_at: new Date().toISOString() })
+              .where(
+                and(
+                  eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+                  eq(kilo_pass_store_events.event_id, notification.notificationUUID)
+                )
+              );
+            return;
+          }
+          throw error;
+        }
         await appendKiloPassAuditLog(tx, {
           action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
           result: KiloPassAuditLogResult.Success,
@@ -748,6 +769,9 @@ export async function processAppStoreKiloPassNotification(params: {
             )
           );
       });
+      if (purchaseMismatch) {
+        return { processed: true };
+      }
       // Post-commit only — never capture inside the transaction.
       const trackedResult = completionResult as CompleteStoreKiloPassPurchaseResult | null;
       if (trackedResult && !trackedResult.alreadyProcessed) {

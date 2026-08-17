@@ -1,5 +1,5 @@
 {
-  "id": "561bfde3-4abd-4960-b35f-1cf06569dccb",
+  "id": "83c888dd-e367-451e-811e-33ef6e0b30e1",
   "prevId": "2f7c0c18-3e2d-4e0f-8ab8-2efe1ee763a8",
   "version": "7",
   "dialect": "postgresql",
@@ -26129,6 +26129,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"operation_ledgers\".\"provider_ref\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -29547,6 +29548,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "operation_key": {
+          "name": "operation_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -29687,6 +29694,50 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_security_agent_commands_org_operation_key": {
+          "name": "UQ_security_agent_commands_org_operation_key",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "operation_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"security_agent_commands\".\"owned_by_organization_id\" IS NOT NULL AND \"security_agent_commands\".\"operation_key\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_security_agent_commands_user_operation_key": {
+          "name": "UQ_security_agent_commands_user_operation_key",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "operation_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"security_agent_commands\".\"owned_by_user_id\" IS NOT NULL AND \"security_agent_commands\".\"operation_key\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

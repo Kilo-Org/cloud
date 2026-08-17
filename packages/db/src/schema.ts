@@ -10426,7 +10426,11 @@ export const operation_ledgers = pgTable(
       table.operation_key
     ),
     index('IDX_operation_ledgers_status_expires_at').on(table.status, table.expires_at),
-    index('IDX_operation_ledgers_provider_ref').on(table.provider_ref),
+    // Partial: provider_ref is NULL for every non-security domain, so the
+    // index only carries the rows the provider-ref join actually reads.
+    index('IDX_operation_ledgers_provider_ref')
+      .on(table.provider_ref)
+      .where(sql`${table.provider_ref} IS NOT NULL`),
   ]
 );
 

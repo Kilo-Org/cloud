@@ -1,3 +1,0 @@
-ALTER TABLE "security_agent_commands" ADD COLUMN "operation_key" text;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_security_agent_commands_org_operation_key" ON "security_agent_commands" USING btree ("owned_by_organization_id","operation_key") WHERE "security_agent_commands"."owned_by_organization_id" IS NOT NULL AND "security_agent_commands"."operation_key" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_security_agent_commands_user_operation_key" ON "security_agent_commands" USING btree ("owned_by_user_id","operation_key") WHERE "security_agent_commands"."owned_by_user_id" IS NOT NULL AND "security_agent_commands"."operation_key" IS NOT NULL;

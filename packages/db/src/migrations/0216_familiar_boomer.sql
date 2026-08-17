@@ -32,8 +32,11 @@ CREATE TABLE "operation_ledgers" (
 	"expires_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "security_agent_commands" ADD COLUMN "operation_key" text;--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_analytics_event_outbox_event_uuid" ON "analytics_event_outbox" USING btree ("event_uuid");--> statement-breakpoint
 CREATE INDEX "IDX_analytics_event_outbox_status_next_attempt_at" ON "analytics_event_outbox" USING btree ("status","next_attempt_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_operation_ledgers_kilo_user_id_domain_operation_key" ON "operation_ledgers" USING btree ("kilo_user_id","domain","operation_key");--> statement-breakpoint
 CREATE INDEX "IDX_operation_ledgers_status_expires_at" ON "operation_ledgers" USING btree ("status","expires_at");--> statement-breakpoint
-CREATE INDEX "IDX_operation_ledgers_provider_ref" ON "operation_ledgers" USING btree ("provider_ref");
+CREATE INDEX "IDX_operation_ledgers_provider_ref" ON "operation_ledgers" USING btree ("provider_ref") WHERE "operation_ledgers"."provider_ref" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_security_agent_commands_org_operation_key" ON "security_agent_commands" USING btree ("owned_by_organization_id","operation_key") WHERE "security_agent_commands"."owned_by_organization_id" IS NOT NULL AND "security_agent_commands"."operation_key" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_security_agent_commands_user_operation_key" ON "security_agent_commands" USING btree ("owned_by_user_id","operation_key") WHERE "security_agent_commands"."owned_by_user_id" IS NOT NULL AND "security_agent_commands"."operation_key" IS NOT NULL;

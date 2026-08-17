@@ -96,6 +96,14 @@ export default {
     responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
+      if (context.request.kind === 'chat_completions') {
+        context.request.body.reasoning_effort = isReasoningExplicitlyDisabled(context.request)
+          ? 'none'
+          : (context.request.body.reasoning?.effort ??
+            context.request.body.reasoning_effort ??
+            undefined);
+        delete context.request.body.reasoning;
+      }
       delete context.request.body.provider;
     },
   },
@@ -111,6 +119,14 @@ export default {
     responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';
+      if (context.request.kind === 'chat_completions') {
+        context.request.body.reasoning_effort = isReasoningExplicitlyDisabled(context.request)
+          ? 'none'
+          : (context.request.body.reasoning?.effort ??
+            context.request.body.reasoning_effort ??
+            undefined);
+        delete context.request.body.reasoning;
+      }
       delete context.request.body.provider;
     },
   },

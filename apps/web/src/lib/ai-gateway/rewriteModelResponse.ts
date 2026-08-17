@@ -1,5 +1,8 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
+import {
+  ReasoningDetailText,
+  ReasoningDetailType,
+} from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
@@ -18,6 +21,7 @@ import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
+import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
 
 /**
  * Handle passed to the response pipeline so the upstream response body can be
@@ -431,7 +435,11 @@ function rewriteGeminiThoughtContent(delta: unknown) {
  * index 0; clients merge consecutive same-type deltas into a single block.
  */
 function rewriteReasoningContentToReasoningDetails(delta: unknown) {
-  if (!isRecord(delta) || typeof delta.reasoning_content !== 'string') {
+  if (
+    !isRecord(delta) ||
+    typeof delta.reasoning_content !== 'string' ||
+    typeof delta.reasoning_details !== 'undefined'
+  ) {
     return;
   }
 
@@ -439,12 +447,9 @@ function rewriteReasoningContentToReasoningDetails(delta: unknown) {
     type: ReasoningDetailType.Text,
     text: delta.reasoning_content,
     index: 0,
-  };
-  if (Array.isArray(delta.reasoning_details)) {
-    delta.reasoning_details.push(detail);
-  } else {
-    delta.reasoning_details = [detail];
-  }
+    format: ReasoningFormat.Unknown,
+  } satisfies ReasoningDetailText;
+  delta.reasoning_details = [detail];
   delete delta.reasoning_content;
 }
 

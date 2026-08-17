@@ -17,8 +17,11 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import {
+  focusAfterPendingCommentRemoval,
   PendingQueueHint,
   PrReviewPendingCommentRow,
   ReviewSummaryField,
@@ -155,7 +158,12 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
+          // Announce/focus only when the remove is confirmed synchronous:
+          // the provider's removeComment filters by id and returns nothing,
+          // so the item must still be queued at delete-confirm time.
+          const removed = pending.items.some(queued => queued.id === item.id);
           pending.removeComment(item.id);
+          focusAfterPendingCommentRemoval(bodyInputRef, removed);
         },
       },
     ]);
@@ -169,20 +177,15 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     inlineErrorKind === 'reconnect';
 
   const keyboardVisible = useFormSheetKeyboardVisible();
-  // Keyboard-open viewport is tight; keep count, hide per-item rows so
-  // Submit + Cancel stay above the keyboard at scroll offset 0.
-  const showPendingRows = !keyboardVisible;
 
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
   // PendingQueueHint so empty-queue + COMMENT is not contradictory.
+  // blockReason is a local persistent validation error (no mutation toast
+  // owns it), so AccessibleStatus announces it through the status contract.
   let queueHint: ReactNode = null;
   if (blockReason !== null) {
-    queueHint = (
-      <Text variant="muted" className="text-xs">
-        {blockReason}
-      </Text>
-    );
+    queueHint = <AccessibleStatus message={blockReason} tone="status" className="text-xs" />;
   } else if (!keyboardVisible && (queuedCount === 0 || hasStaleItems)) {
     queueHint = <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />;
   }
@@ -226,7 +229,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
             </Text>
             {queueHint}
-            {showPendingRows
+            {/* Keyboard-open viewport is tight; keep the count, hide per-item
+                rows so Submit + Cancel stay above the keyboard at offset 0. */}
+            {!keyboardVisible
               ? pending.items.map(item => (
                   <PrReviewPendingCommentRow
                     key={item.id}
@@ -244,14 +249,22 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           </View>
 
           {inlineError && inlineErrorKind !== 'reconnect' ? (
-            <View
-              className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-2"
-              accessibilityLiveRegion="polite"
-            >
+            <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-2">
+              {/* Mutation-classified errors are toast-owned (announcingToast);
+                  the inline text stays visual-only so it never double-announces. */}
               <Text className="text-xs text-destructive">{inlineError}</Text>
             </View>
           ) : null}
-          {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+          {inlineErrorKind === 'reconnect' ? (
+            <>
+              {/* The persistent reconnect message is a local status, not the
+                  toast-owned mutation copy, so AccessibleStatus owns its
+                  announcement on both platforms. The notice below keeps the
+                  Check connection retry CTA. */}
+              <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
+              <PrReviewReconnectNotice />
+            </>
+          ) : null}
         </View>
 
         <PrFormSheetFooter>
@@ -295,7 +308,7 @@ function ReviewEventChips(props: {
       <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Review event
       </Text>
-      <View className="flex-row flex-wrap gap-1.5">
+      <RadioGroup label="Review event" className="flex-row flex-wrap gap-1.5">
         {EVENT_OPTIONS.map(option => {
           const active = props.value === option.value;
           return (
@@ -306,19 +319,18 @@ function ReviewEventChips(props: {
                 void Haptics.selectionAsync();
                 props.onChange(option.value);
               }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active, disabled: props.disabled }}
-              accessibilityLabel={option.label}
+              {...radioItemA11y({ label: option.label, checked: active, disabled: props.disabled })}
               className={cn(
                 'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
-                active ? 'border-primary bg-primary' : 'border-border bg-secondary',
-                props.disabled && 'opacity-50'
+                active ? 'border-primary bg-primary' : 'bg-secondary',
+                !active && (props.disabled ? 'border-hair-soft' : 'border-border')
               )}
             >
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  active ? 'text-primary-foreground' : 'text-foreground'
+                  active ? 'text-primary-foreground' : 'text-foreground',
+                  !active && props.disabled && 'text-muted-foreground'
                 )}
               >
                 {option.label}
@@ -326,7 +338,7 @@ function ReviewEventChips(props: {
             </Pressable>
           );
         })}
-      </View>
+      </RadioGroup>
     </View>
   );
 }

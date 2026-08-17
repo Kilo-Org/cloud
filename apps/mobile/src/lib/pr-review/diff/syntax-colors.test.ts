@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_TOKEN_COLOR, tokenColorFor } from './syntax-colors';
+
+vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
+vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
+
+// The WCAG contrast assertions for these tokens live in
+// `src/lib/hooks/use-theme-colors.contrast.test.ts`, next to the palette they
+// are painted on.
 
 describe('tokenColorFor', () => {
   it('returns the light color for a known class in light mode', () => {

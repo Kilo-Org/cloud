@@ -33,6 +33,7 @@ const setQueryDataMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const invalidateAgentSessionsMock = vi.fn();
 const toastErrorMock = vi.fn();
+const toastSuccessMock = vi.fn();
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 const chainSaveMock = vi.fn((_id: string, op: () => Promise<unknown>) => op());
 
@@ -91,7 +92,10 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: (msg: string) => toastErrorMock(msg) },
+  announcingToast: {
+    error: (msg: string) => toastErrorMock(msg),
+    success: (msg: string) => toastSuccessMock(msg),
+  },
 }));
 
 vi.mock('@/lib/hooks/save-chain', () => ({
@@ -112,6 +116,7 @@ describe('useSessionMutations', () => {
     invalidateQueriesMock.mockReset();
     invalidateAgentSessionsMock.mockReset();
     toastErrorMock.mockReset();
+    toastSuccessMock.mockReset();
     chainSaveMock.mockClear();
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     chainSaveMock.mockImplementation((_id, op) => op());
@@ -261,6 +266,37 @@ describe('useSessionMutations', () => {
       expect(cancelQueriesMock).not.toHaveBeenCalledWith(activeFilter);
       expect(setQueriesDataMock).toHaveBeenCalledTimes(1);
       expect(setQueriesDataMock.mock.calls[0]?.[0]).toEqual({ queryKey: listKey });
+    });
+  });
+
+  describe('deleteSession completion callback', () => {
+    it('toasts success and invokes onDeleted after a successful delete', async () => {
+      mutateAsyncMock.mockResolvedValue(undefined);
+      const onDeleted = vi.fn(() => undefined);
+
+      const { deleteSession } = useSessionMutations();
+      deleteSession('s1', onDeleted);
+
+      await vi.waitFor(() => {
+        expect(onDeleted).toHaveBeenCalledTimes(1);
+      });
+      expect(chainSaveMock).toHaveBeenCalledWith('s1', expect.any(Function));
+      expect(toastSuccessMock).toHaveBeenCalledWith('Session deleted');
+    });
+
+    it('does not invoke onDeleted or the success toast when the delete fails', async () => {
+      mutateAsyncMock.mockRejectedValueOnce(new Error('delete failed'));
+      const onDeleted = vi.fn(() => undefined);
+
+      const { deleteSession } = useSessionMutations();
+      deleteSession('s1', onDeleted);
+
+      // Flush the async IIFE so the internal catch has definitely run.
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+      expect(onDeleted).not.toHaveBeenCalled();
+      expect(toastSuccessMock).not.toHaveBeenCalled();
     });
   });
 });

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Text } from '@/components/ui/text';
 import { type useNativeAuth } from '@/lib/auth/use-native-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -43,12 +44,14 @@ export function EmailOtpForm({
         placeholder="123456"
         placeholderTextColor={colors.mutedForeground}
         keyboardType="number-pad"
+        autoComplete="one-time-code"
+        textContentType="oneTimeCode"
         maxLength={6}
         onChangeText={value => {
           codeRef.current = value;
           setHasCompleteCode(/^\d{6}$/.test(value));
         }}
-        accessibilityLabel="Sign-in code"
+        accessibilityLabel={formFieldA11y({ label: 'Sign-in code', required: true })}
       />
       <Button
         size="lg"

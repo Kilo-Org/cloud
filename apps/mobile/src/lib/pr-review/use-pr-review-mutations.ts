@@ -17,8 +17,9 @@
 // SHA each item was queued under; a per-item 422 surfaces inline.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
+import { announceForA11y } from '@/lib/a11y/announce';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useTRPC } from '@/lib/trpc';
 
 type PrRef = { owner: string; repo: string; number: number };
@@ -48,8 +49,14 @@ export function useCreateReviewCommentMutation(ref: PrRef) {
 
   return useMutation(
     trpc.githubPrReview.createReviewComment.mutationOptions({
+      onSuccess: () => {
+        // Bare success announcement beside the composer's existing success
+        // effect (haptic + dismiss). The inline composer error box owns the
+        // persistent inline error; the toast owns the failure announcement.
+        announceForA11y('Comment posted');
+      },
       onError: (error: { message: string }) => {
-        toast.error(error.message);
+        announcingToast.error(error.message);
       },
       onSettled: async () => {
         await invalidateReviewCaches(queryClient, keys);
@@ -84,8 +91,13 @@ export function useSubmitReviewMutation(ref: PrRef) {
 
   return useMutation(
     trpc.githubPrReview.submitReview.mutationOptions({
+      onSuccess: () => {
+        // Bare success announcement beside the submit sheet's existing
+        // success effect (queue clear + haptic + dismiss).
+        announceForA11y('Review submitted');
+      },
       onError: (error: { message: string }) => {
-        toast.error(error.message);
+        announcingToast.error(error.message);
       },
       onSettled: async () => {
         await invalidateReviewCaches(queryClient, keys);

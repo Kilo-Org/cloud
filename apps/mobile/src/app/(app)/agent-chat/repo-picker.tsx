@@ -74,6 +74,7 @@ export default function RepoPickerScreen() {
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
+              accessibilityLabel="Search repositories"
               placeholder="Search repositories..."
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"

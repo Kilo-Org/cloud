@@ -32,6 +32,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
@@ -43,6 +44,8 @@ export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
 
 type AgentSessionListContentProps = {
+  /** Post-deletion focus anchor: the screen's always-mounted search input. */
+  searchInputRef: Parameters<typeof moveA11yFocus>[0];
   sections: SessionSection[];
   hasAnySessions: boolean;
   /** True when the pinned "Active now" tray is non-empty. Used by the
@@ -88,6 +91,7 @@ type AgentSessionListContentProps = {
 };
 
 export function AgentSessionListContent({
+  searchInputRef,
   sections,
   hasAnySessions,
   hasPinnedActive,
@@ -163,11 +167,9 @@ export function AgentSessionListContent({
     [bottom, fontScale]
   );
 
-  const hasHistoryContent = sections.length > 0;
-
   // Pure body decision — see `session-list-body-model.ts`.
   const bodyModel = selectSessionListBodyModel({
-    hasHistoryContent,
+    hasHistoryContent: sections.length > 0,
     hasStoredSessions,
     hasMoreHistory,
     hasPinnedActive,
@@ -183,7 +185,7 @@ export function AgentSessionListContent({
     activeIsError,
     hasAnySessions,
     hasPinnedActive,
-    hasHistoryContent,
+    hasHistoryContent: sections.length > 0,
   });
 
   const emptyStateAction = useMemo(
@@ -239,14 +241,19 @@ export function AgentSessionListContent({
           onSessionPress(item.session_id, item.organization_id);
         }}
         onDelete={() => {
-          deleteSession(item.session_id);
+          // The hook's success toast announces the deletion; onDeleted only
+          // restores focus, and moveA11yFocus no-ops once the header is
+          // unmounted (last session deleted).
+          deleteSession(item.session_id, () => {
+            moveA11yFocus(searchInputRef);
+          });
         }}
         onRename={newTitle => {
           renameSession(item.session_id, newTitle);
         }}
       />
     ),
-    [onSessionPress, deleteSession, renameSession, sortBy]
+    [onSessionPress, deleteSession, renameSession, sortBy, searchInputRef]
   );
 
   const renderSectionHeader = useCallback(

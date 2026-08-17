@@ -24,6 +24,13 @@ type ChipDescription = {
    * text and never both.
    */
   message: string | null;
+  /**
+   * Composed screen-reader label for the chip body: `<filename>, <message>`
+   * for failed chips, `<filename>, <progressText>` otherwise. Covers both
+   * file and image chips so the strip's single accessible body element is
+   * labeled in every FSM state.
+   */
+  accessibilityLabel: string;
   /** True ONLY for retryable error chips — drives the tap-to-retry affordance. */
   showRetry: boolean;
   /** True for every rendered chip — drives the X remove affordance. */
@@ -77,6 +84,8 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
     sizeText: formatFileSize(size),
     progressText,
     message,
+    accessibilityLabel:
+      message !== null ? `${filename}, ${message}` : `${filename}, ${progressText}`,
     showRetry: isRetryable,
     showRemove: true,
   };

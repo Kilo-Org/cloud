@@ -5,6 +5,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type OptionListProps<T extends string> = {
@@ -51,26 +52,28 @@ export function OptionList<T extends string>({
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
-        {options.map(option => (
-          <View key={option} className="relative">
-            <ChoiceRow
-              label={option}
-              description={descriptions?.[option]}
-              selected={selected === option}
-              disabled={Boolean(disabled) || pending !== null}
-              busy={pending === option}
-              onPress={() => {
-                void handleSelect(option);
-              }}
-              className="border-b-[0.5px] border-hair-soft"
-            />
-            {pending === option && (
-              <View className="absolute inset-y-0 right-0 justify-center" pointerEvents="none">
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-              </View>
-            )}
-          </View>
-        ))}
+        <RadioGroup label={title}>
+          {options.map(option => (
+            <View key={option} className="relative">
+              <ChoiceRow
+                label={option}
+                description={descriptions?.[option]}
+                selected={selected === option}
+                disabled={Boolean(disabled) || pending !== null}
+                busy={pending === option}
+                onPress={() => {
+                  void handleSelect(option);
+                }}
+                className="border-b-[0.5px] border-hair-soft"
+              />
+              {pending === option && (
+                <View className="absolute inset-y-0 right-0 justify-center" pointerEvents="none">
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                </View>
+              )}
+            </View>
+          ))}
+        </RadioGroup>
       </TabScreenScrollView>
     </View>
   );

@@ -18,24 +18,21 @@ import { announceForA11y } from './announce';
 
 type ToastOptions = NonNullable<Parameters<typeof toast.success>[1]>;
 
-function announceTitle(title: string): void {
-  // `announceForA11y` trims and drops empty messages, so we don't gate
-  // the call here.
-  announceForA11y(title);
-}
+// `announceForA11y` trims, drops empty messages, and swallows a native
+// accessibility failure, so the visual toast always renders.
 
 function success(title: string, options?: ToastOptions): string | number {
-  announceTitle(title);
+  announceForA11y(title);
   return toast.success(title, options);
 }
 
 function error(title: string, options?: ToastOptions): string | number {
-  announceTitle(title);
+  announceForA11y(title);
   return toast.error(title, options);
 }
 
 function warning(title: string, options?: ToastOptions): string | number {
-  announceTitle(title);
+  announceForA11y(title);
   return toast.warning(title, options);
 }
 

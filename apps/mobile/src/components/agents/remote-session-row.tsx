@@ -122,6 +122,7 @@ export function RemoteSessionRow({
       <Pressable
         onPress={onPress}
         onLongPress={canManage ? handleLongPress : undefined}
+        accessibilityRole="button"
         accessibilityLabel={sessionRowAccessibilityLabel({
           title,
           needsInput,

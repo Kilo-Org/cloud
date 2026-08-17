@@ -4,6 +4,9 @@ import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/d
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
 
+const CUSTOM_LLM_DESCRIPTION =
+  'Access to this model was granted by a Kilo admin. This model has no availability or data retention guarantees. Do not use for mission critical workloads. Existence of the model may be confidential.';
+
 function convert(publicId: string, model: CustomLlmDefinition) {
   return {
     id: publicId,
@@ -11,7 +14,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     hugging_face_id: '',
     name: model.display_name,
     created: 1756238927,
-    description: model.display_name,
+    description: CUSTOM_LLM_DESCRIPTION,
     context_length: model.context_length,
     architecture: {
       modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',

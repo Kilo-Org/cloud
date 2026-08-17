@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';

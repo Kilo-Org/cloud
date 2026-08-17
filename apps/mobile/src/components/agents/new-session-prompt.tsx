@@ -9,7 +9,7 @@ import {
   type TextStyle,
   View,
 } from 'react-native';
-import { Paperclip } from 'lucide-react-native';
+import { Paperclip } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';

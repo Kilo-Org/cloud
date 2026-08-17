@@ -31,6 +31,10 @@
           {
             "name": "expo-image",
             "message": "Import Image from @/components/ui/image instead."
+          },
+          {
+            "name": "lucide-react-native",
+            "message": "Import icons and Lucide types from @/components/ui/icons."
           }
         ]
       }
@@ -154,6 +158,12 @@
   "overrides": [
     {
       "files": ["src/components/ui/image.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/components/ui/icons.ts"],
       "rules": {
         "no-restricted-imports": "off"
       }

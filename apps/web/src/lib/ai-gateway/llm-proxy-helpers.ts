@@ -302,6 +302,21 @@ export function modelNotAllowedResponse() {
   );
 }
 
+export function efficientPoolBlockedResponse() {
+  const error = 'Your organization blocks every model in the auto-routing pool.';
+  const message =
+    `${error} Configure a custom Efficient model pool with allowed models, ` +
+    `or adjust your organization model restrictions.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_allowed,
+      message,
+    },
+    { status: 404 }
+  );
+}
+
 export function unavailableModelResponse() {
   const error = 'The requested model is currently unavailable. Please choose a different model.';
   return NextResponse.json(

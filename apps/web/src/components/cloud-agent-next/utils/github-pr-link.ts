@@ -16,6 +16,9 @@ export type AssociatedPr = {
   // hook polls while any row is pending so the badge updates without a manual
   // refresh.
   reviewDecisionPending: boolean;
+  // Host platform of the linked PR (e.g. 'github'). Always present when an
+  // associatedPr is returned.
+  platform: string;
 };
 
 export type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft';
@@ -31,6 +34,10 @@ export function normalizePrBadgeState(state: string): PrBadgeState {
   if (state === 'merged') return 'merged';
   if (state === 'draft') return 'draft';
   if (state === 'open') return 'open';
+  // A stored-link partial reports state 'unknown' until the cache syncs. An
+  // unresolved/live link must keep the open (git-pull-request) treatment, never
+  // the closed/destructive badge.
+  if (state === 'unknown') return 'open';
   return 'closed';
 }
 

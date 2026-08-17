@@ -14,7 +14,10 @@ describe('normalizePrBadgeState', () => {
   test('draft stays draft', () => {
     expect(normalizePrBadgeState('draft')).toBe('draft');
   });
-  test('unknown state collapses to closed', () => {
+  test('unknown state collapses to open', () => {
+    expect(normalizePrBadgeState('unknown')).toBe('open');
+  });
+  test('unrecognized state collapses to closed', () => {
     expect(normalizePrBadgeState('weird-state')).toBe('closed');
   });
 });

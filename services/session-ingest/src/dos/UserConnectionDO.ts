@@ -25,6 +25,13 @@ type HeartbeatSession = {
   // `getActiveSessions()` response omits it (preserves byte-identical
   // legacy responses).
   platform?: string;
+  // Pull-request link reported by the CLI. Optional: legacy CLIs predating
+  // this field omit it. Distinct from `platform` above (the client OS).
+  prLink?: {
+    platform: string;
+    prUrl: string;
+    prNumber: number;
+  };
 };
 
 type ConnectionCapabilities = { attachments?: boolean };

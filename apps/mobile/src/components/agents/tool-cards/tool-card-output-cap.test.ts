@@ -26,7 +26,7 @@ vi.mock('react', async importOriginal => {
     useContext: () => undefined,
   };
 });
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Terminal: 'Terminal',
   Search: 'Search',
   FileSearch: 'FileSearch',

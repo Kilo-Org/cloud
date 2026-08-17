@@ -1,7 +1,7 @@
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, ChevronRight, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
+import { Bell, ChevronRight, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';

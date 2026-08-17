@@ -10,7 +10,7 @@ import {
   resolvePrefillRepo,
 } from './new-session-prefill';
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Bug: 'Bug',
   Code: 'Code',
   HelpCircle: 'HelpCircle',

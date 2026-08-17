@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Plus } from 'lucide-react-native';
+import { Plus } from '@/components/ui/icons';
 import { RefreshControl, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 

@@ -233,6 +233,48 @@ describe('dispatchInternalPushCore', () => {
     }
   );
 
+  it('security_finding with ghsaId set uses advisory-identity idempotency key', async () => {
+    const { deps, calls } = fakeDeps();
+    const input = securityFinding({ ghsaId: 'GHSA-abcd-1234' });
+    const result = await dispatchInternalPushCore(input, deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+    expect(calls.dispatchPushInputs[0].idempotencyKey).toBe(
+      'security-finding:acme/api:GHSA-abcd-1234:new_finding'
+    );
+  });
+
+  it.each([undefined, null])(
+    'security_finding with ghsaId %s falls back to per-notificationId key',
+    async ghsaId => {
+      const { deps, calls } = fakeDeps();
+      const input = securityFinding({ ghsaId } as Partial<InternalDispatchSecurityFindingRequest>);
+      const result = await dispatchInternalPushCore(input, deps);
+
+      expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+      expect(calls.dispatchPushInputs).toHaveLength(1);
+      expect(calls.dispatchPushInputs[0].idempotencyKey).toBe('security-finding:notif-1');
+    }
+  );
+
+  it('two sibling findings with same ghsaId+repo+kind share one idempotency key', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      securityFinding({ notificationId: 'notif-1', ghsaId: 'GHSA-abcd-1234' }),
+      deps
+    );
+    await dispatchInternalPushCore(
+      securityFinding({ notificationId: 'notif-2', ghsaId: 'GHSA-abcd-1234' }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0].idempotencyKey).toBe(
+      calls.dispatchPushInputs[1].idempotencyKey
+    );
+  });
+
   it('dispatchPush reject → failed', async () => {
     // Pre-attach a no-op catch so the workers vitest pool does not flag the
     // intentional rejection as unhandled; the core still observes it via await.

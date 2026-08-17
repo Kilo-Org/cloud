@@ -8,7 +8,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { buildContinueRemoteSpawnInput, resolveContinueRemoteSelection } from './continuation-seed';
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Bug: 'Bug',
   Code: 'Code',
   HelpCircle: 'HelpCircle',

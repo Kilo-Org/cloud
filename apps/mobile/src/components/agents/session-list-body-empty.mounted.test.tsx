@@ -8,7 +8,7 @@ import { BodyEmpty } from './session-list-body-empty';
 vi.mock('react-native', () => ({
   View: 'View',
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Activity: 'Activity',
   AlertCircle: 'AlertCircle',
   History: 'History',

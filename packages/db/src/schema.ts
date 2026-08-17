@@ -5591,6 +5591,9 @@ export const cli_sessions_v2 = pgTable(
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
     git_branch: text(),
+    platform: text(), // PR host (e.g. github), NOT the OS.
+    pr_url: text(),
+    pr_number: integer(),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),

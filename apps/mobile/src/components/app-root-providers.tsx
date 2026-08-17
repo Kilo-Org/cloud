@@ -1,7 +1,7 @@
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';

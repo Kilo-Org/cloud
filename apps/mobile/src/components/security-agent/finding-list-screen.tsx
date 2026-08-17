@@ -7,7 +7,7 @@ import {
   toSecurityFindingQuery,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, SlidersHorizontal } from 'lucide-react-native';
+import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { toast } from 'sonner-native';

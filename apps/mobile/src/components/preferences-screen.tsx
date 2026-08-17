@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bell, Brain, type LucideIcon, Smartphone } from 'lucide-react-native';
+import { Bell, Brain, type LucideIcon, Smartphone } from '@/components/ui/icons';
 import { Switch, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';

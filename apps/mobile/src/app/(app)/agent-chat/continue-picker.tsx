@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Cloud, Terminal } from 'lucide-react-native';
+import { Cloud, Terminal } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

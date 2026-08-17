@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Sparkles } from 'lucide-react-native';
+import { Sparkles } from '@/components/ui/icons';
 import { type StandaloneSuggestion, type SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
 import { Button } from '@/components/ui/button';

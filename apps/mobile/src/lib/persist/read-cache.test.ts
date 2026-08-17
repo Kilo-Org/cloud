@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 // The read cache calls the encrypted-kv module directly; the mock below is an
@@ -74,7 +75,6 @@ import {
   resetReadCacheForTests,
   restorePersistedCacheOnColdStart,
   SCHEMA_VERSION,
-  setSignOutActive,
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from './read-cache';

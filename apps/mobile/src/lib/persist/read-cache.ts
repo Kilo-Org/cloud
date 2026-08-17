@@ -9,6 +9,7 @@ import {
 
 import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 import { utf8ByteLength } from '@/lib/utf8-utils';
@@ -39,13 +40,13 @@ export function readCacheScope(userId: string): string {
   return `${CACHE_SCOPE_PREFIX}${userId}:${SCHEMA_VERSION}`;
 }
 
-// Test-only: resets the cold-start restore state and the sign-out flag so a
-// test can drive each lifecycle from a clean module (the same pattern as
+// Test-only: resets the cold-start restore state and the shared sign-out flag
+// so a test can drive each lifecycle from a clean module (the same pattern as
 // `resetEncryptedKvOpenForTests` in encrypted-kv.ts).
 export function resetReadCacheForTests(): void {
   coldStartGeneration = 0;
   coldStartRestoredScope = null;
-  signOutActive = false;
+  setSignOutActive(false);
 }
 
 // ── Allowlist ──────────────────────────────────────────────────────────────
@@ -201,9 +202,11 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
   // Publication fence: every sign-in and sign-out bumps the epoch, and the
   // authoritative user id comes from the live getMe query, so an epoch or
   // user mismatch at write time means the session changed after creation.
-  // The sign-out flag is flipped synchronously at the start of sign-out, so a
-  // write is also refused while teardown is still clearing scopes — even from
-  // a persister created at the current epoch while the old user id is cached.
+  // The shared sign-out flag (`@/lib/auth/sign-out-state`, the same one the
+  // auth context exposes as `isSigningOut`) is flipped synchronously at the
+  // start of sign-out, so a write is also refused while teardown is still
+  // clearing scopes — even from a persister created at the current epoch while
+  // the old user id is cached.
   const isPublicationAllowed = (): boolean =>
     !isSignOutActive() && isCurrentAuthEpoch(epoch) && readCachedUserId(queryClient) === userId;
 
@@ -325,29 +328,6 @@ export function takeOverColdStartRestore(): string | null {
   const scope = coldStartRestoredScope;
   coldStartRestoredScope = null;
   return scope;
-}
-
-// ── Sign-out fence ─────────────────────────────────────────────────────────
-
-let signOutActive = false;
-
-/**
- * True while sign-out teardown is in progress or the user is signed out. The
- * persister publication fence checks this at write time, so a cache blob can
- * never be written into a scope that sign-out is clearing.
- */
-function isSignOutActive(): boolean {
-  return signOutActive;
-}
-
-/**
- * Marks sign-out as active or cleared. Set synchronously at the start of
- * sign-out (before any await), and cleared only after a sign-in's credential
- * publication succeeds. Mirrors the reactive `isSigningOut` auth-context
- * state that fences the cache mount.
- */
-export function setSignOutActive(active: boolean): void {
-  signOutActive = active;
 }
 
 // ── Sign-out cleanup ───────────────────────────────────────────────────────

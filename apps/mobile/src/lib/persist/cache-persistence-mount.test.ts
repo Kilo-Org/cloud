@@ -1,13 +1,18 @@
 /* eslint-disable max-lines -- cohesive mount suite for identity resolution, mismatch recovery, and persister lifecycle */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. See src/app/(app)/(tabs)/(2_agents)/index.mounted.test.tsx. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV and SecureStore factories settle without await because they resolve immediately */
-import { createElement } from 'react';
+import { createElement, useSyncExternalStore } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { type Mutation } from '@tanstack/react-query';
 import { type PersistedQueryClientSaveOptions } from '@tanstack/react-query-persist-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  isSignOutActive,
+  setSignOutActive,
+  subscribeSignOutActive,
+} from '@/lib/auth/sign-out-state';
 import { CachePersistenceMount } from './cache-persistence-mount';
 import { queryClient } from '@/lib/query-client';
 import {
@@ -15,7 +20,6 @@ import {
   createReadCachePersister,
   resetReadCacheForTests,
   restorePersistedCacheOnColdStart,
-  setSignOutActive,
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from './read-cache';
@@ -404,6 +408,53 @@ describe('CachePersistenceMount', () => {
 
     act(() => {
       renderer.unmount();
+    });
+    queryClient.removeQueries({ queryKey: GET_ME_QUERY_KEY });
+  });
+
+  it('feeds one flag to both consumers: the React subscriber and the cache write fence', async () => {
+    queryClient.setQueryData(GET_ME_QUERY_KEY, { id: 'u1' });
+    const persister = createReadCachePersister({
+      queryClient,
+      userId: 'u1',
+      epoch: currentAuthEpoch(),
+    });
+
+    // The exact subscription the auth context uses for `isSigningOut`.
+    const observed: boolean[] = [];
+    function SignOutConsumer(): null {
+      observed.push(useSyncExternalStore(subscribeSignOutActive, isSignOutActive));
+      return null;
+    }
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    act(() => {
+      rendererRef.current = TestRenderer.create(createElement(SignOutConsumer));
+    });
+    expect(observed.at(-1)).toBe(false);
+
+    // ONE setter: there is no second flag to keep in sync by hand.
+    act(() => {
+      setSignOutActive(true);
+    });
+    // The React consumer re-rendered with the in-progress state.
+    expect(observed.at(-1)).toBe(true);
+
+    // The write path reads the same flag and refuses the KV write.
+    await persister.persistClient(makePersistedClient({ id: 'u1' }));
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+
+    // Clearing the one flag opens both consumers again.
+    act(() => {
+      setSignOutActive(false);
+    });
+    expect(observed.at(-1)).toBe(false);
+    await persister.persistClient(makePersistedClient({ id: 'u1' }));
+    expect(kvMock.setItem).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      rendererRef.current?.unmount();
     });
     queryClient.removeQueries({ queryKey: GET_ME_QUERY_KEY });
   });

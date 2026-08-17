@@ -78,7 +78,6 @@ const hoisted = vi.hoisted(() => {
 const readCacheMock = vi.hoisted(() => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),
-  setSignOutActive: vi.fn(),
 }));
 
 // Hoisted so the FIFO and failure-matrix tests can hold remote cleanup open or
@@ -567,7 +566,9 @@ describe('stale sign-in continuation', () => {
     // closed through the whole teardown and after it: the cache mount cannot
     // resubscribe while the old user id is still cached or after the cleanup.
     expect(getCtx().isSigningOut).toBe(true);
-    expect(readCacheMock.setSignOutActive).toHaveBeenCalledWith(true);
+    // Same flag, not a mirror: the cache write fence reads this module.
+    const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
+    expect(isSignOutActive()).toBe(true);
 
     unmount();
   });
@@ -584,7 +585,8 @@ describe('stale sign-in continuation', () => {
       await getCtx().signIn('new-token');
     });
     expect(getCtx().isSigningOut).toBe(false);
-    expect(readCacheMock.setSignOutActive).toHaveBeenCalledWith(false);
+    const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
+    expect(isSignOutActive()).toBe(false);
 
     // FIFO: the sign-in runs its whole body (the fence opens), then the
     // sign-out queued behind it runs the full teardown and closes the fence

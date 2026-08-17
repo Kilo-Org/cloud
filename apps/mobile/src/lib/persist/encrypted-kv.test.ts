@@ -1,18 +1,23 @@
 /* eslint-disable max-lines -- cohesive unit suite for the encrypted-kv open/recovery contract, key validation, and KV behavior */
-/* eslint-disable require-await, @typescript-eslint/require-await -- the fake native methods and vi.fn factories settle without await because node:sqlite calls are synchronous */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake native lifecycle methods and vi.fn factories settle without await because node:sqlite calls are synchronous */
 // eslint-disable-next-line import/no-nodejs-modules -- node:sqlite is the only way to run real SQL semantics in a node test; the expo-sqlite native module cannot load here
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import * as Sentry from '@sentry/react-native';
 import * as Crypto from 'expo-crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The native modules cannot run in a node test, so they are mocked. The
-// expo-sqlite mock is backed by node:sqlite so the SQL statements behave like
-// the real engine (LIKE, upsert, primary key), while open/probe/recovery
-// behavior is driven by the test seams below.
+// The native modules cannot run in a node test, so they are mocked. Drizzle's
+// expo driver drives the *synchronous* expo-sqlite API (`openDatabaseSync`,
+// `prepareSync`, `executeSync`), so the mock exposes that shape and backs it
+// with node:sqlite: the SQL Drizzle generates (LIKE, upsert, composite primary
+// key, the generated migration) runs on the real engine, while open, probe, and
+// recovery behavior is driven by the test seams below.
 
 const store = new Map<string, string>();
-const execLog: string[] = [];
+// Every SQL statement Drizzle prepares, in order. `PRAGMA key`, the probes, and
+// the migration all pass through `prepareSync`, so this is the whole statement
+// stream for one open.
+const sqlLog: string[] = [];
 let randomCallCount = 0;
 let failNextProbe = false;
 let failEveryProbe = false;
@@ -21,61 +26,119 @@ let failEveryPragma = false;
 // Simulates a native build without SQLCipher: `PRAGMA cipher_version` returns
 // no row, exactly as plain SQLite does for an unrecognized pragma.
 let hasSQLCipher = true;
-// Number of exec calls that had happened when `cipher_version` was probed;
-// -1 when it was never probed. Proves the probe precedes `PRAGMA key`.
-let cipherProbedAtExecCount = -1;
+// Number of statements that had been prepared when `cipher_version` was
+// probed; -1 when it was never probed. Proves the probe precedes `PRAGMA key`.
+let cipherProbedAtSqlCount = -1;
 let closeCallCount = 0;
 
+type FakeExecuteResult = {
+  changes: number | bigint;
+  lastInsertRowId: number | bigint;
+  getAllSync: () => Record<string, unknown>[];
+  getFirstSync: () => Record<string, unknown> | null;
+};
+
+type FakeStatement = {
+  executeSync: (params?: SQLInputValue[]) => FakeExecuteResult;
+  executeForRawResultSync: (params?: SQLInputValue[]) => { getAllSync: () => unknown[][] };
+};
+
 type FakeDatabase = {
-  execAsync: (source: string) => Promise<void>;
-  getFirstAsync: (
-    source: string,
-    ...params: (string | number)[]
-  ) => Promise<Record<string, unknown> | null>;
-  getAllAsync: (
-    source: string,
-    ...params: (string | number)[]
-  ) => Promise<Record<string, unknown>[]>;
-  runAsync: (
-    source: string,
-    ...params: (string | number)[]
-  ) => Promise<{ changes: number | bigint; lastInsertRowid: number | bigint }>;
+  // Connection setup runs on the raw handle, ahead of Drizzle: `getFirstSync`
+  // proves SQLCipher and `execSync` sets the key.
+  getFirstSync: (source: string) => Record<string, unknown> | null;
+  execSync: (source: string) => void;
+  prepareSync: (source: string) => FakeStatement;
   closeAsync: () => Promise<void>;
 };
+
+/** A statement whose rows the fake answers itself, computed at execute time. */
+function fakeRows(rows: () => Record<string, unknown>[]): FakeStatement {
+  return {
+    executeSync: () => {
+      const values = rows();
+      return {
+        changes: 0,
+        lastInsertRowId: 0,
+        getAllSync: () => values,
+        getFirstSync: () => values[0] ?? null,
+      };
+    },
+    executeForRawResultSync: () => ({ getAllSync: () => rows().map(row => Object.values(row)) }),
+  };
+}
+
+/** A statement executed by node:sqlite, in expo-sqlite's result shape. */
+function nativeStatement(statement: StatementSync): FakeStatement {
+  const returnsRows = statement.columns().length > 0;
+  return {
+    executeSync: (params = []) => {
+      if (!returnsRows) {
+        const { changes, lastInsertRowid } = statement.run(...params);
+        return {
+          changes,
+          lastInsertRowId: lastInsertRowid,
+          getAllSync: () => [],
+          getFirstSync: () => null,
+        };
+      }
+      const rows = statement.all(...params);
+      return {
+        changes: 0,
+        lastInsertRowId: 0,
+        getAllSync: () => rows,
+        getFirstSync: () => rows[0] ?? null,
+      };
+    },
+    executeForRawResultSync: (params = []) => ({
+      getAllSync: () => statement.all(...params).map(row => Object.values(row)),
+    }),
+  };
+}
+
+function createFakeStatement(native: DatabaseSync, source: string): FakeStatement {
+  // Probe failure seam: a wrong key or corrupt file throws at the probe.
+  if (source.includes('sqlite_master')) {
+    return fakeRows(() => {
+      if (failNextProbe) {
+        failNextProbe = false;
+        throw new Error('file is not a database');
+      }
+      if (failEveryProbe) {
+        throw new Error('file is not a database');
+      }
+      return [{ 'count(*)': 0 }];
+    });
+  }
+  return nativeStatement(native.prepare(source));
+}
 
 function createFakeDatabase(): FakeDatabase {
   const native = new DatabaseSync(':memory:');
   return {
-    execAsync: async source => {
-      execLog.push(source);
-      // PRAGMA failure seam: the key call can fail after the handle opened.
+    // SQLCipher presence seam. node:sqlite has no `cipher_version` pragma, so
+    // the fake answers it directly.
+    getFirstSync: source => {
+      sqlLog.push(source);
+      if (source.startsWith('PRAGMA cipher_version')) {
+        cipherProbedAtSqlCount = sqlLog.length - 1;
+        return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
+      }
+      return native.prepare(source).get() ?? null;
+    },
+    // PRAGMA failure seam: the key call can fail after the handle opened.
+    execSync: source => {
+      sqlLog.push(source);
       if (source.startsWith('PRAGMA key') && (failEveryPragma || failNextPragma)) {
         failNextPragma = false;
         throw new Error('PRAGMA key failed');
       }
       native.exec(source);
     },
-    getFirstAsync: async (source, ...params) => {
-      // SQLCipher presence seam. node:sqlite has no `cipher_version` pragma,
-      // so the fake answers it directly.
-      if (source === 'PRAGMA cipher_version') {
-        cipherProbedAtExecCount = execLog.length;
-        return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
-      }
-      // Probe failure seam: a wrong key or corrupt file throws at the probe.
-      if (source.includes('sqlite_master')) {
-        if (failNextProbe) {
-          failNextProbe = false;
-          throw new Error('file is not a database');
-        }
-        if (failEveryProbe) {
-          throw new Error('file is not a database');
-        }
-      }
-      return native.prepare(source).get(...params) ?? null;
+    prepareSync: source => {
+      sqlLog.push(source);
+      return createFakeStatement(native, source);
     },
-    getAllAsync: async (source, ...params) => native.prepare(source).all(...params),
-    runAsync: async (source, ...params) => native.prepare(source).run(...params),
     closeAsync: async () => {
       closeCallCount += 1;
       native.close();
@@ -100,7 +163,7 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('expo-sqlite', () => ({
-  openDatabaseAsync: vi.fn(async () => createFakeDatabase()),
+  openDatabaseSync: vi.fn(() => createFakeDatabase()),
   deleteDatabaseAsync: vi.fn(async () => undefined),
 }));
 
@@ -129,14 +192,14 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   store.clear();
-  execLog.length = 0;
+  sqlLog.length = 0;
   randomCallCount = 0;
   failNextProbe = false;
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
   hasSQLCipher = true;
-  cipherProbedAtExecCount = -1;
+  cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
   resetEncryptedKvOpenForTests();
 });
@@ -163,7 +226,7 @@ describe('scope and key validation', () => {
 
   it('validates before opening the database', async () => {
     await expect(getItem('', 'k')).rejects.toThrow(TypeError);
-    expect(SQLite.openDatabaseAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
   });
 
   it('validateScope and validateItemKey reject empty input directly', () => {
@@ -185,17 +248,24 @@ describe('scope and key validation', () => {
 describe('SQLCipher presence', () => {
   it('probes cipher_version before setting the key', async () => {
     await setItem('s', 'a', 'x');
-    const keyIndex = execLog.findIndex(source => source.startsWith('PRAGMA key'));
+    const keyIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA key'));
     expect(keyIndex).toBeGreaterThanOrEqual(0);
-    // The probe ran while no exec had happened yet, so it precedes the key.
-    expect(cipherProbedAtExecCount).toBe(0);
+    // The probe was the very first statement, so it precedes the key.
+    expect(cipherProbedAtSqlCount).toBe(0);
+    expect(keyIndex).toBeGreaterThan(cipherProbedAtSqlCount);
+    // SQLCipher needs the key before anything reads the file, so the key runs
+    // before every Drizzle statement: the probe, the migration, and the query.
+    const firstDrizzleIndex = sqlLog.findIndex(
+      source => source.includes('sqlite_master') || source.includes('__drizzle_migrations')
+    );
+    expect(firstDrizzleIndex).toBeGreaterThan(keyIndex);
   });
 
   it('refuses to open a plaintext database when the build has no SQLCipher', async () => {
     hasSQLCipher = false;
     await expect(setItem('s', 'a', 'x')).rejects.toThrow(MissingSQLCipherError);
     // No key is ever set on an unencrypted handle.
-    expect(execLog.some(source => source.startsWith('PRAGMA key'))).toBe(false);
+    expect(sqlLog.some(source => source.startsWith('PRAGMA key'))).toBe(false);
   });
 
   it('never deletes the database when the build has no SQLCipher', async () => {
@@ -209,7 +279,7 @@ describe('SQLCipher presence', () => {
     await expect(setItem('s', 'a', 'x')).rejects.toThrow(MissingSQLCipherError);
     await expect(getItem('s', 'a')).rejects.toThrow(MissingSQLCipherError);
     await expect(clearScope('s')).rejects.toThrow(MissingSQLCipherError);
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(1);
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 });
@@ -217,7 +287,7 @@ describe('SQLCipher presence', () => {
 describe('single-flight open contract', () => {
   it('opens the database once for concurrent callers', async () => {
     await Promise.all([setItem('s', 'a', 'x'), setItem('s', 'b', 'y')]);
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(1);
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
     await expect(getItem('s', 'a')).resolves.toBe('x');
     await expect(getItem('s', 'b')).resolves.toBe('y');
   });
@@ -226,7 +296,7 @@ describe('single-flight open contract', () => {
     await setItem('s', 'a', 'x');
     await setItem('s', 'b', 'y');
     await getItem('s', 'a');
-    expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(1);
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
   });
 
   it('generates a 32-byte hex key and stores it in SecureStore on first open', async () => {
@@ -249,14 +319,27 @@ describe('single-flight open contract', () => {
     await setItem('s', 'a', 'x');
     const key = store.get(PERSIST_DB_KEY);
     expect(key).toBeDefined();
-    expect(execLog).toContain(`PRAGMA key = "x'${key}'"`);
+    expect(sqlLog).toContain(`PRAGMA key = "x'${key}'"`);
   });
 
-  it('creates the DEC-01 schema on open', async () => {
+  it('creates the DEC-01 schema on open by running the generated migration', async () => {
     await setItem('s', 'a', 'x');
-    const createSql = execLog.find(sql => sql.startsWith('CREATE TABLE IF NOT EXISTS kv'));
-    expect(createSql).toContain('PRIMARY KEY (scope, k)');
-    expect(createSql).toContain('updated_at INTEGER NOT NULL');
+    const createSql = sqlLog.find(sql => sql.includes('CREATE TABLE `kv`'));
+    expect(createSql).toContain('PRIMARY KEY(`scope`, `k`)');
+    expect(createSql).toContain('`updated_at` integer NOT NULL');
+    expect(createSql).toContain('`scope` text NOT NULL');
+    expect(createSql).toContain('`k` text NOT NULL');
+    expect(createSql).toContain('`v` text NOT NULL');
+  });
+
+  it('records the applied migration so a reopened database does not re-run it', async () => {
+    await setItem('s', 'a', 'x');
+    // Drizzle owns the bookkeeping: it creates its ledger, reads the last
+    // applied entry, and records the migration it just ran.
+    expect(
+      sqlLog.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS "__drizzle_migrations"'))
+    ).toBe(true);
+    expect(sqlLog.some(sql => sql.includes('INSERT INTO "__drizzle_migrations"'))).toBe(true);
   });
 });
 
@@ -333,7 +416,7 @@ describe('open failure recovery', () => {
       recover();
       await expect(setItem('s', 'a', 'x')).rejects.toThrow();
       await expect(getItem('s', 'a')).rejects.toThrow();
-      expect(SQLite.openDatabaseAsync).toHaveBeenCalledTimes(2);
+      expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
       expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
       expect(Sentry.captureException).toHaveBeenCalledTimes(sentryReports);
 
@@ -370,13 +453,13 @@ describe('database key validation', () => {
       await setItem('s', 'a', 'x');
 
       // The tampered key never reached PRAGMA interpolation.
-      expect(execLog.some(sql => sql.includes(forbidden))).toBe(false);
+      expect(sqlLog.some(sql => sql.includes(forbidden))).toBe(false);
       // Recovery deleted the database, generated a fresh key, and reopened.
       expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
       expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
       const stored = store.get(PERSIST_DB_KEY);
       expect(stored).toMatch(/^[0-9a-f]{64}$/);
-      expect(execLog).toContain(`PRAGMA key = "x'${stored}'"`);
+      expect(sqlLog).toContain(`PRAGMA key = "x'${stored}'"`);
       // No handle was opened for the tampered key, so only the fresh one is open.
       expect(closeCallCount).toBe(0);
 
@@ -443,6 +526,23 @@ describe('kv behavior', () => {
     await expect(getItem('cache:u1:1', 'a')).resolves.toBeNull();
     await expect(getItem('cache:u12:1', 'a')).resolves.toBeNull();
     await expect(getItem('draft:u1', 'b')).resolves.toBe('z');
+  });
+
+  it('clearScopePrefix on a user prefix clears every schema version, and nothing else', async () => {
+    // The sign-out prefix `cache:<userId>:`, on the real SQL engine: it must
+    // cover both schema versions of that user and leave the other account's
+    // cache and the user's drafts alone.
+    await setItem('cache:u1:1', 'read-cache', 'x');
+    await setItem('cache:u1:2', 'read-cache', 'x2');
+    await setItem('cache:u12:1', 'read-cache', 'y');
+    await setItem('draft:u1', 'agent-composer:new', 'z');
+
+    await clearScopePrefix('cache:u1:');
+
+    await expect(getItem('cache:u1:1', 'read-cache')).resolves.toBeNull();
+    await expect(getItem('cache:u1:2', 'read-cache')).resolves.toBeNull();
+    await expect(getItem('cache:u12:1', 'read-cache')).resolves.toBe('y');
+    await expect(getItem('draft:u1', 'agent-composer:new')).resolves.toBe('z');
   });
 
   it('clearScopePrefix does not remove scopes that only contain the prefix later', async () => {

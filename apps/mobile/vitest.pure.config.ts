@@ -2,10 +2,13 @@ import { fileURLToPath } from 'node:url';
 
 import { defineProject } from 'vitest/config';
 
+import { inlineSqlPlugin } from './vitest.sql-plugin';
+
 // Pure-logic tests: node environment, no React mounting. This is the original
 // mobile vitest project, kept unchanged so the existing ~205 suites are
 // unaffected by the mounted-test harness.
 export default defineProject({
+  plugins: [inlineSqlPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

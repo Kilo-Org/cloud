@@ -12,7 +12,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   File: 'File',
   RotateCcw: 'RotateCcw',

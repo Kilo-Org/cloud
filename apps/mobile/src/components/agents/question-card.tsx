@@ -9,9 +9,9 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Check } from 'lucide-react-native';
 
 import { Button } from '@/components/ui/button';
+import { Check } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,

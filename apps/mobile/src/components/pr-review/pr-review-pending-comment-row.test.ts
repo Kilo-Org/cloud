@@ -24,7 +24,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 

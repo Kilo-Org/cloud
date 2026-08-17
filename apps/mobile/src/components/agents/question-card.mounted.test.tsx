@@ -22,7 +22,7 @@ vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light' },
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
 }));
 vi.mock('@/components/ui/button', () => ({

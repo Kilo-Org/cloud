@@ -10,7 +10,7 @@ import { FilePartRenderer } from './file-part-renderer';
 // renderer) and walk the element tree it returns. Every RN/UI module is
 // mocked to string components so the node env never loads native bindings.
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('lucide-react-native', () => ({ File: 'FileIcon' }));
+vi.mock('@/components/ui/icons', () => ({ File: 'FileIcon' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

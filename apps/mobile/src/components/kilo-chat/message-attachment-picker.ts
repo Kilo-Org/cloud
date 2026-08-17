@@ -5,6 +5,7 @@ import { Alert, Linking } from 'react-native';
 import { type AddFileInput } from '@kilocode/kilo-chat-hooks';
 
 import { type ClipboardImageFile } from '@/lib/agent-attachments/clipboard-image';
+import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 
 import {
   type MessageAttachment,
@@ -18,11 +19,6 @@ export type PickedAttachment = {
   input: AddFileInput;
   localUri: string;
 };
-
-const IMAGE_PICKER_OPTIONS = {
-  mediaTypes: ['images'],
-  quality: 1,
-} satisfies ImagePicker.ImagePickerOptions;
 
 function assetToSelection(asset: LocalAttachmentAsset): MessageAttachment {
   const file = new File(asset.uri);
@@ -89,26 +85,20 @@ export async function pickCameraImage(): Promise<MessageAttachment[]> {
     return [];
   }
 
-  const result = await ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS);
+  const assets = await launchImagePicker(ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS));
 
-  if (result.canceled) {
-    return [];
-  }
-
-  return result.assets.map(imageAssetToSelection);
+  return assets.map(asset => imageAssetToSelection(asset));
 }
 
 export async function pickLibraryImages(): Promise<MessageAttachment[]> {
-  const result = await ImagePicker.launchImageLibraryAsync({
-    ...IMAGE_PICKER_OPTIONS,
-    allowsMultipleSelection: true,
-  });
+  const assets = await launchImagePicker(
+    ImagePicker.launchImageLibraryAsync({
+      ...IMAGE_PICKER_OPTIONS,
+      allowsMultipleSelection: true,
+    })
+  );
 
-  if (result.canceled) {
-    return [];
-  }
-
-  return result.assets.map(imageAssetToSelection);
+  return assets.map(asset => imageAssetToSelection(asset));
 }
 
 export async function pickFiles(): Promise<MessageAttachment[]> {

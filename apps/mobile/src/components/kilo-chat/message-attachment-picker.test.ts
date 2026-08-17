@@ -28,9 +28,15 @@ const reactNativeMock = vi.hoisted(() => ({
   openSettings: vi.fn(),
 }));
 
+const announcingToastMock = vi.hoisted(() => ({ error: vi.fn() }));
+
 vi.mock('react-native', () => ({
   Alert: { alert: reactNativeMock.alert },
   Linking: { openSettings: reactNativeMock.openSettings },
+}));
+
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: announcingToastMock.error, success: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock('expo-file-system', () => ({
@@ -138,6 +144,20 @@ describe('message attachment picker permissions', () => {
       },
     ]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  // Android unregisters the picker's ActivityResultLauncher when the launching
+  // Activity is destroyed, so every later launch rejects until the process
+  // restarts. Surface it instead of rejecting into an unhandled promise.
+  it('toasts a recovery hint when the library launch rejects', async () => {
+    launchImageLibraryMock.mockRejectedValueOnce(
+      new Error("Call to function 'ExponentImagePicker.launchImageLibraryAsync' has been rejected.")
+    );
+
+    expect(await pickLibraryImages()).toEqual([]);
+    expect(announcingToastMock.error).toHaveBeenCalledWith(
+      'Could not open the photo picker. Restart Kilo and try again.'
+    );
   });
 
   it('returns normalized document selections without materializing', async () => {

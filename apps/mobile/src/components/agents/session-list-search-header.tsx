@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react-native';
+import { Search, X } from '@/components/ui/icons';
 import { type RefObject } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
@@ -42,6 +42,7 @@ export function SessionListSearchHeader({
         </View>
         <TextInput
           ref={inputRef}
+          accessibilityLabel="Search sessions"
           className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
           placeholder="Search sessions..."
           placeholderTextColor={colors.mutedForeground}

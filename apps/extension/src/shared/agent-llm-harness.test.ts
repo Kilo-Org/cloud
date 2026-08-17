@@ -88,6 +88,7 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'web_search',
       'search_memories',
       'get_memory',
     ]);
@@ -95,6 +96,7 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'web_search',
       'search_memories',
       'get_memory',
       'get_viewport_screenshot',
@@ -374,14 +376,91 @@ describe('agent LLM harness', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'When the user repeats the same multi-step task on a site, offer to save it as a workflow with save_workflow.'
     );
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Never do a real run to verify');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain('Never do a real run to verify');
+  });
+
+  it('no longer claims unconditional card approval or an absolute real-run rule', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
+      'The user approves each workflow script version and each saved memory on a card.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'The user approves each saved memory on a card, and each workflow script version too unless auto-approve workflow changes is on.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'follow the nextStep value in the save_workflow result: it says whether you may start the real run yourself or must ask the user.'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Never start a real run of a workflow whose actions buy, send, delete, or otherwise change data without asking the user first.'
+    );
+  });
+
+  it('gives a URL-first, save-first workflow creation recipe', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('Write workflow scripts URL-first');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'call save_workflow right away when the task and site are clear'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Take at most one get_page_snapshot, and only when you actually need page details'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toMatch(
+      /Once you have inspected enough|Google Flights/
+    );
+  });
+
+  it('teaches param declaration and text-based targeting', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'never ask the user for such values and never hard-code them'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Mark a param required only when the workflow cannot run without it'
+    );
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('page.fillLabel(label, value)');
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('page.clickText(text)');
+  });
+
+  it('tells the model that get_element_details never returns a CSS selector', () => {
+    const definitions = createSafeToolDefinitions({ supportsImages: false });
+    const elementDetails = definitions.find(tool => tool.function.name === 'get_element_details');
+
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
+      'use targeted reads only when a required selector is missing'
+    );
+    expect(elementDetails?.function.description).toContain(
+      "The record repeats that node's snapshot fields (role, tag, label, text, href, state)"
+    );
+    expect(elementDetails?.function.description).toContain('never contains a CSS selector');
+  });
+
+  it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {
+    const definitions = createWorkflowToolDefinitions({ mode: 'dangerous' });
+    const runWorkflow = definitions.find(tool => tool.function.name === 'run_workflow');
+
+    expect(runWorkflow?.function.description).toContain('nextStep');
+    expect(runWorkflow?.function.description).not.toContain('and the user starts it');
+    expect(runWorkflow?.function.description).toContain(
+      'Start a real run yourself only when the save_workflow nextStep says you may, or when the user asks for a run.'
+    );
+  });
+
+  it('save_workflow description names autoApproved and nextStep and drops the absolute card claim', () => {
+    const definitions = createWorkflowToolDefinitions({ mode: 'dangerous' });
+    const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
+
+    expect(saveWorkflow?.function.description).toContain('nextStep');
+    expect(saveWorkflow?.function.description).toContain('autoApproved');
+    expect(saveWorkflow?.function.description).not.toContain(
+      'must approve before the workflow is stored'
+    );
+    expect(saveWorkflow?.function.description).toContain(
+      'The user approves the change on a card unless auto-approve workflow changes is on'
+    );
   });
 
   it('tells the model that omitting pathPrefix, startUrl, or params clears them when updating a workflow', () => {
     const definitions = createWorkflowToolDefinitions({ mode: 'safe' });
     const saveWorkflow = definitions.find(tool => tool.function.name === 'save_workflow');
     expect(JSON.stringify(saveWorkflow?.function.parameters)).toContain(
-      'When updating, omitting pathPrefix, startUrl, or params clears the stored value.'
+      'When updating, omitting script keeps the stored script, while omitting pathPrefix, startUrl, or params clears the stored value.'
     );
   });
 

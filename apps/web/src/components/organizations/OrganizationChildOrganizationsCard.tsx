@@ -1,46 +1,138 @@
 'use client';
 
 import Link from 'next/link';
-import { Building2, ChevronRight } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Building2, ChevronRight, Loader2, Plus } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, type ButtonProps } from '@/components/ui/button';
+import { CardLinkFooter } from '@/components/ui/card.client';
+import { useCreateChildOrganization, useOrganizationChildren } from '@/app/api/organizations/hooks';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useOrganizationChildren } from '@/app/api/organizations/hooks';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 type Props = {
   organizationId: string;
 };
 
+export function CreateSubOrganizationButton({
+  organizationId,
+  variant,
+  className,
+}: {
+  organizationId: string;
+  variant?: ButtonProps['variant'];
+  className?: string;
+}) {
+  const createChild = useCreateChildOrganization();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [name, setName] = useState('');
+
+  const handleCreateChild = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    createChild.mutate(
+      { organizationId, name: trimmedName },
+      {
+        onSuccess: result => {
+          setName('');
+          setIsCreateDialogOpen(false);
+          toast.success(`${result.organization.name} created`);
+        },
+        onError: error => {
+          toast.error(error.message || 'Failed to create sub-organization');
+        },
+      }
+    );
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant={variant}
+        className={className}
+        onClick={() => setIsCreateDialogOpen(true)}
+      >
+        Create sub-organization
+        <Plus />
+      </Button>
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create sub-organization</DialogTitle>
+            <DialogDescription>
+              Create an empty sub-organization managed by this parent organization.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={handleCreateChild}>
+            <div className="grid gap-2">
+              <Label htmlFor="child-organization-name">Organization name</Label>
+              <Input
+                id="child-organization-name"
+                value={name}
+                onChange={event => setName(event.target.value)}
+                autoComplete="organization"
+                maxLength={100}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateDialogOpen(false)}
+                disabled={createChild.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createChild.isPending || name.trim().length === 0}>
+                {createChild.isPending && <Loader2 className="size-4 animate-spin" />}
+                Create sub-organization
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export function OrganizationChildOrganizationsCard({ organizationId }: Props) {
   const { data: children } = useOrganizationChildren(organizationId);
 
-  // Only show the card when there is at least one child organization. While
-  // loading, on error, or when empty, render nothing so the layout stays clean.
   if (!children || children.length === 0) {
     return null;
   }
+
+  const visibleChildren = children.slice(0, 5);
+  const remainingCount = Math.max(0, children.length - visibleChildren.length);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>
           <Building2 className="mr-2 inline h-5 w-5" />
-          Child Organizations
+          Sub-organizations
         </CardTitle>
         <CardDescription>
-          {children.length} child organization{children.length === 1 ? '' : 's'} belong to this
+          {children.length} sub-organization{children.length === 1 ? '' : 's'} belong to this
           organization
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-0.5">
-          {children.map(child => (
+        <div className="space-y-2">
+          {visibleChildren.map(child => (
             <Link
               key={child.id}
               prefetch={false}
@@ -54,17 +146,17 @@ export function OrganizationChildOrganizationsCard({ organizationId }: Props) {
             </Link>
           ))}
         </div>
+        <CardLinkFooter
+          href={`/organizations/${encodeURIComponent(organizationId)}/sub-organizations`}
+          className="flex items-center gap-2"
+        >
+          Manage Sub-Organizations
+          <span className="ml-auto flex items-center gap-2">
+            {remainingCount > 0 && `${remainingCount} more`}
+            <ChevronRight className="size-4" />
+          </span>
+        </CardLinkFooter>
       </CardContent>
-      <CardFooter>
-        <Button asChild variant="secondary" size="sm">
-          <Link
-            prefetch={false}
-            href={`/organizations/${encodeURIComponent(organizationId)}/distribute-funds`}
-          >
-            Distribute funds
-          </Link>
-        </Button>
-      </CardFooter>
     </Card>
   );
 }

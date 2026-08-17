@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
+import {
+  DEFAULT_TOKEN_COLOR,
+  MUTED_COLOR,
+  TOKEN_DARK_LIGHT,
+} from '@/lib/pr-review/diff/syntax-colors';
 
 vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
 vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
@@ -54,17 +59,45 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+// Blend an 8-digit hex (RRGGBBAA) over an opaque background. NativeWind v5
+// cannot decompose theme colors, so `global.css` ships pre-baked alpha tiles
+// like `--good-tile-bg: <hex>1a`; the diff text actually renders on the
+// resulting tinted surface, so assertions must use this composite, not the
+// raw token.
+function compositeHex(tile: string, background: string): string {
+  const alpha = Number.parseInt(tile.slice(7, 9), 16) / 255;
+  const [r, g, b] = expandHex(tile.slice(0, 7));
+  const [bgR, bgG, bgB] = expandHex(background);
+  const channels = [
+    Math.round(r * alpha + bgR * (1 - alpha)),
+    Math.round(g * alpha + bgG * (1 - alpha)),
+    Math.round(b * alpha + bgB * (1 - alpha)),
+  ];
+  return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 describe('muted-foreground token contrast (WCAG AA text)', () => {
-  it('light theme: >= 4.5:1 against background and card', () => {
-    const surfaces = { background: lightColors.background, card: lightColors.card } as const;
+  // `secondary` is included because it is the surface of the switch rows in
+  // preferences-screen and notifications-screen, where a muted title is the
+  // disabled cue.
+  it('light theme: >= 4.5:1 against background, card, and secondary', () => {
+    const surfaces = {
+      background: lightColors.background,
+      card: lightColors.card,
+      secondary: lightColors.secondary,
+    } as const;
     for (const [name, surface] of Object.entries(surfaces)) {
       const ratio = contrastRatio(lightColors.mutedForeground, surface);
       expect(ratio, `muted-foreground vs ${name} (light)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
     }
   });
 
-  it('dark theme: >= 4.5:1 against background and card', () => {
-    const surfaces = { background: darkColors.background, card: darkColors.card } as const;
+  it('dark theme: >= 4.5:1 against background, card, and secondary', () => {
+    const surfaces = {
+      background: darkColors.background,
+      card: darkColors.card,
+      secondary: darkColors.secondary,
+    } as const;
     for (const [name, surface] of Object.entries(surfaces)) {
       const ratio = contrastRatio(darkColors.mutedForeground, surface);
       expect(ratio, `muted-foreground vs ${name} (dark)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
@@ -72,9 +105,65 @@ describe('muted-foreground token contrast (WCAG AA text)', () => {
   });
 });
 
+describe('status token contrast on light surfaces (WCAG AA text)', () => {
+  // Status tokens are read as text on the app background (screens) and on
+  // `secondary` (status chips/cards). `global.css` keeps `--good` /
+  // `--warn` / `--destructive` / `--info` in lockstep with these TS values.
+  const statusTokens = {
+    good: lightColors.good,
+    warn: lightColors.warn,
+    destructive: lightColors.destructive,
+    info: lightColors.info,
+  } as const;
+  const surfaces = {
+    background: lightColors.background,
+    secondary: lightColors.secondary,
+  } as const;
+
+  it('light theme: >= 4.5:1 for every status token on background and secondary', () => {
+    for (const [token, color] of Object.entries(statusTokens)) {
+      for (const [surfaceName, surface] of Object.entries(surfaces)) {
+        const ratio = contrastRatio(color, surface);
+        expect(ratio, `${token} vs ${surfaceName} (light)`).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+      }
+    }
+  });
+});
+
+describe('light diff token contrast on tinted surfaces (WCAG AA text)', () => {
+  // The diff renderer paints token colors as inline text style on top of the
+  // tinted tiles in `global.css` (`--good-tile-bg` / `--danger-tile-bg` = the
+  // status hue at 10% alpha over the theme background), so every light token
+  // must clear 4.5:1 on the composite surfaces, not just on plain background.
+  const surfaces = {
+    plain: lightColors.background,
+    goodTile: compositeHex(`${lightColors.good}1a`, lightColors.background),
+    dangerTile: compositeHex(`${lightColors.destructive}1a`, lightColors.background),
+  } as const;
+
+  const lightTokens: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(TOKEN_DARK_LIGHT).map(([name, pair]) => [name, pair.light])
+    ),
+    default: DEFAULT_TOKEN_COLOR.light,
+    muted: MUTED_COLOR.light,
+  };
+
+  it('every light token clears 4.5:1 on plain, good-tile, and danger-tile', () => {
+    for (const [token, color] of Object.entries(lightTokens)) {
+      for (const [surfaceName, surface] of Object.entries(surfaces)) {
+        const ratio = contrastRatio(color, surface);
+        expect(ratio, `${token} (${color}) vs ${surfaceName} (light)`).toBeGreaterThanOrEqual(
+          MIN_TEXT_RATIO
+        );
+      }
+    }
+  });
+});
+
 describe('warn foreground token contrast (WCAG AA text)', () => {
   it('light theme: warnForeground vs warn >= 4.5:1', () => {
-    // Precomputed ≈ 4.79:1 for #FFFFFF on #9F6612.
+    // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
     const ratio = contrastRatio(lightColors.warnForeground, lightColors.warn);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });

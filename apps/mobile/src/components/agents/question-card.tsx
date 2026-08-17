@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/ui/button';
+import { Check } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,
@@ -74,16 +75,14 @@ export function QuestionCard({
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
   const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
   const customInputs = useRef<Record<number, string>>({});
+  const customInputRefs = useRef<Record<number, TextInput | null>>({});
   // Unread; setting it forces a re-render on every keystroke so
   // `allQuestionsAnswered` (derived from the customInputs ref) stays in sync.
   const [, setCustomHasText] = useState<Record<number, boolean>>({});
 
   // Accessibility presentation is derived from the shared FSM so the
   // selection logic and CTA flags stay covered by pure-logic tests.
-  const presentation = useMemo(
-    () => getBlockingCardPresentationForKind({ kind: 'question', submissionError }),
-    [submissionError]
-  );
+  const presentation = getBlockingCardPresentationForKind({ kind: 'question', submissionError });
 
   // The card root wraps interactive controls, so it must NOT be an
   // accessibility element. The focus target is a non-interactive leaf title
@@ -96,11 +95,12 @@ export function QuestionCard({
   presentationRef.current = presentation;
   useEffect(
     () =>
+      // The shared cleanup cancels a pending delayed focus retry when the
+      // request is replaced or the card unmounts.
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
         focus: moveA11yFocus,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only announce/focus on a new request
     [requestId]
   );
 
@@ -126,47 +126,45 @@ export function QuestionCard({
     }
   }
 
-  function toggleCustom(questionIndex: number, multiple: boolean | undefined) {
-    setCustomSelected(prev => {
-      const wasSelected = prev[questionIndex] ?? false;
-      if (!multiple && !wasSelected) {
-        // Single select: deselect preset options when custom is toggled on
-        setSelectedOptions(p => ({ ...p, [questionIndex]: new Set<number>() }));
+  function selectCustomOption(questionIndex: number, multiple: boolean | undefined) {
+    if (customSelected[questionIndex]) {
+      // Multiple choice: re-activating the checked custom answer unchecks it
+      // and clears its text so the checkbox and input stay consistent.
+      // Single choice behaves like a radio and stays selected.
+      if (multiple) {
+        customInputRefs.current[questionIndex]?.clear();
+        handleCustomTextChange(questionIndex, '');
       }
-      return { ...prev, [questionIndex]: !wasSelected };
-    });
+      return;
+    }
+    if (!multiple) {
+      // Single select: deselect preset options when custom is chosen.
+      setSelectedOptions(p => ({ ...p, [questionIndex]: new Set<number>() }));
+    }
+    setCustomSelected(prev => ({ ...prev, [questionIndex]: true }));
   }
 
   function handleCustomTextChange(questionIndex: number, text: string) {
     customInputs.current[questionIndex] = text;
     const hasText = text.trim().length > 0;
-    setCustomHasText(prev =>
-      prev[questionIndex] === hasText ? prev : { ...prev, [questionIndex]: hasText }
-    );
-    // Auto-select custom when the user starts typing
-    if (text.trim().length > 0 && !customSelected[questionIndex]) {
-      const question = questions[questionIndex];
-      if (!question?.multiple) {
-        // Single select: deselect preset options
-        setSelectedOptions(prev => ({ ...prev, [questionIndex]: new Set<number>() }));
-      }
-      setCustomSelected(prev => ({ ...prev, [questionIndex]: true }));
+    // Force a re-render on every keystroke so `allQuestionsAnswered` (derived
+    // from the customInputs ref) stays in sync.
+    setCustomHasText(prev => ({ ...prev, [questionIndex]: hasText }));
+    // Auto-select custom when the user starts typing; clearing the text
+    // unchecks it so it never reads as selected with no content.
+    if (hasText && !customSelected[questionIndex]) {
+      selectCustomOption(questionIndex, questions[questionIndex]?.multiple);
+    } else if (!hasText && customSelected[questionIndex]) {
+      setCustomSelected(prev => ({ ...prev, [questionIndex]: false }));
     }
   }
 
   function buildAnswers(): string[][] {
     return questions.map((q, qIndex) => {
-      const selected = selectedOptions[qIndex];
-      const labels =
-        selected && selected.size > 0
-          ? [...selected].map(oIndex => {
-              const option = q.options[oIndex];
-              return option ? option.label : '';
-            })
-          : [];
-
-      const isCustom = customSelected[qIndex] ?? false;
-      const customText = isCustom ? (customInputs.current[qIndex] ?? '').trim() : '';
+      const labels = [...(selectedOptions[qIndex] ?? [])].map(
+        oIndex => q.options[oIndex]?.label ?? ''
+      );
+      const customText = customSelected[qIndex] ? (customInputs.current[qIndex] ?? '').trim() : '';
       return customText ? [...labels, customText] : labels;
     });
   }
@@ -191,6 +189,11 @@ export function QuestionCard({
   const allQuestionsAnswered = buildAnswers().every(answer => answer.length > 0);
   const title = formatBlockingCardTitle('Agent needs input', pendingCount);
   const isInert = presentation.state === 'non-retryable';
+  const interactionDisabled = isSubmitting || isInert;
+  const submitDisabled = !allQuestionsAnswered || interactionDisabled;
+  const submittingSpinner = isSubmitting ? (
+    <ActivityIndicator size="small" color={colors.primaryForeground} />
+  ) : null;
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -212,7 +215,6 @@ export function QuestionCard({
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
         <View className="gap-4 p-4">
           {questions.map((question, qIndex) => {
-            const allowCustom = question.custom !== false;
             const isCustomActive = customSelected[qIndex] ?? false;
             return (
               <View key={qIndex} className="gap-2">
@@ -231,7 +233,7 @@ export function QuestionCard({
                         onPress={() => {
                           toggleOption(qIndex, oIndex, question.multiple);
                         }}
-                        disabled={isSubmitting || isInert}
+                        disabled={interactionDisabled}
                         accessibilityRole="button"
                         accessibilityLabel={`${option.label}${isSelected ? ', selected' : ''}`}
                         className={cn(
@@ -250,38 +252,70 @@ export function QuestionCard({
                       </Button>
                     );
                   })}
-                  {allowCustom ? (
-                    <Pressable
-                      onPress={() => {
-                        toggleCustom(qIndex, question.multiple);
-                      }}
-                      disabled={isSubmitting || isInert}
-                      accessibilityState={{
-                        disabled: isSubmitting || isInert,
-                        selected: isCustomActive,
-                      }}
-                      className={cn(
-                        'flex-row items-center rounded-md border px-3 py-2.5 shadow-sm shadow-black/5',
-                        isCustomActive
-                          ? 'border-primary bg-primary'
-                          : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',
-                        (isSubmitting || isInert) && 'opacity-50'
-                      )}
-                    >
+                  {question.custom !== false ? (
+                    // The custom answer choice is a SIBLING radio/checkbox
+                    // Pressable — a TextInput cannot expose a checked choice
+                    // state, and nesting the input inside a selection
+                    // Pressable would shadow it for assistive technology. The
+                    // radio carries the checked semantics (radio for a single
+                    // choice, checkbox beside multi-select options); pressing
+                    // it also focuses the input so typing flows. The input
+                    // below stays a separate, editable control.
+                    <View className="gap-1">
+                      <Pressable
+                        accessibilityRole={question.multiple ? 'checkbox' : 'radio'}
+                        accessibilityLabel="Type your own answer"
+                        accessibilityState={{
+                          checked: isCustomActive,
+                          disabled: interactionDisabled,
+                        }}
+                        disabled={interactionDisabled}
+                        onPress={() => {
+                          selectCustomOption(qIndex, question.multiple);
+                          customInputRefs.current[qIndex]?.focus();
+                        }}
+                        className={cn(
+                          'min-h-11 flex-row items-center justify-between rounded-md border px-3',
+                          isCustomActive
+                            ? 'border-primary bg-primary'
+                            : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',
+                          interactionDisabled && 'opacity-50'
+                        )}
+                      >
+                        <Text
+                          className={cn(
+                            'text-sm',
+                            isCustomActive ? 'text-primary-foreground' : 'text-foreground'
+                          )}
+                        >
+                          Type your own answer
+                        </Text>
+                        {isCustomActive ? (
+                          <Check size={16} color={colors.primaryForeground} />
+                        ) : null}
+                      </Pressable>
                       <TextInput
+                        ref={node => {
+                          customInputRefs.current[qIndex] = node;
+                        }}
                         defaultValue=""
                         onChangeText={text => {
                           handleCustomTextChange(qIndex, text);
                         }}
                         placeholder="Type your own answer…"
                         placeholderTextColor={colors.mutedForeground}
-                        editable={!isSubmitting && !isInert}
+                        editable={!interactionDisabled}
+                        accessibilityLabel="Type your own answer"
+                        accessibilityState={{ disabled: interactionDisabled }}
                         className={cn(
-                          'flex-1 py-0.5 text-sm',
-                          isCustomActive ? 'text-primary-foreground' : 'text-foreground'
+                          'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-black/5',
+                          isCustomActive
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',
+                          interactionDisabled && 'opacity-50'
                         )}
                       />
-                    </Pressable>
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -297,40 +331,26 @@ export function QuestionCard({
               variant="outline"
               className="flex-1"
               onPress={handleReject}
-              disabled={isSubmitting || isInert}
+              disabled={interactionDisabled}
             >
               <Text className="text-sm">Skip</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'answer' ? (
-            <Button
-              className="flex-1"
-              onPress={handleSubmit}
-              disabled={!allQuestionsAnswered || isSubmitting || isInert}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
+            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+              {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>Retry</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'reject' ? (
-            <Button className="flex-1" onPress={handleRetrySkip} disabled={isSubmitting || isInert}>
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
+            <Button className="flex-1" onPress={handleRetrySkip} disabled={interactionDisabled}>
+              {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>Retry skip</Text>
             </Button>
           ) : null}
           {presentation.hasPrimaryCta ? (
-            <Button
-              className="flex-1"
-              onPress={handleSubmit}
-              disabled={!allQuestionsAnswered || isSubmitting || isInert}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
+            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+              {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
                 {isSubmitting ? 'Submitting…' : 'Send answers'}
               </Text>

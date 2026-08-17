@@ -1,12 +1,12 @@
-/* eslint-disable capitalized-comments, id-length, jest/no-hooks, jest/no-untyped-mock-factory, max-dependencies, max-lines, sort-keys, vitest/prefer-import-in-mock -- test fixture constraints */
+/* eslint-disable capitalized-comments, id-length, jest/max-expects, jest/no-hooks, jest/no-untyped-mock-factory, max-dependencies, max-lines, sort-keys, vitest/prefer-import-in-mock -- test fixture constraints */
 /* eslint-disable import/first */
 // @vitest-environment jsdom
 
 import { createElement } from 'react';
 import { Provider, createStore } from 'jotai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, waitFor, cleanup } from '@testing-library/react';
-import type { PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
+import { act, fireEvent, render, waitFor, cleanup } from '@testing-library/react';
+import type { AgentWorkflow, PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
 import { deriveWorkflowSaveCardState } from './pending-workflow-save-card-state';
 
 vi.mock('#imports', () => ({
@@ -39,7 +39,11 @@ vi.mock('./use-agent-memories', () => ({
   useAgentMemories: vi.fn(),
 }));
 
-import { addAgentWorkflow, loadAgentWorkflows } from '@/src/shared/agent-workflows-storage';
+import {
+  addAgentWorkflow,
+  loadAgentWorkflows,
+  loadPendingWorkflowDraft,
+} from '@/src/shared/agent-workflows-storage';
 import type { AgentMemory, PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
 import { addAgentMemory, clearPendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import { useAgentMemories } from './use-agent-memories';
@@ -48,6 +52,7 @@ import { PendingMemorySaveCard } from './pending-memory-save-card';
 import { PendingWorkflowSaveCard } from './pending-workflow-save-card';
 
 const mockLoadAgentWorkflows = vi.mocked(loadAgentWorkflows);
+const mockLoadPendingWorkflowDraft = vi.mocked(loadPendingWorkflowDraft);
 const mockAddAgentWorkflow = vi.mocked(addAgentWorkflow);
 const mockAddAgentMemory = vi.mocked(addAgentMemory);
 const mockClearPendingAgentMemoryDraft = vi.mocked(clearPendingAgentMemoryDraft);
@@ -166,6 +171,7 @@ describe('workflow save card load error render', () => {
     cleanup();
     store = createStore();
     vi.clearAllMocks();
+    mockLoadPendingWorkflowDraft.mockResolvedValue(void 0);
   });
 
   afterEach(() => {
@@ -198,6 +204,296 @@ describe('workflow save card load error render', () => {
     expect(queryByText('My Update')).toBeNull();
 
     // Approval controls must not render.
+    expect(queryByText('Approve and save')).toBeNull();
+    expect(queryByText('Reject')).toBeNull();
+  });
+
+  it('closes the dialog when Dismiss is clicked on a reload-path load error', async () => {
+    // No approval entry is set: the card takes the reload path and reads the stored draft.
+    mockLoadPendingWorkflowDraft.mockRejectedValue(new Error('storage broke'));
+
+    const { container, getByText, queryByText } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText(
+          "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+        )
+      ).toBeDefined();
+    });
+
+    // Dismiss renders even though no draft exists.
+    expect(getByText('Dismiss')).toBeDefined();
+
+    // No draft details or approval controls render.
+    expect(queryByText('Approve and save')).toBeNull();
+    expect(queryByText('Reject')).toBeNull();
+
+    // Dismiss clears the error and closes the dialog.
+    fireEvent.click(getByText('Dismiss'));
+
+    await waitFor(() => {
+      expect(
+        queryByText(
+          "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+        )
+      ).toBeNull();
+    });
+    expect(container.querySelector('[aria-label="Save workflow"]')).toBeNull();
+  });
+
+  it('renders a later approval entry after a reload-path load error', async () => {
+    // No approval entry is set: the card takes the reload path and the load rejects.
+    mockLoadPendingWorkflowDraft.mockRejectedValue(new Error('storage broke'));
+
+    const { getByText, queryByText, rerender } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText(
+          "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+        )
+      ).toBeDefined();
+    });
+
+    // A new approval entry arrives after the reload failure.
+    store.set(pendingApprovalAtom, {
+      draft: draftAlt,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+
+    rerender(createElement(PendingWorkflowSaveCard));
+
+    // The new draft renders with approval controls, not the stale load error.
+    await waitFor(() => {
+      expect(getByText('Second')).toBeDefined();
+    });
+
+    expect(
+      queryByText(
+        "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+      )
+    ).toBeNull();
+    expect(getByText('Approve and save')).toBeDefined();
+    expect(getByText('Reject')).toBeDefined();
+  });
+
+  it('keeps a newer approval draft visible when a superseded reload load rejects late', async () => {
+    const reloadLoad = Promise.withResolvers<undefined>();
+    mockLoadPendingWorkflowDraft.mockReturnValue(reloadLoad.promise);
+
+    const { getByText, queryByText, rerender } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    // A new approval entry supersedes the in-flight reload load.
+    store.set(pendingApprovalAtom, {
+      draft: draftAlt,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+
+    rerender(createElement(PendingWorkflowSaveCard));
+
+    await waitFor(() => {
+      expect(getByText('Second')).toBeDefined();
+    });
+
+    // The superseded reload load rejects late.
+    await act(async () => {
+      reloadLoad.reject(new Error('storage broke'));
+      await Promise.resolve();
+    });
+
+    // The stale rejection must not hide the newer draft.
+    expect(getByText('Second')).toBeDefined();
+    expect(getByText('Approve and save')).toBeDefined();
+    expect(
+      queryByText(
+        "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+      )
+    ).toBeNull();
+  });
+});
+
+describe('workflow save card script diff render', () => {
+  let store = createStore();
+
+  const storedScript =
+    "const greeting = 'hello';\nconst count = 1;\nreturn { done: true, result: count };";
+
+  const storedWorkflow = (overrides: Partial<AgentWorkflow> = {}): AgentWorkflow => ({
+    approvedScriptHash: 'a1b2c3',
+    createdAt: 1_700_000_000_000,
+    description: 'Stored workflow',
+    id: 'wf-1',
+    name: 'Stored',
+    scopeOrigin: 'https://example.com',
+    script: storedScript,
+    updatedAt: 1_700_000_000_000,
+    ...overrides,
+  });
+
+  const changedDraft: PendingAgentWorkflowDraft = {
+    createdAt: 1_700_000_000_000,
+    description: 'Updated workflow',
+    name: 'My Update',
+    scopeOrigin: 'https://example.com',
+    script: "const greeting = 'hello';\nconst count = 2;\nreturn { done: true, result: count };",
+    workflowId: 'wf-1',
+  };
+
+  const identicalDraft: PendingAgentWorkflowDraft = {
+    ...changedDraft,
+    script: storedScript,
+  };
+
+  const createDraft: PendingAgentWorkflowDraft = {
+    createdAt: 1_700_000_000_000,
+    description: 'New workflow',
+    name: 'New Workflow',
+    scopeOrigin: 'https://example.com',
+    script: 'return { done: true, result: 1 };',
+  };
+
+  beforeEach(() => {
+    cleanup();
+    store = createStore();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders label, hunk header, context, add, delete, and syntax rows for a changed update', async () => {
+    store.set(pendingApprovalAtom, {
+      draft: changedDraft,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+    mockLoadAgentWorkflows.mockResolvedValue([storedWorkflow()]);
+
+    const { container, getByText, queryByText } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText('Script changes')).toBeDefined();
+    });
+
+    expect(getByText('@@ -1,3 +1,3 @@')).toBeDefined();
+
+    const contextRow = container.querySelector(
+      '.whitespace-pre-wrap.break-words.text-foreground-muted'
+    );
+    expect(contextRow?.textContent).toContain("const greeting = 'hello';");
+
+    const addRow = container.querySelector('.bg-diff-add-surface');
+    expect(addRow?.textContent).toContain('const count = 2;');
+
+    const delRow = container.querySelector('.bg-diff-delete-surface');
+    expect(delRow?.textContent).toContain('const count = 1;');
+
+    expect(
+      container.querySelector(
+        '.text-syntax-comment, .text-syntax-keyword, .text-syntax-number, .text-syntax-string'
+      )
+    ).not.toBeNull();
+
+    expect(queryByText('Approve and save')).toBeDefined();
+  });
+
+  it('renders the plain script with the Script label for a create', async () => {
+    store.set(pendingApprovalAtom, {
+      draft: createDraft,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+
+    const { container, getByText, queryByText } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText('Approve and save')).toBeDefined();
+    });
+
+    expect(getByText('Script')).toBeDefined();
+    expect(queryByText(/^@@ /)).toBeNull();
+    expect(container.querySelector('[aria-label="Script changes"]')).toBeNull();
+  });
+
+  it('renders the too-large note and plain script for an oversized update', async () => {
+    const hugeScript = Array.from({ length: 1201 }, (_unused, index) => `line ${index}`).join('\n');
+
+    store.set(pendingApprovalAtom, {
+      draft: { ...changedDraft, script: hugeScript },
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+    mockLoadAgentWorkflows.mockResolvedValue([storedWorkflow()]);
+
+    const { container, getByText, queryByText } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText('Script too large to diff line by line.')).toBeDefined();
+    });
+
+    expect(getByText('Script')).toBeDefined();
+    expect(container.querySelector('pre')).not.toBeNull();
+    expect(queryByText(/^@@ /)).toBeNull();
+    expect(container.querySelector('[aria-label="Script changes"]')).toBeNull();
+  });
+
+  it('renders the plain script with the Script (unchanged) label for an identical update', async () => {
+    store.set(pendingApprovalAtom, {
+      draft: identicalDraft,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+    mockLoadAgentWorkflows.mockResolvedValue([storedWorkflow()]);
+
+    const { container, getByText, queryByText } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText('Script (unchanged)')).toBeDefined();
+    });
+
+    expect(queryByText(/^@@ /)).toBeNull();
+    expect(container.querySelector('[aria-label="Script changes"]')).toBeNull();
+  });
+
+  it('renders the dismissible load error when loadAgentWorkflows rejects', async () => {
+    store.set(pendingApprovalAtom, {
+      draft: changedDraft,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+    mockLoadAgentWorkflows.mockRejectedValue(new Error('storage broke'));
+
+    const { getByText, queryByText } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText(
+          "Couldn't read the approved script. Dismiss and ask Kilo to save the workflow again."
+        )
+      ).toBeDefined();
+    });
+
+    expect(getByText('Dismiss')).toBeDefined();
     expect(queryByText('Approve and save')).toBeNull();
     expect(queryByText('Reject')).toBeNull();
   });
@@ -438,6 +734,116 @@ describe('workflow save card A error clears on B draft', () => {
       queryByText('The original workflow was deleted. This update cannot be saved.')
     ).toBeNull();
     expect(getByText('Approve and save')).toBeDefined();
+  });
+});
+
+describe('workflow save card persisted draft recovery', () => {
+  let store = createStore();
+
+  beforeEach(() => {
+    cleanup();
+    store = createStore();
+    vi.clearAllMocks();
+    mockLoadPendingWorkflowDraft.mockResolvedValue(void 0);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders a new approval card after a persisted missing-original update loaded on reload', async () => {
+    // Reload path loads a persisted update whose original workflow is missing.
+    mockLoadPendingWorkflowDraft.mockResolvedValue(updateDraft);
+    mockLoadAgentWorkflows.mockResolvedValue([]);
+
+    const { getByText, queryByText, rerender } = render(createElement(PendingWorkflowSaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText('The original workflow was deleted. This update cannot be saved.')
+      ).toBeDefined();
+    });
+
+    // A new approval entry arrives after the persisted draft loaded.
+    store.set(pendingApprovalAtom, {
+      draft: draftAlt,
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+
+    rerender(createElement(PendingWorkflowSaveCard));
+
+    // The new draft must render, not the persisted missing-original error.
+    await waitFor(() => {
+      expect(getByText('Second')).toBeDefined();
+    });
+
+    expect(
+      queryByText('The original workflow was deleted. This update cannot be saved.')
+    ).toBeNull();
+    expect(getByText('Approve and save')).toBeDefined();
+    expect(getByText('Reject')).toBeDefined();
+  });
+
+  it('does not diff a later approval card against the persisted draft old script', async () => {
+    const oldScript =
+      "const greeting = 'hello';\nconst count = 1;\nreturn { done: true, result: count };";
+
+    const persistedUpdate: PendingAgentWorkflowDraft = {
+      createdAt: 1_700_000_000_000,
+      description: 'Persisted update',
+      name: 'Persisted',
+      scopeOrigin: 'https://example.com',
+      script: "const greeting = 'hello';\nconst count = 2;\nreturn { done: true, result: count };",
+      workflowId: 'wf-1',
+    };
+
+    const stored: AgentWorkflow = {
+      approvedScriptHash: 'a1b2c3',
+      createdAt: 1_700_000_000_000,
+      description: 'Stored workflow',
+      id: 'wf-1',
+      name: 'Stored',
+      scopeOrigin: 'https://example.com',
+      script: oldScript,
+      updatedAt: 1_700_000_000_000,
+    };
+
+    // Reload path loads a persisted update and its old stored script.
+    mockLoadPendingWorkflowDraft.mockResolvedValue(persistedUpdate);
+    mockLoadAgentWorkflows.mockResolvedValue([stored]);
+
+    const { container, getByText, queryByText, rerender } = render(
+      createElement(PendingWorkflowSaveCard),
+      { wrapper: createWrapper(store) }
+    );
+
+    // The persisted card renders the diff against the old script.
+    await waitFor(() => {
+      expect(getByText('Script changes')).toBeDefined();
+    });
+
+    // A new create approval entry arrives after the persisted update loaded.
+    store.set(pendingApprovalAtom, {
+      draft: draft(),
+      kind: 'workflow',
+      settle: vi.fn(),
+    });
+
+    rerender(createElement(PendingWorkflowSaveCard));
+
+    // The new card must render, not the persisted update.
+    await waitFor(() => {
+      expect(getByText('Test Workflow')).toBeDefined();
+    });
+
+    // The new card must not diff against the persisted draft's old script.
+    expect(queryByText('Script changes')).toBeNull();
+    expect(getByText('Script')).toBeDefined();
+    expect(queryByText(/^@@ /)).toBeNull();
+    expect(container.querySelector('[aria-label="Script changes"]')).toBeNull();
   });
 });
 

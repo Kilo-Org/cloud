@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from './latest-model-aliases';
 
 let mockInceptionPromoRunning = true;
 
@@ -65,6 +66,20 @@ describe('checkOrganizationModelRestrictions', () => {
         modelId: 'anthropic/claude-3-opus',
         settings: {
           model_deny_list: ['anthropic/claude-3-opus'],
+        },
+        organizationPlan: 'enterprise',
+      });
+
+      expect(result.error).not.toBeNull();
+      expect(result.error?.status).toBe(404);
+    });
+
+    it('applies model deny lists to latest aliases', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+        settings: {
+          model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
+          provider_allow_list: ['anthropic'],
         },
         organizationPlan: 'enterprise',
       });

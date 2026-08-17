@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Building2 } from 'lucide-react-native';
+import { Building2 } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 

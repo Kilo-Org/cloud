@@ -1,5 +1,5 @@
 import * as WebBrowser from 'expo-web-browser';
-import { ShieldCheck } from 'lucide-react-native';
+import { ShieldCheck } from '@/components/ui/icons';
 import { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { toast } from 'sonner-native';

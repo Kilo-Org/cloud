@@ -15,7 +15,7 @@ import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { CustomLlmDefinitionSchema } from '@kilocode/db';
+import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
@@ -23,6 +23,9 @@ import {
   type AllocationSubject,
 } from '@/lib/ai-gateway/experiments/pick-variant';
 import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/google-service-account';
+import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
+import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 
 /**
  * Metadata about the experiment that resolved this provider, attached when
@@ -78,6 +81,7 @@ async function checkDirectBYOK(
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
+      apiUrlOverrides: directByok.base_url_overrides,
       apiKey: userByok[0].decryptedAPIKey,
       supportedChatApis: directByok.supported_chat_apis,
       responseTransforms: null,
@@ -93,7 +97,8 @@ async function checkDirectBYOK(
 
 async function checkCustomLlm(
   requestedModel: string,
-  organizationId: string
+  organizationId: string,
+  kiloUserId: string
 ): Promise<GetProviderProviderResult | null> {
   const [row] = await readDb
     .select()
@@ -104,17 +109,37 @@ async function checkCustomLlm(
     console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
   }
   const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
+  if (!customLlm || !(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
     return null;
   }
-  const resolvedCustomLlm =
-    typeof customLlm.api_key === 'string'
-      ? customLlm
-      : {
-          ...customLlm,
-          google_service_account: undefined,
-          api_key: await getGoogleServiceAccountAccessToken(customLlm.google_service_account),
-        };
+
+  if (!row?.encrypted_api_key) {
+    return null;
+  }
+
+  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(decrypted);
+  } catch {
+    return null;
+  }
+  const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
+  if (!parsedCredentials.success) {
+    return null;
+  }
+
+  let apiKey: string;
+  if (parsedCredentials.data.type === 'api_key') {
+    apiKey = parsedCredentials.data.api_key;
+  } else {
+    apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
+  }
+
+  const resolvedCustomLlm = {
+    ...customLlm,
+    api_key: apiKey,
+  };
   return {
     kind: 'provider',
     provider: buildDirectProvider(
@@ -229,8 +254,8 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     // this id. Fall through to non-experiment routing.
   }
 
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
+  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
+    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
     if (customLlmResult) {
       return customLlmResult;
     }

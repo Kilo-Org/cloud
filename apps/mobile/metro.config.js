@@ -6,7 +6,9 @@ const { withNativewind } = require('nativewind/metro');
 const monorepoRoot = path.resolve(__dirname, '../..');
 
 /** @type {import('expo/metro-config').MetroConfig} */
-const config = getSentryExpoConfig(__dirname);
+const config = getSentryExpoConfig(__dirname, {
+  autoWrapExpoRouterErrorBoundary: true,
+});
 
 // Allow Metro to resolve workspace files and pnpm's real package paths
 config.watchFolders = [...new Set([...(config.watchFolders || []), monorepoRoot])];
@@ -16,6 +18,10 @@ config.resolver.nodeModulesPaths = [
   ...(config.resolver.nodeModulesPaths || []),
   path.resolve(monorepoRoot, 'node_modules'),
 ];
+
+// Let Metro resolve the generated `drizzle/*.sql` migrations, which
+// `drizzle/migrations.js` imports and babel-plugin-inline-import inlines.
+config.resolver.sourceExts.push('sql');
 
 // Keep colocated tests out of the app bundle. Expo Router's require.context matches
 // every `.tsx` under `src/app`, so a `*.test.tsx` next to a route registers as a route

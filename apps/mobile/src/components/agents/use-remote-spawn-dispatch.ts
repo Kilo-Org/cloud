@@ -1,16 +1,7 @@
-import {
-  createContext,
-  createElement,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
+import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -18,9 +9,11 @@ import {
   buildCreateRemoteSessionInput,
   type CreateRemoteSessionInput,
   type CreateSessionOutcome,
+  type CreateSessionSpawnOptions,
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,
@@ -41,38 +34,19 @@ type InstancesRefetch = () => Promise<{
   data: { instances: InstancePickerInstance[] } | undefined;
 }>;
 
-type RemoteSpawnInheritance = {
-  mode?: string;
-  model?: string;
-  variant?: string;
-};
-
-const RemoteSpawnInheritanceContext = createContext<RemoteSpawnInheritance>({});
-
-/**
- * Supplies the new-session screen's current mode/model/variant to
- * `useRemoteSpawnDispatch` without requiring the sibling-owned
- * `use-new-session-share-remote` wrapper to forward those fields.
- */
-export function RemoteSpawnInheritanceProvider({
-  mode,
-  model,
-  variant,
-  children,
-}: RemoteSpawnInheritance & { children: ReactNode }) {
-  const value = useMemo(() => ({ mode, model, variant }), [mode, model, variant]);
-  return createElement(RemoteSpawnInheritanceContext.Provider, { value }, children);
-}
-
 type UseRemoteSpawnDispatchArgs = {
   organizationId: string | undefined;
   /**
-   * Optional override for inheritance fields. When omitted, values come from
-   * the nearest `RemoteSpawnInheritanceProvider` (the new-session screen).
+   * The current new-session agent mode for the spawn target. Omitted for
+   * callers without a mode (share-gate); the CLI then uses its default.
    */
   mode?: string;
-  model?: string;
-  variant?: string;
+  /**
+   * The validated wire model selection for the active target. Never inherited:
+   * the caller owns it because it depends on the target instance's catalog.
+   * Undefined means "let the CLI use its default".
+   */
+  selection?: ModelSelection;
   runOnInstance: InstancePickerInstance | null;
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   /**
@@ -93,6 +67,16 @@ type UseRemoteSpawnDispatchArgs = {
    * once. Optional: a caller with no composer omits it.
    */
   getSubmitPayload?: () => SharePayload | null;
+  /**
+   * Invoked when `onStart` admits the press-time snapshot and commits to a
+   * spawn attempt: the caller already passed voice settlement (it only calls
+   * `onStart` after the voice input settled) and `resolveRemoteSpawnAdmission`
+   * allowed the payload. A tap that never reaches a spawn — blocked
+   * admission, cancelled voice submit, or a `null` selection — never fires
+   * this, so callers can arm draft clearing on exactly the attempts that
+   * happened.
+   */
+  onSpawnAdmitted?: () => void;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -113,7 +97,9 @@ type UseRemoteSpawnDispatchResult = {
    * `onStart` for the route's "Start session" CTA when a remote
    * target is selected. No-op when the selection is `null` (the
    * route should have routed the cloud-agent path through
-   * `submitCreate` instead, but the guard is defensive).
+   * `submitCreate` instead, but the guard is defensive). Fires
+   * `onSpawnAdmitted` only once a spawn attempt is actually
+   * committed to (voice settlement + admission passed).
    */
   onStart: () => void;
   /**
@@ -142,29 +128,32 @@ type UseRemoteSpawnDispatchResult = {
  */
 export function useRemoteSpawnDispatch({
   organizationId,
-  mode: modeArg,
-  model: modelArg,
-  variant: variantArg,
+  mode,
+  selection,
   runOnInstance,
   setRunOnInstance,
   refetchInstances,
   instanceList,
   getSubmitPayload,
+  onSpawnAdmitted,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
-  const inheritance = useContext(RemoteSpawnInheritanceContext);
-  const mode = modeArg ?? inheritance.mode;
-  const model = modelArg ?? inheritance.model;
-  const variant = variantArg ?? inheritance.variant;
   // Route param is frozen at navigation: missing param means personal, not
   // "inherit live context". `?? null` so undefined does not fall through to
   // `useOrganization()` after a later org switch (share-gate keeps zero-arg
   // inherit by calling `useRemoteInstanceSpawn()` with no arg).
   const remoteSpawn: {
     status: RemoteInstanceSpawnStatus;
-    spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+    spawn: (
+      connectionId: string,
+      opts?: CreateRemoteSessionInput,
+      options?: CreateSessionSpawnOptions
+    ) => Promise<CreateSessionOutcome>;
   } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
+  // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
+  // the key and the relay dedupes the retry.
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)
   // outlives a single render; a plain closure over `runOnInstance` would
@@ -180,12 +169,16 @@ export function useRemoteSpawnDispatch({
     runOnInstanceRef.current = runOnInstance;
   }, [runOnInstance]);
 
+  // Read the press-time inputs through refs so `onStart` stays stable across
+  // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useRef(getSubmitPayload);
-  const spawnFieldsRef = useRef({ mode, model, variant, organizationId });
+  const spawnFieldsRef = useRef({ mode, selection, organizationId });
+  const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
-    spawnFieldsRef.current = { mode, model, variant, organizationId };
-  }, [getSubmitPayload, mode, model, variant, organizationId]);
+    spawnFieldsRef.current = { mode, selection, organizationId };
+    onSpawnAdmittedRef.current = onSpawnAdmitted;
+  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -203,15 +196,28 @@ export function useRemoteSpawnDispatch({
       toast.error(admission.toast);
       return;
     }
+    // Admission passed and voice settlement already happened at the caller:
+    // commit to the spawn attempt. The route arms its draft-clearing marker
+    // here, so a tap that stops at admission can never clear the draft.
+    onSpawnAdmittedRef.current?.();
     const createInput = buildCreateRemoteSessionInput({
       mode: fields.mode,
-      model: fields.model,
-      variant: fields.variant,
+      selection: fields.selection,
       organizationId: fields.organizationId,
     });
+    const operationKey = getKey(
+      JSON.stringify({
+        connectionId: selectedConnectionId,
+        mode: fields.mode,
+        selection: fields.selection,
+        organizationId: fields.organizationId,
+      })
+    );
     void (async () => {
-      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput);
+      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, { operationKey });
       if (outcome.status === 'ready') {
+        // The spawn settled; the next submit is a fresh intent.
+        rotateKey();
         const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
         if (submitPayload === null) {
           router.replace(spawnedPath);
@@ -224,6 +230,8 @@ export function useRemoteSpawnDispatch({
         return;
       }
       if (outcome.status === 'nonRetryable') {
+        // A typed non-retryable rejection ends the intent.
+        rotateKey();
         toast.error(REMOTE_SPAWN_NON_RETRYABLE_TOAST);
         return;
       }
@@ -271,6 +279,8 @@ export function useRemoteSpawnDispatch({
     router,
     runOnInstance,
     setRunOnInstance,
+    getKey,
+    rotateKey,
   ]);
 
   const onChangeRunOnInstance = useCallback(

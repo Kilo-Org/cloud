@@ -97,12 +97,15 @@ describe('keep-screen-on store', () => {
     const store = await makeStore();
 
     store.set(false);
+    await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('keep-session-screen-on', 'false');
 
     store.set(true);
+    await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('keep-session-screen-on', 'true');
 
     store.clear();
+    await flushMicrotasks();
     expect(deleteItemAsync).toHaveBeenCalledWith('keep-session-screen-on');
     expect(store.get()).toBe(true);
   });

@@ -65,6 +65,15 @@ const AT_RISK_WAL_STATUSES = new Set(['unreserved', 'lost']);
 const PROBE_TIMEOUT_MS = 5_000;
 
 /**
+ * Snowflake replication is temporarily disabled. Keep collecting and logging
+ * its slot state, but do not fail the health check until replication is enabled
+ * again. Other logical replication slots remain monitored.
+ */
+export function isReplicationSlotMonitored(slotName: string): boolean {
+  return !slotName.startsWith('snowflake_');
+}
+
+/**
  * Connection config for a single probe.
  *
  * IMPORTANT: do not set `statement_timeout` here. node-postgres transmits
@@ -381,7 +390,7 @@ export async function collectReplicationHealth(options?: {
   const healthy =
     errors.length === 0 &&
     replicas.every(replica => replica.status === 'ok') &&
-    slots.every(slot => !slot.at_risk);
+    slots.every(slot => !isReplicationSlotMonitored(slot.slot_name) || !slot.at_risk);
 
   return {
     healthy,

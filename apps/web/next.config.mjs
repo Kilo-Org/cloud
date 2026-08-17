@@ -195,6 +195,10 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source: '/s/:path*',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
     ];
   },
 

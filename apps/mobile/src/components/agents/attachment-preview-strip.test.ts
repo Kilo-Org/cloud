@@ -35,6 +35,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
     expect(desc.sizeText).toBe('1 KB');
     expect(desc.progressText).toBe('Uploaded');
     expect(desc.message).toBeNull();
+    expect(desc.accessibilityLabel).toBe('doc.pdf, Uploaded');
     expect(desc.showRetry).toBe(false);
     expect(desc.showRemove).toBe(true);
   });
@@ -47,6 +48,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
     });
     expect(desc.progressText).toBe('42%');
     expect(desc.message).toBeNull();
+    expect(desc.accessibilityLabel).toBe('doc.pdf, 42%');
     expect(desc.showRetry).toBe(false);
     expect(desc.showRemove).toBe(true);
     // Size and filename are still surfaced so the user knows what is uploading.
@@ -62,6 +64,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
     });
     expect(desc.progressText).toBe('Uploading…');
     expect(desc.message).toBeNull();
+    expect(desc.accessibilityLabel).toBe('doc.pdf, Uploading…');
     expect(desc.showRetry).toBe(false);
   });
 
@@ -75,6 +78,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
     expect(desc.sizeText).toBe('1 KB');
     expect(desc.progressText).toBe('0%');
     expect(desc.message).toBeNull();
+    expect(desc.accessibilityLabel).toBe('doc.pdf, 0%');
   });
 });
 
@@ -87,6 +91,7 @@ describe('describeAttachmentChip — unhappy, retryable (network/timeout/408/429
       terminal: false,
     });
     expect(desc.message).toBe('Upload failed. Tap to retry.');
+    expect(desc.accessibilityLabel).toBe('doc.pdf, Upload failed. Tap to retry.');
     expect(desc.showRetry).toBe(true);
     expect(desc.showRemove).toBe(true);
     // Size + filename are still surfaced so the user knows which file failed.
@@ -104,6 +109,7 @@ describe('describeAttachmentChip — unhappy, retryable (network/timeout/408/429
     });
     expect(desc.showRetry).toBe(false);
     expect(desc.message).toBe("This file can't be uploaded.");
+    expect(desc.accessibilityLabel).toBe("doc.pdf, This file can't be uploaded.");
   });
 });
 
@@ -116,6 +122,7 @@ describe('describeAttachmentChip — unhappy, non-retryable (presign BAD_REQUEST
       terminal: true,
     });
     expect(desc.message).toBe("This file can't be uploaded.");
+    expect(desc.accessibilityLabel).toBe("doc.pdf, This file can't be uploaded.");
     expect(desc.showRetry).toBe(false);
     // Remove (X) MUST stay available so the user can clear the chip and
     // unblock send.

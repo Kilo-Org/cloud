@@ -12,13 +12,13 @@ import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Me
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
-import { useFonts } from 'expo-font';
+import { loadAsync, useFonts } from 'expo-font';
 import {
+  ErrorBoundary as ExpoRouterErrorBoundary,
   type Href,
   Slot,
   ThemeProvider,
   useGlobalSearchParams,
-  useNavigationContainerRef,
   usePathname,
   useRouter,
   useSegments,
@@ -30,8 +30,10 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
@@ -40,12 +42,17 @@ import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
 import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
-import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
+import {
+  applyThemePreference,
+  preloadThemePreference,
+  useThemePreference,
+} from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
 import {
@@ -53,6 +60,8 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
+import { queryClient } from '@/lib/query-client';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -68,12 +77,13 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
+import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
-const navigationIntegration = Sentry.reactNavigationIntegration({
+const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
 
@@ -82,8 +92,15 @@ installE2EWebSocketLatency();
 
 // DEC-02 consent rule: crash and error reporting is mandatory, so
 // `initSentry(false)` runs at module scope — a crash during bootstrap
-// must still be reported. The optional group is `tracesSampleRate`
-// only. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// must still be reported. The optional group is `tracesSampleRate` plus
+// MASKED session replay and error screenshots (DEC-02 amendment, owner
+// decision 2026-08-17); the replay integration is only registered once
+// optional consent is accepted, so no replay code runs before the
+// decision. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// `enableTombstone` is Android 12+ only; NDK stays on for older devices.
+// `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
+// hangs are not reported twice. Native init in the Expo plugin captures
+// crashes before JS loads.
 //
 // In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
 // — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
@@ -91,16 +108,30 @@ installE2EWebSocketLatency();
 //   `app_startup` event in src/lib/startup-timing.ts.
 function initSentry(optionalConsented: boolean) {
   Sentry.init({
-    dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
+    dsn: SENTRY_DSN,
 
     enabled: true,
 
     sendDefaultPii: false,
 
+    enableTombstone: true,
+    enableMetricKit: true,
+    enableAppHangTracking: false,
+
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),
 
-    integrations: [navigationIntegration],
+    integrations: optionalConsented
+      ? [
+          expoRouterIntegration,
+          Sentry.deeplinkIntegration(),
+          Sentry.mobileReplayIntegration({
+            maskAllText: true,
+            maskAllImages: true,
+            maskAllVectors: true,
+          }),
+        ]
+      : [expoRouterIntegration, Sentry.deeplinkIntegration()],
     enableNativeFramesTracking: false,
 
     beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
@@ -114,10 +145,27 @@ function initSentry(optionalConsented: boolean) {
 
 initSentry(false);
 
+// Kick the font load off at module scope so it overlaps JS bootstrap; the
+// same family names make `loadAsync` dedupe with the `useFonts` call in
+// RootLayoutNav. A failure here is ignored — `useFonts` stays the owner of
+// `fontsError`.
+function preloadStartupFonts(): void {
+  void (async () => {
+    try {
+      await loadAsync({ JetBrainsMono_500Medium, JetBrainsMono_600SemiBold });
+    } catch {
+      // useFonts stays the owner of fontsError.
+    }
+  })();
+}
+
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+prefetchCurrentUser();
+preloadThemePreference();
+preloadStartupFonts();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();
@@ -155,6 +203,13 @@ function RootLayoutNav() {
       Sentry.captureException(fontsError);
     }
   }, [fontsError]);
+
+  // Cold-start read-cache restore: best effort, never blocks startup. Starts
+  // before the auth gate resolves so allowlisted queries can hydrate under
+  // the splash; the authenticated mount abandons or rescopes it on identity.
+  useEffect(() => {
+    void restorePersistedCacheOnColdStart(queryClient);
+  }, []);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
@@ -302,7 +357,10 @@ function RootLayoutNav() {
     accountId: userId,
     optionalConsent,
   });
-  useScreenTracking();
+  // Screen capture must wait for consent: analytics eligibility is decided
+  // only after the account's consent decision has loaded without error.
+  const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
+  useScreenTracking(bootstrapSettled);
 
   useEffect(() => {
     if (shareIntentError) {
@@ -368,7 +426,6 @@ function RootLayoutNav() {
       } else {
         markStartupComplete('force-update');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
       }
       return;
     }
@@ -382,7 +439,6 @@ function RootLayoutNav() {
       if (inAuthGroup) {
         markStartupComplete('login');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
       } else {
         router.replace('/(auth)/login');
       }
@@ -390,14 +446,12 @@ function RootLayoutNav() {
       if (userIdError) {
         markStartupComplete('user-error');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
         return;
       }
 
       if (consentCheckError) {
         markStartupComplete('consent-error');
         setStartupFinished(true);
-        void SplashScreen.hideAsync();
         return;
       }
 
@@ -409,7 +463,6 @@ function RootLayoutNav() {
         if (onConsentRoute) {
           markStartupComplete('consent');
           setStartupFinished(true);
-          void SplashScreen.hideAsync();
         } else {
           router.replace('/(app)/consent' as Href);
         }
@@ -423,7 +476,6 @@ function RootLayoutNav() {
 
       markStartupComplete('app');
       setStartupFinished(true);
-      void SplashScreen.hideAsync();
       // Navigate to pending deep link (cold start universal link / notification tap)
       const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
       if (pendingNavigation) {
@@ -497,6 +549,7 @@ function RootLayoutNav() {
   const needsAppRedirect = token != null && inAuthGroup;
   const hasUserBootstrapError = token != null && userIdError;
   const hasConsentBootstrapError = token != null && consentCheckError !== null;
+  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
   const consentLoading =
     token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
   const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
@@ -514,6 +567,38 @@ function RootLayoutNav() {
     !hasUserBootstrapError &&
     !hasConsentBootstrapError &&
     (isLoading || needsRedirect || consentLoading);
+
+  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
+  // both accessibility trees. On the hidden → visible transition,
+  // `announceForA11y` is the deterministic entry context for screen-reader
+  // users, and the wrapper focus is best-effort (`moveA11yFocus` returns false
+  // when the platform declines — no retry), deferred to the next frame so the
+  // revealed tree is measurable. Per-screen heading/first-control focus is
+  // owned by the screens themselves; the gate cannot know the active screen's
+  // heading.
+  //
+  // The transition is skipped while a bootstrap error is shown: the wrapper
+  // is unmounted then (the error screen replaces it), so "Content ready"
+  // would be a false announcement and the wrapper focus has no target. The
+  // cleanup cancels the pending frame, which React runs before any later
+  // render's frame can fire, so an interrupted reveal never focuses a stale
+  // wrapper.
+  const wrapperRef = useRef<View>(null);
+  const wasHiddenRef = useRef(hidden);
+  useEffect(() => {
+    const wasHidden = wasHiddenRef.current;
+    wasHiddenRef.current = hidden;
+    if (!wasHidden || hidden || hasBootstrapError) {
+      return undefined;
+    }
+    announceForA11y('Content ready');
+    const frame = requestAnimationFrame(() => {
+      moveA11yFocus(wrapperRef);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [hidden, hasBootstrapError]);
 
   if (hasUserBootstrapError) {
     return (
@@ -554,6 +639,12 @@ function RootLayoutNav() {
 
   return (
     <View
+      ref={wrapperRef}
+      // `opacity-0` + `pointerEvents` hide the redirecting tree visually and
+      // from touch, but not from screen readers. Leave both accessibility
+      // trees while hidden (iOS, then Android).
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
       className={`flex-1 ${hidden ? 'opacity-0' : 'opacity-100'}`}
       pointerEvents={hidden ? 'none' : 'auto'}
     >
@@ -563,14 +654,7 @@ function RootLayoutNav() {
 }
 
 function RootLayout() {
-  const ref = useNavigationContainerRef();
   const navigationTheme = useNavigationTheme();
-
-  useEffect(() => {
-    if (ref.current) {
-      navigationIntegration.registerNavigationContainer(ref);
-    }
-  }, [ref]);
 
   useEffect(() => {
     const subscription = setupNotificationResponseHandler();
@@ -585,10 +669,13 @@ function RootLayout() {
         <AppRootProviders>
           <StatusBar style="auto" />
           <RootLayoutNav />
+          <AnimatedSplashOverlay />
         </AppRootProviders>
       </ThemeProvider>
     </ShareIntentProvider>
   );
 }
+
+export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(ExpoRouterErrorBoundary);
 
 export default Sentry.wrap(RootLayout);

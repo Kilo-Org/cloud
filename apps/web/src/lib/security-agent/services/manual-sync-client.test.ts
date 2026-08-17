@@ -59,6 +59,59 @@ describe('submitManualSecuritySync', () => {
     });
   });
 
+  it('passes the stable operation key to the Worker when present', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          messageId: 'message-123',
+        }),
+    });
+
+    await submitManualSecuritySync({
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+      origin: 'dashboard_refresh',
+      operationKey: 'retry-safe-key-123',
+    });
+
+    expect(JSON.parse(mockFetch.mock.calls[0]?.[1]?.body as string)).toEqual({
+      schemaVersion: 1,
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+      origin: 'dashboard_refresh',
+      operationKey: 'retry-safe-key-123',
+    });
+  });
+
+  it('omits the operation key from the request body when absent', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          messageId: 'message-123',
+        }),
+    });
+
+    await submitManualSecuritySync({
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      actor: { id: 'user-123' },
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body as string);
+    expect(body).not.toHaveProperty('operationKey');
+  });
+
   it('throws a TRPCError (not a raw Error) when fetch rejects with a transport error', async () => {
     mockFetch.mockRejectedValue(new Error('network down'));
 
@@ -70,7 +123,7 @@ describe('submitManualSecuritySync', () => {
       })
     ).rejects.toMatchObject({
       name: 'TRPCError',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'BAD_GATEWAY',
     });
 
     try {
@@ -110,7 +163,99 @@ describe('submitManualSecuritySync', () => {
       captured = e;
     }
     expect(captured).toBeInstanceOf(TRPCError);
-    expect((captured as TRPCError).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('classifies a 5xx status as ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ error: 'boom' }),
+    });
+
+    await expect(
+      submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'BAD_GATEWAY',
+    });
+  });
+
+  it('classifies the known disabled-routing 503 as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () =>
+        Promise.resolve({ success: false, error: 'Manual sync Worker routing is disabled' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((captured as TRPCError).message).toContain('503');
+    // The known body is matched, never echoed back into the message.
+    expect((captured as TRPCError).message).not.toContain('disabled');
+    expect((captured as TRPCError).message).not.toContain('security-sync.test');
+    expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('keeps a 503 with a non-matching body ambiguous transport (BAD_GATEWAY)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ success: false, error: 'gateway upstream unavailable' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
+    expect((captured as TRPCError).message).toContain('503');
+  });
+
+  it('classifies a 4xx status as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'invalid request' }),
+    });
+
+    let captured: unknown;
+    try {
+      await submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      });
+      throw new Error('expected throw');
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeInstanceOf(TRPCError);
+    expect((captured as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((captured as TRPCError).message).toContain('400');
+    expect((captured as TRPCError).message).not.toContain('invalid request');
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });
@@ -133,7 +278,7 @@ describe('submitManualSecuritySync', () => {
       captured = e;
     }
     expect(captured).toBeInstanceOf(TRPCError);
-    expect((captured as TRPCError).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
     // Generic status-bearing message; must not echo the worker error or our secret
     expect((captured as TRPCError).message).toContain('500');
     expect((captured as TRPCError).message).not.toContain('boom');
@@ -159,7 +304,7 @@ describe('submitManualSecuritySync', () => {
       captured = e;
     }
     expect(captured).toBeInstanceOf(TRPCError);
-    expect((captured as TRPCError).code).toBe('INTERNAL_SERVER_ERROR');
+    expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });
@@ -170,7 +315,7 @@ describe('submitManualSecuritySync env configuration', () => {
     mockFetch.mockReset();
   });
 
-  it('throws a TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
+  it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
     jest.resetModules();
     jest.doMock('@/lib/config.server', () => ({
       INTERNAL_API_SECRET: 'test-internal-secret',
@@ -188,12 +333,12 @@ describe('submitManualSecuritySync env configuration', () => {
     }
     expect(captured).toBeDefined();
     expect((captured as { name?: string }).name).toBe('TRPCError');
-    expect((captured as { code?: string }).code).toBe('INTERNAL_SERVER_ERROR');
-    expect((captured as Error).message).toContain('not configured');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
     expect((captured as Error).message).not.toContain('test-internal-secret');
   });
 
-  it('throws a TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
+  it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
     jest.resetModules();
     jest.doMock('@/lib/config.server', () => ({
       INTERNAL_API_SECRET: '',
@@ -211,7 +356,7 @@ describe('submitManualSecuritySync env configuration', () => {
     }
     expect(captured).toBeDefined();
     expect((captured as { name?: string }).name).toBe('TRPCError');
-    expect((captured as { code?: string }).code).toBe('INTERNAL_SERVER_ERROR');
-    expect((captured as Error).message).toContain('not configured');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
   });
 });

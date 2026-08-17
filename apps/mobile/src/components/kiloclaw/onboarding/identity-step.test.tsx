@@ -60,7 +60,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: 'LinearTransition',
 }));
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   ChevronDown: () => null,
   ChevronRight: () => null,
   ChevronUp: () => null,

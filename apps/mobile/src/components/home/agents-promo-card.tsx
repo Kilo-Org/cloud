@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bot, ChevronRight } from 'lucide-react-native';
+import { Bot, ChevronRight } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';

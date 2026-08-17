@@ -5,6 +5,7 @@ import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import { isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
+import { isLongCatModel } from '@/lib/ai-gateway/providers/longcat';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
@@ -107,6 +108,9 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   }
   if (isKimiModel(model)) {
     return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
+  }
+  if (isLongCatModel(model)) {
+    return REASONING_VARIANTS_BINARY;
   }
   if (model.includes('laguna')) {
     return REASONING_VARIANTS_BINARY;

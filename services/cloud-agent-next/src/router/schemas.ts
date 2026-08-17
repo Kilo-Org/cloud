@@ -544,6 +544,13 @@ export const PrepareSessionInput = z
     initialPayload: SendMessageV2Payload.optional().describe(
       'Discriminated initial execution payload - command variant allows starting a session with a slash command instead of a free-text prompt'
     ),
+    operationKey: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'Client-generated UUID, stable across retries of one user intent. Admitted into the operation ledger only when autoInitiate is also true; otherwise ignored.'
+      ),
   })
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
@@ -642,6 +649,12 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  replayed: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when this response is a ledger replay of an already-settled create with the same operationKey'
+    ),
 });
 
 /**

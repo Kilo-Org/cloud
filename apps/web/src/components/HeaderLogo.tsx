@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
@@ -18,6 +18,8 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
   const pathname = usePathname();
   const [isHovered, setIsHovered] = useState(false);
 
+  const shouldReduceMotion = useReducedMotion();
+
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (pathname === href) {
       e.preventDefault();
@@ -30,8 +32,8 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
       <motion.div
         className="relative flex size-12 flex-none items-center justify-center overflow-hidden font-bold"
         aria-hidden="true"
-        animate={{ rotate: isHovered ? 90 : 0 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        animate={shouldReduceMotion ? {} : { rotate: isHovered ? 90 : 0 }}
+        transition={shouldReduceMotion ? {} : { duration: 0.3, ease: 'easeInOut' }}
         style={{ transformStyle: 'preserve-3d' }}
       >
         <AnimatePresence>

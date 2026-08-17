@@ -17,6 +17,18 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
+/* eslint-disable import/first */
+import * as SecureStore from 'expo-secure-store';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { chainSave } from '@/lib/hooks/save-chain';
+/* eslint-enable import/first */
+
+async function flushMicrotasks(): Promise<void> {
+  await new Promise(resolve => {
+    setImmediate(resolve);
+  });
+}
+
 describe('consent storage', () => {
   beforeEach(() => {
     store.clear();
@@ -246,5 +258,92 @@ describe('consent storage', () => {
     await acceptConsent('user-1');
 
     expect(changes).toEqual([]);
+  });
+
+  it('a consent write queued across an auth epoch bump still lands', async () => {
+    const { CURRENT_CONSENT_VERSION, acceptConsent } = await import('./consent');
+    let releaseBlock: (() => void) | undefined = undefined;
+    const gate = new Promise<void>(resolve => {
+      releaseBlock = resolve;
+    });
+
+    // Hold the user's consent chain open, then queue acceptConsent behind it.
+    // Consent is `account-metadata (persistent)`: it must SURVIVE sign-out,
+    // so the queued write runs even though the epoch moved while it waited.
+    const blocker = chainSave('consent-accepted-757365722d31', async () => {
+      await gate;
+    });
+    const queued = acceptConsent('user-1');
+
+    bumpAuthEpoch();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    releaseBlock!();
+    await Promise.all([blocker, queued]);
+
+    expect(store.get('consent-accepted-757365722d31')).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+    );
+  });
+
+  it('serializes concurrent consent writes for the same user in FIFO order', async () => {
+    const { CURRENT_CONSENT_VERSION, acceptConsent } = await import('./consent');
+    let releaseFirst: (() => void) | undefined = undefined;
+    const gate = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    let firstWriteStarted = false;
+
+    // Block the first write so the second can be observed waiting in the
+    // queue instead of interleaving with it.
+    vi.mocked(SecureStore.setItemAsync).mockImplementationOnce(async () => {
+      firstWriteStarted = true;
+      await gate;
+    });
+
+    const first = acceptConsent('user-1', false);
+    const second = acceptConsent('user-1', true);
+
+    await flushMicrotasks();
+    // The first write holds the key's chain; the second has not started.
+    expect(firstWriteStarted).toBe(true);
+    expect(store.has('consent-accepted-757365722d31')).toBe(false);
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    releaseFirst!();
+    await Promise.all([first, second]);
+
+    // Both writes landed without interleaving; the queued one is last.
+    expect(store.get('consent-accepted-757365722d31')).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+    );
+  });
+
+  it('does not restore a consent record after a concurrent revoke', async () => {
+    const { acceptConsent, hasAcceptedConsent, revokeConsent, setOptionalConsent } =
+      await import('./consent');
+    let releaseBlocker: (() => void) | undefined = undefined;
+    const gate = new Promise<void>(resolve => {
+      releaseBlocker = resolve;
+    });
+
+    await acceptConsent('user-1', false);
+
+    // Hold the user's consent chain open, then queue a revoke followed by a
+    // stale optional-consent update. The update reads inside the same per-user
+    // chain, so it observes the revoke's delete and must skip its write.
+    const blocker = chainSave('consent-accepted-757365722d31', async () => {
+      await gate;
+    });
+    const revoke = revokeConsent('user-1');
+    const optionalUpdate = setOptionalConsent('user-1', true);
+
+    await flushMicrotasks();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
+    releaseBlocker!();
+    await Promise.all([blocker, revoke, optionalUpdate]);
+
+    // Revoke is authoritative: the queued optional update must not recreate it.
+    expect(await hasAcceptedConsent('user-1')).toBe(false);
+    expect(store.has('consent-accepted-757365722d31')).toBe(false);
   });
 });

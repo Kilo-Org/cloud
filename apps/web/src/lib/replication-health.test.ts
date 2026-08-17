@@ -9,6 +9,7 @@ jest.mock('@/lib/drizzle', () => ({
 import {
   classifyReplicaRow,
   collectReplicationHealth,
+  isReplicationSlotMonitored,
   PROBE_POOL_CONFIG,
   probeReplica,
   REPLICA_LAG_ALERT_SECONDS,
@@ -128,6 +129,14 @@ describe('classifyReplicaRow', () => {
   });
 });
 
+describe('isReplicationSlotMonitored', () => {
+  it('temporarily ignores Snowflake slots only', () => {
+    expect(isReplicationSlotMonitored('snowflake_backend_slot')).toBe(false);
+    expect(isReplicationSlotMonitored('snowflake_connector_gfqyzuertw')).toBe(false);
+    expect(isReplicationSlotMonitored('other_logical_consumer')).toBe(true);
+  });
+});
+
 describe('collectReplicationHealth', () => {
   const originalVercelEnv = process.env.VERCEL_ENV;
 
@@ -227,7 +236,7 @@ describe('collectReplicationHealth', () => {
       [walSenderRow()],
       [
         slotRow(),
-        slotRow({ slot_name: 'snowflake_connector_gfqyzuertw', active: false, wal_status: 'lost' }),
+        slotRow({ slot_name: 'other_logical_consumer', active: false, wal_status: 'lost' }),
       ]
     );
 
@@ -237,8 +246,25 @@ describe('collectReplicationHealth', () => {
     });
 
     expect(report.healthy).toBe(false);
-    const lost = report.slots.find(s => s.slot_name === 'snowflake_connector_gfqyzuertw');
+    const lost = report.slots.find(s => s.slot_name === 'other_logical_consumer');
     expect(lost?.at_risk).toBe(true);
+  });
+
+  it('keeps Snowflake slot telemetry without failing health while replication is disabled', async () => {
+    mockPrimary(
+      [walSenderRow()],
+      [slotRow({ slot_name: 'snowflake_backend_slot', active: false, wal_status: 'lost' })]
+    );
+
+    const report = await collectReplicationHealth({
+      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      probe: async target => okProbe(target.name),
+    });
+
+    expect(report.healthy).toBe(true);
+    expect(report.slots).toEqual([
+      expect.objectContaining({ slot_name: 'snowflake_backend_slot', at_risk: true }),
+    ]);
   });
 
   it('isolates a throwing probe as an unreachable replica without blanking primary data', async () => {

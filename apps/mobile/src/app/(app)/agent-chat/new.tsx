@@ -1,10 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+/* eslint-disable max-lines -- the route coordinates the new-session draft, model selection, and submit lifecycle. */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
+import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import {
   NewSessionModelProvider,
@@ -16,11 +19,23 @@ import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
-import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import {
+  clearDraft,
+  NEW_SESSION_DRAFT_KEY,
+  resolvePrefillOverDraft,
+  saveDraft,
+} from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
+import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
+import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
@@ -46,6 +61,7 @@ function NewSessionScreenBody() {
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
+  const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasPrompt, setHasPrompt] = useState(false);
@@ -54,12 +70,68 @@ function NewSessionScreenBody() {
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
+  // Durable new-session draft. The form mounts immediately — typing must never
+  // wait on the `user.getMe` query — and the stored draft settles behind it.
+  // The prompt input is uncontrolled, so a stored draft that arrives after
+  // mount reaches it only through the remount keyed on `promptSeed` below, and
+  // that remount happens only while the user has typed nothing.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const draftState = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: NEW_SESSION_DRAFT_KEY,
+  });
+
+  // Share-prefill precedence, resolved once before the prompt mounts. The
+  // prompt's own `useSharePrefill` still delivers the shared files and
+  // re-applies the same text idempotently.
+  const [sharePrefillText] = useState<string | null>(() =>
+    shareId ? (peekSharePayload(shareId)?.text ?? null) : null
+  );
+  // The share prefill is known synchronously and always beats a stored draft,
+  // so it seeds the first render; the stored draft only exists once the load
+  // settles.
+  const initialPrompt = resolvePrefillOverDraft(
+    sharePrefillText,
+    draftState.settled ? draftState.text : null
+  );
+
+  // Save the new-session draft debounced on every text change, and flush the
+  // pending write when the app leaves `active`. The draft's fate on unmount —
+  // flush to preserve, or clear after a consumed remote spawn — is owned by
+  // `useRemoteSpawnDraftCleanup`.
+  useDraftFlushOnBackground(userId, NEW_SESSION_DRAFT_KEY, false);
+
   const {
     models,
     isLoading: isLoadingModels,
     isError: isModelsError,
     refetch: refetchModels,
   } = useAvailableModels(organizationId);
+  const instanceCatalog = useInstanceModelCatalog(runOnInstance?.connectionId ?? null);
+  const modelView = useMemo(
+    () =>
+      resolveNewSessionModelView({
+        isRemoteTarget: runOnInstance !== null,
+        catalog: instanceCatalog.catalog,
+        catalogLoading: instanceCatalog.isLoading,
+        gatewayModels: models,
+        gatewayModelsLoading: isLoadingModels,
+        gatewayModel: model,
+        gatewayVariant: variant,
+        remoteOverride,
+      }),
+    [
+      runOnInstance,
+      instanceCatalog.catalog,
+      instanceCatalog.isLoading,
+      models,
+      isLoadingModels,
+      model,
+      variant,
+      remoteOverride,
+    ]
+  );
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { saveModel } = usePersistedAgentModel();
   const attachments = useAgentAttachmentUpload({ organizationId });
@@ -97,28 +169,98 @@ function NewSessionScreenBody() {
     [instancesData]
   );
 
+  // A successful session creation owns clearing the new-session draft; a
+  // failure must preserve it for the retry.
+  const handleCreated = useCallback(() => {
+    if (userId) {
+      void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+    }
+  }, [userId]);
+
+  // Remote spawn success lives inside the spawn dispatch (it replaces the
+  // screen). The route arms the attempt marker only after the dispatch
+  // admits the spawn — voice settlement and remote admission already
+  // passed — and clears the consumed draft when the screen unmounts. A
+  // failed spawn keeps the screen mounted (draft preserved for retry); a
+  // blocked admission or cancelled voice submit never arms the marker, so
+  // the unmount flush preserves the draft.
+  const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({ userId });
+
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
     mode,
     model,
     organizationId,
+    onCreated: handleCreated,
     selectedRepo,
     setIsCreating,
     variant,
   });
 
+  // Seed the route-owned prompt state from the restored draft once the load
+  // settles: the prompt input notifies the route only on typing, so without
+  // this the creator's `promptRef` stays empty and the Start button stays
+  // disabled (and a remote start would send an empty prompt).
+  //
+  // `pending` → the load has not settled; `settled` → the input already holds
+  // the right text (nothing was stored, the user typed first, or the share
+  // prefill seeded the first render); `restore` → a stored draft has to reach
+  // the uncontrolled input, which only a remount can do. Only `restore`
+  // changes the form key, so the settled path never remounts and never
+  // destroys typing.
+  const [promptSeed, setPromptSeed] = useState<'pending' | 'settled' | 'restore'>('pending');
+  useEffect(() => {
+    if (!draftState.settled) {
+      if (promptSeed !== 'pending') {
+        // The identity or entity changed, so the input remounts empty: clear
+        // the route-owned prompt state with it, or Start would submit text the
+        // user can no longer see.
+        promptRef.current = '';
+        setHasPrompt(false);
+        setPromptSeed('pending');
+      }
+      return;
+    }
+    if (promptSeed !== 'pending') {
+      return;
+    }
+    if (promptRef.current !== '' || !initialPrompt) {
+      setPromptSeed('settled');
+      return;
+    }
+    // `hasPrompt` is exactly what `resolveNewSessionPromptForCreate` re-derives
+    // on submit, so seeding both from one value keeps the Start gate and the
+    // submitted text in agreement.
+    promptRef.current = initialPrompt;
+    setHasPrompt(initialPrompt.trim().length > 0);
+    // A share prefill already seeded the first render; only a stored draft
+    // needs the remount.
+    setPromptSeed(initialPrompt === sharePrefillText ? 'settled' : 'restore');
+  }, [draftState.settled, initialPrompt, promptRef, promptSeed, sharePrefillText]);
+
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
     organizationId,
+    mode,
     runOnInstance,
     setRunOnInstance,
     refetchInstances,
     instanceList,
     promptRef,
     attachments: attachments.attachments,
+    selection: modelView.spawnSelection,
+    // Arms the draft-clearing marker only when the dispatch admits the spawn:
+    // a blocked admission or cancelled voice submit never clears the draft.
+    onSpawnAdmitted: markRemoteSpawnAttempted,
   });
 
   const handleModelSelect = useCallback(
-    (modelId: string, newVariant: string) => {
+    (modelId: string, newVariant: string, pickerSelection?: ModelPickerSelection) => {
+      setRemoteOverride(
+        pickerSelection ? createRemoteModelOverride(pickerSelection.option, newVariant) : null
+      );
+      if (pickerSelection?.option.overrideSource === 'cli-catalog') {
+        return;
+      }
       setModel(modelId);
       setVariant(newVariant);
       saveModel(organizationId, { model: modelId, variant: newVariant });
@@ -127,10 +269,21 @@ function NewSessionScreenBody() {
     [organizationId, saveModel, persistServerLastSelected, setModel, setVariant]
   );
 
+  const handleRunOnChange = useCallback(
+    (next: InstancePickerInstance | null) => {
+      setRemoteOverride(null);
+      handleRunOnInstanceChange(next);
+    },
+    [handleRunOnInstanceChange]
+  );
+
   function handlePromptChange(text: string) {
     promptRef.current = text;
     const nextHasPrompt = text.trim().length > 0;
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
+    if (userId) {
+      saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
+    }
   }
 
   const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
@@ -170,7 +323,11 @@ function NewSessionScreenBody() {
 
   const isRemoteTargetSelected = runOnInstance !== null;
   const isStartDisabled = isRemoteTargetSelected
-    ? remoteSpawn.isSpawningRemote || isSubmitting || attachments.hasFailedAttachments
+    ? remoteSpawn.isSpawningRemote ||
+      isSubmitting ||
+      attachments.hasFailedAttachments ||
+      modelView.isSelectionUnavailable ||
+      instanceCatalog.isLoading
     : resolveNewSessionSubmitDisabled({
         attachmentsHasFailed: attachments.hasFailedAttachments,
         attachmentsIsUploading: attachments.isUploading,
@@ -197,16 +354,17 @@ function NewSessionScreenBody() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="New session" />
       <NewSessionConfigureForm
+        key={promptSeed === 'restore' ? 'draft' : 'empty'}
         attachments={attachments.attachments}
         attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
         isCreating={isCreating}
         isModelsError={isModelsError}
-        isLoadingModels={isLoadingModels}
+        isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
         mode={mode}
-        model={model}
-        variant={variant}
-        modelOptions={models}
-        initialPrompt={promptRef.current}
+        model={modelView.selectedValue}
+        variant={modelView.selectedVariant}
+        modelOptions={modelView.options}
+        initialPrompt={initialPrompt}
         onChangeText={handlePromptChange}
         onModeChange={setMode}
         onModelSelect={handleModelSelect}
@@ -221,7 +379,7 @@ function NewSessionScreenBody() {
         runOnInstance={runOnInstance}
         instanceList={instanceList}
         isLoadingInstances={isLoadingInstances}
-        onChangeRunOnInstance={handleRunOnInstanceChange}
+        onChangeRunOnInstance={handleRunOnChange}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
         view={view}
         isRetrying={isRetrying}

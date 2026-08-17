@@ -1,4 +1,4 @@
-import { Bug, RefreshCw, Sparkles } from 'lucide-react-native';
+import { Bug, RefreshCw, Sparkles } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';

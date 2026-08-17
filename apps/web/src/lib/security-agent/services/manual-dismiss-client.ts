@@ -1,59 +1,34 @@
 import 'server-only';
-import { INTERNAL_API_SECRET, SECURITY_SYNC_WORKER_URL } from '@/lib/config.server';
+import {
+  postSecurityWorkerCommand,
+  type AcceptedSecurityWorkerCommand,
+} from './security-sync-worker-client';
 
 type ManualFindingDismissalOwner =
   | { organizationId: string; userId?: never }
   | { userId: string; organizationId?: never };
 
-type ManualFindingDismissalActor = {
-  id: string;
-};
-
 type DismissReason = 'fix_started' | 'no_bandwidth' | 'tolerable_risk' | 'inaccurate' | 'not_used';
 
 type SubmitManualFindingDismissalParams = {
   owner: ManualFindingDismissalOwner;
-  actor: ManualFindingDismissalActor;
+  actor: { id: string; email?: string | null };
   findingId: string;
   installationId: string;
   reason: DismissReason;
   comment?: string;
-};
-
-type AcceptedManualFindingDismissal = {
-  accepted: true;
-  commandId: string;
-  runId: string;
-  messageId: string;
-};
-
-type ManualFindingDismissalWorkerResponse = {
-  success?: boolean;
-  accepted?: boolean;
-  commandId?: string;
-  runId?: string;
-  messageId?: string;
-  error?: string;
+  /** Stable per-intent operation key; the Worker reuses the original command on a same-key retry. */
+  operationKey?: string;
 };
 
 export async function submitManualFindingDismissal(
   params: SubmitManualFindingDismissalParams
-): Promise<AcceptedManualFindingDismissal> {
-  if (!SECURITY_SYNC_WORKER_URL) {
-    throw new Error('SECURITY_SYNC_WORKER_URL is not configured');
-  }
-
-  if (!INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
-  }
-
-  const response = await fetch(`${SECURITY_SYNC_WORKER_URL}/internal/dismiss-finding`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({
+): Promise<AcceptedSecurityWorkerCommand> {
+  return postSecurityWorkerCommand({
+    path: '/internal/dismiss-finding',
+    service: 'dismissal',
+    disabledRoutingError: 'Finding dismissal Worker routing is disabled',
+    body: {
       schemaVersion: 1,
       owner: params.owner,
       actor: params.actor,
@@ -61,30 +36,7 @@ export async function submitManualFindingDismissal(
       installationId: params.installationId,
       reason: params.reason,
       comment: params.comment,
-    }),
+      ...(params.operationKey !== undefined ? { operationKey: params.operationKey } : {}),
+    },
   });
-  const body = (await response.json()) as ManualFindingDismissalWorkerResponse;
-
-  if (!response.ok) {
-    throw new Error(
-      body.error ?? `Security dismissal Worker request failed with ${response.status}`
-    );
-  }
-
-  if (
-    body.success !== true ||
-    body.accepted !== true ||
-    typeof body.commandId !== 'string' ||
-    typeof body.runId !== 'string' ||
-    typeof body.messageId !== 'string'
-  ) {
-    throw new Error('Security dismissal Worker returned an invalid accepted response');
-  }
-
-  return {
-    accepted: true,
-    commandId: body.commandId,
-    runId: body.runId,
-    messageId: body.messageId,
-  };
 }

@@ -1,8 +1,10 @@
 import { classifyWithOpenRouter } from '@kilocode/auto-routing-contracts/classifier';
 import {
+  BENCHMARK_CONTAINER_BUDGET,
   CLASSIFIER_WINNER_KV_KEY,
   ROUTING_TABLE_KV_KEY,
   resolveBenchmarkIdentity,
+  type BenchmarkConfig,
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
@@ -16,6 +18,7 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
+  countCurrentProfilesByStatus,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
@@ -23,21 +26,27 @@ import {
   getLatestSummariesByModel,
   getRunningRun,
   getRunWithModels,
+  getLatestRoutingTable,
   getSummaries,
+  getSummariesForRuns,
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
-  listStaleRunningDeciderRunIds,
+  listReadyCurrentProfilesForEntries,
+  listStaleRunningDeciderRuns,
   markProfilesFailedForEntries,
   markProfilesFailedForRun,
   markProfilesReadyForRun,
   markProfilesRunningForRun,
+  releaseProfileClaims,
   markRunCompleted,
   markRunFailed,
   markStaleRunsFailed,
+  failOrphanedRunningProfiles,
   recordLaneFailure,
   replaceModelSummaries,
   saveRoutingTable,
+  syncPlatformRegistryRows,
   upsertCaseResult,
   type BenchmarkRunPurpose,
   type CaseResultRow,
@@ -45,7 +54,11 @@ import {
 } from './db';
 import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
-import { buildRoutingTable } from './routing-table-builder';
+import {
+  buildRoutingTable,
+  computeRegistryRoutingTableVersion,
+  filterSummariesByProvenance,
+} from './routing-table-builder';
 import {
   destroyDeciderCliContainer,
   isRetryableContainerAvailabilityError,
@@ -105,10 +118,6 @@ const DECIDER_CHUNK_SIZE = 5;
 // keep it below Cloudflare Queues' 15-minute wall-clock limit.
 const CLASSIFIER_CHUNK_SIZE = 1;
 
-// Cloudflare Containers cap for the benchmark runner. Sharded decider fan-out
-// uses this as the live-container budget.
-export const DECIDER_CONTAINER_INSTANCE_CAP = 100;
-
 // Cloudflare Queues caps a single sendBatch at 100 messages. Classifier fan-out
 // can exceed that because each classifier case is its own message, so dispatch
 // must be sliced.
@@ -126,7 +135,7 @@ export function computeDeciderShardCount({
   modelCount,
   repetitions,
   chunkCount,
-  maxLiveContainers = DECIDER_CONTAINER_INSTANCE_CAP,
+  maxLiveContainers = BENCHMARK_CONTAINER_BUDGET,
 }: {
   modelCount: number;
   repetitions: number;
@@ -161,8 +170,8 @@ async function enqueueRunMessages(
 }
 
 /**
- * Mark a running run failed, transition any profile rows it claimed, and attempt
- * to drain the oldest pending profile batch into the freed single decider slot.
+ * Mark a running run failed, fail the registry rows it claimed, then try to
+ * drain both queues into whatever slot just freed up.
  */
 export async function failRunAndDrain(env: Env, runId: string, error: string): Promise<void> {
   await markRunFailed(env.BENCH_DB, runId, error);
@@ -177,17 +186,7 @@ export async function failRunAndDrain(env: Env, runId: string, error: string): P
       })
     );
   }
-  try {
-    await drainPendingProfileBatch(env);
-  } catch (drainError) {
-    console.warn(
-      JSON.stringify({
-        event: 'benchmark_profile_drain_error',
-        afterRunId: runId,
-        ...formatError(drainError),
-      })
-    );
-  }
+  await drainQueues(env, 'both');
 }
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
@@ -196,44 +195,266 @@ const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 // exhausted / dead-lettered). Called both before starting a run and when
 // listing runs, so a wedged run is recovered without depending on a new run
 // being started (the UI disables Start while a run shows 'running').
-// Also fails Benchmark-profile rows claimed by those stale runs so they do
-// not stay stuck in `running`. Drain is separate (needs Env for startRun).
-export async function sweepStaleRuns(db: D1Database): Promise<string[]> {
+// Stale DECIDER runs are salvaged per entry first: entries whose lanes all
+// produced results still become `ready`. Only entries with an unfinished lane
+// fail, so one wedged model can't discard every other model's measurements —
+// which matters because those measurements cost real money.
+// Registry rows claimed by a stale run that could not be salvaged are failed so
+// they do not stay stuck in `running`.
+export async function sweepStaleRuns(env: Env): Promise<string[]> {
+  const db = env.BENCH_DB;
   const olderThanIso = new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString();
-  // Capture ids before the bulk status flip so profile claims can be failed.
-  const staleIds = await listStaleRunningDeciderRunIds(db, olderThanIso).catch(
-    () => [] as string[]
+  // Capture ids before the bulk status flip so profile claims can be settled.
+  const stale = await listStaleRunningDeciderRuns(db, olderThanIso).catch(
+    () => [] as Array<{ id: string; purpose: BenchmarkRunPurpose }>
   );
-  await markStaleRunsFailed(db, olderThanIso);
-  for (const runId of staleIds) {
-    await markProfilesFailedForRun(db, runId, 'timed out').catch(() => {});
+  for (const run of stale) {
+    // Salvage before the bulk flip — markRunCompleted guards on status='running'.
+    await salvageTimedOutDeciderRun(env, run.id).catch(error => {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_profile_salvage_error',
+          runId: run.id,
+          ...formatError(error),
+        })
+      );
+    });
   }
-  return staleIds;
+  await markStaleRunsFailed(db, olderThanIso);
+  // Rows a terminal run left claimed (its transition threw) are unreachable by
+  // the drain, by requeue and by the stale sweep. Settle them so a pool entry
+  // can never sit `running` forever.
+  await failOrphanedRunningProfiles(db, PROFILE_ORPHANED_CLAIM_FAILURE_REASON, olderThanIso).catch(
+    error => {
+      console.warn(
+        JSON.stringify({ event: 'benchmark_profile_orphan_release_error', ...formatError(error) })
+      );
+    }
+  );
+  for (const run of stale) {
+    // No-ops for a salvaged run: its rows are already ready/failed.
+    await markProfilesFailedForRun(db, run.id, 'timed out').catch(() => {});
+  }
+  return stale.map(run => run.id);
 }
 
 /**
- * Sweep stale runs and attempt the pending-profile drain. Used by the
- * scheduled handler so a failed final queue message or platform run cannot
- * strand pending profile work. Never throws for drain/slot contention.
+ * Settle a timed-out decider run per entry. Every lane that never produced a
+ * full set of case rows is recorded as failed, which lets the normal
+ * finalization path complete the run: finished entries go `ready` with their
+ * summaries, unfinished ones go `failed` and a requeue re-admits them.
+ */
+async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void> {
+  const state = await getRunState(env, runId);
+  if (state.status !== 'running') return;
+
+  const { unfinished, deadLaneKeys } = await loadLaneAccounting(
+    env.BENCH_DB,
+    runId,
+    state,
+    DECIDER_CASES.length
+  );
+  for (const lane of unfinished) {
+    if (deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep))) continue;
+    await recordLaneFailure(env.BENCH_DB, { runId, ...lane, chunk: 0, shard: 0 });
+  }
+  console.warn(
+    JSON.stringify({
+      event: 'benchmark_decider_run_salvaged',
+      runId,
+      unfinishedLanes: unfinished.length,
+    })
+  );
+  await finalizeRunIfComplete(env, runId, 'decider', state);
+}
+
+/**
+ * Sweep stale runs, reconcile the platform queue, then drain both registry
+ * queues. Used by the scheduled handler so a failed final queue message cannot
+ * strand pending work. Never throws for drain/slot contention.
  */
 export async function sweepStaleRunsAndDrain(env: Env): Promise<{
   staleRunIds: string[];
-  drained: { runId: string; entryCount: number } | null;
+  drained: StartedQueueRun[];
 }> {
-  const staleRunIds = await sweepStaleRuns(env.BENCH_DB);
-  let drained: { runId: string; entryCount: number } | null = null;
-  try {
-    drained = await drainPendingProfileBatch(env);
-  } catch (error) {
-    console.warn(
-      JSON.stringify({
-        event: 'benchmark_profile_drain_error',
-        afterSweep: true,
-        ...formatError(error),
-      })
-    );
-  }
+  const staleRunIds = await sweepStaleRuns(env);
+  // `platform_requested` is what makes a pending row visible to the platform
+  // drain and to the publish guard, and only a reconcile sets it. Without this
+  // the timer could not pick up a newly configured decider model at all, and
+  // the guard would count a pending platform pair as settled and publish a
+  // table missing it.
+  await syncPlatformRegistry(env).catch(error => {
+    console.warn(JSON.stringify({ event: 'platform_registry_sync_failed', ...formatError(error) }));
+  });
+  const drained = await drainQueues(env, 'both');
   return { staleRunIds, drained };
+}
+
+export type StartedQueueRun = { runId: string; purpose: BenchmarkRunPurpose; entryCount: number };
+
+/**
+ * Drain the selected registry queues. 'both' starts at most one run per queue —
+ * they hold independent slots and container budgets. Drain failures are logged
+ * per queue, never thrown, so one wedged queue cannot block the other.
+ */
+export async function drainQueues(
+  env: Env,
+  selector: 'platform' | 'user' | 'both',
+  // Filled with whatever each queue threw. The scheduled callers ignore it; an
+  // admin who pressed a button needs to be told the queue is wedged instead of
+  // being shown "nothing to run".
+  errors?: unknown[]
+): Promise<StartedQueueRun[]> {
+  const queues: BenchmarkRunPurpose[] =
+    selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
+  const started: StartedQueueRun[] = [];
+  for (const queue of queues) {
+    try {
+      const drained = await drainQueue(env, queue);
+      if (drained) started.push({ ...drained, purpose: queue });
+    } catch (error) {
+      errors?.push(error);
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_queue_drain_error',
+          queue,
+          ...formatError(error),
+        })
+      );
+    }
+  }
+  return started;
+}
+
+/**
+ * Reconcile the platform queue with the saved decider model list. Every
+ * configured exact pair ends up with a current-engine registry row; pairs that
+ * already have a `ready` row (measured for an owner pool, or by an earlier
+ * platform run) keep it and are not re-benchmarked.
+ */
+export async function syncPlatformRegistry(env: Env): Promise<{ desiredEntries: number }> {
+  const config = await getBenchmarkConfig(env.BENCH_DB);
+  if (!config) return { desiredEntries: 0 };
+  const desired = platformRegistryEntries(config);
+  await syncPlatformRegistryRows(
+    env.BENCH_DB,
+    { engineIdentity: computeEngineIdentity('decider'), repetitions: config.deciderRepetitions },
+    desired
+  );
+  return { desiredEntries: desired.length };
+}
+
+/** The exact (model, variant) pairs the saved platform decider list wants. */
+export function platformRegistryEntries(
+  config: Pick<BenchmarkConfig, 'deciderModels'>
+): RunModelEntry[] {
+  return config.deciderModels.map(model => ({
+    model: model.id,
+    variant:
+      model.variant !== undefined
+        ? (model.variant ?? null)
+        : variantFromReasoningEffort(model.reasoningEffort ?? null),
+  }));
+}
+
+/**
+ * Rebuild and publish the platform routing table from the registry. Candidates
+ * come from ready+current registry rows for the configured platform pairs, each
+ * bound to its own measuring run's summaries — the same provenance rule owner
+ * pools use, so platform and user tables read the one shared measurement set.
+ *
+ * The table is published only once the platform queue has settled: no entry
+ * still pending or running. Publishing mid-measurement would put a table built
+ * from the handful of models measured so far in front of every user — after an
+ * engine bump that can be a single model taking all routes. A permanently
+ * failing model does not block publishing, because `failed` is settled.
+ */
+export async function publishPlatformRoutingTable(env: Env): Promise<{ version: string } | null> {
+  const config = await getBenchmarkConfig(env.BENCH_DB);
+  if (!config) return null;
+
+  const current = {
+    engineIdentity: computeEngineIdentity('decider'),
+    repetitions: config.deciderRepetitions,
+  };
+  const desired = platformRegistryEntries(config);
+
+  // syncPlatformRegistry flags exactly the desired pairs, so the platform queue
+  // counts are this table's inputs.
+  const queueCounts = await countCurrentProfilesByStatus(env.BENCH_DB, current, 'platform');
+  const unsettled = queueCounts
+    .filter(row => row.status === 'pending' || row.status === 'running')
+    .reduce((total, row) => total + row.count, 0);
+  if (unsettled > 0) {
+    console.log(
+      JSON.stringify({ event: 'routing_table_publish_skipped_queue_unsettled', unsettled })
+    );
+    return null;
+  }
+
+  const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, desired);
+  const readyEntries = readyRows
+    .filter((row): row is typeof row & { run_id: string } => Boolean(row.run_id))
+    .map(row => ({
+      entry: { model: row.model, variant: variantFromStorage(row.variant) },
+      runId: row.run_id,
+    }));
+  if (readyEntries.length === 0) {
+    console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_no_ready_entries' }));
+    return null;
+  }
+
+  const summaries = await getSummariesForRuns(env.BENCH_DB, [
+    ...new Set(readyEntries.map(r => r.runId)),
+  ]);
+  const generatedAt = new Date().toISOString();
+  // Platform artifact keeps emitting reasoningEffort for enum efforts (not
+  // variant) so the shape stays unchanged for auto-routing workers deployed
+  // before exact pairs. A non-enum catalog variant can only ride as `variant`;
+  // emitting effort would drop it.
+  const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => {
+    const effort = parsePersistedReasoningEffort(entry.variant);
+    if (effort === null && entry.variant !== null) {
+      return { id: entry.model, variant: entry.variant, reasoningEffort: null };
+    }
+    return { id: entry.model, reasoningEffort: effort };
+  });
+  const table = buildRoutingTable({
+    version: computeRegistryRoutingTableVersion(
+      readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
+      {
+        minAccuracy: config.minAccuracy,
+        switchCostFactor: config.switchCostFactor,
+        bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+      }
+    ),
+    generatedAt,
+    minAccuracy: config.minAccuracy,
+    switchCostFactor: config.switchCostFactor,
+    bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+    deciderModels,
+    summaries: filterSummariesByProvenance(readyEntries, summaries),
+  });
+
+  // The version hashes the contributing registry rows and the config knobs, so
+  // an identical version means an identical table. Skip the write and the flush.
+  const published = await getLatestRoutingTable(env.BENCH_DB).catch(() => null);
+  if (published?.table.version === table.version) {
+    return { version: table.version };
+  }
+
+  await saveRoutingTable(env.BENCH_DB, table, generatedAt);
+  // Clear KV so the auto-routing worker repopulates from D1 on next request.
+  await env.AUTO_ROUTING_CONFIG.delete(ROUTING_TABLE_KV_KEY);
+  console.log(
+    JSON.stringify({
+      event: 'routing_table_published',
+      version: table.version,
+      readyEntries: readyEntries.length,
+      desiredEntries: desired.length,
+    })
+  );
+  return { version: table.version };
 }
 
 // Bump when grading logic, the CLI invocation/variant handling, the container
@@ -285,7 +506,7 @@ export function buildDeciderMessages(
   models: readonly (string | RunModelEntry)[],
   repetitions: number,
   chunks: readonly (readonly { id: string }[])[],
-  maxLiveContainers: number = DECIDER_CONTAINER_INSTANCE_CAP
+  maxLiveContainers: number = BENCHMARK_CONTAINER_BUDGET
 ): { body: BenchmarkJobMessage }[] {
   const entries = normalizeRunModelEntries(models);
   const shardCount = computeDeciderShardCount({
@@ -365,6 +586,17 @@ export class RunAlreadyActiveError extends Error {
   }
 }
 
+/**
+ * Thrown when every entry of a batch was already claimed by the other queue's
+ * run. Not a fault: the pairs are being measured, just not by this run.
+ */
+export class NoEntriesClaimedError extends Error {
+  constructor(readonly runId: string) {
+    super(`no registry entries left to claim for ${runId}`);
+    this.name = 'NoEntriesClaimedError';
+  }
+}
+
 // Thrown when the saved benchmark config would exceed a hard runtime limit.
 // The admin route maps it to HTTP 400 so operators can fix config instead of
 // starting a run that will immediately hit platform capacity.
@@ -393,16 +625,14 @@ export function validateDeciderContainerBudget({
 }
 
 export type StartRunOptions = {
+  /** Classifier only: re-measure models that already have current results. */
   force?: boolean;
-  /**
-   * 'platform' (default): publish the default routing table / classifier winner.
-   * 'profile': measure an explicit Pool-entry snapshot for the global registry;
-   * never publishes platform artifacts.
-   */
+  /** Which registry queue this run drains. Classifier runs are always 'platform'. */
   purpose?: BenchmarkRunPurpose;
   /**
-   * Explicit decider entry snapshot for profile runs. Required when
-   * purpose === 'profile'. Ignored for platform runs (entries come from config).
+   * Registry entry snapshot to measure. Required for decider runs — every
+   * decider measurement now comes from the registry queue, never from the saved
+   * config list. Ignored for classifier runs.
    */
   entries?: readonly RunModelEntry[];
 };
@@ -413,61 +643,49 @@ export async function startRun(
   options: StartRunOptions = {}
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
   const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
-  if (purpose === 'profile' && kind !== 'decider') {
-    throw new BenchmarkRunConfigError('profile runs must be decider kind');
-  }
-  if (purpose === 'profile' && (!options.entries || options.entries.length === 0)) {
-    throw new BenchmarkRunConfigError('profile runs require a non-empty entries snapshot');
+  if (kind === 'decider' && (!options.entries || options.entries.length === 0)) {
+    throw new BenchmarkRunConfigError('decider runs require a non-empty registry entry snapshot');
   }
 
   // Stale-run sweeper: fail dead 'running' runs first so a wedged run can't
   // block new ones and the admin panel shows the truth.
-  await sweepStaleRuns(env.BENCH_DB);
+  await sweepStaleRuns(env);
 
   const config = await getBenchmarkConfig(env.BENCH_DB);
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
 
-  // One active run per kind. The unique partial index is the atomic backstop;
-  // this pre-check turns the common case (a run already going) into a clean
-  // RunAlreadyActiveError instead of an insert-constraint failure.
-  // Platform and profile share this single decider slot.
-  const activeRun = await getRunningRun(env.BENCH_DB, kind);
+  // One active run per (kind, purpose). The unique partial index is the atomic
+  // backstop; this pre-check turns the common case (a run already going) into a
+  // clean RunAlreadyActiveError instead of an insert-constraint failure.
+  // The platform and user queues hold independent slots and can run at once.
+  const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose);
   if (activeRun) {
     throw new RunAlreadyActiveError(kind, activeRun.id);
   }
   const repetitions =
     kind === 'classifier' ? config.classifierRepetitions : config.deciderRepetitions;
 
-  // Platform: config maps reasoningEffort → stored variant. Profile: explicit
-  // snapshot (may include two variants of one model).
-  const profileEntries = options.entries;
+  // Decider entries always come from the registry queue snapshot (which may
+  // include two variants of one model). Classifier still measures its own list.
   const modelEntries: RunModelEntry[] =
-    purpose === 'profile' && profileEntries
-      ? normalizeRunModelEntries(profileEntries)
-      : kind === 'classifier'
-        ? config.classifierModels.map(model => ({ model, variant: null }))
-        : config.deciderModels.map(m => ({
-            model: m.id,
-            variant:
-              m.variant !== undefined
-                ? (m.variant ?? null)
-                : variantFromReasoningEffort(m.reasoningEffort ?? null),
-          }));
+    kind === 'decider'
+      ? normalizeRunModelEntries(options.entries ?? [])
+      : config.classifierModels.map(model => ({ model, variant: null }));
 
   const engineIdentity = computeEngineIdentity(kind);
 
-  // Exact entries with prior results are skipped (their latest summaries are
-  // carried into this run's aggregate) unless the admin forces a full re-run.
-  // A prior result is only carried when it was measured under the SAME
-  // benchmark identity — engine identity (dataset + grading/CLI version),
-  // repetitions, AND exact variant — so a config/dataset/variant change
-  // re-benchmarks instead of pairing current serving config with stale numbers.
-  // Profile runs always re-measure the snapshot (no carry) so registry
-  // provenance points at a run that actually graded these entries.
+  // Classifier entries with prior results are skipped (their latest summaries
+  // are carried into this run's aggregate) unless the admin forces a re-run. A
+  // prior result is only carried when it was measured under the SAME benchmark
+  // identity — engine identity (dataset + grading version) and repetitions — so
+  // a config/dataset change re-benchmarks instead of pairing current serving
+  // config with stale numbers.
+  // Decider runs never carry: the registry already dedupes across runs, and
+  // registry provenance must point at a run that actually graded these entries.
   const priorByPair =
-    options.force || purpose === 'profile'
+    options.force || kind === 'decider'
       ? new Map<string, PriorModelResult>()
       : await getLatestSummariesByModel(env.BENCH_DB, kind);
   const isCarryable = (entry: RunModelEntry): boolean => {
@@ -488,32 +706,74 @@ export async function startRun(
 
   const benchmarkIdentity = resolveBenchmarkIdentity(config);
 
-  const maxLiveDeciderContainers = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
+  // Each queue owns its own lane budget so a running user-queue run never
+  // shrinks a platform-queue run (and vice versa). The config schema keeps the
+  // two budgets summing to at most the platform container cap.
+  const laneBudget = purpose === 'user' ? config.userMaxConcurrency : config.maxConcurrency;
   if (kind === 'decider') {
     validateDeciderContainerBudget({
       modelCount: enqueuedEntries.length,
       repetitions,
-      maxLiveContainers: maxLiveDeciderContainers,
+      maxLiveContainers: laneBudget,
     });
   }
 
   const startedAt = new Date().toISOString();
-  // Distinguish profile run ids so ops logs and D1 rows are easy to filter.
+  // Distinguish user-queue run ids so ops logs and D1 rows are easy to filter.
+  // The nonce matters: two drains of one queue can reach here in the same
+  // millisecond, and a shared id makes each one's claim match the other's rows —
+  // the loser's release would then hand back rows the winner is measuring.
   const runId =
-    purpose === 'profile'
-      ? `profile-${startedAt.replace(/[:.]/g, '-')}`
-      : `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
+    (purpose === 'user' ? 'user' : kind) +
+    `-${startedAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}`;
 
-  // Build run_models rows for ALL exact entries of this run.
-  // Platform runs write variant AND keep reasoning_effort as a legacy mirror.
-  // Profile runs write variant only (reasoning_effort null).
-  const enqueuedPairKeys = new Set(enqueuedEntries.map(e => exactPairKey(e.model, e.variant)));
-  const runModelRows: RunModelRow[] = modelEntries.map(entry => ({
+  // Claim the registry rows BEFORE writing the run. Both queues drain from the
+  // same registry and their drains can overlap (cron, admin, run completion), so
+  // whichever claim lands first owns the pair; the loser drops it instead of
+  // paying to benchmark it a second time and then discarding the result.
+  let claimedEntries: RunModelEntry[] = modelEntries;
+  if (kind === 'decider') {
+    try {
+      claimedEntries = await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
+        engineIdentity,
+        repetitions,
+      });
+    } catch (error) {
+      // The claim walks entries one statement at a time, so a failure part-way
+      // leaves earlier rows claimed by a run that will never be written. Give
+      // them straight back rather than leaving them for the orphan sweep.
+      await releaseProfileClaims(env.BENCH_DB, runId).catch(releaseError => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_profile_claim_release_error',
+            runId,
+            ...formatError(releaseError),
+          })
+        );
+      });
+      throw error;
+    }
+    if (claimedEntries.length === 0) {
+      throw new NoEntriesClaimedError(runId);
+    }
+  }
+  const claimedPairKeys = new Set(claimedEntries.map(e => exactPairKey(e.model, e.variant)));
+  const runEntries = modelEntries.filter(e =>
+    claimedPairKeys.has(exactPairKey(e.model, e.variant))
+  );
+  const enqueuedRunEntries = enqueuedEntries.filter(e =>
+    claimedPairKeys.has(exactPairKey(e.model, e.variant))
+  );
+
+  // Build run_models rows for ALL exact entries of this run. reasoning_effort is
+  // a legacy mirror of the variant, kept for provenance and rollback.
+  const enqueuedPairKeys = new Set(enqueuedRunEntries.map(e => exactPairKey(e.model, e.variant)));
+  const runModelRows: RunModelRow[] = runEntries.map(entry => ({
     run_id: runId,
     model: entry.model,
     variant: variantToStorage(entry.variant),
     enqueued: enqueuedPairKeys.has(exactPairKey(entry.model, entry.variant)),
-    reasoning_effort: purpose === 'profile' ? null : entry.variant,
+    reasoning_effort: entry.variant,
   }));
 
   try {
@@ -526,7 +786,7 @@ export async function startRun(
         min_accuracy: config.minAccuracy,
         switch_cost_factor: config.switchCostFactor,
         best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
-        max_concurrency: config.maxConcurrency,
+        max_concurrency: laneBudget,
         benchmark_user_id: benchmarkIdentity.benchmarkUserId,
         benchmark_org_id: benchmarkIdentity.benchmarkOrgId,
         repetitions,
@@ -539,33 +799,28 @@ export async function startRun(
       carriedSummaries
     );
   } catch (error) {
+    // The claim is already made, so hand the rows back to the queue — otherwise
+    // they sit `running` under a run that was never written and nothing can
+    // reach them.
+    if (kind === 'decider') {
+      await releaseProfileClaims(env.BENCH_DB, runId).catch((releaseError: unknown) => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_profile_claim_release_error',
+            runId,
+            ...formatError(releaseError),
+          })
+        );
+      });
+    }
     // The pre-check already passed, so an insert failure is almost certainly a
-    // race losing the one-running-per-kind unique index. Re-read the winner and
+    // race losing the one-running-per-slot unique index. Re-read the winner and
     // surface a clean conflict rather than a 500.
-    const winner = await getRunningRun(env.BENCH_DB, kind).catch(() => undefined);
+    const winner = await getRunningRun(env.BENCH_DB, kind, purpose).catch(() => undefined);
     if (winner && winner.id !== runId) {
       throw new RunAlreadyActiveError(kind, winner.id);
     }
     throw error;
-  }
-
-  if (purpose === 'profile') {
-    try {
-      await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
-        engineIdentity,
-        repetitions,
-      });
-    } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: 'benchmark_profile_running_transition_error',
-          runId,
-          ...formatError(error),
-        })
-      );
-      await failRunAndDrain(env, runId, formatError(error).error);
-      throw error;
-    }
   }
 
   console.log(
@@ -574,19 +829,19 @@ export async function startRun(
       runId,
       kind,
       purpose,
-      enqueuedModels: enqueuedEntries.map(e => e.model),
+      enqueuedModels: enqueuedRunEntries.map(e => e.model),
       skippedModels,
     })
   );
 
-  if (enqueuedEntries.length === 0) {
+  if (enqueuedRunEntries.length === 0) {
     // Everything already has results: complete immediately and republish the
     // aggregate so config-only changes (model removed, threshold tweaked)
     // take effect without re-running any model. The state mirrors the rows
     // insertRun just wrote, so no re-read is needed.
     await finalizeRunIfComplete(env, runId, kind, {
       status: 'running',
-      maxConcurrency: config.maxConcurrency,
+      maxConcurrency: laneBudget,
       minAccuracy: config.minAccuracy,
       switchCostFactor: config.switchCostFactor,
       bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
@@ -603,9 +858,9 @@ export async function startRun(
 
   if (kind === 'classifier') {
     const chunks = chunkArray(CLASSIFIER_CASES, CLASSIFIER_CHUNK_SIZE);
-    const messages = buildClassifierMessages(runId, enqueuedEntries, repetitions, chunks);
+    const messages = buildClassifierMessages(runId, enqueuedRunEntries, repetitions, chunks);
     await enqueueRunMessages(env, runId, messages);
-    return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
+    return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
   }
 
   // Decider: seed as many shard lanes as fit under the live-container cap. Each
@@ -615,32 +870,36 @@ export async function startRun(
   const messages = buildDeciderMessages(
     runId,
     kind,
-    enqueuedEntries,
+    enqueuedRunEntries,
     repetitions,
     chunks,
-    maxLiveDeciderContainers
+    laneBudget
   );
   await enqueueRunMessages(env, runId, messages);
-  return { runId, enqueuedModels: enqueuedEntries.length, skippedModels };
+  return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
 /**
- * After any decider run reaches a terminal state, claim the oldest pending
- * profile batch that fits the container budget and start a profile run.
- * No-ops when the decider slot is occupied or there is no pending work.
+ * Claim the oldest pending registry batch of one queue that fits that queue's
+ * container budget, and start a run for it. Runs on a timer, on the admin's
+ * manual trigger, and after any decider run reaches a terminal state. No-ops
+ * when that queue's slot is occupied or there is no pending work. The other
+ * queue's state is irrelevant — the slots and budgets are independent.
  * Returns the started run id, or null.
  */
-export async function drainPendingProfileBatch(
-  env: Env
+export async function drainQueue(
+  env: Env,
+  queue: BenchmarkRunPurpose
 ): Promise<{ runId: string; entryCount: number } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB);
   if (!config) return null;
 
-  const active = await getRunningRun(env.BENCH_DB, 'decider');
+  const active = await getRunningRun(env.BENCH_DB, 'decider', queue);
   if (active) {
     console.log(
       JSON.stringify({
-        event: 'benchmark_profile_drain_skipped_slot_occupied',
+        event: 'benchmark_queue_drain_skipped_slot_occupied',
+        queue,
         activeRunId: active.id,
       })
     );
@@ -649,15 +908,16 @@ export async function drainPendingProfileBatch(
 
   const engineIdentity = computeEngineIdentity('decider');
   const repetitions = config.deciderRepetitions;
-  const pending = await listPendingCurrentProfiles(env.BENCH_DB, {
-    engineIdentity,
-    repetitions,
-  });
+  const pending = await listPendingCurrentProfiles(
+    env.BENCH_DB,
+    { engineIdentity, repetitions },
+    queue
+  );
   if (pending.length === 0) return null;
 
-  // Oldest-first (query already ordered by requested_at). Cap by container budget:
-  // modelCount * repetitions <= maxLiveContainers.
-  const maxLive = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
+  // Oldest-first (query already ordered by requested_at). Cap by this queue's
+  // container budget: modelCount * repetitions <= maxLiveContainers.
+  const maxLive = queue === 'user' ? config.userMaxConcurrency : config.maxConcurrency;
   const maxEntries = Math.max(1, Math.floor(maxLive / Math.max(1, repetitions)));
   const batch = pending.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
@@ -666,45 +926,34 @@ export async function drainPendingProfileBatch(
   }));
 
   try {
-    validateDeciderContainerBudget({
-      modelCount: entries.length,
-      repetitions,
-      maxLiveContainers: maxLive,
-    });
-  } catch (error) {
-    // Even a single entry can exceed the budget when repetitions are huge;
-    // leave pending and log — scheduled sweep will retry after config fix.
-    console.warn(
-      JSON.stringify({
-        event: 'benchmark_profile_drain_budget_exceeded',
-        entryCount: entries.length,
-        repetitions,
-        maxLive,
-        ...formatError(error),
-      })
-    );
-    return null;
-  }
-
-  try {
-    const result = await startRun(env, 'decider', { purpose: 'profile', entries });
+    const result = await startRun(env, 'decider', { purpose: queue, entries });
     console.log(
       JSON.stringify({
-        event: 'benchmark_profile_drain_started',
+        event: 'benchmark_queue_drain_started',
+        queue,
         runId: result.runId,
-        entryCount: entries.length,
+        entryCount: result.enqueuedModels,
         models: entries.map(e => e.model),
       })
     );
-    return { runId: result.runId, entryCount: entries.length };
+    // The claimed count, not the requested one — the other queue may have taken
+    // part of this batch between the read and the claim.
+    return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
     if (error instanceof RunAlreadyActiveError) {
       console.log(
         JSON.stringify({
-          event: 'benchmark_profile_drain_skipped_slot_occupied',
+          event: 'benchmark_queue_drain_skipped_slot_occupied',
+          queue,
           activeRunId: error.activeRunId,
         })
       );
+      return null;
+    }
+    if (error instanceof NoEntriesClaimedError) {
+      // The other queue claimed this whole batch between our read and our
+      // claim. The pairs are being measured; nothing to do.
+      console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
       return null;
     }
     throw error;
@@ -891,7 +1140,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     repetitions: run.repetitions,
     classifierMaxP95LatencyMs: run.classifier_max_p95_latency_ms,
     startedAt: run.started_at,
-    purpose: run.purpose === 'profile' ? 'profile' : 'platform',
+    purpose: run.purpose === 'user' ? 'user' : 'platform',
   };
 }
 
@@ -1224,9 +1473,49 @@ function laneKey(model: string, variant: string, rep: number): string {
   return JSON.stringify([model, variant, rep]);
 }
 
-/** Failure reason written to profile entries whose lane dead-lettered. */
+/** Failure reason for rows a terminal run left claimed. */
+export const PROFILE_ORPHANED_CLAIM_FAILURE_REASON =
+  'Benchmark run ended without settling this entry; requeue to re-measure.';
+
+/** Failure reason written to profile entries whose lane never finished. */
 export const PROFILE_LANE_DEAD_FAILURE_REASON =
-  'Benchmark lane dead-lettered (queue retries exhausted); retry to re-measure.';
+  'Benchmark lane did not finish (queue retries exhausted or run timed out); retry to re-measure.';
+
+type Lane = { model: string; variant: string; rep: number };
+
+/**
+ * Lane accounting for a run: a lane is done when all its case rows exist, dead
+ * when one of its chunk messages dead-lettered (rows win — a message can die
+ * after its writes landed). `unfinished` is every lane without a full set of
+ * rows; the caller decides whether an unfinished lane is fatal or just missing.
+ */
+async function loadLaneAccounting(
+  db: D1Database,
+  runId: string,
+  state: RunState,
+  caseCount: number
+): Promise<{ unfinished: Lane[]; deadLaneKeys: Set<string> }> {
+  const [laneCounts, laneFailures] = await Promise.all([
+    countCaseResultsByLane(db, runId),
+    listLaneFailures(db, runId),
+  ]);
+  const countByLane = new Map(laneCounts.map(r => [laneKey(r.model, r.variant, r.rep), r.n]));
+  const lanes: Lane[] = state.models
+    .filter(m => m.enqueued)
+    .flatMap(m =>
+      Array.from({ length: state.repetitions }, (_, rep) => ({
+        model: m.model,
+        variant: m.variant,
+        rep,
+      }))
+    );
+  return {
+    unfinished: lanes.filter(
+      lane => (countByLane.get(laneKey(lane.model, lane.variant, lane.rep)) ?? 0) < caseCount
+    ),
+    deadLaneKeys: new Set(laneFailures.map(f => laneKey(f.model, f.variant, f.rep))),
+  };
+}
 
 async function finalizeRunIfComplete(
   env: Env,
@@ -1238,34 +1527,22 @@ async function finalizeRunIfComplete(
   const enqueuedModels = state.models.filter(m => m.enqueued);
   const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
 
-  // Lane accounting: a lane is done when all its case rows exist, dead when
-  // one of its chunk messages dead-lettered (rows win — a message can die
-  // after its writes landed). The run finalizes once every lane is accounted
-  // for, so one dead lane no longer wedges the run until the stale sweep.
-  const [laneCounts, laneFailures] = await Promise.all([
-    countCaseResultsByLane(env.BENCH_DB, runId),
-    listLaneFailures(env.BENCH_DB, runId),
-  ]);
-  const countByLane = new Map(laneCounts.map(r => [laneKey(r.model, r.variant, r.rep), r.n]));
-  const deadLaneKeys = new Set(laneFailures.map(f => laneKey(f.model, f.variant, f.rep)));
-  const lanes = enqueuedModels.flatMap(m =>
-    Array.from({ length: state.repetitions }, (_, rep) => ({
-      model: m.model,
-      variant: m.variant,
-      rep,
-    }))
+  // The run finalizes once every lane is accounted for, so one dead lane no
+  // longer wedges the run until the stale sweep.
+  const { unfinished: deadLanes, deadLaneKeys } = await loadLaneAccounting(
+    env.BENCH_DB,
+    runId,
+    state,
+    caseCount
   );
-  const isDone = (lane: { model: string; variant: string; rep: number }) =>
-    (countByLane.get(laneKey(lane.model, lane.variant, lane.rep)) ?? 0) >= caseCount;
-  const deadLanes = lanes.filter(lane => !isDone(lane));
   if (deadLanes.some(lane => !deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep)))) {
     return;
   }
 
-  // A platform run publishes one comparable artifact; a missing candidate
-  // would silently drop it from routing. Fail fast instead of publishing
-  // partial results or wedging until the 6h stale sweep.
-  if (deadLanes.length > 0 && state.purpose !== 'profile') {
+  // A classifier run derives one winner from a single comparable set, and its
+  // models are not registry-tracked, so a dead lane fails the whole run. Decider
+  // runs settle per entry below — one dead model never discards the rest.
+  if (deadLanes.length > 0 && kind === 'classifier') {
     const [first, ...rest] = deadLanes;
     await failRunAndDrain(
       env,
@@ -1285,19 +1562,30 @@ async function finalizeRunIfComplete(
   // model_summaries with carried=true and are included via getSummaries below.
   const freshSummaries = summarize(rows, kind);
   await replaceModelSummaries(env.BENCH_DB, runId, freshSummaries);
-  await markRunCompleted(env.BENCH_DB, runId);
 
-  // Profile runs update the registry only — never publish platform artifacts,
-  // never touch the classifier winner, never clear platform KV keys.
-  if (state.purpose === 'profile') {
+  // Every decider run feeds the one global registry — the platform routing table
+  // and every owner's custom table are assembled from it, so no decider run
+  // publishes an artifact of its own.
+  if (kind === 'decider') {
     // Entries whose lanes all completed become ready; entries with a dead lane
-    // fail (retry re-admits them) without taking down the whole run. Fail
-    // first so the ready sweep only catches survivors; both statements keep
+    // fail (a requeue re-admits them) without taking down the rest of the batch.
+    // Fail first so the ready sweep only catches survivors; both statements keep
     // the run_id + status='running' no-clobber guard.
     const failedEntryKeys = new Set(deadLanes.map(l => JSON.stringify([l.model, l.variant])));
     const failedEntries = enqueuedModels
       .filter(m => failedEntryKeys.has(JSON.stringify([m.model, m.variant])))
       .map(m => ({ model: m.model, variant: m.variant }));
+    // One try block, fail-first. `markProfilesReadyForRun` has no entry filter —
+    // it readies every row still `running` under this run — so it must not run
+    // when the per-entry failure did not complete, or a dead lane's partial
+    // measurements would be published as a real result. If this throws, the
+    // rows stay `running` and the orphan sweep settles them.
+    //
+    // This runs BEFORE `markRunCompleted`. The orphan reaper spares rows whose
+    // run is still in the running set, so settling first leaves it no window:
+    // completing first would expose a run older than the stale age — its rows
+    // carry claim-time `updated_at`, so the age guard does not cover them — and
+    // a sweep landing in between would fail entries that are fully measured.
     try {
       if (failedEntries.length > 0) {
         await markProfilesFailedForEntries(
@@ -1311,34 +1599,40 @@ async function finalizeRunIfComplete(
     } catch (error) {
       console.warn(
         JSON.stringify({
-          event: 'benchmark_profile_ready_transition_error',
+          event: 'benchmark_profile_transition_error',
           runId,
           ...formatError(error),
         })
       );
     }
+    await markRunCompleted(env.BENCH_DB, runId);
     console.log(
       JSON.stringify({
-        event: 'benchmark_profile_run_completed',
+        event: 'benchmark_decider_run_completed',
         runId,
-        kind,
         purpose: state.purpose,
+        readyEntries: enqueuedModels.length - failedEntries.length,
         failedEntries: failedEntries.length,
       })
     );
-    try {
-      await drainPendingProfileBatch(env);
-    } catch (drainError) {
+    // Fresh registry rows may complete the platform model list, so republish.
+    await publishPlatformRoutingTable(env).catch(error => {
       console.warn(
         JSON.stringify({
-          event: 'benchmark_profile_drain_error',
-          afterRunId: runId,
-          ...formatError(drainError),
+          event: 'routing_table_publish_skipped',
+          runId,
+          ...formatError(error),
         })
       );
-    }
+    });
+    // Both queues: this run's slot just freed, and a pair it just measured may
+    // have been the only pending work the other queue was waiting on.
+    await drainQueues(env, 'both');
     return;
   }
+
+  // Classifier runs own no registry rows, so there is nothing to settle first.
+  await markRunCompleted(env.BENCH_DB, runId);
 
   // Read back all summaries (fresh + carried) for publishing.
   const allSummaries = await getSummaries(env.BENCH_DB, runId);
@@ -1374,46 +1668,6 @@ async function finalizeRunIfComplete(
     await env.AUTO_ROUTING_CONFIG.delete(CLASSIFIER_WINNER_KV_KEY);
   }
 
-  if (kind === 'decider' && !supersededByNewer) {
-    const generatedAt = new Date().toISOString();
-    try {
-      // Built from the run's own model snapshot, not live config, so a mid-run
-      // admin edit can't skew the published table. Platform tables still emit
-      // reasoningEffort (sourced from the run snapshot's effort key) — not
-      // variant — so the published artifact shape stays unchanged for rolling
-      // deploys of old auto-routing workers.
-      const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => ({
-        id: m.model,
-        reasoningEffort: parsePersistedReasoningEffort(
-          m.reasoning_effort ?? variantFromStorage(m.variant)
-        ),
-      }));
-      const table = buildRoutingTable({
-        runId,
-        generatedAt,
-        minAccuracy: state.minAccuracy,
-        switchCostFactor: state.switchCostFactor,
-        bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
-        deciderModels,
-        summaries: allSummaries,
-      });
-      await saveRoutingTable(env.BENCH_DB, table, generatedAt);
-      // Clear KV so the auto-routing worker repopulates from D1 on next request.
-      await env.AUTO_ROUTING_CONFIG.delete(ROUTING_TABLE_KV_KEY);
-      console.log(
-        JSON.stringify({ event: 'routing_table_published', runId, version: table.version })
-      );
-    } catch (error) {
-      console.warn(
-        JSON.stringify({
-          event: 'routing_table_publish_skipped',
-          runId,
-          ...formatError(error),
-        })
-      );
-    }
-  }
-
   console.log(
     JSON.stringify({
       event: 'benchmark_run_completed',
@@ -1423,21 +1677,6 @@ async function finalizeRunIfComplete(
       summaries: allSummaries,
     })
   );
-
-  // Free the single decider slot into the oldest pending profile batch.
-  if (kind === 'decider') {
-    try {
-      await drainPendingProfileBatch(env);
-    } catch (drainError) {
-      console.warn(
-        JSON.stringify({
-          event: 'benchmark_profile_drain_error',
-          afterRunId: runId,
-          ...formatError(drainError),
-        })
-      );
-    }
-  }
 }
 
 export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): BenchmarkModelSummary[] {

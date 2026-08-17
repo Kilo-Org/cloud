@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { Circle, CircleCheck, CircleDot, CircleX } from 'lucide-react-native';
+import { Circle, CircleCheck, CircleDot, CircleX } from '@/components/ui/icons';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SelectableText } from '@/components/ui/selectable-text';

@@ -43,7 +43,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 // ── icons ──────────────────────────────────────────────────────────
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   ClipboardPaste: () => null,
   Paperclip: () => null,
 }));

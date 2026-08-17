@@ -4,7 +4,7 @@ import {
   getRemediationStatusPresentation,
   getRemediationUnavailableCopy,
 } from '@kilocode/app-shared/security-agent';
-import { Wrench } from 'lucide-react-native';
+import { Wrench } from '@/components/ui/icons';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
@@ -19,7 +19,7 @@ import {
   useCancelSecurityRemediation,
   useRetrySecurityRemediation,
   useStartSecurityRemediation,
-} from '@/lib/hooks/use-security-findings';
+} from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';

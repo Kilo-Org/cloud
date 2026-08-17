@@ -6,6 +6,7 @@
 
 import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
+import { sanitizeAnalyticsPathname } from './src/lib/sanitize-analytics-url';
 
 type DrizzleQueryError = Error & {
   query: string;
@@ -79,10 +80,11 @@ function isTRPC4xxError(error: unknown): boolean {
   );
 }
 
-// The GitHub OAuth callback uses `state` as a short-lived bearer token, and the
-// mobile app handoff carries a C1 bearer in `installState`. Sentry's automatic
-// request-data integration can capture either in the request URL or query
-// string, so strip both from both while keeping the rest of the request data.
+// The GitHub OAuth callback uses `state` as a short-lived bearer token, the
+// mobile app handoff carries a C1 bearer in `installState`, and `/s/*` carries
+// a session-share JWT in the path. Sentry's automatic request-data integration
+// can capture those in the request URL or query string, so strip them while
+// keeping the rest of the request data.
 const REDACTED_QUERY_KEYS = new Set(['state', 'installState'].map(key => key.toLowerCase()));
 
 // Decode a raw query key the way URLSearchParams would, so percent-encoded
@@ -121,9 +123,9 @@ function sanitizeRelativeRequestUrl(url: string): string {
   const pathAndQuery = hashIndex === -1 ? url : url.slice(0, hashIndex);
   const queryIndex = pathAndQuery.indexOf('?');
   if (queryIndex === -1) {
-    return url;
+    return `${sanitizeAnalyticsPathname(pathAndQuery)}${fragment}`;
   }
-  const path = pathAndQuery.slice(0, queryIndex);
+  const path = sanitizeAnalyticsPathname(pathAndQuery.slice(0, queryIndex));
   const sanitizedQuery = sanitizeStringQuery(pathAndQuery.slice(queryIndex + 1));
   return sanitizedQuery.length > 0 ? `${path}?${sanitizedQuery}${fragment}` : `${path}${fragment}`;
 }
@@ -131,6 +133,7 @@ function sanitizeRelativeRequestUrl(url: string): string {
 function sanitizeRequestUrl(url: string): string {
   try {
     const parsed = new URL(url);
+    parsed.pathname = sanitizeAnalyticsPathname(parsed.pathname);
     for (const [key] of Array.from(parsed.searchParams)) {
       if (isRedactedQueryKey(key)) {
         parsed.searchParams.delete(key);
@@ -244,9 +247,9 @@ if (process.env.NODE_ENV !== 'development') {
         }
       }
 
-      // Automatic request data can retain the GitHub OAuth `state` token or the
-      // app-flow `installState` bearer in the request URL or query string; strip
-      // them while keeping the rest.
+      // Automatic request data can retain the GitHub OAuth `state` token, the
+      // app-flow `installState` bearer, or a `/s/{jwt}` share token; strip them
+      // while keeping the rest.
       sanitizeSentryRequestData(event);
 
       return event;

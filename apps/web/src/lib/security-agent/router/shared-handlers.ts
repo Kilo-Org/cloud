@@ -30,6 +30,7 @@ import {
   listActiveSecurityAgentCommands,
   createApplyAutoRemediationCommand,
   markApplyAutoRemediationCommandAdmissionFailed,
+  type SecurityAgentCommandStatusResponse,
 } from '@/lib/security-agent/db/security-commands';
 import {
   canStartAnalysis,
@@ -65,10 +66,15 @@ import {
   countEligibleForAutoDismiss,
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
-import { organizations, type SecurityFinding } from '@kilocode/db/schema';
+import {
+  operation_ledgers,
+  organizations,
+  type OperationLedgerRow,
+  type SecurityFinding,
+} from '@kilocode/db/schema';
 import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
 import { db } from '@/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -120,6 +126,14 @@ import {
   logSecurityAudit,
   SecurityAuditLogAction,
 } from '@/lib/security-agent/services/audit-log-service';
+import {
+  admitOperation,
+  isTerminalOperationStatus,
+  markReconcilePending,
+  recordOperationAcceptance,
+  settleOperation,
+  type OutboxEventInput,
+} from '@kilocode/db/operation-ledger';
 
 // ---------------------------------------------------------------------------
 // Strategy types
@@ -259,6 +273,329 @@ async function assembleAuditReportResponse<TExtra>(params: {
       return { status: 'query_failed', message: 'Report query did not finish' };
     }
     throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Security operation ledger (P1-A-08e)
+// ---------------------------------------------------------------------------
+//
+// The manual sync and finding dismissal procedures accept an optional
+// `operationKey`. When present, the handler admits a `security`-domain ledger
+// row BEFORE submitting to the security-sync Worker, and only then runs the
+// submission. Later same-key calls dedupe, replay the canonical result, or
+// conflict. The Worker dedupes the command itself by `operation_key`, so the
+// Worker settles the ledger row from the terminal command state. The
+// `getCommandStatus` handler retries that settle as a fallback, joined by the
+// stored `provider_ref` (the Worker's `commandId`). A
+// definitive pre-acceptance rejection (4xx, disabled routing, unconfigured
+// service) settles the row `failed`; an ambiguous transport outcome
+// (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
+// same-key retry re-submits instead of re-executing blind.
+
+type SecurityLedgerIntent = 'manual_sync' | 'dismiss_finding';
+
+/** The Worker's acceptance receipt and correlation ids. */
+type AcceptedCommandIds = {
+  accepted: true;
+  commandId: string;
+  runId: string;
+  messageId: string;
+};
+
+type SecurityCommandResult =
+  | { kind: 'accepted'; accepted: AcceptedCommandIds }
+  | { kind: 'replayed'; canonical: Record<string, unknown> };
+
+/** `security_command_settled` outbox payload (DEC-05): no free text, no resource keys. */
+function securitySettledOutboxEvent(params: {
+  distinctId: string;
+  intent: SecurityLedgerIntent;
+  outcome: 'completed' | 'failed' | 'no_op' | 'ambiguous';
+  startedAt: number;
+}): OutboxEventInput {
+  return {
+    eventName: 'security_command_settled',
+    distinctId: params.distinctId,
+    properties: {
+      source: 'web',
+      surface: 'security',
+      phase: 'terminal',
+      intent: params.intent,
+      outcome: params.outcome,
+      duration_ms: Math.max(0, Date.now() - params.startedAt),
+    },
+  };
+}
+
+function securityOwnerScopeKey(owner: SecurityReviewOwner): string {
+  return 'organizationId' in owner && owner.organizationId
+    ? `org:${owner.organizationId}`
+    : `user:${owner.userId}`;
+}
+
+/** Security ledger resource identity for a manual sync (owner scope + repo). */
+function securitySyncLedgerResourceKey(owner: SecurityReviewOwner, repoFullName?: string): string {
+  return `security:manual_sync:${securityOwnerScopeKey(owner)}:${repoFullName ?? '*'}`;
+}
+
+/** Trimmed, whitespace-collapsed comment, so cosmetic spacing is not a key-reuse mismatch. */
+function normalizeDismissComment(comment?: string): string {
+  return (comment ?? '').trim().replace(/\s+/g, ' ');
+}
+
+/** Security ledger resource identity for a finding dismissal. */
+function securityDismissLedgerResourceKey(
+  owner: SecurityReviewOwner,
+  findingId: string,
+  reason: string,
+  comment?: string
+): string {
+  return `security:dismiss_finding:${securityOwnerScopeKey(owner)}:${findingId}:${reason}:${normalizeDismissComment(comment)}`;
+}
+
+/**
+ * Runs a ledger write whose failure must never produce a success receipt:
+ * `work` resolves false when nothing durable was written. Both cases surface
+ * `message` as a typed server error, and a same-key retry re-records.
+ */
+async function requireLedgerWrite(message: string, work: () => Promise<boolean>): Promise<void> {
+  try {
+    if (!(await work())) {
+      throw new Error('the ledger row was missing or in an unexpected state');
+    }
+  } catch (error) {
+    console.error(
+      `Security operation ledger write failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message, cause: error });
+  }
+}
+
+/** The replay receipt for a settled row; only `completed`/`no_op` may replay. */
+function replaySettledSecurityRow(row: OperationLedgerRow): Record<string, unknown> {
+  if (row.status === 'completed' || row.status === 'no_op') {
+    return row.canonical_result ?? {};
+  }
+  // A settled `failed` row cannot be recovered under the same key: surface a
+  // non-retryable typed rejection so the client starts a fresh intent.
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: 'This action did not complete. Please try again.',
+  });
+}
+
+/** The handler response for a replayed duplicate, built from the stored result. */
+function replayedSecurityResponse(canonical: Record<string, unknown>) {
+  const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+  return {
+    success: true as const,
+    accepted: true as const,
+    commandId: text(canonical.commandId),
+    runId: text(canonical.runId),
+    messageId: text(canonical.messageId),
+    replayed: true as const,
+  };
+}
+
+/**
+ * Runs the Worker submission under an already-admitted row:
+ * - acceptance records the provider reference durably, then returns accepted;
+ * - a definitive pre-acceptance rejection settles the row `failed`;
+ * - an ambiguous transport outcome (BAD_GATEWAY) marks the row
+ *   `reconcile_pending` and surfaces a retryable CONFLICT.
+ */
+async function executeSecurityCommandSubmit(args: {
+  row: OperationLedgerRow;
+  intent: SecurityLedgerIntent;
+  distinctId: string;
+  startedAt: number;
+  submit: () => Promise<AcceptedCommandIds>;
+}): Promise<AcceptedCommandIds> {
+  const outboxEvent = (outcome: 'failed' | 'ambiguous') =>
+    securitySettledOutboxEvent({
+      distinctId: args.distinctId,
+      intent: args.intent,
+      outcome,
+      startedAt: args.startedAt,
+    });
+
+  let accepted: AcceptedCommandIds;
+  try {
+    accepted = await args.submit();
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
+      // The ambiguous CONFLICT promises same-key reconciliation, so it is
+      // surfaced only once `reconcile_pending` is durable.
+      await requireLedgerWrite(
+        'We could not record this action. Please try again later.',
+        async () =>
+          (
+            await markReconcilePending(db, {
+              rowId: args.row.id,
+              outboxEvent: outboxEvent('ambiguous'),
+            })
+          )?.status === 'reconcile_pending'
+      );
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: "Couldn't confirm — check the security review before retrying.",
+      });
+    }
+    // Best effort: the caller already receives the typed rejection, so a
+    // failed settle must not mask it. A later same-key retry re-records.
+    try {
+      await settleOperation(db, {
+        rowId: args.row.id,
+        status: 'failed',
+        outcomeCode: 'pre_acceptance_rejected',
+        outboxEvent: outboxEvent('failed'),
+      });
+    } catch (settleError) {
+      console.error('Failed to settle the security operation ledger row', settleError);
+    }
+    throw error;
+  }
+  // The Worker accepted, so an unrecorded provider reference must never yield a
+  // success receipt: surface a retryable error and let a same-key retry
+  // re-submit. `provider_ref` holds the `commandId`, which is what the terminal
+  // command state is later joined back to this row by.
+  await requireLedgerWrite(
+    'The action completed, but we could not record the result. Please try again.',
+    async () =>
+      (await recordOperationAcceptance(db, {
+        rowId: args.row.id,
+        providerRef: accepted.commandId,
+        canonicalResult: {
+          commandId: accepted.commandId,
+          runId: accepted.runId,
+          messageId: accepted.messageId,
+        },
+      })) !== null
+  );
+  return accepted;
+}
+
+/**
+ * Admits a `security`-domain ledger row and routes the admission:
+ * `admitted` runs the Worker submission; `takeover`/`duplicate_reconcile_pending`
+ * re-submit (the Worker owns the sync state, so reconciliation is a re-enqueue
+ * under the same key); `duplicate_settled` replays the canonical result;
+ * in-flight admissions conflict. Cross-intent key reuse is rejected before any
+ * outcome is honored.
+ */
+async function runSecurityLedgerSubmit(args: {
+  ctx: TRPCContext;
+  owner: SecurityReviewOwner;
+  intent: SecurityLedgerIntent;
+  operationKey: string;
+  resourceKey: string;
+  submit: () => Promise<AcceptedCommandIds>;
+}): Promise<SecurityCommandResult> {
+  const distinctId = args.ctx.user.google_user_email || args.ctx.user.id;
+  const startedAt = Date.now();
+  const admission = await admitOperation(db, {
+    userId: args.ctx.user.id,
+    orgId:
+      'organizationId' in args.owner && args.owner.organizationId
+        ? args.owner.organizationId
+        : null,
+    domain: 'security',
+    intent: args.intent,
+    operationKey: args.operationKey,
+    resourceKey: args.resourceKey,
+    taxonomy: 'reconcile-first',
+    // While an `admitted` row holds this lease, same-key retries conflict.
+    leaseSeconds: 120,
+  });
+
+  if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
+
+  switch (admission.admission) {
+    case 'admitted':
+    case 'takeover':
+    case 'duplicate_reconcile_pending':
+      return {
+        kind: 'accepted',
+        accepted: await executeSecurityCommandSubmit({
+          row: admission.row,
+          intent: args.intent,
+          distinctId,
+          startedAt,
+          submit: args.submit,
+        }),
+      };
+    case 'duplicate_settled':
+      return { kind: 'replayed', canonical: replaySettledSecurityRow(admission.row) };
+    case 'duplicate_in_flight':
+    case 'duplicate_reconcile_in_progress':
+      throw new TRPCError({ code: 'CONFLICT', message: 'operation_in_progress' });
+  }
+}
+
+/** Command status → ledger terminal status; a non-terminal command has none. */
+const SECURITY_COMMAND_TERMINAL_STATUS = {
+  succeeded: 'completed',
+  failed: 'failed',
+  no_op: 'no_op',
+} as const;
+
+/**
+ * Retries settlement for a terminal command when the Worker did not complete
+ * it. The row is joined by `provider_ref` (the Worker
+ * `commandId`) recorded at acceptance and scoped to the admitting user, so a
+ * poll never settles another user's row. The settle is a compare-and-set, so
+ * later polls are no-ops and the event is emitted exactly once. A settle
+ * failure must not fail the status read: the next poll retries it.
+ */
+async function settleSecurityLedgerForTerminalCommand(params: {
+  ctx: TRPCContext;
+  command: SecurityAgentCommandStatusResponse;
+}): Promise<void> {
+  const status =
+    SECURITY_COMMAND_TERMINAL_STATUS[
+      params.command.status as keyof typeof SECURITY_COMMAND_TERMINAL_STATUS
+    ];
+  if (!status) return;
+
+  try {
+    const [row] = await db
+      .select({
+        id: operation_ledgers.id,
+        intent: operation_ledgers.intent,
+        status: operation_ledgers.status,
+        admitted_at: operation_ledgers.admitted_at,
+      })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.domain, 'security'),
+          eq(operation_ledgers.kilo_user_id, params.ctx.user.id),
+          eq(operation_ledgers.provider_ref, params.command.id)
+        )
+      )
+      .limit(1);
+    if (!row || isTerminalOperationStatus(row.status)) return;
+    if (row.intent !== 'manual_sync' && row.intent !== 'dismiss_finding') return;
+
+    await settleOperation(db, {
+      rowId: row.id,
+      status,
+      outcomeCode: params.command.resultCode,
+      outboxEvent: securitySettledOutboxEvent({
+        distinctId: params.ctx.user.google_user_email || params.ctx.user.id,
+        intent: row.intent,
+        outcome: status,
+        startedAt: new Date(row.admitted_at).getTime(),
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to settle the security operation ledger row from the command state', {
+      command_id: params.command.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -1071,7 +1408,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
 
-        // If a specific repo is provided, sync only that one
+        // Resolve the sync scope (a specific repo, or every enabled repo).
+        let syncScope:
+          | { syncType: 'single_repo'; repoCount: number; repoFullName: string }
+          | { syncType: 'all_repos'; repoCount: number };
         if (input.repoFullName) {
           const hasRepo = allRepos.some(r => r.full_name === input.repoFullName);
           if (!hasRepo) {
@@ -1080,91 +1420,69 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               message: 'Repository not found in your GitHub integration',
             });
           }
-
-          const accepted = await submitManualSecuritySync({
-            owner: securityOwner,
-            actor: {
-              id: ctx.user.id,
-              email: ctx.user.google_user_email,
-              name: ctx.user.google_user_name,
-            },
-            origin: 'dashboard_refresh',
-            repoFullName: input.repoFullName,
-          });
-
-          trackSecurityAgentSync({
-            distinctId: ctx.user.id,
-            userId: ctx.user.id,
-            ...deps.trackingExtras(ctx, input),
+          syncScope = {
             syncType: 'single_repo',
             repoCount: 1,
-            synced: 0,
-            errors: 0,
-          });
-
-          logSecurityAudit({
-            owner: securityOwner,
-            actor_id: ctx.user.id,
-            actor_email: ctx.user.google_user_email,
-            actor_name: ctx.user.google_user_name,
-            action: SecurityAuditLogAction.SyncTriggered,
-            resource_type: 'agent_config',
-            resource_id: resourceId,
-            metadata: {
-              syncType: 'single_repo',
-              repoFullName: input.repoFullName,
-              runId: accepted.runId,
-              messageId: accepted.messageId,
-              status: 'accepted',
-            },
-          });
-
-          return {
-            success: true,
-            ...accepted,
+            repoFullName: input.repoFullName,
           };
-        }
-
-        // No specific repo - sync all enabled repositories based on config
-        const config = await getSecurityAgentConfigWithStatus(owner);
-        const selectionMode = config?.config.repository_selection_mode ?? 'selected';
-        const selectedIds = config?.config.selected_repository_ids ?? [];
-
-        let repositoriesToSync: string[];
-        if (selectionMode === 'all') {
-          repositoriesToSync = allRepos
-            .map(r => r.full_name)
-            .filter((name): name is string => !!name);
         } else {
-          repositoriesToSync = allRepos
-            .filter(r => selectedIds.includes(r.id))
-            .map(r => r.full_name)
-            .filter((name): name is string => !!name);
+          const config = await getSecurityAgentConfigWithStatus(owner);
+          const selectionMode = config?.config.repository_selection_mode ?? 'selected';
+          const selectedIds = config?.config.selected_repository_ids ?? [];
+
+          const repositoriesToSync: string[] =
+            selectionMode === 'all'
+              ? allRepos.map(r => r.full_name).filter((name): name is string => !!name)
+              : allRepos
+                  .filter(r => selectedIds.includes(r.id))
+                  .map(r => r.full_name)
+                  .filter((name): name is string => !!name);
+
+          if (repositoriesToSync.length === 0) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'No repositories configured for security reviews',
+            });
+          }
+          syncScope = { syncType: 'all_repos', repoCount: repositoriesToSync.length };
         }
 
-        if (repositoriesToSync.length === 0) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'No repositories configured for security reviews',
-          });
-        }
-
-        const accepted = await submitManualSecuritySync({
+        const submitParams = {
           owner: securityOwner,
           actor: {
             id: ctx.user.id,
             email: ctx.user.google_user_email,
             name: ctx.user.google_user_name,
           },
-          origin: 'dashboard_refresh',
-        });
+          origin: 'dashboard_refresh' as const,
+          repoFullName: input.repoFullName,
+          operationKey: input.operationKey,
+        };
+
+        // With an `operationKey`, admit a `security`-domain ledger row before
+        // submitting (P1-A-08e). A replayed settled duplicate returns the
+        // recorded correlation ids without re-triggering tracking or audit.
+        const result: SecurityCommandResult =
+          input.operationKey === undefined
+            ? { kind: 'accepted', accepted: await submitManualSecuritySync(submitParams) }
+            : await runSecurityLedgerSubmit({
+                ctx,
+                owner: securityOwner,
+                intent: 'manual_sync',
+                operationKey: input.operationKey,
+                resourceKey: securitySyncLedgerResourceKey(securityOwner, input.repoFullName),
+                submit: () => submitManualSecuritySync(submitParams),
+              });
+        if (result.kind === 'replayed') {
+          return replayedSecurityResponse(result.canonical);
+        }
 
         trackSecurityAgentSync({
           distinctId: ctx.user.id,
           userId: ctx.user.id,
           ...deps.trackingExtras(ctx, input),
-          syncType: 'all_repos',
-          repoCount: repositoriesToSync.length,
+          syncType: syncScope.syncType,
+          repoCount: syncScope.repoCount,
           synced: 0,
           errors: 0,
         });
@@ -1178,17 +1496,18 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           resource_type: 'agent_config',
           resource_id: resourceId,
           metadata: {
-            syncType: 'all_repos',
-            repoCount: repositoriesToSync.length,
-            runId: accepted.runId,
-            messageId: accepted.messageId,
+            syncType: syncScope.syncType,
+            ...(input.repoFullName ? { repoFullName: input.repoFullName } : {}),
+            repoCount: syncScope.repoCount,
+            runId: result.accepted.runId,
+            messageId: result.accepted.messageId,
             status: 'accepted',
           },
         });
 
         return {
           success: true,
-          ...accepted,
+          ...result.accepted,
         };
       },
     },
@@ -1242,14 +1561,38 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const accepted = await submitManualFindingDismissal({
+        const submitParams = {
           owner: securityOwner,
-          actor: { id: ctx.user.id },
+          actor: { id: ctx.user.id, email: ctx.user.google_user_email },
           findingId: input.findingId,
           installationId,
           reason: input.reason,
           comment: input.comment,
-        });
+          operationKey: input.operationKey,
+        };
+
+        // With an `operationKey`, admit a `security`-domain ledger row before
+        // submitting (P1-A-08e). A replayed settled duplicate returns the
+        // recorded correlation ids without re-triggering tracking.
+        const result: SecurityCommandResult =
+          input.operationKey === undefined
+            ? { kind: 'accepted', accepted: await submitManualFindingDismissal(submitParams) }
+            : await runSecurityLedgerSubmit({
+                ctx,
+                owner: securityOwner,
+                intent: 'dismiss_finding',
+                operationKey: input.operationKey,
+                resourceKey: securityDismissLedgerResourceKey(
+                  securityOwner,
+                  input.findingId,
+                  input.reason,
+                  input.comment
+                ),
+                submit: () => submitManualFindingDismissal(submitParams),
+              });
+        if (result.kind === 'replayed') {
+          return replayedSecurityResponse(result.canonical);
+        }
 
         trackSecurityAgentFindingDismissed({
           distinctId: ctx.user.id,
@@ -1261,7 +1604,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           severity: finding.severity,
         });
 
-        return { success: true, ...accepted };
+        return { success: true, ...result.accepted };
       },
     },
 
@@ -1545,6 +1888,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         if (!command) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Security Agent command not found' });
         }
+        await settleSecurityLedgerForTerminalCommand({ ctx, command });
         return command;
       },
     },

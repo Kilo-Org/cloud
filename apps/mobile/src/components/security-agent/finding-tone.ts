@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   XCircle,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
 

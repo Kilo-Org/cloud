@@ -140,6 +140,11 @@ const KiloPassSubscriptionStatusSchema = z.union([
   z.literal('unpaid'),
 ]);
 
+type KiloPassBonusKind =
+  | KiloPassIssuanceItemKind.Bonus
+  | KiloPassIssuanceItemKind.ReferralBonus
+  | KiloPassIssuanceItemKind.PromoFirstMonth50Pct;
+
 const KiloPassSubscriptionStateBaseSchema = z.object({
   subscriptionId: z.string(),
   stripeSubscriptionId: z.string().nullable(),
@@ -167,6 +172,18 @@ const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.exte
   currentPeriodUsageUsd: z.number(),
   currentPeriodHostingCostUsd: z.number(),
   currentPeriodBonusCreditsUsd: z.number().nullable(),
+  currentPeriodBonus: z.object({
+    status: z.enum(['available', 'issued']),
+    kind: z
+      .enum([
+        KiloPassIssuanceItemKind.Bonus,
+        KiloPassIssuanceItemKind.ReferralBonus,
+        KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+      ])
+      .nullable(),
+    actualAmountUsd: z.number().nullable(),
+    projectedAmountUsd: z.number().nullable(),
+  }),
   isBonusUnlocked: z.boolean(),
   isBonusAvailableToUnlock: z.boolean(),
   refillAt: z.string().nullable(),
@@ -440,26 +457,50 @@ function assertStripeManagedSubscription(
   }
 }
 
-async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Promise<boolean> {
+async function getLatestBonusLikeItemForSubscriptionId(subscriptionId: string): Promise<{
+  kind: KiloPassBonusKind;
+  amountUsd: number;
+} | null> {
   const lastIssuance = await db
     .select({ id: kilo_pass_issuances.id })
     .from(kilo_pass_issuances)
     .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId))
-    .orderBy(desc(kilo_pass_issuances.issue_month))
+    // Keep the existing latest-issuance interpretation; the id tie-breaker
+    // makes duplicate issue months deterministic.
+    .orderBy(desc(kilo_pass_issuances.issue_month), desc(kilo_pass_issuances.id))
     .limit(1);
 
   const issuanceId = lastIssuance[0]?.id;
-  if (!issuanceId) return false;
+  if (!issuanceId) return null;
 
-  const unlockedItem = await db.query.kilo_pass_issuance_items.findFirst({
-    columns: { id: true },
-    where: and(
-      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-      inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
-    ),
-  });
+  const unlockedItems = await db
+    .select({
+      kind: kilo_pass_issuance_items.kind,
+      amountUsd: kilo_pass_issuance_items.amount_usd,
+    })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
+      )
+    )
+    .orderBy(asc(kilo_pass_issuance_items.kind))
+    .limit(1);
 
-  return Boolean(unlockedItem);
+  const unlockedItem = unlockedItems[0];
+  if (!unlockedItem) {
+    return null;
+  }
+
+  switch (unlockedItem.kind) {
+    case KiloPassIssuanceItemKind.Bonus:
+    case KiloPassIssuanceItemKind.ReferralBonus:
+    case KiloPassIssuanceItemKind.PromoFirstMonth50Pct:
+      return { kind: unlockedItem.kind, amountUsd: unlockedItem.amountUsd };
+    default:
+      return null;
+  }
 }
 
 async function getHasKiloPassThreshold(kiloUserId: string): Promise<boolean> {
@@ -750,7 +791,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
   const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
   const [
     isFirstTimeSubscriberEver,
-    isBonusUnlocked,
+    latestBonusLikeItem,
     hasKiloPassThreshold,
     latestBaseCredits,
     initialWelcomePromoContext,
@@ -759,13 +800,14 @@ async function buildActiveKiloPassSubscriptionState(params: {
       kiloUserId: params.kiloUserId,
       subscriptionId: params.subscription.subscriptionId,
     }),
-    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+    getLatestBonusLikeItemForSubscriptionId(params.subscription.subscriptionId),
     getHasKiloPassThreshold(params.kiloUserId),
     getLatestBaseCreditsForSubscription(params.subscription.subscriptionId),
     getInitialWelcomePromoContextForSubscription(db, {
       subscriptionId: params.subscription.subscriptionId,
     }),
   ]);
+  const isBonusUnlocked = latestBonusLikeItem !== null;
   const isBonusAvailableToUnlock = hasKiloPassThreshold && !isBonusUnlocked;
   const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
     paymentProvider: params.subscription.paymentProvider,
@@ -785,6 +827,16 @@ async function buildActiveKiloPassSubscriptionState(params: {
     usageBaselineMicrodollars: latestBaseCredits?.usageBaselineMicrodollars ?? null,
   });
 
+  const projectedAmountUsd =
+    isBonusUnlocked || isBonusAvailableToUnlock
+      ? getCurrentKiloPassBonusCreditsUsd({
+          subscription: params.subscription,
+          isFirstTimeSubscriberEver,
+          welcomePromoPolicy,
+          welcomePromoEligibilityReason,
+        })
+      : null;
+
   return {
     ...params.subscription,
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
@@ -798,15 +850,13 @@ async function buildActiveKiloPassSubscriptionState(params: {
     currentPeriodBaseCreditsUsd: baseAmountUsd,
     currentPeriodUsageUsd,
     currentPeriodHostingCostUsd,
-    currentPeriodBonusCreditsUsd:
-      isBonusUnlocked || isBonusAvailableToUnlock
-        ? getCurrentKiloPassBonusCreditsUsd({
-            subscription: params.subscription,
-            isFirstTimeSubscriberEver,
-            welcomePromoPolicy,
-            welcomePromoEligibilityReason,
-          })
-        : null,
+    currentPeriodBonusCreditsUsd: projectedAmountUsd,
+    currentPeriodBonus: {
+      status: isBonusUnlocked ? 'issued' : 'available',
+      kind: latestBonusLikeItem?.kind ?? null,
+      actualAmountUsd: latestBonusLikeItem?.amountUsd ?? null,
+      projectedAmountUsd,
+    },
     isBonusUnlocked,
     isBonusAvailableToUnlock,
     refillAt:
@@ -837,6 +887,12 @@ async function buildEndedKiloPassSubscriptionState(params: {
     currentPeriodUsageUsd: 0,
     currentPeriodHostingCostUsd: 0,
     currentPeriodBonusCreditsUsd: null,
+    currentPeriodBonus: {
+      status: 'available',
+      kind: null,
+      actualAmountUsd: null,
+      projectedAmountUsd: null,
+    },
     isBonusUnlocked: false,
     isBonusAvailableToUnlock: false,
     refillAt: null,

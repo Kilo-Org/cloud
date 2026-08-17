@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ExternalLink, Settings2 } from 'lucide-react-native';
+import { AlertTriangle, ExternalLink, Settings2 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { isTransitionalStatus, statusLabel, statusTone } from '@/components/kiloclaw/status-badge';

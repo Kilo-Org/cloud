@@ -19,9 +19,9 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
+  organizationAdminMutationProcedure,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
-  organizationAdminMutationProcedure,
 } from '@/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { sendOrganizationInviteEmail } from '@/lib/email';
@@ -107,6 +107,86 @@ async function getDirectOrganizationRole(
   return membership?.role ?? null;
 }
 
+/**
+ * The target membership's role, or undefined when the user is not a member.
+ * `UQ_organization_memberships_org_user` makes the row unique per
+ * (organization, member).
+ */
+async function readOrgMemberRole(
+  organizationId: string,
+  memberId: string
+): Promise<{ role: OrganizationRole } | undefined> {
+  const [member] = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    );
+  return member;
+}
+
+/** The target membership plus the service-account flag used by the removal guard. */
+async function readOrgMemberWithBotFlag(
+  organizationId: string,
+  memberId: string
+): Promise<{ role: OrganizationRole; isBot: boolean } | undefined> {
+  const [member] = await db
+    .select({
+      role: organization_memberships.role,
+      isBot: kilocode_users.is_bot,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    );
+  return member;
+}
+
+/** KiloClaw instance cleanup after a member removal (existing behavior, extracted). */
+async function cleanupRemovedMemberInstances(
+  memberId: string,
+  organizationId: string
+): Promise<void> {
+  // Runs after the membership deletion transaction commits.
+  // Fire-and-forget worker calls — Postgres rows are already soft-deleted,
+  // so even if worker calls fail the instance is "dead" from the platform
+  // perspective and reconciliation will clean up.
+  try {
+    const destroyedInstances = await destroyOrgInstancesForUser(memberId, organizationId);
+    if (destroyedInstances.length > 0) {
+      const client = new KiloClawInternalClient();
+      const results = await Promise.allSettled(
+        destroyedInstances.map(({ instanceId }) =>
+          client.destroy(memberId, instanceId, { reason: 'org_member_cleanup' })
+        )
+      );
+      for (const [i, result] of results.entries()) {
+        if (result.status === 'rejected') {
+          console.error(
+            `[kiloclaw-org] Failed to destroy worker instance ${destroyedInstances[i].instanceId} for removed member ${memberId}:`,
+            result.reason
+          );
+        }
+      }
+      console.log(
+        `[kiloclaw-org] Destroyed ${destroyedInstances.length} instance(s) for removed member ${memberId} in org ${organizationId}`
+      );
+    }
+  } catch (err) {
+    console.error(
+      `[kiloclaw-org] Failed to clean up KiloClaw instances for removed member ${memberId}:`,
+      err
+    );
+  }
+}
+
 export const organizationsMembersRouter = createTRPCRouter({
   listPublic: organizationMemberProcedure
     .input(OrganizationIdInputSchema)
@@ -121,74 +201,71 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, memberId, role, dailyUsageLimitUsd } = input;
 
-      // Get the target user's role if we need to check permissions for role or limit changes
-      let targetMember: { role: OrganizationRole } | undefined;
-      if (role !== undefined || dailyUsageLimitUsd !== undefined) {
-        const [member] = await db
-          .select({ role: organization_memberships.role })
-          .from(organization_memberships)
-          .where(
-            and(
-              eq(organization_memberships.organization_id, organizationId),
-              eq(organization_memberships.kilo_user_id, memberId)
-            )
-          );
-
-        if (!member) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'User is not a member of this organization',
-          });
-        }
-
-        targetMember = member;
-      }
-
-      // Handle role update if provided
-      if (role !== undefined) {
-        // Prevent users from changing their own role
-        if (user.id === memberId) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You cannot change your own role',
-          });
-        }
-
-        const actorRole = await ensureOrganizationAccess(
-          ctx,
-          organizationId,
-          ORGANIZATION_MANAGE_ROLES
-        );
-        assertOwnerAuthority(actorRole, { currentRole: targetMember?.role, nextRole: role });
-
-        const result = await updateUserRoleInOrganization(organizationId, memberId, role);
-        const updatedUser = await findUserById(memberId);
-        const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
-        await createAuditLog({
-          action: 'organization.member.change_role',
-          actor_email: user.google_user_email,
-          actor_id: user.id,
-          actor_name: user.google_user_name,
-          message: `Changed role for user ${updatedUserEmail} from ${targetMember?.role} to ${role}`,
-          organization_id: organizationId,
+      // Prevent users from changing their own role.
+      if (role !== undefined && user.id === memberId) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You cannot change your own role',
         });
-
-        if (!result.success) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Failed to update user role',
-          });
-        }
       }
 
-      // Handle daily usage limit update if provided
-      if (dailyUsageLimitUsd !== undefined && targetMember) {
+      // Limit-only update.
+      if (role === undefined) {
+        if (dailyUsageLimitUsd !== undefined) {
+          const targetMember = await readOrgMemberRole(organizationId, memberId);
+          if (!targetMember) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'User is not a member of this organization',
+            });
+          }
+
+          await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
+        }
+        return successResult({ updated: 'limit' });
+      }
+
+      const targetMember = await readOrgMemberRole(organizationId, memberId);
+      if (!targetMember) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User is not a member of this organization',
+        });
+      }
+
+      // Only an owner may grant the owner role or change an existing owner's
+      // role; admins match owners everywhere else.
+      const actorRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
+      assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
+
+      const result = await updateUserRoleInOrganization(organizationId, memberId, role);
+      const updatedUser = await findUserById(memberId);
+      const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
+      await createAuditLog({
+        action: 'organization.member.change_role',
+        actor_email: user.google_user_email,
+        actor_id: user.id,
+        actor_name: user.google_user_name,
+        message: `Changed role for user ${updatedUserEmail} from ${targetMember.role} to ${role}`,
+        organization_id: organizationId,
+      });
+
+      if (!result.success) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Failed to update user role',
+        });
+      }
+
+      if (dailyUsageLimitUsd !== undefined) {
         await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
       }
 
-      return successResult({
-        updated: role !== undefined ? 'role and limit' : 'limit',
-      });
+      return successResult({ updated: 'role and limit' });
     }),
   setChildMemberships: organizationBillingMutationProcedure
     .input(SetChildMembershipsSchema)
@@ -332,21 +409,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Get the target user's role and bot status
-      const [targetMember] = await db
-        .select({
-          role: organization_memberships.role,
-          isBot: kilocode_users.is_bot,
-        })
-        .from(organization_memberships)
-        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-        .where(
-          and(
-            eq(organization_memberships.organization_id, organizationId),
-            eq(organization_memberships.kilo_user_id, memberId)
-          )
-        );
-
+      const targetMember = await readOrgMemberWithBotFlag(organizationId, memberId);
       if (!targetMember) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -362,6 +425,8 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
+      // Only an owner may act on an existing owner's membership; admins match
+      // owners everywhere else.
       const actorRole = await ensureOrganizationAccess(
         ctx,
         organizationId,
@@ -388,40 +453,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       });
 
       await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
-
-      // KiloClaw cleanup: destroy org instances assigned to the removed member.
-
-      // Runs after the membership deletion transaction commits.
-      // Fire-and-forget worker calls — Postgres rows are already soft-deleted,
-      // so even if worker calls fail the instance is "dead" from the platform
-      // perspective and reconciliation will clean up.
-      try {
-        const destroyedInstances = await destroyOrgInstancesForUser(memberId, organizationId);
-        if (destroyedInstances.length > 0) {
-          const client = new KiloClawInternalClient();
-          const results = await Promise.allSettled(
-            destroyedInstances.map(({ instanceId }) =>
-              client.destroy(memberId, instanceId, { reason: 'org_member_cleanup' })
-            )
-          );
-          for (const [i, result] of results.entries()) {
-            if (result.status === 'rejected') {
-              console.error(
-                `[kiloclaw-org] Failed to destroy worker instance ${destroyedInstances[i].instanceId} for removed member ${memberId}:`,
-                result.reason
-              );
-            }
-          }
-          console.log(
-            `[kiloclaw-org] Destroyed ${destroyedInstances.length} instance(s) for removed member ${memberId} in org ${organizationId}`
-          );
-        }
-      } catch (err) {
-        console.error(
-          `[kiloclaw-org] Failed to clean up KiloClaw instances for removed member ${memberId}:`,
-          err
-        );
-      }
+      await cleanupRemovedMemberInstances(memberId, organizationId);
 
       return successResult({ updated: memberId });
     }),
@@ -452,8 +484,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Owners and Kilo staff can invite any role. Admins can invite any role
-      // except owner. Billing managers can invite members only.
+      // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       let invitation;
       try {
         invitation = await inviteUserToOrganization(organizationId, user.id, email, role);

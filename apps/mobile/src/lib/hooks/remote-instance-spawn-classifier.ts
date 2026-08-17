@@ -1,4 +1,8 @@
-import { type KiloSessionId, type UserWebConnection } from '@kilocode/cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type ModelSelection,
+  type UserWebConnection,
+} from '@kilocode/cloud-agent-sdk';
 // kilocode_change - K1/C2: these two runtime imports must come from their
 // narrow subpaths, not the `cloud-agent-sdk` barrel. The barrel's index.ts
 // also re-exports web-only transport code (`cloud-agent-connection.ts` ->
@@ -21,6 +25,7 @@ import {
   UserWebCommandError,
 } from '@kilocode/cloud-agent-sdk/user-web-connection';
 import {
+  COMMAND_ALREADY_PENDING_CODE,
   type CreateRemoteSessionInput,
   createRemoteSessionOnConnection,
   parseCreateSessionResponse,
@@ -38,15 +43,18 @@ export type { CreateRemoteSessionInput };
  * the caller needs:
  *
  *   - `ready`        — a fresh `KiloSessionId` was provisioned by the CLI
- *   - `retryable`    — either a transport-level failure (timeout, destroyed
- *                      connection, socket gone) OR the DO-emitted literal
- *                      `'Session owner not found'`, which is semantically
- *                      "the instance disconnected" and should follow the
- *                      same recovery path as a transport failure
+ *   - `retryable`    — a transport-level failure (timeout, destroyed
+ *                      connection, socket gone), the DO-emitted literal
+ *                      `'Session owner not found'` (semantically "the
+ *                      instance disconnected", same recovery path as a
+ *                      transport failure), OR the relay's
+ *                      `COMMAND_ALREADY_PENDING` same-key in-flight dedupe
+ *                      (the intent is still pending; keep the operation key
+ *                      and wait for the durable replay)
  *   - `nonRetryable` — anything else: a malformed response envelope, a
  *                      delivered CLI string error (e.g. `'failed to create
- *                      session'`), or any structured `UserWebCommandError`
- *                      (including `CLI_UPGRADE_REQUIRED`)
+ *                      session'`), or any other structured
+ *                      `UserWebCommandError` (including `CLI_UPGRADE_REQUIRED`)
  *
  * Note on intentionally-unreachable structured codes: relay-sourced codes
  * that are semantically transient (`COMMAND_EXPIRED`, `PENDING_COMMAND_LIMIT`)
@@ -96,9 +104,17 @@ export function classifyCreateSessionResult(
   // result.status === 'rejected'
   const cause: unknown = result.reason;
 
-  // Structured relay error: keep `.code` available; the classifier still
-  // intentionally maps all such errors to `nonRetryable` (see header).
+  // Structured relay error: keep `.code` available. Every code maps to
+  // `nonRetryable` except `COMMAND_ALREADY_PENDING` — the intent is still
+  // pending on the DO, so the caller keeps its key and retries for the replay.
   if (cause instanceof UserWebCommandError) {
+    if (cause.code === COMMAND_ALREADY_PENDING_CODE) {
+      return {
+        status: 'retryable',
+        reason: cause.message || cause.code,
+        cause,
+      };
+    }
     return {
       status: 'nonRetryable',
       reason: cause.message || cause.code,
@@ -137,26 +153,26 @@ export function classifyCreateSessionResult(
 // ---------------------------------------------------------------------------
 
 /**
- * Map the new-session screen's picker strings into the SDK
- * `CreateRemoteSessionInput` shape. Empty strings are omitted. Mobile model
- * options are gateway models; `kilo` is their provider (same mapping
- * `getRemoteModelFields` uses for legacy overrides).
+ * Map the new-session screen's picker state into the SDK
+ * `CreateRemoteSessionInput` shape. The caller resolves the picker's model
+ * choice into a `ModelSelection` (provider + model + optional variant); this
+ * builder forwards the selected provider and model as-is, without any
+ * hard-coded provider mapping. Empty strings are omitted.
  */
 export function buildCreateRemoteSessionInput(fields: {
   mode?: string;
-  model?: string;
-  variant?: string;
+  selection?: ModelSelection;
   organizationId?: string | null;
 }): CreateRemoteSessionInput | undefined {
   const input: CreateRemoteSessionInput = {};
   if (fields.mode) {
     input.agent = fields.mode;
   }
-  if (fields.model) {
+  if (fields.selection) {
     input.model = {
-      providerID: 'kilo',
-      modelID: fields.model,
-      ...(fields.variant ? { variant: fields.variant } : {}),
+      providerID: fields.selection.model.providerID,
+      modelID: fields.selection.model.modelID,
+      ...(fields.selection.variant ? { variant: fields.selection.variant } : {}),
     };
   }
   if (fields.organizationId) {
@@ -205,14 +221,20 @@ export function mergeSpawnOrganizationId(
 // Spawner
 // ---------------------------------------------------------------------------
 
+export type CreateSessionSpawnOptions = {
+  /**
+   * Stable per-user-intent key; becomes the SDK `mutationId` on the wire, so
+   * the relay's UserConnectionDO dedupes duplicate sends and replays the
+   * durable terminal result under the same key.
+   */
+  operationKey?: string;
+};
+
 /**
- * Stable per-spawner identity (UUID v4). Generated once at spawner creation.
- *
- * v1 does NOT use `creationKey` for server-side dedup — the relay/CLI has no
- * idempotency layer for `create_session` and an existing connection's race
- * is a real (but small) possibility. The key exists purely as a stable
- * per-attempt identifier for in-hook bookkeeping and tests; do not build a
- * dedupe layer on top of it without revisiting the contract.
+ * Stable per-spawner identity (UUID v4), generated once at spawner creation.
+ * It is NOT the dedupe key — server-side dedup rides the caller's
+ * `operationKey` (see `CreateSessionSpawnOptions`). Do not build a dedupe
+ * layer on top of `creationKey`.
  */
 export type CreateSessionSpawner = {
   readonly creationKey: string;
@@ -220,7 +242,11 @@ export type CreateSessionSpawner = {
    * Attempt a `create_session` against the given CLI connection. Returns
    * the classified outcome — never throws.
    */
-  spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+  spawn: (
+    connectionId: string,
+    opts?: CreateRemoteSessionInput,
+    options?: CreateSessionSpawnOptions
+  ) => Promise<CreateSessionOutcome>;
 };
 
 function generateCreationKey(): string {
@@ -249,9 +275,13 @@ export function createSessionSpawner(
   const creationKey = generateCreationKey();
   return {
     creationKey,
-    async spawn(connectionId, opts) {
+    async spawn(connectionId, opts, options) {
+      const input: CreateRemoteSessionInput = {
+        ...opts,
+        ...(options?.operationKey !== undefined ? { mutationId: options.operationKey } : {}),
+      };
       try {
-        const raw = await createRemoteSessionOnConnection(connection, connectionId, opts);
+        const raw = await createRemoteSessionOnConnection(connection, connectionId, input);
         return classifyCreateSessionResult({ status: 'fulfilled', value: raw });
       } catch (error) {
         return classifyCreateSessionResult({ status: 'rejected', reason: error });

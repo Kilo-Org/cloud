@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Check, Info, Lock, Search, SearchX, Unlock } from 'lucide-react-native';
+import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,6 +74,7 @@ export default function RepoPickerScreen() {
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
+              accessibilityLabel="Search repositories"
               placeholder="Search repositories..."
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"

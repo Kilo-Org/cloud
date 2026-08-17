@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, ChevronRight } from 'lucide-react-native';
+import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { SheetHeader } from '@/components/sheet-header';

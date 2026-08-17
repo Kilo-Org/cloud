@@ -1,17 +1,19 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { ROLE_LABEL } from '@/components/organization/member-row';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
-import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -72,11 +74,13 @@ export function InviteMemberSheet() {
 
       <FormField
         label="Email"
-        accessibilityLabel="Email"
+        required
         placeholder="name@company.com"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
         autoFocus
         validate={value => (EMAIL_PATTERN.test(value.trim()) ? null : EMAIL_ERROR)}
         onChangeText={value => {
@@ -92,7 +96,7 @@ export function InviteMemberSheet() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Role
           </Text>
-          <View className="overflow-hidden rounded-lg bg-secondary">
+          <RadioGroup label="Role" className="overflow-hidden rounded-lg bg-secondary">
             {INVITABLE_ROLES.map((value, index) => {
               const selected = role === value;
               return (
@@ -105,21 +109,24 @@ export function InviteMemberSheet() {
                   onPress={() => {
                     setRole(value);
                   }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
+                  {...radioItemA11y({ label: ROLE_LABEL[value], checked: selected })}
                 >
                   <Text className="flex-1 text-sm">{ROLE_LABEL[value]}</Text>
                   {selected && <Check size={16} color={colors.primary} />}
                 </Pressable>
               );
             })}
-          </View>
+          </RadioGroup>
         </View>
       )}
 
-      {mutations.invite.isError && (
-        <Text className="text-sm text-destructive">{mutations.invite.error.message}</Text>
-      )}
+      {/* The mutation hook has no toast for invite (inline error pattern P2),
+          so AccessibleStatus is the single announcement owner here: one
+          announcement per platform, visuals preserved (tone error). */}
+      <AccessibleStatus
+        message={mutations.invite.isError ? mutations.invite.error.message : null}
+        className="text-sm"
+      />
 
       <Button disabled={!canSubmit} loading={mutations.invite.isPending} onPress={onSubmit}>
         <Text className="text-primary-foreground">Send invite</Text>

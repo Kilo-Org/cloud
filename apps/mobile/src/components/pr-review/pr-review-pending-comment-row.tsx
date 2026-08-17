@@ -3,9 +3,10 @@
 // pressable body that opens the comment composer in edit mode.
 
 import { type RefObject } from 'react';
-import { Trash2 } from 'lucide-react-native';
+import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
 
+import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -56,6 +57,23 @@ export function PrReviewPendingCommentRow({
       </Pressable>
     </View>
   );
+}
+
+/**
+ * Announce a confirmed pending-comment removal and land focus on the
+ * always-mounted Review summary input. A toast would paint behind the form
+ * sheet on iOS, so the announcement is imperative. `removed` is the caller's
+ * confirmed synchronous remove; a stale id announces nothing.
+ */
+export function focusAfterPendingCommentRemoval(
+  inputRef: RefObject<TextInput | null>,
+  removed: boolean
+): void {
+  if (!removed) {
+    return;
+  }
+  announceForA11y('Pending comment deleted');
+  moveA11yFocus(inputRef);
 }
 
 /** Mono location label matching the composer range format (en dash). */

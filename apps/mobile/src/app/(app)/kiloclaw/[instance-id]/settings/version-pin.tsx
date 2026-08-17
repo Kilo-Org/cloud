@@ -1,4 +1,4 @@
-import { PackageSearch } from 'lucide-react-native';
+import { PackageSearch } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Alert, FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';

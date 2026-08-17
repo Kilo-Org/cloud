@@ -2,6 +2,8 @@ import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { announceForA11y } from '@/lib/a11y/announce';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
   canAddAttachments,
@@ -62,6 +64,13 @@ export function useAgentAttachmentUpload(
   const pathRef = useRef<string>(Crypto.randomUUID());
   const messageUuidRef = useRef<string>(Crypto.randomUUID());
   const isMountedRef = useRef(true);
+  // Row 3.3 stale-outcome guard. `liveIdsRef` mirrors the current attachment
+  // ids, so an in-flight upload for a removed chip — or for any chip cleared by
+  // a reset — is invalidated synchronously; the async completion never observes
+  // a stale `attachments` closure. `generationRef` covers only the window
+  // before ids exist: a reset while candidate measurement is in flight.
+  const generationRef = useRef(0);
+  const liveIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -74,7 +83,14 @@ export function useAgentAttachmentUpload(
     if (!isMountedRef.current) {
       return;
     }
-    setAttachments(current => current.map(item => (item.id === id ? { ...item, ...patch } : item)));
+    setAttachments(current => {
+      if (!current.some(item => item.id === id)) {
+        // Keep the same array reference when the id is gone (removed or
+        // reset) so a stale async update cannot replace the attachment list.
+        return current;
+      }
+      return current.map(item => (item.id === id ? { ...item, ...patch } : item));
+    });
   }, []);
 
   const startUpload = useCallback(
@@ -99,12 +115,30 @@ export function useAgentAttachmentUpload(
               updateAttachment(attachment.id, { progress });
             },
           });
+          // Row 3.3 stale-outcome guard: a removed or reset upload must not
+          // flip state or announce for the current composer. Ids are UUIDs, so
+          // a cleared id can never come back. Unmount is suppressed separately
+          // via `isMountedRef`.
+          if (!liveIdsRef.current.has(attachment.id)) {
+            return;
+          }
           updateAttachment(attachment.id, {
             status: 'uploaded',
             remoteFilename: key.split('/').at(-1),
             progress: 1,
           });
+          // Hook-owned success announcement (D19): the flip to terminal
+          // success announces exactly once, and only while the composer is
+          // still mounted. The chip is presentational and never announces.
+          // `announceForA11y` swallows native failures, so it can never enter
+          // the upload catch and turn success into a failure toast.
+          if (isMountedRef.current) {
+            announceForA11y('Attachment uploaded');
+          }
         } catch (error) {
+          if (!liveIdsRef.current.has(attachment.id)) {
+            return;
+          }
           const { retryable, reason } = classifyUploadFailure(error);
           updateAttachment(attachment.id, {
             status: 'error',
@@ -112,9 +146,9 @@ export function useAgentAttachmentUpload(
             terminal: !retryable,
             progress: null,
           });
-          // Single toast per failed chip. Terminal surfaces its own chip
-          // copy so the toast only needs to echo the same intent.
-          toast.error(
+          // Single announced toast per failed chip (D19). Terminal surfaces
+          // its own chip copy so the toast only needs to echo the same intent.
+          announcingToast.error(
             retryable ? `Failed to upload file: ${reason}` : describeTerminalReason(reason)
           );
         }
@@ -129,6 +163,7 @@ export function useAgentAttachmentUpload(
       if (candidates.length === 0) {
         return;
       }
+      const generation = generationRef.current;
       const limit = canAddAttachments(attachments.length, candidates.length);
       if (!limit.ok) {
         toast.error(`Maximum ${AGENT_ATTACHMENT_MAX_FILES} files allowed`);
@@ -151,6 +186,13 @@ export function useAgentAttachmentUpload(
           return { candidate, size };
         })
       );
+
+      // Row 3.3 stale-outcome guard: a reset while measurement is pending
+      // invalidates the captured generation, so the continuation must not
+      // classify, add, or start uploads for the previous composer session.
+      if (generationRef.current !== generation || !isMountedRef.current) {
+        return;
+      }
 
       const additions: AgentAttachment[] = [];
       for (const { candidate, size } of measured) {
@@ -178,6 +220,7 @@ export function useAgentAttachmentUpload(
       }
       setAttachments(current => [...current, ...additions]);
       for (const addition of additions) {
+        liveIdsRef.current.add(addition.id);
         startUpload(addition, pathRef.current);
       }
     },
@@ -185,6 +228,7 @@ export function useAgentAttachmentUpload(
   );
 
   const removeAttachment = useCallback((id: string) => {
+    liveIdsRef.current.delete(id);
     setAttachments(current => current.filter(item => item.id !== id));
   }, []);
 
@@ -202,6 +246,11 @@ export function useAgentAttachmentUpload(
   );
 
   const reset = useCallback(() => {
+    // Invalidate the generation before clearing state so a pending
+    // candidate-measurement continuation observes the new generation
+    // and drops its candidates instead of adding them post-reset.
+    generationRef.current += 1;
+    liveIdsRef.current.clear();
     setAttachments([]);
     pathRef.current = Crypto.randomUUID();
     messageUuidRef.current = Crypto.randomUUID();

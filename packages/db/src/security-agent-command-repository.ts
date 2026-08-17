@@ -22,6 +22,12 @@ export type CreateSecurityAgentCommandInput = {
   resultMetadata?: Record<string, unknown>;
 };
 
+export type CreateOrFindSecurityAgentCommandResult = {
+  command: SecurityAgentCommand;
+  /** False when a same-key request already created the command row. */
+  created: boolean;
+};
+
 export type TransitionSecurityAgentCommandInput = {
   commandId: string;
   fromStatuses: SecurityAgentCommandStatus[];
@@ -69,26 +75,70 @@ function isTerminalStatus(status: SecurityAgentCommandStatus): boolean {
   return status === 'succeeded' || status === 'failed' || status === 'no_op';
 }
 
+function commandInsertValues(input: CreateSecurityAgentCommandInput, operationKey?: string) {
+  return {
+    id: input.id,
+    command_type: input.commandType,
+    origin: input.origin,
+    ...ownerValues(input.owner),
+    finding_id: input.findingId,
+    repo_full_name: input.repoFullName,
+    operation_key: operationKey,
+    result_metadata: input.resultMetadata,
+    status: 'accepted' as const,
+  };
+}
+
 export async function createSecurityAgentCommand(
   db: SecurityAgentCommandDb,
   input: CreateSecurityAgentCommandInput
 ): Promise<SecurityAgentCommand> {
   const [command] = await db
     .insert(security_agent_commands)
-    .values({
-      id: input.id,
-      command_type: input.commandType,
-      origin: input.origin,
-      ...ownerValues(input.owner),
-      finding_id: input.findingId,
-      repo_full_name: input.repoFullName,
-      result_metadata: input.resultMetadata,
-      status: 'accepted',
-    })
+    .values(commandInsertValues(input))
     .returning();
 
   if (!command) throw new Error('Failed to create security agent command');
   return command;
+}
+
+/**
+ * Creates the command for `operationKey`, or returns the command a same-key
+ * request already created. The partial unique indexes on
+ * `(owner, operation_key)` arbitrate concurrent inserts, so the loser reads the
+ * committed winner instead of raising a unique violation, and a conflict always
+ * implies the same owner. The caller must inspect an existing command whose
+ * initial queue admission failed before it returns an accepted response.
+ */
+export async function createOrFindSecurityAgentCommandByOperationKey(
+  db: SecurityAgentCommandDb,
+  input: CreateSecurityAgentCommandInput & { operationKey: string }
+): Promise<CreateOrFindSecurityAgentCommandResult> {
+  const [created] = await db
+    .insert(security_agent_commands)
+    .values(commandInsertValues(input, input.operationKey))
+    .onConflictDoNothing()
+    .returning();
+
+  if (created) return { command: created, created: true };
+
+  const [existing] = await db
+    .select()
+    .from(security_agent_commands)
+    .where(
+      and(ownerWhere(input.owner), eq(security_agent_commands.operation_key, input.operationKey))
+    )
+    .limit(1);
+
+  if (!existing) {
+    throw new Error('Security Agent command vanished after a conflict-safe insert');
+  }
+  if (existing.command_type !== input.commandType) {
+    throw new Error(
+      `Security Agent command operation key ${input.operationKey} was reused for another command type`
+    );
+  }
+  return { command: existing, created: false };
 }
 
 export async function transitionSecurityAgentCommand(
@@ -108,7 +158,7 @@ export async function transitionSecurityAgentCommand(
         input.status === 'running'
           ? sql`COALESCE(${security_agent_commands.started_at}, now())`
           : undefined,
-      completed_at: isTerminalStatus(input.status) ? sql`now()` : undefined,
+      completed_at: isTerminalStatus(input.status) ? sql`now()` : null,
       updated_at: sql`now()`,
     })
     .where(

@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { File as FileIcon } from 'lucide-react-native';
+import { File as FileIcon } from '@/components/ui/icons';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 
 import { Image } from '@/components/ui/image';
@@ -17,7 +17,17 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   if (isImage && part.url) {
     return (
       <View className="my-1 overflow-hidden rounded-lg">
-        <Image source={{ uri: part.url }} className="aspect-video w-full" contentFit="contain" />
+        {/* An agent's image output carries meaning, so it is labeled rather
+            than decorative. `accessible` is required: expo-image defaults it
+            to false, so `alt` alone leaves the image unreachable. */}
+        <Image
+          source={{ uri: part.url }}
+          className="aspect-video w-full"
+          contentFit="contain"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={part.filename ? `Image output, ${part.filename}` : 'Image output'}
+        />
         {part.filename ? (
           <Text className="mt-1 text-xs text-muted-foreground">{part.filename}</Text>
         ) : null}

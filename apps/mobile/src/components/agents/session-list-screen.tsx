@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus } from 'lucide-react-native';
+import { Plus } from '@/components/ui/icons';
 
 import { ActiveNowSection } from '@/components/agents/active-now-section';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
@@ -224,6 +224,7 @@ export function AgentSessionListScreen() {
       ) : null}
       <Animated.View layout={LinearTransition} className="flex-1">
         <AgentSessionListContent
+          searchInputRef={searchInputRef}
           sections={sections}
           hasAnySessions={hasAnySessions}
           hasPinnedActive={hasPinnedActive}

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, Server } from 'lucide-react-native';
+import { Check, Server } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 

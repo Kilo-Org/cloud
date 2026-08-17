@@ -113,8 +113,12 @@ describe('buildCodingPlanInventorySlackNotification', () => {
     expect(rendered).toContain('*MiniMax*');
     expect(rendered).toContain('Token Plan Plus · Available `2` · Assigned `0` · Loaded `2`');
     expect(rendered).toContain('*BytePlus*');
-    expect(rendered).toContain('Coding Plan Lite · Available `1` · Assigned `4` · Loaded `5`');
-    expect(rendered).toContain('Coding Plan Pro · Available `3` · Assigned `0` · Loaded `3`');
+    expect(rendered).toContain(
+      'Enterprise Coding Plan Lite · Available `1` · Assigned `4` · Loaded `5`'
+    );
+    expect(rendered).toContain(
+      'Enterprise Coding Plan Pro · Available `3` · Assigned `0` · Loaded `3`'
+    );
   });
 
   it('renders an explicit empty-inventory state', () => {

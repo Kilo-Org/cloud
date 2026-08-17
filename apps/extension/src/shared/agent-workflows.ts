@@ -61,6 +61,8 @@ export interface PendingAgentWorkflowDraft {
 
 export interface AgentWorkflowSettings {
   allowWorkflowsInSafeMode: boolean;
+  autoApproveWorkflowChanges: boolean;
+  autoApproveWorkflowRuns: boolean;
 }
 
 export const agentWorkflowParamSchema = z
@@ -122,8 +124,16 @@ export const pendingAgentWorkflowDraftSchema = z
 export const agentWorkflowSettingsSchema = z
   .object({
     allowWorkflowsInSafeMode: z.boolean(),
+    autoApproveWorkflowChanges: z.boolean().default(false),
+    autoApproveWorkflowRuns: z.boolean().default(false),
   })
   .strip();
+
+export const DEFAULT_WORKFLOW_SETTINGS: AgentWorkflowSettings = {
+  allowWorkflowsInSafeMode: false,
+  autoApproveWorkflowChanges: false,
+  autoApproveWorkflowRuns: false,
+};
 
 /**
  * Compute the SHA-256 hex digest of a workflow script.

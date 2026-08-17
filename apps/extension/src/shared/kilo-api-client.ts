@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { FetchLike } from './auth';
 export {
   fetchKiloGatewayChatCompletionStream,
+  KiloGatewayHttpError,
+  KiloGatewayStreamStalledError,
   parseKiloGatewayChatCompletionStream,
 } from './kilo-gateway-chat-stream-client';
 export type {

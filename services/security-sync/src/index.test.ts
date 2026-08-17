@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,
   markSecurityAgentCommandQueueAdmissionFailed,
   markSecurityAgentCommandRetriesExhausted,
@@ -7,6 +8,7 @@ import {
 } from '@kilocode/db';
 import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
+import { settleOperation } from '@kilocode/db/operation-ledger';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
@@ -18,6 +20,7 @@ vi.mock('@kilocode/db', async importOriginal => {
     requireSecurityAgentCommandTransitionOrTerminal,
   } = await importOriginal<typeof DbModule>();
   return {
+    createOrFindSecurityAgentCommandByOperationKey: vi.fn(),
     createSecurityAgentCommand: vi.fn(),
     isTerminalSecurityAgentCommandTransitionOutcome,
     markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
@@ -27,6 +30,7 @@ vi.mock('@kilocode/db', async importOriginal => {
   };
 });
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+vi.mock('@kilocode/db/operation-ledger', () => ({ settleOperation: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
@@ -46,7 +50,23 @@ beforeEach(() => {
     command: {},
   } as never);
   vi.mocked(runSecurityNotificationSweep).mockResolvedValue({} as never);
+  vi.mocked(settleOperation).mockResolvedValue({ settled: true, row: {} } as never);
 });
+
+/** Worker database stub; every repository call it would serve is mocked. */
+function workerDbStub(): never {
+  return {} as never;
+}
+
+function ledgerDb(rows: { id: string }[]): never {
+  return {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: async () => rows }),
+      }),
+    }),
+  } as never;
+}
 
 describe('collectScheduledSyncOwners', () => {
   it('skips owners whose automatic sync policy is disabled', () => {
@@ -104,7 +124,7 @@ describe('scheduled sync dispatch', () => {
           }),
         }),
       } as never)
-      .mockReturnValueOnce({} as never);
+      .mockReturnValueOnce(workerDbStub());
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
 
     await worker.scheduled(
@@ -362,7 +382,8 @@ describe('manual sync dispatch', () => {
       repoFullName: 'kilo/repo',
     });
 
-    vi.mocked(getWorkerDb).mockReturnValue({} as never);
+    const workerDb = workerDbStub();
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const ack = vi.fn();
     const retry = vi.fn();
@@ -384,12 +405,12 @@ describe('manual sync dispatch', () => {
     );
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
       1,
-      {},
+      workerDb,
       expect.objectContaining({ status: 'running' })
     );
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
       2,
-      {},
+      workerDb,
       expect.objectContaining({ status: 'succeeded', resultCode: 'SYNC_COMPLETED' })
     );
     expect(
@@ -400,6 +421,7 @@ describe('manual sync dispatch', () => {
   });
 
   it('enables sync-time notification staging only for exact true rollout flag', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const ack = vi.fn();
     const retry = vi.fn();
@@ -479,7 +501,7 @@ describe('manual sync dispatch', () => {
       },
     });
 
-    vi.mocked(getWorkerDb).mockReturnValue({} as never);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
     const ack = vi.fn();
     const retry = vi.fn();
@@ -505,6 +527,7 @@ describe('manual sync dispatch', () => {
       transitioned: false,
       command: { status: 'succeeded', result_code: 'SYNC_COMPLETED' },
     } as never);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
     const ack = vi.fn();
     const retry = vi.fn();
 
@@ -566,7 +589,7 @@ describe('manual dismissal dispatch', () => {
         body: JSON.stringify({
           schemaVersion: 1,
           owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-          actor: { id: 'user-123' },
+          actor: { id: 'user-123', email: 'owner@example.com' },
           findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           installationId: 'installation-123',
           reason: 'not_used',
@@ -589,7 +612,7 @@ describe('manual dismissal dispatch', () => {
     expect(queuedBatches[0]?.[0]?.body).toMatchObject({
       kind: 'dismiss',
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      actor: { id: 'user-123' },
+      actor: { id: 'user-123', email: 'owner@example.com' },
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       installationId: 'installation-123',
       reason: 'not_used',
@@ -656,6 +679,8 @@ describe('manual dismissal dispatch', () => {
       commandStatus: 'succeeded',
       resultCode: 'FINDING_DISMISSED',
     });
+    const workerDb = workerDbStub();
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
     const ack = vi.fn();
     const retry = vi.fn();
 
@@ -672,7 +697,7 @@ describe('manual dismissal dispatch', () => {
               messageId: 'dismiss-message-123',
               dispatchedAt: '2026-05-18T08:30:00.000Z',
               owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-              actor: { id: 'user-123' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
               findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
               installationId: 'installation-123',
               reason: 'not_used',
@@ -690,7 +715,7 @@ describe('manual dismissal dispatch', () => {
 
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
       2,
-      {},
+      workerDb,
       expect.objectContaining({ status: 'succeeded', resultCode: 'FINDING_DISMISSED' })
     );
     expect(
@@ -744,6 +769,17 @@ describe('manual dismissal dispatch', () => {
       transitioned: false,
       command: null,
     });
+    vi.mocked(markSecurityAgentCommandRetriesExhausted).mockResolvedValueOnce({
+      transitioned: true,
+      command: {
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        operation_key: 'retry-safe-key-123',
+        status: 'failed',
+        result_code: 'QUEUE_RETRIES_EXHAUSTED',
+      },
+    } as never);
+    const workerDb = ledgerDb([{ id: 'ledger-row-id' }]);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
     const ack = vi.fn();
     const retry = vi.fn();
 
@@ -760,7 +796,7 @@ describe('manual dismissal dispatch', () => {
               messageId: 'dismiss-message-123',
               dispatchedAt: '2026-05-18T08:30:00.000Z',
               owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-              actor: { id: 'user-123' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
               findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
               installationId: 'installation-123',
               reason: 'not_used',
@@ -774,12 +810,24 @@ describe('manual dismissal dispatch', () => {
     );
 
     expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
-      {},
+      workerDb,
       'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
     );
     expect(
       vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
     ).toBeLessThan(retry.mock.invocationCallOrder[0] ?? Infinity);
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'failed',
+        outcomeCode: 'QUEUE_RETRIES_EXHAUSTED',
+        outboxEvent: expect.objectContaining({ distinctId: 'owner@example.com' }),
+      })
+    );
+    expect(vi.mocked(settleOperation).mock.invocationCallOrder[0]).toBeLessThan(
+      retry.mock.invocationCallOrder[0] ?? Infinity
+    );
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
   });
@@ -820,6 +868,309 @@ describe('manual dismissal dispatch', () => {
       } as CloudflareEnv
     );
 
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('same-key command dedupe (P1-A-08e)', () => {
+  function manualSyncEnv(queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][]) {
+    return {
+      INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+      HYPERDRIVE: { connectionString: 'postgres://worker' },
+      SYNC_QUEUE: {
+        sendBatch: async (batch: MessageSendRequest<SecuritySyncQueueMessage>[]) => {
+          queuedBatches.push(batch);
+        },
+      },
+    } as CloudflareEnv;
+  }
+
+  function manualSyncRequest(operationKey: string) {
+    return new Request('https://security-sync.test/internal/manual-sync', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': 'worker-secret',
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        origin: 'dashboard_refresh',
+        operationKey,
+      }),
+    });
+  }
+
+  function dismissalRequest(operationKey: string) {
+    return new Request('https://security-sync.test/internal/dismiss-finding', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': 'worker-secret',
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+        operationKey,
+      }),
+    });
+  }
+
+  /** One stored command per operation key, as the partial unique index enforces. */
+  function commandsByOperationKey() {
+    const commands = new Map<string, string>();
+    vi.mocked(createOrFindSecurityAgentCommandByOperationKey).mockImplementation(
+      async (_db, input) => {
+        const existing = commands.get(input.operationKey);
+        if (existing) {
+          return { command: { id: existing }, created: false } as never;
+        }
+        const id = `command-${commands.size + 1}`;
+        commands.set(input.operationKey, id);
+        return { command: { id }, created: true } as never;
+      }
+    );
+    return commands;
+  }
+
+  it('creates the keyed manual sync command with its operation key and enqueues once', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    commandsByOperationKey();
+
+    const response = await worker.fetch(
+      manualSyncRequest('retry-safe-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      accepted: true,
+      commandId: 'command-1',
+    });
+    expect(createOrFindSecurityAgentCommandByOperationKey).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        commandType: 'sync',
+        origin: 'dashboard_refresh',
+        owner: { type: 'org', id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        operationKey: 'retry-safe-key-123',
+      })
+    );
+    expect(createSecurityAgentCommand).not.toHaveBeenCalled();
+    expect(queuedBatches).toHaveLength(1);
+    expect(queuedBatches[0]?.[0]?.body).toMatchObject({ commandId: 'command-1' });
+  });
+
+  it('reuses the original command on a same-key manual sync retry without enqueueing a duplicate', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    commandsByOperationKey();
+
+    const first = await worker.fetch(
+      manualSyncRequest('retry-safe-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+    const second = await worker.fetch(
+      manualSyncRequest('retry-safe-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
+    await expect(first.json()).resolves.toMatchObject({ commandId: 'command-1' });
+    await expect(second.json()).resolves.toMatchObject({ commandId: 'command-1' });
+    expect(queuedBatches).toHaveLength(1);
+  });
+
+  it('reuses the original command on a same-key dismissal retry without re-running the dismissal', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    commandsByOperationKey();
+
+    const first = await worker.fetch(
+      dismissalRequest('dismiss-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+    const second = await worker.fetch(
+      dismissalRequest('dismiss-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
+    await expect(first.json()).resolves.toMatchObject({ commandId: 'command-1' });
+    await expect(second.json()).resolves.toMatchObject({ commandId: 'command-1' });
+    expect(createOrFindSecurityAgentCommandByOperationKey).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        commandType: 'dismiss_finding',
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        operationKey: 'dismiss-key-123',
+      })
+    );
+    expect(queuedBatches).toHaveLength(1);
+  });
+
+  it('serializes concurrent same-key requests into one command and one queue batch', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    commandsByOperationKey();
+
+    const [first, second] = await Promise.all([
+      worker.fetch(manualSyncRequest('retry-safe-key-123'), manualSyncEnv(queuedBatches)),
+      worker.fetch(manualSyncRequest('retry-safe-key-123'), manualSyncEnv(queuedBatches)),
+    ]);
+
+    const firstBody = (await first.json()) as { commandId?: string };
+    const secondBody = (await second.json()) as { commandId?: string };
+    expect(firstBody.commandId).toBe('command-1');
+    expect(secondBody.commandId).toBe('command-1');
+    expect(queuedBatches).toHaveLength(1);
+  });
+
+  it('compensates a fresh keyed command when queue admission fails', async () => {
+    commandsByOperationKey();
+
+    await expect(
+      worker.fetch(manualSyncRequest('retry-safe-key-123'), {
+        INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        SYNC_QUEUE: {
+          sendBatch: async () => {
+            throw new Error('queue unavailable');
+          },
+        },
+      } as unknown as CloudflareEnv)
+    ).rejects.toThrow('queue unavailable');
+
+    expect(markSecurityAgentCommandQueueAdmissionFailed).toHaveBeenCalledWith(
+      {},
+      'command-1',
+      'Queue admission failed'
+    );
+  });
+
+  it('re-enqueues a same-key command whose first queue admission failed', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    vi.mocked(createOrFindSecurityAgentCommandByOperationKey).mockResolvedValue({
+      command: {
+        id: 'command-1',
+        status: 'failed',
+        result_code: 'QUEUE_ADMISSION_FAILED',
+      },
+      created: false,
+    } as never);
+
+    const response = await worker.fetch(
+      manualSyncRequest('retry-safe-key-123'),
+      manualSyncEnv(queuedBatches)
+    );
+
+    expect(response.status).toBe(202);
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledWith(
+      {},
+      {
+        commandId: 'command-1',
+        fromStatuses: ['failed'],
+        status: 'accepted',
+        resultCode: null,
+        lastErrorRedacted: null,
+      }
+    );
+    expect(queuedBatches).toHaveLength(1);
+    expect(queuedBatches[0]?.[0]?.body).toMatchObject({ commandId: 'command-1' });
+  });
+
+  it('propagates a rejected operation key without creating a command or a queue message', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    vi.mocked(createOrFindSecurityAgentCommandByOperationKey).mockRejectedValue(
+      new Error(
+        'Security Agent command operation key reuse-key was reused for another command type'
+      )
+    );
+
+    await expect(
+      worker.fetch(manualSyncRequest('reuse-key'), manualSyncEnv(queuedBatches))
+    ).rejects.toThrow('was reused for another command type');
+    expect(queuedBatches).toHaveLength(0);
+  });
+});
+
+describe('security operation ledger settlement', () => {
+  const terminalCommand = {
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    operation_key: 'retry-safe-key-123',
+    status: 'succeeded',
+    result_code: 'SYNC_COMPLETED',
+  };
+
+  async function processTerminalSync(rows: { id: string }[]) {
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerDb(rows));
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: terminalCommand,
+    } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              commandId: terminalCommand.id,
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'manual-sync-message',
+              trigger: 'manual',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              ownerKey: 'org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              chunkIndex: 0,
+              chunkCount: 1,
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              actor: { id: 'user-123', email: 'owner@example.com' },
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+    return { ack, retry };
+  }
+
+  it('settles a terminal command without a client status poll', async () => {
+    const { ack, retry } = await processTerminalSync([{ id: 'ledger-row-id' }]);
+
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'completed',
+        outcomeCode: 'SYNC_COMPLETED',
+        outboxEvent: expect.objectContaining({
+          eventName: 'security_command_settled',
+          distinctId: 'owner@example.com',
+        }),
+      })
+    );
+    expect(vi.mocked(settleOperation).mock.invocationCallOrder[0]).toBeLessThan(
+      ack.mock.invocationCallOrder[0] ?? Infinity
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('retries until the web handler records the command provider reference', async () => {
+    const { ack, retry } = await processTerminalSync([]);
+
+    expect(settleOperation).not.toHaveBeenCalled();
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
   });

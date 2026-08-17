@@ -16,8 +16,12 @@ import {
   isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
-import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
+import {
+  applyMoonshotModelSettings,
+  isKimiModel,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/moonshotai';
+import { FRIENDLI_GLM_PUBLIC_ID, isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
@@ -35,6 +39,7 @@ import {
   enableReasoningSummaries,
   fixResponsesRequest,
   isReasoningExplicitlyEnabled,
+  mapReasoningDetailsToReasoningContent,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
@@ -70,8 +75,8 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isGlmModel(requestedModel)) {
     return [
+      OpenRouterInferenceProviderIdSchema.enum.friendli,
       OpenRouterInferenceProviderIdSchema.enum.novita,
-      OpenRouterInferenceProviderIdSchema.enum['z-ai'],
     ];
   }
   if (isQwenModel(requestedModel)) {
@@ -118,6 +123,42 @@ export async function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
+export function applyAnthropicThinkingDefault(
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+) {
+  const defaultsToThinking =
+    (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
+    requestedModel === FRIENDLI_GLM_PUBLIC_ID ||
+    requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
+  if (
+    defaultsToThinking &&
+    requestToMutate.kind === 'messages' &&
+    !isReasoningExplicitlyEnabled(requestToMutate)
+  ) {
+    // The Anthropic provider omits thinking:disabled when reasoning is not enabled, but these
+    // models can default to thinking when the field is absent.
+    requestToMutate.body.thinking = { type: 'disabled' };
+  }
+}
+
+/**
+ * Inverse of the `mapReasoningContentToDetails` response transform: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` string
+ * the upstream speaks, so reasoning survives the round trip.
+ */
+export function applyReasoningDetailsTransform(
+  provider: Provider,
+  requestToMutate: GatewayRequest
+) {
+  if (
+    requestToMutate.kind === 'chat_completions' &&
+    provider.responseTransforms?.mapReasoningContentToDetails
+  ) {
+    mapReasoningDetailsToReasoningContent(requestToMutate.body);
+  }
+}
+
 export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -139,6 +180,8 @@ export async function applyProviderSpecificLogic(
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
     repairChatCompletionsTools(requestToMutate.body);
+
+    applyReasoningDetailsTransform(provider, requestToMutate);
 
     if (isClaudeModel(requestedModel)) {
       // Workaround for older clients corrupting Claude reasoning, resulting in:
@@ -182,16 +225,7 @@ export async function applyProviderSpecificLogic(
     addCacheBreakpoints(requestToMutate);
   }
 
-  if (
-    isMinimaxModel(requestedModel) &&
-    requestedModel.includes('m3') &&
-    !isReasoningExplicitlyEnabled(requestToMutate) &&
-    requestToMutate.kind === 'messages'
-  ) {
-    // MiniMax defaults to thinking, but the Anthropic provider does not include thinking:disabled in the request, creating a mismatch.
-    // https://github.com/vercel/ai/blob/4a441d8fb584b231f771348de3e7f383ab7aa95b/packages/anthropic/src/anthropic-language-model.ts#L421-L453
-    requestToMutate.body.thinking = { type: 'disabled' };
-  }
+  applyAnthropicThinkingDefault(requestedModel, requestToMutate);
 
   await provider.transformRequest({
     provider,

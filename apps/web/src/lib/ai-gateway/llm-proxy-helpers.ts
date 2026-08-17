@@ -302,6 +302,21 @@ export function modelNotAllowedResponse() {
   );
 }
 
+export function efficientPoolBlockedResponse() {
+  const error = 'Your organization blocks every model in the auto-routing pool.';
+  const message =
+    `${error} Configure a custom Efficient model pool with allowed models, ` +
+    `or adjust your organization model restrictions.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_allowed,
+      message,
+    },
+    { status: 404 }
+  );
+}
+
 export function unavailableModelResponse() {
   const error = 'The requested model is currently unavailable. Please choose a different model.';
   return NextResponse.json(
@@ -316,6 +331,22 @@ export function modelDoesNotExistResponse() {
       error: 'Model not found',
       error_type: ProxyErrorType.model_not_found,
       message: 'The requested model could not be found.',
+    },
+    { status: 404 }
+  );
+}
+
+export function modelDoesNotExistOnOpenRouterResponse(model: string) {
+  const error =
+    `The requested model '${model}' does not exist. ` +
+    `Please use an exact model id as listed on /api/gateway/models. ` +
+    `If this is a newly released model, please try again in a few minutes.`;
+  errorExceptInTest(`[modelDoesNotExistOnOpenRouterResponse] ${error}`);
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.model_not_found,
+      message: error,
     },
     { status: 404 }
   );

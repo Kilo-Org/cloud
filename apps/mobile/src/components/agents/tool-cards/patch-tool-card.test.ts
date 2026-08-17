@@ -6,7 +6,7 @@ import { PatchToolCard, PatchToolCardBody } from './patch-tool-card';
 import * as React from 'react';
 
 vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
-vi.mock('lucide-react-native', () => ({ FileDiff: 'FileDiff', Plug: 'Plug' }));
+vi.mock('@/components/ui/icons', () => ({ FileDiff: 'FileDiff', Plug: 'Plug' }));
 // Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');

@@ -168,12 +168,12 @@ describe('processDeadLetter', () => {
       PROFILE_LANE_DEAD_FAILURE_REASON
     );
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    // Profile runs never publish platform artifacts.
+    // Nothing is ready in the registry, so no table is published.
     expect(saveRoutingTable).not.toHaveBeenCalled();
     expect(kvDelete).not.toHaveBeenCalled();
   });
 
-  it('fails a platform run fast when a lane is dead, without publishing', async () => {
+  it('fails only the dead entry of a platform-queue run, never the whole run', async () => {
     mockRunState([{ model: 'b/dead', variant: 'high' }], 'platform');
     vi.mocked(listLaneFailures).mockResolvedValue([
       {
@@ -189,13 +189,16 @@ describe('processDeadLetter', () => {
 
     await processDeadLetter(env, deadLetterMessage());
 
-    expect(markRunFailed).toHaveBeenCalledWith(
+    // Platform-queue runs feed the same registry as user-queue runs, so a dead
+    // lane costs that entry only — the run itself still completes.
+    expect(markRunFailed).not.toHaveBeenCalled();
+    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
       env.BENCH_DB,
       runId,
-      expect.stringContaining('lane dead-lettered: b/dead variant high rep 0')
+      [{ model: 'b/dead', variant: 'high' }],
+      PROFILE_LANE_DEAD_FAILURE_REASON
     );
-    expect(markRunCompleted).not.toHaveBeenCalled();
-    expect(saveRoutingTable).not.toHaveBeenCalled();
   });
 
   it('does not finalize while another lane is still pending', async () => {

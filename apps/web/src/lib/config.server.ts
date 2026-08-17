@@ -57,10 +57,13 @@ export const TURNSTILE_SECRET_KEY = getEnvVariable('TURNSTILE_SECRET_KEY');
 export const NEXTAUTH_SECRET = getEnvVariable('NEXTAUTH_SECRET');
 export const OPENROUTER_API_KEY = getEnvVariable('OPENROUTER_API_KEY');
 export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
-export const OPENAI_API_KEY = getEnvVariable('OPENAI_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET');
+export const USER_DATA_EXPORT_WORKER_URL =
+  getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
+  (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
 export const CALLBACK_TOKEN_SECRET = getEnvVariable('CALLBACK_TOKEN_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
@@ -189,6 +192,16 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 export const SLACK_ENCRYPTION_KEY = getEnvVariable('SLACK_ENCRYPTION_KEY');
+/**
+ * RSA keyset for encrypting Slack bot credentials at rest, as JSON or base64-encoded
+ * JSON: `{ "active": { "keyId": "...", "publicKeyPem": "..." },
+ * "decrypt": [{ "keyId": "...", "privateKeyPem": "..." }] }`.
+ *
+ * Unlike the GitLab/Bitbucket platform-credential keys, web holds the private half
+ * because the Slack webhook path decrypts in-process. See
+ * `@/lib/integrations/platforms/slack/credential-keyset`.
+ */
+export const SLACK_CREDENTIAL_KEYSET_JSON = getEnvVariable('SLACK_CREDENTIAL_KEYSET_JSON');
 // Posts notifications from server-side Admin UI code to a fixed Slack channel.
 // Expected to be a Slack Incoming Webhook URL. Keep this server-only.
 export const SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(

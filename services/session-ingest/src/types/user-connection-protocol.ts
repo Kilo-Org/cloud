@@ -44,6 +44,16 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
         // Platform the session is running on (e.g. "darwin", "linux", "vscode").
         // Optional for backward compatibility with legacy CLIs.
         platform: z.string().max(32).optional(),
+        // Pull-request link reported by the CLI. Distinct from `platform`
+        // above, which is the client OS and stays unchanged. Absent on legacy
+        // CLIs that predate this field.
+        prLink: z
+          .object({
+            platform: z.string().min(1).max(32),
+            prUrl: z.string().max(2048),
+            prNumber: z.number().int().positive(),
+          })
+          .optional(),
       })
     ),
   }),

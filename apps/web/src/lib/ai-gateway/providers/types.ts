@@ -8,8 +8,11 @@ export type ProviderId =
   | 'seed'
   | 'direct-byok'
   | 'inception'
+  | 'longcat'
   | 'martian'
   | 'mistral'
+  | 'friendli'
+  | 'perplexity'
   | 'streamlake'
   | 'vercel'
   | 'custom'
@@ -35,13 +38,17 @@ export type TransformRequestContext = {
 
 export type GatewayChatApiKind = GatewayRequest['kind'];
 
+export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind, string>>>;
+
 export type ProviderResponseTransforms = {
-  thoughtContentMapping: string | null;
+  mapGeminiThoughtContent: boolean;
+  mapReasoningContentToDetails: boolean;
 };
 
 export type Provider = {
   id: ProviderId;
   apiUrl: string;
+  apiUrlOverrides: ProviderApiUrlOverrides;
   apiKey: string;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;

@@ -260,6 +260,81 @@ describe('CLIOutboundMessageSchema capabilities', () => {
   });
 });
 
+describe('CLIOutboundMessageSchema prLink', () => {
+  const baseSession = { id: 'ses_pr_1', status: 'busy', title: 'PR session' };
+
+  it('parses a heartbeat session with a prLink', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          ...baseSession,
+          prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/42', prNumber: 42 },
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0].prLink).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/o/r/pull/42',
+        prNumber: 42,
+      });
+    }
+  });
+
+  it('parses a legacy heartbeat session without prLink', () => {
+    const msg = { type: 'heartbeat', sessions: [baseSession] };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).not.toHaveProperty('prLink');
+    }
+  });
+
+  it('rejects a prLink with an oversize prUrl', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          ...baseSession,
+          prLink: { platform: 'github', prUrl: 'x'.repeat(2049), prNumber: 42 },
+        },
+      ],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('rejects a prLink with a non-positive prNumber', () => {
+    for (const prNumber of [0, -1]) {
+      const msg = {
+        type: 'heartbeat',
+        sessions: [
+          {
+            ...baseSession,
+            prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/1', prNumber },
+          },
+        ],
+      };
+      expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+    }
+  });
+
+  it('rejects a prLink with an empty platform', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          ...baseSession,
+          prLink: { platform: '', prUrl: 'https://github.com/o/r/pull/1', prNumber: 1 },
+        },
+      ],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+});
+
 describe('CLIInboundMessageSchema', () => {
   it('parses valid subscribe', () => {
     const msg = { type: 'subscribe', sessionId: validSessionId };

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { AgentBadge } from '@/components/ui/agent-badge';
@@ -181,6 +181,9 @@ export function SessionRow({
   );
   if (onPress) {
     return (
+      // No caller passes `onPress` today; both session rows wrap this
+      // primitive in their own labelled Pressable. A future caller owns its
+      // own accessible name.
       <Pressable onPress={onPress} className="active:opacity-70">
         {row}
       </Pressable>

@@ -1,43 +1,37 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useRef, useState } from 'react';
 import { type Href, useRouter } from 'expo-router';
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from 'jotai';
 import { toast } from 'sonner-native';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import * as Haptics from 'expo-haptics';
+import { listInstanceModels } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 
 import {
   buildContinuationSeed,
+  buildContinueRemoteSpawnInput,
   type ContinuationDestination,
   resolveContinuationDestinations,
-  resolveContinueRemoteModel,
 } from '@/components/agents/continuation-seed';
-import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { setContinuePickerBridge } from '@/components/agents/continue-picker-bridge';
+import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import {
-  getAgentSessionPath,
-  getSpawnedAgentSessionPath,
-} from '@/components/agents/session-detail-routes';
 import { type useSessionManager } from '@/components/agents/session-provider';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { putSharePayload } from '@/lib/share-payload';
 import { appendShareParams } from '@/lib/share-navigation';
-import {
-  buildCreateRemoteSessionInput,
-  useRemoteInstanceSpawn,
-} from '@/lib/hooks/use-remote-instance-spawn';
+import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,
 } from '@/lib/remote-submit-outcome';
-import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
-import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type RepositoriesResult =
@@ -48,7 +42,7 @@ type InstancesResult = RouterOutputs['activeSessions']['listInstances'];
 export function useContinueSession(args: {
   organizationId: string | undefined;
   manager: ReturnType<typeof useSessionManager>;
-  models: { id: string; variants: string[] }[];
+  models: SessionModelOption[];
   modelsLoading: boolean;
 }): {
   continueSession: (input: {
@@ -63,37 +57,15 @@ export function useContinueSession(args: {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const store = useStore();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const connection = useUserWebConnection();
   const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
   const busyRef = useRef(false);
-
-  const runCloudCreate = useCallback(
-    async (seed: string, dest: { repo: string; model: string; variant: string }, mode: string) => {
-      const initialMessageId = generateMessageId();
-      const baseInput = {
-        prompt: seed,
-        initialMessageId,
-        mode: normalizeAgentMode(mode),
-        model: dest.model,
-        variant: dest.variant || undefined,
-        githubRepo: dest.repo,
-        autoCommit: true,
-        autoInitiate: true,
-      };
-      const result = args.organizationId
-        ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...baseInput,
-            organizationId: args.organizationId,
-          })
-        : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
-      captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-      await invalidateAgentSessionQueries(queryClient, trpc);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.push(getAgentSessionPath(result.kiloSessionId, args.organizationId));
-    },
-    [args.organizationId, queryClient, router, trpc]
-  );
+  // P1-A-08b: cloud prepares and remote spawns are different intents, so each
+  // destination family holds its own hoisted `operationKey`. The cloud key
+  // lives inside `useContinueCloudCreate`.
+  const remoteOperationKey = useHoistedOperationKey();
+  const runCloudCreate = useContinueCloudCreate(args.organizationId);
 
   const execute = useCallback(
     async (
@@ -112,17 +84,32 @@ export function useContinueSession(args: {
           }
           return;
         }
-        const remoteModel = resolveContinueRemoteModel(fields.model, fields.variant, args.models);
-        const outcome = await spawn(
-          dest.instance.connectionId,
-          buildCreateRemoteSessionInput({
+        const remoteOperationKeyValue = remoteOperationKey.getKey(
+          JSON.stringify({
+            connectionId: dest.instance.connectionId,
+            seed,
+            model: fields.model,
+            variant: fields.variant,
             mode: fields.mode,
-            model: remoteModel.model,
-            variant: remoteModel.variant,
-            organizationId: args.organizationId,
+            organizationId: args.organizationId ?? null,
           })
         );
+        const catalogResult = await listInstanceModels(connection, dest.instance.connectionId);
+        const outcome = await spawn(
+          dest.instance.connectionId,
+          buildContinueRemoteSpawnInput({
+            mode: fields.mode,
+            model: fields.model,
+            variant: fields.variant,
+            options: args.models,
+            catalogResult,
+            organizationId: args.organizationId,
+          }),
+          { operationKey: remoteOperationKeyValue }
+        );
         if (outcome.status === 'ready') {
+          // The spawn settled; the next submit is a fresh intent.
+          remoteOperationKey.rotateKey();
           const shareId = putSharePayload({ text: seed, files: [], failedFiles: [] });
           router.push(
             appendShareParams(
@@ -138,12 +125,25 @@ export function useContinueSession(args: {
             ? REMOTE_SPAWN_RETRYABLE_TOAST
             : REMOTE_SPAWN_NON_RETRYABLE_TOAST
         );
+        // A non-retryable rejection ends the intent; a retryable outcome keeps
+        // the key so a same-key retry dedupes on the relay.
+        if (outcome.status === 'nonRetryable') {
+          remoteOperationKey.rotateKey();
+        }
       } finally {
         busyRef.current = false;
         setIsContinuing(false);
       }
     },
-    [args.organizationId, args.models, router, runCloudCreate, spawn]
+    [
+      args.organizationId,
+      args.models,
+      connection,
+      router,
+      runCloudCreate,
+      spawn,
+      remoteOperationKey,
+    ]
   );
 
   const fallback = useCallback(
@@ -254,30 +254,18 @@ export function useContinueSession(args: {
         }
 
         handedOff = true;
-        const labels = destinations.map(d =>
-          d.kind === 'cloud-agent' ? 'Cloud Agent' : d.instance.name
-        );
-        showActionSheetWithOptions(
-          {
-            title: 'Continue in a new session',
-            options: [...labels, 'Cancel'],
-            cancelButtonIndex: labels.length,
-          },
-          selected => {
-            if (selected === undefined || selected >= labels.length) {
-              busyRef.current = false;
-              setIsContinuing(false);
-              return;
-            }
-            const dest = destinations[selected];
-            if (!dest) {
-              busyRef.current = false;
-              setIsContinuing(false);
-              return;
-            }
+        const release = () => {
+          busyRef.current = false;
+          setIsContinuing(false);
+        };
+        setContinuePickerBridge({
+          destinations,
+          onSelect: dest => {
             void execute(dest, seed, fields);
-          }
-        );
+          },
+          onCancel: release,
+        });
+        router.push('/(app)/agent-chat/continue-picker' as Href);
       } finally {
         if (!handedOff) {
           busyRef.current = false;
@@ -295,7 +283,7 @@ export function useContinueSession(args: {
       queryClient,
       trpc,
       execute,
-      showActionSheetWithOptions,
+      router,
     ]
   );
 

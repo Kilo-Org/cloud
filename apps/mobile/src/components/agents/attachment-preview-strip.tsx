@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
-import { AlertCircle, File as FileIcon, X } from 'lucide-react-native';
+
+import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -14,6 +15,7 @@ type Props = {
   onRetry: (id: string) => void;
 };
 
+/** 28pt visible button + 8pt slop on every side = 44pt effective target. */
 const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 
 function AttachmentChip({
@@ -38,57 +40,111 @@ function AttachmentChip({
   });
 
   return (
-    <Pressable
-      onPress={description.showRetry ? onRetry : undefined}
-      disabled={!description.showRetry}
-      className={cn(
-        'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
-        isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2',
-        description.showRetry && 'border-destructive active:opacity-70',
-        isErrored && !description.showRetry && 'border-destructive/60'
-      )}
-      accessibilityRole={description.showRetry ? 'button' : undefined}
-      accessibilityLabel={
-        description.showRetry
-          ? `Retry uploading ${attachment.filename}`
-          : `${attachment.filename}, ${attachment.status}`
-      }
-    >
-      {isImage ? (
-        <Image
-          source={{ uri: attachment.localUri }}
+    // Outer wrapper keeps the strip's horizontal spacing (mr-2) and anchors
+    // the absolute Retry/Remove controls. It has NO overflow-hidden, so a
+    // parent never clips the controls' hitSlop; the rounded-image clipping
+    // lives on the surface view below, which is not their ancestor. Each
+    // control keeps its full 44pt effective target at runtime.
+    <View className="relative mr-2">
+      {/* Chip surface — the single accessible element describing the
+          attachment. The container above stays non-accessible so the sibling
+          Retry and Remove controls are individually reachable instead of
+          being shadowed by an accessible parent. */}
+      <View
+        className={cn(
+          'overflow-hidden rounded-md border border-border bg-card',
+          isImage ? 'h-16 w-20' : 'h-12 w-48',
+          description.showRetry && 'border-destructive',
+          isErrored && !description.showRetry && 'border-destructive/60'
+        )}
+      >
+        <View
           className="h-full w-full"
-          contentFit="cover"
-          transition={0}
-        />
-      ) : (
-        <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          {isErrored ? (
-            <AlertCircle size={14} color={colors.destructive} />
-          ) : (
-            <FileIcon size={14} color={colors.mutedForeground} />
-          )}
-          <View className="min-w-0 flex-1">
-            <Text numberOfLines={1} className="text-xs text-foreground">
-              {description.filename}
-            </Text>
-            <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {description.message ?? `${description.sizeText} · ${description.progressText}`}
-            </Text>
+          accessible
+          accessibilityLabel={description.accessibilityLabel}
+          accessibilityRole={isUploading ? 'progressbar' : undefined}
+          accessibilityValue={
+            isUploading && attachment.progress !== null
+              ? { min: 0, max: 100, now: Math.round(attachment.progress * 100) }
+              : undefined
+          }
+          accessibilityState={
+            isUploading && attachment.progress === null ? { busy: true } : undefined
+          }
+        >
+          {/* Visual descendants are excluded from the accessibility tree so
+            the body stays the single announced element: the nested Texts,
+            the decorative thumbnail, and the uploading ActivityIndicator
+            must never surface as duplicate nodes. */}
+          <View
+            className="h-full w-full"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {isImage ? (
+              <Image
+                source={{ uri: attachment.localUri }}
+                className="h-full w-full"
+                contentFit="cover"
+                transition={0}
+              />
+            ) : (
+              <View
+                className={cn(
+                  'h-full w-full flex-row items-center gap-2',
+                  // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
+                  // the retryable chip's file content shifts right of its 44pt
+                  // target instead of being hidden underneath it.
+                  description.showRetry ? 'pl-10 pr-2' : 'px-2'
+                )}
+              >
+                {isErrored ? (
+                  <AlertCircle size={14} color={colors.destructive} />
+                ) : (
+                  <FileIcon size={14} color={colors.mutedForeground} />
+                )}
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="text-xs text-foreground">
+                    {description.filename}
+                  </Text>
+                  <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
+                    {description.message ?? `${description.sizeText} · ${description.progressText}`}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {isImage && isUploading ? (
+              <View className="absolute inset-0 items-center justify-center bg-black/30">
+                <ActivityIndicator size="small" color={colors.foreground} />
+              </View>
+            ) : null}
+
+            {isImage && isErrored ? (
+              <View className="absolute inset-0 items-center justify-center bg-black/30">
+                <AlertCircle size={20} color="white" />
+              </View>
+            ) : null}
           </View>
         </View>
-      )}
+      </View>
 
-      {isImage && isUploading ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
-          <ActivityIndicator size="small" color={colors.foreground} />
-        </View>
-      ) : null}
-
-      {isImage && isErrored ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
-          <AlertCircle size={20} color="white" />
-        </View>
+      {/* Retry covers the whole chip, restoring the tap-anywhere target a
+          failed chip has always had, while staying a SIBLING of the surface and
+          of Remove — nesting it as their parent would shadow both for assistive
+          technology. It renders before Remove, so Remove wins the overlap. The
+          badge is the visible affordance; the content is padded clear of it. */}
+      {description.showRetry ? (
+        <Pressable
+          onPress={onRetry}
+          className="absolute inset-0 items-start justify-end p-1 active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={`Retry uploading ${attachment.filename}`}
+        >
+          <View className="h-7 w-7 items-center justify-center rounded-full bg-background">
+            <RotateCcw size={14} color={colors.foreground} />
+          </View>
+        </Pressable>
       ) : null}
 
       {description.showRemove ? (
@@ -102,7 +158,7 @@ function AttachmentChip({
           <X size={14} color={colors.foreground} />
         </Pressable>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 
@@ -117,7 +173,6 @@ export function AttachmentPreviewStrip({ attachments, onRemove, onRetry }: Reado
       className="mb-2"
       contentContainerClassName="items-center"
       keyboardShouldPersistTaps="handled"
-      accessibilityRole="summary"
     >
       {attachments.map(attachment => (
         <AttachmentChip

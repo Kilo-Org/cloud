@@ -55,7 +55,7 @@ export async function getAvailableModelsForOrganization(
   }
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-  availableModels.push(...(await listAvailableCustomLlms(organizationId)));
+  availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
 
   return {
     ...responseData,

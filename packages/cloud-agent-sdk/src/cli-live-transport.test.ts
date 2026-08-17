@@ -7,6 +7,7 @@ import type {
   RemoteModelState,
 } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
+import { configureCloudAgentSdkRuntime, resetCloudAgentSdkRuntime } from './runtime';
 import {
   CommandDeliveredError,
   UserWebCommandError,
@@ -2687,6 +2688,37 @@ describe('CliLiveTransport createSession', () => {
     expect(secondMutationId).toBeDefined();
     expect(secondMutationId).not.toBe(firstMutationId);
     transport.destroy();
+  });
+
+  it('takes the mutationId from the configured runtime, not the global crypto', async () => {
+    // Hermes (React Native) has no global `crypto` binding, so a bare
+    // `crypto.randomUUID()` throws "Property crypto does not exist" and /new
+    // fails. Every id in this package must go through the runtime shim.
+    configureCloudAgentSdkRuntime({ randomUUID: () => 'runtime-uuid' });
+    try {
+      const connection = createConnection();
+      jest
+        .mocked(connection.sendCommand)
+        .mockResolvedValue({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+      const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      jest.mocked(userWebConnection.sendCommand).mockClear();
+      await transport.createSession?.();
+
+      const createCall = jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.find(([, command]) => command === 'create_session');
+      expect(createCall?.[4]).toBe('runtime-uuid');
+      transport.destroy();
+    } finally {
+      resetCloudAgentSdkRuntime();
+    }
   });
 });
 

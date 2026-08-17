@@ -15,6 +15,7 @@ import {
   kilocode_users,
   microdollar_usage,
   credit_transactions,
+  device_sessions,
   auto_top_up_configs,
   user_auth_provider,
   kiloclaw_instances,
@@ -44,6 +45,32 @@ import { revokeWebSessions } from '@/lib/web-session-revocation';
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
+
+/**
+ * Revoke a device session owned by `userId`.
+ *
+ * One conditional UPDATE does the whole job: the ownership filter means a
+ * caller can never revoke another user's session, and the `revoked_at` filter
+ * keeps the first revocation's timestamp and reason. A missing, foreign, or
+ * already-revoked session is a silent no-op — no caller reads the difference,
+ * and staying silent stops a caller probing for other users' session ids.
+ */
+async function revokeOwnedDeviceSession(
+  sessionId: string,
+  userId: string,
+  reason: 'user_revoked' | 'logout'
+): Promise<void> {
+  await db
+    .update(device_sessions)
+    .set({ revoked_at: sql`now()`, revoked_reason: reason })
+    .where(
+      and(
+        eq(device_sessions.id, sessionId),
+        eq(device_sessions.kilo_user_id, userId),
+        isNull(device_sessions.revoked_at)
+      )
+    );
+}
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
 
@@ -386,6 +413,45 @@ export const userRouter = createTRPCRouter({
   signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
     await revokeWebSessions(ctx.user.id);
 
+    return successResult();
+  }),
+
+  // ─── Device Sessions ────────────────────────────────────────────────
+
+  listDeviceSessions: baseProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select({
+        id: device_sessions.id,
+        user_agent: device_sessions.user_agent,
+        created_at: device_sessions.created_at,
+        last_seen_at: device_sessions.last_seen_at,
+      })
+      .from(device_sessions)
+      .where(and(eq(device_sessions.kilo_user_id, ctx.user.id), isNull(device_sessions.revoked_at)))
+      .orderBy(desc(device_sessions.last_seen_at));
+
+    return rows.map(row => ({
+      id: row.id,
+      user_agent: row.user_agent,
+      // Normalize PostgreSQL timestamp text (e.g. `2026-04-29 01:16:12.945+00`)
+      // to UTC ISO before returning it over the tRPC JSON boundary.
+      created_at: new Date(row.created_at).toISOString(),
+      last_seen_at: new Date(row.last_seen_at).toISOString(),
+      isCurrent: row.id === ctx.deviceSessionId,
+    }));
+  }),
+
+  revokeDeviceSessionById: baseProcedure
+    .input(z.object({ sessionId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
+      return successResult();
+    }),
+
+  revokeCurrentDeviceSession: baseProcedure.mutation(async ({ ctx }) => {
+    if (ctx.deviceSessionId) {
+      await revokeOwnedDeviceSession(ctx.deviceSessionId, ctx.user.id, 'logout');
+    }
     return successResult();
   }),
 

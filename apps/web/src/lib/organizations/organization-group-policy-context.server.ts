@@ -36,6 +36,7 @@ export type OrganizationPolicySubject =
 export type OrganizationGroupPolicyContext = {
   organization: Organization;
   defaultPolicies: OrganizationGroupPolicies;
+  groupIds: string[];
   groupPolicies: OrganizationGroupPolicies[];
   policyRevision: number;
 };
@@ -147,6 +148,7 @@ export async function getOrganizationGroupPolicyContext(params: {
       }) as OrganizationGroupPolicies)
     : DEFAULT_POLICIES;
 
+  let groupIds: string[] = [];
   let groupPolicies: OrganizationGroupPolicies[] = [];
   // A non-member caller belongs to no group, so only organization-level policy
   // applies to them.
@@ -167,6 +169,7 @@ export async function getOrganizationGroupPolicyContext(params: {
           eq(organization_group_memberships.kilo_user_id, params.subject.kiloUserId)
         )
       );
+    groupIds = groups.map(group => group.id);
     groupPolicies = groups.map(
       group =>
         parsePolicies(group.policies, {
@@ -180,6 +183,7 @@ export async function getOrganizationGroupPolicyContext(params: {
   return {
     organization,
     defaultPolicies,
+    groupIds,
     groupPolicies,
     policyRevision: settings?.policy_revision ?? 0,
   };

@@ -1,20 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import { softDeleteUserExternalServices } from '@/lib/external-services';
-import {
-  assertUserCanBeSoftDeleted,
-  softDeleteUser,
-  SoftDeletePreconditionError,
-  findUserById,
-} from '@/lib/user';
-import {
-  listAllActiveInstanceRows,
-  markActiveInstanceBatchDestroyedForGdpr,
-  restoreGdprDestroyedInstanceBatch,
-  workerInstanceId,
-} from '@/lib/kiloclaw/instance-registry';
-import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { SoftDeletePreconditionError, findUserById } from '@/lib/user';
+import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { captureException } from '@sentry/nextjs';
 
 type GdprRemovalResponse =
@@ -22,7 +10,7 @@ type GdprRemovalResponse =
   | { success: boolean; message: string; warnings?: string[] };
 
 export async function POST(request: NextRequest): Promise<NextResponse<GdprRemovalResponse>> {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user: adminUser, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
   let body: unknown;
@@ -48,39 +36,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
   }
 
   try {
-    await assertUserCanBeSoftDeleted(userId);
+    const { warnings } = await performGdprRemoval(userId, {
+      destroyReason: 'admin_request',
+      actor: {
+        id: adminUser.id,
+        email: adminUser.google_user_email,
+        name: adminUser.google_user_name,
+      },
+    });
 
-    const groups = new Map<string, { instanceIds: string[]; workerInstanceId?: string }>();
-    for (const instance of await listAllActiveInstanceRows(userId)) {
-      const instanceId = workerInstanceId(instance);
-      const key = instanceId ?? 'legacy';
-      const group = groups.get(key) ?? { instanceIds: [], workerInstanceId: instanceId };
-      group.instanceIds.push(instance.id);
-      groups.set(key, group);
-    }
-
-    // Process rows serially. Legacy instances share one user-routed worker;
-    // instance-keyed rows each route to their own worker.
-    for (const group of groups.values()) {
-      const batch = await markActiveInstanceBatchDestroyedForGdpr(userId, group.instanceIds);
-      try {
-        await new KiloClawInternalClient().destroy(userId, group.workerInstanceId, {
-          reason: 'admin_request',
-        });
-      } catch (error) {
-        try {
-          await restoreGdprDestroyedInstanceBatch(batch);
-        } catch (rollbackError) {
-          captureException(rollbackError, {
-            tags: { source: 'gdpr-removal', operation: 'restore-instance-batch' },
-            extra: { userId, instanceIds: batch.instanceIds },
-          });
-        }
-        throw error;
-      }
-    }
-
-    await softDeleteUser(userId);
+    return NextResponse.json({
+      success: true,
+      message: `Account for user ${userId} has been soft-deleted and PII removed`,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    });
   } catch (error) {
     if (error instanceof SoftDeletePreconditionError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -94,12 +63,4 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
       { status: 500 }
     );
   }
-
-  const warnings = await softDeleteUserExternalServices(user);
-
-  return NextResponse.json({
-    success: true,
-    message: `Account for user ${userId} has been soft-deleted and PII removed`,
-    ...(warnings.length > 0 ? { warnings } : {}),
-  });
 }

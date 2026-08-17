@@ -184,6 +184,10 @@ type AssociatedPrData = {
   title: string | null;
   headSha: string | null;
   lastSyncedAt: string;
+  /** PR host (`github`, `gitlab`, …). Populated from `cli_sessions_v2.platform`. */
+  platform?: string;
+  reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
+  reviewDecisionPending: boolean;
 };
 
 type FetchedSessionData = {
@@ -361,6 +365,11 @@ type SessionManager = {
    * already surfaced for the active session.
    */
   loadOlderMessages(): Promise<void>;
+  /**
+   * Merge a freshly fetched `associatedPr` (or null after an unlink) into the
+   * current `fetchedSessionData` atom. Mobile calls this after a focus refetch.
+   */
+  updateFetchedAssociatedPr(pr: AssociatedPrData | null): void;
   send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
@@ -1685,6 +1694,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  function updateFetchedAssociatedPr(pr: AssociatedPrData | null): void {
+    const currentFetched = store.get(fetchedSessionDataAtom);
+    if (currentFetched) {
+      store.set(fetchedSessionDataAtom, { ...currentFetched, associatedPr: pr });
+    }
+  }
+
   function clearTranscript(): void {
     if (!currentSession) return;
     currentSession.storage.clear();
@@ -1813,6 +1829,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     switchSession,
     hydrateChildSession,
     loadOlderMessages,
+    updateFetchedAssociatedPr,
     send,
     setRemoteModelOverride,
     setCloudAgentModelOverride,

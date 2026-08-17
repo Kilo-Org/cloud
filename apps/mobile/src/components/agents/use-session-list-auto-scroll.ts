@@ -10,6 +10,7 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type UseSessionListAutoScrollParams = {
   itemCount: number;
@@ -28,6 +29,7 @@ export function useSessionListAutoScroll<ItemT>({
   resetKey,
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
+  const { scrollAnimated } = useMotionPolicy();
   const shouldAutoScrollRef = useRef(true);
   // React state mirror of `shouldAutoScrollRef`'s at-bottom side, so the
   // scroll-to-bottom button can be conditionally rendered. Updated through
@@ -91,8 +93,8 @@ export function useSessionListAutoScroll<ItemT>({
   // `updateAutoScrollFromEvent` so the at-bottom detection flips and the
   // button fades out on completion.
   const scrollToLatestAnimated = useCallback(() => {
-    listRef.current?.scrollToEnd({ animated: true });
-  }, []);
+    listRef.current?.scrollToEnd({ animated: scrollAnimated });
+  }, [scrollAnimated]);
 
   const scheduleScrollToLatestMessage = useCallback(() => {
     if (

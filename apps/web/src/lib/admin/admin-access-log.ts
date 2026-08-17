@@ -19,7 +19,7 @@ import { logExceptInTest } from '@/lib/utils.server';
  *   - `"rest"` — a Next.js route handler (`/admin/api/*`, `/api/*`).
  *   - `"trpc"` — a tRPC procedure.
  *
- * `kind` — what produced the event:
+ * `kind` — what produced the event (three values):
  *   - `"admin_guard"` — an explicit admin gate was satisfied. Emitted at the two
  *     choke points that protect the `/admin` console: `getUserFromAuth` with
  *     `adminOnly: true`, and the `adminProcedure` middleware.
@@ -28,6 +28,12 @@ import { logExceptInTest } from '@/lib/utils.server';
  *     (e.g. reading any organization, querying sessions across all orgs). These
  *     paths pass through neither admin gate, so they emit here instead. Carries
  *     a `reason` and a `target`.
+ *   - `"support_service"` — the support-service secret called lookup or GDPR
+ *     delete. `adminTier` remains a human employee tier (`super_admin` |
+ *     `platform_admin`); support events use `"platform_admin"`. `email` /
+ *     `kiloUserId` are the service sentinel `"support-automation"`; the CSA
+ *     Google actor claim is `claimedActorEmail`. Dashboards that count distinct
+ *     admins must exclude `kind:"support_service"`.
  *
  * Coverage note: `kind:"admin_guard"` alone covers only the `/admin` console
  * surface. Kilo's highest-value admin capability — an employee reading an
@@ -42,7 +48,17 @@ import { logExceptInTest } from '@/lib/utils.server';
 
 export type AdminAccessSurface = 'rest' | 'trpc';
 
-export type AdminAccessKind = 'admin_guard' | 'kilo_admin_elevation';
+export type AdminAccessKind = 'admin_guard' | 'kilo_admin_elevation' | 'support_service';
+
+export type SupportServiceOutcome =
+  | 'found'
+  | 'not_found'
+  | 'deleted'
+  | 'already_deleted'
+  | 'refused'
+  | 'precondition'
+  | 'conflict'
+  | 'error';
 
 /**
  * Why an `is_admin` elevation fired. A closed union so the values stay stable
@@ -100,6 +116,21 @@ export type AdminAccessEvent = {
    * where `route` already identifies the resource.
    */
   target: string | null;
+  /**
+   * CSA Google actor claim for `kind:"support_service"`. Null for
+   * `admin_guard` / elevation events. Not authentication.
+   */
+  claimedActorEmail: string | null;
+  /** Set after a support-service handler knows the result; else null. */
+  outcome: SupportServiceOutcome | null;
+  /**
+   * HMAC-SHA256(`SUPPORT_API_SECRET`, lowercase lookup email). Set on support
+   * lookup; null on delete and on non-support events. Comparable only within
+   * one secret generation.
+   */
+  targetEmailHash: string | null;
+  /** CSA deletion-request id for `kind:"support_service"`; else null. */
+  correlationId: string | null;
 };
 
 export type AdminAccessSink = (event: AdminAccessEvent) => void;
@@ -126,7 +157,7 @@ type AdminAccessUser = Pick<User, 'id' | 'google_user_email' | 'is_super_admin'>
  */
 export function emitAdminAccessEvent(params: {
   surface: AdminAccessSurface;
-  kind: AdminAccessKind;
+  kind: Exclude<AdminAccessKind, 'support_service'>;
   user: AdminAccessUser;
   authViaToken: boolean;
   tokenSource: string | null;
@@ -153,6 +184,52 @@ export function emitAdminAccessEvent(params: {
       ip: params.ip,
       reason: params.reason ?? null,
       target: params.target ?? null,
+      claimedActorEmail: null,
+      outcome: null,
+      targetEmailHash: null,
+      correlationId: null,
+    });
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_access_log' } });
+  }
+}
+
+const SUPPORT_AUTOMATION_SENTINEL = 'support-automation';
+
+/**
+ * Emit `admin_access` for a support-service secret call. Never throws.
+ * Call after the handler knows the result; do not emit on 401 or invalid
+ * `actorEmail`.
+ */
+export function emitSupportServiceAccessEvent(params: {
+  method: string;
+  route: string | null;
+  ip: string | null;
+  claimedActorEmail: string;
+  correlationId: string;
+  outcome: SupportServiceOutcome;
+  target: string | null;
+  targetEmailHash: string | null;
+}): void {
+  try {
+    currentSink({
+      event: 'admin_access',
+      surface: 'rest',
+      kind: 'support_service',
+      kiloUserId: SUPPORT_AUTOMATION_SENTINEL,
+      email: SUPPORT_AUTOMATION_SENTINEL,
+      adminTier: 'platform_admin',
+      authVia: 'token',
+      tokenSource: SUPPORT_AUTOMATION_SENTINEL,
+      route: params.route,
+      method: params.method,
+      ip: params.ip,
+      reason: null,
+      target: params.target,
+      claimedActorEmail: params.claimedActorEmail,
+      outcome: params.outcome,
+      targetEmailHash: params.targetEmailHash,
+      correlationId: params.correlationId,
     });
   } catch (error) {
     captureException(error, { tags: { operation: 'admin_access_log' } });

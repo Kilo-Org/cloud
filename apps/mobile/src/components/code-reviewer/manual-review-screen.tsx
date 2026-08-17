@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Check, GitPullRequest } from 'lucide-react-native';
+import { Check, GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
@@ -10,6 +10,8 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -181,14 +183,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               <Skeleton className="h-14 w-full rounded-lg" />
             </View>
           ) : (
-            <View className="overflow-hidden rounded-lg bg-secondary">
+            <RadioGroup label="Platform" className="overflow-hidden rounded-lg bg-secondary">
               {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
                 const connected = isConnected(option);
                 return (
                   <Pressable
                     key={option}
                     disabled={!connected}
-                    accessibilityState={{ disabled: !connected }}
                     className={cn(
                       'flex-row items-center justify-between px-4 py-3 active:opacity-70',
                       index < MANUAL_REVIEW_PLATFORMS.length - 1 &&
@@ -201,6 +202,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                       setUrlError(null);
                       setPlatformChoice(option);
                     }}
+                    {...radioItemA11y({
+                      label: PLATFORM_CAPABILITIES[option].label,
+                      checked: connected && platform === option,
+                      disabled: !connected,
+                    })}
                   >
                     <View>
                       <Text className="text-sm font-medium">
@@ -219,7 +225,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                   </Pressable>
                 );
               })}
-            </View>
+            </RadioGroup>
           )}
         </View>
 
@@ -235,6 +241,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
+            accessibilityLabel={formFieldA11y({ label: 'Pull request URL', error: urlError })}
             onChangeText={value => {
               urlRef.current = value;
               if (urlError) {

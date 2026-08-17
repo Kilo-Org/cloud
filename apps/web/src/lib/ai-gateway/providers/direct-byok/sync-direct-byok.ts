@@ -29,7 +29,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string().optional(),
-      context_length: z.number().optional(),
+      context_length: z.number().nullish(),
       max_model_len: z.number().optional(),
       max_output_length: z.number().optional(),
       input_modalities: z.array(ModalitySchema).optional(),
@@ -294,6 +294,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://www.morphllm.com/api/models/json',
   }),
   modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
+  modelsDevFetcher('edenai', 'edenai', 'https://api.edenai.run/v3/models'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
   modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),

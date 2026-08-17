@@ -41,6 +41,18 @@
     },
   ],
 
+  // Mirrors the production binding so ingest's live-persist path can read
+  // `env.HYPERDRIVE.connectionString`. The local connection string points at a
+  // Postgres that is not running in tests; the resulting failure is caught and
+  // logged by the DO, so tests still pass.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+
   "queues": {
     "producers": [
       {

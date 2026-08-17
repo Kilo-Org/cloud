@@ -54,6 +54,12 @@ export function getLanguageModelIds(models: StoredModelMap): string[] {
     .map(model => model.id);
 }
 
+export function getLanguageModelIdsWithoutEndpoints(models: StoredModelMap): string[] {
+  return Object.values(models)
+    .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length === 0)
+    .map(model => model.id);
+}
+
 export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): string[] {
   return [
     ...new Set(
@@ -112,6 +118,11 @@ export const getVercelModelsFromRedis = createModelIdsFetcher(
 export const getOpenRouterModelsFromRedis = createModelIdsFetcher(
   GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds,
   'OpenRouter'
+);
+
+export const getOpenRouterModelIdsWithoutEndpointsFromRedis = createModelIdsFetcher(
+  GATEWAY_METADATA_REDIS_KEYS.openrouterModelIdsWithoutEndpoints,
+  'OpenRouter models without endpoints'
 );
 
 // These are (undocumented?) aliases OpenRouter accepts and were in use around 2026-08-11

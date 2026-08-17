@@ -15,6 +15,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
+  getOpenRouterModelIdsWithoutEndpointsFromRedis,
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
@@ -57,6 +58,18 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
   return optOutModels.has(requestedModel);
 }
 
+export function hasVercelProvidersButNoOpenRouterProviders(
+  requestedModel: string,
+  openRouterModelIdsWithoutEndpoints: ReadonlySet<string>,
+  vercelInferenceProviders: string[] | null
+) {
+  return (
+    openRouterModelIdsWithoutEndpoints.has(requestedModel) &&
+    vercelInferenceProviders !== null &&
+    vercelInferenceProviders.length > 0
+  );
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
@@ -75,10 +88,6 @@ export async function shouldRouteToVercel(
 
   const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
 
-  if (!passedRandomization) {
-    return false;
-  }
-
   const vercelModels = await getVercelModelsFromRedis();
   const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
@@ -86,11 +95,31 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  let vercelInferenceProviders: string[] | null | undefined;
+  if (!passedRandomization) {
+    const openRouterModelIdsWithoutEndpoints =
+      await getOpenRouterModelIdsWithoutEndpointsFromRedis();
+    vercelInferenceProviders = await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+    if (
+      !hasVercelProvidersButNoOpenRouterProviders(
+        requestedModel,
+        openRouterModelIdsWithoutEndpoints,
+        vercelInferenceProviders
+      )
+    ) {
+      return false;
+    }
+    console.debug(
+      '[shouldRouteToVercel] routing to Vercel because no OpenRouter inference providers remain'
+    );
+  }
+
   const provider = request.body.provider;
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;
-    const vercelInferenceProviders =
-      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+    if (vercelInferenceProviders === undefined) {
+      vercelInferenceProviders = await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+    }
 
     if (ignore?.length) {
       if (!vercelInferenceProviders) {

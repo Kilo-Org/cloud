@@ -32,6 +32,9 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
   // Lightweight lists of language model ids used for existence checks without
   // loading every model's metadata and endpoints.
   openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
+  openrouterModelIdsWithoutEndpoints: redisKey(
+    'ai-gateway.metadata:openrouter-model-ids-without-endpoints'
+  ),
   vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
 } as const;

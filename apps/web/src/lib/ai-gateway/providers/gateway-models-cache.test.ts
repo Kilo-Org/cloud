@@ -7,6 +7,7 @@ jest.mock('@/lib/redis', () => ({
 import {
   extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
+  getLanguageModelIdsWithoutEndpoints,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { StoredModel } from '@kilocode/db';
 
@@ -33,6 +34,23 @@ describe('getLanguageModelIds', () => {
         'vendor/image': storedModel({ id: 'vendor/image', type: 'image' }),
       })
     ).toEqual(['vendor/with-endpoints', 'vendor/no-endpoints', 'vendor/untyped']);
+  });
+});
+
+describe('getLanguageModelIdsWithoutEndpoints', () => {
+  it('returns only language models with no endpoints', () => {
+    expect(
+      getLanguageModelIdsWithoutEndpoints({
+        'vendor/with-endpoints': storedModel({ id: 'vendor/with-endpoints' }),
+        'vendor/no-endpoints': storedModel({ id: 'vendor/no-endpoints', endpoints: [] }),
+        'vendor/untyped': storedModel({ id: 'vendor/untyped', type: undefined, endpoints: [] }),
+        'vendor/embedding': storedModel({
+          id: 'vendor/embedding',
+          type: 'embedding',
+          endpoints: [],
+        }),
+      })
+    ).toEqual(['vendor/no-endpoints', 'vendor/untyped']);
   });
 });
 

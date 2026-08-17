@@ -4,6 +4,7 @@ import {
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
+  hasVercelProvidersButNoOpenRouterProviders,
   hasCompatibleVercelInferenceProvider,
   isVercelRoutingOptOut,
   passesVercelRoutingPercentage,
@@ -115,6 +116,36 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
         'bedrock',
       ])
     ).toEqual([]);
+  });
+});
+
+describe('hasVercelProvidersButNoOpenRouterProviders', () => {
+  const requestedModel = 'vendor/model';
+
+  it('returns true when only Vercel has inference providers', () => {
+    expect(
+      hasVercelProvidersButNoOpenRouterProviders(requestedModel, new Set([requestedModel]), [
+        'provider',
+      ])
+    ).toBe(true);
+  });
+
+  it('returns false when OpenRouter still has inference providers', () => {
+    expect(
+      hasVercelProvidersButNoOpenRouterProviders(requestedModel, new Set(), ['provider'])
+    ).toBe(false);
+  });
+
+  it('returns false when Vercel has no inference providers', () => {
+    expect(
+      hasVercelProvidersButNoOpenRouterProviders(requestedModel, new Set([requestedModel]), [])
+    ).toBe(false);
+  });
+
+  it('returns false when Vercel provider data is unavailable', () => {
+    expect(
+      hasVercelProvidersButNoOpenRouterProviders(requestedModel, new Set([requestedModel]), null)
+    ).toBe(false);
   });
 });
 

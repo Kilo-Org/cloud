@@ -34,6 +34,7 @@ import {
 import {
   extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
+  getLanguageModelIdsWithoutEndpoints,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -371,6 +372,10 @@ async function mirrorToRedis(values: {
   const entries: [RedisKey, unknown][] = [
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
+    [
+      GATEWAY_METADATA_REDIS_KEYS.openrouterModelIdsWithoutEndpoints,
+      getLanguageModelIdsWithoutEndpoints(values.openrouter),
+    ],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
   ];
   if (values.openrouterProviders) {

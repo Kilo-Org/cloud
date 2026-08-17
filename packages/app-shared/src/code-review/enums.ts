@@ -10,6 +10,11 @@
 export const REVIEW_STYLES = ['strict', 'balanced', 'lenient', 'roast'] as const;
 export type ReviewStyle = (typeof REVIEW_STYLES)[number];
 
+// Styles offered in the UI. 'roast' stays in REVIEW_STYLES so stored configs
+// still parse, but it is no longer a public choice — see P3-F-15.
+export const PUBLIC_REVIEW_STYLES = ['strict', 'balanced', 'lenient'] as const;
+export type PublicReviewStyle = (typeof PUBLIC_REVIEW_STYLES)[number];
+
 export const REVIEW_FOCUS_AREAS = [
   'security',
   'performance',

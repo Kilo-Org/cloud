@@ -27,8 +27,9 @@ import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
+  PUBLIC_REVIEW_STYLES,
   REVIEW_FOCUS_AREAS,
-  REVIEW_STYLES as REVIEW_STYLE_VALUES,
+  type PublicReviewStyle,
   type ReviewFocusArea,
   type ReviewStyle,
 } from '@kilocode/app-shared/code-review';
@@ -101,7 +102,7 @@ const FOCUS_AREA_COPY: Record<ReviewFocusArea, { label: string; description: str
 
 export const FOCUS_AREAS = REVIEW_FOCUS_AREAS.map(id => ({ id, ...FOCUS_AREA_COPY[id] }));
 
-const REVIEW_STYLE_COPY: Record<ReviewStyle, { label: string; description: string }> = {
+const REVIEW_STYLE_COPY: Record<PublicReviewStyle, { label: string; description: string }> = {
   strict: {
     label: 'Strict',
     description: 'Flag all potential issues, prioritize quality and security',
@@ -114,17 +115,16 @@ const REVIEW_STYLE_COPY: Record<ReviewStyle, { label: string; description: strin
     label: 'Lenient',
     description: 'Only critical bugs and security issues, be encouraging',
   },
-  roast: {
-    label: 'Roast',
-    description:
-      'Brutally honest, technically accurate feedback wrapped in sharp, witty commentary',
-  },
 };
 
-export const REVIEW_STYLES = REVIEW_STYLE_VALUES.map(value => ({
-  value,
-  ...REVIEW_STYLE_COPY[value],
-}));
+// The picker offers only the public styles, but the element type keeps the full
+// `ReviewStyle` union so downstream consumers (BitbucketReviewConfigForm) that
+// derive their state type from this list still accept legacy 'roast' configs.
+export const REVIEW_STYLES: Array<{ value: ReviewStyle; label: string; description: string }> =
+  PUBLIC_REVIEW_STYLES.map(value => ({
+    value,
+    ...REVIEW_STYLE_COPY[value],
+  }));
 
 export function ReviewConfigForm({
   organizationId,

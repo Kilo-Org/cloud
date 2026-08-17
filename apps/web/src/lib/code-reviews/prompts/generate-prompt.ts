@@ -174,6 +174,9 @@ export async function generateReviewPrompt(
   const platformConfig = getPlatformConfig(platform);
   const pr = prNumber || `{${platformConfig.prTerm}_NUMBER}`;
   const reviewStyle = config.review_style;
+  // Legacy 'roast' configs render as 'balanced' so collaborators never see
+  // sarcastic copy. 'roast' stays in the stored enum for backward compatibility.
+  const effectiveReviewStyle = reviewStyle === 'roast' ? 'balanced' : reviewStyle;
 
   if (outputMode === 'kilo') {
     return {
@@ -221,7 +224,7 @@ export async function generateReviewPrompt(
   prompt += template.systemRole + '\n\n';
 
   // 2. Style guidance (persona/tone override for non-default styles like roast)
-  const styleGuide = template.styleGuidance?.[reviewStyle];
+  const styleGuide = template.styleGuidance?.[effectiveReviewStyle];
   if (styleGuide) {
     prompt += styleGuide + '\n\n';
   }
@@ -293,7 +296,8 @@ export async function generateReviewPrompt(
   }
 
   // 8. Comment format (use style override if available, otherwise default)
-  const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
+  const commentFormat =
+    template.commentFormatOverrides?.[effectiveReviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
 
   if (platform === 'github' && template.inlineCommentFooter) {
@@ -337,7 +341,7 @@ export async function generateReviewPrompt(
   }
 
   // 11. Summary format templates (use style override if available, otherwise default)
-  const summaryOverride = template.summaryFormatOverrides?.[reviewStyle];
+  const summaryOverride = template.summaryFormatOverrides?.[effectiveReviewStyle];
   prompt += (summaryOverride?.issuesFound ?? template.summaryFormatIssuesFound) + '\n\n';
   prompt += (summaryOverride?.noIssues ?? template.summaryFormatNoIssues) + '\n\n';
 
@@ -392,7 +396,9 @@ function buildLocalReviewPrompt(params: {
     );
   }
 
-  const styleGuide = getPromptTemplate(params.platform).styleGuidance?.[params.config.review_style];
+  const effectiveReviewStyle =
+    params.config.review_style === 'roast' ? 'balanced' : params.config.review_style;
+  const styleGuide = getPromptTemplate(params.platform).styleGuidance?.[effectiveReviewStyle];
   if (styleGuide) promptParts.push(styleGuide);
 
   if (params.config.custom_instructions) {

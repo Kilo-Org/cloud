@@ -21,10 +21,11 @@
 // ledger markers map onto the existing per-surface copy.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 
+import { announceForA11y } from '@/lib/a11y/announce';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
@@ -87,8 +88,14 @@ export function useCreateReviewCommentMutation(ref: PrRef) {
         throw mapPrOperationError(error, 'create-comment');
       }
     },
+    onSuccess: () => {
+      // Bare success announcement beside the composer's existing success
+      // effect (haptic + dismiss). The inline composer error box owns the
+      // persistent inline error; the toast owns the failure announcement.
+      announceForA11y('Comment posted');
+    },
     onError: (error: { message: string }) => {
-      toast.error(prOperationToastMessage(error, 'create-comment'));
+      announcingToast.error(prOperationToastMessage(error, 'create-comment'));
     },
     onSettled: async () => {
       await invalidateReviewCaches(queryClient, keys);
@@ -136,8 +143,13 @@ export function useSubmitReviewMutation(ref: PrRef) {
         throw mapPrOperationError(error, 'submit-review');
       }
     },
+    onSuccess: () => {
+      // Bare success announcement beside the submit sheet's existing
+      // success effect (queue clear + haptic + dismiss).
+      announceForA11y('Review submitted');
+    },
     onError: (error: { message: string }) => {
-      toast.error(prOperationToastMessage(error, 'submit-review'));
+      announcingToast.error(prOperationToastMessage(error, 'submit-review'));
     },
     onSettled: async () => {
       await invalidateReviewCaches(queryClient, keys);

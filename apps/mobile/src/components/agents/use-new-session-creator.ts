@@ -22,6 +22,8 @@ type UseNewSessionCreatorInput = {
   mode: AgentMode;
   model: string;
   organizationId?: string;
+  /** Invoked on the success path before navigation; failures never fire it. */
+  onCreated?: () => void;
   selectedRepo: string;
   setIsCreating: (value: boolean) => void;
   variant: string;
@@ -44,6 +46,7 @@ export function useNewSessionCreator({
   mode,
   model,
   organizationId,
+  onCreated,
   selectedRepo,
   setIsCreating,
   variant,
@@ -132,8 +135,17 @@ export function useNewSessionCreator({
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.
       try {
-        captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
-        await invalidateAgentSessionQueries(queryClient, trpc);
+        // Contained together so neither can skip the host signal below.
+        try {
+          captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
+          await invalidateAgentSessionQueries(queryClient, trpc);
+        } catch {
+          // Analytics and cache invalidation are cosmetic; stay silent.
+        }
+        // Signal the host (e.g. clear the new-session draft) before navigating,
+        // so the draft is gone by the time the route unmounts and can never be
+        // flushed back by an unmount write.
+        onCreated?.();
         // Contained on its own so a rejected haptics call still navigates.
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -189,6 +201,7 @@ export function useNewSessionCreator({
     setIsCreating,
     getKey,
     rotateKey,
+    onCreated,
   ]);
 
   return { createSessionFromDraft, promptRef };

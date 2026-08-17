@@ -1,17 +1,21 @@
 // Bottom-sheet picker for GitHub's 8 review-comment reactions.
-// Pattern-copied from kilo-chat's message-reaction-picker-sheet
-// (Portal + backdrop fade + slide-up card + Android BackHandler).
-// Portal name is unique so chat and PR-review sheets never clobber
-// each other when both trees mount.
+// Pattern-copied from kilo-chat's message-reaction-picker-sheet, then
+// converted to a native transparent Modal (D5): the Modal isolates the
+// background on both platforms, `onRequestClose` answers the Android back
+// button, and `animationType="slide"` gives the sheet its motion. Letting the
+// platform animate keeps `visible` the single source of truth — nothing here
+// has to stay in sync with an animation duration.
+//
+// Focus restore after the sheet closes belongs to the parent, which owns the
+// trigger. Every close path here routes through `onClose` or `onPick`.
 
-import { Portal } from '@rn-primitives/portal';
 import { X } from '@/components/ui/icons';
-import { useEffect } from 'react';
-import { BackHandler, Pressable, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { useRef } from 'react';
+import { Modal, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, REACTION_LABEL } from '@/lib/pr-review/discussion/reaction-pills';
 import {
@@ -39,23 +43,7 @@ export function ReactionPickerSheet({
 }: Readonly<ReactionPickerSheetProps>) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    if (!visible) {
-      return undefined;
-    }
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose();
-      return true;
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [visible, onClose]);
-
-  if (!visible) {
-    return null;
-  }
+  const titleRef = useRef<RNText | null>(null);
 
   const reacted = new Set<string>();
   for (const r of reactions) {
@@ -65,22 +53,32 @@ export function ReactionPickerSheet({
   }
 
   return (
-    <Portal name="pr-review-reactions">
-      <Animated.View
-        entering={FadeIn.duration(150)}
-        exiting={FadeOut.duration(150)}
-        className="absolute inset-0 justify-end bg-black/40"
-      >
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      // Best-effort focus after native presentation; moveA11yFocus is a no-op
+      // when the title handle is not mounted yet, so no retry loop is needed.
+      onShow={() => {
+        moveA11yFocus(titleRef);
+      }}
+      onRequestClose={onClose}
+    >
+      <View className="flex-1 justify-end bg-black/40">
         <Pressable className="flex-1" accessibilityLabel="Close reactions" onPress={onClose} />
-        <Animated.View
-          entering={SlideInDown.duration(220)}
-          exiting={SlideOutDown.duration(180)}
+        <View
           accessibilityViewIsModal
           className="gap-4 rounded-t-3xl bg-card px-5 pt-4"
           style={{ paddingBottom: insets.bottom + 24 }}
         >
           <View className="flex-row items-center justify-between">
-            <Text className="text-base font-semibold text-foreground">Reactions</Text>
+            <Text
+              ref={titleRef}
+              accessibilityRole="header"
+              className="text-base font-semibold text-foreground"
+            >
+              Reactions
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close reactions"
@@ -111,8 +109,8 @@ export function ReactionPickerSheet({
               );
             })}
           </View>
-        </Animated.View>
-      </Animated.View>
-    </Portal>
+        </View>
+      </View>
+    </Modal>
   );
 }

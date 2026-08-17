@@ -13,5 +13,8 @@
   "ignore": ["src/components/ui/**"],
   "postcss": {
     "config": ["postcss.config.mjs"]
+  },
+  "babel": {
+    "config": ["babel.config.js"]
   }
 }

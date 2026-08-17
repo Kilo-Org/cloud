@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- fetchSession NOT_FOUND retry helpers stay with the manager (M1). */
-import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 import {
   type CloudAgentSessionId,
@@ -21,7 +20,7 @@ import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-sessi
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
@@ -210,7 +209,7 @@ export function createMobileAgentSessionManager({
     },
     getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
       const ticket = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
-        const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+        const token = await getAuthTokenForRequest();
         const body: Record<string, string> = { cloudAgentSessionId: sessionId };
         if (organizationId) {
           body.organizationId = organizationId;

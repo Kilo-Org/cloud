@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -139,18 +140,20 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             Only organization owners and billing managers can change these settings.
           </Text>
         )}
-        {(['all', 'selected'] as const).map(option => (
-          <ChoiceRow
-            key={option}
-            label={option === 'all' ? 'All repositories' : 'Selected repositories'}
-            selected={mode === option}
-            disabled={!canManage}
-            className="border-b-[0.5px] border-hair-soft"
-            onPress={() => {
-              setModeOption(option);
-            }}
-          />
-        ))}
+        <RadioGroup label="Repositories">
+          {(['all', 'selected'] as const).map(option => (
+            <ChoiceRow
+              key={option}
+              label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+              selected={mode === option}
+              disabled={!canManage}
+              className="border-b-[0.5px] border-hair-soft"
+              onPress={() => {
+                setModeOption(option);
+              }}
+            />
+          ))}
+        </RadioGroup>
 
         {mode === 'selected' && (
           <View className="mt-6">

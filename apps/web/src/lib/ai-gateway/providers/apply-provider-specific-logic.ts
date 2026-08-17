@@ -39,6 +39,7 @@ import {
   enableReasoningSummaries,
   fixResponsesRequest,
   isReasoningExplicitlyEnabled,
+  mapReasoningDetailsToReasoningContent,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
@@ -141,6 +142,23 @@ export function applyAnthropicThinkingDefault(
   }
 }
 
+/**
+ * Inverse of the `mapReasoningContentToDetails` response transform: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` string
+ * the upstream speaks, so reasoning survives the round trip.
+ */
+export function applyReasoningDetailsTransform(
+  provider: Provider,
+  requestToMutate: GatewayRequest
+) {
+  if (
+    requestToMutate.kind === 'chat_completions' &&
+    provider.responseTransforms?.mapReasoningContentToDetails
+  ) {
+    mapReasoningDetailsToReasoningContent(requestToMutate.body);
+  }
+}
+
 export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -162,6 +180,8 @@ export async function applyProviderSpecificLogic(
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
     repairChatCompletionsTools(requestToMutate.body);
+
+    applyReasoningDetailsTransform(provider, requestToMutate);
 
     if (isClaudeModel(requestedModel)) {
       // Workaround for older clients corrupting Claude reasoning, resulting in:

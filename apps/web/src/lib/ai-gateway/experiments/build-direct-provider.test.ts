@@ -98,6 +98,7 @@ describe('buildDirectProvider response transforms', () => {
 
     expect(provider.responseTransforms).toEqual({
       mapGeminiThoughtContent: true,
+      mapReasoningContentToDetails: false,
     });
   });
 

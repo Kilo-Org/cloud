@@ -29,6 +29,9 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 jest.mock('next/server', () => {
   return {
@@ -65,6 +68,7 @@ jest.mock('@/lib/ai-gateway/abuse-service', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/providers/get-provider');
+jest.mock('@/lib/ai-gateway/providers/partner-routing');
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
@@ -139,6 +143,7 @@ const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitB
 const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
+const mockedGetPercentageRoutedPartnerProvider = jest.mocked(getPercentageRoutedPartnerProvider);
 
 const provider = {
   id: 'openrouter',
@@ -150,6 +155,27 @@ const provider = {
   transformRequest: jest.fn(),
 } satisfies Provider;
 
+const vercelProvider = {
+  ...provider,
+  id: 'vercel',
+  apiUrl: 'https://ai-gateway.vercel.sh/v1',
+  transformRequest: jest.fn(),
+} satisfies Provider;
+
+const partnerProvider = {
+  ...provider,
+  id: 'friendli',
+  apiUrl: 'https://api.friendli.ai/serverless/v1',
+  supportedChatApis: ['messages'],
+  transformRequest: jest.fn(async context => {
+    Object.assign(context.request.body, {
+      model: 'zai-org/GLM-5.2',
+      metadata: { transformedBy: 'friendli' },
+    });
+    delete context.request.body.provider;
+  }),
+} satisfies Provider;
+
 function makeRequest(body: unknown, headers?: HeadersInit) {
   return new Request('http://localhost:3000/api/openrouter/v1/chat/completions', {
     method: 'POST',
@@ -157,6 +183,17 @@ function makeRequest(body: unknown, headers?: HeadersInit) {
       'Content-Type': 'application/json',
       'x-forwarded-for': '127.0.0.1',
       ...headers,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function makeMessagesRequest(body: unknown) {
+  return new Request('http://localhost:3000/api/openrouter/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-forwarded-for': '127.0.0.1',
     },
     body: JSON.stringify(body),
   });
@@ -216,9 +253,9 @@ function cachedRulesEngineAction(
   return action;
 }
 
-function upstreamJsonResponse(body: unknown) {
+function upstreamJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { 'content-type': 'application/json', 'request-id': 'req-123' },
   });
 }
@@ -325,7 +362,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
-    const responseTransforms = { mapGeminiThoughtContent: true };
+    const responseTransforms = {
+      mapGeminiThoughtContent: true,
+      mapReasoningContentToDetails: false,
+    };
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider: { ...provider, responseTransforms },
@@ -1068,5 +1108,157 @@ describe('auto-routing shadow classifier', () => {
       expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
     );
     expect(mockedAfter).not.toHaveBeenCalled();
+  });
+});
+
+describe('percentage-routed partner fallback', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedGetPercentageRoutedPartnerProvider.mockResolvedValue(partnerProvider);
+    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue('OK');
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+  });
+
+  it.each([
+    ['openrouter', provider, 400],
+    ['vercel', vercelProvider, 500],
+  ] as const)(
+    'retries a failed partner request through the initial %s provider',
+    async (_sourceId, sourceProvider, partnerStatus) => {
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: sourceProvider,
+        userByok: null,
+        bypassAccessCheck: false,
+      });
+      const cancelPartnerBody = jest.fn();
+      const failedPartnerResponse = new Response(
+        new ReadableStream({
+          cancel() {
+            cancelPartnerBody();
+          },
+        }),
+        { status: partnerStatus }
+      );
+      mockedUpstreamRequest
+        .mockResolvedValueOnce({ type: 'success', response: failedPartnerResponse })
+        .mockResolvedValueOnce({
+          type: 'success',
+          response: upstreamJsonResponse({ type: 'message', id: 'fallback-response' }),
+        });
+
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeMessagesRequest({
+          model: FRIENDLI_GLM_PUBLIC_ID,
+          max_tokens: 1_024,
+          messages: [{ role: 'user', content: 'hello' }],
+        }) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
+      const partnerAttempt = mockedUpstreamRequest.mock.calls[0]?.[0];
+      const fallbackAttempt = mockedUpstreamRequest.mock.calls[1]?.[0];
+      expect(partnerAttempt.provider).toBe(partnerProvider);
+      expect(partnerAttempt.body.model).toBe('zai-org/GLM-5.2');
+      expect(partnerAttempt.body.metadata).toEqual({ transformedBy: 'friendli' });
+      expect(fallbackAttempt.provider).toBe(sourceProvider);
+      expect(fallbackAttempt.body.model).toBe(FRIENDLI_GLM_PUBLIC_ID);
+      expect(fallbackAttempt.body.metadata).not.toHaveProperty('transformedBy');
+      expect(fallbackAttempt.body).not.toBe(partnerAttempt.body);
+      expect((fallbackAttempt.body as GatewayMessagesRequest).messages).not.toBe(
+        (partnerAttempt.body as GatewayMessagesRequest).messages
+      );
+      expect(fallbackAttempt.extraHeaders).not.toBe(partnerAttempt.extraHeaders);
+      expect(cancelPartnerBody).toHaveBeenCalledTimes(1);
+      expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: sourceProvider.id, statusCode: 200 }),
+        expect.any(Response),
+        expect.any(Number)
+      );
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+        provider: sourceProvider.id,
+        status_code: 200,
+      });
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ providerId: sourceProvider.id })
+      );
+    }
+  );
+
+  it('does not retry a successful partner response', async () => {
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ type: 'message', id: 'partner-response' }),
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMessagesRequest({
+        model: FRIENDLI_GLM_PUBLIC_ID,
+        max_tokens: 1_024,
+        messages: [{ role: 'user', content: 'hello' }],
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider).toBe(partnerProvider);
+  });
+
+  it('returns a failed managed fallback without a third attempt', async () => {
+    mockedUpstreamRequest
+      .mockResolvedValueOnce({
+        type: 'success',
+        response: upstreamJsonResponse({ error: 'partner failed' }, 500),
+      })
+      .mockResolvedValueOnce({
+        type: 'success',
+        response: upstreamJsonResponse({ error: 'fallback failed' }, 503),
+      });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMessagesRequest({
+        model: FRIENDLI_GLM_PUBLIC_ID,
+        max_tokens: 1_024,
+        messages: [{ role: 'user', content: 'hello' }],
+      }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a partner transport failure without an HTTP status', async () => {
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'error',
+      response: new Response(null, { status: 503 }) as never,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMessagesRequest({
+        model: FRIENDLI_GLM_PUBLIC_ID,
+        max_tokens: 1_024,
+        messages: [{ role: 'user', content: 'hello' }],
+      }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 });

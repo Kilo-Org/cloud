@@ -107,6 +107,7 @@ export function ConfigureRow({
       <Pressable
         onPress={onPress}
         disabled={disabled}
+        accessibilityRole="button"
         accessibilityState={{ disabled: Boolean(disabled) }}
         className={cn(!disabled && 'active:opacity-70')}
       >

@@ -137,6 +137,10 @@ const config: ExpoConfig = {
     'expo-font',
     'expo-secure-store',
     'expo-sharing',
+    // Encrypts the local persistence database (kilo-persist.db) with SQLCipher.
+    // The key is generated from expo-crypto and held in SecureStore; see
+    // src/lib/persist/encrypted-kv.ts.
+    ['expo-sqlite', { useSQLCipher: true }],
     [
       'expo-notifications',
       {

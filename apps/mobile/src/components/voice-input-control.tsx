@@ -1,6 +1,7 @@
 import { Mic, Square } from '@/components/ui/icons';
-import { ActivityIndicator, Pressable, Text } from 'react-native';
+import { ActivityIndicator, Pressable } from 'react-native';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
@@ -109,9 +110,5 @@ export function VoiceInputStatus({
   if (status !== 'listening') {
     return null;
   }
-  return (
-    <Text accessibilityLiveRegion="polite" className="text-muted-foreground text-xs">
-      Listening...
-    </Text>
-  );
+  return <AccessibleStatus message="Listening..." tone="status" className="text-xs" />;
 }

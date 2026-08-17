@@ -196,11 +196,13 @@ function radio(
   );
 }
 
+// A React Native radio reports its current choice through `checked`, not
+// `selected` — see `radioItemA11y` in @/components/ui/radio-group.
 function radioSelected(root: TestRenderer.ReactTestInstance, label: string): boolean {
   const state = propOf(radio(root, label), 'accessibilityState') as
-    | { selected: boolean }
+    | { checked: boolean }
     | undefined;
-  return state?.selected === true;
+  return state?.checked === true;
 }
 
 function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {

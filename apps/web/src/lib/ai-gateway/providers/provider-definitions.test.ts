@@ -52,9 +52,16 @@ describe.each([
     upstreamModel: 'perplexity/kimi-k3',
   },
 ])('$name provider', ({ provider, expectedUrl, requestedModel, upstreamModel }) => {
-  test('supports Messages only', () => {
+  test('supports chat completions and Messages', () => {
     expect(`${provider.apiUrl}/messages`).toBe(expectedUrl);
-    expect(provider.supportedChatApis).toEqual(['messages']);
+    expect(provider.supportedChatApis).toEqual(['chat_completions', 'messages']);
+  });
+
+  test('enables the reasoning details response transform', () => {
+    expect(provider.responseTransforms).toEqual({
+      mapGeminiThoughtContent: false,
+      mapReasoningContentToDetails: true,
+    });
   });
 
   test('hardwires the upstream model and removes provider settings', async () => {

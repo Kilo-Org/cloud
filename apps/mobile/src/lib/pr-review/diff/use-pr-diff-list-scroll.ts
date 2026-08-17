@@ -1,6 +1,8 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { type Dispatch, type RefObject, type SetStateAction, useEffect, useRef } from 'react';
 
+import { announceForA11y } from '@/lib/a11y/announce';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import { fileHeaderKey, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { subscribeFileNavigatorRequest } from '@/lib/pr-review/file-navigator-bridge';
 
@@ -30,6 +32,7 @@ export function usePrDiffListScroll({
   // re-fires a scroll: a programmatic scroll landing mid-drag fights the user.
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const { scrollAnimated } = useMotionPolicy();
 
   useEffect(
     () =>
@@ -45,8 +48,10 @@ export function usePrDiffListScroll({
         if (target?.kind === 'file-header' && target.hasDiff) {
           setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
         }
-        void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+        void listRef.current?.scrollToIndex({ index, animated: scrollAnimated, viewPosition: 0 });
+        // The destination is virtualized, so announce it (D13).
+        announceForA11y(request.path);
       }),
-    [owner, repo, number, setExpanded, listRef]
+    [owner, repo, number, setExpanded, listRef, scrollAnimated]
   );
 }

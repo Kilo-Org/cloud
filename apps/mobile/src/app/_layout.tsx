@@ -33,6 +33,7 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
@@ -59,6 +60,8 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
+import { queryClient } from '@/lib/query-client';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -178,6 +181,13 @@ function RootLayoutNav() {
       Sentry.captureException(fontsError);
     }
   }, [fontsError]);
+
+  // Cold-start read-cache restore: best effort, never blocks startup. Starts
+  // before the auth gate resolves so allowlisted queries can hydrate under
+  // the splash; the authenticated mount abandons or rescopes it on identity.
+  useEffect(() => {
+    void restorePersistedCacheOnColdStart(queryClient);
+  }, []);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
@@ -517,6 +527,7 @@ function RootLayoutNav() {
   const needsAppRedirect = token != null && inAuthGroup;
   const hasUserBootstrapError = token != null && userIdError;
   const hasConsentBootstrapError = token != null && consentCheckError !== null;
+  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
   const consentLoading =
     token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
   const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
@@ -534,6 +545,38 @@ function RootLayoutNav() {
     !hasUserBootstrapError &&
     !hasConsentBootstrapError &&
     (isLoading || needsRedirect || consentLoading);
+
+  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
+  // both accessibility trees. On the hidden → visible transition,
+  // `announceForA11y` is the deterministic entry context for screen-reader
+  // users, and the wrapper focus is best-effort (`moveA11yFocus` returns false
+  // when the platform declines — no retry), deferred to the next frame so the
+  // revealed tree is measurable. Per-screen heading/first-control focus is
+  // owned by the screens themselves; the gate cannot know the active screen's
+  // heading.
+  //
+  // The transition is skipped while a bootstrap error is shown: the wrapper
+  // is unmounted then (the error screen replaces it), so "Content ready"
+  // would be a false announcement and the wrapper focus has no target. The
+  // cleanup cancels the pending frame, which React runs before any later
+  // render's frame can fire, so an interrupted reveal never focuses a stale
+  // wrapper.
+  const wrapperRef = useRef<View>(null);
+  const wasHiddenRef = useRef(hidden);
+  useEffect(() => {
+    const wasHidden = wasHiddenRef.current;
+    wasHiddenRef.current = hidden;
+    if (!wasHidden || hidden || hasBootstrapError) {
+      return undefined;
+    }
+    announceForA11y('Content ready');
+    const frame = requestAnimationFrame(() => {
+      moveA11yFocus(wrapperRef);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [hidden, hasBootstrapError]);
 
   if (hasUserBootstrapError) {
     return (
@@ -574,6 +617,12 @@ function RootLayoutNav() {
 
   return (
     <View
+      ref={wrapperRef}
+      // `opacity-0` + `pointerEvents` hide the redirecting tree visually and
+      // from touch, but not from screen readers. Leave both accessibility
+      // trees while hidden (iOS, then Android).
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
       className={`flex-1 ${hidden ? 'opacity-0' : 'opacity-100'}`}
       pointerEvents={hidden ? 'none' : 'auto'}
     >

@@ -59,6 +59,7 @@ import {
   mergeDiscussionListItems,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import {
   expandedForThread,
   expandThread,
@@ -100,6 +101,7 @@ export function PrReviewDiscussionTab({
   const listRef = useRef<FlashListRef<DiscussionListItem>>(null);
   const settleGenerationRef = useRef(0);
   const settleThreadIdRef = useRef<string | null>(null);
+  const { scrollAnimated } = useMotionPolicy();
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -169,7 +171,7 @@ export function PrReviewDiscussionTab({
             index,
             viewPosition: 0,
             viewOffset: firstItemOffset,
-            animated: true,
+            animated: scrollAnimated,
           });
           if (settleGenerationRef.current === generation) {
             settleThreadIdRef.current = null;

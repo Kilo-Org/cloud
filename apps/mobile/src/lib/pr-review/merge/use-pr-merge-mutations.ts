@@ -13,13 +13,15 @@
 // head. `listFiles` is per-page; we invalidate the full procedure too.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 
+import { announceForA11y } from '@/lib/a11y/announce';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   assertMergeResult,
+  gateMergeResult,
   type MergePullRequestResult,
 } from '@/lib/pr-review/merge/merge-result-gate';
 import { useHoistedOperationKey } from '@/lib/operation-key';
@@ -98,8 +100,19 @@ export function useMergePullRequestMutation(ref: PrRef) {
         throw mapPrOperationError(error, 'merge');
       }
     },
+    onSuccess: (result: MergePullRequestResult) => {
+      // One announcement owner per outcome. `assertMergeResult` gated
+      // `merged: true` before this runs, so only clean and partial
+      // outcomes reach here. The partial announcement carries the full
+      // merged-but-branch-delete-failed message; the persistent banner
+      // (which renders that text) has no live region of its own.
+      const gate = gateMergeResult(result);
+      const message =
+        gate.kind === 'partial' ? `Merged. Couldn't delete the branch: ${gate.reason}` : 'Merged';
+      announceForA11y(message);
+    },
     onError: (error: { message: string }) => {
-      toast.error(prOperationToastMessage(error, 'merge'));
+      announcingToast.error(prOperationToastMessage(error, 'merge'));
     },
     onSettled: async () => {
       await invalidatePrCaches(queryClient, keys);
@@ -115,7 +128,7 @@ export function useUpdateBranchMutation(ref: PrRef) {
   return useMutation(
     trpc.githubPrReview.updateBranch.mutationOptions({
       onError: (error: { message: string }) => {
-        toast.error(error.message);
+        announcingToast.error(error.message);
       },
       onSettled: async () => {
         await invalidatePrCaches(queryClient, keys);
@@ -131,8 +144,13 @@ export function useEnableAutoMergeMutation(ref: PrRef) {
 
   return useMutation(
     trpc.githubPrReview.enableAutoMerge.mutationOptions({
+      onSuccess: () => {
+        // Bare success announcement beside the merge sheet's existing
+        // auto-merge success effect (haptic + refetch + dismiss).
+        announceForA11y('Auto-merge enabled');
+      },
       onError: (error: { message: string }) => {
-        toast.error(error.message);
+        announcingToast.error(error.message);
       },
       onSettled: async () => {
         await invalidatePrCaches(queryClient, keys);
@@ -149,7 +167,7 @@ export function useDisableAutoMergeMutation(ref: PrRef) {
   return useMutation(
     trpc.githubPrReview.disableAutoMerge.mutationOptions({
       onError: (error: { message: string }) => {
-        toast.error(error.message);
+        announcingToast.error(error.message);
       },
       onSettled: async () => {
         await invalidatePrCaches(queryClient, keys);

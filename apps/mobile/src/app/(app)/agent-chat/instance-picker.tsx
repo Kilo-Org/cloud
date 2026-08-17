@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
+import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -173,18 +174,16 @@ export default function InstancePickerScreen() {
 
   const renderItem = ({ item }: { item: LabeledInstance }) => {
     const selected = item.connectionId === currentConnectionId;
+    const label = item.dedupSuffix
+      ? `${item.name} on ${item.projectName} (${item.dedupSuffix})`
+      : `${item.name} on ${item.projectName}`;
     return (
       <Pressable
         className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
         onPress={() => {
           handleSelectInstance(item);
         }}
-        accessibilityRole="button"
-        accessibilityLabel={
-          item.dedupSuffix
-            ? `${item.name} on ${item.projectName} (${item.dedupSuffix})`
-            : `${item.name} on ${item.projectName}`
-        }
+        {...radioItemA11y({ label, checked: selected })}
       >
         <View className="flex-1">
           <View className="flex-row items-center gap-2">
@@ -213,8 +212,13 @@ export default function InstancePickerScreen() {
   // the only target the user can actually pick right now.
   return (
     <PickerSheet title="Run on" onDone={closePicker} scrollable={false}>
+      {/* The list must stay a direct child of the sheet header for native
+          formSheet sizing, so the radiogroup role and the visible "Run on"
+          group name live on the FlatList container instead of a wrapper. */}
       <FlatList
         className="flex-1 bg-background"
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Run on"
         data={labeled}
         keyExtractor={item => item.connectionId}
         contentContainerStyle={{ paddingBottom: bottom }}
@@ -222,8 +226,10 @@ export default function InstancePickerScreen() {
           <Pressable
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
             onPress={handleSelectCloudAgent}
-            accessibilityRole="button"
-            accessibilityLabel="Run on Cloud Agent"
+            {...radioItemA11y({
+              label: 'Run on Cloud Agent',
+              checked: currentConnectionId === null,
+            })}
           >
             <Cloud size={18} color={colors.foreground} />
             <View className="flex-1">

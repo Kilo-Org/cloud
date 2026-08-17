@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
@@ -67,12 +68,16 @@ export function QueryError({
   placement = 'center',
 }: Readonly<QueryErrorProps>) {
   const meta = VARIANT_META[variant];
+  const titleText = title ?? meta.title;
+  const descriptionText = message ?? meta.description;
 
   return (
     <EmptyState
       icon={meta.icon}
-      title={title ?? meta.title}
-      description={message ?? meta.description}
+      title={titleText}
+      description={
+        <AccessibleStatus message={descriptionText} tone="error" className="text-center text-sm" />
+      }
       className={className}
       placement={placement}
       iconContainerClassName="rounded-full bg-muted p-4"

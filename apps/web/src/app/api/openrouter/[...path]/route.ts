@@ -15,7 +15,10 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import {
+  getProvider,
+  type GetProviderProviderResult,
+} from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -849,7 +852,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     sourceProviderId: effectiveProviderContext.provider.id,
     hasUserByok: effectiveProviderContext.userByok !== null,
   });
+  let partnerFallback:
+    | { providerContext: GetProviderProviderResult; request: GatewayRequest }
+    | undefined;
   if (partnerProvider) {
+    partnerFallback = {
+      providerContext: effectiveProviderContext,
+      request: structuredClone(requestBodyParsed),
+    };
     effectiveProviderContext = {
       kind: 'provider',
       provider: partnerProvider,
@@ -927,27 +937,61 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     op: 'http.client',
   });
 
-  const attempt = await sendUpstreamAttempt({
-    providerContext: effectiveProviderContext,
+  const upstreamAttemptOptions = {
     requestedModel: effectiveModelIdLowerCased,
-    request: requestBodyParsed,
     fraudHeaders,
     userId: user.id,
     organizationId: organizationId ?? null,
     sessionId: usageContext.session_id,
     taskId: taskId ?? null,
-    delayMs: rulesEngineDecision.delayMs,
     search: url.search,
     method: request.method,
     signal: request.signal,
     vercelRequestId,
+  };
+  let attempt = await sendUpstreamAttempt({
+    ...upstreamAttemptOptions,
+    providerContext: effectiveProviderContext,
+    request: requestBodyParsed,
+    delayMs: rulesEngineDecision.delayMs,
   });
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
+
+  if (partnerFallback && attempt.response.status >= 400) {
+    console.warn('Partner request failed; retrying initial managed provider', {
+      partner_provider: effectiveProviderContext.provider.id,
+      fallback_provider: partnerFallback.providerContext.provider.id,
+      status_code: attempt.response.status,
+    });
+    try {
+      await attempt.response.body?.cancel();
+    } catch {
+      console.warn('Failed to cancel discarded partner response body');
+    }
+
+    effectiveProviderContext = partnerFallback.providerContext;
+    requestBodyParsed = partnerFallback.request;
+    usageContext.provider = effectiveProviderContext.provider.id;
+    usageContext.user_byok = !!effectiveProviderContext.userByok;
+
+    attempt = await sendUpstreamAttempt({
+      ...upstreamAttemptOptions,
+      providerContext: effectiveProviderContext,
+      request: requestBodyParsed,
+      delayMs: 0,
+    });
+    if (attempt.type === 'invalid-openrouter-model') {
+      return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+    }
+    if (attempt.type === 'error') return attempt.response;
+  }
+
   const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
   if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
+  const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',
     response.status,
@@ -987,7 +1031,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed.body,
       response,
       organizationId,
-      model: requestBodyParsed.body.model,
+      model: finalUpstreamModel,
       errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
       trackInSentry: true,
     });
@@ -1002,7 +1046,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed.body,
       response,
       organizationId,
-      model: requestBodyParsed.body.model,
+      model: finalUpstreamModel,
       errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
       trackInSentry: response.status >= 500,
     });

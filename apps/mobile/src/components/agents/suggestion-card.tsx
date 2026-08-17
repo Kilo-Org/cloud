@@ -6,6 +6,7 @@ import { type StandaloneSuggestion, type SuggestionAction } from '@kilocode/clou
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -75,11 +76,7 @@ export function SuggestionCard({
       <View className="gap-3 p-4">
         <Text className="text-sm leading-5 text-foreground">{text}</Text>
 
-        {error ? (
-          <Text accessibilityLiveRegion="polite" className="text-xs text-destructive">
-            {error}
-          </Text>
-        ) : null}
+        {error ? <AccessibleStatus message={error} className="text-xs" /> : null}
 
         {actions.length > 0 ? (
           <View className="gap-2">

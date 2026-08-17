@@ -14,6 +14,7 @@ import {
   type LayoutChangeEvent,
   Modal,
   Pressable,
+  type Text as RNText,
   Text,
   useWindowDimensions,
   View,
@@ -28,8 +29,10 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
 import { type MarkdownPalette } from './markdown-palette';
 
 const MODAL_COLUMN_MIN_WIDTH = 148;
@@ -55,10 +58,16 @@ function getColumnCount(header: ReactNode[][], rows: ReactNode[][][]): number {
   return columnCount;
 }
 
+function pluralizeCount(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+}
+
 function formatTableSummary(columnCount: number, rowCount: number): string {
-  const columns = columnCount === 1 ? 'column' : 'columns';
-  const rows = rowCount === 1 ? 'row' : 'rows';
-  return `${columnCount} ${columns} · ${rowCount} ${rows}`;
+  return `${pluralizeCount(columnCount, 'column')} · ${pluralizeCount(rowCount, 'row')}`;
+}
+
+function formatChipAccessibilityLabel(columnCount: number, rowCount: number): string {
+  return `Table, ${pluralizeCount(columnCount, 'column')}, ${pluralizeCount(rowCount, 'row')}, opens full screen`;
 }
 
 // Markdown tables never fit inside a chat bubble: a horizontal ScrollView in a
@@ -79,6 +88,9 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
     Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
   );
 
+  // Column titles, flattened to spoken text once so every body row reuses them.
+  const headerTexts = header.map(node => extractNodeText(node));
+
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [natural, setNatural] = useState<{ width: number; height: number } | undefined>(undefined);
   const scale = useSharedValue(ZOOM_DEFAULT);
@@ -87,6 +99,10 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
   const gestureSession = useSharedValue(0);
   const verticalRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const horizontalRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  // The modal header announces as a header and receives focus after the native
+  // modal finishes presenting (onShow) so screen-reader users land on the table
+  // title instead of the first cell.
+  const titleRef = useRef<RNText | null>(null);
 
   // RNGH types an external gesture ref as RefObject<ComponentType> (see
   // node_modules/react-native-gesture-handler/lib/typescript/handlers/gestures/gesture.d.ts:5),
@@ -185,7 +201,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
           setOpen(true);
         }}
         accessibilityRole="button"
-        accessibilityLabel="View table"
+        accessibilityLabel={formatChipAccessibilityLabel(columnCount, rows.length)}
         className="my-1 flex-row items-center gap-2.5 self-start rounded-lg border px-3 py-2 active:opacity-70"
         // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
         style={{ backgroundColor: palette.codeBackground, borderColor: palette.borderColor }}
@@ -206,6 +222,11 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
       <Modal
         visible={open}
         animationType="slide"
+        // Best-effort focus after native presentation; moveA11yFocus is a no-op
+        // when the title handle is not mounted yet, so no retry loop is needed.
+        onShow={() => {
+          moveA11yFocus(titleRef);
+        }}
         onRequestClose={() => {
           session.value += 1;
           setOpen(false);
@@ -216,7 +237,13 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
             className="flex-row items-center justify-between border-b border-border bg-background px-4"
             style={{ paddingTop: insets.top, height: insets.top + 56 }}
           >
-            <Text className="text-lg font-semibold text-foreground">Table</Text>
+            <Text
+              ref={titleRef}
+              accessibilityRole="header"
+              className="text-lg font-semibold text-foreground"
+            >
+              Table
+            </Text>
             <Pressable
               onPress={() => {
                 session.value += 1;
@@ -265,6 +292,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
                           columnWidth={columnWidth}
                           isHeader
                           isLastRow={rows.length === 0}
+                          headerTexts={headerTexts}
                         />
                         {rows.map((row, rowIdx) => (
                           <TableRow
@@ -274,6 +302,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
                             columnCount={columnCount}
                             columnWidth={columnWidth}
                             isLastRow={rows.length - 1 === rowIdx}
+                            headerTexts={headerTexts}
                           />
                         ))}
                       </View>
@@ -296,22 +325,45 @@ type TableRowProps = {
   columnWidth: number;
   isLastRow: boolean;
   isHeader?: boolean;
+  headerTexts: string[];
 };
 
-function TableRow({
+// The export keeps the direct row semantics testable without mounting the modal tree.
+export function TableRow({
   palette,
   cells,
   columnCount,
   columnWidth,
   isLastRow,
   isHeader = false,
+  headerTexts,
 }: TableRowProps) {
+  // A row announces exactly one way, never both:
+  //
+  // - Plain row (no nested control): the linear label carries the whole row
+  //   ("Header: cell, Header: cell") on a 1px invisible accessible sibling,
+  //   and the cells leave the accessibility tree. Without hiding them the
+  //   screen reader reads the row label AND every cell again.
+  // - Row with a Markdown link or image: the cells stay reachable so those
+  //   controls keep their own focus and tap target, and the linear label is
+  //   dropped — an accessible container would shadow them on iOS.
+  const cellTexts = cells.map(node => extractNodeText(node));
+  const rowLabel = linearRowLabel(isHeader ? [] : headerTexts, cellTexts);
+  const hasControls = containsPressable(cells);
   return (
     <View
       className="flex-row"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant header background
       style={isHeader ? { backgroundColor: palette.codeBackground } : undefined}
     >
+      {hasControls ? null : (
+        <View
+          accessible
+          accessibilityLabel={rowLabel}
+          className="absolute h-px w-px overflow-hidden"
+          pointerEvents="none"
+        />
+      )}
       {Array.from({ length: columnCount }, (_, colIdx) => (
         <TableCell
           key={colIdx}
@@ -319,6 +371,7 @@ function TableRow({
           width={columnWidth}
           hasRightBorder={colIdx < columnCount - 1}
           hasBottomBorder={isHeader || !isLastRow}
+          hiddenFromA11y={!hasControls}
         >
           {cells[colIdx] ?? []}
         </TableCell>
@@ -332,13 +385,24 @@ type TableCellProps = {
   width: number;
   hasRightBorder: boolean;
   hasBottomBorder: boolean;
+  /** True when the row's linear label already speaks this cell's content. */
+  hiddenFromA11y: boolean;
   children: ReactNode;
 };
 
-function TableCell({ palette, width, hasRightBorder, hasBottomBorder, children }: TableCellProps) {
+function TableCell({
+  palette,
+  width,
+  hasRightBorder,
+  hasBottomBorder,
+  hiddenFromA11y,
+  children,
+}: TableCellProps) {
   return (
     <View
       className="p-2"
+      accessibilityElementsHidden={hiddenFromA11y}
+      importantForAccessibility={hiddenFromA11y ? 'no-hide-descendants' : 'auto'}
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic column width and per-variant border color
       style={{
         width,

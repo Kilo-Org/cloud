@@ -10,6 +10,8 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -20,15 +22,14 @@ import {
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 
-function shortMethodChipLabel(value: AllowedMergeMethod): string {
-  if (value === 'merge') {
-    return 'Merge';
-  }
-  if (value === 'squash') {
-    return 'Squash';
-  }
-  return 'Rebase';
-}
+const NO_ENABLED_METHODS_MESSAGE =
+  'This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.';
+
+const SHORT_METHOD_LABELS: Record<AllowedMergeMethod, string> = {
+  merge: 'Merge',
+  squash: 'Squash',
+  rebase: 'Rebase',
+};
 
 function MethodPicker({
   methodOptions,
@@ -46,11 +47,10 @@ function MethodPicker({
       <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Method
       </Text>
-      <View className="flex-row flex-wrap gap-1">
+      <RadioGroup label="Method" className="flex-row flex-wrap gap-1">
         {methodOptions.map(option => {
           const active = method === option.value;
           // Long labels stay readable via accessibilityLabel; chip shows short text.
-          const shortLabel = shortMethodChipLabel(option.value);
           return (
             <Pressable
               key={option.value}
@@ -59,28 +59,29 @@ function MethodPicker({
                 void Haptics.selectionAsync();
                 onChange(option.value);
               }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active, disabled: isDisabled }}
-              accessibilityLabel={option.label}
+              {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
               accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
               className={cn(
                 'min-h-8 items-center justify-center rounded-full border px-2.5 py-1 active:opacity-70',
-                active ? 'border-primary bg-primary' : 'border-border bg-secondary',
-                isDisabled && 'opacity-50'
+                active && 'border-primary bg-primary',
+                !active && isDisabled && 'border-hair-soft bg-secondary',
+                !active && !isDisabled && 'border-border bg-secondary'
               )}
             >
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  active ? 'text-primary-foreground' : 'text-foreground'
+                  active && 'text-primary-foreground',
+                  !active && isDisabled && 'text-muted-foreground',
+                  !active && !isDisabled && 'text-foreground'
                 )}
               >
-                {shortLabel}
+                {SHORT_METHOD_LABELS[option.value]}
               </Text>
             </Pressable>
           );
         })}
-      </View>
+      </RadioGroup>
     </View>
   );
 }
@@ -238,10 +239,11 @@ export function MergeSheetFormBody(props: {
       <View className="gap-1.5 px-6 pt-1.5">
         {noMethodsAllowed ? (
           <View className="rounded-md border border-border bg-secondary p-3">
-            <Text className="text-sm text-muted-foreground">
-              This repository has no enabled merge methods. Ask a repository admin to enable merge,
-              squash, or rebase merging.
-            </Text>
+            <AccessibleStatus
+              message={NO_ENABLED_METHODS_MESSAGE}
+              tone="status"
+              className="text-sm"
+            />
           </View>
         ) : (
           <MethodPicker
@@ -272,14 +274,16 @@ export function MergeSheetFormBody(props: {
           />
         ) : null}
         {inlineError && inlineErrorKind !== 'reconnect' ? (
-          <View
-            className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5"
-            accessibilityLiveRegion="polite"
-          >
+          <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
             <Text className="text-xs text-destructive">{inlineError}</Text>
           </View>
         ) : null}
-        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+        {inlineErrorKind === 'reconnect' ? (
+          <>
+            <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
+            <PrReviewReconnectNotice />
+          </>
+        ) : null}
       </View>
 
       <PrFormSheetFooter className="pb-1 pt-1">

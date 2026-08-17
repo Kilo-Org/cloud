@@ -94,8 +94,11 @@ import {
 } from '@/lib/analytics/posthog';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
@@ -192,6 +195,39 @@ export function SessionDetailContent({
   const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
   const { bottom } = useSafeAreaInsets();
+
+  // Durable composer draft. The composer renders immediately — typing must
+  // never wait on the `user.getMe` query — and the draft load settles behind
+  // it: `initialDraft` stays undefined until then, and the composer applies a
+  // restored draft only into an untouched input. Identity still gates the data
+  // itself: drafts neither save nor restore while the user id is unknown, the
+  // shared fence resets on identity or session changes, and only the newest
+  // generation's load publishes, so an old account's draft can never restore
+  // into the current composer.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const sessionComposerDraftKey = agentComposerDraftKey(sessionId);
+  const composerDraft = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: sessionComposerDraftKey,
+  });
+
+  // Composer remount identity. An account CHANGE must remount the composer, so
+  // one account's typed text never surfaces under another. Identity RESOLVING
+  // must not: the composer already renders while `userId` is undefined, so a
+  // key flipping from anonymous to the real id would remount and destroy what
+  // the user typed on a cold start. The epoch therefore bumps only between two
+  // known ids.
+  const [composerAccount, setComposerAccount] = useState<{ id?: string; epoch: number }>({
+    id: userId,
+    epoch: 0,
+  });
+  if (userId !== undefined && composerAccount.id !== userId) {
+    setComposerAccount(current => ({
+      id: userId,
+      epoch: current.id === undefined ? current.epoch : current.epoch + 1,
+    }));
+  }
 
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
@@ -657,6 +693,9 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
+  // One condition for the composer and for the bottom BlurBar that reserves
+  // its space: if the bar claimed the space on a condition the composer does
+  // not share, the composer pops in and the layout jumps on every open.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
@@ -1024,6 +1063,7 @@ export function SessionDetailContent({
               isSelectionCurrent={isModelPickerSelectionCurrent}
             >
               <ChatComposer
+                key={`${composerAccount.epoch}:${sessionId}`}
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
@@ -1046,6 +1086,8 @@ export function SessionDetailContent({
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}
+                draftKey={userId ? sessionComposerDraftKey : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

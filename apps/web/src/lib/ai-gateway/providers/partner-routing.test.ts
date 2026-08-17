@@ -84,23 +84,43 @@ describe('getPercentageRoutedPartnerProvider', () => {
     expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
   });
 
-  it('routes Messages requests', () => {
-    expect(selectPartner({ request: request('messages') })).toBe(PROVIDERS.FRIENDLI_GLM);
+  it.each(['chat_completions', 'messages'] as const)('routes %s requests', kind => {
+    expect(selectPartner({ request: request(kind) })).toBe(PROVIDERS.FRIENDLI_GLM);
   });
 
-  it.each(['chat_completions', 'responses'] as const)(
-    'does not route unsupported %s requests',
-    kind => {
-      expect(selectPartner({ request: request(kind) })).toBeNull();
-    }
-  );
+  it('does not route unsupported responses requests', () => {
+    expect(selectPartner({ request: request('responses') })).toBeNull();
+  });
 
   it('allows an empty provider object', () => {
     expect(selectPartner({ request: request('messages', {}) })).toBe(PROVIDERS.FRIENDLI_GLM);
   });
 
-  it('does not route requests with customized provider options', () => {
-    expect(selectPartner({ request: request('messages', { only: ['friendli'] }) })).toBeNull();
+  it.each([
+    [FRIENDLI_GLM_PUBLIC_ID, 'friendli', PROVIDERS.FRIENDLI_GLM],
+    [PERPLEXITY_KIMI_PUBLIC_ID, 'perplexity', PROVIDERS.PERPLEXITY_KIMI],
+  ])('honors provider filters for %s', (requestedModel, providerId, expectedProvider) => {
+    expect(
+      selectPartner({ requestedModel, request: request('messages', { only: [providerId] }) })
+    ).toBe(expectedProvider);
+    expect(
+      selectPartner({ requestedModel, request: request('messages', { ignore: ['openai'] }) })
+    ).toBe(expectedProvider);
+    expect(
+      selectPartner({ requestedModel, request: request('messages', { only: ['openai'] }) })
+    ).toBeNull();
+    expect(
+      selectPartner({ requestedModel, request: request('messages', { ignore: [providerId] }) })
+    ).toBeNull();
+  });
+
+  it.each([
+    [FRIENDLI_GLM_PUBLIC_ID, { data_collection: 'deny' } as const, PROVIDERS.FRIENDLI_GLM],
+    [PERPLEXITY_KIMI_PUBLIC_ID, { zdr: true } as const, PROVIDERS.PERPLEXITY_KIMI],
+  ])('routes ZDR model %s with data policy options', (requestedModel, provider, expected) => {
+    expect(selectPartner({ requestedModel, request: request('messages', provider) })).toBe(
+      expected
+    );
   });
 
   it.each(['openrouter', 'vercel'] as const)(

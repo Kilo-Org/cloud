@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store';
 import { useMemo } from 'react';
 
 import { API_BASE_URL } from '@/lib/config';
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -103,7 +102,7 @@ export function thinkingEffortLabel(variant: string): string {
 const MODEL_REQUEST_TIMEOUT_MS = 15_000;
 
 async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await getAuthTokenForRequest();
   const url = organizationId
     ? `${API_BASE_URL}/api/organizations/${organizationId}/models`
     : `${API_BASE_URL}/api/openrouter/models`;
@@ -140,7 +139,7 @@ async function fetchModels(organizationId: string | undefined): Promise<ModelRes
 }
 
 async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await getAuthTokenForRequest();
   const response = await fetch(`${API_BASE_URL}/api/organizations/${organizationId}/defaults`, {
     headers: {
       Accept: 'application/json',

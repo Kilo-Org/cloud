@@ -9,6 +9,7 @@ import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -124,19 +125,22 @@ export default function ReposRoute() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Repositories" />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
-        {capabilities.selectionModePicker &&
-          (['all', 'selected'] as const).map(option => (
-            <ChoiceRow
-              key={option}
-              label={option === 'all' ? 'All repositories' : 'Selected repositories'}
-              selected={mode === option}
-              disabled={configDisabled}
-              className="border-b-[0.5px] border-hair-soft"
-              onPress={() => {
-                setMode(option);
-              }}
-            />
-          ))}
+        {capabilities.selectionModePicker && (
+          <RadioGroup label="Repositories">
+            {(['all', 'selected'] as const).map(option => (
+              <ChoiceRow
+                key={option}
+                label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+                selected={mode === option}
+                disabled={configDisabled}
+                className="border-b-[0.5px] border-hair-soft"
+                onPress={() => {
+                  setMode(option);
+                }}
+              />
+            ))}
+          </RadioGroup>
+        )}
 
         {(!capabilities.selectionModePicker || mode === 'selected') && (
           <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>

@@ -90,10 +90,20 @@ export default {
     apiUrlOverrides: {},
     apiKey: getEnvVariable('FRIENDLI_API_KEY'),
     // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
-    supportedChatApis: ['messages'],
-    responseTransforms: null,
+    supportedChatApis: ['chat_completions', 'messages'],
+    // Chat completions responses report reasoning as `reasoning_content`; expose it as
+    // `reasoning_details` so clients can conserve it across turns.
+    responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
+      if (context.request.kind === 'chat_completions') {
+        context.request.body.reasoning_effort = isReasoningExplicitlyDisabled(context.request)
+          ? 'none'
+          : (context.request.body.reasoning?.effort ??
+            context.request.body.reasoning_effort ??
+            undefined);
+        delete context.request.body.reasoning;
+      }
       delete context.request.body.provider;
     },
   },
@@ -103,10 +113,20 @@ export default {
     apiUrlOverrides: {},
     apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
     // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
-    supportedChatApis: ['messages'],
-    responseTransforms: null,
+    supportedChatApis: ['chat_completions', 'messages'],
+    // Chat completions responses report reasoning as `reasoning_content`; expose it as
+    // `reasoning_details` so clients can conserve it across turns.
+    responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';
+      if (context.request.kind === 'chat_completions') {
+        context.request.body.reasoning_effort = isReasoningExplicitlyDisabled(context.request)
+          ? 'none'
+          : (context.request.body.reasoning?.effort ??
+            context.request.body.reasoning_effort ??
+            undefined);
+        delete context.request.body.reasoning;
+      }
       delete context.request.body.provider;
     },
   },

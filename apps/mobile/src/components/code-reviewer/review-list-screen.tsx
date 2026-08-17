@@ -133,6 +133,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 return (
                   <Pressable
                     key={review.id}
+                    accessibilityRole="button"
                     className={cn(
                       'py-3 active:opacity-70',
                       index < data.reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'

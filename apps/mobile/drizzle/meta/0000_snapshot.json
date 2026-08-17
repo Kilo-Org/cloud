@@ -1,0 +1,64 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "e7d69526-c2d6-4633-b14f-24bcef818f44",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "kv": {
+      "name": "kv",
+      "columns": {
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "k": {
+          "name": "k",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "v": {
+          "name": "v",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "kv_scope_k_pk": {
+          "columns": [
+            "scope",
+            "k"
+          ],
+          "name": "kv_scope_k_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

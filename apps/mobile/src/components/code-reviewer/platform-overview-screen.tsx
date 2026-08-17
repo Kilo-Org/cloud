@@ -12,6 +12,7 @@ import {
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -229,6 +230,7 @@ export function PlatformOverviewScreen({
                     </Text>
                   </View>
                   <Switch
+                    accessibilityLabel="Automatic reviews"
                     value={config.data.isEnabled}
                     disabled={
                       !canEdit || toggle.isPending || (!hasRepoSelection && !config.data.isEnabled)
@@ -272,22 +274,15 @@ export function PlatformOverviewScreen({
               </View>
 
               {capabilities.reviewMd && (
-                <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Follow REVIEW.md</Text>
-                    <Text variant="muted" className="text-xs">
-                      Honor per-repo REVIEW.md instruction files
-                    </Text>
-                  </View>
-                  <Switch
-                    value={!config.data.disableReviewMd}
-                    disabled={!canEdit || save.isPending}
-                    onValueChange={value => {
-                      void Haptics.selectionAsync();
-                      save.mutate({ disableReviewMd: !value });
-                    }}
-                  />
-                </View>
+                <ToggleRow
+                  title="Follow REVIEW.md"
+                  subtitle="Honor per-repo REVIEW.md instruction files"
+                  value={!config.data.disableReviewMd}
+                  disabled={!canEdit || save.isPending}
+                  onValueChange={value => {
+                    save.mutate({ disableReviewMd: !value });
+                  }}
+                />
               )}
 
               {!canEdit && (

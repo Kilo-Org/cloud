@@ -24,7 +24,7 @@
   --accent-foreground: #ffffff;
   --primary: #4f5a10;
   --primary-foreground: #ffffff;
-  --destructive: #be4e3f;
+  --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   --border: rgba(20, 15, 10, 0.09);
   --input: rgba(20, 15, 10, 0.45);
@@ -37,20 +37,20 @@
   --hair-soft: rgba(20, 15, 10, 0.05);
   --accent-soft: #e8f27a;
   --accent-soft-foreground: #1a1a10;
-  --good: #278150;
+  --good: #24784a;
   --good-foreground: #ffffff;
-  --good-tile-bg: #2781501a;
-  --good-tile-border: #27815033;
-  --warn: #9f6612;
+  --good-tile-bg: #24784a1a;
+  --good-tile-border: #24784a33;
+  --warn: #956011;
   --warn-foreground: #ffffff;
-  --warn-tile-bg: #9f66121a;
-  --warn-tile-border: #9f661233;
-  --danger-tile-bg: #be4e3f1a;
-  --danger-tile-border: #be4e3f33;
-  --info: #2563eb;
+  --warn-tile-bg: #9560111a;
+  --warn-tile-border: #95601133;
+  --danger-tile-bg: #b0483a1a;
+  --danger-tile-border: #b0483a33;
+  --info: #2260eb;
   --info-foreground: #ffffff;
-  --info-tile-bg: #2563eb1a;
-  --info-tile-border: #2563eb33;
+  --info-tile-bg: #2260eb1a;
+  --info-tile-border: #2260eb33;
 
   /* Per-agent hues + pre-tinted tile pairs.
    * The *-tile-bg (10% alpha) and *-tile-border (20% alpha) tokens exist

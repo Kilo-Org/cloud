@@ -42,6 +42,7 @@ export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind
 
 export type ProviderResponseTransforms = {
   mapGeminiThoughtContent: boolean;
+  mapReasoningContentToDetails: boolean;
 };
 
 export type Provider = {

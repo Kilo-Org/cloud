@@ -141,7 +141,7 @@ describe('organization service fee exemptions', () => {
       isExempt: true,
       reason: 'renewed with new documentation',
       changedByKiloUserId: 'admin_2',
-      now: new Date('2026-09-03T00:00:00.000Z'),
+      now: new Date('2026-09-02T00:00:00.000Z'),
     });
 
     const view = await getOrganizationServiceFeeExemption({ store, organizationId: ORG_A });
@@ -149,7 +149,7 @@ describe('organization service fee exemptions', () => {
     expect(first.current.isExempt).toBe(true);
     expect(first.current.reason).toBe('initial grant');
     expect(second.current.id).toBe(second.history.id);
-    expect(second.current.createdAt).not.toBe(first.current.createdAt);
+    expect(second.current.createdAt).toBe('2026-09-02T00:00:00.001Z');
     expect(view.history.map(row => row.reason)).toEqual([
       'renewed with new documentation',
       'initial grant',

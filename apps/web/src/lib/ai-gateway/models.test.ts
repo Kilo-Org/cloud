@@ -19,7 +19,10 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { deepseek_v4_pro_discounted_model } from './providers/deepseek';
-import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_5_6_sol_stealth_model,
+} from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
 import { longcat_2_free_model } from './providers/longcat';
@@ -117,31 +120,50 @@ describe('isFreeModel', () => {
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 
-    test('registers GPT-5.6 Sol as a Martian stealth model', () => {
-      expect(findKiloExclusiveModel('stealth/gpt-5.6-sol')).toBe(gpt_5_6_sol_stealth_model);
-      expect(gpt_5_6_sol_stealth_model.internal_id).toBe('openai/gpt-5.6-sol:optimized');
-      expect(gpt_5_6_sol_stealth_model.gateway).toBe('martian');
-      expect(getInferenceProvider(gpt_5_6_sol_stealth_model)?.slug).toBe('stealth');
-      expect(gpt_5_6_sol_stealth_model.pricing?.tiers).toEqual([
+    test('registers the discounted GPT-5.6 Sol OpenAI endpoint', async () => {
+      expect(findKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBe(
+        gpt_5_6_sol_discounted_model
+      );
+      expect(gpt_5_6_sol_discounted_model).toMatchObject({
+        internal_id: 'openai/gpt-5.6-sol',
+        gateway: 'vercel',
+        flags: ['reasoning', 'vision'],
+        inference_provider_restriction: ['openai'],
+      });
+      expect(getInferenceProvider(gpt_5_6_sol_discounted_model)).toEqual({
+        slug: 'openai',
+        name: 'OPENAI',
+        training: false,
+        retainsPrompts: true,
+      });
+      expect(
+        await hasBestEffortGuessDataCollectionRequirement(gpt_5_6_sol_discounted_model.public_id)
+      ).toBe(false);
+      expect(gpt_5_6_sol_discounted_model.pricing?.tiers).toEqual([
         {
           start_context_length: 0,
           pricing: {
-            prompt_per_million: 4,
-            completion_per_million: 24,
-            input_cache_read_per_million: 0.4,
-            input_cache_write_per_million: 5,
+            prompt_per_million: 2.5,
+            completion_per_million: 15,
+            input_cache_read_per_million: 0.25,
+            input_cache_write_per_million: 3.125,
           },
         },
         {
           start_context_length: 272_000,
           pricing: {
-            prompt_per_million: 8,
-            completion_per_million: 36,
-            input_cache_read_per_million: 0.8,
-            input_cache_write_per_million: 10,
+            prompt_per_million: 5,
+            completion_per_million: 22.5,
+            input_cache_read_per_million: 0.5,
+            input_cache_write_per_million: 6.25,
           },
         },
       ]);
+    });
+
+    test('keeps the previous GPT-5.6 Sol stealth discount disabled', () => {
+      expect(gpt_5_6_sol_stealth_model.status).toBe('disabled');
+      expect(findKiloExclusiveModel(gpt_5_6_sol_stealth_model.public_id)).toBeNull();
     });
 
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
@@ -366,15 +388,18 @@ describe('getKiloExclusiveInferenceProviderRestriction', () => {
     expect(
       getKiloExclusiveInferenceProviderRestriction(deepseek_v4_pro_discounted_model.public_id)
     ).toEqual(new Set(['deepseek']));
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
+    ).toEqual(new Set(['openai']));
     expect(getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)).toEqual(
       new Set(['tencent'])
     );
   });
 
   test('does not treat unrestricted exclusives or unknown ids as restricted', () => {
-    expect(
-      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_stealth_model.public_id)
-    ).toBeUndefined();
+    expect(getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_stealth_model.public_id)).toBe(
+      undefined
+    );
     expect(
       getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
     ).toBeUndefined();

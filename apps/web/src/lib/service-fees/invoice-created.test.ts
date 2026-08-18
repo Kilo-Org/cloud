@@ -450,8 +450,7 @@ describe('handleKiloPassInvoiceCreated', () => {
     expect(findEffectiveExemption).toHaveBeenCalledWith('org_1', new Date(ACTIVATION * 1000));
     expect(result.assessment).toMatchObject({
       outcome: 'exempt',
-      eligibility: 'exempt',
-      exemptionHistoryId: 'hist_exempt',
+      exemptionId: 'hist_exempt',
       expectedFeeMinor: 245,
       chargedFeeMinor: 0,
     });
@@ -634,7 +633,7 @@ describe('handleKiloPassInvoiceCreated', () => {
       deps: availableTax,
     });
 
-    expect(first.assessment?.id).toBe(second.assessment?.id);
+    expect(first.assessment?.assessmentKey).toBe(second.assessment?.assessmentKey);
     expect(create).toHaveBeenCalledTimes(1);
 
     const missedStore = createMemoryAssessmentStore();

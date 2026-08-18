@@ -8,7 +8,6 @@ import {
   normalizeOrganizationServiceFeeExemptionReason,
   organizationServiceFeeExemptionLockKey,
   setOrganizationServiceFeeExemption,
-  type OrganizationServiceFeeExemptionHistoryRecord,
   type OrganizationServiceFeeExemptionRecord,
   type OrganizationServiceFeeExemptionStore,
 } from '@/lib/service-fees/organization-exemptions';
@@ -19,8 +18,7 @@ function createMemoryExemptionStore(options?: {
   calls: string[];
 } {
   const active = new Set(options?.activeOrganizationIds ?? []);
-  const history: OrganizationServiceFeeExemptionHistoryRecord[] = [];
-  const current = new Map<string, OrganizationServiceFeeExemptionRecord>();
+  const history: OrganizationServiceFeeExemptionRecord[] = [];
   const calls: string[] = [];
 
   const store: OrganizationServiceFeeExemptionStore & { calls: string[] } = {
@@ -36,7 +34,7 @@ function createMemoryExemptionStore(options?: {
       calls.push(`findOrg:${organizationId}`);
       return active.has(organizationId) ? { id: organizationId } : null;
     },
-    async findHistoryAtOrBefore(organizationId, at) {
+    async findAtOrBefore(organizationId, at) {
       const atMs = at.getTime();
       return (
         history
@@ -47,23 +45,18 @@ function createMemoryExemptionStore(options?: {
           .at(-1) ?? null
       );
     },
-    async listHistoryNewestFirst(organizationId) {
+    async listNewestFirst(organizationId) {
       return history
         .filter(row => row.organizationId === organizationId)
         .slice()
         .reverse();
     },
     async getCurrent(organizationId) {
-      return current.get(organizationId) ?? null;
+      return history.filter(row => row.organizationId === organizationId).at(-1) ?? null;
     },
-    async insertHistory(record) {
-      calls.push(`insertHistory:${record.id}`);
+    async insert(record) {
+      calls.push(`insert:${record.id}`);
       history.push(record);
-      return record;
-    },
-    async upsertCurrent(record) {
-      calls.push(`upsertCurrent:${record.currentHistoryId}`);
-      current.set(record.organizationId, record);
       return record;
     },
   };
@@ -131,7 +124,7 @@ describe('organization service fee exemptions', () => {
     expect(otherOrg).toBeNull();
   });
 
-  test('set inserts history first, upserts current, and allows the same state with a new reason', async () => {
+  test('set appends each change and allows the same state with a new reason', async () => {
     const store = createMemoryExemptionStore({ activeOrganizationIds: [ORG_A] });
 
     const first = await setOrganizationServiceFeeExemption({
@@ -155,18 +148,15 @@ describe('organization service fee exemptions', () => {
 
     expect(first.current.isExempt).toBe(true);
     expect(first.current.reason).toBe('initial grant');
-    expect(second.current.currentHistoryId).toBe(second.history.id);
-    expect(second.current.createdAt).toBe(first.current.createdAt);
+    expect(second.current.id).toBe(second.history.id);
+    expect(second.current.createdAt).not.toBe(first.current.createdAt);
     expect(view.history.map(row => row.reason)).toEqual([
       'renewed with new documentation',
       'initial grant',
     ]);
     expect(view.current?.reason).toBe('renewed with new documentation');
     expect(store.calls.filter(call => call.startsWith('lock:'))).toHaveLength(2);
-    const firstInsert = store.calls.findIndex(call => call.startsWith('insertHistory:'));
-    const firstUpsert = store.calls.findIndex(call => call.startsWith('upsertCurrent:'));
-    expect(firstInsert).toBeGreaterThan(-1);
-    expect(firstUpsert).toBeGreaterThan(firstInsert);
+    expect(store.calls.filter(call => call.startsWith('insert:'))).toHaveLength(2);
   });
 
   test('rejects missing or deleted organizations', async () => {

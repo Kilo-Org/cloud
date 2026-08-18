@@ -49,10 +49,6 @@ export const SERVICE_FEE_OUTCOMES = [
 
 export type ServiceFeeOutcome = (typeof SERVICE_FEE_OUTCOMES)[number];
 
-export const SERVICE_FEE_ELIGIBILITIES = ['eligible', 'exempt', 'pre_activation'] as const;
-
-export type ServiceFeeEligibility = (typeof SERVICE_FEE_ELIGIBILITIES)[number];
-
 export const SERVICE_FEE_OWNER_KINDS = ['personal', 'organization'] as const;
 
 export type ServiceFeeOwnerKind = (typeof SERVICE_FEE_OWNER_KINDS)[number];
@@ -125,10 +121,6 @@ export function isServiceFeeFlow(value: string): value is ServiceFeeFlow {
 
 export function isServiceFeeOutcome(value: string): value is ServiceFeeOutcome {
   return (SERVICE_FEE_OUTCOMES as readonly string[]).includes(value);
-}
-
-export function isServiceFeeEligibility(value: string): value is ServiceFeeEligibility {
-  return (SERVICE_FEE_ELIGIBILITIES as readonly string[]).includes(value);
 }
 
 export function isPersonalServiceFeeFlow(flow: ServiceFeeFlow): flow is PersonalServiceFeeFlow {

@@ -1121,7 +1121,6 @@ async function safePrepareDecision(params: {
       assessmentKey: params.assessmentKey,
       version: SERVICE_FEE_VERSION,
       flow: params.flow,
-      eligibility: 'eligible',
       outcome: 'pending',
       currency: SERVICE_FEE_SUPPORTED_CURRENCY,
       kiloUserId: params.kiloUserId ?? null,
@@ -1131,7 +1130,7 @@ async function safePrepareDecision(params: {
       eligibleSubtotalMinor: params.principalMinor,
       expectedFeeMinor: 0,
       chargedFeeMinor: 0,
-      exemptionHistoryId: null,
+      exemptionId: null,
       failureCode: null,
       metadata: {},
     };

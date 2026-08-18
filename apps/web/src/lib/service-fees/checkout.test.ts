@@ -253,7 +253,7 @@ describe('prepareTopUpCheckoutFee', () => {
 
     expect(prepared.outcome).toBe('exempt');
     expect(prepared.checkoutLineItem).toBeUndefined();
-    expect(prepared.decision.exemptionHistoryId).toBe('hist_1');
+    expect(prepared.decision.exemptionId).toBe('hist_1');
     expect(prepared.expectedFeeMinor).toBe(500);
   });
 

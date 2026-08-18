@@ -21,7 +21,7 @@ export class OrganizationServiceFeeExemptionError extends Error {
   }
 }
 
-export type OrganizationServiceFeeExemptionHistoryRecord = {
+export type OrganizationServiceFeeExemptionRecord = {
   id: string;
   organizationId: string;
   isExempt: boolean;
@@ -30,19 +30,9 @@ export type OrganizationServiceFeeExemptionHistoryRecord = {
   createdAt: string;
 };
 
-export type OrganizationServiceFeeExemptionRecord = {
-  organizationId: string;
-  isExempt: boolean;
-  currentHistoryId: string;
-  reason: string;
-  changedByKiloUserId: string | null;
-  changedAt: string;
-  createdAt: string;
-};
-
 export type OrganizationServiceFeeExemptionView = {
   current: OrganizationServiceFeeExemptionRecord | null;
-  history: OrganizationServiceFeeExemptionHistoryRecord[];
+  history: OrganizationServiceFeeExemptionRecord[];
 };
 
 export type ActiveOrganizationRef = {
@@ -62,18 +52,13 @@ export type OrganizationServiceFeeExemptionStore = {
   transact<T>(fn: (store: OrganizationServiceFeeExemptionStore) => Promise<T>): Promise<T>;
   lockOrganization(organizationId: string): Promise<void>;
   findActiveOrganization(organizationId: string): Promise<ActiveOrganizationRef | null>;
-  findHistoryAtOrBefore(
+  findAtOrBefore(
     organizationId: string,
     at: Date
-  ): Promise<OrganizationServiceFeeExemptionHistoryRecord | null>;
-  listHistoryNewestFirst(
-    organizationId: string
-  ): Promise<OrganizationServiceFeeExemptionHistoryRecord[]>;
+  ): Promise<OrganizationServiceFeeExemptionRecord | null>;
+  listNewestFirst(organizationId: string): Promise<OrganizationServiceFeeExemptionRecord[]>;
   getCurrent(organizationId: string): Promise<OrganizationServiceFeeExemptionRecord | null>;
-  insertHistory(
-    record: OrganizationServiceFeeExemptionHistoryRecord
-  ): Promise<OrganizationServiceFeeExemptionHistoryRecord>;
-  upsertCurrent(
+  insert(
     record: OrganizationServiceFeeExemptionRecord
   ): Promise<OrganizationServiceFeeExemptionRecord>;
 };
@@ -117,21 +102,11 @@ export function normalizeOrganizationServiceFeeExemptionReason(reason: string): 
   return trimmed;
 }
 
-function withNormalizedHistory(
-  record: OrganizationServiceFeeExemptionHistoryRecord
-): OrganizationServiceFeeExemptionHistoryRecord {
-  return {
-    ...record,
-    createdAt: normalizeOrganizationExemptionTimestamp(record.createdAt),
-  };
-}
-
-function withNormalizedCurrent(
+function withNormalizedTimestamp(
   record: OrganizationServiceFeeExemptionRecord
 ): OrganizationServiceFeeExemptionRecord {
   return {
     ...record,
-    changedAt: normalizeOrganizationExemptionTimestamp(record.changedAt),
     createdAt: normalizeOrganizationExemptionTimestamp(record.createdAt),
   };
 }
@@ -140,12 +115,12 @@ export async function getEffectiveOrganizationServiceFeeExemption(params: {
   store: OrganizationServiceFeeExemptionStore;
   organizationId: string;
   at: Date;
-}): Promise<OrganizationServiceFeeExemptionHistoryRecord | null> {
+}): Promise<OrganizationServiceFeeExemptionRecord | null> {
   if (Number.isNaN(params.at.getTime())) {
     throw new Error('eligibility timestamp is invalid');
   }
-  const history = await params.store.findHistoryAtOrBefore(params.organizationId, params.at);
-  return history ? withNormalizedHistory(history) : null;
+  const exemption = await params.store.findAtOrBefore(params.organizationId, params.at);
+  return exemption ? withNormalizedTimestamp(exemption) : null;
 }
 
 export async function getOrganizationServiceFeeExemption(params: {
@@ -154,12 +129,12 @@ export async function getOrganizationServiceFeeExemption(params: {
 }): Promise<OrganizationServiceFeeExemptionView> {
   const [current, history] = await Promise.all([
     params.store.getCurrent(params.organizationId),
-    params.store.listHistoryNewestFirst(params.organizationId),
+    params.store.listNewestFirst(params.organizationId),
   ]);
 
   return {
-    current: current ? withNormalizedCurrent(current) : null,
-    history: history.map(withNormalizedHistory),
+    current: current ? withNormalizedTimestamp(current) : null,
+    history: history.map(withNormalizedTimestamp),
   };
 }
 
@@ -172,11 +147,10 @@ export async function setOrganizationServiceFeeExemption(params: {
   now?: Date;
 }): Promise<{
   current: OrganizationServiceFeeExemptionRecord;
-  history: OrganizationServiceFeeExemptionHistoryRecord;
+  history: OrganizationServiceFeeExemptionRecord;
 }> {
   const reason = normalizeOrganizationServiceFeeExemptionReason(params.reason);
-  const now = params.now ?? new Date();
-  const nowIso = normalizeOrganizationExemptionTimestamp(now);
+  const nowIso = normalizeOrganizationExemptionTimestamp(params.now ?? new Date());
 
   return params.store.transact(async store => {
     await store.lockOrganization(params.organizationId);
@@ -189,31 +163,17 @@ export async function setOrganizationServiceFeeExemption(params: {
       );
     }
 
-    const existing = await store.getCurrent(params.organizationId);
-    const history = await store.insertHistory({
-      id: randomUUID(),
-      organizationId: params.organizationId,
-      isExempt: params.isExempt,
-      reason,
-      changedByKiloUserId: params.changedByKiloUserId,
-      createdAt: nowIso,
-    });
+    const exemption = withNormalizedTimestamp(
+      await store.insert({
+        id: randomUUID(),
+        organizationId: params.organizationId,
+        isExempt: params.isExempt,
+        reason,
+        changedByKiloUserId: params.changedByKiloUserId,
+        createdAt: nowIso,
+      })
+    );
 
-    const current = await store.upsertCurrent({
-      organizationId: params.organizationId,
-      isExempt: params.isExempt,
-      currentHistoryId: history.id,
-      reason,
-      changedByKiloUserId: params.changedByKiloUserId,
-      changedAt: nowIso,
-      createdAt: existing?.createdAt
-        ? normalizeOrganizationExemptionTimestamp(existing.createdAt)
-        : nowIso,
-    });
-
-    return {
-      current: withNormalizedCurrent(current),
-      history: withNormalizedHistory(history),
-    };
+    return { current: exemption, history: exemption };
   });
 }

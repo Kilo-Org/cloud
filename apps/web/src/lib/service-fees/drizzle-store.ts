@@ -10,19 +10,16 @@ import {
   acquireOrganizationServiceFeeExemptionLock,
   normalizeOrganizationExemptionTimestamp,
   type ActiveOrganizationRef,
-  type OrganizationServiceFeeExemptionHistoryRecord,
   type OrganizationServiceFeeExemptionRecord,
   type OrganizationServiceFeeExemptionStore,
 } from '@/lib/service-fees/organization-exemptions';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
-  organization_service_fee_exemption_history,
   organization_service_fee_exemptions,
   organizations,
   stripe_service_fee_assessments,
   type NewStripeServiceFeeAssessment,
   type OrganizationServiceFeeExemption,
-  type OrganizationServiceFeeExemptionHistory,
   type StripeServiceFeeAssessment,
 } from '@kilocode/db/schema';
 import { and, desc, eq, isNull, lte, or } from 'drizzle-orm';
@@ -168,37 +165,37 @@ export function createOrganizationServiceFeeExemptionStore(
       return row ? ({ id: row.id } satisfies ActiveOrganizationRef) : null;
     },
 
-    async findHistoryAtOrBefore(organizationId, at) {
+    async findAtOrBefore(organizationId, at) {
       const [row] = await dbOrTx
         .select()
-        .from(organization_service_fee_exemption_history)
+        .from(organization_service_fee_exemptions)
         .where(
           and(
-            eq(organization_service_fee_exemption_history.organization_id, organizationId),
+            eq(organization_service_fee_exemptions.organization_id, organizationId),
             lte(
-              organization_service_fee_exemption_history.created_at,
+              organization_service_fee_exemptions.created_at,
               normalizeOrganizationExemptionTimestamp(at)
             )
           )
         )
         .orderBy(
-          desc(organization_service_fee_exemption_history.created_at),
-          desc(organization_service_fee_exemption_history.id)
+          desc(organization_service_fee_exemptions.created_at),
+          desc(organization_service_fee_exemptions.id)
         )
         .limit(1);
-      return row ? toExemptionHistoryRecord(row) : null;
+      return row ? toExemptionRecord(row) : null;
     },
 
-    async listHistoryNewestFirst(organizationId) {
+    async listNewestFirst(organizationId) {
       const rows = await dbOrTx
         .select()
-        .from(organization_service_fee_exemption_history)
-        .where(eq(organization_service_fee_exemption_history.organization_id, organizationId))
+        .from(organization_service_fee_exemptions)
+        .where(eq(organization_service_fee_exemptions.organization_id, organizationId))
         .orderBy(
-          desc(organization_service_fee_exemption_history.created_at),
-          desc(organization_service_fee_exemption_history.id)
+          desc(organization_service_fee_exemptions.created_at),
+          desc(organization_service_fee_exemptions.id)
         );
-      return rows.map(toExemptionHistoryRecord);
+      return rows.map(toExemptionRecord);
     },
 
     async getCurrent(organizationId) {
@@ -206,13 +203,17 @@ export function createOrganizationServiceFeeExemptionStore(
         .select()
         .from(organization_service_fee_exemptions)
         .where(eq(organization_service_fee_exemptions.organization_id, organizationId))
+        .orderBy(
+          desc(organization_service_fee_exemptions.created_at),
+          desc(organization_service_fee_exemptions.id)
+        )
         .limit(1);
-      return row ? toExemptionCurrentRecord(row) : null;
+      return row ? toExemptionRecord(row) : null;
     },
 
-    async insertHistory(record) {
+    async insert(record) {
       const [row] = await dbOrTx
-        .insert(organization_service_fee_exemption_history)
+        .insert(organization_service_fee_exemptions)
         .values({
           id: record.id,
           organization_id: record.organizationId,
@@ -224,43 +225,10 @@ export function createOrganizationServiceFeeExemptionStore(
         .returning();
 
       if (!row) {
-        throw new Error(`organization service fee exemption history ${record.id} was not inserted`);
+        throw new Error(`organization service fee exemption ${record.id} was not inserted`);
       }
 
-      return toExemptionHistoryRecord(row);
-    },
-
-    async upsertCurrent(record) {
-      const [row] = await dbOrTx
-        .insert(organization_service_fee_exemptions)
-        .values({
-          organization_id: record.organizationId,
-          is_exempt: record.isExempt,
-          current_history_id: record.currentHistoryId,
-          reason: record.reason,
-          changed_by_kilo_user_id: nullableText(record.changedByKiloUserId),
-          changed_at: record.changedAt,
-          created_at: record.createdAt,
-        })
-        .onConflictDoUpdate({
-          target: organization_service_fee_exemptions.organization_id,
-          set: {
-            is_exempt: record.isExempt,
-            current_history_id: record.currentHistoryId,
-            reason: record.reason,
-            changed_by_kilo_user_id: nullableText(record.changedByKiloUserId),
-            changed_at: record.changedAt,
-          },
-        })
-        .returning();
-
-      if (!row) {
-        throw new Error(
-          `organization service fee exemption ${record.organizationId} was not upserted`
-        );
-      }
-
-      return toExemptionCurrentRecord(row);
+      return toExemptionRecord(row);
     },
   };
 
@@ -292,11 +260,9 @@ function nullableText(value: string | null | undefined): string | null {
 
 function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessmentRecord {
   return {
-    id: row.id,
     assessmentKey: row.assessment_key,
     version: row.version,
     flow: row.flow,
-    eligibility: row.eligibility,
     outcome: row.outcome,
     currency: row.currency,
     kiloUserId: row.kilo_user_id,
@@ -321,7 +287,7 @@ function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessme
     refundedGrossMinor: row.refunded_gross_minor,
     disputedProductMinor: row.disputed_product_minor,
     disputedFeeMinor: row.disputed_fee_minor,
-    exemptionHistoryId: row.exemption_history_id,
+    exemptionId: row.exemption_id,
     failureCode: row.failure_code,
     metadata: sanitizeServiceFeeAssessmentMetadata(row.metadata),
     createdAt: toServiceFeeTimestamp(row.created_at),
@@ -331,11 +297,9 @@ function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessme
 
 function toAssessmentInsert(record: ServiceFeeAssessmentRecord): NewStripeServiceFeeAssessment {
   return {
-    id: record.id,
     assessment_key: record.assessmentKey,
     version: record.version,
     flow: record.flow,
-    eligibility: record.eligibility,
     outcome: record.outcome,
     currency: record.currency,
     kilo_user_id: nullableText(record.kiloUserId),
@@ -360,7 +324,7 @@ function toAssessmentInsert(record: ServiceFeeAssessmentRecord): NewStripeServic
     refunded_gross_minor: record.refundedGrossMinor,
     disputed_product_minor: record.disputedProductMinor,
     disputed_fee_minor: record.disputedFeeMinor,
-    exemption_history_id: nullableText(record.exemptionHistoryId),
+    exemption_id: nullableText(record.exemptionId),
     failure_code: nullableText(record.failureCode),
     metadata: sanitizeServiceFeeAssessmentMetadata(record.metadata),
     created_at: record.createdAt,
@@ -375,7 +339,6 @@ function toAssessmentUpdate(
 
   if (patch.version !== undefined) set.version = patch.version;
   if (patch.flow !== undefined) set.flow = patch.flow;
-  if (patch.eligibility !== undefined) set.eligibility = patch.eligibility;
   if (patch.outcome !== undefined) set.outcome = patch.outcome;
   if (patch.currency !== undefined) set.currency = patch.currency;
   if (patch.kiloUserId !== undefined) set.kilo_user_id = nullableText(patch.kiloUserId);
@@ -428,8 +391,8 @@ function toAssessmentUpdate(
     set.disputed_product_minor = patch.disputedProductMinor;
   }
   if (patch.disputedFeeMinor !== undefined) set.disputed_fee_minor = patch.disputedFeeMinor;
-  if (patch.exemptionHistoryId !== undefined) {
-    set.exemption_history_id = nullableText(patch.exemptionHistoryId);
+  if (patch.exemptionId !== undefined) {
+    set.exemption_id = nullableText(patch.exemptionId);
   }
   if (patch.failureCode !== undefined) set.failure_code = nullableText(patch.failureCode);
   if (patch.metadata !== undefined) {
@@ -541,29 +504,15 @@ async function findAssessmentByNullableText(
   return row ? toAssessmentRecord(row) : null;
 }
 
-function toExemptionHistoryRecord(
-  row: OrganizationServiceFeeExemptionHistory
-): OrganizationServiceFeeExemptionHistoryRecord {
+function toExemptionRecord(
+  row: OrganizationServiceFeeExemption
+): OrganizationServiceFeeExemptionRecord {
   return {
     id: row.id,
     organizationId: row.organization_id,
     isExempt: row.is_exempt,
     reason: row.reason,
     changedByKiloUserId: row.changed_by_kilo_user_id,
-    createdAt: normalizeOrganizationExemptionTimestamp(row.created_at),
-  };
-}
-
-function toExemptionCurrentRecord(
-  row: OrganizationServiceFeeExemption
-): OrganizationServiceFeeExemptionRecord {
-  return {
-    organizationId: row.organization_id,
-    isExempt: row.is_exempt,
-    currentHistoryId: row.current_history_id,
-    reason: row.reason,
-    changedByKiloUserId: row.changed_by_kilo_user_id,
-    changedAt: normalizeOrganizationExemptionTimestamp(row.changed_at),
     createdAt: normalizeOrganizationExemptionTimestamp(row.created_at),
   };
 }

@@ -34,7 +34,7 @@ vi.mock('@kilocode/db/client', () => ({
 
 describe('validateStreamTicket', () => {
   it('returns a configuration error when NEXTAUTH_SECRET is missing', () => {
-    expect(validateStreamTicket('ticket', null)).toEqual({
+    expect(validateStreamTicket('ticket', null, 'cloud-agent-stream')).toEqual({
       success: false,
       error: 'NEXTAUTH_SECRET is not configured on the worker',
     });
@@ -48,10 +48,10 @@ describe('validateStreamTicket', () => {
         cloudAgentSessionId: 'session-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: -1 }
+      { algorithm: 'HS256', expiresIn: -1, audience: 'cloud-agent-stream' }
     );
 
-    expect(validateStreamTicket(ticket, secret)).toEqual({
+    expect(validateStreamTicket(ticket, secret, 'cloud-agent-stream')).toEqual({
       success: false,
       error: 'Ticket expired',
     });
@@ -65,16 +65,51 @@ describe('validateStreamTicket', () => {
         cloudAgentSessionId: 'session-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: '1 minute' }
+      { algorithm: 'HS256', expiresIn: '1 minute', audience: 'cloud-agent-stream' }
     );
 
-    expect(validateStreamTicket(ticket, secret)).toMatchObject({
+    expect(validateStreamTicket(ticket, secret, 'cloud-agent-stream')).toMatchObject({
       success: true,
       payload: {
         type: 'stream_ticket',
         userId: 'user-1',
         cloudAgentSessionId: 'session-1',
       },
+    });
+  });
+
+  it('rejects a stream ticket presented with the terminal audience', () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        userId: 'user-1',
+        cloudAgentSessionId: 'session-1',
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: '1 minute', audience: 'cloud-agent-stream' }
+    );
+
+    expect(validateStreamTicket(ticket, secret, 'cloud-agent-terminal')).toEqual({
+      success: false,
+      error: 'Invalid ticket audience',
+    });
+  });
+
+  it('rejects a terminal ticket presented with the stream audience', () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        purpose: 'terminal',
+        userId: 'user-1',
+        cloudAgentSessionId: 'session-1',
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: '1 minute', audience: 'cloud-agent-terminal' }
+    );
+
+    expect(validateStreamTicket(ticket, secret, 'cloud-agent-stream')).toEqual({
+      success: false,
+      error: 'Invalid ticket audience',
     });
   });
 });

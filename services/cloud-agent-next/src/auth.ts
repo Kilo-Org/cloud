@@ -12,7 +12,11 @@ type StreamTicketPayload = {
   organizationId?: string;
   ptyId?: string;
   nonce?: string;
+  aud?: string;
 };
+
+export const STREAM_TICKET_AUDIENCE = 'cloud-agent-stream';
+export const TERMINAL_TICKET_AUDIENCE = 'cloud-agent-terminal';
 
 export type WrapperDispatchTicketClaims = {
   type: 'wrapper_dispatch_ticket';
@@ -96,7 +100,8 @@ export async function validateKiloToken(
 
 export function validateStreamTicket(
   ticket: string | null,
-  secret: string | null | undefined
+  secret: string | null | undefined,
+  expectedAudience: string
 ): { success: true; payload: StreamTicketPayload } | { success: false; error: string } {
   if (!ticket) {
     return { success: false, error: 'Missing stream ticket' };
@@ -112,6 +117,10 @@ export function validateStreamTicket(
 
     if (payload.type !== 'stream_ticket') {
       return { success: false, error: 'Invalid ticket type' };
+    }
+
+    if (payload.aud !== expectedAudience) {
+      return { success: false, error: 'Invalid ticket audience' };
     }
 
     return { success: true, payload };

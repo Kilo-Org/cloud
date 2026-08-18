@@ -10,8 +10,11 @@ import {
   validateStreamTicket,
   validateKiloToken,
   validateWrapperDispatchTicket,
+  STREAM_TICKET_AUDIENCE,
+  TERMINAL_TICKET_AUDIENCE,
   type WrapperAuthClaims,
 } from './auth.js';
+import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
@@ -75,7 +78,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
   }
 
   const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET);
-  const ticketResult = validateStreamTicket(ticket, nextAuthSecret);
+  const ticketResult = validateStreamTicket(ticket, nextAuthSecret, TERMINAL_TICKET_AUDIENCE);
   if (!ticketResult.success) {
     logger
       .withFields({ cloudAgentSessionId, error: ticketResult.error })
@@ -118,6 +121,17 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     });
   } catch (error) {
     return projectSessionAccessHttpError(error);
+  }
+
+  const nonce = ticketResult.payload.nonce;
+  if (!nonce) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Missing ticket nonce');
+    return new Response('Missing ticket nonce', { status: 401 });
+  }
+  const consumed = await consumeStreamTicketNonce(env, nonce);
+  if (!consumed) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Ticket nonce already used');
+    return new Response('Ticket nonce already used', { status: 401 });
   }
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
@@ -274,7 +288,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
   }
 
   const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const ticketResult = validateStreamTicket(ticket, nextAuthSecret);
+  const ticketResult = validateStreamTicket(ticket, nextAuthSecret, STREAM_TICKET_AUDIENCE);
   if (!ticketResult.success) {
     logger
       .withFields({ cloudAgentSessionId, error: ticketResult.error })
@@ -312,6 +326,17 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     });
   } catch (error) {
     return projectSessionAccessHttpError(error);
+  }
+
+  const nonce = ticketResult.payload.nonce;
+  if (!nonce) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Missing ticket nonce');
+    return c.text('Missing ticket nonce', 401);
+  }
+  const consumed = await consumeStreamTicketNonce(c.env, nonce);
+  if (!consumed) {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Ticket nonce already used');
+    return c.text('Ticket nonce already used', 401);
   }
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');

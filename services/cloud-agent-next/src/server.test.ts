@@ -123,6 +123,10 @@ type MockEnv = {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
+  STREAM_TICKET_NONCE_DO: {
+    idFromName: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+  };
 };
 
 function createEnv(): MockEnv {
@@ -136,6 +140,10 @@ function createEnv(): MockEnv {
       get: vi.fn(),
     },
     USER_KILO_FACADE: {
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    },
+    STREAM_TICKET_NONCE_DO: {
       idFromName: vi.fn(),
       get: vi.fn(),
     },
@@ -219,7 +227,7 @@ describe('server /stream', () => {
         cloudAgentSessionId: 'session-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-stream' }
     );
     const env = createEnv();
     requireCurrentSessionAccessMock.mockRejectedValue(
@@ -294,11 +302,16 @@ describe('server /terminal', () => {
         userId: 'user-1',
         cloudAgentSessionId: 'session-1',
         ptyId: 'pty_123',
+        nonce: 'nonce-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
+    env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
+    env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({
+      consume: vi.fn().mockResolvedValue(true),
+    });
     const metadata = {
       metadataSchemaVersion: 2,
       identity: {
@@ -359,7 +372,7 @@ describe('server /terminal', () => {
         ptyId: 'pty_123',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     requireCurrentSessionAccessMock.mockRejectedValue(
       Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
@@ -387,7 +400,7 @@ describe('server /terminal', () => {
         cloudAgentSessionId: 'session-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
     const request = new Request(
@@ -414,7 +427,7 @@ describe('server /terminal', () => {
         ptyId: 'pty_other',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
     const request = new Request(

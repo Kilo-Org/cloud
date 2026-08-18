@@ -96,7 +96,7 @@ import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-model.js';
 import { dispatchedKilocodeModelId } from './model-utils.js';
 
-import { resolveSecret, validateStreamTicket } from '../auth.js';
+import { resolveSecret, validateStreamTicket, STREAM_TICKET_AUDIENCE } from '../auth.js';
 import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
@@ -985,7 +985,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       }
 
       const nextAuthSecret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-      const authResult = validateStreamTicket(ticket, nextAuthSecret);
+      const authResult = validateStreamTicket(ticket, nextAuthSecret, STREAM_TICKET_AUDIENCE);
       if (!authResult.success) {
         return new Response(authResult.error, { status: 401 });
       }

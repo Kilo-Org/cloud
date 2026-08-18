@@ -6,6 +6,7 @@ describe('resolveChatComposerControlState', () => {
   it('disables nothing and allows sending when idle with text and no voice session', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: true,
@@ -32,6 +33,7 @@ describe('resolveChatComposerControlState', () => {
     ]) {
       const state = resolveChatComposerControlState({
         attachmentsCount: 0,
+        readyAttachmentsCount: 0,
         attachmentMax: 5,
         disabled: override.disabled,
         hasText: true,
@@ -51,6 +53,7 @@ describe('resolveChatComposerControlState', () => {
   it('keeps the input editable and toolbar enabled while streaming when text is present', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: true,
@@ -69,6 +72,7 @@ describe('resolveChatComposerControlState', () => {
   it('keeps the input editable while streaming with an empty draft (canSend stays false)', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: false,
@@ -86,6 +90,7 @@ describe('resolveChatComposerControlState', () => {
   it('still blocks send mid-stream when the parent disabled flag is on (e.g. read-only or capability gate)', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: true,
       hasText: true,
@@ -99,9 +104,10 @@ describe('resolveChatComposerControlState', () => {
     expect(state.toolbarDisabled).toBe(true);
   });
 
-  it('does not allow send when the draft is empty even with attachments and no overrides', () => {
+  it('does not allow send when the draft is empty and no attachment is ready', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 2,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: false,
@@ -115,9 +121,42 @@ describe('resolveChatComposerControlState', () => {
     expect(state.showToolbar).toBe(true);
   });
 
+  it('allows send when the draft is empty and at least one attachment is ready', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 1,
+      readyAttachmentsCount: 1,
+      attachmentMax: 5,
+      disabled: false,
+      hasText: false,
+      isFocused: false,
+      isSending: false,
+      voiceInputActive: false,
+    });
+
+    expect(state.canSend).toBe(true);
+    expect(state.toolbarDisabled).toBe(false);
+    expect(state.showToolbar).toBe(true);
+  });
+
+  it('allows send with text and no attachments', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 0,
+      readyAttachmentsCount: 0,
+      attachmentMax: 5,
+      disabled: false,
+      hasText: true,
+      isFocused: false,
+      isSending: false,
+      voiceInputActive: false,
+    });
+
+    expect(state.canSend).toBe(true);
+  });
+
   it('keeps the toolbar visible when focused, has text, has attachments, or voice is active', () => {
     const base = {
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: false,
@@ -140,6 +179,7 @@ describe('resolveChatComposerControlState', () => {
   it('disables the paperclip when at or above the attachment cap', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 5,
+      readyAttachmentsCount: 5,
       attachmentMax: 5,
       disabled: false,
       hasText: true,
@@ -154,6 +194,7 @@ describe('resolveChatComposerControlState', () => {
   it('disables the paperclip while the composer is in a toolbar-disabled state', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: true,
@@ -168,6 +209,7 @@ describe('resolveChatComposerControlState', () => {
   it('disables the paperclip and input while this owner is voice active', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: true,
@@ -184,6 +226,7 @@ describe('resolveChatComposerControlState', () => {
   it('leaves voice enabled (only toolbar gates it) when the composer is otherwise ready', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
+      readyAttachmentsCount: 0,
       attachmentMax: 5,
       disabled: false,
       hasText: false,

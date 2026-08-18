@@ -30,6 +30,7 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
@@ -698,13 +699,14 @@ export function SessionDetailContent({
   // not share, the composer pops in and the layout jumps on every open.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
-  const isComposerDisabled =
-    isReadOnly ||
-    !canSend ||
-    shouldShowLoading ||
-    Boolean(error) ||
-    hasBlockingInteraction ||
-    (requiresModel && !currentModel);
+  const isComposerDisabled = resolveSessionComposerDisabled({
+    isReadOnly,
+    canSend,
+    shouldShowLoading,
+    hasBlockingInteraction,
+    requiresModel,
+    hasModel: Boolean(currentModel),
+  });
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);

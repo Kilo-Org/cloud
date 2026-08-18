@@ -76,7 +76,7 @@ export type KiloExclusiveModel = {
   gateway: ProviderId;
   internal_id: string;
   pricing: PricingTiers | null;
-  /** Only use this pricing when the upstream response does not report a market cost. */
+  /** Only use this pricing when the upstream response does not report a positive market cost. */
   fallbackOnly?: boolean;
   /**
    * Upstream inference providers this model may be routed to; empty means no

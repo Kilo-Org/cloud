@@ -239,6 +239,13 @@ export const CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS = [
   'payment required',
 ] as const;
 
+/**
+ * User-facing message for auto-fix billing failures.
+ * Shared by the web app and auto-fix-infra so the copy stays in sync.
+ */
+export const AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE =
+  'Insufficient credits. Auto-fix requires at least $1 in available credits. Add credits, then retry.';
+
 export function isCloudAgentNextBillingErrorBody(body: string): boolean {
   const normalizedBody = body.toLowerCase();
 

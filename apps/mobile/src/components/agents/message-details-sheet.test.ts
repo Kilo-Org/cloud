@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive unit suite: projection, empty, canSelectText, and copy wiring share one harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -258,6 +259,113 @@ describe('getMessageDetailsContent — empty', () => {
     const message = storedMessage(info, [textPart('x')]);
     const content = getMessageDetailsContent(message, catalogOptions);
     expect(content.sentTimeLabel).toBeNull();
+  });
+});
+
+function textPartWithTime(
+  text: string,
+  time: { start: number; end?: number },
+  id = 'p-text-time'
+): Part {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'text',
+    text,
+    time,
+  };
+}
+
+function reasoningPart(
+  text: string,
+  time: { start: number; end?: number },
+  id = 'p-reasoning'
+): Part {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'reasoning',
+    text,
+    time,
+  };
+}
+
+function runningToolPart(id = 'p-tool'): Part {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'tool',
+    callID: 'call-1',
+    tool: 'bash',
+    state: { status: 'running', input: { command: 'echo hi' }, time: { start: 1 } },
+  };
+}
+
+describe('getMessageDetailsContent — canSelectText', () => {
+  it('allows selection for a finished user text part with no time', () => {
+    const message = storedMessage(userInfo(), [textPart('user body')]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBe('user body');
+    expect(content.canSelectText).toBe(true);
+  });
+
+  it('allows selection for a reconciled user text part with start and no end', () => {
+    const message = storedMessage(userInfo(), [textPartWithTime('user body', { start: 1 })]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBe('user body');
+    expect(content.canSelectText).toBe(true);
+  });
+
+  it('allows selection for a finished assistant text part with time.end', () => {
+    const message = storedMessage(assistantInfo(), [
+      textPartWithTime('assistant body', { start: 1, end: 2 }),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBe('assistant body');
+    expect(content.canSelectText).toBe(true);
+  });
+
+  it('allows selection for a finished assistant text part with no time', () => {
+    const message = storedMessage(assistantInfo(), [textPart('assistant body')]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBe('assistant body');
+    expect(content.canSelectText).toBe(true);
+  });
+
+  it('hides selection for a streaming assistant text part but keeps copyable text', () => {
+    const message = storedMessage(assistantInfo(), [
+      textPartWithTime('streaming body', { start: 1 }),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBe('streaming body');
+    expect(content.canSelectText).toBe(false);
+  });
+
+  it('hides selection while an assistant tool part is running', () => {
+    const message = storedMessage(assistantInfo(), [runningToolPart()]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).not.toBeNull();
+    expect(content.canSelectText).toBe(false);
+  });
+
+  it('hides selection while an assistant reasoning part is in flight', () => {
+    const message = storedMessage(assistantInfo(), [
+      textPart('finished text'),
+      reasoningPart('thinking...', { start: 1 }),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).not.toBeNull();
+    expect(content.canSelectText).toBe(false);
+  });
+
+  it('hides both actions for a user message with no parts', () => {
+    const message = storedMessage(userInfo(), []);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBeNull();
+    expect(content.canSelectText).toBe(false);
   });
 });
 

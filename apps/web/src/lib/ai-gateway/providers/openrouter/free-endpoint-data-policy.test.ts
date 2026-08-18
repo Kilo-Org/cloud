@@ -50,17 +50,19 @@ function dataCollectionExclusiveModel(
   inference_provider_restriction: KiloExclusiveModel['inference_provider_restriction']
 ): KiloExclusiveModel {
   const model = freeExclusiveModel(public_id, inference_provider_restriction);
-  model.pricing = [
-    {
-      start_context_length: 0,
-      pricing: {
-        prompt_per_million: 1,
-        completion_per_million: 1,
-        input_cache_read_per_million: null,
-        input_cache_write_per_million: null,
+  model.pricing = {
+    tiers: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 1,
+          completion_per_million: 1,
+          input_cache_read_per_million: null,
+          input_cache_write_per_million: null,
+        },
       },
-    },
-  ];
+    ],
+  };
   model.flags = ['requires-data-collection'];
   return model;
 }
@@ -191,17 +193,19 @@ describe('applyFreeEndpointDataPolicy', () => {
     const disabled = freeExclusiveModel('example/model:free', []);
     disabled.status = 'disabled';
     const paid = freeExclusiveModel('example/model:discounted', []);
-    paid.pricing = [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 1,
-          completion_per_million: 1,
-          input_cache_read_per_million: null,
-          input_cache_write_per_million: null,
+    paid.pricing = {
+      tiers: [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 1,
+            completion_per_million: 1,
+            input_cache_read_per_million: null,
+            input_cache_write_per_million: null,
+          },
         },
-      },
-    ];
+      ],
+    };
 
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],

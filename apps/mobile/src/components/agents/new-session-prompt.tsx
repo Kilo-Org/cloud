@@ -38,7 +38,10 @@ import {
   type AgentAttachmentCandidate,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
+import {
+  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  useClipboardPaste,
+} from '@/lib/agent-attachments/use-clipboard-paste';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -214,8 +217,12 @@ export function NewSessionPrompt({
         onChangeText: handlePromptChange,
       });
     },
-    onUnreadable: () => {
-      toast.error(describeClassificationFailure('unreadable'));
+    onFailure: reason => {
+      toast.error(
+        reason === 'empty'
+          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          : describeClassificationFailure('unreadable')
+      );
     },
   });
 

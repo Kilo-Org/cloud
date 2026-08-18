@@ -61,7 +61,10 @@ import {
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
+import {
+  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  useClipboardPaste,
+} from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModeOption } from '@/components/agents/mode-normalize';
@@ -404,6 +407,8 @@ export function ChatComposer({
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
+    readyAttachmentsCount: upload.attachments.filter(attachment => attachment.status === 'uploaded')
+      .length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
     hasText,
@@ -433,8 +438,12 @@ export function ChatComposer({
         onChangeText: handleChangeText,
       });
     },
-    onUnreadable: () => {
-      toast.error(describeClassificationFailure('unreadable'));
+    onFailure: reason => {
+      toast.error(
+        reason === 'empty'
+          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          : describeClassificationFailure('unreadable')
+      );
     },
   });
 
@@ -600,7 +609,7 @@ export function ChatComposer({
 
   async function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!trimmed || !control.canSend) {
+    if (!control.canSend) {
       return;
     }
     if (upload.isUploading) {

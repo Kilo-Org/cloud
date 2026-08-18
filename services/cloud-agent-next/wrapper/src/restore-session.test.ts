@@ -677,9 +677,9 @@ describe('restoreSession', () => {
     expect(fs.readFileSync(path.join(workspace, 'dup.txt'), 'utf-8')).toBe('second version');
   });
 
-  // ---- Skipping empty after ----
+  // ---- Empty after-content ----
 
-  it('skips non-deleted diffs with empty after content', async () => {
+  it('restores non-deleted diffs with empty after content', async () => {
     const snapshot = makeSnapshot([
       { file: 'empty.txt', after: '', status: 'modified' },
       { file: 'real.txt', after: 'real content', status: 'modified' },
@@ -690,13 +690,161 @@ describe('restoreSession', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.diffs.applied).toBe(1);
-      expect(result.diffs.skipped).toBe(1);
+      expect(result.diffs.applied).toBe(2);
+      expect(result.diffs.skipped).toBe(0);
       expect(result.diffs.total).toBe(2);
     }
 
-    expect(fs.existsSync(path.join(workspace, 'empty.txt'))).toBe(false);
+    expect(fs.readFileSync(path.join(workspace, 'empty.txt'), 'utf-8')).toBe('');
     expect(fs.readFileSync(path.join(workspace, 'real.txt'), 'utf-8')).toBe('real content');
+  });
+
+  it('writes after-content when git apply cannot use the patch', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [
+          {
+            file: 'src/index.ts',
+            patch: 'not a git patch',
+            after: 'restored from after\n',
+            status: 'modified',
+          },
+        ],
+      })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8')).toBe(
+      'restored from after\n'
+    );
+  });
+
+  it('continues with a partial restore when a patch cannot be applied', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [
+          {
+            file: 'src/index.ts',
+            patch: 'not a git patch',
+            status: 'modified',
+          },
+        ],
+      })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 0, skipped: 1, total: 1 },
+    });
+    expect(fs.existsSync(path.join(workspace, 'src/index.ts'))).toBe(false);
+  });
+
+  it('unlinks a deleted file when its patch cannot be applied', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    const deletedFile = path.join(workspace, 'src/gone.ts');
+    fs.writeFileSync(deletedFile, 'should be removed');
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [
+          {
+            file: 'src/gone.ts',
+            patch: 'not a git patch',
+            after: '',
+            status: 'deleted',
+          },
+        ],
+      })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.existsSync(deletedFile)).toBe(false);
+  });
+
+  it('clears failed three-way state before writing after-content', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const restoredFile = path.join(workspace, 'src/index.ts');
+    fs.writeFileSync(restoredFile, 'base\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'base'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(restoredFile, 'snapshot\n');
+    const patch = new TextDecoder().decode(
+      Bun.spawnSync(['git', 'diff'], {
+        cwd: workspace,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      }).stdout
+    );
+    fs.writeFileSync(restoredFile, 'current\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'current'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [{ file: 'src/index.ts', patch, after: 'snapshot\n', status: 'modified' }],
+      })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.readFileSync(restoredFile, 'utf-8')).toBe('snapshot\n');
+    const unmerged = Bun.spawnSync(['git', 'diff', '--name-only', '--diff-filter=U'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    expect(unmerged.exitCode).toBe(0);
+    expect(new TextDecoder().decode(unmerged.stdout)).toBe('');
   });
 
   // ---- Temp file cleanup ----

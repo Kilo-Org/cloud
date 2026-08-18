@@ -43,6 +43,11 @@ vi.mock('./session-events', () => ({
   notifyUserSessionEvent: vi.fn(),
 }));
 
+vi.mock('./services/user-session-admission', () => ({
+  canCreateCliSessionForUser: vi.fn(),
+  USER_SESSION_ADMISSION_ERROR: 'User session creation is not allowed',
+}));
+
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
@@ -57,6 +62,7 @@ import {
 import { desc, gte, isNotNull, or } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
+import { canCreateCliSessionForUser } from './services/user-session-admission';
 
 const sdkSessionInfoFixture = {
   id: 'ses_12345678901234567890123456',
@@ -164,6 +170,10 @@ describe('createSessionForCloudAgent', () => {
     createdOnPlatform: 'cloud-agent',
   };
 
+  beforeEach(() => {
+    vi.mocked(canCreateCliSessionForUser).mockReset().mockResolvedValue(true);
+  });
+
   it('creates a root with both Cloud Agent identity columns', async () => {
     const row = {
       session_id: params.sessionId,
@@ -203,6 +213,17 @@ describe('createSessionForCloudAgent', () => {
     await expect(rpc.createSessionForCloudAgent(params)).rejects.toThrow(
       'Cloud Agent root session identity conflict'
     );
+  });
+
+  it('rejects a blocked or missing user before any session write', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    vi.mocked(canCreateCliSessionForUser).mockResolvedValueOnce(false);
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).rejects.toThrow(
+      'User session creation is not allowed'
+    );
+    expect(fake.values).not.toHaveBeenCalled();
   });
 });
 

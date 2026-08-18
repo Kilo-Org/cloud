@@ -123,6 +123,8 @@ export function ChatComposerInputRow({
           style={textInputStyle}
           scrollEnabled={inputScrollable}
           editable={inputEditable}
+          contextMenuHidden={!inputEditable}
+          pointerEvents={inputEditable ? 'auto' : 'none'}
           accessibilityState={{ disabled: inputAccessibilityDisabled }}
           returnKeyType="default"
           submitBehavior="newline"

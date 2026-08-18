@@ -32,6 +32,7 @@ import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-a
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { warnExceptInTest } from '@/lib/utils.server';
 
 jest.mock('next/server', () => {
   return {
@@ -103,6 +104,10 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/auto-routing-decision');
+jest.mock('@/lib/utils.server', () => ({
+  ...jest.requireActual('@/lib/utils.server'),
+  warnExceptInTest: jest.fn(),
+}));
 jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
 }));
@@ -144,6 +149,7 @@ const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedGetPercentageRoutedPartnerProvider = jest.mocked(getPercentageRoutedPartnerProvider);
+const mockedWarnExceptInTest = jest.mocked(warnExceptInTest);
 
 const provider = {
   id: 'openrouter',
@@ -1143,15 +1149,9 @@ describe('percentage-routed partner fallback', () => {
         userByok: null,
         bypassAccessCheck: false,
       });
-      const cancelPartnerBody = jest.fn();
-      const failedPartnerResponse = new Response(
-        new ReadableStream({
-          cancel() {
-            cancelPartnerBody();
-          },
-        }),
-        { status: partnerStatus }
-      );
+      const failedPartnerResponse = new Response('partner failed', { status: partnerStatus });
+      jest.spyOn(failedPartnerResponse, 'clone').mockReturnValue(new Response('partner failed'));
+      const cancelPartnerBody = jest.spyOn(failedPartnerResponse.body!, 'cancel');
       mockedUpstreamRequest
         .mockResolvedValueOnce({ type: 'success', response: failedPartnerResponse })
         .mockResolvedValueOnce({
@@ -1184,6 +1184,19 @@ describe('percentage-routed partner fallback', () => {
       );
       expect(fallbackAttempt.extraHeaders).not.toBe(partnerAttempt.extraHeaders);
       expect(cancelPartnerBody).toHaveBeenCalledTimes(1);
+      const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+      const partnerLog = mockedAfter.mock.calls[0]?.[0];
+      expect(partnerLog).toBeInstanceOf(Promise);
+      await partnerLog;
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        'Partner request failed before managed fallback',
+        {
+          partner_provider: partnerProvider.id,
+          fallback_provider: sourceProvider.id,
+          status_code: partnerStatus,
+          body: 'partner failed',
+        }
+      );
       expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
         expect.objectContaining({ provider: sourceProvider.id, statusCode: 200 }),
         expect.any(Response),
@@ -1198,6 +1211,48 @@ describe('percentage-routed partner fallback', () => {
       );
     }
   );
+
+  it('logs partner response body read errors before falling back', async () => {
+    const failedPartnerResponse = upstreamJsonResponse({ error: 'partner failed' }, 500);
+    const unreadableResponse = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error('read failed'));
+        },
+      })
+    );
+    jest.spyOn(failedPartnerResponse, 'clone').mockReturnValue(unreadableResponse);
+    mockedUpstreamRequest
+      .mockResolvedValueOnce({ type: 'success', response: failedPartnerResponse })
+      .mockResolvedValueOnce({
+        type: 'success',
+        response: upstreamJsonResponse({ type: 'message', id: 'fallback-response' }),
+      });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMessagesRequest({
+        model: FRIENDLI_GLM_PUBLIC_ID,
+        max_tokens: 1_024,
+        messages: [{ role: 'user', content: 'hello' }],
+      }) as never
+    );
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+    const partnerLog = mockedAfter.mock.calls[0]?.[0];
+    expect(partnerLog).toBeInstanceOf(Promise);
+    await partnerLog;
+
+    expect(response.status).toBe(200);
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      'Partner request failed before managed fallback',
+      {
+        partner_provider: partnerProvider.id,
+        fallback_provider: provider.id,
+        status_code: 500,
+        response_body_read_error: 'Error: read failed',
+      }
+    );
+  });
 
   it('does not retry a successful partner response', async () => {
     mockedUpstreamRequest.mockResolvedValue({

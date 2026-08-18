@@ -69,7 +69,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `STYTCH_PROJECT_SECRET` - Stytch project secret. `[SECRET]`
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
-- `SUPPORT_API_SECRET` - Dedicated shared secret for the customer-support-automation GDPR web app. Accepted only on `GET /api/internal/support/users` and `POST /api/internal/support/users/gdpr-removal` via `Authorization: Bearer`. Not a user JWT and not `INTERNAL_API_SECRET`. Leak = enumerate any email + wipe any non-staff, non-live-subscription customer. Distinct values for Development / Staging / Production. Do not put the production value on Cloud preview deployments. Rotate by updating Cloud and CSA together. `[SECRET]`
+- `SUPPORT_API_SECRET` - Dedicated shared secret for the customer-support-automation GDPR web app. Accepted only on `GET /api/internal/support/users` and `POST /api/internal/support/users/gdpr-removal` via `Authorization: Bearer`. Not a user JWT and not `INTERNAL_API_SECRET`. Leak = enumerate any email + wipe any non-admin, non-bot, non-live-subscription customer. Distinct values for Development / Staging / Production. Do not put the production value on Cloud preview deployments. Rotate by updating Cloud and CSA together. `[SECRET]`
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 
@@ -236,6 +236,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### AI Providers
 
 - `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
+- `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
 - `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`

@@ -23,6 +23,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { formatAutoFixErrorMessage } from '@/lib/auto-fix/core/format-error-message';
 
 type AutoFixTicketsCardProps = {
   organizationId?: string;
@@ -476,7 +477,7 @@ export function AutoFixTicketsCard({ organizationId }: AutoFixTicketsCardProps) 
                     {/* Error Message */}
                     {ticket.error_message && (
                       <div className="text-destructive mt-1 text-xs">
-                        Error: {ticket.error_message}
+                        Error: {formatAutoFixErrorMessage(ticket.error_message)}
                       </div>
                     )}
 

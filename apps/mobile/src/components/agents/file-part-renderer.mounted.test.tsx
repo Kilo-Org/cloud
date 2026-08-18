@@ -371,10 +371,10 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('resolves a file:// URL for text preview without re-downloading', async () => {
+  it('resolves a cached file:// URI (from a data: write) for text preview without re-downloading', async () => {
     expoFileSystemMock.fileText.mockResolvedValue('# Hello');
     cacheFilePart('part-1', {
-      url: 'file:///cache/session-file-parts/part-1-readme.md',
+      url: 'data:text/markdown;base64,QUJD',
       mime: 'text/markdown',
       filename: 'readme.md',
     });
@@ -394,9 +394,9 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shares a file:// URL via shareLocalFile without re-downloading', async () => {
+  it('shares a cached file:// URI (from a data: write) via shareLocalFile without re-downloading', async () => {
     cacheFilePart('part-1', {
-      url: 'file:///cache/session-file-parts/part-1-report.pdf',
+      url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
       filename: 'report.pdf',
     });
@@ -416,6 +416,42 @@ describe('FilePartRenderer mounted', () => {
     );
     expect(shareRemoteFileMock.shareRemoteFile).not.toHaveBeenCalled();
     expect(shareRemoteFileMock.downloadRemoteFile).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('shows an unavailable row for an uncached file:// part.url', async () => {
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'image/png',
+        filename: 'shot.png',
+        url: 'file:///etc/passwd',
+      })
+    );
+    const root = renderer.root;
+
+    expect(pressableByLabel(root, 'Open shot.png full screen')).toHaveLength(0);
+    expect(texts(root)).toContain('Image unavailable');
+
+    await unmount(renderer);
+  });
+
+  it('toasts "Preview unavailable" for an uncached file:// part.url chip', async () => {
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'file:///etc/passwd',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+
+    expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
+    expect(showActionSheetWithOptions).not.toHaveBeenCalled();
 
     await unmount(renderer);
   });

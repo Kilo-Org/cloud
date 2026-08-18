@@ -42,13 +42,17 @@ function getVersionSnapshot(): number {
 
 /**
  * Resolve the URL to store for a captured FilePart. A `data:` URL is written
- * to disk and stored as a `file://` URI; an `http(s)` URL is stored as-is. On
- * any decode or write failure the raw URL is stored instead. Never throws.
+ * to disk and stored as a `file://` URI; an `http(s)` URL is stored as-is. A
+ * transcript `file://` URL is rejected (returns `undefined`). On any decode or
+ * write failure the raw URL is stored instead. Never throws.
  */
 function resolveCacheUrl(
   partId: string,
   payload: Readonly<{ url: string; mime: string; filename?: string }>
-): string {
+): string | undefined {
+  if (payload.url.startsWith('file://')) {
+    return undefined;
+  }
   if (!payload.url.startsWith('data:')) {
     return payload.url;
   }
@@ -82,8 +86,12 @@ export function cacheFilePart(
   if (entriesByPartId.has(partId)) {
     return;
   }
+  const url = resolveCacheUrl(partId, payload);
+  if (url === undefined) {
+    return;
+  }
   entriesByPartId.set(partId, {
-    url: resolveCacheUrl(partId, payload),
+    url,
     mime: payload.mime,
     ...(payload.filename ? { filename: payload.filename } : {}),
   });
@@ -104,14 +112,9 @@ export function useFilePartCache(partId: string): FilePartCacheEntry | undefined
   return entriesByPartId.get(partId);
 }
 
-/** True only for `http:`, `https:`, `data:`, and `file:` URLs. */
+/** True only for `http:`, `https:`, and `data:` URLs. */
 export function isUsableFilePartUrl(url: string): boolean {
-  return (
-    url.startsWith('http://') ||
-    url.startsWith('https://') ||
-    url.startsWith('data:') ||
-    url.startsWith('file://')
-  );
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
 
 /** Test-only: clear in-memory state between cases. */

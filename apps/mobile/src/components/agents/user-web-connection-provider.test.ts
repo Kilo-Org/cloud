@@ -8,11 +8,11 @@ import { UserWebConnectionProvider } from './user-web-connection-provider';
 type AuthConfig = { getAuthToken: () => Promise<string> };
 
 const mocks = vi.hoisted(() => ({
-  mutate: vi.fn(),
-  query: vi.fn(async () => {
+  mutate: vi.fn(async () => {
     await Promise.resolve();
     return { token: 'ticket-1', expiresAt: 1_700_000_060 };
   }),
+  query: vi.fn(),
   capturedConfig: null as AuthConfig | null,
 }));
 
@@ -34,8 +34,10 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     activeSessions: {
-      getToken: {
+      createWebTicket: {
         mutate: mocks.mutate,
+      },
+      getToken: {
         query: mocks.query,
       },
     },
@@ -49,7 +51,7 @@ describe('UserWebConnectionProvider', () => {
     mocks.query.mockClear();
   });
 
-  it('mints the ingest ticket via the getToken query (not mutation)', async () => {
+  it('mints the ingest ticket via the createWebTicket mutation (not the getToken query)', async () => {
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -68,8 +70,8 @@ describe('UserWebConnectionProvider', () => {
     const token = await config.getAuthToken();
 
     expect(token).toBe('ticket-1');
-    expect(mocks.query).toHaveBeenCalledTimes(1);
-    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
+    expect(mocks.query).not.toHaveBeenCalled();
 
     const renderer = rendererRef.current;
     if (!renderer) {

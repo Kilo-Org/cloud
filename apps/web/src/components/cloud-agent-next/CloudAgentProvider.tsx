@@ -69,7 +69,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
     sharedConnectionRef.current = createUserWebConnection({
       websocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
       getAuthToken: async () => {
-        const result = await trpcClient.activeSessions.getToken.query();
+        const result = await trpcClient.activeSessions.createWebTicket.mutate();
         return result.token;
       },
       lifecycleHooks: createBrowserLifecycleHooks(),

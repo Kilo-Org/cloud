@@ -521,7 +521,7 @@ export const mockAgentsApi = async (
         return { result: { data: { favorites: [], lastSelected: null } } };
       }
 
-      if (proc === 'activeSessions.getToken') {
+      if (proc === 'activeSessions.createWebTicket' || proc === 'activeSessions.getToken') {
         return {
           result: { data: { expiresAt: 1_700_000_000, token: 'mock-ingest-token' } },
         };

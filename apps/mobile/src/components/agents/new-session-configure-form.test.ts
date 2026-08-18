@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the form renders many mutually-exclusive target/state branches, each needing its own render case */
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -145,6 +146,17 @@ function defaultProps() {
     onRefreshRepos: vi.fn(),
     repositories: [] as { fullName: string; isPrivate: boolean }[],
     selectedRepo: '',
+    profile: null as {
+      id: string;
+      name: string;
+      commandCount: number;
+      mcpServerCount: number;
+      skillCount: number;
+      agentCount: number;
+    } | null,
+    isProfileLoading: false,
+    isProfileError: false,
+    onRetryProfile: vi.fn(),
     isSpawningRemote: false,
     isStartDisabled: false,
     onStartSession: vi.fn(),
@@ -362,5 +374,92 @@ describe('NewSessionConfigureForm', () => {
     expect(prompt).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(prompt!.isCreating).toBe(true);
+  });
+
+  // ── Case 10: effective profile row ──
+  it('renders the profile name and capability counts when a profile resolves', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      profile: {
+        id: 'profile-1',
+        name: 'Production',
+        commandCount: 3,
+        mcpServerCount: 1,
+        skillCount: 2,
+        agentCount: 4,
+      },
+    }) as Node;
+
+    expect(findTextContent(element, t => t === 'Production')).toBe(true);
+    expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
+      true
+    );
+  });
+
+  it('renders "Default environment" when no profile resolves', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      profile: null,
+    }) as Node;
+
+    expect(findTextContent(element, t => t === 'Default environment')).toBe(true);
+    expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('renders an inline error with Retry when the profile query fails', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      isProfileError: true,
+    }) as Node;
+
+    expect(findTextContent(element, t => t.includes("Couldn't load"))).toBe(true);
+    expect(findTextContent(element, t => t === 'Retry')).toBe(true);
+  });
+
+  it('hides the environment row while the profile query is loading', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      isProfileLoading: true,
+    }) as Node;
+
+    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+    expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
+  });
+
+  it('does not render the environment row for a remote target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      profile: {
+        id: 'profile-1',
+        name: 'Production',
+        commandCount: 3,
+        mcpServerCount: 1,
+        skillCount: 2,
+        agentCount: 4,
+      },
+    }) as Node;
+
+    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+    expect(findTextContent(element, t => t === 'Production')).toBe(false);
   });
 });

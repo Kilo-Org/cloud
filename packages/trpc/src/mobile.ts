@@ -15,6 +15,7 @@ import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
+import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
@@ -38,6 +39,7 @@ const mobileRouter = createTRPCRouter({
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
   kiloChat: kiloChatRouter,
+  agentProfiles: agentProfilesMobileRouter,
 });
 
 export type MobileRouter = typeof mobileRouter;

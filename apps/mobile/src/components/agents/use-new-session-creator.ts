@@ -28,6 +28,8 @@ type UseNewSessionCreatorInput = {
   selectedRepo: string;
   setIsCreating: (value: boolean) => void;
   variant: string;
+  /** Effective environment profile id; omitted from the create body when unset. */
+  profileId?: string | null;
 };
 
 type UseNewSessionCreatorResult = {
@@ -51,6 +53,7 @@ export function useNewSessionCreator({
   selectedRepo,
   setIsCreating,
   variant,
+  profileId,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -89,6 +92,7 @@ export function useNewSessionCreator({
       variant: variant || undefined,
       repo: selectedRepo,
       organizationId: organizationId ?? null,
+      profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
     });
     const operationKey = getKey(intentFingerprint);
@@ -105,6 +109,7 @@ export function useNewSessionCreator({
         autoCommit: boolean;
         autoInitiate: boolean;
         operationKey: string;
+        profileId?: string;
         attachments?: AgentAttachmentWire;
       } = {
         prompt,
@@ -117,6 +122,9 @@ export function useNewSessionCreator({
         autoInitiate: true,
         operationKey,
       };
+      if (profileId) {
+        baseInput.profileId = profileId;
+      }
       if (attachmentWire) {
         baseInput.attachments = attachmentWire;
       }
@@ -183,6 +191,7 @@ export function useNewSessionCreator({
     mode,
     variant,
     organizationId,
+    profileId,
     queryClient,
     trpc,
     router,

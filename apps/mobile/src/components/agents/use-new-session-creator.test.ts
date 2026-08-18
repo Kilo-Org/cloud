@@ -259,6 +259,7 @@ function runCreator(args: {
   variant?: string;
   organizationId?: string;
   selectedRepo?: string;
+  profileId?: string | null;
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
   const refs: { current: unknown }[] = [];
@@ -296,6 +297,7 @@ function runCreator(args: {
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
+      profileId: args.profileId,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -599,6 +601,28 @@ describe('useNewSessionCreator onCreated', () => {
     expect(prepareSessionMutate).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionCreator profileId', () => {
+  it('passes profileId into prepareSession when an effective id exists', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ profileId: 'profile-1' });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ profileId: 'profile-1' });
+  });
+
+  it('omits profileId from prepareSession when no effective id exists', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('profileId');
   });
 });
 

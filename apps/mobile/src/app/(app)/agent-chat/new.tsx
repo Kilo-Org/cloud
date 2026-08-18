@@ -9,6 +9,7 @@ import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import {
   NewSessionModelProvider,
   useNewSessionModelState,
@@ -24,7 +25,7 @@ import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog'
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
-import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
+import { resolveNewSessionStartDisabled } from '@/lib/new-session-submit';
 import {
   clearDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -160,6 +161,14 @@ function NewSessionScreenBody() {
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
 
+  const {
+    profile,
+    profileId,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    refetch: refetchProfile,
+  } = useEffectiveAgentProfile(organizationId);
+
   // Keep the inline selector and picker list in sync.
   const {
     data: instancesData,
@@ -215,6 +224,7 @@ function NewSessionScreenBody() {
     selectedRepo,
     setIsCreating,
     variant,
+    profileId,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -376,7 +386,7 @@ function NewSessionScreenBody() {
       attachments.hasFailedAttachments ||
       modelView.isSelectionUnavailable ||
       instanceCatalog.isLoading
-    : resolveNewSessionSubmitDisabled({
+    : resolveNewSessionStartDisabled({
         attachmentsHasFailed: attachments.hasFailedAttachments,
         attachmentsIsUploading: attachments.isUploading,
         hasPrompt,
@@ -385,6 +395,8 @@ function NewSessionScreenBody() {
         isSubmitting,
         model,
         selectedRepo,
+        isProfileLoading,
+        isProfileError,
       });
 
   const handleStartSession = useCallback(() => {
@@ -436,6 +448,10 @@ function NewSessionScreenBody() {
         onRefreshRepos={() => void refreshReposForceFresh()}
         repositories={repositories}
         selectedRepo={selectedRepo}
+        profile={profile}
+        isProfileLoading={isProfileLoading}
+        isProfileError={isProfileError}
+        onRetryProfile={() => void refetchProfile()}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         onStartSession={handleStartSession}

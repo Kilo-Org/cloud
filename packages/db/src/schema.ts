@@ -4531,6 +4531,9 @@ export const agent_configs = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+
+    // Optimistic concurrency revision for compare-and-set config saves.
+    config_revision: integer().notNull().default(1),
   },
   table => [
     // Unique constraints for org and user ownership
@@ -4560,6 +4563,10 @@ export const agent_configs = pgTable(
     check(
       'agent_configs_agent_type_check',
       sql`${table.agent_type} IN ('code_review', 'auto_triage', 'auto_fix', 'security_scan')`
+    ),
+    check(
+      'agent_configs_config_revision_check',
+      sql`${table.config_revision} >= 1`
     ),
   ]
 );
@@ -6358,6 +6365,7 @@ export const security_analysis_queue = pgTable(
     }),
     queue_status: text().notNull(),
     severity_rank: smallint().notNull(),
+    admitted_config_revision: integer(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_by_job_id: text(),

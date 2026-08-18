@@ -3,6 +3,7 @@ import {
   getSecurityAgentActiveCommandState,
   getUnprocessedTerminalSecurityAgentCommands,
   mergeSecurityAgentActiveCommands,
+  refetchConfigOnConflictError,
   shouldRunSecurityAgentCommandSuccessCallback,
   type SecurityAgentCommand,
 } from './SecurityAgentContext';
@@ -173,5 +174,24 @@ describe('SecurityAgentContext command helpers', () => {
       true
     );
     expect(shouldRunSecurityAgentCommandSuccessCallback(command({ status: 'no_op' }))).toBe(true);
+  });
+});
+
+describe('refetchConfigOnConflictError', () => {
+  it('refetches config on a stale-revision CONFLICT save error', () => {
+    const refetch = jest.fn();
+    const conflict = { data: { code: 'CONFLICT' } };
+
+    expect(refetchConfigOnConflictError(conflict, refetch)).toBe(true);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch on a non-CONFLICT save error', () => {
+    const refetch = jest.fn();
+
+    expect(refetchConfigOnConflictError(new Error('boom'), refetch)).toBe(false);
+    expect(refetchConfigOnConflictError({ data: { code: 'BAD_REQUEST' } }, refetch)).toBe(false);
+    expect(refetchConfigOnConflictError(undefined, refetch)).toBe(false);
+    expect(refetch).not.toHaveBeenCalled();
   });
 });

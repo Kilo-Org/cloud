@@ -16,9 +16,10 @@ jest.mock('@/lib/drizzle', () => ({
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 let cleanupStaleAnalyses: typeof analysisDbModule.cleanupStaleAnalyses;
+let enqueueBacklogFindings: typeof analysisDbModule.enqueueBacklogFindings;
 
 beforeAll(async () => {
-  ({ cleanupStaleAnalyses } = await import('./security-analysis'));
+  ({ cleanupStaleAnalyses, enqueueBacklogFindings } = await import('./security-analysis'));
 });
 
 beforeEach(() => {
@@ -47,5 +48,23 @@ describe('retired web sync queue policy surface', () => {
     expect('isFindingEligibleForAutoAnalysis' in analysisDb).toBe(false);
     expect('syncAutoAnalysisQueueForFinding' in analysisDb).toBe(false);
     expect('dequeueSupersededFindings' in analysisDb).toBe(false);
+  });
+});
+
+describe('enqueueBacklogFindings', () => {
+  it('writes admitted_config_revision into the queue rows', async () => {
+    const mockExecute = jest.fn(async (_query: unknown) => ({ rows: [{ id: 'a' }, { id: 'b' }] }));
+
+    const count = await enqueueBacklogFindings({
+      owner: { userId: 'user-1' },
+      autoAnalysisMinSeverity: 'high',
+      tx: { execute: mockExecute } as never,
+      admittedConfigRevision: 7,
+    });
+
+    expect(count).toBe(2);
+    const serialized = inspect(mockExecute.mock.calls[0]?.[0], { depth: 10 });
+    expect(serialized).toContain('admitted_config_revision');
+    expect(serialized).toContain('7');
   });
 });

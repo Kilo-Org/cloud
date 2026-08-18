@@ -18,6 +18,7 @@ import {
   mapSecuritySyncOperationError,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   securitySyncIntentFingerprint,
+  useSaveSecurityAgentConfig,
   useTriggerSecuritySync,
 } from './use-security-agent-mutations';
 
@@ -53,7 +54,12 @@ type MutationOptions = {
 let lastCapturedOptions: MutationOptions | null = null;
 const personalTriggerSyncMutateMock = vi.fn();
 const orgTriggerSyncMutateMock = vi.fn();
+const personalSaveConfigMutateMock = vi.fn();
+const orgSaveConfigMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
+const getQueryDataMock = vi.fn();
+const setQueryDataMock = vi.fn();
+const cancelQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 const trackCommandMock = vi.hoisted(() => vi.fn());
 
@@ -66,20 +72,30 @@ vi.mock('@tanstack/react-query', () => ({
     invalidateQueries: (...args: unknown[]) => {
       invalidateQueriesMock(...args);
     },
+    getQueryData: (...args: unknown[]) => getQueryDataMock(...args),
+    setQueryData: (...args: unknown[]) => setQueryDataMock(...args),
+    cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
   }),
 }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     securityAgent: { getConfig: { queryKey: () => ['securityAgent', 'getConfig'] } },
+    organizations: {
+      securityAgent: {
+        getConfig: { queryKey: () => ['organizations', 'securityAgent', 'getConfig'] },
+      },
+    },
   }),
   trpcClient: {
     securityAgent: {
       triggerSync: { mutate: (vars: unknown) => personalTriggerSyncMutateMock(vars) },
+      saveConfig: { mutate: (vars: unknown) => personalSaveConfigMutateMock(vars) },
     },
     organizations: {
       securityAgent: {
         triggerSync: { mutate: (vars: unknown) => orgTriggerSyncMutateMock(vars) },
+        saveConfig: { mutate: (vars: unknown) => orgSaveConfigMutateMock(vars) },
       },
     },
   },
@@ -100,7 +116,12 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     lastCapturedOptions = null;
     personalTriggerSyncMutateMock.mockReset();
     orgTriggerSyncMutateMock.mockReset();
+    personalSaveConfigMutateMock.mockReset();
+    orgSaveConfigMutateMock.mockReset();
     invalidateQueriesMock.mockReset();
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
     toastErrorMock.mockReset();
     trackCommandMock.mockClear();
     hoistedKeys.getKey.mockClear();
@@ -194,6 +215,32 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
       { repoFullName: 'kilo/repo' }
     );
     expect(trackCommandMock).toHaveBeenCalled();
+  });
+});
+
+describe('useSaveSecurityAgentConfig (expectedRevision)', () => {
+  it('sends expectedRevision from the last getConfig on a personal save', async () => {
+    getQueryDataMock.mockReturnValue({ configRevision: 7 });
+    personalSaveConfigMutateMock.mockResolvedValueOnce({});
+    useSaveSecurityAgentConfig('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ slaEnabled: true });
+
+    expect(personalSaveConfigMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 7 })
+    );
+  });
+
+  it('sends expectedRevision null when no config is cached', async () => {
+    getQueryDataMock.mockReturnValue(undefined);
+    personalSaveConfigMutateMock.mockResolvedValueOnce({});
+    useSaveSecurityAgentConfig('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ slaEnabled: true });
+
+    expect(personalSaveConfigMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: null })
+    );
   });
 });
 

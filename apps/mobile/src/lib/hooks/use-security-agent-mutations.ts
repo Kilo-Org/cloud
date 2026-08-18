@@ -111,13 +111,19 @@ export function useSaveSecurityAgentConfig(scope: string) {
 
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (patch: SecurityAgentConfigPatch) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.saveConfig.mutate(patch)
+    mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
+      // The server rejects a save whose revision is stale, so send the revision
+      // the last getConfig returned. `null` means the client saw no config yet.
+      const current = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
+      const expectedRevision = current?.configRevision ?? null;
+      return isPersonalSecurityScope(scope)
+        ? trpcClient.securityAgent.saveConfig.mutate({ ...patch, expectedRevision })
         : trpcClient.organizations.securityAgent.saveConfig.mutate({
             organizationId: scope,
             ...patch,
-          }),
+            expectedRevision,
+          });
+    },
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
       const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
@@ -139,12 +145,6 @@ export function useSaveSecurityAgentConfig(scope: string) {
     onSuccess: result => {
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
-      }
-      if (result.backlogAdmissionWarning) {
-        announcingToast.error(result.backlogAdmissionWarning);
-      }
-      if (result.remediationBacklogAdmissionWarning) {
-        announcingToast.error(result.remediationBacklogAdmissionWarning);
       }
     },
     onSettled: async () => {

@@ -4,19 +4,33 @@ import {
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { createSecurityAgentCommand, type SecurityAgentCommandOwner } from '@kilocode/db';
+import { agent_configs } from '@kilocode/db/schema';
+import { TRPCError } from '@trpc/server';
+import { and, eq } from 'drizzle-orm';
 import {
   DEFAULT_SECURITY_AGENT_CONFIG,
   mergeSecurityAgentConfigPatch,
   parseSecurityAgentConfig,
 } from '../core/constants';
-import { SecurityAgentConfigSchema, type SecurityAgentConfig } from '../core/types';
+import {
+  SecurityAgentConfigSchema,
+  type AutoAnalysisMinSeverity,
+  type SecurityAgentConfig,
+  type SecurityReviewOwner,
+} from '../core/types';
 import {
   setOwnerAutoAnalysisEnabledAtNow,
   resetOwnerAutoAnalysisEnabledAt,
+  enqueueBacklogFindings,
 } from './security-analysis';
 
 const AGENT_TYPE = 'security_scan';
 const DEFAULT_PLATFORM = 'github';
+
+const SECURITY_CONFIG_CONFLICT_MESSAGE =
+  'This configuration changed in another tab. Review the latest settings and save again.';
 
 export async function getSecurityAgentConfig(
   owner: Owner,
@@ -38,6 +52,7 @@ export async function getSecurityAgentConfigWithStatus(
   config: SecurityAgentConfig;
   storedConfig: Partial<SecurityAgentConfig>;
   isEnabled: boolean;
+  configRevision: number;
 } | null> {
   const agentConfig = await getAgentConfigForOwner(owner, AGENT_TYPE, platform);
 
@@ -49,20 +64,23 @@ export async function getSecurityAgentConfigWithStatus(
     storedConfig: agentConfig.config as Partial<SecurityAgentConfig>,
     config: parseSecurityAgentConfig(agentConfig.config),
     isEnabled: agentConfig.is_enabled,
+    configRevision: agentConfig.config_revision,
   };
 }
 
-export async function upsertSecurityAgentConfig(
-  owner: Owner,
-  config: Partial<SecurityAgentConfig>,
-  createdBy: string,
-  platform: string = DEFAULT_PLATFORM
-): Promise<void> {
-  const existingConfig = await getSecurityAgentConfigWithStatus(owner, platform);
+/**
+ * Merge a partial config patch against the stored config, applying the same
+ * remediation defaults as the last-write-wins upsert path.
+ */
+function computeMergedSecurityConfig(
+  existingConfig: {
+    config: SecurityAgentConfig;
+    storedConfig: Partial<SecurityAgentConfig>;
+  } | null,
+  config: Partial<SecurityAgentConfig>
+): SecurityAgentConfig {
   const fullConfig = mergeSecurityAgentConfigPatch(existingConfig?.storedConfig, config);
 
-  const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
-  const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;
   const wasAutoRemediationEnabled = existingConfig?.config.auto_remediation_enabled ?? false;
   const isNowAutoRemediationEnabled = fullConfig.auto_remediation_enabled;
 
@@ -76,6 +94,21 @@ export async function upsertSecurityAgentConfig(
     fullConfig.remediation_model_slug =
       fullConfig.analysis_model_slug ?? fullConfig.model_slug ?? fullConfig.triage_model_slug;
   }
+
+  return fullConfig;
+}
+
+export async function upsertSecurityAgentConfig(
+  owner: Owner,
+  config: Partial<SecurityAgentConfig>,
+  createdBy: string,
+  platform: string = DEFAULT_PLATFORM
+): Promise<void> {
+  const existingConfig = await getSecurityAgentConfigWithStatus(owner, platform);
+  const fullConfig = computeMergedSecurityConfig(existingConfig, config);
+
+  const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
+  const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;
 
   await upsertAgentConfigForOwner({
     owner,
@@ -99,6 +132,166 @@ export async function upsertSecurityAgentConfig(
       await setOwnerAutoAnalysisEnabledAtNow(securityOwner);
     }
   }
+}
+
+function toCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {
+  if ('organizationId' in owner && owner.organizationId) {
+    return { type: 'org', id: owner.organizationId };
+  }
+  if ('userId' in owner && owner.userId) {
+    return { type: 'user', id: owner.userId };
+  }
+  throw new Error('Invalid Security Agent owner');
+}
+
+/**
+ * Compare-and-set config write inside `tx`.
+ *
+ * A `null` expectedRevision is a first insert (config_revision = 1); a row
+ * already existing means the caller's view was stale, so it conflicts. A
+ * non-null expectedRevision updates only when the stored revision still
+ * matches; zero affected rows means a concurrent writer won, so it conflicts.
+ *
+ * Returns the new revision.
+ */
+async function writeSecurityAgentConfigWithRevision(
+  tx: DrizzleTransaction,
+  params: {
+    owner: Owner;
+    fullConfig: SecurityAgentConfig;
+    createdBy: string;
+    expectedRevision: number | null;
+    platform: string;
+  }
+): Promise<number> {
+  const ownerValues =
+    params.owner.type === 'org'
+      ? { owned_by_organization_id: params.owner.id, owned_by_user_id: null }
+      : { owned_by_organization_id: null, owned_by_user_id: params.owner.id };
+
+  if (params.expectedRevision === null) {
+    const inserted = await tx
+      .insert(agent_configs)
+      .values({
+        ...ownerValues,
+        agent_type: AGENT_TYPE,
+        platform: params.platform,
+        config: params.fullConfig,
+        is_enabled: true,
+        created_by: params.createdBy,
+        config_revision: 1,
+      })
+      .onConflictDoNothing()
+      .returning({ id: agent_configs.id });
+
+    if (inserted.length === 0) {
+      throw new TRPCError({ code: 'CONFLICT', message: SECURITY_CONFIG_CONFLICT_MESSAGE });
+    }
+    return 1;
+  }
+
+  const ownerCondition =
+    params.owner.type === 'org'
+      ? eq(agent_configs.owned_by_organization_id, params.owner.id)
+      : eq(agent_configs.owned_by_user_id, params.owner.id);
+
+  const updated = await tx
+    .update(agent_configs)
+    .set({
+      config: params.fullConfig,
+      is_enabled: true,
+      updated_at: new Date().toISOString(),
+      config_revision: params.expectedRevision + 1,
+    })
+    .where(
+      and(
+        ownerCondition,
+        eq(agent_configs.agent_type, AGENT_TYPE),
+        eq(agent_configs.platform, params.platform),
+        eq(agent_configs.config_revision, params.expectedRevision)
+      )
+    )
+    .returning({ id: agent_configs.id });
+
+  if (updated.length === 0) {
+    throw new TRPCError({ code: 'CONFLICT', message: SECURITY_CONFIG_CONFLICT_MESSAGE });
+  }
+  return params.expectedRevision + 1;
+}
+
+export type SecurityConfigSaveOutcome = {
+  newRevision: number;
+  existingFindingsQueuedCount?: number;
+  existingRemediationCommandId?: string;
+};
+
+/**
+ * Compare-and-set security config save. The CAS write, the include-existing
+ * analysis enqueue, and the include-existing remediation command creation all
+ * share one transaction: if any enqueue throws, the config change rolls back.
+ */
+export async function saveSecurityAgentConfigWithRevision(params: {
+  owner: Owner;
+  config: Partial<SecurityAgentConfig>;
+  createdBy: string;
+  expectedRevision: number | null;
+  platform?: string;
+  enqueueAnalysis?: { owner: SecurityReviewOwner; minSeverity: AutoAnalysisMinSeverity };
+  enqueueRemediation?: { owner: SecurityReviewOwner };
+}): Promise<SecurityConfigSaveOutcome> {
+  const platform = params.platform ?? DEFAULT_PLATFORM;
+  const existingConfig = await getSecurityAgentConfigWithStatus(params.owner, platform);
+  const fullConfig = computeMergedSecurityConfig(existingConfig, params.config);
+
+  const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
+  const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;
+
+  const outcome = await db.transaction(async tx => {
+    const newRevision = await writeSecurityAgentConfigWithRevision(tx, {
+      owner: params.owner,
+      fullConfig,
+      createdBy: params.createdBy,
+      expectedRevision: params.expectedRevision,
+      platform,
+    });
+
+    let existingFindingsQueuedCount: number | undefined;
+    if (params.enqueueAnalysis) {
+      existingFindingsQueuedCount = await enqueueBacklogFindings({
+        tx,
+        owner: params.enqueueAnalysis.owner,
+        autoAnalysisMinSeverity: params.enqueueAnalysis.minSeverity,
+        admittedConfigRevision: newRevision,
+      });
+    }
+
+    let existingRemediationCommandId: string | undefined;
+    if (params.enqueueRemediation) {
+      const command = await createSecurityAgentCommand(tx, {
+        commandType: 'apply_auto_remediation',
+        origin: 'settings_include_existing',
+        owner: toCommandOwner(params.enqueueRemediation.owner),
+      });
+      existingRemediationCommandId = command.id;
+    }
+
+    return { newRevision, existingFindingsQueuedCount, existingRemediationCommandId };
+  });
+
+  const securityOwner =
+    params.owner.type === 'org' ? { organizationId: params.owner.id } : { userId: params.owner.id };
+
+  if (isNowAutoAnalysisEnabled) {
+    if (!wasAutoAnalysisEnabled) {
+      await resetOwnerAutoAnalysisEnabledAt(securityOwner);
+    } else {
+      await setOwnerAutoAnalysisEnabledAtNow(securityOwner);
+    }
+  }
+
+  return {
+    ...outcome,
+  };
 }
 
 export async function setSecurityAgentEnabled(

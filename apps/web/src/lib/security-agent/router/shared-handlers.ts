@@ -14,6 +14,7 @@ import { requireNumericPlatformRepositories } from '@/lib/integrations/core/type
 import {
   getSecurityAgentConfigWithStatus,
   upsertSecurityAgentConfig,
+  saveSecurityAgentConfigWithRevision,
   setSecurityAgentEnabled,
 } from '@/lib/security-agent/db/security-config';
 import {
@@ -28,14 +29,10 @@ import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
   getSecurityAgentCommandStatus,
   listActiveSecurityAgentCommands,
-  createApplyAutoRemediationCommand,
   markApplyAutoRemediationCommandAdmissionFailed,
   type SecurityAgentCommandStatusResponse,
 } from '@/lib/security-agent/db/security-commands';
-import {
-  canStartAnalysis,
-  enqueueBacklogFindings,
-} from '@/lib/security-agent/db/security-analysis';
+import { canStartAnalysis } from '@/lib/security-agent/db/security-analysis';
 import {
   decorateFindingWithRemediation,
   decorateFindingsWithRemediation,
@@ -679,6 +676,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       if (!result) {
         return {
           hasConfig: false,
+          configRevision: null,
           isEnabled: false,
           slaCriticalDays: 15,
           slaHighDays: 30,
@@ -730,6 +728,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       return {
         hasConfig: true,
+        configRevision: result.configRevision,
         isEnabled: result.isEnabled,
         slaCriticalDays: result.config.sla_critical_days,
         slaHighDays: result.config.sla_high_days,
@@ -845,9 +844,51 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           existingConfig?.config.remediation_model_slug ??
           analysisModelSlug;
 
-        await upsertSecurityAgentConfig(
+        // Enqueue backlog findings when include_existing becomes active — either
+        // because it was just toggled ON, or because auto-analysis was re-enabled
+        // while include_existing was already ON.
+        const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
+        const isAutoAnalysisOn =
+          input.autoAnalysisEnabled ?? existingConfig?.config.auto_analysis_enabled ?? false;
+        const wasIncludeExisting = existingConfig?.config.auto_analysis_include_existing ?? false;
+        const isNowIncludeExisting = input.autoAnalysisIncludeExisting ?? wasIncludeExisting;
+
+        const includeExistingJustTurnedOn = isNowIncludeExisting && !wasIncludeExisting;
+        const autoAnalysisReEnabled =
+          isAutoAnalysisOn && !wasAutoAnalysisOn && isNowIncludeExisting;
+
+        const shouldEnqueueAnalysis =
+          isAutoAnalysisOn && (includeExistingJustTurnedOn || autoAnalysisReEnabled);
+
+        const wasAutoRemediationOn = existingConfig?.config.auto_remediation_enabled ?? false;
+        const isAutoRemediationOn =
+          input.autoRemediationEnabled ?? existingConfig?.config.auto_remediation_enabled ?? false;
+        const wasRemediationIncludeExisting =
+          existingConfig?.config.auto_remediation_include_existing ?? false;
+        const isNowRemediationIncludeExisting =
+          input.autoRemediationIncludeExisting ?? wasRemediationIncludeExisting;
+        const remediationIncludeExistingJustTurnedOn =
+          isNowRemediationIncludeExisting && !wasRemediationIncludeExisting;
+        const autoRemediationReEnabled =
+          isAutoRemediationOn && !wasAutoRemediationOn && isNowRemediationIncludeExisting;
+        const remediationThresholdChanged =
+          isAutoRemediationOn &&
+          isNowRemediationIncludeExisting &&
+          !!input.autoRemediationMinSeverity &&
+          input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
+
+        const shouldEnqueueRemediation =
+          isAutoRemediationOn &&
+          (remediationIncludeExistingJustTurnedOn ||
+            autoRemediationReEnabled ||
+            remediationThresholdChanged);
+
+        // Compare-and-set save: the config write, the include-existing analysis
+        // enqueue, and the include-existing remediation command all commit in one
+        // transaction. A stale revision or an enqueue failure rolls back.
+        const saveOutcome = await saveSecurityAgentConfigWithRevision({
           owner,
-          {
+          config: {
             sla_critical_days: input.slaCriticalDays,
             sla_high_days: input.slaHighDays,
             sla_medium_days: input.slaMediumDays,
@@ -875,80 +916,38 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             new_finding_notifications_enabled: input.newFindingNotificationsEnabled,
             new_finding_notification_min_severity: input.newFindingNotificationMinSeverity,
           },
-          ctx.user.id
-        );
+          createdBy: ctx.user.id,
+          expectedRevision: input.expectedRevision,
+          enqueueAnalysis: shouldEnqueueAnalysis
+            ? {
+                owner: securityOwner,
+                minSeverity:
+                  input.autoAnalysisMinSeverity ??
+                  existingConfig?.config.auto_analysis_min_severity ??
+                  'high',
+              }
+            : undefined,
+          enqueueRemediation: shouldEnqueueRemediation ? { owner: securityOwner } : undefined,
+        });
 
-        // Enqueue backlog findings when include_existing becomes active — either
-        // because it was just toggled ON, or because auto-analysis was re-enabled
-        // while include_existing was already ON.
-        const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
-        const isAutoAnalysisOn =
-          input.autoAnalysisEnabled ?? existingConfig?.config.auto_analysis_enabled ?? false;
-        const wasIncludeExisting = existingConfig?.config.auto_analysis_include_existing ?? false;
-        const isNowIncludeExisting = input.autoAnalysisIncludeExisting ?? wasIncludeExisting;
+        const existingFindingsQueuedCount = saveOutcome.existingFindingsQueuedCount;
+        const existingRemediationCommandId = saveOutcome.existingRemediationCommandId;
 
-        const includeExistingJustTurnedOn = isNowIncludeExisting && !wasIncludeExisting;
-        const autoAnalysisReEnabled =
-          isAutoAnalysisOn && !wasAutoAnalysisOn && isNowIncludeExisting;
-
-        let existingFindingsQueuedCount: number | undefined;
-        let backlogAdmissionWarning: string | undefined;
-        if (isAutoAnalysisOn && (includeExistingJustTurnedOn || autoAnalysisReEnabled)) {
-          try {
-            existingFindingsQueuedCount = await enqueueBacklogFindings({
-              owner: securityOwner,
-              autoAnalysisMinSeverity:
-                input.autoAnalysisMinSeverity ??
-                existingConfig?.config.auto_analysis_min_severity ??
-                'high',
-            });
-          } catch (error) {
-            console.error('Failed to enqueue backlog findings', error);
-            backlogAdmissionWarning =
-              'Settings saved, but existing findings could not be queued. Retry saving settings.';
-          }
-        }
-
-        const wasAutoRemediationOn = existingConfig?.config.auto_remediation_enabled ?? false;
-        const isAutoRemediationOn =
-          input.autoRemediationEnabled ?? existingConfig?.config.auto_remediation_enabled ?? false;
-        const wasRemediationIncludeExisting =
-          existingConfig?.config.auto_remediation_include_existing ?? false;
-        const isNowRemediationIncludeExisting =
-          input.autoRemediationIncludeExisting ?? wasRemediationIncludeExisting;
-        const remediationIncludeExistingJustTurnedOn =
-          isNowRemediationIncludeExisting && !wasRemediationIncludeExisting;
-        const autoRemediationReEnabled =
-          isAutoRemediationOn && !wasAutoRemediationOn && isNowRemediationIncludeExisting;
-        const remediationThresholdChanged =
-          isAutoRemediationOn &&
-          isNowRemediationIncludeExisting &&
-          !!input.autoRemediationMinSeverity &&
-          input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
-
-        let existingRemediationCommandId: string | undefined;
-        let remediationBacklogAdmissionWarning: string | undefined;
-        if (
-          isAutoRemediationOn &&
-          (remediationIncludeExistingJustTurnedOn ||
-            autoRemediationReEnabled ||
-            remediationThresholdChanged)
-        ) {
-          const command = await createApplyAutoRemediationCommand(securityOwner);
-          existingRemediationCommandId = command.id;
+        // The remediation command row is committed; submit it to the Worker. A
+        // submission failure marks the command failed but does not roll back the
+        // already-committed config.
+        if (existingRemediationCommandId) {
           try {
             await submitApplyAutoRemediation({
-              commandId: command.id,
+              commandId: existingRemediationCommandId,
               owner: securityOwner,
               actorUserId: ctx.user.id,
             });
           } catch (error) {
-            console.error('Failed to enqueue existing findings for remediation', error);
-            remediationBacklogAdmissionWarning =
-              'Settings saved, but existing exploitable findings could not be queued. Retry saving settings.';
+            console.error('Failed to submit existing findings for remediation', error);
             await markApplyAutoRemediationCommandAdmissionFailed(
-              command.id,
-              remediationBacklogAdmissionWarning
+              existingRemediationCommandId,
+              'Settings saved, but existing exploitable findings could not be queued.'
             );
           }
         }
@@ -1020,9 +1019,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         return {
           success: true,
           existingFindingsQueuedCount,
-          backlogAdmissionWarning,
           existingRemediationCommandId,
-          remediationBacklogAdmissionWarning,
         };
       },
     },

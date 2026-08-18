@@ -1,7 +1,33 @@
 import { describe, expect, test } from '@jest/globals';
-import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  addCacheBreakpoints,
+  removeChatCompletionsToolNames,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import type {
+  GatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
+
+describe('removeChatCompletionsToolNames', () => {
+  test('removes names from tool messages only', () => {
+    const toolMessage: OpenAI.ChatCompletionToolMessageParam & { name?: string } = {
+      role: 'tool',
+      content: 'Tool result',
+      tool_call_id: 'call_123',
+      name: 'read_file',
+    };
+    const request: OpenRouterChatCompletionRequest = {
+      model: 'test-model',
+      messages: [{ role: 'user', content: 'Run the tool', name: 'user-name' }, toolMessage],
+    };
+
+    removeChatCompletionsToolNames(request);
+
+    expect(toolMessage.name).toBeUndefined();
+    expect(request.messages[0]).toHaveProperty('name', 'user-name');
+  });
+});
 
 describe('addCacheBreakpoints', () => {
   test('adds a cache breakpoint to the system message and the last eligible chat completions message when none exist', () => {

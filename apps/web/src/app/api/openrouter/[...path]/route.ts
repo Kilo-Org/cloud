@@ -108,14 +108,13 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { readPartnerFailureBody } from '@/lib/ai-gateway/read-partner-failure-body';
 
 export const maxDuration = 800;
 
@@ -971,12 +970,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     after(
       (async () => {
         try {
-          console.warn('Partner request failed before managed fallback', {
+          warnExceptInTest('Partner request failed before managed fallback', {
             ...partnerFailureLog,
-            body: await readPartnerFailureBody(responseForLogging),
+            body: await responseForLogging.text(),
           });
         } catch (error) {
-          console.warn('Partner request failed before managed fallback', {
+          warnExceptInTest('Partner request failed before managed fallback', {
             ...partnerFailureLog,
             response_body_read_error: String(error),
           });
@@ -986,7 +985,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     try {
       await attempt.response.body?.cancel();
     } catch {
-      console.warn('Failed to cancel discarded partner response body');
+      warnExceptInTest('Failed to cancel discarded partner response body');
     }
 
     effectiveProviderContext = partnerFallback.providerContext;

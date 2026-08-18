@@ -32,6 +32,7 @@ import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-a
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { warnExceptInTest } from '@/lib/utils.server';
 
 jest.mock('next/server', () => {
   return {
@@ -103,6 +104,10 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/auto-routing-decision');
+jest.mock('@/lib/utils.server', () => ({
+  ...jest.requireActual('@/lib/utils.server'),
+  warnExceptInTest: jest.fn(),
+}));
 jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
 }));
@@ -144,6 +149,7 @@ const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedGetPercentageRoutedPartnerProvider = jest.mocked(getPercentageRoutedPartnerProvider);
+const mockedWarnExceptInTest = jest.mocked(warnExceptInTest);
 
 const provider = {
   id: 'openrouter',
@@ -1112,11 +1118,8 @@ describe('auto-routing shadow classifier', () => {
 });
 
 describe('percentage-routed partner fallback', () => {
-  let consoleWarn: jest.SpiedFunction<typeof console.warn>;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     setUserAuth();
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
@@ -1132,10 +1135,6 @@ describe('percentage-routed partner fallback', () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
-  });
-
-  afterEach(() => {
-    consoleWarn.mockRestore();
   });
 
   it.each([
@@ -1189,12 +1188,15 @@ describe('percentage-routed partner fallback', () => {
       const partnerLog = mockedAfter.mock.calls[0]?.[0];
       expect(partnerLog).toBeInstanceOf(Promise);
       await partnerLog;
-      expect(consoleWarn).toHaveBeenCalledWith('Partner request failed before managed fallback', {
-        partner_provider: partnerProvider.id,
-        fallback_provider: sourceProvider.id,
-        status_code: partnerStatus,
-        body: 'partner failed',
-      });
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        'Partner request failed before managed fallback',
+        {
+          partner_provider: partnerProvider.id,
+          fallback_provider: sourceProvider.id,
+          status_code: partnerStatus,
+          body: 'partner failed',
+        }
+      );
       expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
         expect.objectContaining({ provider: sourceProvider.id, statusCode: 200 }),
         expect.any(Response),
@@ -1241,12 +1243,15 @@ describe('percentage-routed partner fallback', () => {
     await partnerLog;
 
     expect(response.status).toBe(200);
-    expect(consoleWarn).toHaveBeenCalledWith('Partner request failed before managed fallback', {
-      partner_provider: partnerProvider.id,
-      fallback_provider: provider.id,
-      status_code: 500,
-      response_body_read_error: 'Error: read failed',
-    });
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      'Partner request failed before managed fallback',
+      {
+        partner_provider: partnerProvider.id,
+        fallback_provider: provider.id,
+        status_code: 500,
+        response_body_read_error: 'Error: read failed',
+      }
+    );
   });
 
   it('does not retry a successful partner response', async () => {

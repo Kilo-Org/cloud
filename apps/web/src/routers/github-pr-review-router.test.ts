@@ -30,12 +30,18 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
   recordOperationAcceptance: (...args: unknown[]) => mockRecordOperationAcceptance(...args),
 }));
 
+// The UGC Terms gate (`assertTermsAccepted`) reads `user_terms_acceptances`
+// through `db.select(...).from(...).where(...).limit(1)`. The mock returns a
+// single acceptance row by default so every PR write mutation passes the gate;
+// tests that assert the missing-terms rejection override it to resolve [].
+const mockTermsLookup = jest.fn();
+
 jest.mock('@/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: () => Promise.resolve([]),
+          limit: () => mockTermsLookup(),
         }),
       }),
     }),
@@ -147,6 +153,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   tokenOctokits.clear();
   getGitHubUserAccessToken.mockReset();
+  mockTermsLookup.mockReset();
+  mockTermsLookup.mockResolvedValue([{ id: 'terms-row-1' }]);
 });
 
 describe('githubPrReviewRouter.mergePullRequest', () => {
@@ -2064,5 +2072,23 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     });
     expect(t1Octokit.pulls.merge).not.toHaveBeenCalled();
     expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+});
+
+describe('githubPrReviewRouter UGC terms gate', () => {
+  it('rejects a PR write with PRECONDITION_FAILED terms_required and admits no ledger row when the user has not accepted the current terms', async () => {
+    // The gate runs before `admitOperation`, so a missing acceptance must
+    // never create a ledger row and never reach the GitHub effect.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockTermsLookup.mockResolvedValueOnce([]);
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'terms_required',
+    });
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
   });
 });

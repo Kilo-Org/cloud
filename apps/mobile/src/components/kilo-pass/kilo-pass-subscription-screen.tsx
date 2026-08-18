@@ -116,7 +116,10 @@ function KiloPassUnavailableScreen({
                 accessibilityLabel={KILO_PASS_MANAGE_CTA_LABEL}
                 className="mt-4 self-start"
                 onPress={() => {
-                  void openExternalUrl(presentation.webUrl!, {
+                  if (!presentation.webUrl) {
+                    return;
+                  }
+                  void openExternalUrl(presentation.webUrl, {
                     label: 'Kilo Pass management',
                   });
                 }}

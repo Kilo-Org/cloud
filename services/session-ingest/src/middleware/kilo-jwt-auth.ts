@@ -39,11 +39,23 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }
 
-  const auth = await verifyKiloBearerAgainstCurrentPepper({
-    token,
-    nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
-    connectionString: c.env.HYPERDRIVE.connectionString,
-  });
+  let auth;
+  try {
+    auth = await verifyKiloBearerAgainstCurrentPepper({
+      token,
+      nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+      connectionString: c.env.HYPERDRIVE.connectionString,
+    });
+  } catch (error) {
+    // Secret-store or database failure. Stay retryable: a 401 here would tell
+    // the client its credential is bad and stop it from retrying.
+    console.error('Auth infrastructure failure', {
+      operation: 'kilo-bearer-verify',
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
 
   if (!auth) {
     return c.json({ success: false, error: 'Invalid or expired token' }, 401);

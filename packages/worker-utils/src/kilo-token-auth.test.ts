@@ -59,6 +59,40 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
   });
 
+  it('propagates a pepper-lookup failure instead of reporting an invalid token', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper: async () => {
+          throw new Error('connection refused');
+        },
+      })
+    ).rejects.toThrow('connection refused');
+  });
+
+  it('propagates a secret-store failure instead of reporting an invalid token', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: {
+          get: async () => {
+            throw new Error('secrets store unavailable');
+          },
+        },
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper,
+      })
+    ).rejects.toThrow('secrets store unavailable');
+  });
+
   it('rejects tokens for missing users', async () => {
     userResultByUserId.clear();
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });

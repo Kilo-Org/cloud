@@ -11,12 +11,15 @@ const userRowByUserId = vi.hoisted(
   () => new Map<string, { pepper: string | null; blockedReason: string | null }>()
 );
 
+const dbState = vi.hoisted(() => ({ fails: false }));
+
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
           limit: async () => {
+            if (dbState.fails) throw new Error('connection refused');
             const row = userRowByUserId.get('usr_123');
             if (!row) return [];
             return [{ api_token_pepper: row.pepper, blocked_reason: row.blockedReason }];
@@ -116,6 +119,34 @@ describe('kiloJwtAuthMiddleware', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
     userRowByUserId.clear();
+    dbState.fails = false;
+  });
+
+  it('returns a retryable 503 when the secret store fails', async () => {
+    const token = await signUserToken('pepper-current');
+    const env = makeEnv(TEST_JWT_SECRET);
+    env.NEXTAUTH_SECRET_PROD.get = async () => {
+      throw new Error('secrets store unavailable');
+    };
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      env
+    );
+
+    expect(res.status).toBe(503);
+  });
+
+  it('returns a retryable 503 when the database fails', async () => {
+    dbState.fails = true;
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(503);
   });
 
   it('rejects missing Authorization header', async () => {

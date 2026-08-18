@@ -195,15 +195,13 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
   }
 
-  let slug: OpenRouterInferenceProviderId;
-  if (model.inference_provider_restriction.length === 1) {
-    slug = model.inference_provider_restriction[0];
-  } else {
-    if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
-      return null;
-    }
-    slug = OpenRouterInferenceProviderIdSchema.parse(model.gateway);
-  }
+  const slug: OpenRouterInferenceProviderId | null =
+    model.inference_provider_restriction.length === 1
+      ? model.inference_provider_restriction[0]
+      : model.gateway === 'openrouter' || model.gateway === 'vercel'
+        ? null
+        : OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+  if (!slug) return null;
 
   return {
     slug,

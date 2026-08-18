@@ -25,7 +25,7 @@ export function UserWebConnectionProvider({ children }: Readonly<UserWebConnecti
   connectionRef.current ??= createUserWebConnection({
     websocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
     getAuthToken: async () => {
-      const result = await trpcClient.activeSessions.getToken.mutate();
+      const result = await trpcClient.activeSessions.getToken.query();
       return result.token;
     },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),

@@ -53,7 +53,7 @@ export const ExtensionAgentsProvider = ({
 
     const userWebConnection = createUserWebConnection({
       getAuthToken: async () => {
-        const tokenResult = await trpcClient.activeSessions.getToken.mutate();
+        const tokenResult = await trpcClient.activeSessions.getToken.query();
         return tokenResult.token;
       },
       lifecycleHooks: createBrowserLifecycleHooks(),

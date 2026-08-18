@@ -235,7 +235,7 @@ export const activeSessionsRouter = createTRPCRouter({
    * expiry from the worker body. A missing worker URL or a non-2xx mint
    * response fails fast with PRECONDITION_FAILED rather than hanging.
    */
-  getToken: baseProcedure.mutation(async ({ ctx }) => {
+  getToken: baseProcedure.query(async ({ ctx }) => {
     if (!SESSION_INGEST_WORKER_URL) {
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',

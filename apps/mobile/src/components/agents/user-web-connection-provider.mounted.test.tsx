@@ -8,8 +8,8 @@ import { UserWebConnectionProvider } from './user-web-connection-provider';
 type AuthConfig = { getAuthToken: () => Promise<string> };
 
 const mocks = vi.hoisted(() => ({
-  mutate: vi.fn(() => ({ token: 'ticket-1', expiresAt: 1_700_000_060 })),
-  query: vi.fn(),
+  mutate: vi.fn(),
+  query: vi.fn(() => ({ token: 'ticket-1', expiresAt: 1_700_000_060 })),
   createUserWebConnection: vi.fn(),
   capturedConfig: null as AuthConfig | null,
 }));
@@ -63,7 +63,7 @@ describe('UserWebConnectionProvider', () => {
     mocks.createUserWebConnection.mockClear();
   });
 
-  it('mints the ingest ticket via the getToken mutation', async () => {
+  it('mints the ingest ticket via the getToken query', async () => {
     const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
     await act(() => {
       holder.renderer = TestRenderer.create(createElement(UserWebConnectionProvider, null));
@@ -78,8 +78,8 @@ describe('UserWebConnectionProvider', () => {
     const token = await config.getAuthToken();
 
     expect(token).toBe('ticket-1');
-    expect(mocks.mutate).toHaveBeenCalledTimes(1);
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.query).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate).not.toHaveBeenCalled();
 
     await act(() => {
       holder.renderer?.unmount();

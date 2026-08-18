@@ -82,6 +82,40 @@ function readTrpcErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Extracts the tRPC error message from an unknown thrown value, mirroring
+ * `readTrpcErrorCode`. The server's `terms_required` rejection is a
+ * `PRECONDITION_FAILED` whose message distinguishes it from a generic
+ * reconnect, so the message must be readable without guessing the shape.
+ */
+function readTrpcErrorMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const record = error as Record<string, unknown>;
+  const data = record.data;
+  if (data && typeof data === 'object') {
+    const message = (data as Record<string, unknown>).message;
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+  const shape = record.shape;
+  if (shape && typeof shape === 'object') {
+    const shapeData = (shape as Record<string, unknown>).data;
+    if (shapeData && typeof shapeData === 'object') {
+      const message = (shapeData as Record<string, unknown>).message;
+      if (typeof message === 'string') {
+        return message;
+      }
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return undefined;
+}
+
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   const code = readTrpcErrorCode(error);
   if (code === 'PRECONDITION_FAILED') {
@@ -136,6 +170,15 @@ type PrReviewMutationErrorState =
        */
       kind: 'reconnect';
       message: string;
+    }
+  | {
+      /**
+       * The mutation failed because the user has not accepted the current
+       * UGC Terms. The caller should surface the Terms gate (not a
+       * reconnect CTA) so the user can accept and retry.
+       */
+      kind: 'terms-required';
+      message: string;
     };
 
 export function classifyPrReviewMutationError(error: unknown): PrReviewMutationErrorState {
@@ -151,6 +194,9 @@ export function classifyPrReviewMutationError(error: unknown): PrReviewMutationE
       kind: 'forbidden',
       message: error instanceof Error ? error.message : 'Forbidden',
     };
+  }
+  if (code === 'PRECONDITION_FAILED' && readTrpcErrorMessage(error) === 'terms_required') {
+    return { kind: 'terms-required', message: 'terms_required' };
   }
   if (code === 'PRECONDITION_FAILED' || code === 'UNAUTHORIZED') {
     return {

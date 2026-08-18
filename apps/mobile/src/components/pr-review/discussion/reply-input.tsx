@@ -3,11 +3,15 @@
 // (non-optimistic) reply mutation and re-fetches the list on settle.
 
 import { useEffect, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Alert, TextInput, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+
+import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
@@ -15,8 +19,70 @@ import {
   isPrOperationPersistenceFailed,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { trpcClient } from '@/lib/trpc';
 
 const REPLY_PLACEHOLDER = 'Reply…';
+
+const TERMS_COPY = 'You must be 13 or older to post.';
+
+/**
+ * Best-effort UGC Terms gate. Returns true when the current version is
+ * already accepted, or when the user accepts now. Returns false when the
+ * user dismisses the gate. A `getTermsStatus` failure passes through (the
+ * server enforces Terms on the write and the reactive path re-prompts).
+ */
+export async function ensureTermsAccepted(): Promise<boolean> {
+  try {
+    const status = await trpcClient.moderation.getTermsStatus.query();
+    if (status.accepted) {
+      return true;
+    }
+    return await promptTermsAcceptance(status.currentVersion);
+  } catch {
+    return true;
+  }
+}
+
+async function promptTermsAcceptance(version: string): Promise<boolean> {
+  const accepted = await new Promise<boolean>(resolve => {
+    const show = () => {
+      Alert.alert('Terms of Service', TERMS_COPY, [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            resolve(false);
+          },
+        },
+        {
+          text: 'View terms',
+          onPress: () => {
+            void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
+            show();
+          },
+        },
+        {
+          text: 'Accept',
+          onPress: () => {
+            void (async () => {
+              try {
+                await trpcClient.moderation.acceptTerms.mutate({
+                  version,
+                  agePosture: UGC_AGE_POSTURE,
+                });
+                resolve(true);
+              } catch {
+                resolve(false);
+              }
+            })();
+          },
+        },
+      ]);
+    };
+    show();
+  });
+  return accepted;
+}
 
 type ReplyInputProps = {
   readonly owner: string;
@@ -49,7 +115,17 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         return;
       }
       const classification = classifyPrReviewMutationError(reply.error);
-      if (classification.kind === 'bad-request') {
+      if (classification.kind === 'terms-required') {
+        void (async () => {
+          const accepted = await ensureTermsAccepted();
+          if (accepted) {
+            setInlineError(null);
+          } else {
+            setInlineError(TERMS_COPY);
+          }
+          setInlineErrorKind(null);
+        })();
+      } else if (classification.kind === 'bad-request') {
         setInlineError("This reply can't be posted. The thread may have changed.");
         setInlineErrorKind('bad-request');
       } else if (classification.kind === 'forbidden') {
@@ -66,13 +142,17 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
     }
   }, [reply.error]);
 
-  const submit = () => {
+  const submit = async () => {
     const body = bodyRef.current.trim();
     if (!body || reply.isPending) {
       return;
     }
     setInlineError(null);
     setInlineErrorKind(null);
+    const accepted = await ensureTermsAccepted();
+    if (!accepted) {
+      return;
+    }
     reply.mutate(
       { owner, repo, number, commentId, body },
       {
@@ -120,7 +200,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
             inlineErrorKind === 'forbidden' ||
             inlineErrorKind === 'reconnect'
           }
-          onPress={submit}
+          onPress={() => {
+            void submit();
+          }}
           accessibilityLabel="Submit reply"
         >
           <Text>Reply</Text>

@@ -1,3 +1,4 @@
+import { QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
@@ -110,6 +111,41 @@ describe('permission-denied query removal', () => {
 
     expect(queryClient.getQueryData(key)).toBeUndefined();
     expect(signOut).not.toHaveBeenCalled();
+    clear();
+  });
+
+  it('keeps an actively-observed query in the cache on FORBIDDEN', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const key: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-1' } },
+    ];
+    queryClient.setQueryData(key, { members: ['a'] });
+
+    const error = Object.assign(new Error('forbidden'), {
+      data: { code: 'FORBIDDEN', httpStatus: 403 },
+    });
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryFn: () => {
+        throw error;
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+
+    // The observer makes the query active; a forced refetch fails FORBIDDEN but
+    // must not drop the still-observed query (removal would rebuild and loop).
+    await observer.refetch().catch(() => undefined);
+
+    expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
+    expect(signOut).not.toHaveBeenCalled();
+    unsubscribe();
     clear();
   });
 

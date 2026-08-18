@@ -101,7 +101,12 @@ export function createKiloAppQueryClient(): QueryClient {
     queryCache: new QueryCache({
       onError: (error, query) => {
         void handleTrpcQueryError(error);
-        removePermissionDeniedQueries(queryClient, error, query);
+        // Removing a still-observed query rebuilds it on the next render and
+        // refetches, which fails FORBIDDEN again and loops for as long as the
+        // error screen stays mounted. Only drop queries nothing is observing.
+        if (!query.isActive()) {
+          removePermissionDeniedQueries(queryClient, error, query);
+        }
       },
     }),
     mutationCache: new MutationCache({

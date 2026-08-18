@@ -837,9 +837,7 @@ export function SessionDetailContent({
       // never clears to null on an unpinned send.
       if (activeSessionType === 'cloud-agent') {
         manager.setCloudAgentModelOverride(
-          sendModel
-            ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) }
-            : null
+          sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
         );
       }
       // manager.send() reports failures via its own return value (and toasts

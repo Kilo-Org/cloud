@@ -3,6 +3,7 @@ import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type {
   StopWrappersResult,
+  WrapperObservation,
   WrapperStopReason,
   WrapperStopTarget,
 } from '../agent-sandbox/protocol.js';
@@ -60,6 +61,7 @@ import {
   resetWrapperLivenessAfterReconnect,
   type WrapperConnectionFence,
   type WrapperRuntimeState,
+  nextExhaustedWrapperRecheckAt,
   WRAPPER_STOP_MAX_ATTEMPTS,
 } from './wrapper-runtime-state.js';
 
@@ -147,6 +149,7 @@ export type WrapperSupervisor = {
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
   onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
   requestPhysicalWrapperStop(reason: WrapperStopReason, target?: WrapperStopTarget): Promise<void>;
+  recheckExhaustedCleanup(): Promise<void>;
   clearDisconnectGrace(): Promise<void>;
   runMaintenance(now: number): Promise<void>;
   nextMaintenanceDeadlines(): Promise<number[]>;
@@ -185,8 +188,14 @@ export type WrapperSupervisorDependencies = {
     attemptId: string;
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
+  /**
+   * Observation-only probe used to recover an exhausted cleanup lease. Must not
+   * stop wrappers and must not wake a stopped container.
+   */
+  observeWrappers?: () => Promise<WrapperObservation>;
   recordSharedSandboxFailover: (routeKey: SandboxId) => Promise<void>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
+  isSessionDeletionInProgress?: () => Promise<boolean>;
   getSessionIdForLogs: () => string | undefined;
 };
 
@@ -411,8 +420,10 @@ export function createWrapperSupervisor(
     clearInterruptRequest,
     ensureAcceptedMessageBeforeTerminal,
     stopWrappers,
+    observeWrappers,
     recordSharedSandboxFailover,
     requestAlarmAtOrBefore,
+    isSessionDeletionInProgress,
     getSessionIdForLogs,
   } = dependencies;
 
@@ -663,7 +674,33 @@ export function createWrapperSupervisor(
     if (next !== current) {
       await putWrapperLease(storage, next);
       await requestAlarmAtOrBefore?.(now);
+      return;
     }
+    // The reducer only accepts request_stop from `none`/`owns_wrapper`, so a
+    // no-op means cleanup was already in flight (or exhausted). That is usually
+    // fine — the existing lease deadline drives reconciliation — but it must
+    // never be silent: a stuck-session investigation needs to see that the stop
+    // request was received and why it did not schedule new work. Only the
+    // exhausted case warns; a stop already in flight is the common benign path.
+    const exhausted = isWrapperCleanupExhausted(current);
+    const entry = logger.withFields({
+      sessionId: getSessionIdForLogs(),
+      reason,
+      leaseState: current.state,
+      leaseReason:
+        current.state === 'stop_needed' || current.state === 'stopping'
+          ? current.reason
+          : undefined,
+      attempts:
+        current.state === 'stop_needed' || current.state === 'stopping'
+          ? current.attempts
+          : undefined,
+      exhausted,
+      logTag: 'wrapper_stop_request_noop',
+    });
+    const message = 'Physical wrapper stop request left the existing cleanup lease unchanged';
+    if (exhausted) entry.warn(message);
+    else entry.info(message);
   }
 
   /**
@@ -1222,6 +1259,133 @@ export function createWrapperSupervisor(
     }
   }
 
+  /**
+   * An exhausted cleanup no longer retries stops, but the physical sandbox can
+   * still change underneath it — the container runtime reaps wedged containers
+   * (e.g. activity_expired), after which the wrapper is observably gone.
+   * Re-observe on a slow cadence and release the lease once absence is
+   * confirmed so the session can allocate a fresh wrapper for new messages.
+   * Without this, exhaustion fenced delivery for the rest of the session TTL.
+   *
+   * This is deliberately an observation, never a stop attempt: the exhausted
+   * lease has spent its `WRAPPER_STOP_MAX_ATTEMPTS` budget and its rollback
+   * fence says so, and the observation must not wake a stopped container just
+   * to ask whether a process that cannot outlive it is still there.
+   *
+   * Callers with a user actively waiting (pending-message flush) pass `force`
+   * to skip the cadence gate and the recovery window; an explicit send is worth
+   * one probe.
+   */
+  async function recheckExhaustedPhysicalCleanup(
+    lease: Extract<Awaited<ReturnType<typeof getWrapperLease>>, { state: 'stop_needed' }> & {
+      exhaustedAt: number;
+    },
+    now: number,
+    options?: { force?: boolean }
+  ): Promise<void> {
+    if (!observeWrappers) return;
+    // While the session is being deleted, wholesale sandbox deletion owns
+    // physical teardown; re-observing individual wrappers is pointless churn
+    // (and the sandbox may already be gone). Rechecks exist to recover sessions
+    // that still have future work.
+    if (await isSessionDeletionInProgress?.()) return;
+    if (!options?.force) {
+      const recheckAt = nextExhaustedWrapperRecheckAt(lease);
+      if (recheckAt === undefined || now < recheckAt) return;
+    }
+
+    // Re-read after the awaits above: the lease we were handed may already have
+    // been released (and a fresh wrapper allocated) by a concurrent recheck, and
+    // the cadence write below must not resurrect it.
+    const current = await getWrapperLease(storage);
+    if (!isWrapperCleanupExhausted(current) || current.exhaustedAt !== lease.exhaustedAt) return;
+    // Rate-limit before probing so a hanging or throwing observation cannot
+    // hot-loop on every maintenance pass.
+    await putWrapperLease(
+      storage,
+      reduceWrapperLease(current, { type: 'exhausted_recheck_scheduled', now })
+    );
+
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        reason: lease.reason,
+        target: lease.target,
+        attempts: lease.attempts,
+        requestedAt: lease.requestedAt,
+        exhaustedAt: lease.exhaustedAt,
+        forced: options?.force === true,
+        logTag: 'wrapper_cleanup_exhausted_recheck',
+      })
+      .info('Rechecking exhausted wrapper cleanup');
+
+    let observation: WrapperObservation;
+    try {
+      observation = await observeWrappers();
+    } catch (error) {
+      observation = {
+        status: 'inspection-failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (observation.status === 'inspection-failed') {
+      await recordSandboxInspectionFailure(storage, observation.reason);
+    }
+    if (observation.status !== 'absent') {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          reason: lease.reason,
+          observation: observation.status,
+          logTag: 'wrapper_cleanup_exhausted_recheck',
+        })
+        .info('Exhausted wrapper cleanup recheck did not confirm absence');
+      return;
+    }
+
+    const latest = await getWrapperLease(storage);
+    if (!isWrapperCleanupExhausted(latest) || latest.exhaustedAt !== lease.exhaustedAt) return;
+    const released = reduceWrapperLease(latest, { type: 'release_exhausted' });
+    if (released.state !== 'none') return;
+    await putWrapperLease(storage, released);
+    await clearSettledSandboxRecovery(storage);
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        reason: lease.reason,
+        logTag: 'wrapper_cleanup_exhausted_recheck',
+      })
+      .info('Released exhausted wrapper cleanup after confirmed absence');
+    if (!isWrapperDeliveryHeld(await getWrapperRuntimeState(storage), released)) {
+      await sessionMessageQueue.requestPendingDrainIfNeeded();
+    }
+  }
+
+  let exhaustedRecheck: Promise<void> | undefined;
+
+  /**
+   * Single-flight wrapper: a maintenance alarm and a blocked flush can both
+   * reach the recheck at the same time, and one probe answers both.
+   */
+  async function recheckExhaustedPhysicalCleanupOnce(
+    lease: Extract<Awaited<ReturnType<typeof getWrapperLease>>, { state: 'stop_needed' }> & {
+      exhaustedAt: number;
+    },
+    now: number,
+    options?: { force?: boolean }
+  ): Promise<void> {
+    if (exhaustedRecheck) {
+      await exhaustedRecheck;
+      return;
+    }
+    exhaustedRecheck = recheckExhaustedPhysicalCleanup(lease, now, options);
+    try {
+      await exhaustedRecheck;
+    } finally {
+      exhaustedRecheck = undefined;
+    }
+  }
+
   async function performSharedSandboxFailoverReconciliation(): Promise<void> {
     const currentTime = Date.now();
     let recovery = await getSandboxRecoveryState(storage);
@@ -1313,7 +1477,10 @@ export function createWrapperSupervisor(
   async function reconcilePhysicalCleanup(now: number): Promise<void> {
     if (!stopWrappers) return;
     let lease = await getWrapperLease(storage);
-    if (isWrapperCleanupExhausted(lease)) return;
+    if (isWrapperCleanupExhausted(lease)) {
+      await recheckExhaustedPhysicalCleanupOnce(lease, now);
+      return;
+    }
     if (lease.state === 'stop_needed' && lease.attempts >= WRAPPER_STOP_MAX_ATTEMPTS) {
       await exhaustPhysicalCleanup(
         lease,
@@ -1658,6 +1825,17 @@ export function createWrapperSupervisor(
     return deadlines;
   }
 
+  /**
+   * Force one out-of-cadence recheck of an exhausted cleanup lease. Used when a
+   * pending-message flush is blocked on exhaustion and a user is actively
+   * waiting on the outcome. No-op unless the persisted lease is exhausted.
+   */
+  async function recheckExhaustedCleanup(): Promise<void> {
+    const lease = await getWrapperLease(storage);
+    if (!isWrapperCleanupExhausted(lease)) return;
+    await recheckExhaustedPhysicalCleanupOnce(lease, Date.now(), { force: true });
+  }
+
   return {
     checkReconnect,
     recordReconnectAccepted,
@@ -1668,6 +1846,7 @@ export function createWrapperSupervisor(
     onDisconnected,
     onTerminalEvent,
     requestPhysicalWrapperStop,
+    recheckExhaustedCleanup,
     clearDisconnectGrace,
     runMaintenance,
     nextMaintenanceDeadlines,

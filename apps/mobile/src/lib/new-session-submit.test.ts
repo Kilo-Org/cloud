@@ -125,7 +125,9 @@ describe('resolveNewSessionSubmitDisabled', () => {
 });
 
 describe('resolveNewSessionStartDisabled', () => {
-  function startInput(overrides: Partial<Parameters<typeof resolveNewSessionStartDisabled>[0]> = {}) {
+  function startInput(
+    overrides: Partial<Parameters<typeof resolveNewSessionStartDisabled>[0]> = {}
+  ) {
     return {
       ...validInput(),
       isProfileLoading: false,

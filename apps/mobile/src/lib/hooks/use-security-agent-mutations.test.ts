@@ -138,7 +138,9 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     hoistedKeys.getKey.mockClear();
     hoistedKeys.rotateKey.mockClear();
     outboxMock.writeReconcileFirst.mockReset();
-    outboxMock.writeReconcileFirst.mockImplementation(async (row: { operationKey: string }) => row.operationKey);
+    outboxMock.writeReconcileFirst.mockImplementation(
+      async (row: { operationKey: string }) => row.operationKey
+    );
     outboxMock.remove.mockReset();
     outboxMock.remove.mockResolvedValue(undefined);
   });

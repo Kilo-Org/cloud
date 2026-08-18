@@ -4564,10 +4564,7 @@ export const agent_configs = pgTable(
       'agent_configs_agent_type_check',
       sql`${table.agent_type} IN ('code_review', 'auto_triage', 'auto_fix', 'security_scan')`
     ),
-    check(
-      'agent_configs_config_revision_check',
-      sql`${table.config_revision} >= 1`
-    ),
+    check('agent_configs_config_revision_check', sql`${table.config_revision} >= 1`),
   ]
 );
 

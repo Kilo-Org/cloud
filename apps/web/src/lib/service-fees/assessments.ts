@@ -1,18 +1,15 @@
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
-
 import { calculateServiceFeeMinor } from '@/lib/service-fees/calculation';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_VERSION,
 } from '@/lib/service-fees/constants';
-import type { OrganizationServiceFeeExemptionHistoryRecord } from '@/lib/service-fees/organization-exemptions';
+import type { OrganizationServiceFeeExemptionRecord } from '@/lib/service-fees/organization-exemptions';
 import {
   getServiceFeeOwner,
   isSupportedServiceFeeCurrency,
   type PrepareAssessmentInput,
-  type ServiceFeeEligibility,
   type ServiceFeeFlow,
   type ServiceFeeOutcome,
 } from '@/lib/service-fees/types';
@@ -90,11 +87,9 @@ const STRIPE_ID_FIELDS = [
 ] as const satisfies readonly (keyof ServiceFeeStripeIds)[];
 
 export type ServiceFeeAssessmentRecord = {
-  id: string;
   assessmentKey: string;
   version: string;
   flow: ServiceFeeFlow;
-  eligibility: ServiceFeeEligibility;
   outcome: ServiceFeeOutcome;
   currency: string;
   kiloUserId: string | null;
@@ -119,7 +114,7 @@ export type ServiceFeeAssessmentRecord = {
   refundedGrossMinor: number;
   disputedProductMinor: number;
   disputedFeeMinor: number;
-  exemptionHistoryId: string | null;
+  exemptionId: string | null;
   failureCode: string | null;
   metadata: ServiceFeeAssessmentMetadata;
   createdAt: string;
@@ -147,13 +142,12 @@ export type ServiceFeeAssessmentStore = {
 export type EffectiveExemptionLookup = (
   organizationId: string,
   at: Date
-) => Promise<Pick<OrganizationServiceFeeExemptionHistoryRecord, 'id' | 'isExempt'> | null>;
+) => Promise<Pick<OrganizationServiceFeeExemptionRecord, 'id' | 'isExempt'> | null>;
 
 export type PreparedServiceFeeDecision = {
   assessmentKey: string;
   version: typeof SERVICE_FEE_VERSION;
   flow: ServiceFeeFlow;
-  eligibility: ServiceFeeEligibility;
   outcome: Exclude<ServiceFeeOutcome, 'charged' | 'missed'>;
   currency: string;
   kiloUserId: string | null;
@@ -163,7 +157,7 @@ export type PreparedServiceFeeDecision = {
   eligibleSubtotalMinor: number;
   expectedFeeMinor: number;
   chargedFeeMinor: 0;
-  exemptionHistoryId: string | null;
+  exemptionId: string | null;
   failureCode: null;
   metadata: ServiceFeeAssessmentMetadata;
 };
@@ -350,7 +344,6 @@ export async function prepareServiceFeeAssessmentDecision(
       assessmentKey: input.assessmentKey,
       version: SERVICE_FEE_VERSION,
       flow: input.flow,
-      eligibility: 'eligible',
       outcome: 'unsupported_currency',
       currency,
       kiloUserId,
@@ -360,34 +353,29 @@ export async function prepareServiceFeeAssessmentDecision(
       eligibleSubtotalMinor: 0,
       expectedFeeMinor: 0,
       chargedFeeMinor: 0,
-      exemptionHistoryId: null,
+      exemptionId: null,
       failureCode: null,
       metadata: {},
     };
   }
 
-  let eligibility: ServiceFeeEligibility = 'eligible';
-  let exemptionHistoryId: string | null = null;
+  let outcome: PreparedServiceFeeDecision['outcome'] = 'pending';
+  let exemptionId: string | null = null;
 
   if (createdUnixSeconds < SERVICE_FEE_ACTIVATION_UNIX_SECONDS) {
-    eligibility = 'pre_activation';
+    outcome = 'pre_activation';
   } else if (owner.kind === 'organization') {
     const exemption = deps.findEffectiveExemption
       ? await deps.findEffectiveExemption(owner.organizationId, input.eligibilityCreatedAt)
       : null;
     if (exemption?.isExempt) {
-      eligibility = 'exempt';
-      exemptionHistoryId = exemption.id;
+      outcome = 'exempt';
+      exemptionId = exemption.id;
     }
   }
 
   const expectedFeeMinor = calculateServiceFeeMinor(input.eligibleSubtotalMinor);
-  let outcome: PreparedServiceFeeDecision['outcome'] = 'pending';
-  if (eligibility === 'pre_activation') {
-    outcome = 'pre_activation';
-  } else if (eligibility === 'exempt') {
-    outcome = 'exempt';
-  } else if (expectedFeeMinor === 0) {
+  if (outcome === 'pending' && expectedFeeMinor === 0) {
     outcome = 'zero_rounded';
   }
 
@@ -395,7 +383,6 @@ export async function prepareServiceFeeAssessmentDecision(
     assessmentKey: input.assessmentKey,
     version: SERVICE_FEE_VERSION,
     flow: input.flow,
-    eligibility,
     outcome,
     currency,
     kiloUserId,
@@ -405,7 +392,7 @@ export async function prepareServiceFeeAssessmentDecision(
     eligibleSubtotalMinor: input.eligibleSubtotalMinor,
     expectedFeeMinor,
     chargedFeeMinor: 0,
-    exemptionHistoryId,
+    exemptionId,
     failureCode: null,
     metadata: {},
   };
@@ -464,11 +451,9 @@ function buildNewAssessmentRecord(params: {
   const nowIso = toServiceFeeTimestamp(params.now);
   const stripeIds = params.stripeIds ?? {};
   return {
-    id: randomUUID(),
     assessmentKey: params.decision.assessmentKey,
     version: params.decision.version,
     flow: params.decision.flow,
-    eligibility: params.decision.eligibility,
     outcome: params.decision.outcome,
     currency: params.decision.currency,
     kiloUserId: params.decision.kiloUserId,
@@ -493,7 +478,7 @@ function buildNewAssessmentRecord(params: {
     refundedGrossMinor: 0,
     disputedProductMinor: 0,
     disputedFeeMinor: 0,
-    exemptionHistoryId: params.decision.exemptionHistoryId,
+    exemptionId: params.decision.exemptionId,
     failureCode: null,
     metadata: sanitizeServiceFeeAssessmentMetadata(params.decision.metadata),
     createdAt: nowIso,
@@ -550,22 +535,13 @@ async function mergePreparedAssessment(
     );
   }
 
-  if (existing.eligibility !== decision.eligibility) {
+  if (existing.exemptionId !== decision.exemptionId) {
     conflict(
       existing.assessmentKey,
       'illegal_transition',
-      'eligibility',
-      existing.eligibility,
-      decision.eligibility
-    );
-  }
-  if (existing.exemptionHistoryId !== decision.exemptionHistoryId) {
-    conflict(
-      existing.assessmentKey,
-      'illegal_transition',
-      'exemptionHistoryId',
-      existing.exemptionHistoryId,
-      decision.exemptionHistoryId
+      'exemptionId',
+      existing.exemptionId,
+      decision.exemptionId
     );
   }
 

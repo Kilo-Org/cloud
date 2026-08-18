@@ -116,7 +116,6 @@ describe('prepareServiceFeeAssessmentDecision', () => {
       personalInput({ eligibilityCreatedAt: BEFORE_ACTIVATION })
     );
     expect(preActivation).toMatchObject({
-      eligibility: 'pre_activation',
       outcome: 'pre_activation',
       expectedFeeMinor: 500,
     });
@@ -125,16 +124,15 @@ describe('prepareServiceFeeAssessmentDecision', () => {
       findEffectiveExemption: async () => ({ id: 'hist_1', isExempt: true }),
     });
     expect(exempt).toMatchObject({
-      eligibility: 'exempt',
       outcome: 'exempt',
       expectedFeeMinor: 500,
-      exemptionHistoryId: 'hist_1',
+      exemptionId: 'hist_1',
     });
 
     const revoked = await prepareServiceFeeAssessmentDecision(organizationInput(), {
       findEffectiveExemption: async () => ({ id: 'hist_2', isExempt: false }),
     });
-    expect(revoked).toMatchObject({ eligibility: 'eligible', outcome: 'pending' });
+    expect(revoked).toMatchObject({ outcome: 'pending', exemptionId: null });
 
     const zeroRounded = await prepareServiceFeeAssessmentDecision(
       personalInput({ eligibleSubtotalMinor: 1 })
@@ -172,7 +170,7 @@ describe('upsertServiceFeeAssessment', () => {
       },
     });
 
-    expect(second.id).toBe(first.id);
+    expect(second.assessmentKey).toBe(first.assessmentKey);
     expect(second.stripeCustomerId).toBe('cus_1');
     expect(second.stripeCheckoutSessionId).toBe('cs_1');
     expect(second.stripePaymentIntentId).toBe('pi_1');
@@ -329,7 +327,7 @@ describe('service fee assessment transitions', () => {
     expect(again.stripeChargeId).toBe('ch_1');
     expect(again.stripePaymentIntentId).toBe('pi_1');
     expect(again.stripeInvoiceId).toBe('in_1');
-    expect(linked.id).toBe(again.id);
+    expect(linked.assessmentKey).toBe(again.assessmentKey);
 
     await expect(
       linkServiceFeeAssessmentStripeIds({

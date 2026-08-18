@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import {
-  organization_service_fee_exemption_history,
   organization_service_fee_exemptions,
   organizations,
   stripe_service_fee_assessments,
@@ -66,10 +65,9 @@ describe('drizzle service fee assessment store', () => {
       }),
     ]);
 
-    expect(first.id).toBe(second.id);
+    expect(first.assessmentKey).toBe(second.assessmentKey);
     const persisted = await assessments.findByAssessmentKey(assessmentKey);
     expect(persisted).toMatchObject({
-      id: first.id,
       assessmentKey,
       outcome: 'pending',
       expectedFeeMinor: 500,
@@ -180,7 +178,7 @@ describe('drizzle service fee assessment store', () => {
         ServiceFeeAssessmentKeyConflictError
       );
       const found = await store.findByAssessmentKey(assessmentKey);
-      expect(found?.id).toBe(first.id);
+      expect(found?.assessmentKey).toBe(first.assessmentKey);
       const enriched = await store.update(assessmentKey, {
         stripeCustomerId: 'cus_after_conflict',
         updatedAt: new Date().toISOString(),
@@ -191,7 +189,7 @@ describe('drizzle service fee assessment store', () => {
     expect(
       await createServiceFeeAssessmentStore(db).findByAssessmentKey(assessmentKey)
     ).toMatchObject({
-      id: first.id,
+      assessmentKey: first.assessmentKey,
       stripeCustomerId: 'cus_after_conflict',
     });
   });
@@ -245,7 +243,6 @@ describe('drizzle service fee assessment store', () => {
         assessment_key: invalidMissedKey,
         version: SERVICE_FEE_VERSION,
         flow: 'personal_top_up',
-        eligibility: 'eligible',
         outcome: 'missed',
         currency: 'usd',
         kilo_user_id: user.id,
@@ -266,7 +263,6 @@ describe('drizzle service fee assessment store', () => {
         assessment_key: `checkout:${crypto.randomUUID()}`,
         version: SERVICE_FEE_VERSION,
         flow: 'personal_top_up',
-        eligibility: 'eligible',
         outcome: 'missed',
         currency: 'usd',
         kilo_user_id: user.id,
@@ -334,7 +330,7 @@ describe('drizzle organization service fee exemption store', () => {
       'child exemption revoked',
       'child historical grant',
     ]);
-    expect(childView.current?.createdAt).toBe(childView.history.at(-1)?.createdAt);
+    expect(childView.current?.createdAt).toBe(childView.history[0]?.createdAt);
 
     const childAtGrant = await getEffectiveOrganizationServiceFeeExemption({
       store: exemptions,
@@ -384,9 +380,8 @@ describe('drizzle organization service fee exemption store', () => {
       }
     );
     expect(childDecision).toMatchObject({
-      eligibility: 'exempt',
       outcome: 'exempt',
-      exemptionHistoryId: childAtGrant?.id,
+      exemptionId: childAtGrant?.id,
     });
 
     const siblingDecision = await prepareServiceFeeAssessmentDecision(
@@ -405,28 +400,22 @@ describe('drizzle organization service fee exemption store', () => {
       }
     );
     expect(siblingDecision).toMatchObject({
-      eligibility: 'eligible',
       outcome: 'pending',
-      exemptionHistoryId: null,
+      exemptionId: null,
     });
 
     const persistedExempt = await upsertServiceFeeAssessment({
       store: assessments,
       decision: childDecision,
     });
-    expect(persistedExempt.exemptionHistoryId).toBe(childAtGrant?.id);
+    expect(persistedExempt.exemptionId).toBe(childAtGrant?.id);
 
-    const historyRows = await db
-      .select()
-      .from(organization_service_fee_exemption_history)
-      .where(eq(organization_service_fee_exemption_history.organization_id, child.id));
-    const currentRows = await db
+    const exemptionRows = await db
       .select()
       .from(organization_service_fee_exemptions)
       .where(eq(organization_service_fee_exemptions.organization_id, child.id));
-    expect(historyRows).toHaveLength(2);
-    expect(currentRows).toHaveLength(1);
-    expect(currentRows[0]?.current_history_id).toBe(childView.current?.currentHistoryId);
+    expect(exemptionRows).toHaveLength(2);
+    expect(exemptionRows.map(row => row.id)).toContain(childView.current?.id);
   });
 
   test('rejects deleted organizations and holds a transaction-scoped advisory lock', async () => {

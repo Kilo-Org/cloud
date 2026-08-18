@@ -23,6 +23,7 @@ function releaseCredentialWrites(): void {
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 vi.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
     return store.get(key) ?? null;
@@ -599,7 +600,11 @@ describe('exchangeLegacyToken', () => {
     // Let the exchange pass its pre-persist epoch check and block at the
     // fenced AUTH_TOKEN write, then supersede it.
     await vi.waitFor(() => {
-      expect(vi.mocked(SecureStore.setItemAsync)).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'exchanged');
+      expect(vi.mocked(SecureStore.setItemAsync)).toHaveBeenCalledWith(
+        AUTH_TOKEN_KEY,
+        'exchanged',
+        expect.anything()
+      );
     });
     bumpAuthEpoch();
     releaseCredentialWrites();

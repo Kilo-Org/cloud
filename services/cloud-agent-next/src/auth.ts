@@ -11,7 +11,11 @@ type StreamTicketPayload = {
   organizationId?: string;
   ptyId?: string;
   nonce?: string;
+  aud?: string;
 };
+
+export const STREAM_TICKET_AUDIENCE = 'cloud-agent-stream';
+export const TERMINAL_TICKET_AUDIENCE = 'cloud-agent-terminal';
 
 export type WrapperDispatchTicketClaims = {
   type: 'wrapper_dispatch_ticket';
@@ -58,34 +62,10 @@ export async function resolveSecret(
   }
 }
 
-export async function validateKiloToken(
-  authHeader: string | null,
-  secret: string | null | undefined
-): Promise<
-  | { success: true; userId: string; token: string; botId?: string }
-  | { success: false; error: string }
-> {
-  if (!secret) {
-    return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
-  }
-
-  const token = extractBearerToken(authHeader);
-  if (!token) {
-    return { success: false, error: 'Missing or malformed Authorization header' };
-  }
-
-  try {
-    const payload = await verifyKiloToken(token, secret);
-    return { success: true, userId: payload.kiloUserId, token, botId: payload.botId };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'JWT verification failed';
-    return { success: false, error: message };
-  }
-}
-
 export function validateStreamTicket(
   ticket: string | null,
-  secret: string | null | undefined
+  secret: string | null | undefined,
+  expectedAudience: string
 ): { success: true; payload: StreamTicketPayload } | { success: false; error: string } {
   if (!ticket) {
     return { success: false, error: 'Missing stream ticket' };
@@ -101,6 +81,10 @@ export function validateStreamTicket(
 
     if (payload.type !== 'stream_ticket') {
       return { success: false, error: 'Invalid ticket type' };
+    }
+
+    if (payload.aud !== expectedAudience) {
+      return { success: false, error: 'Invalid ticket audience' };
     }
 
     return { success: true, payload };

@@ -8,11 +8,13 @@ const {
   consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportDataMock,
   requireCurrentSessionAccessMock,
+  getPgDbMock,
 } = vi.hoisted(() => ({
   getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
   removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
   requireCurrentSessionAccessMock: vi.fn(),
+  getPgDbMock: vi.fn(),
 }));
 
 vi.mock('./logger.js', () => {
@@ -93,6 +95,22 @@ vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
 
+vi.mock('./db/pg.js', () => ({
+  getPgDb: getPgDbMock,
+}));
+
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: () => ({
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ api_token_pepper: null, blocked_reason: null }],
+        }),
+      }),
+    }),
+  }),
+}));
+
 const { default: worker } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -102,11 +120,17 @@ type MockEnv = {
   Sandbox: unknown;
   SandboxSmall: unknown;
   WS_ALLOWED_ORIGINS?: string;
+  HYPERDRIVE: { connectionString: string };
+  INTERNAL_API_SECRET?: string;
   CLOUD_AGENT_SESSION: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
   USER_KILO_FACADE: {
+    idFromName: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+  };
+  STREAM_TICKET_NONCE_DO: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
@@ -117,11 +141,17 @@ function createEnv(): MockEnv {
     NEXTAUTH_SECRET: secret,
     Sandbox: {},
     SandboxSmall: {},
+    HYPERDRIVE: { connectionString: 'postgres://test' },
+    INTERNAL_API_SECRET: 'test-internal-secret',
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(),
       get: vi.fn(),
     },
     USER_KILO_FACADE: {
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    },
+    STREAM_TICKET_NONCE_DO: {
       idFromName: vi.fn(),
       get: vi.fn(),
     },
@@ -163,6 +193,7 @@ beforeEach(() => {
   getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
   removeExpiredCloudAgentReportDataMock.mockClear();
+  getPgDbMock.mockReset();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
     kiloSessionId: 'ses_12345678901234567890123456',
     organizationId: null,
@@ -205,7 +236,7 @@ describe('server /stream', () => {
         cloudAgentSessionId: 'session-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-stream' }
     );
     const env = createEnv();
     requireCurrentSessionAccessMock.mockRejectedValue(
@@ -280,11 +311,16 @@ describe('server /terminal', () => {
         userId: 'user-1',
         cloudAgentSessionId: 'session-1',
         ptyId: 'pty_123',
+        nonce: 'nonce-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
+    env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
+    env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({
+      consume: vi.fn().mockResolvedValue(true),
+    });
     const metadata = {
       metadataSchemaVersion: 2,
       identity: {
@@ -345,7 +381,7 @@ describe('server /terminal', () => {
         ptyId: 'pty_123',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     requireCurrentSessionAccessMock.mockRejectedValue(
       Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
@@ -373,7 +409,7 @@ describe('server /terminal', () => {
         cloudAgentSessionId: 'session-1',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
     const request = new Request(
@@ -400,7 +436,7 @@ describe('server /terminal', () => {
         ptyId: 'pty_other',
       },
       secret,
-      { algorithm: 'HS256', expiresIn: 60 }
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
     const request = new Request(
@@ -891,5 +927,126 @@ describe('server wrapper log upload route', () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
     expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /internal/streams/close', () => {
+  it('rejects without the internal API key', async () => {
+    const env = createEnv();
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(getPgDbMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects with an incorrect internal API key', async () => {
+    const env = createEnv();
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'wrong-key',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(getPgDbMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed body', async () => {
+    const env = createEnv();
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(getPgDbMock).not.toHaveBeenCalled();
+  });
+
+  it('closes org stream sockets for every matching session', async () => {
+    const env = createEnv();
+    const closeOrgStreams = vi.fn().mockResolvedValue(1);
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: 'agent_1' },
+            { cloudAgentSessionId: 'agent_2' },
+          ]),
+        })),
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_removed:agent_1');
+    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_removed:agent_2');
+    expect(env.CLOUD_AGENT_SESSION.get).toHaveBeenCalledTimes(2);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(2);
+    expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
+  });
+
+  it('skips rows without a cloud agent session id', async () => {
+    const env = createEnv();
+    const closeOrgStreams = vi.fn().mockResolvedValue(0);
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [{ cloudAgentSessionId: null }]),
+        })),
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(closeOrgStreams).not.toHaveBeenCalled();
   });
 });

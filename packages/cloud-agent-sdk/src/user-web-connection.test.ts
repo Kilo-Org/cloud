@@ -116,20 +116,20 @@ describe('createUserWebConnection', () => {
     const release = client.retain();
 
     expect(webSocketConstructor).toHaveBeenCalledWith(
-      `${WS_URL}?source=web&token=token+with+spaces&connectionId=uuid-1`
+      `${WS_URL}?source=web&ticket=token+with+spaces&connectionId=uuid-1`
     );
     release();
 
     const secondRelease = client.retain();
     expect(webSocketConstructor).toHaveBeenLastCalledWith(
-      `${WS_URL}?source=web&token=token+with+spaces&connectionId=uuid-1`
+      `${WS_URL}?source=web&ticket=token+with+spaces&connectionId=uuid-1`
     );
     secondRelease();
 
     const other = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     const otherRelease = other.retain();
     expect(webSocketConstructor).toHaveBeenLastCalledWith(
-      `${WS_URL}?token=token&connectionId=uuid-2`
+      `${WS_URL}?ticket=token&connectionId=uuid-2`
     );
     otherRelease();
     client.destroy();
@@ -203,7 +203,7 @@ describe('createUserWebConnection', () => {
       expect(sockets[0].close).toHaveBeenCalledTimes(1);
       expect(getAuthToken).toHaveBeenCalledTimes(2);
       expect(webSocketConstructor).toHaveBeenLastCalledWith(
-        `${WS_URL}?token=new-token&connectionId=uuid-1`
+        `${WS_URL}?ticket=new-token&connectionId=uuid-1`
       );
       open(sockets[1]);
       expect(sockets[1].send).toHaveBeenCalledWith(
@@ -463,7 +463,7 @@ describe('createUserWebConnection', () => {
     client.connect();
 
     expect(webSocketConstructor).toHaveBeenCalledTimes(1);
-    expect(webSocketConstructor).toHaveBeenCalledWith(`${WS_URL}?token=token&connectionId=uuid-1`);
+    expect(webSocketConstructor).toHaveBeenCalledWith(`${WS_URL}?ticket=token&connectionId=uuid-1`);
     client.destroy();
   });
 
@@ -485,7 +485,7 @@ describe('createUserWebConnection', () => {
 
     expect(webSocketConstructor).toHaveBeenCalledTimes(1);
     expect(webSocketConstructor).toHaveBeenCalledWith(
-      `${WS_URL}?token=async-token&connectionId=uuid-1`
+      `${WS_URL}?ticket=async-token&connectionId=uuid-1`
     );
     client.destroy();
   });
@@ -552,7 +552,7 @@ describe('createUserWebConnection', () => {
 
       expect(getAuthToken).toHaveBeenCalledTimes(2);
       expect(webSocketConstructor).toHaveBeenCalledWith(
-        `${WS_URL}?token=recovered-token&connectionId=uuid-1`
+        `${WS_URL}?ticket=recovered-token&connectionId=uuid-1`
       );
       release();
       client.destroy();
@@ -590,7 +590,7 @@ describe('createUserWebConnection', () => {
 
       expect(getAuthToken).toHaveBeenCalledTimes(10);
       expect(webSocketConstructor).toHaveBeenCalledWith(
-        `${WS_URL}?token=eventual-token&connectionId=uuid-1`
+        `${WS_URL}?ticket=eventual-token&connectionId=uuid-1`
       );
       release();
       client.destroy();
@@ -634,7 +634,7 @@ describe('createUserWebConnection', () => {
 
       expect(getAuthToken).toHaveBeenCalledTimes(2);
       expect(webSocketConstructor).toHaveBeenCalledWith(
-        `${WS_URL}?token=online-token&connectionId=uuid-1`
+        `${WS_URL}?ticket=online-token&connectionId=uuid-1`
       );
       expect(removeOnline).toHaveBeenCalledTimes(1);
       open();
@@ -682,7 +682,7 @@ describe('createUserWebConnection', () => {
 
       expect(getAuthToken).toHaveBeenCalledTimes(2);
       expect(webSocketConstructor).toHaveBeenCalledWith(
-        `${WS_URL}?token=restored-token&connectionId=uuid-1`
+        `${WS_URL}?ticket=restored-token&connectionId=uuid-1`
       );
       release();
       client.destroy();
@@ -722,7 +722,7 @@ describe('createUserWebConnection', () => {
 
       expect(getAuthToken).toHaveBeenCalledTimes(2);
       expect(webSocketConstructor).toHaveBeenCalledWith(
-        `${WS_URL}?token=foreground-token&connectionId=uuid-1`
+        `${WS_URL}?ticket=foreground-token&connectionId=uuid-1`
       );
       release();
       client.destroy();
@@ -944,7 +944,7 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
-  it('resubscribes retained sessions and calls reconnect listeners', () => {
+  it('resubscribes retained sessions and calls reconnect listeners', async () => {
     jest.useFakeTimers();
     try {
       const onReconnect = jest.fn();
@@ -962,6 +962,9 @@ describe('createUserWebConnection', () => {
       });
       sockets[0].onclose?.({ code: 1006 } as CloseEvent);
       jest.advanceTimersByTime(60_000);
+      // The reconnect now refreshes auth before opening the new socket.
+      await Promise.resolve();
+      await Promise.resolve();
       open(sockets[1]);
       inbound(
         { type: 'system', event: 'sessions.list', data: { connectionId: 'c2', sessions: [] } },
@@ -972,6 +975,34 @@ describe('createUserWebConnection', () => {
         JSON.stringify({ type: 'subscribe', sessionId: 'ses-1' })
       );
       expect(onReconnect).toHaveBeenCalledTimes(1);
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('mints a fresh ticket on a non-auth-failure (1006) reconnect', async () => {
+    jest.useFakeTimers();
+    try {
+      const getAuthToken = jest.fn().mockReturnValueOnce('old-token').mockReturnValue('new-token');
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+      client.subscribeToCliSession('ses-1');
+      open();
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+      expect(webSocketConstructor).toHaveBeenLastCalledWith(
+        `${WS_URL}?ticket=old-token&connectionId=uuid-1`
+      );
+
+      sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(webSocketConstructor).toHaveBeenLastCalledWith(
+        `${WS_URL}?ticket=new-token&connectionId=uuid-1`
+      );
       client.destroy();
     } finally {
       jest.useRealTimers();

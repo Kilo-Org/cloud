@@ -1,9 +1,19 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { getUserAuthProviders, unlinkAuthProviderFromUser } from '@/lib/user';
 import {
-  sendAccountDeletionConfirmationEmail,
-  sendAccountDeletionSupportNotification,
-} from '@/lib/email';
+  assertUserCanBeSoftDeleted,
+  getUserAuthProviders,
+  SoftDeletePreconditionError,
+  unlinkAuthProviderFromUser,
+} from '@/lib/user';
+import { sendSignInCodeEmail } from '@/lib/email';
+import {
+  consumeSignInCode,
+  createSignInCode,
+  deleteSignInCode,
+  releaseSignInCode,
+  reserveSignInCode,
+} from '@/lib/auth/magic-link-tokens';
+import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
@@ -877,33 +887,121 @@ export const userRouter = createTRPCRouter({
     return successResult({ is_member: isMember });
   }),
 
-  requestAccountDeletion: baseProcedure.mutation(async ({ ctx }) => {
-    const userEmail = ctx.user.google_user_email;
-    const userId = ctx.user.id;
+  requestAccountDeletionChallenge: baseProcedure
+    .output(z.object({ challengeId: z.uuid(), devCode: z.string().optional() }))
+    .mutation(async ({ ctx }) => {
+      const userEmail = ctx.user.google_user_email;
+      const userId = ctx.user.id;
 
-    const lastRequested = ctx.user.account_deletion_requested_at;
-    if (
-      lastRequested &&
-      Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
-    ) {
+      const lastRequested = ctx.user.account_deletion_requested_at;
+      if (
+        lastRequested &&
+        Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
+      ) {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Account deletion already requested. Please wait before trying again.',
+        });
+      }
+
+      const { code, challengeId } = await createSignInCode(userEmail);
+      const sendResult = await sendSignInCodeEmail(userEmail, code);
+      const includeDevCode = process.env.NODE_ENV !== 'production';
+
+      if (sendResult.sent) {
+        await db
+          .update(kilocode_users)
+          .set({ account_deletion_requested_at: new Date().toISOString() })
+          .where(eq(kilocode_users.id, userId));
+        return includeDevCode ? { challengeId, devCode: code } : { challengeId };
+      }
+
+      if (sendResult.reason === 'provider_not_configured') {
+        // Local/dev has no mail provider. Keep the code row so the caller can
+        // still complete the flow with the returned dev code. In production,
+        // treat this like any other send failure: discard the code and fail so
+        // the user is not left stuck with a cooldown and no code.
+        if (!includeDevCode) {
+          await deleteSignInCode(userEmail, code);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to send confirmation code. Please try again.',
+          });
+        }
+        await db
+          .update(kilocode_users)
+          .set({ account_deletion_requested_at: new Date().toISOString() })
+          .where(eq(kilocode_users.id, userId));
+        return { challengeId, devCode: code };
+      }
+
+      // neverbounce_rejected: discard the code and leave the stamp untouched so
+      // a retry / resend stays available.
+      await deleteSignInCode(userEmail, code);
       throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Account deletion already requested. Please wait before trying again.',
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to send confirmation code. Please try again.',
       });
-    }
+    }),
 
-    await Promise.all([
-      sendAccountDeletionConfirmationEmail(userEmail),
-      sendAccountDeletionSupportNotification(userEmail, userId),
-    ]);
+  requestAccountDeletion: baseProcedure
+    .input(z.object({ challengeId: z.uuid(), code: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const userEmail = ctx.user.google_user_email;
+      const userId = ctx.user.id;
 
-    await db
-      .update(kilocode_users)
-      .set({ account_deletion_requested_at: new Date().toISOString() })
-      .where(eq(kilocode_users.id, userId));
+      try {
+        await assertUserCanBeSoftDeleted(userId);
+      } catch (error) {
+        if (error instanceof SoftDeletePreconditionError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        throw error;
+      }
 
-    return successResult();
-  }),
+      const reserveResult = await reserveSignInCode(userEmail, input.code, input.challengeId);
+      if (reserveResult === 'invalid') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid confirmation code' });
+      }
+      if (reserveResult === 'too_many_attempts') {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many attempts. Please request a new confirmation code.',
+        });
+      }
+      if (reserveResult === 'in_progress') {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Confirmation code is already being verified. Please wait.',
+        });
+      }
+
+      // The code is consumed only after removal succeeds. Burning it first
+      // stranded the caller: a failed removal left no usable code and the
+      // 1 h request cooldown blocked a new one.
+      try {
+        await performGdprRemoval(userId, {
+          destroyReason: 'admin_request',
+          actor: {
+            id: userId,
+            email: userEmail,
+            name: ctx.user.google_user_name,
+          },
+        });
+      } catch (error) {
+        await releaseSignInCode(userEmail, input.code, input.challengeId);
+        // A precondition race inside performGdprRemoval (re-asserted there) maps
+        // to the same PRECONDITION_FAILED surface.
+        if (error instanceof SoftDeletePreconditionError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        throw error;
+      }
+
+      await consumeSignInCode(userEmail, input.code, input.challengeId);
+
+      return { status: 'deleted' as const };
+    }),
 
   // ─── Push Notification Tokens ──────────────────────────────────────
 

@@ -1,6 +1,5 @@
 import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
-import jwt from 'jsonwebtoken';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
@@ -31,8 +30,6 @@ import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-
 // `require()`.
 process.env.SESSION_INGEST_WORKER_URL = 'https://test-ingest.example.com';
 let createCallerForUser: typeof CreateCallerForUser;
-let JWT_TOKEN_VERSION: number;
-let TOKEN_EXPIRY: { oneHour: number };
 
 let regularUser: User;
 let testOrganization: Organization;
@@ -40,7 +37,6 @@ let testOrganization: Organization;
 describe('active-sessions-router', () => {
   beforeAll(async () => {
     ({ createCallerForUser } = await import('@/routers/test-utils'));
-    ({ JWT_TOKEN_VERSION, TOKEN_EXPIRY } = await import('@/lib/tokens'));
 
     regularUser = await insertTestUser({
       google_user_email: 'active-sessions-user@example.com',
@@ -77,28 +73,75 @@ describe('active-sessions-router', () => {
   });
 
   describe('getToken', () => {
-    it('returns a one-hour pepper-bearing API token for the caller', async () => {
-      const knownPepper = 'active-sessions-get-token-pepper';
-      const tokenUser = await insertTestUser({
-        google_user_email: `active-sessions-token-${crypto.randomUUID()}@example.com`,
-        google_user_name: 'Active Sessions Token User',
-        api_token_pepper: knownPepper,
-      });
+    it('mints a one-use ticket and returns { token, expiresAt }', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ticket: 'ticket-abc', expiresAt: 1_700_000_060 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
 
-      const caller = await createCallerForUser(tokenUser.id);
+      const caller = await createCallerForUser(regularUser.id);
       const result = await caller.activeSessions.getToken();
-      const payload = jwt.decode(result.token) as jwt.JwtPayload & {
-        kiloUserId: string;
-        apiTokenPepper: string;
-        version: number;
-      };
 
-      expect(payload.kiloUserId).toBe(tokenUser.id);
-      expect(payload.apiTokenPepper).toBe(knownPepper);
-      expect(payload.version).toBe(JWT_TOKEN_VERSION);
-      expect(payload.exp).toBeDefined();
-      expect(payload.iat).toBeDefined();
-      expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(TOKEN_EXPIRY.oneHour);
+      expect(result).toEqual({ token: 'ticket-abc', expiresAt: 1_700_000_060 });
+
+      const [calledUrl, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+      expect(calledUrl).toBe('https://test-ingest.example.com/api/user/web-ticket');
+      expect(init.method).toBe('POST');
+      expect((init.headers as Record<string, string>).Authorization).toContain('Bearer ');
+    });
+
+    it('throws PRECONDITION_FAILED when the worker returns a non-2xx response', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response('upstream failed', { status: 502 }));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.getToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('PRECONDITION_FAILED');
+        expect(err.message).toBe('Session ingest is not configured');
+      }
+    });
+
+    it('throws PRECONDITION_FAILED when fetch itself fails (network error)', async () => {
+      jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.getToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('PRECONDITION_FAILED');
+        expect(err.message).toBe('Session ingest is not configured');
+      }
+    });
+
+    it('throws PRECONDITION_FAILED when the worker returns a malformed 200 body', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ticket: '', expiresAt: 'not-a-number' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.getToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('PRECONDITION_FAILED');
+        expect(err.message).toBe('Invalid ticket response from session ingest');
+      }
     });
   });
 

@@ -33,6 +33,7 @@ import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy
 import { classifyOrganizationEntitlement } from './trial-utils';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
@@ -499,6 +500,18 @@ async function invalidateRemovedMemberSessionAccess(
         error: error instanceof Error ? error.message : String(error),
       }
     );
+  }
+
+  // Best-effort: close the removed member's live Cloud Agent stream sockets.
+  // A failure here must not fail member removal.
+  try {
+    await closeCloudAgentOrgStreams(userId, organizationId);
+  } catch (error) {
+    errorExceptInTest('Failed to close Cloud Agent streams for removed organization member', {
+      organizationId,
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

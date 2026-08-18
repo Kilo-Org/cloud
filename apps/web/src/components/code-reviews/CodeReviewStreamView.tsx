@@ -21,6 +21,7 @@ import {
 import type { CloudAgentEvent, StreamError } from '@/lib/cloud-agent-next/event-types';
 import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
 import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
+import { fetchStreamTicket } from './fetch-stream-ticket';
 
 type CodeReviewStreamViewProps = {
   reviewId: string;
@@ -303,24 +304,8 @@ export function CodeReviewStreamView({
   // ---------------------------------------------------------------------------
 
   const getTicket = useCallback(
-    async (sessionId: string): Promise<string> => {
-      const body: { cloudAgentSessionId: string; organizationId?: string } = {
-        cloudAgentSessionId: sessionId,
-      };
-      if (organizationId) {
-        body.organizationId = organizationId;
-      }
-      const response = await fetch('/api/cloud-agent-next/sessions/stream-ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) {
-        const errorData = (await response.json()) as { error?: string };
-        throw new Error(errorData.error ?? 'Failed to get stream ticket');
-      }
-      const result = (await response.json()) as { ticket: string };
-      return result.ticket;
+    async (sessionId: string): Promise<{ ticket: string; expiresAt: number }> => {
+      return fetchStreamTicket(sessionId, organizationId);
     },
     [organizationId]
   );
@@ -360,7 +345,7 @@ export function CodeReviewStreamView({
     async function connect() {
       if (cancelled || !cloudAgentSessionId) return;
       try {
-        const ticket = await getTicket(cloudAgentSessionId);
+        const result = await getTicket(cloudAgentSessionId);
         if (cancelled) return;
 
         const url = new URL('/stream', CLOUD_AGENT_NEXT_WS_URL);
@@ -368,11 +353,14 @@ export function CodeReviewStreamView({
 
         const manager = createWebSocketManager({
           url: url.toString(),
-          ticket,
+          ticket: result.ticket,
           onEvent: handleEvent,
           onError: handleWsError,
           onStateChange: setConnectionState,
-          onRefreshTicket: async () => getTicket(cloudAgentSessionId),
+          onRefreshTicket: async () => {
+            const refreshed = await getTicket(cloudAgentSessionId);
+            return refreshed.ticket;
+          },
         });
 
         wsManagerRef.current = manager;

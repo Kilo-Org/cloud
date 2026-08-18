@@ -96,7 +96,7 @@ import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-model.js';
 import { dispatchedKilocodeModelId } from './model-utils.js';
 
-import { resolveSecret, validateStreamTicket } from '../auth.js';
+import { resolveSecret, validateStreamTicket, STREAM_TICKET_AUDIENCE } from '../auth.js';
 import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
@@ -1008,7 +1008,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       }
 
       const nextAuthSecret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-      const authResult = validateStreamTicket(ticket, nextAuthSecret);
+      const authResult = validateStreamTicket(ticket, nextAuthSecret, STREAM_TICKET_AUDIENCE);
       if (!authResult.success) {
         return new Response(authResult.error, { status: 401 });
       }
@@ -1324,6 +1324,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    */
   getConnectedClientCount(): number {
     return getConnectedStreamClientCount(this.ctx);
+  }
+
+  /**
+   * Close every connected /stream client whose session belongs to the given
+   * organization. Called on member removal so a removed member's live stream
+   * sockets are torn down immediately. Returns the number of sockets closed.
+   * Sockets live on this DO, so the HTTP handler must delegate here rather
+   * than close anything itself.
+   */
+  async closeOrgStreams(organizationId: string): Promise<number> {
+    const metadata = await this.getStoredMetadata();
+    const orgId = metadata?.identity.orgId;
+    if (!orgId || orgId !== organizationId) return 0;
+
+    let closed = 0;
+    for (const ws of this.ctx.getWebSockets('stream')) {
+      ws.close(1000, 'session access revoked');
+      closed++;
+    }
+    return closed;
   }
 
   // ---------------------------------------------------------------------------

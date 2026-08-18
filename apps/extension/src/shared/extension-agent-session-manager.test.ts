@@ -418,14 +418,14 @@ describe('createExtensionAgentSessionManager', () => {
   describe('getTicket', () => {
     it('builds correct ticket URL and returns ticket', async () => {
       const { mock, restore } = withFakeFetch(
-        Response.json({ ticket: 'ticket-123' }, { status: 200 })
+        Response.json({ expiresAt: 1_700_000_000, ticket: 'ticket-123' }, { status: 200 })
       );
       try {
         const opts = makeDefaultOptions();
         vi.spyOn(opts, 'getToken').mockReturnValue('bearer-token');
         createExtensionAgentSessionManager(opts);
-        const ticket = await capturedConfig!.getTicket(CLOUD_AGENT_ID as never);
-        expect(ticket).toBe('ticket-123');
+        const result = await capturedConfig!.getTicket(CLOUD_AGENT_ID as never);
+        expect(result).toStrictEqual({ expiresAt: 1_700_000_000, ticket: 'ticket-123' });
         expect(mock).toHaveBeenCalledTimes(1);
         const [callUrl] = mock.mock.calls[0] as unknown as [string];
         expect(callUrl).toBe('https://api.test/api/cloud-agent-next/sessions/stream-ticket');
@@ -447,7 +447,7 @@ describe('createExtensionAgentSessionManager', () => {
 
     it('includes organizationId in body when org is set', async () => {
       const { mock, restore } = withFakeFetch(
-        Response.json({ ticket: 'ticket-org' }, { status: 200 })
+        Response.json({ expiresAt: 1_700_000_000, ticket: 'ticket-org' }, { status: 200 })
       );
       try {
         const opts = {
@@ -469,7 +469,7 @@ describe('createExtensionAgentSessionManager', () => {
 
     it('omits Authorization header when getToken returns undefined', async () => {
       const { mock, restore } = withFakeFetch(
-        Response.json({ ticket: 'ticket-noauth' }, { status: 200 })
+        Response.json({ expiresAt: 1_700_000_000, ticket: 'ticket-noauth' }, { status: 200 })
       );
       try {
         const opts = makeDefaultOptions();
@@ -488,7 +488,7 @@ describe('createExtensionAgentSessionManager', () => {
 
     it('omits Authorization header when getToken returns empty string', async () => {
       const { mock, restore } = withFakeFetch(
-        Response.json({ ticket: 'ticket-empty' }, { status: 200 })
+        Response.json({ expiresAt: 1_700_000_000, ticket: 'ticket-empty' }, { status: 200 })
       );
       try {
         const opts = makeDefaultOptions();
@@ -522,6 +522,21 @@ describe('createExtensionAgentSessionManager', () => {
         createExtensionAgentSessionManager(opts);
         await expect(capturedConfig!.getTicket(CLOUD_AGENT_ID as never)).rejects.toThrow(
           'Missing ticket'
+        );
+      } finally {
+        restore();
+      }
+    });
+
+    it('throws when expiresAt is missing from response', async () => {
+      const { restore } = withFakeFetch(
+        Response.json({ ticket: 'ticket-noexpiry' }, { status: 200 })
+      );
+      try {
+        const opts = makeDefaultOptions();
+        createExtensionAgentSessionManager(opts);
+        await expect(capturedConfig!.getTicket(CLOUD_AGENT_ID as never)).rejects.toThrow(
+          'Missing expiresAt'
         );
       } finally {
         restore();

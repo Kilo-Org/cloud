@@ -291,6 +291,10 @@
         "name": "CLOUD_AGENT_SESSION",
       },
       {
+        "class_name": "StreamTicketNonceDO",
+        "name": "STREAM_TICKET_NONCE_DO",
+      },
+      {
         "class_name": "UserKiloFacade",
         "name": "USER_KILO_FACADE",
       },
@@ -328,6 +332,10 @@
         "SandboxCodeReviewContainment",
       ],
       "tag": "v7",
+    },
+    {
+      "new_sqlite_classes": ["StreamTicketNonceDO"],
+      "tag": "v8",
     },
   ],
   /**
@@ -574,6 +582,10 @@
           {
             "class_name": "CloudAgentSession",
             "name": "CLOUD_AGENT_SESSION",
+          },
+          {
+            "class_name": "StreamTicketNonceDO",
+            "name": "STREAM_TICKET_NONCE_DO",
           },
           {
             "class_name": "UserKiloFacade",

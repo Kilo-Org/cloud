@@ -57,6 +57,10 @@ type TestBindings = {
     sendSessionReadyNotification: ReturnType<typeof vi.fn>;
     sendCloudAgentSessionNotification: ReturnType<typeof vi.fn>;
   };
+  CONNECTION_TICKET_DO: {
+    get: ReturnType<typeof vi.fn>;
+    idFromName: ReturnType<typeof vi.fn>;
+  };
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
   DIRECT_INGEST_MAX_BYTES: string;
@@ -75,6 +79,10 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
     NOTIFICATIONS: {
       sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })),
       sendCloudAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+    },
+    CONNECTION_TICKET_DO: {
+      get: vi.fn(),
+      idFromName: vi.fn(),
     },
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
@@ -1967,6 +1975,35 @@ describe('api routes', () => {
     const forwardedUrl = new URL(forwardedReq.url);
     expect(forwardedUrl.pathname).toBe('/web');
     expect(forwardedUrl.searchParams.get('connectionId')).toBe('viewer-1');
+  });
+
+  it('POST /user/web-ticket mints seconds for the body and milliseconds for the DO store', async () => {
+    const mint = vi.fn(async () => undefined);
+    const ticketStub = { mint };
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.idFromName.mockReturnValue('ticket-do-id');
+    env.CONNECTION_TICKET_DO.get.mockReturnValue(ticketStub);
+
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+    now.mockRestore();
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ticket: string; expiresAt: number };
+    expect(body).toEqual({
+      ticket: expect.any(String),
+      expiresAt: 1_700_000_060,
+    });
+    expect(Number.isInteger(body.expiresAt)).toBe(true);
+    expect(mint).toHaveBeenCalledWith({
+      userId: 'usr_test',
+      expiresAt: 1_700_000_060_000,
+    });
   });
 
   // -------------------------------------------------------------------------

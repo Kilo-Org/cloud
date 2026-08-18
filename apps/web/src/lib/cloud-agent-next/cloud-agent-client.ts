@@ -866,3 +866,30 @@ export function createCloudAgentNextClientForModel(
   }
   return createCloudAgentNextClient(authToken);
 }
+
+/**
+ * Close live Cloud Agent stream sockets for a removed organization member.
+ * Best-effort: callers log and continue on failure so member removal never
+ * fails because stream close failed.
+ */
+export async function closeCloudAgentOrgStreams(
+  userId: string,
+  organizationId: string
+): Promise<void> {
+  const response = await fetch(`${CLOUD_AGENT_NEXT_API_URL}/internal/streams/close`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-internal-api-key': INTERNAL_API_SECRET,
+    },
+    body: JSON.stringify({ userId, organizationId }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(
+      `Cloud Agent stream close failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
+    );
+  }
+}

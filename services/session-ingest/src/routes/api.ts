@@ -739,7 +739,7 @@ api.get('/user/cli', async c => {
   return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
 });
 
-// Web UI connects to /api/user/web without userId in the path — userId comes from the JWT.
+// Web UI connects to /api/user/web without userId in the path — the websocket upgrade takes userId from the consumed ticket.
 api.get('/user/web', async c => {
   if (c.req.header('Upgrade') !== 'websocket') {
     return c.json({ success: false, error: 'Expected WebSocket upgrade' }, 426);
@@ -749,6 +749,26 @@ api.get('/user/web', async c => {
   const stub = getUserConnectionDO(c.env, { kiloUserId });
   const wsUrl = new URL(c.req.url);
   wsUrl.pathname = '/web';
+  // The DO can't recover the user from its idFromName-derived id; the web
+  // attachment needs it for command/subscribe access rechecks.
+  wsUrl.searchParams.set('kiloUserId', kiloUserId);
 
   return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
+});
+
+// Web UI mints a one-use ticket before opening /api/user/web. The ticket is
+// opaque (UUID); the DO stores { userId, expiresAt } keyed by the ticket and
+// the websocket upgrade consumes it exactly once.
+api.post('/user/web-ticket', async c => {
+  const kiloUserId = c.get('user_id');
+  const ticket = crypto.randomUUID();
+  const doExpiresAt = Date.now() + 60_000;
+
+  const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
+  await stub.mint({
+    userId: kiloUserId,
+    expiresAt: doExpiresAt,
+  });
+
+  return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

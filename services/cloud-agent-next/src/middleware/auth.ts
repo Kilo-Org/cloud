@@ -1,7 +1,8 @@
 import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
 import type { HonoContext } from '../hono-context.js';
-import { resolveSecret, validateKiloToken } from '../auth.js';
+import { resolveSecret } from '../auth.js';
+import { validateKiloToken } from '../validate-kilo-token.js';
 import { logger } from '../logger.js';
 import { buildTrpcErrorResponse } from '../trpc-error.js';
 import { extractProcedureName } from '../balance-validation.js';
@@ -10,7 +11,10 @@ export const authMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
     const authHeader = c.req.header('authorization');
     const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    const result = await validateKiloToken(authHeader ?? null, nextAuthSecret);
+    const result = await validateKiloToken(authHeader ?? null, {
+      secret: nextAuthSecret,
+      connectionString: c.env.HYPERDRIVE.connectionString,
+    });
 
     if (!result.success) {
       logger.withFields({ error: result.error }).warn('Authentication failed');

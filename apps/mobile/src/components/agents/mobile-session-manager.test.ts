@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
-import { createSessionManager, type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type SessionManager,
+  type SessionManagerConfig,
+} from '@kilocode/cloud-agent-sdk';
 
 // Keep this suite on the pure vitest project: mock every RN / Expo / SDK
 // side-effect import that `mobile-session-manager.ts` pulls transitively
@@ -15,8 +19,21 @@ vi.mock('expo-secure-store', () => ({
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
+// Capture the config passed to createSessionManager so the getTicket closure
+// can be asserted directly, mirroring the extension suite.
+const { configHolder, mockCreateSessionManager } = vi.hoisted(() => {
+  const holder: { current: SessionManagerConfig | null } = { current: null };
+  const createSessionManagerMock = vi.fn((config: SessionManagerConfig): SessionManager => {
+    holder.current = config;
+    return { atoms: {} } as unknown as SessionManager;
+  });
+  return { configHolder: holder, mockCreateSessionManager: createSessionManagerMock };
+});
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
-  createSessionManager: vi.fn(),
+  createSessionManager: mockCreateSessionManager,
+}));
+vi.mock('@/lib/auth/token-owner', () => ({
+  getAuthTokenForRequest: vi.fn(async () => 'test-token'),
 }));
 vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
   normalizeTransportPayload: vi.fn((x: unknown) => x),
@@ -66,10 +83,10 @@ vi.mock('@/lib/trpc', () => ({
 const { buildRemoteAttachmentParts } =
   await import('@/components/agents/mobile-session-manager-helpers');
 const {
+  createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
   isCloudPrepareRetryableError,
   readFetchSessionErrorCode,
-  createMobileAgentSessionManager,
 } = await import('@/components/agents/mobile-session-manager');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
@@ -82,6 +99,18 @@ function notFoundError(): Error {
 
 function withCode(code: string, message: string): Error {
   return Object.assign(new Error(message), { data: { code } });
+}
+
+function withFakeFetch(response: Response) {
+  const originalFetch = globalThis.fetch;
+  const mock = vi.fn(async () => response);
+  globalThis.fetch = mock as never;
+  return {
+    mock,
+    restore: () => {
+      globalThis.fetch = originalFetch;
+    },
+  };
 }
 
 describe('buildRemoteAttachmentParts', () => {
@@ -343,38 +372,95 @@ describe('fetchSessionWithNotFoundRetry', () => {
   });
 });
 
-type CapturedSendInput = {
-  sessionId: string;
-  payload: unknown;
-  messageId?: string;
-  attachments?: unknown;
-};
+describe('getTicket', () => {
+  const CLOUD_AGENT_ID = 'agent_12345678-1234-1234-1234-123456789abc';
 
-type CapturedManagerConfig = { api: { send: (input: CapturedSendInput) => Promise<unknown> } };
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('returns the ticket and expiresAt from the stream-ticket response', async () => {
+    const { mock, restore } = withFakeFetch(
+      Response.json({ ticket: 'ticket-123', expiresAt: 1_700_000_000 }, { status: 200 })
+    );
+    try {
+      const config = setup();
+      await expect(config.getTicket(CLOUD_AGENT_ID as never)).resolves.toEqual({
+        ticket: 'ticket-123',
+        expiresAt: 1_700_000_000,
+      });
+      expect(mock).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it('throws when expiresAt is missing from the response', async () => {
+    const { restore } = withFakeFetch(
+      Response.json({ ticket: 'ticket-noexpiry' }, { status: 200 })
+    );
+    try {
+      const config = setup();
+      await expect(config.getTicket(CLOUD_AGENT_ID as never)).rejects.toThrow(
+        'Missing expiresAt in stream-ticket response'
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it('throws when ticket is missing from the response', async () => {
+    const { restore } = withFakeFetch(Response.json({ expiresAt: 1_700_000_000 }, { status: 200 }));
+    try {
+      const config = setup();
+      await expect(config.getTicket(CLOUD_AGENT_ID as never)).rejects.toThrow(
+        'Missing ticket in stream-ticket response'
+      );
+    } finally {
+      restore();
+    }
+  });
+});
 
 describe('createMobileAgentSessionManager api.send', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
   it('omits autoCommit from the send payload', async () => {
     sendMessageMutate.mockReset();
     sendMessageMutate.mockResolvedValue(undefined);
-    const createSessionManagerMock = createSessionManager as unknown as {
-      mockImplementation: (impl: (config: CapturedManagerConfig) => unknown) => void;
-    };
-    let captured: CapturedManagerConfig | undefined = undefined;
-    createSessionManagerMock.mockImplementation(config => {
-      captured = config;
-      return {};
-    });
-
-    createMobileAgentSessionManager({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- fake store, never read by the mocked createSessionManager
-      store: {} as never,
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- fake connection, never read by the mocked createSessionManager
-      userWebConnection: {} as never,
-    });
-
-    expect(captured).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
-    await captured!.api.send({ sessionId: 'c-1', payload: 'hi', messageId: 'm-1' });
+    const config = setup();
+    const input = { sessionId: 'c-1', payload: 'hi', messageId: 'm-1' };
+    await config.api.send(input as never);
 
     expect(sendMessageMutate).toHaveBeenCalledTimes(1);
     const payload = sendMessageMutate.mock.calls[0]?.[0] as Record<string, unknown>;

@@ -59,6 +59,40 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
   });
 
+  it('propagates a pepper-lookup failure instead of reporting an invalid token', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper: async () => {
+          throw new Error('connection refused');
+        },
+      })
+    ).rejects.toThrow('connection refused');
+  });
+
+  it('propagates a secret-store failure instead of reporting an invalid token', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: {
+          get: async () => {
+            throw new Error('secrets store unavailable');
+          },
+        },
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper,
+      })
+    ).rejects.toThrow('secrets store unavailable');
+  });
+
   it('rejects tokens for missing users', async () => {
     userResultByUserId.clear();
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
@@ -84,6 +118,13 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
 
   it('rejects tokens with stale peppers', async () => {
     const { token } = await signToken({ pepper: 'pepper-stale', tokenSource: 'kilo-chat' });
+
+    await expect(verifyToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects a user token with a null pepper when the stored pepper is non-null', async () => {
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    const { token } = await signToken({ pepper: null, tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toBeNull();
   });
@@ -114,6 +155,82 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+
+  it('succeeds when a token with env is verified without workerEnv', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        connectionString: 'postgres://test',
+        getUserPepper,
+      })
+    ).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+
+  it('fails when token env does not match a provided workerEnv', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        workerEnv: 'staging',
+        connectionString: 'postgres://test',
+        getUserPepper,
+      })
+    ).resolves.toBeNull();
+  });
+});
+
+describe('internal service tokens (no apiTokenPepper, no env)', () => {
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    userResultByUserId.clear();
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+  });
+
+  async function signInternalToken(): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    return new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+  }
+
+  function verifyInternalToken(token: string, workerEnv?: string) {
+    return verifyKiloBearerAgainstCurrentPepper({
+      token,
+      nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+      ...(workerEnv ? { workerEnv } : {}),
+      connectionString: 'postgres://test',
+      getUserPepper,
+    });
+  }
+
+  it('succeeds when workerEnv is omitted and the user is active', async () => {
+    const token = await signInternalToken();
+
+    await expect(verifyInternalToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+
+  it('fails when workerEnv is provided', async () => {
+    const token = await signInternalToken();
+
+    await expect(verifyInternalToken(token, 'production')).resolves.toBeNull();
+  });
+
+  it('fails when blocked_reason is set', async () => {
+    userResultByUserId.set('user-xyz-789', { pepper: null, blockedReason: 'manual block' });
+    const token = await signInternalToken();
+
+    await expect(verifyInternalToken(token)).resolves.toBeNull();
   });
 });
 

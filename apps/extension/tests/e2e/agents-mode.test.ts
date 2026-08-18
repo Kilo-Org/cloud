@@ -926,3 +926,67 @@ test('Agents new session toolbar stays usable at the narrowest panel width', asy
     await cleanup();
   }
 });
+
+test('Agents session header reports context usage and session cost', async () => {
+  const sessionId = DEFAULT_CLOUD_SESSION.kiloSessionId;
+  let eventCounter = 0;
+  const ev = (streamEventType: string, data: unknown): Record<string, unknown> => ({
+    data,
+    eventId: ++eventCounter,
+    executionId: 'exec-usage',
+    sessionId,
+    streamEventType,
+    timestamp: new Date().toISOString(),
+  });
+  const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
+    ev('kilocode', { properties, type });
+  // 1200 input + 300 output + 100 reasoning + 400 cache read = 2000 context tokens.
+  const events: Record<string, unknown>[] = [
+    kilocode('session.created', { info: { id: sessionId } }),
+    kilocode('message.updated', {
+      info: {
+        agent: 'build',
+        cost: 0.0125,
+        id: 'msg-usage-1',
+        mode: 'code',
+        modelID: 'claude-sonnet-4',
+        path: { cwd: '/', root: '/' },
+        providerID: 'anthropic',
+        role: 'assistant',
+        sessionID: sessionId,
+        time: { completed: Date.now(), created: Date.now() },
+        tokens: { cache: { read: 400, write: 0 }, input: 1200, output: 300, reasoning: 100 },
+      },
+    }),
+    kilocode('message.part.updated', {
+      part: {
+        id: 'part-usage-1',
+        messageID: 'msg-usage-1',
+        sessionID: sessionId,
+        text: 'Done with the fix.',
+        type: 'text',
+      },
+    }),
+    ev('complete', { currentBranch: 'main' }),
+  ];
+
+  const { cleanup, getSidePanel } = await setupAgentsTest({ cloudAgentWsEvents: events });
+  try {
+    const sidePanel = await getSidePanel();
+    await navigateToAgentsMode(sidePanel);
+    await sidePanel.getByText('Fix login bug').click();
+    await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 10_000 });
+    await expect(sidePanel.getByText('Done with the fix.')).toBeVisible({ timeout: 10_000 });
+
+    // The indicator reports the summed context tokens, never a fabricated value.
+    const indicator = sidePanel.getByLabel(/^Context usage:/u);
+    await expect(indicator).toBeVisible({ timeout: 10_000 });
+    await expect(indicator).toHaveAttribute('aria-label', /2,000 tokens/u);
+
+    // The popover carries the session cost streamed with the assistant message.
+    await indicator.click();
+    await expect(sidePanel.getByText('Session cost $0.0125')).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await cleanup();
+  }
+});

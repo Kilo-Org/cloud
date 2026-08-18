@@ -13,6 +13,7 @@ import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
 import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
+  isAssistantInterrupt,
 } from './safe-failure-projection.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import type { SessionMessageQueue } from './session-message-queue.js';
@@ -245,12 +246,22 @@ function getAssistantErrorMessage(error: unknown): string | undefined {
   return 'Assistant message failed';
 }
 
-function assistantErrorTerminalizeParams(assistantError: string): TerminalizeParams {
+function assistantErrorTerminalizeParams(assistantError: unknown): TerminalizeParams {
+  if (isAssistantInterrupt(assistantError)) {
+    return {
+      kind: 'interrupted',
+      error: getAssistantErrorMessage(assistantError) ?? 'The message was interrupted by the user',
+      completionSource: 'interrupt',
+      failureStage: 'interruption',
+      failureCode: 'user_interrupt',
+    };
+  }
+  const errorMessage = getAssistantErrorMessage(assistantError) ?? 'Assistant request failed';
   const assistantFailure = classifyAssistantFailure(assistantError);
   return {
     kind: 'failed',
     reason: 'assistant_error',
-    error: assistantError,
+    error: errorMessage,
     completionSource: 'idle_reconciliation',
     failureStage: 'agent_activity',
     failureCode: assistantFailure.terminalCode ?? 'assistant_error',
@@ -277,8 +288,9 @@ function projectWrapperDeathReconciliation(
   assistantMessage: LatestAssistantMessage | null
 ): TerminalizeParams | null {
   if (!assistantMessage) return null;
-  const assistantError = getAssistantErrorMessage(assistantMessage.info.error);
-  if (assistantError !== undefined) return assistantErrorTerminalizeParams(assistantError);
+  if (assistantMessage.info.error !== undefined && assistantMessage.info.error !== null) {
+    return assistantErrorTerminalizeParams(assistantMessage.info.error);
+  }
   if (!hasAssistantCompletionMarker(assistantMessage.info)) return null;
   return {
     kind: 'completed',
@@ -1091,8 +1103,8 @@ export function createWrapperSupervisor(
       const assistantMessage = kiloSessionId
         ? getAssistantMessageForUserMessage(metadata.identity.sessionId, kiloSessionId, messageId)
         : null;
-      const assistantError = getAssistantErrorMessage(assistantMessage?.info.error);
-      if (assistantError !== undefined) {
+      const assistantError = assistantMessage?.info.error;
+      if (assistantError !== undefined && assistantError !== null) {
         projectedSettlements.push({
           message,
           observeCorrelatedActivity: true,

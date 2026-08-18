@@ -181,6 +181,11 @@ export type WrapperCloneTelemetry = {
   receivedBytes?: number;
 };
 
+export type WrapperRestoreTelemetry = {
+  path: 'warm' | 'cold' | 'backup';
+  diffs?: { applied: number; skipped: number; total: number };
+};
+
 /**
  * Non-sensitive bootstrap diagnostics, kept as a sibling of `workspaceReady` rather
  * than a member of it: `workspaceReady` carries `gitToken`, so nesting telemetry there
@@ -198,6 +203,7 @@ export type WrapperBootstrapTelemetry = {
    */
   restoredFromBackup: boolean;
   clone?: WrapperCloneTelemetry;
+  restore?: WrapperRestoreTelemetry;
 };
 
 export type WrapperSessionReadySuccessResponse = {

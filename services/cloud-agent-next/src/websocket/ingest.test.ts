@@ -1090,6 +1090,49 @@ describe('createIngestHandler', () => {
       );
     });
 
+    it('terminalizes MessageAbortedError as interrupted', async () => {
+      const state = createFakeState();
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        state,
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const message = JSON.stringify({
+        streamEventType: 'kilocode',
+        data: {
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'asst_aborted',
+              role: 'assistant',
+              parentID: 'msg_user_aborted',
+              error: { name: 'MessageAbortedError', data: { message: 'aborted' } },
+            },
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+        'msg_user_aborted',
+        expect.objectContaining({
+          kind: 'interrupted',
+          assistantMessageId: 'asst_aborted',
+          completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
+        }),
+        WRAPPER_RUN_ID
+      );
+    });
+
     it('terminalizes object-shaped assistant errors with completion as failed', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();

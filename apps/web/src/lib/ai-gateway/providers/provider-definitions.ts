@@ -1,5 +1,8 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  removeChatCompletionsToolNames,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -118,8 +121,10 @@ export default {
             context.request.body.reasoning_effort ??
             undefined);
         delete context.request.body.reasoning;
+        removeChatCompletionsToolNames(context.request.body);
       }
       delete context.request.body.provider;
+      delete context.request.body.user;
     },
   },
   STREAMLAKE: {

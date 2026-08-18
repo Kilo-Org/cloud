@@ -195,23 +195,7 @@ These tables store no user or account PII — only actor foreign keys — so `so
 
 ### `organization_service_fee_exemptions`
 
-One current state row per exact organization:
-
-| Column                    | Type               | Rules                                                       |
-| ------------------------- | ------------------ | ----------------------------------------------------------- |
-| `organization_id`         | UUID               | Primary key; FK to `organizations.id`; `onDelete: restrict` |
-| `is_exempt`               | boolean            | Not null                                                    |
-| `current_history_id`      | UUID               | Not null; FK to the history row that established this state |
-| `reason`                  | text               | Not null; trimmed non-empty                                 |
-| `changed_by_kilo_user_id` | text nullable      | FK to `kilocode_users.id`, `onDelete: set null`             |
-| `changed_at`              | timestamptz string | Not null, default now                                       |
-| `created_at`              | timestamptz string | Not null, default now                                       |
-
-Store an explicit false row after revocation. Insert the history row first, then point `current_history_id` at it in the same transaction. This makes current state and the exact establishing history row available without guessing from timestamps. Define the history table before this FK in `schema.ts` if Drizzle declaration order requires it. Do not add these fields to `organizations.settings` or expose them through ordinary organization contracts.
-
-### `organization_service_fee_exemption_history`
-
-Append-only internal history:
+Append-only internal exemption log. The newest row is current state; a false row records revocation:
 
 | Column                    | Type               | Rules                                                    |
 | ------------------------- | ------------------ | -------------------------------------------------------- |
@@ -222,9 +206,9 @@ Append-only internal history:
 | `changed_by_kilo_user_id` | text nullable      | FK to `kilocode_users.id`, `onDelete: set null`          |
 | `created_at`              | timestamptz string | Not null, default now                                    |
 
-Index `(organization_id, created_at desc)`. This table is not `organization_audit_logs`; it must be returned only by `adminProcedure` endpoints.
+Index `(organization_id, created_at desc)`. Resolve current state and historical state with the same deterministic order: `created_at desc, id desc`. Keep the organization-scoped advisory lock around each append. Assessments point directly to the exact exemption row used for their decision.
 
-When an admin is soft-deleted, nulling the actor FK is sufficient. Do not store actor email or name in either exemption table.
+This table is not `organization_audit_logs`; it must be returned only by `adminProcedure` endpoints. Do not add these fields to `organizations.settings` or expose them through ordinary organization contracts. When an admin is soft-deleted, nulling the actor FK is sufficient. Do not store actor email or name.
 
 ### `stripe_service_fee_assessments`
 
@@ -232,11 +216,9 @@ One row per commercial billing event:
 
 | Column                             | Type                        | Rules                                                           |
 | ---------------------------------- | --------------------------- | --------------------------------------------------------------- |
-| `id`                               | UUID                        | Primary key                                                     |
-| `assessment_key`                   | text                        | Not null, unique, immutable                                     |
+| `assessment_key`                   | text                        | Primary key; not null and immutable                             |
 | `version`                          | text                        | Not null; initial value `2026-09-01-v1`                         |
 | `flow`                             | text                        | Not null; checked against flow values                           |
-| `eligibility`                      | text                        | Not null; `eligible`, `exempt`, or `pre_activation`             |
 | `outcome`                          | text                        | Not null; `enumCheck` against outcome values                    |
 | `currency`                         | text                        | Not null, lowercase ISO code                                    |
 | `kilo_user_id`                     | text nullable               | FK to `kilocode_users.id`, `onDelete: set null`                 |
@@ -258,9 +240,10 @@ One row per commercial billing event:
 | `settled_at`                       | timestamptz string nullable | Set only after positive/zero successful settlement              |
 | `refunded_product_minor`           | integer                     | Not null, default 0, non-negative; monotonic                     |
 | `refunded_fee_minor`               | integer                     | Not null, default 0, non-negative; monotonic                     |
+| `refunded_gross_minor`             | integer                     | Not null, default 0, non-negative; monotonic                     |
 | `disputed_product_minor`           | integer                     | Not null, default 0, non-negative; not monotonic                |
 | `disputed_fee_minor`               | integer                     | Not null, default 0, non-negative; not monotonic                |
-| `exemption_history_id`             | UUID nullable               | FK to exemption history, `onDelete: restrict`                   |
+| `exemption_id`                     | UUID nullable               | FK to the exact exemption log row, `onDelete: restrict`         |
 | `failure_code`                     | text nullable               | Stable internal reason code, no secret or raw provider payload  |
 | `metadata`                         | JSONB                       | Not null, default `{}`; only non-sensitive reconciliation facts |
 | `created_at`                       | timestamptz string          | Not null, default now                                           |
@@ -271,7 +254,7 @@ Owner check:
 - Personal flows require `kilo_user_id` and forbid `organization_id`.
 - Organization flows require `organization_id`; `kilo_user_id` may record the initiating user.
 
-`outcome` is the single state column. The separate `application_state` column is removed: it was fully derivable from `(eligibility, expected_fee_minor, attachment success)` and forced a redundant two-column state machine with roughly twenty interdependent checks. Outcome values:
+`outcome` is the single decision-state column. Both the earlier `application_state` design and the separate `eligibility` column were removed because they were derivable from `outcome`, expected amount, and attachment success. Outcome values:
 
 | Outcome | Meaning |
 | --- | --- |
@@ -292,7 +275,7 @@ Amount and state checks:
 - `outcome = missed` requires `expected_fee_minor > 0`, `charged_fee_minor = 0`, and a non-empty `failure_code`.
 - `outcome = zero_rounded` requires `expected_fee_minor = 0`.
 - `outcome IN (exempt, pre_activation, zero_rounded, unsupported_currency)` requires `charged_fee_minor = 0`.
-- `eligibility = exempt` requires `exemption_history_id`; other eligibility values forbid it.
+- `outcome = exempt` requires `exemption_id`; every other outcome forbids it.
 - **Do not constrain `charged_fee_minor <= expected_fee_minor`, and do not require equality.** For Checkout flows `expected_fee_minor` is computed from list price and the collected fee is typically lower because a promotion code discounted the fee line proportionally. Equality holds only for invoice-attached fees. Enforce the relationship through the settlement-time effective-rate assertion instead of a database check.
 - Guarded update predicates must reject settlement of a `pending` assessment; it must first reach a terminal outcome. Admin monitoring reports stale pending rows. No cron later attaches their fee.
 
@@ -308,7 +291,7 @@ Do not store email, billing address, tax ID, card data, or webhook bodies in the
 
 After generation:
 
-1. Confirm the migration creates only the three intended tables, checks, FKs, and indexes.
+1. Confirm the migration creates only the two intended tables, checks, FKs, and indexes.
 2. Confirm there is no destructive DDL.
 3. Run `pnpm drizzle:verify-bootstrap` if the branch migration changes bootstrap behavior.
 4. Run `packages/db/src/schema.test.ts` and package typecheck.
@@ -462,10 +445,10 @@ type PrepareAssessmentInput = {
 Decision order:
 
 1. Validate flow owner and currency. A non-USD eligible event terminates as `unsupported_currency`.
-2. Resolve eligibility at `eligibilityCreatedAt`. If it precedes activation, eligibility is `pre_activation`. For organization flows, find the latest exemption history at or before that instant; eligibility is `exempt` only when that exact row grants exemption. Otherwise eligibility is `eligible`. Never use current exemption state to decide a delayed invoice webhook.
+2. Resolve the decision at `eligibilityCreatedAt`. If it precedes activation, the outcome is `pre_activation`. For organization flows, find the latest exemption row at or before that instant; the outcome is `exempt` only when that exact row grants exemption. Never use current exemption state to decide a delayed invoice webhook.
 3. Compute `expected_fee_minor` from the eligible subtotal in all cases, including exempt and pre-activation events. Leakage and audit reporting need it. The subtotal is always known at this point: top-ups and Kilo Pass Checkout use list price, invoices use actual draft lines.
-4. If eligibility is `pre_activation`, outcome is `pre_activation`.
-5. If eligibility is `exempt`, outcome is `exempt`.
+4. If the event is pre-activation, outcome is `pre_activation`.
+5. If the exact organization is exempt, outcome is `exempt`.
 6. If the expected fee is zero, outcome is `zero_rounded`.
 7. Otherwise persist outcome `pending` while attaching the provider line.
 8. After Stripe accepts the fee line, move to `charged`. For invoice-attached fees set `charged_fee_minor` to the attached amount, which equals `expected_fee_minor`. For Checkout-created fees leave `charged_fee_minor` at zero until settlement reads the settled fee line, because a promotion code may have reduced it.
@@ -1042,8 +1025,8 @@ Exit condition: settled fees and leakage reconcile, refunds and disputes reduce 
 4. Validate the confirmed mirrored `tax_behavior` in Stripe test mode and retain the decision record in ADR 0004.
 5. Audit live Stripe coupons for `applies_to` restrictions covering fee-bearing products.
 6. Deploy before activation and monitor assessment outcomes.
-6. At activation, verify one example of each eligible flow and one excluded seat/KiloClaw flow.
-7. Keep rollback artifact/commit ready; do not add a runtime switch.
+7. At activation, verify one example of each eligible flow and one excluded seat/KiloClaw flow.
+8. Keep rollback artifact/commit ready; do not add a runtime switch.
 
 ## Test plan
 

@@ -250,8 +250,8 @@ Before production activation:
    plan, seats, sponsorship, hierarchy, trial state, or a source-controlled
    allowlist.
 2. A second operator must verify each current exemption against the approved
-   source and confirm that `current_history_id` points to the expected history
-   row. Record the organization IDs, history IDs, and verification time without
+   source and confirm that the newest exemption row is the expected state.
+   Record the organization IDs, exemption IDs, and verification time without
    copying contract text or unrelated customer data into the evidence pack.
 3. Run the read-only Kilo Pass classification audit using the service-fee
    runbook in `kilo-org/on-call` against the release environment.
@@ -442,7 +442,7 @@ webhook may still be in flight.
 Poll up to 30 s:
 
 ```sql
-SELECT id, assessment_key, flow, eligibility, outcome,
+SELECT assessment_key, flow, outcome,
        currency,
        eligible_subtotal_minor, expected_fee_minor, charged_fee_minor,
        settled_product_minor, gross_paid_minor,
@@ -450,7 +450,7 @@ SELECT id, assessment_key, flow, eligibility, outcome,
        disputed_product_minor, disputed_fee_minor,
        stripe_checkout_session_id, stripe_invoice_id,
        stripe_payment_intent_id, stripe_charge_id,
-       failure_code, settled_at, exemption_history_id
+       failure_code, settled_at, exemption_id
 FROM stripe_service_fee_assessments
 WHERE kilo_user_id = '<user-id>'
    OR organization_id = '<org-id>'
@@ -712,7 +712,6 @@ charged.
 | Column | Value |
 | --- | --- |
 | `flow` | `personal_top_up` |
-| `eligibility` | `eligible` |
 | `outcome` | `charged` |
 | `eligible_subtotal_minor` | `10000` |
 | `expected_fee_minor` | `500` |
@@ -1144,19 +1143,14 @@ at 375 px; long reasons wrap.
 **Database expect**
 
 ```sql
-SELECT is_exempt, reason, changed_by_kilo_user_id, current_history_id
-FROM organization_service_fee_exemptions
-WHERE organization_id = '<ORG-B>';
-
 SELECT id, is_exempt, reason, changed_by_kilo_user_id, created_at
-FROM organization_service_fee_exemption_history
+FROM organization_service_fee_exemptions
 WHERE organization_id = '<ORG-B>'
-ORDER BY created_at DESC;
+ORDER BY created_at DESC, id DESC;
 ```
 
-Current row `is_exempt = true`, non-empty reason, `current_history_id` points
-at the newest history row. No new row in `organization_audit_logs` for this
-action.
+Newest row has `is_exempt = true` and a non-empty reason. No new row in
+`organization_audit_logs` exists for this action.
 
 **Video** (`video-evidence`, one clip)
 
@@ -1176,9 +1170,9 @@ action.
 **UI expect:** Checkout has **no** `Service fee (5%)` line. Total is $100
 before tax. Org balance +$100.
 
-**Database expect:** `flow = organization_top_up`, `eligibility = exempt`,
-`outcome = exempt`, `expected_fee_minor = 500`, `charged_fee_minor = 0`,
-`exemption_history_id` = the V16 history row, `settled_at` non-null after
+**Database expect:** `flow = organization_top_up`, `outcome = exempt`,
+`expected_fee_minor = 500`, `charged_fee_minor = 0`, `exemption_id` = the V16
+exemption row, `settled_at` non-null after
 payment. Credits $100.
 
 **Email:** reuse for V24.
@@ -1219,7 +1213,7 @@ payment. Credits $100.
 **UI expect:** fee $5.00 present.
 
 **Database expect:** `organization_id = ORG-CHILD`, `outcome = charged`,
-`exemption_history_id IS NULL`.
+`exemption_id IS NULL`.
 
 **Video** (`video-evidence`, one clip)
 
@@ -1244,8 +1238,8 @@ payment. Credits $100.
 unchanged.
 
 **Database expect:** second assessment `outcome = charged`, `charged_fee_minor
-= 500`. V17 row remains `exempt`. History has two rows; current
-`is_exempt = false` and `current_history_id` is the revoke row.
+= 500`. V17 row remains `exempt`. The exemption log has two rows and its
+newest row is the revoke row with `is_exempt = false`.
 
 **Video** (`video-evidence`, two clips; split personas)
 
@@ -1551,8 +1545,8 @@ fee-free even if it pays later.
 
 **UI expect:** Checkout has no fee line. Credits equal the button amount.
 
-**Database expect:** `eligibility = pre_activation`, `outcome =
-pre_activation`, `expected_fee_minor = 500` for a $100 top-up,
+**Database expect:** `outcome = pre_activation`, `expected_fee_minor = 500`
+for a $100 top-up,
 `charged_fee_minor = 0`, `settled_at` set after pay.
 
 **Video** (`video-evidence`, one clip)

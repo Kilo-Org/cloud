@@ -661,7 +661,6 @@ describe('database schema', () => {
         'personal_kilo_pass',
         'organization_kilo_pass',
       ],
-      StripeServiceFeeEligibility: ['eligible', 'exempt', 'pre_activation'],
       StripeServiceFeeOutcome: [
         'pending',
         'charged',

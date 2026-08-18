@@ -201,6 +201,32 @@ export function enumCheck<T extends Record<string, string>>(
   );
 }
 
+export const StripeServiceFeeFlow = {
+  PersonalTopUp: 'personal_top_up',
+  OrganizationTopUp: 'organization_top_up',
+  PersonalAutoTopUpSetup: 'personal_auto_top_up_setup',
+  OrganizationAutoTopUpSetup: 'organization_auto_top_up_setup',
+  PersonalAutoTopUp: 'personal_auto_top_up',
+  OrganizationAutoTopUp: 'organization_auto_top_up',
+  PersonalKiloPass: 'personal_kilo_pass',
+  OrganizationKiloPass: 'organization_kilo_pass',
+} as const;
+
+export type StripeServiceFeeFlow = (typeof StripeServiceFeeFlow)[keyof typeof StripeServiceFeeFlow];
+
+export const StripeServiceFeeOutcome = {
+  Pending: 'pending',
+  Charged: 'charged',
+  Exempt: 'exempt',
+  PreActivation: 'pre_activation',
+  ZeroRounded: 'zero_rounded',
+  UnsupportedCurrency: 'unsupported_currency',
+  Missed: 'missed',
+} as const;
+
+export type StripeServiceFeeOutcome =
+  (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
+
 export const SCHEMA_CHECK_ENUMS = {
   KiloPassTier,
   KiloPassCadence,
@@ -10911,8 +10937,8 @@ export const user_terms_acceptances = pgTable(
 export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
 export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;
 
-export const organization_service_fee_exemption_history = pgTable(
-  'organization_service_fee_exemption_history',
+export const organization_service_fee_exemptions = pgTable(
+  'organization_service_fee_exemptions',
   {
     id: idPrimaryKeyColumn,
     organization_id: uuid().notNull(),
@@ -10925,56 +10951,7 @@ export const organization_service_fee_exemption_history = pgTable(
     foreignKey({
       columns: [table.organization_id],
       foreignColumns: [organizations.id],
-      name: 'FK_org_svc_fee_exemption_history_organization',
-    })
-      .onDelete('restrict')
-      .onUpdate('cascade'),
-    foreignKey({
-      columns: [table.changed_by_kilo_user_id],
-      foreignColumns: [kilocode_users.id],
-      name: 'FK_org_svc_fee_exemption_history_changed_by',
-    })
-      .onDelete('set null')
-      .onUpdate('cascade'),
-    index('IDX_org_service_fee_exemption_history_org_created_at').on(
-      table.organization_id,
-      table.created_at.desc()
-    ),
-    check(
-      'organization_service_fee_exemption_history_reason_check',
-      sql`length(trim(${table.reason})) > 0`
-    ),
-  ]
-);
-
-export type OrganizationServiceFeeExemptionHistory =
-  typeof organization_service_fee_exemption_history.$inferSelect;
-export type NewOrganizationServiceFeeExemptionHistory =
-  typeof organization_service_fee_exemption_history.$inferInsert;
-
-export const organization_service_fee_exemptions = pgTable(
-  'organization_service_fee_exemptions',
-  {
-    organization_id: uuid().primaryKey().notNull(),
-    is_exempt: boolean().notNull(),
-    current_history_id: uuid().notNull(),
-    reason: text().notNull(),
-    changed_by_kilo_user_id: text(),
-    changed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    foreignKey({
-      columns: [table.organization_id],
-      foreignColumns: [organizations.id],
       name: 'FK_org_svc_fee_exemptions_organization',
-    })
-      .onDelete('restrict')
-      .onUpdate('cascade'),
-    foreignKey({
-      columns: [table.current_history_id],
-      foreignColumns: [organization_service_fee_exemption_history.id],
-      name: 'FK_org_svc_fee_exemptions_current_history',
     })
       .onDelete('restrict')
       .onUpdate('cascade'),
@@ -10985,6 +10962,10 @@ export const organization_service_fee_exemptions = pgTable(
     })
       .onDelete('set null')
       .onUpdate('cascade'),
+    index('IDX_org_service_fee_exemptions_org_created_at').on(
+      table.organization_id,
+      table.created_at.desc()
+    ),
     check(
       'organization_service_fee_exemptions_reason_check',
       sql`length(trim(${table.reason})) > 0`
@@ -11000,11 +10981,9 @@ export type NewOrganizationServiceFeeExemption =
 export const stripe_service_fee_assessments = pgTable(
   'stripe_service_fee_assessments',
   {
-    id: idPrimaryKeyColumn,
-    assessment_key: text().notNull().unique(),
+    assessment_key: text().primaryKey().notNull(),
     version: text().notNull(),
     flow: text().notNull().$type<StripeServiceFeeFlow>(),
-    eligibility: text().notNull().$type<StripeServiceFeeEligibility>(),
     outcome: text().notNull().$type<StripeServiceFeeOutcome>(),
     currency: text().notNull(),
     kilo_user_id: text(),
@@ -11029,7 +11008,7 @@ export const stripe_service_fee_assessments = pgTable(
     disputed_product_minor: integer().default(0).notNull(),
     disputed_fee_minor: integer().default(0).notNull(),
     settled_at: timestamp({ withTimezone: true, mode: 'string' }),
-    exemption_history_id: uuid(),
+    exemption_id: uuid(),
     failure_code: text(),
     metadata: jsonb().$type<Record<string, unknown>>().default({}).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -11054,9 +11033,9 @@ export const stripe_service_fee_assessments = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
     foreignKey({
-      columns: [table.exemption_history_id],
-      foreignColumns: [organization_service_fee_exemption_history.id],
-      name: 'FK_stripe_svc_fee_assessments_exemption_history',
+      columns: [table.exemption_id],
+      foreignColumns: [organization_service_fee_exemptions.id],
+      name: 'FK_stripe_svc_fee_assessments_exemption',
     })
       .onDelete('restrict')
       .onUpdate('cascade'),
@@ -11080,11 +11059,6 @@ export const stripe_service_fee_assessments = pgTable(
       .on(table.stripe_invoice_fee_line_item_id)
       .where(isNotNull(table.stripe_invoice_fee_line_item_id)),
     enumCheck('stripe_service_fee_assessments_flow_check', table.flow, StripeServiceFeeFlow),
-    enumCheck(
-      'stripe_service_fee_assessments_eligibility_check',
-      table.eligibility,
-      StripeServiceFeeEligibility
-    ),
     enumCheck(
       'stripe_service_fee_assessments_outcome_check',
       table.outcome,
@@ -11166,8 +11140,8 @@ export const stripe_service_fee_assessments = pgTable(
         OR ${table.charged_fee_minor} = 0`
     ),
     check(
-      'stripe_service_fee_assessments_exemption_history_check',
-      sql`(${table.eligibility} = 'exempt') = (${table.exemption_history_id} IS NOT NULL)`
+      'stripe_service_fee_assessments_exemption_check',
+      sql`(${table.outcome} = 'exempt') = (${table.exemption_id} IS NOT NULL)`
     ),
   ]
 );

@@ -20,6 +20,7 @@ import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { signSessionShareToken } from '../services/session-share-token';
 
 export type ApiContext = {
   Bindings: Env;
@@ -483,7 +484,12 @@ api.post('/session/:sessionId/share', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  return c.json({ success: true, public_id: sharedSession.public_id }, 200);
+  const shareToken = await signSessionShareToken(c.env, {
+    sessionId: parsed.data,
+    publicId: sharedSession.public_id,
+  });
+
+  return c.json({ success: true, share_token: shareToken }, 200);
 });
 
 api.post('/session/:sessionId/unshare', async c => {

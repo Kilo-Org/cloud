@@ -101,6 +101,7 @@ function sandboxWithTerminalResult(
   return {
     ensureWrapper: vi.fn(),
     discoverSessionWrappers: vi.fn(),
+    observeWrappersWithoutWaking: vi.fn(),
     stopWrappers: vi.fn(),
     probeHealth: vi.fn(),
     getRunningWrapper: vi.fn(),

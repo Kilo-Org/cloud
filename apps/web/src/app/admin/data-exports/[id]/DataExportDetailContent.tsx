@@ -85,15 +85,39 @@ function ExportIdentityCard({ detail }: { detail: DataExportDetail }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Export and user</CardTitle>
-        <CardDescription>Identity, ownership, and current lifecycle status.</CardDescription>
+        <CardTitle>Export identity</CardTitle>
+        <CardDescription>Data subject, requester, and current lifecycle status.</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="divide-y divide-border">
           <DetailField label="Export ID">
             <span className="font-mono text-xs break-all">{detail.id}</span>
           </DetailField>
-          <DetailField label="User">
+          <DetailField label="Subject type">
+            <Badge variant="outline">
+              {detail.subject.type === 'organization' ? 'Organization' : 'Personal'}
+            </Badge>
+          </DetailField>
+          {detail.subject.organization ? (
+            <>
+              <DetailField label="Organization">
+                <Link
+                  className="text-link hover:text-link-hover rounded-sm underline decoration-current/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  href={`/admin/organizations/${encodeURIComponent(detail.subject.organization.id)}`}
+                >
+                  {detail.subject.organization.name ?? detail.subject.organization.id}
+                </Link>
+              </DetailField>
+              <DetailField label="Organization ID">
+                <span className="font-mono text-xs break-all">
+                  {detail.subject.organization.id}
+                </span>
+              </DetailField>
+            </>
+          ) : (
+            <DetailField label="Data subject">Requester's own account</DetailField>
+          )}
+          <DetailField label="Requested by">
             <Link
               className="text-link hover:text-link-hover rounded-sm underline decoration-current/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               href={`/admin/users/${encodeURIComponent(detail.user.id)}`}
@@ -101,8 +125,8 @@ function ExportIdentityCard({ detail }: { detail: DataExportDetail }) {
               {detail.user.email}
             </Link>
           </DetailField>
-          <DetailField label="User name">{detail.user.name ?? 'Not available'}</DetailField>
-          <DetailField label="User ID">
+          <DetailField label="Requester name">{detail.user.name ?? 'Not available'}</DetailField>
+          <DetailField label="Requester ID">
             <span className="font-mono text-xs break-all">{detail.user.id}</span>
           </DetailField>
           <DetailField label="Status">

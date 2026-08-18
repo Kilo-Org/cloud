@@ -5,11 +5,12 @@ import {
   type ExportQueueMessage,
 } from './contracts';
 import {
-  createReplicaQuery,
+  createReplicaDatabase,
   createStateDb,
   type ExportCompletionResult,
   type ExportJob,
   type HyperdriveBinding,
+  type ReplicaDatabase,
 } from './databases';
 import { SourceReadError, TerminalExportError } from './errors';
 import {
@@ -72,6 +73,25 @@ export function hasRetiredGeneratorState(
   job: Pick<ExportJob, 'current_source' | 'source_cursor' | 'next_part_number'>
 ): boolean {
   return job.current_source !== null || job.source_cursor !== null || job.next_part_number !== 1;
+}
+
+export async function closeReplicaDatabase(input: {
+  database: ReplicaDatabase | undefined;
+  exportId: string;
+  generation: number;
+}): Promise<void> {
+  if (!input.database) return;
+  try {
+    await input.database.close();
+  } catch (error) {
+    // Cleanup must be awaited, but it must not replace the generation outcome. In
+    // particular, a close failure after state completion must not retry a ready export.
+    logExportEvent('warn', 'export_warehouse_close_failed', {
+      exportId: input.exportId,
+      generation: input.generation,
+      ...safeError(error),
+    });
+  }
 }
 
 export async function handleGenerationFailure(input: {
@@ -401,6 +421,7 @@ export async function processGenerateMessage(
   let objectCompletionAttempted = false;
   let phase = 'claim';
   let activeSource = job.current_source;
+  let warehouse: ReplicaDatabase | undefined;
 
   try {
     if (hasRetiredGeneratorState(job)) {
@@ -443,15 +464,16 @@ export async function processGenerateMessage(
     // Resolved once, from persisted state, and reused for every page. Deriving it per
     // page would let a single mis-set field change scope midway through a file.
     const subject = exportSubject(job);
-    const warehouseQuery = createReplicaQuery(env.EXPORT_WAREHOUSE_DB, 'warehouse');
-    const allAdapters = createSourceAdapters({ warehouseQuery });
+    warehouse = createReplicaDatabase(env.EXPORT_WAREHOUSE_DB, 'warehouse');
+    const activeWarehouse = warehouse;
+    const allAdapters = createSourceAdapters({ warehouseQuery: activeWarehouse.query });
 
     // Before anything is written, because the header names what is missing and cannot
     // be amended once the first part has been uploaded. One query, not one per source.
     phase = 'source_probe';
     const sources = await withSpan('export_source_probe', {}, async span => {
       const present = await findPresentWarehouseTables(
-        warehouseQuery,
+        activeWarehouse.query,
         warehouseRequirements(allAdapters, job.subject_type)
       );
       const partitioned = partitionSources(allAdapters, job.subject_type, present);
@@ -763,6 +785,11 @@ export async function processGenerateMessage(
     if (outcome === 'retry') throw failure;
   } finally {
     if (deadline) clearTimeout(deadline);
+    await closeReplicaDatabase({
+      database: warehouse,
+      exportId: job.id,
+      generation: job.dispatch_generation,
+    });
   }
 }
 

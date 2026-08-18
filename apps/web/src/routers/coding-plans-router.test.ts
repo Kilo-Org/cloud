@@ -1073,6 +1073,31 @@ describe('coding plans router', () => {
     expect(secondPage.pagination).toEqual({ page: 2, total: 23, totalPages: 2 });
   });
 
+  it('includes inventory and upstream plan identifiers in admin subscriptions', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const inventory = await insertInventory({
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+      upstream_plan_id: 'upstream-plan-admin-display',
+    });
+    await db.insert(coding_plan_subscriptions).values(
+      subscriptionValues(user.id, {
+        key_inventory_id: inventory.id,
+      })
+    );
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.codingPlans.adminListSubscriptions({});
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        inventoryKeyId: inventory.id,
+        upstreamPlanId: 'upstream-plan-admin-display',
+      }),
+    ]);
+  });
+
   it('searches admin subscriptions by user id and email substring', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const emailUser = await insertTestUser({

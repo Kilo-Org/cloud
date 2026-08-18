@@ -24,6 +24,7 @@
     "DIRECT_INGEST_PERCENT": "100",
     "DIRECT_INGEST_USER_IDS": "f1a848ca-bade-48d8-a5ad-1042d08651e6",
     "DIRECT_INGEST_MAX_BYTES": "4194304",
+    "SESSION_SHARE_TOKEN_MIN_IAT": "0",
   },
   "observability": {
     "enabled": true,
@@ -127,6 +128,11 @@
       "binding": "INTERNAL_API_SECRET_PROD",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "SESSION_SHARE_JWT_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "SESSION_SHARE_JWT_SECRET_PROD",
     },
   ],
 }

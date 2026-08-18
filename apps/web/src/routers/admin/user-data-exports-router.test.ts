@@ -15,6 +15,7 @@ import {
   user_data_export_object_deletions,
   user_data_export_parts,
   user_data_exports,
+  organizations,
   type User,
 } from '@kilocode/db/schema';
 
@@ -34,6 +35,8 @@ describe('adminUserDataExportsRouter', () => {
   let deletionKeys: string[] = [];
   let failedExportId: string;
   let leasedProcessingExportId: string;
+  let organizationExportId: string;
+  let subjectOrganizationId: string;
   let cleanupDueBaseline = 0;
   let recoveryAuditEvents: DataExportRecoveryAuditEvent[] = [];
 
@@ -70,6 +73,12 @@ describe('adminUserDataExportsRouter', () => {
     `);
     cleanupDueBaseline = Number(dueCleanup.rows[0]?.count ?? 0);
     const now = Date.now();
+    const subjectOrganization = await createTestOrganization(
+      `Data Export Subject ${crypto.randomUUID()}`,
+      owner.id,
+      0
+    );
+    subjectOrganizationId = subjectOrganization.id;
     const rows = await db
       .insert(user_data_exports)
       .values([
@@ -113,6 +122,8 @@ describe('adminUserDataExportsRouter', () => {
         },
         {
           kilo_user_id: owner.id,
+          subject_type: 'organization',
+          organization_id: subjectOrganization.id,
           status: 'processing',
           snapshot_at: new Date(now - 86_400_000).toISOString(),
           dispatch_generation: 0,
@@ -139,6 +150,7 @@ describe('adminUserDataExportsRouter', () => {
       throw new Error('Expected export fixtures');
     leasedProcessingExportId = processing.id;
     failedExportId = failed.id;
+    organizationExportId = processingWithoutLease.id;
     await db.insert(user_data_export_outbox).values([
       {
         export_id: processing.id,
@@ -174,6 +186,7 @@ describe('adminUserDataExportsRouter', () => {
         .delete(user_data_export_object_deletions)
         .where(inArray(user_data_export_object_deletions.object_key, deletionKeys));
     deletionKeys = [];
+    await db.delete(organizations).where(eq(organizations.id, subjectOrganizationId));
     setDataExportRecoveryAuditSinkForTest(null);
     jest.clearAllMocks();
   });
@@ -250,6 +263,20 @@ describe('adminUserDataExportsRouter', () => {
     expect(searched.pagination.total).toBe(3);
     expect(searched.rows.every(row => row.user.id === owner.id)).toBe(true);
     expect(searched.rows.every(row => row.requestedAt.endsWith('Z'))).toBe(true);
+    expect(searched.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ subject: { type: 'user', organization: null } }),
+        expect.objectContaining({
+          subject: {
+            type: 'organization',
+            organization: {
+              id: subjectOrganizationId,
+              name: expect.stringContaining('Data Export Subject'),
+            },
+          },
+        }),
+      ])
+    );
     expect(searched.rows.find(row => row.status === 'ready')?.health).toMatchObject({
       severity: 'degraded',
       email: 'retry_due',
@@ -314,6 +341,73 @@ describe('adminUserDataExportsRouter', () => {
     );
     expect(JSON.stringify(failedDetail)).not.toContain('multipart-failed');
     expect(JSON.stringify(processingDetail)).not.toContain('safe-etag');
+  });
+
+  it('returns the organization subject separately from the requester in detail', async () => {
+    const detail = await (
+      await createCallerForUser(admin.id)
+    ).admin.userDataExports.detail({ exportId: organizationExportId });
+
+    expect(detail.user).toMatchObject({ id: owner.id, email: owner.google_user_email });
+    expect(detail.subject).toEqual({
+      type: 'organization',
+      organization: {
+        id: subjectOrganizationId,
+        name: expect.stringContaining('Data Export Subject'),
+      },
+    });
+    expect(detail.actions.cancelAndRetry).toEqual({ eligible: true, disabledReason: null });
+  });
+
+  it('allows an organization retry when its requester has a usable personal export', async () => {
+    const result = await (
+      await createCallerForUser(admin.id)
+    ).admin.userDataExports.cancelAndRetry({
+      exportId: organizationExportId,
+      expectedGeneration: 0,
+    });
+    exportIds.push(result.replacementExportId);
+
+    const replacement = await db.query.user_data_exports.findFirst({
+      where: eq(user_data_exports.id, result.replacementExportId),
+    });
+    expect(replacement).toMatchObject({
+      kilo_user_id: owner.id,
+      subject_type: 'organization',
+      organization_id: subjectOrganizationId,
+    });
+  });
+
+  it('rejects an organization retry when another requester has a usable export for it', async () => {
+    await db
+      .update(user_data_exports)
+      .set({ status: 'failed' })
+      .where(eq(user_data_exports.id, organizationExportId));
+    const [blocker] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        subject_type: 'organization',
+        organization_id: subjectOrganizationId,
+        status: 'ready',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+        r2_object_key: `exports/${crypto.randomUUID()}/kilo-data-export.jsonl.gz`,
+        size_bytes: 1024,
+        completed_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(blocker.id);
+
+    await expect(
+      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndRetry({
+        exportId: organizationExportId,
+        expectedGeneration: 0,
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'This organization already has another active or downloadable export',
+    });
   });
 
   it('returns not found for an unknown export', async () => {

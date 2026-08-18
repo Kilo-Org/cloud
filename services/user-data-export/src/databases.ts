@@ -1,7 +1,7 @@
 import { getWorkerDb, pg } from '@kilocode/db/client';
 import { organizationExportAccess } from '@kilocode/db/organization-export-access';
 import { sql } from 'drizzle-orm';
-import { safeError, setSpanFields, withSpan } from './observability';
+import { logExportEvent, safeError, setSpanFields, withSpan } from './observability';
 import type { ReplicaQuery } from './source-adapters';
 
 export type HyperdriveBinding = { connectionString: string };
@@ -397,51 +397,76 @@ export function createStateDb(binding: HyperdriveBinding) {
 
 type ExportQueueRow = { id: string; export_id: string; generation: number };
 
+export type ReplicaDatabase = {
+  query: ReplicaQuery;
+  close: () => Promise<void>;
+};
+
+type ReplicaPool = {
+  query: (text: string, values: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+  end: () => Promise<void>;
+};
+
 /**
- * Build the page-reading query function for one Hyperdrive binding.
+ * Build one invocation-scoped warehouse connection pool.
  *
  * `database` only labels spans, so pass the logical binding name rather than anything
  * derived from the connection string, which carries credentials.
  *
  * Every source page an export reads passes through here, and Hyperdrive is not
- * auto-instrumented, so this is the one place that can make read cost visible. The
- * nested connect span is deliberate: this opens a fresh connection and transaction per
- * page, and the split between connect and query time is the only way to see what that
- * setup actually costs against a remote warehouse.
+ * auto-instrumented, so this is the one place that can make read cost visible. The pool
+ * has one client because pages are read sequentially. Keeping it for the invocation avoids
+ * reconnecting for every page while still preventing I/O state from crossing invocations.
+ * Callers must await each query before starting the next; max: 1 is a guard, not a source
+ * of query parallelism.
  *
  * The query text is intentionally not recorded. The enclosing per-source span already
  * identifies which of the six queries ran, so the text would add bytes to every span
  * without adding information, and keeping it out avoids growing the exported surface.
  */
-export function createReplicaQuery(binding: HyperdriveBinding, database: string): ReplicaQuery {
-  return async (text: string, values: unknown[]): Promise<Record<string, unknown>[]> =>
-    withSpan(
-      'postgres_read_page',
-      { 'db.system.name': 'postgresql', 'db.name': database },
-      async span => {
-        const client = new pg.Client({
-          connectionString: binding.connectionString,
-          statement_timeout: 30_000,
-        });
-        try {
-          await withSpan('postgres_connect', { 'db.name': database }, async () => {
-            await client.connect();
-            await client.query('BEGIN READ ONLY');
-          });
-          const result = await client.query<Record<string, unknown>>(text, values);
-          await client.query('COMMIT');
-          span.setAttribute('db.response.returned_rows', result.rows.length);
-          return result.rows;
-        } catch (error) {
-          span.setAttribute('db.read.failed', true);
-          setSpanFields(span, safeError(error));
-          await client.query('ROLLBACK').catch(() => undefined);
-          throw error;
-        } finally {
-          await client.end();
+export function createReplicaDatabase(
+  binding: HyperdriveBinding,
+  database: string,
+  createPool: (config: pg.PoolConfig) => ReplicaPool = config => {
+    const pool = new pg.Pool(config);
+    // node-postgres emits idle-client failures through EventEmitter rather than through
+    // query(). Without a listener they become uncaught errors for the invocation.
+    pool.on('error', error => {
+      logExportEvent('warn', 'postgres_pool_error', {
+        database,
+        ...safeError(error),
+      });
+    });
+    return {
+      query: (text, values) => pool.query<Record<string, unknown>>(text, values),
+      end: () => pool.end(),
+    };
+  }
+): ReplicaDatabase {
+  const pool = createPool({
+    connectionString: binding.connectionString,
+    max: 1,
+    statement_timeout: 30_000,
+  });
+  return {
+    query: (text, values) =>
+      withSpan(
+        'postgres_read_page',
+        { 'db.system.name': 'postgresql', 'db.name': database },
+        async span => {
+          try {
+            const result = await pool.query(text, values);
+            span.setAttribute('db.response.returned_rows', result.rows.length);
+            return result.rows;
+          } catch (error) {
+            span.setAttribute('db.read.failed', true);
+            setSpanFields(span, safeError(error));
+            throw error;
+          }
         }
-      }
-    );
+      ),
+    close: () => pool.end(),
+  };
 }
 
 export const __test__ = { callerMayAccess };

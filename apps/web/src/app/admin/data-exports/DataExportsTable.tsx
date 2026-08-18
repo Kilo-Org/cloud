@@ -25,7 +25,7 @@ import {
   statusBadgeClass,
 } from './data-export-format';
 
-const COLUMN_COUNT = 10;
+const COLUMN_COUNT = 11;
 const SKELETON_ROW_COUNT = 5;
 
 function shortId(id: string): string {
@@ -73,6 +73,24 @@ function DataExportRow({ row, asOf }: { row: DataExportListRow; asOf: string | u
         <Badge variant="outline" className={statusBadgeClass(row.status)}>
           {humanizeToken(row.status)}
         </Badge>
+      </TableCell>
+      <TableCell className="w-52 max-w-52 text-sm">
+        <div className="flex flex-col items-start gap-1">
+          <Badge variant="outline">
+            {row.subject.type === 'organization' ? 'Organization' : 'Personal'}
+          </Badge>
+          {row.subject.organization ? (
+            <Link
+              className="text-link hover:text-link-hover block max-w-52 truncate rounded-sm text-xs underline decoration-current/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={`/admin/organizations/${encodeURIComponent(row.subject.organization.id)}`}
+              title={row.subject.organization.name ?? row.subject.organization.id}
+            >
+              {row.subject.organization.name ?? row.subject.organization.id}
+            </Link>
+          ) : (
+            <span className="text-muted-foreground text-xs">Requester's own data</span>
+          )}
+        </div>
       </TableCell>
       <TableCell className="w-56 max-w-56 text-sm">
         <div className="flex flex-col gap-0.5">
@@ -165,7 +183,8 @@ export function DataExportsTable({
             <TableHead>Requested</TableHead>
             <TableHead>Health</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>User</TableHead>
+            <TableHead>Subject</TableHead>
+            <TableHead>Requester</TableHead>
             <TableHead>Execution</TableHead>
             <TableHead>Attempts</TableHead>
             <TableHead>Rows / size</TableHead>

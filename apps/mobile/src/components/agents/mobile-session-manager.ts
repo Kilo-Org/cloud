@@ -23,6 +23,7 @@ import { trpcClient } from '@/lib/trpc';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
+import { cacheFilePart } from '@/components/agents/file-part-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 type SessionWithRuntimeState =
@@ -176,6 +177,9 @@ export function createMobileAgentSessionManager({
     userWebConnection,
     onToolAttachment: (partId, attachment) => {
       cacheToolAttachment(partId, attachment);
+    },
+    onFilePart: (partId, file) => {
+      cacheFilePart(partId, file);
     },
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       // Read-only is only ever returned once we have successful evidence the

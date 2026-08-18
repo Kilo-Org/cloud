@@ -11,7 +11,7 @@ import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import {
   findKiloExclusiveModel,
-  isDeadFreeModel,
+  isDisabledKiloExclusiveModel,
   kiloExclusiveModels,
 } from '@/lib/ai-gateway/models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -277,11 +277,11 @@ describe('disabled paid Kilo-exclusive model fallback', () => {
     global.fetch = originalFetch;
   });
 
-  it('keeps the OpenRouter model available without Kilo-exclusive blocking or routing', async () => {
+  it('keeps the OpenRouter model listed without active Kilo-exclusive routing', async () => {
     const models = await getEnhancedOpenRouterModels();
 
     expect(models.data.some(model => model.id === disabledPaidModel.public_id)).toBe(true);
-    expect(isDeadFreeModel(disabledPaidModel.public_id)).toBe(false);
+    expect(isDisabledKiloExclusiveModel(disabledPaidModel.public_id)).toBe(true);
     expect(findKiloExclusiveModel(disabledPaidModel.public_id)).toBeNull();
   });
 });

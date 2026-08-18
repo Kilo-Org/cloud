@@ -806,11 +806,28 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             };
           }
         },
+        observeWrappers: async () => {
+          if (this.physicalWrapperObserver) return this.physicalWrapperObserver();
+          if (this.orchestrator) return { status: 'absent' };
+          const metadata = await this.getStoredMetadata();
+          if (!metadata) {
+            return { status: 'inspection-failed', error: 'Session metadata unavailable' };
+          }
+          if (
+            getSandboxProvider(metadata) === 'cloudflare' &&
+            !this.env.Sandbox &&
+            !this.env.SandboxSmall
+          ) {
+            return { status: 'absent' };
+          }
+          return createAgentSandbox(this.env, metadata).observeWrappersWithoutWaking();
+        },
         recordSharedSandboxFailover: routeKey =>
           this.sharedSandboxFailoverRecorder
             ? this.sharedSandboxFailoverRecorder(routeKey)
             : recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, routeKey),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        isSessionDeletionInProgress: () => this.hasDeletionIntent(),
         getSessionIdForLogs: () => this.sessionId,
       });
     }
@@ -858,6 +875,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           if (isWrapperCleanupExhausted(lease)) return { kind: 'exhausted' };
           const retryAt = nextWrapperCleanupDeadline(lease);
           return retryAt === undefined ? null : { kind: 'retryable', retryAt };
+        },
+        // A blocked flush means a user is waiting; let the supervisor force one
+        // out-of-cadence recheck so a reaped sandbox releases the lease
+        // immediately instead of failing the message on the stale fence.
+        recoverExhaustedDeliveryBlock: async () => {
+          await this.getWrapperSupervisor().recheckExhaustedCleanup();
         },
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>

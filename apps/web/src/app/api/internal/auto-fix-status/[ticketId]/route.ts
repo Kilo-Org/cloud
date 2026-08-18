@@ -20,6 +20,7 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import type { FixStatus } from '@/lib/auto-fix/core/schemas';
+import { formatAutoFixErrorMessage } from '@/lib/auto-fix/core/format-error-message';
 
 interface StatusUpdatePayload {
   sessionId?: string;
@@ -57,6 +58,7 @@ export async function POST(
       cliSessionId,
       status,
       hasError: !!errorMessage,
+      errorMessage,
     });
 
     // Get current ticket to check if update is needed
@@ -95,7 +97,8 @@ export async function POST(
     await updateFixTicketStatus(ticketId, status, {
       sessionId,
       cliSessionId,
-      errorMessage,
+      errorMessage:
+        errorMessage !== undefined ? formatAutoFixErrorMessage(errorMessage) : undefined,
       startedAt: status === 'running' ? new Date() : undefined,
       completedAt:
         status === 'completed' || status === 'failed' || status === 'cancelled'

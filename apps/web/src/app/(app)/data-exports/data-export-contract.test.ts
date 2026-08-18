@@ -1,4 +1,5 @@
 import {
+  canReuseDownloadCodeChallenge,
   getDisplayStatus,
   getRefetchInterval,
   hasActiveExports,
@@ -6,6 +7,25 @@ import {
   USER_EXPORTS_POLL_INTERVAL_MS,
   type UserExport,
 } from './data-export-contract';
+
+describe('canReuseDownloadCodeChallenge', () => {
+  const challenge = {
+    exportId: 'export-1',
+    challengeId: 'challenge-1',
+    expiresAt: 60_000,
+  };
+
+  it('reuses a challenge for the same export with more than 30 seconds remaining', () => {
+    expect(canReuseDownloadCodeChallenge(challenge, 'export-1', 29_999)).toBe(true);
+  });
+
+  it('requests a new challenge for another export or with 30 seconds or less remaining', () => {
+    expect(canReuseDownloadCodeChallenge(challenge, 'export-2', 29_999)).toBe(false);
+    expect(canReuseDownloadCodeChallenge(challenge, 'export-1', 30_000)).toBe(false);
+    expect(canReuseDownloadCodeChallenge(challenge, 'export-1', 60_000)).toBe(false);
+    expect(canReuseDownloadCodeChallenge(null, 'export-1', 29_999)).toBe(false);
+  });
+});
 
 function makeUserExport(overrides: Partial<UserExport> = {}): UserExport {
   return {

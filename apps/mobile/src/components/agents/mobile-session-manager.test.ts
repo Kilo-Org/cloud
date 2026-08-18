@@ -57,6 +57,9 @@ vi.mock('@/components/agents/tool-card-image-cache', () => ({
   cacheToolAttachment: vi.fn(),
   cacheToolCardImage: vi.fn(),
 }));
+vi.mock('@/components/agents/file-part-cache', () => ({
+  cacheFilePart: vi.fn(),
+}));
 
 const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();

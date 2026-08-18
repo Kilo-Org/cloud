@@ -97,6 +97,28 @@ function rejectAmbiguousAttachments(
 }
 
 /**
+ * Reject a prompt that is empty or whitespace-only when there are no
+ * `attachments.files` and no `images.files`. Command turns have no prompt and
+ * must skip this rule at the call site.
+ */
+function rejectEmptyPromptWithoutAttachments(
+  data: {
+    prompt?: unknown;
+    attachments?: { files?: unknown[] } | undefined;
+    images?: { files?: unknown[] } | undefined;
+  },
+  ctx: z.RefinementCtx,
+  path: (string | number)[] = ['prompt']
+): void {
+  const prompt = typeof data.prompt === 'string' ? data.prompt : '';
+  if (prompt.trim().length > 0) return;
+  const hasFiles =
+    (data.attachments?.files?.length ?? 0) > 0 || (data.images?.files?.length ?? 0) > 0;
+  if (hasFiles) return;
+  ctx.addIssue({ code: 'custom', path, message: 'Prompt is required' });
+}
+
+/**
  * Base prompt payload schema used by all execution endpoints.
  * Contains the essential fields for Kilocode execution.
  */
@@ -120,6 +142,38 @@ export const PromptPayload = z.object({
 export const PromptSendPayload = z.object({
   type: z.literal('prompt'),
   prompt: z.string().min(1, 'Prompt is required'),
+  mode: ModeSlugSchema,
+  model: modelIdSchema,
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
+});
+
+/**
+ * Send-only flat prompt payload. Allows an empty prompt when attachments are
+ * present; the empty-prompt refine runs on the input, not on this field.
+ * Used only by `SendMessageV2FlatInput`.
+ */
+export const FollowUpPromptPayload = z.object({
+  prompt: z.string(),
+  mode: ModeSlugSchema,
+  model: modelIdSchema,
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
+});
+
+/**
+ * Send-only discriminated prompt payload clone. Allows an empty prompt when
+ * attachments are present. Used only by `SendMessageV2PromptPayloadInput`.
+ */
+export const FollowUpPromptSendPayload = z.object({
+  type: z.literal('prompt'),
+  prompt: z.string(),
   mode: ModeSlugSchema,
   model: modelIdSchema,
   variant: z
@@ -264,9 +318,9 @@ const SendMessageV2Options = z.object({
   messageId: MessageIdSchema.nullish().describe('Optional message ID for correlating the request'),
 });
 
-const SendMessageV2FlatInput = SendMessageV2Options.extend(PromptPayload.shape);
+const SendMessageV2FlatInput = SendMessageV2Options.extend(FollowUpPromptPayload.shape);
 const SendMessageV2PromptPayloadInput = SendMessageV2Options.extend({
-  payload: PromptSendPayload,
+  payload: FollowUpPromptSendPayload,
 });
 const SendMessageV2CommandPayloadInput = SendMessageV2Options.extend({
   payload: CommandSendPayload,
@@ -280,15 +334,29 @@ export const SendMessageV2Input = z
   ])
   .superRefine((input, ctx) => {
     rejectAmbiguousAttachments(input, ctx);
-    if ('payload' in input && input.payload.type === 'command') {
-      if (input.attachments !== undefined || input.images !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['attachments'],
-          message: 'Attachments cannot be attached to slash commands',
-        });
+    if ('payload' in input) {
+      if (input.payload.type === 'command') {
+        if (input.attachments !== undefined || input.images !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['attachments'],
+            message: 'Attachments cannot be attached to slash commands',
+          });
+        }
+        return;
       }
+      rejectEmptyPromptWithoutAttachments(
+        { prompt: input.payload.prompt, attachments: input.attachments, images: input.images },
+        ctx,
+        ['payload', 'prompt']
+      );
+      return;
     }
+    rejectEmptyPromptWithoutAttachments(
+      { prompt: input.prompt, attachments: input.attachments, images: input.images },
+      ctx,
+      ['prompt']
+    );
   })
   .transform(input => {
     if ('payload' in input && input.payload.type === 'prompt') {
@@ -814,11 +882,17 @@ export const SendMessageInput = z
     cloudAgentSessionId: sessionIdSchema,
     message: z
       .object({
-        prompt: z.string().min(1, 'Prompt is required'),
+        prompt: z.string(),
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.nullish(),
       })
-      .superRefine(rejectAmbiguousAttachments),
+      .superRefine(rejectAmbiguousAttachments)
+      .superRefine((message, ctx) =>
+        rejectEmptyPromptWithoutAttachments(
+          { prompt: message.prompt, attachments: message.attachments, images: message.images },
+          ctx
+        )
+      ),
     agent: z
       .object({
         mode: ModeSlugSchema,

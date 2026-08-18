@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   Platform,
@@ -18,25 +18,17 @@ import {
   type ComposerSelection,
   pasteTextIntoComposer,
 } from '@/components/agents/composer-paste-text';
-import { type AgentMode } from '@/components/agents/mode-selector';
-import { type ModeOption } from '@/components/agents/mode-normalize';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
-import { type ModelOption } from '@/lib/hooks/use-available-models';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type ModelPickerSelection } from '@/lib/picker-bridge';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
-import {
-  type AgentAttachment,
-  type AgentAttachmentCandidate,
-} from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import {
   CLIPBOARD_PASTE_EMPTY_MESSAGE,
@@ -62,36 +54,6 @@ const promptInputStyle = {
   lineHeight: PROMPT_INPUT_LINE_HEIGHT,
   textAlignVertical: 'top',
 } satisfies TextStyle;
-
-type NewSessionPromptProps = {
-  attachments: AgentAttachment[];
-  attachmentMax: number;
-  isCreating: boolean;
-  isModelsError: boolean;
-  isLoadingModels: boolean;
-  mode: AgentMode;
-  model: string;
-  variant: string;
-  modelOptions: (ModelOption | SessionModelOption)[];
-  onChangeText: (text: string) => void;
-  onModeChange: (mode: AgentMode) => void;
-  onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
-  /** Custom mode options shown under the built-ins in the mode picker. */
-  customOptions?: ModeOption[];
-  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
-  modelLocked?: boolean;
-  /** Agent name shown in the locked model chip's accessibility label. */
-  modelLockLabel?: string;
-  onAddAttachment: () => void;
-  onRemoveAttachment: (id: string) => void;
-  onRetryAttachment: (id: string) => void;
-  onRefetchModels: () => void;
-  onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
-  shareId?: string;
-  voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
-  /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
-  initialPrompt?: string;
-};
 
 /**
  * New-session prompt surface: attachment strip, full-width multiline text

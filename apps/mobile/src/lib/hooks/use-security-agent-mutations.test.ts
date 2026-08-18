@@ -41,6 +41,7 @@ vi.mock('@/lib/operation-key', async importOriginal => {
 const outboxMock = vi.hoisted(() => ({
   writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => row.operationKey),
   remove: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<void> => undefined),
 }));
 
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
@@ -143,6 +144,8 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     );
     outboxMock.remove.mockReset();
     outboxMock.remove.mockResolvedValue(undefined);
+    outboxMock.whenLoaded.mockReset();
+    outboxMock.whenLoaded.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -252,6 +255,23 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(outboxMock.writeReconcileFirst.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       personalTriggerSyncMutateMock.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  it('awaits the outbox load before writing the reconcile-first row (no key-reuse race)', async () => {
+    const order: string[] = [];
+    outboxMock.whenLoaded.mockImplementation(async () => {
+      order.push('whenLoaded');
+    });
+    outboxMock.writeReconcileFirst.mockImplementation(async (row: { operationKey: string }) => {
+      order.push('writeReconcileFirst');
+      return row.operationKey;
+    });
+    personalTriggerSyncMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useTriggerSecuritySync('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' });
+
+    expect(order).toEqual(['whenLoaded', 'writeReconcileFirst']);
   });
 
   it('keeps the reconcile-first row on a retryable (ambiguous) failure', async () => {

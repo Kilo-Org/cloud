@@ -13,6 +13,7 @@ import { normalizeAgentMode } from '@/components/agents/mode-options';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { useHoistedOperationKey } from '@/lib/operation-key';
+import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -30,6 +31,14 @@ export function useContinueCloudCreate(
   // P1-A-08b: cloud prepares and remote spawns are different intents, so each
   // destination family holds its own hoisted `operationKey`.
   const cloudOperationKey = useHoistedOperationKey();
+  // P1-E-40c: persist the safe-retry row across relaunch so a crash mid-flight
+  // reuses the same key instead of minting a duplicate session.
+  const {
+    getStoredOperationKey,
+    writeSafeRetry,
+    remove: removeOutboxRow,
+    whenLoaded,
+  } = useMutationOutbox();
 
   return useCallback(
     async (seed: string, dest: { repo: string; model: string; variant: string }, mode: string) => {
@@ -41,7 +50,14 @@ export function useContinueCloudCreate(
         mode,
         organizationId: organizationId ?? null,
       });
-      const operationKey = cloudOperationKey.getKey(intentFingerprint);
+      // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
+      // fresh key only when no stored row exists. A stored row must never be
+      // replaced by a new in-memory key. Gate on the outbox load first: a
+      // continue that races the launch load would read empty rows and mint a
+      // duplicate.
+      await whenLoaded();
+      const operationKey =
+        getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
       const initialMessageId = generateMessageId();
       const baseInput = {
         prompt: seed,
@@ -55,6 +71,14 @@ export function useContinueCloudCreate(
         operationKey,
       };
       try {
+        // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
+        // reuses the same key on relaunch instead of minting a duplicate.
+        await writeSafeRetry({
+          operationKey,
+          fingerprint: intentFingerprint,
+          input: baseInput,
+        });
+
         const result = organizationId
           ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
               ...baseInput,
@@ -65,6 +89,7 @@ export function useContinueCloudCreate(
         // before the post-success work so a UI failure cannot keep the
         // successful key for a retry or rotate it a second time.
         cloudOperationKey.rotateKey();
+        await removeOutboxRow(intentFingerprint);
 
         // The cloud session already exists, so no post-success UI failure may
         // report the create as failed or invite a duplicate retry. Each step is
@@ -94,10 +119,21 @@ export function useContinueCloudCreate(
         // above. A typed terminal rejection ends the intent.
         if (!isCloudPrepareRetryableError(error)) {
           cloudOperationKey.rotateKey();
+          await removeOutboxRow(intentFingerprint);
         }
         throw error;
       }
     },
-    [organizationId, queryClient, router, trpc, cloudOperationKey]
+    [
+      organizationId,
+      queryClient,
+      router,
+      trpc,
+      cloudOperationKey,
+      getStoredOperationKey,
+      writeSafeRetry,
+      removeOutboxRow,
+      whenLoaded,
+    ]
   );
 }

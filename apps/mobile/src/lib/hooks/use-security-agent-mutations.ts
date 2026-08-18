@@ -259,13 +259,17 @@ export function useTriggerSecuritySync(scope: string) {
   const { getKey, rotateKey } = useHoistedOperationKey();
   // P1-E-40c: Security sync is reconcile-first — persist the row so a crash
   // mid-flight surfaces a card on relaunch instead of auto-replaying.
-  const { writeReconcileFirst, remove: removeOutboxRow } = useMutationOutbox();
+  const { writeReconcileFirst, remove: removeOutboxRow, whenLoaded } = useMutationOutbox();
 
   return useMutation({
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {
       const fingerprint = securitySyncIntentFingerprint(scope, vars.repoFullName);
+      // Gate on the outbox load first: a sync that races the launch load would
+      // read empty rows and write a fresh key over a crash row, dropping the
+      // stored reconcile key.
+      await whenLoaded();
       // Persist the reconcile-first row BEFORE the POST and resolve the row's
       // own operationKey: a stored row keeps its key, so the wire never POSTs
       // a fresh in-memory key over a crash row. The row carries the scope so

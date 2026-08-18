@@ -307,6 +307,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                     onSuccess: () => {
                       toast.success('Sync queued');
                     },
+                    onSettled: () => {
+                      refreshOutbox();
+                    },
                   }
                 );
               }}

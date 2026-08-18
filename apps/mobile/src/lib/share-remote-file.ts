@@ -59,6 +59,19 @@ async function materializeRemoteFile({
   }
 }
 
+export async function downloadRemoteFile({
+  url,
+  cacheDirectoryName,
+  cacheFilename,
+}: {
+  url: string;
+  cacheDirectoryName: string;
+  cacheFilename: string;
+}): Promise<MaterializedRemoteFile> {
+  const materialized = await materializeRemoteFile({ url, cacheDirectoryName, cacheFilename });
+  return materialized;
+}
+
 export async function shareLocalFile(
   localUri: string,
   options?: { mimeType?: string }

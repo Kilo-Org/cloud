@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  downloadRemoteFile,
   getSafeCacheFilename,
   shareLocalFile,
   shareMaterializedRemoteFile,
@@ -151,6 +152,29 @@ describe('shareMaterializedRemoteFile', () => {
       )
     ).rejects.toThrow('share failed');
     expect(deleted).toEqual(['file:///cache/org-invoices/a.pdf']);
+  });
+});
+
+describe('downloadRemoteFile', () => {
+  it('downloads an http(s) URL and returns a materialized file with a working delete', async () => {
+    const downloaded = {
+      uri: 'file:///cache/org-invoices/in_1-a.pdf',
+      delete: vi.fn(),
+    };
+    expoFileSystemMock.File.downloadFileAsync.mockResolvedValue(downloaded);
+
+    const result = await downloadRemoteFile({
+      url: 'https://example.com/a.pdf',
+      cacheDirectoryName: 'org-invoices',
+      cacheFilename: 'in_1-a.pdf',
+    });
+
+    expect(result.uri).toBe('file:///cache/org-invoices/in_1-a.pdf');
+    expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'org-invoices');
+    expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalled();
+
+    result.delete();
+    expect(downloaded.delete).toHaveBeenCalled();
   });
 });
 

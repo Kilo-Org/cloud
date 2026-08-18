@@ -49,7 +49,7 @@ const ReportUserInput = z.object({
 
 const ReceiptInput = z.object({ receiptId: z.uuid() });
 
-const AppealInput = z.object({ receiptId: z.uuid(), reason: z.string().min(1) });
+const AppealInput = z.object({ receiptId: z.uuid() });
 
 const HiddenUserInput = z.object({ githubLogin: z.string().min(1) });
 
@@ -71,7 +71,7 @@ async function getStoredGitHubLogin(userId: string): Promise<string | null> {
 /** Rejects a block/mute of the caller's own GitHub login. */
 async function assertNotSelf(userId: string, githubLogin: string): Promise<void> {
   const storedLogin = await getStoredGitHubLogin(userId);
-  if (storedLogin && storedLogin === githubLogin) {
+  if (storedLogin && storedLogin.toLowerCase() === githubLogin.toLowerCase()) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'cannot_target_self' });
   }
 }
@@ -162,7 +162,10 @@ export const moderationRouter = createTRPCRouter({
     await assertNotSelf(ctx.user.id, input.githubLogin);
     await db
       .insert(user_moderation_blocks)
-      .values({ blocker_user_id: ctx.user.id, blocked_github_login: input.githubLogin })
+      .values({
+        blocker_user_id: ctx.user.id,
+        blocked_github_login: input.githubLogin.toLowerCase(),
+      })
       .onConflictDoNothing();
     return { ok: true };
   }),
@@ -173,7 +176,7 @@ export const moderationRouter = createTRPCRouter({
       .where(
         and(
           eq(user_moderation_blocks.blocker_user_id, ctx.user.id),
-          eq(user_moderation_blocks.blocked_github_login, input.githubLogin)
+          eq(user_moderation_blocks.blocked_github_login, input.githubLogin.toLowerCase())
         )
       );
     return { ok: true };
@@ -183,7 +186,7 @@ export const moderationRouter = createTRPCRouter({
     await assertNotSelf(ctx.user.id, input.githubLogin);
     await db
       .insert(user_moderation_mutes)
-      .values({ blocker_user_id: ctx.user.id, muted_github_login: input.githubLogin })
+      .values({ blocker_user_id: ctx.user.id, muted_github_login: input.githubLogin.toLowerCase() })
       .onConflictDoNothing();
     return { ok: true };
   }),
@@ -194,7 +197,7 @@ export const moderationRouter = createTRPCRouter({
       .where(
         and(
           eq(user_moderation_mutes.blocker_user_id, ctx.user.id),
-          eq(user_moderation_mutes.muted_github_login, input.githubLogin)
+          eq(user_moderation_mutes.muted_github_login, input.githubLogin.toLowerCase())
         )
       );
     return { ok: true };

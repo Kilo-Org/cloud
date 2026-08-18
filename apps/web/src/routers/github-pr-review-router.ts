@@ -917,9 +917,11 @@ type PrLedgerMutationArgs<T> = {
 type ReplayedResult<T> = T & { replayed: true };
 
 /**
- * UGC gate: a user must have accepted the current Terms before any PR write.
- * Runs before `admitOperation` so a missing acceptance never creates a ledger
- * row. Throws PRECONDITION_FAILED `terms_required` when absent.
+ * UGC gate: a user must have accepted the current Terms before a
+ * comment-creating mutation (`createReviewComment`, `replyToComment`,
+ * `submitReview`). Runs before `admitOperation` so a missing acceptance never
+ * creates a ledger row. Throws PRECONDITION_FAILED `terms_required` when
+ * absent.
  */
 async function assertTermsAccepted(userId: string): Promise<void> {
   const [row] = await db

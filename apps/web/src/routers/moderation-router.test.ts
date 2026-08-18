@@ -121,6 +121,35 @@ describe('moderation-router', () => {
     });
   });
 
+  it('rejects blocking the caller own GitHub login with different casing', async () => {
+    await db.insert(user_github_app_tokens).values({
+      kilo_user_id: user.id,
+      github_app_type: 'standard',
+      github_user_id: '102',
+      github_login: 'octocat',
+      access_token_encrypted: 'opaque-access-envelope',
+      access_token_expires_at: '2030-01-01T00:00:00.000Z',
+      refresh_token_encrypted: 'opaque-refresh-envelope',
+      refresh_token_expires_at: '2030-01-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.moderation.blockUser({ githubLogin: 'OctoCat' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+  });
+
+  it('deduplicates a block whose login differs only in casing', async () => {
+    const caller = await createCallerForUser(user.id);
+
+    await caller.moderation.blockUser({ githubLogin: 'Alice' });
+    await caller.moderation.blockUser({ githubLogin: 'alice' });
+
+    const hidden = await caller.moderation.listHiddenUsers();
+    expect(hidden.blockedLogins).toEqual(['alice']);
+  });
+
   it('blocks and mutes other logins and lists hidden users', async () => {
     const caller = await createCallerForUser(user.id);
 
@@ -183,16 +212,16 @@ describe('moderation-router', () => {
     });
 
     // A still-`received` report cannot be appealed.
-    await expect(
-      caller.moderation.appealReport({ receiptId, reason: 'I disagree' })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.moderation.appealReport({ receiptId })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
 
     await db
       .update(content_moderation_reports)
       .set({ triage_status: 'actioned' })
       .where(eq(content_moderation_reports.receipt_id, receiptId));
 
-    const result = await caller.moderation.appealReport({ receiptId, reason: 'I disagree' });
+    const result = await caller.moderation.appealReport({ receiptId });
     expect(result).toEqual({ appealStatus: 'submitted' });
 
     const receipt = await caller.moderation.getReportReceipt({ receiptId });

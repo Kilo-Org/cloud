@@ -36,6 +36,15 @@ import { RestorePurchasesButton } from './restore-purchases-button';
 
 type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
 
+/**
+ * A failed preflight is either retryable (transient network/5xx) or
+ * non-retryable (the server refused the purchase). The retryable variant keeps
+ * the product so the "Try again" CTA can re-run preflight without starting IAP.
+ */
+type PreflightFailure =
+  | { kind: 'retryable'; message: string; product: AppStoreKiloPassProduct }
+  | { kind: 'nonRetryable'; message: string };
+
 function formatTier(product: AppStoreKiloPassProduct): string {
   return `$${product.webMonthlyPriceUsd} in credits`;
 }
@@ -154,13 +163,14 @@ function KiloPassNativeIapContent() {
   useInlinePurchaseErrorOwnership();
   const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());
   const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
-  const [preflightError, setPreflightError] = useState<string | null>(null);
+  const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
   let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
   if (errorMessage) {
     feedback = { type: 'error', text: errorMessage };
-  } else if (preflightError) {
-    feedback = { type: 'error', text: preflightError };
+  } else if (preflightFailure) {
+    feedback = { type: 'error', text: preflightFailure.message };
   }
+  const preflightBlocked = preflightFailure?.kind === 'nonRetryable';
   const isRetryDisabled = isPending || productsIsRefetching;
   const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
   useEffect(
@@ -170,30 +180,47 @@ function KiloPassNativeIapContent() {
     [clearError]
   );
 
-  const handleProductPress = (product: AppStoreKiloPassProduct) => {
-    void Haptics.selectionAsync();
-    void (async () => {
-      setPreflightError(null);
-      const preflight = await preflightPurchase.mutateAsync({
+  const runPreflight = async (product: AppStoreKiloPassProduct) => {
+    setPreflightFailure(null);
+    // eslint-disable-next-line init-declarations -- assigned in the try block below
+    let preflight: Awaited<ReturnType<typeof preflightPurchase.mutateAsync>>;
+    try {
+      preflight = await preflightPurchase.mutateAsync({
         platform: 'ios',
         storefront: 'app_store',
         product: 'kilo_pass',
         appleProductId: product.appleProductId,
       });
-      if (!preflight.allowed) {
-        setPreflightError(
+    } catch {
+      setPreflightFailure({
+        kind: 'retryable',
+        message: "Couldn't verify your purchase. Check your connection and try again.",
+        product,
+      });
+      return;
+    }
+
+    if (!preflight.allowed) {
+      setPreflightFailure({
+        kind: 'nonRetryable',
+        message:
           preflight.reason === 'already_subscribed'
             ? 'You already have a Kilo Pass subscription.'
-            : 'Kilo Pass purchase is not available right now.'
-        );
-        return;
-      }
-      await purchase(product, {
-        onCompleted: () => {
-          ensureProfileAfterKiloPassPurchase(router);
-        },
+            : 'Kilo Pass purchase is not available right now.',
       });
-    })();
+      return;
+    }
+
+    await purchase(product, {
+      onCompleted: () => {
+        ensureProfileAfterKiloPassPurchase(router);
+      },
+    });
+  };
+
+  const handleProductPress = (product: AppStoreKiloPassProduct) => {
+    void Haptics.selectionAsync();
+    void runPreflight(product);
   };
 
   return (
@@ -219,6 +246,19 @@ function KiloPassNativeIapContent() {
             >
               {feedback.text}
             </Text>
+          )}
+
+          {preflightFailure?.kind === 'retryable' && (
+            <Button
+              accessibilityLabel="Try verifying purchase again"
+              className="self-start"
+              onPress={() => {
+                void runPreflight(preflightFailure.product);
+              }}
+              variant="outline"
+            >
+              <Text>Try again</Text>
+            </Button>
           )}
 
           {productsIsLoading &&
@@ -256,12 +296,12 @@ function KiloPassNativeIapContent() {
                 key={product.appleProductId}
                 accessibilityLabel={`${formatTier(product)}, ${formatStorePrice(product)}`}
                 accessibilityRole="button"
-                accessibilityState={{ busy: isPending, disabled: isPending }}
+                accessibilityState={{ busy: isPending, disabled: isPending || preflightBlocked }}
                 className={cn(
                   'rounded-xl border border-border bg-card p-5 active:opacity-80',
-                  isPending && 'opacity-50'
+                  (isPending || preflightBlocked) && 'opacity-50'
                 )}
-                disabled={isPending}
+                disabled={isPending || preflightBlocked}
                 onPress={() => {
                   handleProductPress(product);
                 }}

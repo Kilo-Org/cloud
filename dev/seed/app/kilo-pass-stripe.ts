@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from '@kilocode/db/schema-types';
 import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import Stripe from 'stripe';
 
 import { getSeedDb } from '../lib/db';
@@ -214,38 +214,33 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     kiloUserId: userId,
   });
 
-  // Upsert on the unique `stripe_subscription_id`: the local `stripe listen`
-  // webhook may have already written this row for the same subscription. A plain
-  // insert would fail on the unique key.
+  // The local `stripe listen` webhook may have already written a row for this
+  // subscription. Delete any row that matches either unique key, then insert
+  // plainly. Delete-then-insert is safe and idempotent for a dev seed.
   await db
-    .insert(kilo_pass_subscriptions)
-    .values({
-      kilo_user_id: userId,
-      payment_provider: KiloPassPaymentProvider.Stripe,
-      provider_subscription_id: subscription.id,
-      stripe_subscription_id: subscription.id,
-      tier: KiloPassTier.Tier49,
-      cadence: KiloPassCadence.Monthly,
-      status: 'active',
-      cancel_at_period_end: false,
-      started_at: new Date().toISOString(),
-      ended_at: null,
-    })
-    .onConflictDoUpdate({
-      target: kilo_pass_subscriptions.stripe_subscription_id,
-      set: {
-        kilo_user_id: userId,
-        payment_provider: KiloPassPaymentProvider.Stripe,
-        provider_subscription_id: subscription.id,
-        stripe_subscription_id: subscription.id,
-        tier: KiloPassTier.Tier49,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        cancel_at_period_end: false,
-        started_at: new Date().toISOString(),
-        ended_at: null,
-      },
-    });
+    .delete(kilo_pass_subscriptions)
+    .where(
+      or(
+        eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.id),
+        and(
+          eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.Stripe),
+          eq(kilo_pass_subscriptions.provider_subscription_id, subscription.id)
+        )
+      )
+    );
+
+  await db.insert(kilo_pass_subscriptions).values({
+    kilo_user_id: userId,
+    payment_provider: KiloPassPaymentProvider.Stripe,
+    provider_subscription_id: subscription.id,
+    stripe_subscription_id: subscription.id,
+    tier: KiloPassTier.Tier49,
+    cadence: KiloPassCadence.Monthly,
+    status: 'active',
+    cancel_at_period_end: false,
+    started_at: new Date().toISOString(),
+    ended_at: null,
+  });
 
   console.log('This fixture represents a web-managed (Stripe) Kilo Pass subscription.');
   console.log('Suggested next step: fake-login as the user and open the Kilo Pass screen.');

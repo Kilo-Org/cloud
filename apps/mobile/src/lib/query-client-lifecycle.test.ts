@@ -96,7 +96,7 @@ describe('installQueryClientNativeLifecycle', () => {
     expect(native.removeConnectivityListener).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to isConnected when isInternetReachable is null', () => {
+  it('treats unknown reachability as offline for React Query', () => {
     const native = createSources();
     const setFocused = createBooleanSetterMock();
     const setOnline = createBooleanSetterMock();
@@ -112,10 +112,14 @@ describe('installQueryClientNativeLifecycle', () => {
     native.setConnectivity({ isConnected: false, isInternetReachable: null });
     native.setConnectivity({ isConnected: true, isInternetReachable: null });
     native.setConnectivity({ isConnected: null, isInternetReachable: null });
+    native.setConnectivity({ isConnected: true, isInternetReachable: true });
     cleanup();
 
+    // Unknown must never count as online: React Query pauses while NetInfo
+    // has not settled, and only a confirmed online state resumes it.
     expect(setOnline).toHaveBeenNthCalledWith(1, false);
-    expect(setOnline).toHaveBeenNthCalledWith(2, true);
-    expect(setOnline).toHaveBeenNthCalledWith(3, true);
+    expect(setOnline).toHaveBeenNthCalledWith(2, false);
+    expect(setOnline).toHaveBeenNthCalledWith(3, false);
+    expect(setOnline).toHaveBeenNthCalledWith(4, true);
   });
 });

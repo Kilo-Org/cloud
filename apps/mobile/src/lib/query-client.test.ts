@@ -45,3 +45,101 @@ describe('createKiloAppQueryClient', () => {
     clear();
   });
 });
+
+describe('permission-denied query removal', () => {
+  it('removes an org-scoped query on FORBIDDEN and keeps the user signed in', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const org1Key: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-1' } },
+    ];
+    const org2Key: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-2' } },
+    ];
+    queryClient.setQueryData(org1Key, { members: ['a'] });
+    queryClient.setQueryData(org2Key, { members: ['b'] });
+
+    const error = Object.assign(new Error('forbidden'), {
+      data: { code: 'FORBIDDEN', httpStatus: 403 },
+    });
+
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: org1Key,
+        queryFn: () => {
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    // The forbidden org's query is dropped; the sibling org's query survives.
+    expect(queryClient.getQueryData(org1Key)).toBeUndefined();
+    expect(queryClient.getQueryData(org2Key)).toEqual({ members: ['b'] });
+    // Permission loss never signs the user out.
+    expect(signOut).not.toHaveBeenCalled();
+    clear();
+  });
+
+  it('removes a procedure UNAUTHORIZED without authRequired and keeps the user signed in', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const key: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-1' } },
+    ];
+    queryClient.setQueryData(key, { members: ['a'] });
+
+    const error = Object.assign(new Error('unauthorized'), {
+      data: { code: 'UNAUTHORIZED', httpStatus: 401 },
+    });
+
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: () => {
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+    expect(signOut).not.toHaveBeenCalled();
+    clear();
+  });
+
+  it('keeps a non-permission query error in the cache', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const key: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-1' } },
+    ];
+    queryClient.setQueryData(key, { members: ['a'] });
+
+    const error = Object.assign(new Error('not found'), {
+      data: { code: 'NOT_FOUND', httpStatus: 404 },
+    });
+
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: () => {
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    // A non-permission failure must not drop the cached data.
+    expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
+    expect(signOut).not.toHaveBeenCalled();
+    clear();
+  });
+});

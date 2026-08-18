@@ -50,7 +50,7 @@ export function cacheFilePart(
   emitChange();
 }
 
-/** Synchronous lookup used by the hook and by tests. */
+/** Synchronous lookup used by tests. */
 export function getFilePartCacheEntry(partId: string): FilePartCacheEntry | undefined {
   return entriesByPartId.get(partId);
 }

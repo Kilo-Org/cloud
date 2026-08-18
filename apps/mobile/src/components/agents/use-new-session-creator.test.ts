@@ -120,7 +120,7 @@ const outboxMock = vi.hoisted(() => ({
   getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
   writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
   remove: vi.fn(async (): Promise<void> => undefined),
-  whenLoaded: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
 }));
 
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
@@ -236,7 +236,7 @@ beforeEach(() => {
   outboxMock.getStoredOperationKey.mockReturnValue(null);
   outboxMock.writeSafeRetry.mockResolvedValue(undefined);
   outboxMock.remove.mockResolvedValue(undefined);
-  outboxMock.whenLoaded.mockResolvedValue(undefined);
+  outboxMock.whenLoaded.mockResolvedValue(true);
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrameStub);
 });
 
@@ -727,6 +727,8 @@ describe('useNewSessionCreator mutation outbox (P1-E-40c)', () => {
     const order: string[] = [];
     outboxMock.whenLoaded.mockImplementation(async () => {
       order.push('whenLoaded');
+      await Promise.resolve();
+      return true;
     });
     outboxMock.getStoredOperationKey.mockImplementation(() => {
       order.push('getStoredOperationKey');
@@ -741,6 +743,18 @@ describe('useNewSessionCreator mutation outbox (P1-E-40c)', () => {
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
       operationKey: 'stored-op-key',
     });
+  });
+
+  it('refuses to create when the outbox read failed (no duplicate key)', async () => {
+    outboxMock.whenLoaded.mockResolvedValueOnce(false);
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(outboxMock.writeSafeRetry).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith('Could not read pending sessions. Try again.');
   });
 
   it('keeps the row on a retryable failure so a relaunch reuses the key', async () => {

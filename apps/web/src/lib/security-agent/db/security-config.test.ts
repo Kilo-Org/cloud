@@ -4,11 +4,13 @@ import { agent_configs, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
-const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
+const mockEnqueueBacklogFindings = jest.fn<(params: { tx?: unknown }) => Promise<number>>();
+const mockResetOwnerAutoAnalysisEnabledAt =
+  jest.fn<(owner: unknown, tx?: unknown) => Promise<void>>();
 
 jest.mock('./security-analysis', () => ({
   setOwnerAutoAnalysisEnabledAtNow: jest.fn(),
-  resetOwnerAutoAnalysisEnabledAt: jest.fn(),
+  resetOwnerAutoAnalysisEnabledAt: mockResetOwnerAutoAnalysisEnabledAt,
   enqueueBacklogFindings: mockEnqueueBacklogFindings,
 }));
 
@@ -132,5 +134,24 @@ describe('saveSecurityAgentConfigWithRevision', () => {
 
     // The config write was rolled back with the enqueue failure.
     expect(await readRevision()).toBeNull();
+  });
+
+  it('records the activation boundary in the same transaction as the enqueue', async () => {
+    mockEnqueueBacklogFindings.mockResolvedValue(0);
+
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { auto_analysis_enabled: true },
+      createdBy: user.id,
+      expectedRevision: null,
+      enqueueAnalysis: { owner: { userId: user.id }, minSeverity: 'high' },
+    });
+
+    // Same tx object for both: no worker can claim a queued backlog row before
+    // the activation boundary it is judged against is committed.
+    const enqueueTx = mockEnqueueBacklogFindings.mock.calls[0]?.[0].tx;
+    expect(enqueueTx).toBeDefined();
+    expect(mockResetOwnerAutoAnalysisEnabledAt).toHaveBeenCalledTimes(1);
+    expect(mockResetOwnerAutoAnalysisEnabledAt.mock.calls[0]?.[1]).toBe(enqueueTx);
   });
 });

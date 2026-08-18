@@ -199,9 +199,11 @@ function parseOutboxRow(raw: string): OutboxRow | null {
 
 /**
  * Lists every outbox row for one user. Corrupt entries are skipped. A storage
- * failure returns an empty list and is reported to Sentry.
+ * failure returns `null` (reported to Sentry) so a caller can never read a
+ * failed read as "no stored rows" and mint a fresh operation key over a row
+ * whose mutation the server may already have accepted.
  */
-export async function listOutboxRows(userId: string): Promise<OutboxRow[]> {
+export async function listOutboxRows(userId: string): Promise<OutboxRow[] | null> {
   if (!userId) {
     return [];
   }
@@ -224,6 +226,6 @@ export async function listOutboxRows(userId: string): Promise<OutboxRow[]> {
       userId,
       fingerprint: '<list>',
     });
-    return [];
+    return null;
   }
 }

@@ -269,7 +269,11 @@ export function useTriggerSecuritySync(scope: string) {
       // Gate on the outbox load first: a sync that races the launch load would
       // read empty rows and write a fresh key over a crash row, dropping the
       // stored reconcile key.
-      await whenLoaded();
+      // A failed outbox read reads as no stored rows, so refuse instead of
+      // writing a fresh key over a crash row the server may already hold.
+      if (!(await whenLoaded())) {
+        throw new Error('Could not read pending syncs. Try again.');
+      }
       // Persist the reconcile-first row BEFORE the POST and resolve the row's
       // own operationKey: a stored row keeps its key, so the wire never POSTs
       // a fresh in-memory key over a crash row. The row carries the scope so

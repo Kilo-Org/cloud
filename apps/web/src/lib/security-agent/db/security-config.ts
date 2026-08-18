@@ -226,9 +226,11 @@ export type SecurityConfigSaveOutcome = {
 };
 
 /**
- * Compare-and-set security config save. The CAS write, the include-existing
- * analysis enqueue, and the include-existing remediation command creation all
- * share one transaction: if any enqueue throws, the config change rolls back.
+ * Compare-and-set security config save. The CAS write, the activation-boundary
+ * timestamp, the include-existing analysis enqueue, and the include-existing
+ * remediation command creation all share one transaction: if any step throws,
+ * the config change rolls back, and no worker can claim a queued backlog row
+ * before the boundary it is judged against exists.
  */
 export async function saveSecurityAgentConfigWithRevision(params: {
   owner: Owner;
@@ -246,6 +248,9 @@ export async function saveSecurityAgentConfigWithRevision(params: {
   const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
   const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;
 
+  const securityOwner =
+    params.owner.type === 'org' ? { organizationId: params.owner.id } : { userId: params.owner.id };
+
   const outcome = await db.transaction(async tx => {
     const newRevision = await writeSecurityAgentConfigWithRevision(tx, {
       owner: params.owner,
@@ -254,6 +259,17 @@ export async function saveSecurityAgentConfigWithRevision(params: {
       expectedRevision: params.expectedRevision,
       platform,
     });
+
+    // Record the activation boundary in the same transaction as the enqueue
+    // below: a worker that claims a queued row must never see a null boundary
+    // and skip the finding as ineligible.
+    if (isNowAutoAnalysisEnabled) {
+      if (!wasAutoAnalysisEnabled) {
+        await resetOwnerAutoAnalysisEnabledAt(securityOwner, tx);
+      } else {
+        await setOwnerAutoAnalysisEnabledAtNow(securityOwner, tx);
+      }
+    }
 
     let existingFindingsQueuedCount: number | undefined;
     if (params.enqueueAnalysis) {
@@ -277,17 +293,6 @@ export async function saveSecurityAgentConfigWithRevision(params: {
 
     return { newRevision, existingFindingsQueuedCount, existingRemediationCommandId };
   });
-
-  const securityOwner =
-    params.owner.type === 'org' ? { organizationId: params.owner.id } : { userId: params.owner.id };
-
-  if (isNowAutoAnalysisEnabled) {
-    if (!wasAutoAnalysisEnabled) {
-      await resetOwnerAutoAnalysisEnabledAt(securityOwner);
-    } else {
-      await setOwnerAutoAnalysisEnabledAtNow(securityOwner);
-    }
-  }
 
   return {
     ...outcome,

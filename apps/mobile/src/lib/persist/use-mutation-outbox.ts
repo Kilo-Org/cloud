@@ -27,7 +27,10 @@ export type OutboxRowInput = {
  * - `loaded` is false until the launch load settles (or the identity resolves
  *   to no user). `whenLoaded` resolves at that point, so a submit can gate on
  *   the load and read the freshly-loaded rows instead of minting a key over
- *   an unread stored row.
+ *   an unread stored row. It resolves `false` when the stored rows could not
+ *   be read: the caller must refuse the mutation instead of minting a key over
+ *   a row whose POST the server may already have accepted. A refused attempt
+ *   re-reads the store, so the user's retry can succeed.
  * - `writeSafeRetry` / `writeReconcileFirst` persist a row under the forced
  *   taxonomy. `never-replay` has no write helper and is never enqueued.
  * - Both write helpers preserve an existing stored row's `operationKey` for the
@@ -44,7 +47,7 @@ export function useMutationOutbox(): {
   remove: (fingerprint: string) => Promise<void>;
   needsReconcile: OutboxRow[];
   loaded: boolean;
-  whenLoaded: () => Promise<void>;
+  whenLoaded: () => Promise<boolean>;
   refresh: () => void;
 } {
   const { userId, isLoading } = useCurrentUserId();
@@ -54,6 +57,7 @@ export function useMutationOutbox(): {
   const rowsRef = useRef<OutboxRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const loadedRef = useRef(false);
+  const loadFailedRef = useRef(false);
   const waitersRef = useRef<(() => void)[]>([]);
 
   const markLoaded = useCallback(() => {
@@ -74,48 +78,69 @@ export function useMutationOutbox(): {
     setLoaded(false);
   }, []);
 
-  const whenLoaded = useCallback(async (): Promise<void> => {
-    if (loadedRef.current) {
-      return;
-    }
-    await new Promise<void>(resolve => {
-      waitersRef.current.push(resolve);
-    });
-  }, []);
-
   // Generation fence: a load applies only when its captured generation is
   // still current (a ref dodges type-aware flow narrowing, same pattern as
-  // useFencedDraftLoad). `loaded` stays false while the identity is still
-  // resolving, so a submit cannot read rows before the user is known.
+  // useFencedDraftLoad).
   const loadGenerationRef = useRef(0);
-  useEffect(() => {
+
+  // Single loader for the launch load, `refresh`, and a `whenLoaded` retry.
+  // Returns false when the rows could not be read (or the load was superseded
+  // by an identity change), so a caller must not treat the empty list as truth.
+  const runLoad = useCallback(async (): Promise<boolean> => {
     loadGenerationRef.current += 1;
     const generation = loadGenerationRef.current;
+    if (!userId) {
+      rowsRef.current = [];
+      setRows([]);
+      loadFailedRef.current = false;
+      return true;
+    }
+    const loadedRows = await listOutboxRows(userId);
+    if (loadGenerationRef.current !== generation) {
+      return false;
+    }
+    if (loadedRows === null) {
+      loadFailedRef.current = true;
+      return false;
+    }
+    loadFailedRef.current = false;
+    rowsRef.current = loadedRows;
+    setRows(loadedRows);
+    return true;
+  }, [userId]);
+
+  const whenLoaded = useCallback(async (): Promise<boolean> => {
+    if (!loadedRef.current) {
+      await new Promise<void>(resolve => {
+        waitersRef.current.push(resolve);
+      });
+    }
+    // A failed read must never pass as "no stored rows"; re-read so the user's
+    // retry can succeed, and report the failure so the caller refuses.
+    return loadFailedRef.current ? runLoad() : true;
+  }, [runLoad]);
+
+  // `loaded` stays false while the identity is still resolving, so a submit
+  // cannot read rows before the user is known.
+  useEffect(() => {
     if (isLoading) {
+      loadGenerationRef.current += 1;
       rowsRef.current = [];
       setRows([]);
       resetLoaded();
       return undefined;
     }
-    if (!userId) {
-      rowsRef.current = [];
-      setRows([]);
-      markLoaded();
-      return undefined;
-    }
     resetLoaded();
+    // Marked loaded even when the read failed: `whenLoaded` reports the
+    // failure and retries, so a waiter is never left hanging.
     void (async () => {
-      const loadedRows = await listOutboxRows(userId);
-      if (loadGenerationRef.current === generation) {
-        rowsRef.current = loadedRows;
-        setRows(loadedRows);
-        markLoaded();
-      }
+      await runLoad();
+      markLoaded();
     })();
     return () => {
       loadGenerationRef.current += 1;
     };
-  }, [userId, isLoading, markLoaded, resetLoaded]);
+  }, [isLoading, runLoad, markLoaded, resetLoaded]);
 
   const getStoredOperationKey = useCallback((fingerprint: string): string | null => {
     const row = rowsRef.current.find(
@@ -172,21 +197,8 @@ export function useMutationOutbox(): {
   );
 
   const refresh = useCallback(() => {
-    loadGenerationRef.current += 1;
-    const generation = loadGenerationRef.current;
-    if (!userId) {
-      rowsRef.current = [];
-      setRows([]);
-      return;
-    }
-    void (async () => {
-      const loadedRows = await listOutboxRows(userId);
-      if (loadGenerationRef.current === generation) {
-        rowsRef.current = loadedRows;
-        setRows(loadedRows);
-      }
-    })();
-  }, [userId]);
+    void runLoad();
+  }, [runLoad]);
 
   const needsReconcile = rows.filter(r => r.taxonomy === 'reconcile-first');
 

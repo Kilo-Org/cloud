@@ -41,7 +41,7 @@ vi.mock('@/lib/operation-key', async importOriginal => {
 const outboxMock = vi.hoisted(() => ({
   writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => row.operationKey),
   remove: vi.fn(async (): Promise<void> => undefined),
-  whenLoaded: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
 }));
 
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
@@ -145,7 +145,7 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     outboxMock.remove.mockReset();
     outboxMock.remove.mockResolvedValue(undefined);
     outboxMock.whenLoaded.mockReset();
-    outboxMock.whenLoaded.mockResolvedValue(undefined);
+    outboxMock.whenLoaded.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -261,6 +261,8 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     const order: string[] = [];
     outboxMock.whenLoaded.mockImplementation(async () => {
       order.push('whenLoaded');
+      await Promise.resolve();
+      return true;
     });
     outboxMock.writeReconcileFirst.mockImplementation(async (row: { operationKey: string }) => {
       order.push('writeReconcileFirst');

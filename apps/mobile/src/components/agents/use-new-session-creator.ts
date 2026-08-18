@@ -112,7 +112,13 @@ export function useNewSessionCreator({
     // fresh key only when no stored row exists. A stored row must never be
     // replaced by a new in-memory key. Gate on the outbox load first: a submit
     // that races the launch load would read empty rows and mint a duplicate.
-    await whenLoaded();
+    // A failed outbox read reads as no stored rows, so refuse instead of
+    // minting a fresh key over a row whose POST the server may have accepted.
+    if (!(await whenLoaded())) {
+      toast.error('Could not read pending sessions. Try again.');
+      setIsCreating(false);
+      return;
+    }
     const operationKey = getStoredOperationKey(intentFingerprint) ?? getKey(intentFingerprint);
 
     try {

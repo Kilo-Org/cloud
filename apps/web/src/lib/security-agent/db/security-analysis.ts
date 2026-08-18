@@ -491,14 +491,19 @@ export async function countSecurityFindingsWithAnalysis(
   }
 }
 
-export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwner): Promise<void> {
+export async function setOwnerAutoAnalysisEnabledAtNow(
+  owner: SecurityReviewOwner,
+  /** Run inside the caller's transaction; defaults to the primary db. */
+  tx?: DrizzleTransaction
+): Promise<void> {
   const ownerConverted = toOwner(owner);
   const ownerCondition =
     ownerConverted.type === 'org'
       ? eq(security_analysis_owner_state.owned_by_organization_id, ownerConverted.id)
       : eq(security_analysis_owner_state.owned_by_user_id, ownerConverted.id);
+  const executor = tx ?? db;
 
-  await db
+  await executor
     .insert(security_analysis_owner_state)
     .values({
       owned_by_organization_id: ownerConverted.type === 'org' ? ownerConverted.id : null,
@@ -508,7 +513,7 @@ export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwne
     })
     .onConflictDoNothing();
 
-  await db
+  await executor
     .update(security_analysis_owner_state)
     .set({ auto_analysis_enabled_at: sql`now()`, updated_at: sql`now()` })
     .where(and(ownerCondition, isNull(security_analysis_owner_state.auto_analysis_enabled_at)));
@@ -519,15 +524,20 @@ export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwne
  * Used when auto-analysis is re-enabled (toggled OFF then ON) so the time
  * boundary reflects the latest activation, not the original one.
  */
-export async function resetOwnerAutoAnalysisEnabledAt(owner: SecurityReviewOwner): Promise<void> {
+export async function resetOwnerAutoAnalysisEnabledAt(
+  owner: SecurityReviewOwner,
+  /** Run inside the caller's transaction; defaults to the primary db. */
+  tx?: DrizzleTransaction
+): Promise<void> {
   const ownerConverted = toOwner(owner);
   const ownerCondition =
     ownerConverted.type === 'org'
       ? eq(security_analysis_owner_state.owned_by_organization_id, ownerConverted.id)
       : eq(security_analysis_owner_state.owned_by_user_id, ownerConverted.id);
+  const executor = tx ?? db;
 
   // Upsert: insert if missing, update unconditionally if present
-  await db
+  await executor
     .insert(security_analysis_owner_state)
     .values({
       owned_by_organization_id: ownerConverted.type === 'org' ? ownerConverted.id : null,
@@ -537,7 +547,7 @@ export async function resetOwnerAutoAnalysisEnabledAt(owner: SecurityReviewOwner
     })
     .onConflictDoNothing();
 
-  await db
+  await executor
     .update(security_analysis_owner_state)
     .set({ auto_analysis_enabled_at: sql`now()`, updated_at: sql`now()` })
     .where(ownerCondition);

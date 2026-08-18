@@ -78,6 +78,7 @@ vi.mock('@/lib/persist/use-mutation-outbox', () => ({
     loaded: true,
     whenLoaded: vi.fn(async () => {
       await Promise.resolve();
+      return true;
     }),
     refresh: vi.fn(),
   }),

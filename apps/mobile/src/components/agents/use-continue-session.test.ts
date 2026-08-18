@@ -1,4 +1,5 @@
 /* eslint-disable import/first -- mocks must be defined before the module under test is imported */
+/* eslint-disable require-await, typescript-eslint/require-await -- the fake outbox mocks settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the suite pins both key families (cloud prepare + remote spawn) through one fake-dispatcher runner. */
 import * as React from 'react';
 import { atom, type createStore } from 'jotai';
@@ -183,7 +184,7 @@ const outboxMock = vi.hoisted(() => ({
   getStoredOperationKey: vi.fn(),
   writeSafeRetry: vi.fn(),
   remove: vi.fn(),
-  whenLoaded: vi.fn(),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
 }));
 
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
@@ -593,7 +594,7 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
     outboxMock.remove.mockReset();
     outboxMock.remove.mockResolvedValue(undefined);
     outboxMock.whenLoaded.mockReset();
-    outboxMock.whenLoaded.mockResolvedValue(undefined);
+    outboxMock.whenLoaded.mockResolvedValue(true);
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     queryClientFetchQuery.mockImplementation((options: { queryKey?: string[] }) => {
       if (options.queryKey?.[0] === 'instances') {
@@ -637,8 +638,10 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
 
   it('awaits the outbox load before reading the stored key (no key-reuse race)', async () => {
     const order: string[] = [];
-    outboxMock.whenLoaded.mockImplementation(() => {
+    outboxMock.whenLoaded.mockImplementation(async () => {
       order.push('whenLoaded');
+      await Promise.resolve();
+      return true;
     });
     outboxMock.getStoredOperationKey.mockImplementation(() => {
       order.push('getStoredOperationKey');

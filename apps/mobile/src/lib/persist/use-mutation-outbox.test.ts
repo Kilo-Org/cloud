@@ -14,7 +14,7 @@ const identityMock = vi.hoisted<{
   value: { userId: undefined, isLoading: false },
 }));
 
-const listOutboxRowsMock = vi.hoisted(() => vi.fn(async (): Promise<OutboxRow[]> => []));
+const listOutboxRowsMock = vi.hoisted(() => vi.fn(async (): Promise<OutboxRow[] | null> => []));
 const writeOutboxRowMock = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
 const removeOutboxRowMock = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
 
@@ -238,6 +238,30 @@ describe('useMutationOutbox load gating', () => {
     await waiter;
 
     expect(result.getStoredOperationKey('fp-1')).toBe('op-key-1');
+  });
+
+  it('reports a failed read instead of passing it off as no stored rows', async () => {
+    listOutboxRowsMock.mockResolvedValue(null);
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+
+    await expect(requireResult(resultRef).whenLoaded()).resolves.toBe(false);
+  });
+
+  it('re-reads the store on a whenLoaded retry after a failed read', async () => {
+    listOutboxRowsMock.mockResolvedValue(null);
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+
+    const result = requireResult(resultRef);
+    await expect(result.whenLoaded()).resolves.toBe(false);
+
+    listOutboxRowsMock.mockResolvedValue([safeRetryRow({ fingerprint: 'fp-1' })]);
+    await act(async () => {
+      await expect(result.whenLoaded()).resolves.toBe(true);
+    });
+
+    expect(requireResult(resultRef).getStoredOperationKey('fp-1')).toBe('op-key-1');
   });
 
   it('is loaded immediately when the identity resolves to no user', async () => {

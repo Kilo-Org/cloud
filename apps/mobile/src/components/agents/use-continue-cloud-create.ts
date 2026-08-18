@@ -55,7 +55,11 @@ export function useContinueCloudCreate(
       // replaced by a new in-memory key. Gate on the outbox load first: a
       // continue that races the launch load would read empty rows and mint a
       // duplicate.
-      await whenLoaded();
+      // A failed outbox read reads as no stored rows, so refuse instead of
+      // minting a fresh key over a row whose POST the server may have accepted.
+      if (!(await whenLoaded())) {
+        throw new Error('Could not read pending sessions. Try again.');
+      }
       const operationKey =
         getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
       const initialMessageId = generateMessageId();

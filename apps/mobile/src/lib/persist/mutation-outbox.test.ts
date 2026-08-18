@@ -158,14 +158,25 @@ describe('remove and list', () => {
     await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp-1' }));
     await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp-2', taxonomy: 'reconcile-first' }));
     const rows = await listOutboxRows('u1');
-    expect(rows.map(r => r.fingerprint).toSorted()).toEqual(['fp-1', 'fp-2']);
+    expect(rows?.map(r => r.fingerprint).toSorted()).toEqual(['fp-1', 'fp-2']);
   });
 
   it('skips corrupt entries when listing', async () => {
     seedStoredValue('outbox:u1', 'fp-1', 'not-json{{{');
     await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp-2' }));
     const rows = await listOutboxRows('u1');
-    expect(rows.map(r => r.fingerprint)).toEqual(['fp-2']);
+    expect(rows?.map(r => r.fingerprint)).toEqual(['fp-2']);
+  });
+
+  it('returns null when the store read fails, never an empty list', async () => {
+    // A failed read must not read as "no stored rows": a caller that trusts an
+    // empty list mints a fresh operation key and can duplicate the mutation.
+    kvMock.listEntries.mockRejectedValueOnce(new Error('kv down'));
+    await expect(listOutboxRows('u1')).resolves.toBeNull();
+
+    await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp-1' }));
+    kvMock.getItem.mockRejectedValueOnce(new Error('kv down'));
+    await expect(listOutboxRows('u1')).resolves.toBeNull();
   });
 });
 

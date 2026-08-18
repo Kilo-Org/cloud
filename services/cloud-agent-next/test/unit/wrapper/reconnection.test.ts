@@ -1406,6 +1406,117 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
+  it('classifies AI_InvalidResponseDataError as a terminal provider error', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'AI_InvalidResponseDataError',
+                message: "Expected 'id' to be a string",
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'provider_error',
+      message: "Expected 'id' to be a string",
+      errorSource: 'assistant',
+    });
+  });
+
+  it('classifies an AI_JSONParseError as a terminal provider error', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'AI_JSONParseError',
+                message: 'Unexpected end of JSON input',
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'provider_error',
+      message: 'Unexpected end of JSON input',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('classifies an expected-field pattern error as a terminal provider error', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                data: { message: "Expected 'choices' to be an array" },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'provider_error',
+      message: "Expected 'choices' to be an array",
+      errorSource: 'assistant',
+    });
+  });
+
+  it('does not treat a transient provider error as terminal', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'ProviderError',
+                data: { message: 'Rate limit exceeded for provider request' },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
   it('records explicit Kilo gate results from event properties', async () => {
     const kiloClient = createMockKiloClient({
       subscribeEvents: vi.fn().mockResolvedValue({

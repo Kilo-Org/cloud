@@ -829,6 +829,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         isSessionDeletionInProgress: () => this.hasDeletionIntent(),
         getSessionIdForLogs: () => this.sessionId,
+        onSessionTerminalized: async () => {
+          this.broadcastVolatileEvent({
+            executionId: '' as EventSourceId,
+            sessionId: this.sessionId ?? '',
+            streamEventType: 'cloud.status',
+            payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+            timestamp: Date.now(),
+          });
+        },
       });
     }
 
@@ -3580,8 +3589,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   async handleWrapperTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
-    await this.resolveSessionId();
-    await this.getWrapperSupervisor().onTerminalEvent(params);
+    const sessionId = await this.resolveSessionId();
+    const accepted = await this.getWrapperSupervisor().onTerminalEvent(params);
+
+    if (accepted && (params.status === 'failed' || params.status === 'interrupted')) {
+      this.broadcastVolatileEvent({
+        executionId: '' as EventSourceId,
+        sessionId: sessionId ?? '',
+        streamEventType: 'cloud.status',
+        payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+        timestamp: Date.now(),
+      });
+    }
+
     const metadata = await this.getMetadata();
     if (!metadata) return;
     if (!isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) return;

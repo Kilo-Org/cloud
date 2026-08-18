@@ -892,7 +892,14 @@ export function createConnectionManager(
             normalizedError.includes('too many requests')
           );
         })());
-    if (!code && !isExplicitAssistantFailure) return undefined;
+    const isProviderResponseError =
+      eventType === 'session.error' &&
+      isAIProviderResponseError(terminalErrorText, properties.error);
+    if (!code && !isExplicitAssistantFailure && !isProviderResponseError) return undefined;
+
+    if (isProviderResponseError && !code) {
+      code = 'provider_error';
+    }
 
     return {
       ...(code ? { code } : {}),
@@ -925,6 +932,18 @@ export function createConnectionManager(
 
   function isModelNotFoundMessage(message: string): boolean {
     return /\b(model\s+(?:was\s+)?not\s+found|unknown\s+model|invalid\s+model)\b/i.test(message);
+  }
+
+  function isAIProviderResponseError(errorText: string, error: unknown): boolean {
+    const normalized = errorText.toLowerCase();
+    if (normalized.includes('ai_invalidresponsedataerror')) return true;
+    if (normalized.includes('ai_jsonparseerror')) return true;
+    if (isRecord(error) && typeof error.name === 'string') {
+      const name = error.name.toLowerCase();
+      if (name === 'ai_invalidresponsedataerror' || name === 'ai_jsonparseerror') return true;
+    }
+    if (/^expected\s+['"].+['"]\s+to be\s+/i.test(errorText.trim())) return true;
+    return false;
   }
 
   function shouldFetchModelNotFoundDiagnostics(

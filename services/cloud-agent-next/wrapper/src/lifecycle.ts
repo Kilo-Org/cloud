@@ -5,6 +5,15 @@ import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
 
 const DRAIN_DELAY_MS = 250;
+/**
+ * When a terminal error is detected while the ingest WS is disconnected, the
+ * fatal error frame is buffered and only delivered after the WS reconnects
+ * (first attempt after ~1 s). Extend the drain window so the reconnect can
+ * flush the buffered terminal frame before close() clears the buffer. If the
+ * reconnect completes within this window, the drain closes immediately rather
+ * than waiting for the full delay; this value is the fallback ceiling.
+ */
+const TERMINAL_ERROR_DISCONNECTED_DRAIN_DELAY_MS = 2_000;
 const STABLE_ROOT_IDLE_MS = 3_000;
 const SSE_TRANSPORT_TIMEOUT_MS = 15_000;
 const AUTO_COMMIT_TIMEOUT_MS = 120_000;
@@ -18,6 +27,14 @@ export type LifecycleDependencies = {
   kiloClient: WrapperKiloClient;
   closeConnections: () => Promise<void>;
   isConnected: () => boolean;
+  /**
+   * Whether the ingest WebSocket is currently attempting to reconnect. When a
+   * terminal error is detected while disconnected, the fatal frame is buffered
+   * and only flushed once a reconnect completes; the drain close defers while a
+   * reconnect is in progress so that frame can be delivered instead of being
+   * discarded by close().
+   */
+  isReconnecting?: () => boolean;
   reconnectEventSubscription: () => void;
 };
 
@@ -153,6 +170,28 @@ export function createLifecycleManager(
     }
   }
 
+  function performDrainClose(): void {
+    // When closing on an aborted drain while disconnected, a reconnect may
+    // still be in progress with a buffered fatal terminal frame. Closing now
+    // would abort that reconnect and discard the frame before it can be
+    // flushed. Defer until the reconnect completes (onConnectionRestored
+    // closes immediately once the frame is flushed) or gives up.
+    if (isAborted && !deps.isConnected() && deps.isReconnecting?.()) {
+      drainTimeout = setTimeout(performDrainClose, DRAIN_DELAY_MS);
+      return;
+    }
+    void deps
+      .closeConnections()
+      .catch(error =>
+        logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
+      )
+      .finally(() => {
+        isDraining = false;
+        drainTimeout = null;
+        state.clearSession();
+      });
+  }
+
   function triggerDrainAndClose(): void {
     state.blockAdmissions();
     if (isDraining) return;
@@ -208,18 +247,12 @@ export function createLifecycleManager(
         }
 
         if (isDraining) {
-          drainTimeout = setTimeout(() => {
-            void deps
-              .closeConnections()
-              .catch(error =>
-                logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
-              )
-              .finally(() => {
-                isDraining = false;
-                drainTimeout = null;
-                state.clearSession();
-              });
-          }, DRAIN_DELAY_MS);
+          drainTimeout = setTimeout(
+            performDrainClose,
+            isAborted && !deps.isConnected()
+              ? TERMINAL_ERROR_DISCONNECTED_DRAIN_DELAY_MS
+              : DRAIN_DELAY_MS
+          );
         }
       }
     })();
@@ -282,7 +315,18 @@ export function createLifecycleManager(
       }
       armStableIdleCandidate();
     },
-    onConnectionRestored: armStableIdleCandidate,
+    onConnectionRestored: () => {
+      if (isDraining && isAborted && drainTimeout) {
+        logToFile(
+          'reconnect restored during aborted drain — closing now that buffered terminal frame flushed'
+        );
+        clearTimeout(drainTimeout);
+        drainTimeout = null;
+        performDrainClose();
+        return;
+      }
+      armStableIdleCandidate();
+    },
     triggerDrainAndClose,
     signalCompletion,
     setAborted: () => {

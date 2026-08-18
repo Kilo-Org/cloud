@@ -558,6 +558,7 @@ async function main() {
         kiloClient: nextKiloClient,
         closeConnections: () => connectionManager?.close() ?? Promise.resolve(),
         isConnected: () => connectionManager?.isConnected() ?? false,
+        isReconnecting: () => connectionManager?.isReconnecting() ?? false,
         reconnectEventSubscription: () => connectionManager?.reconnectEventSubscription(),
       }
     );

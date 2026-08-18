@@ -55,6 +55,20 @@ const createStorage = ({
   };
 };
 
+/* A getItem that throws for one key, so a settings read failure is testable
+   without a conditional inside the test body. */
+const failGetItemForKey = (storage: TestStorage, failingKey: string): void => {
+  const { values } = storage;
+
+  storage.getItem = (key: string) => {
+    if (key === failingKey) {
+      throw new Error('Settings read failed.');
+    }
+
+    return values.get(key);
+  };
+};
+
 const memoryDraft = (
   overrides: Partial<PendingAgentMemoryDraft> = {}
 ): PendingAgentMemoryDraft => ({
@@ -85,6 +99,11 @@ const abortSignal = (): AbortSignal => {
 const autoApproveSettings = (): Record<string, unknown> => ({
   ...DEFAULT_WORKFLOW_SETTINGS,
   autoApproveWorkflowChanges: true,
+});
+
+// Memory settings value that enables auto-approve of memory saves.
+const autoApproveMemorySettings = (): Record<string, unknown> => ({
+  autoApproveMemorySaves: true,
 });
 
 // Clear the atom and lock between tests.
@@ -1030,5 +1049,74 @@ describe(requestApproval, () => {
       status: 'approved',
     });
     expect(atomStore.get(pendingLockAtom)).toBe(false);
+  });
+
+  it('auto-approve memory save stores the memory without a card or draft', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentMemories', []);
+    storage.values.set('local:kiloMemorySettings', autoApproveMemorySettings());
+
+    const outcome = await requestApproval(storage, 'memory', memoryDraft(), abortSignal());
+    expect(outcome).toMatchObject({ autoApproved: true, status: 'approved' });
+
+    const memories = storage.values.get('local:kiloAgentMemories') as Record<string, unknown>[];
+    expect(memories[0]?.['id']).toBe((outcome as { savedId: string }).savedId);
+    expect(storage.values.has('local:kiloPendingAgentMemoryDraft')).toBe(false);
+
+    // No card and the lock released.
+    const atomStore = getDefaultStore();
+    expect({
+      atom: atomStore.get(pendingApprovalAtom),
+      lock: atomStore.get(pendingLockAtom),
+    }).toStrictEqual({ atom: undefined, lock: false });
+  });
+
+  it('shows the memory card when auto-approve of memory saves is off', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentMemories', []);
+    storage.values.set('local:kiloMemorySettings', { autoApproveMemorySaves: false });
+
+    const promise = requestApproval(storage, 'memory', memoryDraft(), abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    expect({
+      draft: storage.values.has('local:kiloPendingAgentMemoryDraft'),
+      kind: atomStore.get(pendingApprovalAtom)?.kind,
+      memories: storage.values.get('local:kiloAgentMemories'),
+    }).toStrictEqual({ draft: true, kind: 'memory', memories: [] });
+
+    atomStore.get(pendingApprovalAtom)?.settle({
+      autoApproved: false,
+      savedId: 'mem-off',
+      status: 'approved',
+    });
+    await promise;
+  });
+
+  it('falls back to the memory card when the memory settings cannot be read', async () => {
+    const storage = createStorage();
+    storage.values.set('local:kiloAgentMemories', []);
+    failGetItemForKey(storage, 'local:kiloMemorySettings');
+
+    const promise = requestApproval(storage, 'memory', memoryDraft(), abortSignal());
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    const atomStore = getDefaultStore();
+    expect({
+      kind: atomStore.get(pendingApprovalAtom)?.kind,
+      memories: storage.values.get('local:kiloAgentMemories'),
+    }).toStrictEqual({ kind: 'memory', memories: [] });
+
+    atomStore.get(pendingApprovalAtom)?.settle({
+      autoApproved: false,
+      savedId: 'mem-fallback',
+      status: 'approved',
+    });
+    await promise;
   });
 });

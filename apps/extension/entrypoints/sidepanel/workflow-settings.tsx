@@ -54,7 +54,8 @@ const SETTINGS_TOGGLE_ROWS = [
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
 
-const SettingsToggle = ({
+/** Shared with the Memories settings section. */
+export const SettingsToggle = ({
   checked,
   description,
   disabled,

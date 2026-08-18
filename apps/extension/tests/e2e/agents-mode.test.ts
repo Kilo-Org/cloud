@@ -606,10 +606,21 @@ test('Agents new session spawns onto a connected CLI instance', async () => {
     await expect(runOn).toBeVisible({ timeout: 10_000 });
     await runOn.selectOption(DEFAULT_INSTANCE.connectionId);
 
-    // Cloud-only pickers leave the form; the CLI hint appears.
-    await expect(sidePanel.getByLabel('Model', { exact: true })).toBeHidden();
+    // The CLI target keeps the model picker and starts on the CLI's own model.
+    const modelTrigger = sidePanel.getByLabel('Model', { exact: true });
+    await expect(modelTrigger).toBeVisible({ timeout: 10_000 });
+    await expect(modelTrigger).toContainText('CLI default');
+    // The repo still comes from the CLI checkout, so that picker stays hidden.
     await expect(sidePanel.getByLabel('Select repository')).toBeHidden();
     await expect(sidePanel.getByText(/Runs in checkout-service/)).toBeVisible();
+
+    // Overriding the CLI model with a gateway model.
+    await modelTrigger.click();
+    await sidePanel
+      .getByRole('dialog', { name: 'Select model' })
+      .locator('[data-model-id="anthropic/claude-sonnet-4"]')
+      .click();
+    await expect(modelTrigger).toContainText('Claude Sonnet 4');
 
     await sidePanel.getByRole('button', { name: 'Start session' }).click();
 
@@ -623,6 +634,10 @@ test('Agents new session spawns onto a connected CLI instance', async () => {
         (message as { command?: string }).command === 'create_session'
     );
     expect(spawnCommands.length).toBeGreaterThan(0);
+    // The picked gateway model travels with the spawn command, so the CLI starts on it.
+    expect(spawnCommands[0]).toMatchObject({
+      data: { model: { modelID: 'anthropic/claude-sonnet-4', providerID: 'kilo' } },
+    });
     await expect(sidePanel.getByRole('heading', { name: 'Spawned session' })).toBeVisible({
       timeout: 15_000,
     });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeSessionsQueryKey,
+  historyEmptyMessage,
   mapActiveSessionRow,
   mapHistorySessionRow,
   sessionHistoryQueryKey,
@@ -208,5 +209,28 @@ describe('query key functions', () => {
         'search term',
       ]);
     });
+  });
+});
+
+describe('historyEmptyMessage()', () => {
+  it('keeps the search copy while searching, whatever else is listed', () => {
+    expect(historyEmptyMessage({ hasActiveSessions: true, isSearching: true })).toBe(
+      'No sessions match your search.'
+    );
+    expect(historyEmptyMessage({ hasActiveSessions: false, isSearching: true })).toBe(
+      'No sessions match your search.'
+    );
+  });
+
+  it('does not claim a first run when active sessions are listed above', () => {
+    expect(historyEmptyMessage({ hasActiveSessions: true, isSearching: false })).toBe(
+      'No past sessions yet.'
+    );
+  });
+
+  it('invites the first session only when the account has none', () => {
+    expect(historyEmptyMessage({ hasActiveSessions: false, isSearching: false })).toBe(
+      'No sessions yet. Start your first session above.'
+    );
   });
 });

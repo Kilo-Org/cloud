@@ -318,6 +318,7 @@ export const AgentChatPanel = ({
         onCompact={() => {
           void compactActiveConversation();
         }}
+        placement="above"
         promptTokens={activePromptTokens}
         sessionCostUsd={activeSessionCostUsd}
       />

@@ -14,15 +14,20 @@ const RADIUS = 6;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export const ContextDonut = ({
-  canCompact,
+  canCompact = false,
   contextLength,
   onCompact,
+  placement,
   promptTokens,
   sessionCostUsd,
 }: {
-  canCompact: boolean;
+  /** Only meaningful with `onCompact`; without it no button is rendered. */
+  canCompact?: boolean;
   contextLength: number | undefined;
-  onCompact: () => void;
+  /** Omit when the caller cannot compact: the button is left out, not disabled. */
+  onCompact?: () => void;
+  /** Which side of the trigger the popover opens on. */
+  placement: 'above' | 'below';
   promptTokens: number;
   sessionCostUsd: number;
 }): JSX.Element => {
@@ -64,21 +69,25 @@ export const ContextDonut = ({
           />
         </svg>
       </summary>
-      <div className="absolute bottom-10 right-0 z-20 w-56 rounded-lg border border-border bg-surface-overlay p-3 shadow-lg shadow-black/50">
+      <div
+        className={`absolute right-0 z-20 w-56 rounded-lg border border-border bg-surface-overlay p-3 shadow-lg shadow-black/50 ${placement === 'above' ? 'bottom-10' : 'top-10'}`}
+      >
         <p className="text-sm font-semibold text-foreground">Context</p>
         <p className="type-label mt-1 text-foreground-muted">{summary}</p>
         <p className="type-label mt-1 text-foreground-muted">Session cost {sessionCostLabel}</p>
-        <button
-          className="type-label mt-3 h-8 w-full rounded-md border border-border bg-surface-overlay px-2 text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle"
-          disabled={!canCompact}
-          onClick={() => {
-            detailsRef.current?.removeAttribute('open');
-            onCompact();
-          }}
-          type="button"
-        >
-          Compact now
-        </button>
+        {onCompact === undefined ? null : (
+          <button
+            className="type-label mt-3 h-8 w-full rounded-md border border-border bg-surface-overlay px-2 text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle"
+            disabled={!canCompact}
+            onClick={() => {
+              detailsRef.current?.removeAttribute('open');
+              onCompact();
+            }}
+            type="button"
+          >
+            Compact now
+          </button>
+        )}
       </div>
     </details>
   );

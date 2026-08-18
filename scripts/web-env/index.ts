@@ -142,6 +142,11 @@ async function main(): Promise<void> {
     if (!options.only && defaults.size === 0) warnAboutMissingTrackedDefault(options.name);
     rejectMatchingTrackedValues(repoRoot, options.name, values, defaults);
 
+    const deployableEnvironments = environments.filter(
+      (environment): environment is Exclude<Environment, 'development'> =>
+        environment !== 'development'
+    );
+
     console.log('\nPlan');
     for (const environment of environments) {
       const type = sensitive && environment !== 'development' ? 'sensitive' : 'encrypted';
@@ -150,7 +155,13 @@ async function main(): Promise<void> {
     for (const [file, value] of defaults)
       console.log(`- ${file}: ${options.name}=${JSON.stringify(value)}`);
     console.log(`- 1Password: ${updatesProductionVault ? 'update Production copy' : 'skip'}`);
-    console.log('- Deployments: ask after environment updates');
+    console.log(
+      `- Deployments: ${
+        deployableEnvironments.length > 0
+          ? 'ask after environment updates'
+          : 'not applicable for development'
+      }`
+    );
 
     if (options.dryRun) {
       console.log('\nDry run complete; nothing changed.');
@@ -180,10 +191,6 @@ async function main(): Promise<void> {
       await setVaultValue(vault, options.name, productionValue);
     }
 
-    const deployableEnvironments = environments.filter(
-      (environment): environment is Exclude<Environment, 'development'> =>
-        environment !== 'development'
-    );
     if (
       deployableEnvironments.length > 0 &&
       (await confirm(

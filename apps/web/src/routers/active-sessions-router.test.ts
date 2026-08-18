@@ -1,7 +1,6 @@
 import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
-import jwt from 'jsonwebtoken';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';

@@ -175,7 +175,7 @@ export const UserByokTestModels = {
 
 // This is a registry of provider IDs referenced explicitly in our mappings, not
 // an exhaustive schema for the open-ended provider IDs returned by Vercel.
-export const KnownVercelNonUserByokInferenceProviderIdSchema = z.enum([
+export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'alibaba',
   'arcee-ai',
   'azure',
@@ -213,7 +213,7 @@ export const KnownVercelNonUserByokInferenceProviderIdSchema = z.enum([
 ]);
 
 export const KnownVercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
-  KnownVercelNonUserByokInferenceProviderIdSchema
+  VercelNonUserByokInferenceProviderIdSchema
 );
 
 export type OpenRouterInferenceProviderId = z.infer<typeof OpenRouterInferenceProviderIdSchema>;
@@ -224,17 +224,17 @@ const openRouterToVercelInferenceProviderMapping = {
   [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']]:
     VercelUserByokInferenceProviderIdSchema.enum.bedrock,
   [OpenRouterInferenceProviderIdSchema.enum['claude-on-aws']]:
-    KnownVercelNonUserByokInferenceProviderIdSchema.enum.claudeaws,
+    VercelNonUserByokInferenceProviderIdSchema.enum.claudeaws,
   [OpenRouterInferenceProviderIdSchema.enum['google-ai-studio']]:
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
     VercelUserByokInferenceProviderIdSchema.enum.vertex,
   [OpenRouterInferenceProviderIdSchema.enum.seed]:
-    KnownVercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
+    VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:
     VercelUserByokInferenceProviderIdSchema.enum.zai,
   [OpenRouterInferenceProviderIdSchema.enum.together]:
-    KnownVercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
+    VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
 } as Record<string, KnownVercelInferenceProviderId | undefined>;
 
 export function normalizeInferenceProviderId(providerId: string): string;
@@ -263,7 +263,7 @@ export function normalizeVercelInferenceProviderIdForRouting(
   providerId: string | undefined
 ): string | undefined;
 export function normalizeVercelInferenceProviderIdForRouting(providerId: string | undefined) {
-  return providerId === KnownVercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
+  return providerId === VercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
     ? VercelUserByokInferenceProviderIdSchema.enum.vertex
     : providerId;
 }
@@ -274,7 +274,7 @@ const modelPrefixToVercelInferenceProviderMapping = {
   openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
   minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
   mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
-  qwen: KnownVercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
+  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
   'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
   'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
 } as Record<string, KnownVercelInferenceProviderId | undefined>;

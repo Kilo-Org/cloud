@@ -2,10 +2,10 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
   KnownVercelInferenceProviderIdSchema,
-  KnownVercelNonUserByokInferenceProviderIdSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
+  VercelNonUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from './inference-provider-id';
 
@@ -37,7 +37,7 @@ describe('inference provider ids', () => {
 
   test('promotes Vertex to a user BYOK provider', () => {
     expect(VercelUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(true);
-    expect(KnownVercelNonUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(false);
+    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(false);
     expect(openRouterToVercelInferenceProviderId('google-vertex')).toBe('vertex');
   });
 

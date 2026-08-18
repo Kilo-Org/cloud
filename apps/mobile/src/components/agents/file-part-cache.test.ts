@@ -70,7 +70,7 @@ function Probe({ partId }: { partId: string }) {
 }
 
 function textOf(renderer: TestRenderer.ReactTestRenderer): string | undefined {
-  const node = renderer.root.find(n => typeof n.type === 'string' && n.type === 'Text');
+  const node = renderer.root.find(n => typeof n.type === 'string' && (n.type as string) === 'Text');
   return node.props.children as string | undefined;
 }
 

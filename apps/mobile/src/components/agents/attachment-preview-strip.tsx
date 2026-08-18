@@ -228,7 +228,7 @@ function AttachmentChip({
               accessible
               onPress={handleOpen}
               accessibilityLabel={description.accessibilityLabel}
-              accessibilityRole={isUploading ? 'progressbar' : 'button'}
+              accessibilityRole="button"
               accessibilityValue={accessibilityValue}
               accessibilityState={accessibilityState}
             >

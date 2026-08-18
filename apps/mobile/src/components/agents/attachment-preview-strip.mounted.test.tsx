@@ -211,11 +211,11 @@ beforeEach(() => {
 });
 
 describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
-  it('exposes determinate progressbar semantics while uploading', async () => {
+  it('exposes determinate progress value on a button while uploading', async () => {
     const renderer = await mount([makeAttachment({ status: 'uploading', progress: 0.42 })]);
 
     const body = chipBody(renderer.root);
-    expect(body.props.accessibilityRole).toBe('progressbar');
+    expect(body.props.accessibilityRole).toBe('button');
     expect(body.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 42 });
     expect(body.props.accessibilityState).toBeUndefined();
     expect(body.props.accessibilityLabel).toBe('doc.pdf, 42%');
@@ -223,11 +223,11 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     renderer.unmount();
   });
 
-  it('exposes busy progressbar semantics when progress is indeterminate', async () => {
+  it('exposes busy button semantics when progress is indeterminate', async () => {
     const renderer = await mount([makeAttachment({ status: 'uploading', progress: null })]);
 
     const body = chipBody(renderer.root);
-    expect(body.props.accessibilityRole).toBe('progressbar');
+    expect(body.props.accessibilityRole).toBe('button');
     expect(body.props.accessibilityState).toEqual({ busy: true });
     expect(body.props.accessibilityValue).toBeUndefined();
     expect(body.props.accessibilityLabel).toBe('doc.pdf, Uploading…');

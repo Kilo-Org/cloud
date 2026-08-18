@@ -2732,6 +2732,113 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('list / search sharedOnly', () => {
+    const sharedId = 'ses_shared_only_published_0001';
+    const unsharedId = 'ses_shared_only_private_0001';
+    const sharedPublicId = '11111111-1111-4111-8111-111111111111';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sharedId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'published session',
+          public_id: sharedPublicId,
+        },
+        {
+          session_id: unsharedId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'private session',
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(inArray(cli_sessions_v2.session_id, [sharedId, unsharedId]));
+    });
+
+    it('list with sharedOnly returns only sessions that have a public_id', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({ sharedOnly: true });
+      const ids = result.cliSessions.map(session => session.session_id);
+
+      expect(ids).toContain(sharedId);
+      expect(ids).not.toContain(unsharedId);
+      expect(
+        result.cliSessions.find(session => session.session_id === sharedId)
+      ).not.toHaveProperty('public_id');
+    });
+
+    it('search with sharedOnly returns only sessions that have a public_id', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+        sharedOnly: true,
+      });
+      const ids = result.results.map(session => session.session_id);
+
+      expect(ids).toContain(sharedId);
+      expect(ids).not.toContain(unsharedId);
+      expect(result.results.find(session => session.session_id === sharedId)).not.toHaveProperty(
+        'public_id'
+      );
+    });
+  });
+
+  describe('unshare', () => {
+    const sessionId = 'ses_unshare_owner_only_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cli',
+        title: 'shared session',
+        public_id: '22222222-2222-4222-8222-222222222222',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('is owner-only and maps worker 404 to not found', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'session_not_found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        const otherCaller = await createCallerForUser(otherUser.id);
+        await expect(
+          otherCaller.cliSessionsV2.unshare({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+        });
+        expect(fetchSpy).not.toHaveBeenCalled();
+
+        const ownerCaller = await createCallerForUser(regularUser.id);
+        await expect(
+          ownerCaller.cliSessionsV2.unshare({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+        });
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}/unshare`,
+          expect.objectContaining({ method: 'POST' })
+        );
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('rename CLI notify', () => {
     const sessionId = 'ses_rename_notify_test_abc12';
 

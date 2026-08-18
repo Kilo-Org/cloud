@@ -15,12 +15,14 @@ export type SessionsListProps<T extends SessionsListItem = SessionsListItem> = {
   sessions: T[];
   organizationId?: string;
   onSessionClick?: (session: T) => void;
+  rowActions?: (session: T) => React.ReactNode;
 };
 
 export function SessionsList<T extends SessionsListItem>({
   sessions,
   organizationId,
   onSessionClick,
+  rowActions,
 }: SessionsListProps<T>) {
   if (sessions.length === 0) {
     return (
@@ -121,6 +123,15 @@ export function SessionsList<T extends SessionsListItem>({
                     </CardDescription>
                   )}
                 </div>
+                {rowActions ? (
+                  <div
+                    className="flex shrink-0 items-center gap-2"
+                    onClick={event => event.stopPropagation()}
+                    onKeyDown={event => event.stopPropagation()}
+                  >
+                    {rowActions(session)}
+                  </div>
+                ) : null}
               </div>
             </CardHeader>
             <CardContent className="pt-0">

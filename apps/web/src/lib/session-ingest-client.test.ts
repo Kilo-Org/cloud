@@ -7,6 +7,7 @@ import {
   fetchSessionMessagesPage,
   deleteSession,
   shareSession,
+  unshareSession,
   fetchSharedSessionMetadata,
   invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
@@ -406,6 +407,77 @@ describe('shareSession', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       'https://ingest.test.example.com/api/session/ses_with%20spaces%26special/share',
       expect.any(Object)
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unshareSession
+// ---------------------------------------------------------------------------
+
+describe('unshareSession', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+  });
+
+  it('resolves on success', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true }),
+    });
+
+    await expect(unshareSession('ses_abc123', 'user_123')).resolves.toBeUndefined();
+  });
+
+  it('calls POST on the worker unshare path', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true }),
+    });
+
+    await unshareSession('ses_abc123', 'user_123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/api/session/ses_abc123/unshare',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('throws on 404 without capturing', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+
+    await expect(unshareSession('ses_nonexistent', 'user_123')).rejects.toThrow(
+      'Session not found'
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('throws and calls captureException on 500', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('something broke'),
+    });
+
+    await expect(unshareSession('ses_abc123', 'user_123')).rejects.toThrow(
+      'Session ingest unshare failed: 500 Internal Server Error - something broke'
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'unshare' },
+        extra: { sessionId: 'ses_abc123', status: 500 },
+      })
     );
   });
 });

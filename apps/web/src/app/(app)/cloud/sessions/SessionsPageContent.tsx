@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,6 +29,8 @@ import { CopyableCommand } from '@/components/CopyableCommand';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { PageContainer } from '@/components/layouts/PageContainer';
+import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm';
 
 /** Platform filter options matching the badge logic in SessionsList */
 const PLATFORM_OPTIONS: readonly {
@@ -45,14 +47,18 @@ const PLATFORM_OPTIONS: readonly {
 ];
 
 type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'gastown' | 'other';
+type SessionFilterValue = 'all' | 'shared';
 
 export function SessionsPageContent() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
-  const [includeSubSessions, setIncludeSubSessions] = useState(false);
+  const [sessionFilter, setSessionFilter] = useState<SessionFilterValue>('all');
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   type SessionWithSource = SessionsListItem & { source: 'v2' };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -72,41 +78,82 @@ export function SessionsPageContent() {
   const shouldUsePageContainer = !organizationId;
 
   const isSearching = debouncedSearchQuery.trim().length > 0;
+  const sharedOnly = sessionFilter === 'shared';
+  const createdOnPlatform =
+    platformFilter === 'all'
+      ? undefined
+      : platformFilter === 'cloud-agent'
+        ? ['cloud-agent', 'cloud-agent-web']
+        : platformFilter;
 
-  // Query for listing sessions (when not searching)
-  // Order by updated_at and filter by organization and platform
   const { data: listData, isLoading: isListLoading } = useQuery(
     trpc.cliSessionsV2.list.queryOptions({
       limit: 50,
       orderBy: 'updated_at',
       organizationId: organizationId ?? null,
-      createdOnPlatform:
-        platformFilter === 'all'
-          ? undefined
-          : platformFilter === 'cloud-agent'
-            ? ['cloud-agent', 'cloud-agent-web']
-            : platformFilter,
-      includeChildren: includeSubSessions,
+      createdOnPlatform,
+      includeChildren: false,
+      sharedOnly,
     })
   );
 
-  // Query for searching sessions (uses debounced value)
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
     ...trpc.cliSessionsV2.search.queryOptions({
       search_string: debouncedSearchQuery.trim(),
       limit: 50,
       offset: 0,
       organizationId: organizationId ?? null,
-      createdOnPlatform:
-        platformFilter === 'all'
-          ? undefined
-          : platformFilter === 'cloud-agent'
-            ? ['cloud-agent', 'cloud-agent-web']
-            : platformFilter,
-      includeChildren: includeSubSessions,
+      createdOnPlatform,
+      includeChildren: false,
+      sharedOnly,
     }),
     enabled: isSearching,
   });
+
+  const unshareMutation = useMutation(
+    trpc.cliSessionsV2.unshare.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.cliSessionsV2.list.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.cliSessionsV2.search.queryKey() });
+      },
+    })
+  );
+
+  const shareMutation = useMutation(trpc.cliSessionsV2.share.mutationOptions());
+
+  const handleCopyLink = async (sessionId: string) => {
+    setPendingSessionId(sessionId);
+    try {
+      const result = await shareMutation.mutateAsync({ session_id: sessionId });
+      await navigator.clipboard.writeText(`${window.location.origin}/s/${result.share_token}`);
+      toast.success('Link copied to clipboard');
+    } catch {
+      toast.error('Could not copy the share link');
+    } finally {
+      setPendingSessionId(null);
+    }
+  };
+
+  const handleUnshare = async (sessionId: string) => {
+    const confirmed = await confirm({
+      title: 'Unshare session',
+      description: 'Anyone with the link will lose access.',
+      confirmLabel: 'Unshare',
+      destructive: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    setPendingSessionId(sessionId);
+    try {
+      await unshareMutation.mutateAsync({ session_id: sessionId });
+    } catch {
+      toast.error('Could not unshare the session');
+    } finally {
+      setPendingSessionId(null);
+    }
+  };
 
   // Convert API session to StoredSession format
   const convertToStoredSession = (session: {
@@ -182,15 +229,15 @@ export function SessionsPageContent() {
             </SelectContent>
           </Select>
           <Select
-            value={includeSubSessions ? 'all' : 'root'}
-            onValueChange={value => setIncludeSubSessions(value === 'all')}
+            value={sessionFilter}
+            onValueChange={value => setSessionFilter(value as SessionFilterValue)}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="root">Root sessions</SelectItem>
-              <SelectItem value="all">All sessions</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="shared">Shared</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -204,11 +251,47 @@ export function SessionsPageContent() {
       ) : sessions.length === 0 ? (
         <div className="py-12 text-center">
           <p className="text-muted-foreground">
-            {isSearching ? 'No sessions found matching your search.' : 'No sessions yet.'}
+            {isSearching
+              ? 'No sessions found matching your search.'
+              : sharedOnly
+                ? 'No shared sessions.'
+                : 'No sessions yet.'}
           </p>
         </div>
       ) : (
-        <SessionsList sessions={sessions} onSessionClick={handleSessionClick} />
+        <SessionsList
+          sessions={sessions}
+          onSessionClick={handleSessionClick}
+          rowActions={
+            sharedOnly
+              ? session => {
+                  const isPending = pendingSessionId === session.sessionId;
+                  return (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isPending}
+                        onClick={() => void handleCopyLink(session.sessionId)}
+                      >
+                        Copy link
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isPending}
+                        onClick={() => void handleUnshare(session.sessionId)}
+                      >
+                        Unshare
+                      </Button>
+                    </>
+                  );
+                }
+              : undefined
+          }
+        />
       )}
 
       {/* Open In Dialog */}

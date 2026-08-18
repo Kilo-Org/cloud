@@ -134,16 +134,21 @@ vi.mock('@/components/agents/use-text-height', () => ({
 
 vi.mock('@/components/agents/chat-composer-input-state', () => ({
   // The real gate (hasText → canSend) is covered by chat-composer-input-state
-  // tests; this suite isolates the restore → send path.
-  resolveChatComposerControlState: () => ({
-    canSend: true,
-    inputAccessibilityDisabled: false,
-    inputEditable: true,
-    paperclipDisabled: false,
-    showToolbar: true,
-    toolbarDisabled: false,
-    voiceDisabled: false,
-  }),
+  // tests; this suite isolates the restore → send path. `canSend` follows the
+  // live draft (textRef, the first useRef slot) so an empty draft stays
+  // non-sendable now that handleSend no longer guards on `!trimmed`.
+  resolveChatComposerControlState: () => {
+    const draft = (refSlots.slots[0]?.current as string | undefined) ?? '';
+    return {
+      canSend: draft.trim().length > 0,
+      inputAccessibilityDisabled: false,
+      inputEditable: true,
+      paperclipDisabled: false,
+      showToolbar: true,
+      toolbarDisabled: false,
+      voiceDisabled: false,
+    };
+  },
 }));
 
 vi.mock('@/components/ui/blur-bar', () => ({

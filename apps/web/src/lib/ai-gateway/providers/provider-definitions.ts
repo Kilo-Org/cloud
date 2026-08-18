@@ -1,5 +1,8 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  removeChatCompletionsToolNames,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -18,8 +21,7 @@ export default {
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
-    // Prompt caching is not supported on the responses API for Alibaba; enabling it is therefore dangerous.
-    supportedChatApis: ['chat_completions' /*, 'responses'*/],
+    supportedChatApis: ['chat_completions', 'responses'],
     responseTransforms: null,
     async transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
@@ -30,8 +32,7 @@ export default {
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
-    // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.
-    supportedChatApis: ['chat_completions' /*, 'responses'*/],
+    supportedChatApis: ['chat_completions', 'responses'],
     responseTransforms: null,
     async transformRequest(context) {
       if (!isReasoningExplicitlyDisabled(context.request)) {
@@ -89,10 +90,7 @@ export default {
     apiUrl: 'https://api.friendli.ai/serverless/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('FRIENDLI_API_KEY'),
-    // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
-    supportedChatApis: ['chat_completions', 'messages'],
-    // Chat completions responses report reasoning as `reasoning_content`; expose it as
-    // `reasoning_details` so clients can conserve it across turns.
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
@@ -112,10 +110,7 @@ export default {
     apiUrl: 'https://api.perplexity.ai/router/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
-    // Direct responses may omit market cost metadata; keep fallback pricing in custom-pricing.ts.
-    supportedChatApis: ['chat_completions', 'messages'],
-    // Chat completions responses report reasoning as `reasoning_content`; expose it as
-    // `reasoning_details` so clients can conserve it across turns.
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';
@@ -126,8 +121,10 @@ export default {
             context.request.body.reasoning_effort ??
             undefined);
         delete context.request.body.reasoning;
+        removeChatCompletionsToolNames(context.request.body);
       }
       delete context.request.body.provider;
+      delete context.request.body.user;
     },
   },
   STREAMLAKE: {

@@ -1,3 +1,8 @@
+import {
+  AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE,
+  isCloudAgentNextBillingErrorBody,
+} from '@kilocode/worker-utils';
+
 type CallbackTarget = {
   url: string;
   headers?: Record<string, string>;
@@ -53,6 +58,9 @@ export class CloudAgentNextClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 402 || isCloudAgentNextBillingErrorBody(errorText)) {
+        throw new Error(AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE);
+      }
       throw new Error(`prepareSession failed (${response.status}): ${errorText}`);
     }
 
@@ -93,6 +101,9 @@ export class CloudAgentNextClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 402 || isCloudAgentNextBillingErrorBody(errorText)) {
+        throw new Error(AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE);
+      }
       throw new Error(`initiateFromKilocodeSessionV2 failed (${response.status}): ${errorText}`);
     }
 

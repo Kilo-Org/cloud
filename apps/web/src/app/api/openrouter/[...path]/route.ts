@@ -25,7 +25,10 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isDeadFreeModel, isKiloExclusiveRateLimitedModel } from '@/lib/ai-gateway/models';
+import {
+  isDisabledKiloExclusiveModel,
+  isKiloExclusiveRateLimitedModel,
+} from '@/lib/ai-gateway/models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -108,7 +111,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
@@ -673,7 +676,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    isDeadFreeModel(effectiveModelIdLowerCased) ||
+    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
     (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
@@ -961,15 +964,31 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (attempt.type === 'error') return attempt.response;
 
   if (partnerFallback && attempt.response.status >= 400) {
-    console.warn('Partner request failed; retrying initial managed provider', {
+    const partnerFailureLog = {
       partner_provider: effectiveProviderContext.provider.id,
       fallback_provider: partnerFallback.providerContext.provider.id,
       status_code: attempt.response.status,
-    });
+    };
+    const responseForLogging = attempt.response.clone();
+    after(
+      (async () => {
+        try {
+          warnExceptInTest('Partner request failed before managed fallback', {
+            ...partnerFailureLog,
+            body: await responseForLogging.text(),
+          });
+        } catch (error) {
+          warnExceptInTest('Partner request failed before managed fallback', {
+            ...partnerFailureLog,
+            response_body_read_error: String(error),
+          });
+        }
+      })()
+    );
     try {
       await attempt.response.body?.cancel();
     } catch {
-      console.warn('Failed to cancel discarded partner response body');
+      warnExceptInTest('Failed to cancel discarded partner response body');
     }
 
     effectiveProviderContext = partnerFallback.providerContext;

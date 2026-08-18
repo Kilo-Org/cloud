@@ -25,14 +25,14 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
+import { generateApiToken } from '@/lib/tokens';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
+  unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
@@ -513,6 +513,7 @@ const ListSessionsInputSchema = z.object({
   limit: z.number().min(1).max(RECENT_DAYS_LIMIT).optional().default(PAGE_SIZE),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   includeChildren: z.boolean().optional().default(false),
+  sharedOnly: z.boolean().optional().default(false),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
@@ -539,6 +540,7 @@ const SearchInputSchema = z.object({
     .optional(),
   organizationId: z.uuid().nullable().optional(),
   includeChildren: z.boolean().optional().default(false),
+  sharedOnly: z.boolean().optional().default(false),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
 });
 
@@ -729,6 +731,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       limit,
       orderBy,
       includeChildren,
+      sharedOnly,
       createdOnPlatform,
       organizationId,
       gitUrl,
@@ -752,6 +755,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     if (!includeChildren) {
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    if (sharedOnly) {
+      whereConditions.push(isNotNull(cli_sessions_v2.public_id));
     }
 
     if (updatedSince) {
@@ -815,6 +822,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       createdOnPlatform,
       organizationId,
       includeChildren,
+      sharedOnly,
       gitUrl,
     } = input;
 
@@ -832,6 +840,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     if (!includeChildren) {
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    if (sharedOnly) {
+      whereConditions.push(isNotNull(cli_sessions_v2.public_id));
     }
 
     // Use position() for a case-insensitive substring match. This avoids LIKE
@@ -1639,10 +1651,10 @@ export const cliSessionsV2Router = createTRPCRouter({
   }),
 
   /**
-   * Share a V2 session by generating a public_id.
+   * Share a V2 session by issuing an opaque JWT share token.
    *
    * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has a public_id, the existing one is returned.
+   * already has an active share generation, the existing one is reused.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
@@ -1650,7 +1662,7 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id);
-      return { public_id: result.public_id };
+      return { share_token: result.share_token };
     } catch (error) {
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
@@ -1659,6 +1671,35 @@ export const cliSessionsV2Router = createTRPCRouter({
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to share session',
+        cause: error,
+      });
+    }
+  }),
+
+  /**
+   * Revoke a V2 session's public share link.
+   *
+   * Owner-only, matching the session-ingest worker. A missing or inaccessible
+   * session is NOT_FOUND. Worker 404 is mapped the same way.
+   */
+  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+    const { session_id } = input;
+    await getSessionWithAccessCheck(session_id, ctx);
+
+    try {
+      await unshareSessionIngest(session_id, ctx.user.id);
+      return { success: true as const };
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Session not found') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+      captureException(error, {
+        tags: { source: 'cli-sessions-v2-router', endpoint: 'unshare' },
+        extra: { session_id },
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to unshare session',
         cause: error,
       });
     }
@@ -1700,40 +1741,14 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      if (!SESSION_INGEST_WORKER_URL) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'SESSION_INGEST_WORKER_URL is not configured',
-        });
-      }
-
-      const token = generateInternalServiceToken(session.kilo_user_id);
-      const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(input.kilo_session_id)}/share`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Session share failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`,
-        });
-      }
-
-      const shareResponseSchema = z.object({ public_id: z.string() });
-      let body: z.infer<typeof shareResponseSchema>;
       try {
-        body = shareResponseSchema.parse(await response.json());
-      } catch {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Session share succeeded but response was malformed',
-        });
+        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
+        return { share_token: result.share_token, session_id: input.kilo_session_id };
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Session not found') {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
+        throw error;
       }
-
-      return { share_id: body.public_id, session_id: input.kilo_session_id };
     }),
 });

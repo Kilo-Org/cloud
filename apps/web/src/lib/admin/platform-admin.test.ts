@@ -1,9 +1,12 @@
 import { isEligibleForPlatformAdmin, shouldAutoProvisionPlatformAdmin } from './platform-admin';
 
 describe('isEligibleForPlatformAdmin', () => {
-  it('is eligible for an exact lowercase kilocode.ai email and hosted domain', () => {
-    expect(isEligibleForPlatformAdmin('person@kilocode.ai', 'kilocode.ai')).toBe(true);
-  });
+  test.each(['kilocode.ai', 'anaconda.com'])(
+    'is eligible for an exact lowercase %s email and hosted domain',
+    domain => {
+      expect(isEligibleForPlatformAdmin(`person@${domain}`, domain)).toBe(true);
+    }
+  );
 
   it('is not eligible when the hosted domain is a personal/provider placeholder', () => {
     expect(isEligibleForPlatformAdmin('person@kilocode.ai', '@@personal@@')).toBe(false);
@@ -13,8 +16,12 @@ describe('isEligibleForPlatformAdmin', () => {
     expect(isEligibleForPlatformAdmin('person@kilocode.ai', null)).toBe(false);
   });
 
-  it('is not eligible when the hosted domain matches but the email is not a kilocode.ai email', () => {
+  it('is not eligible when the hosted domain matches but the email is not from an allowed domain', () => {
     expect(isEligibleForPlatformAdmin('person@example.com', 'kilocode.ai')).toBe(false);
+  });
+
+  it('is not eligible when the email and hosted domain belong to different allowed domains', () => {
+    expect(isEligibleForPlatformAdmin('person@anaconda.com', 'kilocode.ai')).toBe(false);
   });
 
   it('is not eligible for uppercase email variants', () => {
@@ -27,10 +34,12 @@ describe('isEligibleForPlatformAdmin', () => {
 
   it('is not eligible for a subdomain lookalike', () => {
     expect(isEligibleForPlatformAdmin('person@sub.kilocode.ai', 'kilocode.ai')).toBe(false);
+    expect(isEligibleForPlatformAdmin('person@sub.anaconda.com', 'anaconda.com')).toBe(false);
   });
 
   it('is not eligible for a registrable-parent-domain lookalike', () => {
     expect(isEligibleForPlatformAdmin('person@notkilocode.ai', 'kilocode.ai')).toBe(false);
+    expect(isEligibleForPlatformAdmin('person@notanaconda.com', 'anaconda.com')).toBe(false);
   });
 
   it('is not eligible for a fake-login hosted domain even with a kilocode.ai email', () => {

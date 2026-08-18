@@ -461,7 +461,9 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
     if (!body.message?.id) {
       return errorResponse('INVALID_REQUEST', 'message.id is required', 400);
     }
-    if (!body.message.prompt && !body.message.parts) {
+    const hasAttachments = (body.message.attachments?.length ?? 0) > 0;
+    const hasParts = Array.isArray(body.message.parts) && body.message.parts.length > 0;
+    if (!body.message.prompt && !hasParts && !hasAttachments) {
       return errorResponse(
         'INVALID_REQUEST',
         'Either message.prompt or message.parts is required',

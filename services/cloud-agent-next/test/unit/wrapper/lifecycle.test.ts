@@ -168,6 +168,27 @@ describe('wrapper sealed batch lifecycle', () => {
     expect(closeConnections).toHaveBeenCalledOnce();
   });
 
+  it('still emits complete if abort arrives after a sealed idle drain starts', async () => {
+    let resolveAutoCommit: ((result: { success: boolean }) => void) | undefined;
+    vi.mocked(runAutoCommit).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveAutoCommit = resolve;
+        })
+    );
+    state.acceptMessage('message-1', { ...config, autoCommit: true });
+
+    manager.onSessionIdle();
+    await vi.advanceTimersByTimeAsync(3_000);
+    manager.setAborted();
+    resolveAutoCommit?.({ success: true });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(sendToIngest).toHaveBeenCalledWith(
+      expect.objectContaining({ streamEventType: 'complete' })
+    );
+  });
+
   it('uses latest admitted finalization config', async () => {
     state.acceptMessage('message-1', { ...config, autoCommit: true });
     state.acceptMessage('message-2', config);

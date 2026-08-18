@@ -41,7 +41,7 @@ export const claude_opus_4_8_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  pricing: CLAUDE_OPUS_STEALTH_PRICING,
+  pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
 };
 
@@ -56,7 +56,7 @@ export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  pricing: CLAUDE_OPUS_STEALTH_PRICING,
+  pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
 };
 
@@ -83,7 +83,7 @@ export const claude_sonnet_4_6_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 64_000,
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  pricing: CLAUDE_SONNET_STEALTH_PRICING,
+  pricing: { tiers: CLAUDE_SONNET_STEALTH_PRICING },
   inference_provider_restriction: [],
 };
 
@@ -98,7 +98,7 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  pricing: CLAUDE_OPUS_STEALTH_PRICING,
+  pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
 };
 

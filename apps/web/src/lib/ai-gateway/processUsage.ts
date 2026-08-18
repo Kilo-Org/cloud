@@ -1188,10 +1188,13 @@ export function parseMicrodollarUsageFromString(
 export function calculateKiloExclusiveCost_mUsd(
   model: KiloExclusiveModel,
   usage: JustTheCostsUsageStats
-): number {
+): number | undefined {
   const pricing = model?.pricing;
   if (!pricing) {
     return 0;
+  }
+  if (pricing.fallbackOnly && usage.cost_mUsd > 0) {
+    return undefined;
   }
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
   if (uncachedInputTokens < 0) {
@@ -1209,7 +1212,7 @@ export function calculateKiloExclusiveCost_mUsd(
         cacheHitTokens: usage.cacheHitTokens,
         cacheWriteTokens: usage.cacheWriteTokens,
       },
-      pricing
+      pricing.tiers
     )
   );
 }
@@ -1288,8 +1291,11 @@ export async function processTokenData(
 
   const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
-    usageStats.market_cost = usageStats.cost_mUsd;
-    usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
+    const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
+    if (exclusiveCost_mUsd !== undefined) {
+      usageStats.market_cost = usageStats.cost_mUsd;
+      usageStats.cost_mUsd = exclusiveCost_mUsd;
+    }
   }
 
   const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);

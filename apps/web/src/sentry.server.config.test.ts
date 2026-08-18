@@ -275,4 +275,30 @@ describe('sanitizeSentryRequestData', () => {
 
     expect(sanitizeSentryRequestData(event)).toBe(event);
   });
+
+  test('redacts a session share JWT from an absolute request URL', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/s/eyJhbGciOiJIUzI1NiJ9.share.token?utm_source=copy',
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.url).toBe('https://app.kilo.sh/s/:share_token?utm_source=copy');
+  });
+
+  test('redacts a session share JWT from a relative request URL while keeping the fragment', () => {
+    const event: Event = {
+      request: {
+        url: '/s/eyJhbGciOiJIUzI1NiJ9.share.token#open',
+        method: 'GET',
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.url).toBe('/s/:share_token#open');
+  });
 });

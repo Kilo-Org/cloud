@@ -32,7 +32,9 @@ vi.mock('./dos/SessionAccessCacheDO', () => ({
 
 import { app } from './index';
 import { getWorkerDb } from '@kilocode/db/client';
+import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { signSessionShareToken } from './services/session-share-token';
 
 type TestBindings = {
   HYPERDRIVE: { connectionString: string };
@@ -41,12 +43,16 @@ type TestBindings = {
   NEXTAUTH_SECRET: unknown;
   NEXTAUTH_SECRET_RAW?: string;
   INTERNAL_API_SECRET_PROD: { get(): Promise<string> };
+  SESSION_SHARE_JWT_SECRET_PROD: { get(): Promise<string> };
+  SESSION_SHARE_TOKEN_MIN_IAT: string;
+  USER_EXISTS_CACHE?: { delete: ReturnType<typeof vi.fn<(key: string) => Promise<void>>> };
 };
 
 function makeDbFakes() {
   const selectResult = vi.fn<() => Promise<unknown[]>>(async () => []);
   const select = {
     from: vi.fn(() => select),
+    leftJoin: vi.fn(() => select),
     where: vi.fn(() => select),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
@@ -66,6 +72,10 @@ const defaultEnv: TestBindings = {
   NEXTAUTH_SECRET: {},
   NEXTAUTH_SECRET_RAW: 'secret',
   INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+  SESSION_SHARE_JWT_SECRET_PROD: {
+    get: async () => 'session-share-secret-for-tests-32-bytes',
+  },
+  SESSION_SHARE_TOKEN_MIN_IAT: '0',
 };
 
 describe('session access invalidation route', () => {
@@ -158,23 +168,222 @@ describe('session access invalidation route', () => {
   });
 });
 
+describe('user auth invalidation route', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('rejects invalidation without the internal secret', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(401);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalidation with an incorrect internal secret', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'wrong-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(401);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalidation with a malformed body', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 123 }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(400);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the versioned user-auth cache key', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(204);
+    expect(cache.delete).toHaveBeenCalledWith('user-auth:v1:usr_blocked');
+  });
+
+  it('protects the session export route with the shared internal-secret middleware', async () => {
+    const res = await app.request(
+      '/internal/session/ses_12345678901234567890123456/export',
+      { method: 'GET' },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 503 when the Secrets Store cannot resolve the internal secret', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const cache = { delete: vi.fn(async () => undefined) };
+    const suppliedSecret = 'caller-supplied-secret';
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': suppliedSecret,
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      {
+        ...defaultEnv,
+        USER_EXISTS_CACHE: cache,
+        INTERNAL_API_SECRET_PROD: {
+          get: async () => {
+            throw new Error('secret store unavailable');
+          },
+        },
+      }
+    );
+
+    const body = await res.json();
+    expect(res.status).toBe(503);
+    expect(body).toEqual({ success: false, error: 'Service temporarily unavailable' });
+    expect(JSON.stringify(body)).not.toContain('secret store unavailable');
+    expect(JSON.stringify(body)).not.toContain(suppliedSecret);
+    expect(cache.delete).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'internal-api-secret-get',
+        errorClass: 'Error',
+      })
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(suppliedSecret);
+    error.mockRestore();
+  });
+});
+
 describe('public session route', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it('returns 400 for invalid uuid', async () => {
-    const res = await app.request('/session/not-a-uuid', {}, defaultEnv);
-    expect(res.status).toBe(400);
+  it('returns 404 for malformed share tokens', async () => {
+    const res = await app.request('/session/not-a-jwt', {}, defaultEnv);
+    expect(res.status).toBe(404);
   });
 
-  it('returns 404 without looking up the public_id', async () => {
+  it('returns 404 when the token generation is not found', async () => {
     const { db, selectResult } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValueOnce([]);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
 
-    const res = await app.request('/session/11111111-1111-4111-8111-111111111111', {}, defaultEnv);
+    const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
 
     expect(res.status).toBe(404);
-    expect(selectResult).not.toHaveBeenCalled();
+  });
+
+  it('returns a matching DO snapshot with no-store caching', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    selectResult.mockResolvedValueOnce([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        ownerName: 'Shared owner',
+      },
+    ]);
+
+    const stub = {
+      getAllStream: vi.fn(async () => new Response('{"ok":true}').body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      stub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.text()).toBe('{"ok":true}');
+  });
+
+  it('returns shared metadata with no-store caching', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    selectResult.mockResolvedValueOnce([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        ownerName: 'Shared owner',
+      },
+    ]);
+
+    const res = await app.request(`/session/${encodeURIComponent(token)}/metadata`, {}, defaultEnv);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({
+      success: true,
+      title: 'Shared title',
+      owner_name: 'Shared owner',
+    });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 });

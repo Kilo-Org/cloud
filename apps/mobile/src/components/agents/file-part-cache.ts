@@ -42,15 +42,15 @@ function getVersionSnapshot(): number {
 
 /**
  * Resolve the URL to store for a captured FilePart. A `data:` URL is written
- * to disk and stored as a `file://` URI; an `http(s)` URL is stored as-is. A
- * transcript `file://` URL is rejected (returns `undefined`). On any decode or
- * write failure the raw URL is stored instead. Never throws.
+ * to disk and stored as a `file://` URI; an `http(s)` URL is stored as-is.
+ * Any other scheme is rejected (returns `undefined`). On any decode or write
+ * failure the raw URL is stored instead. Never throws.
  */
 function resolveCacheUrl(
   partId: string,
   payload: Readonly<{ url: string; mime: string; filename?: string }>
 ): string | undefined {
-  if (payload.url.startsWith('file://')) {
+  if (!isUsableFilePartUrl(payload.url)) {
     return undefined;
   }
   if (!payload.url.startsWith('data:')) {

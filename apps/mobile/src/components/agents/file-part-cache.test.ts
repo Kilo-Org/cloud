@@ -177,6 +177,17 @@ describe('cacheFilePart', () => {
     expect(fileInstances).toHaveLength(0);
     expect(getFilePartCacheEntry('part-1')).toBeUndefined();
   });
+
+  it('does not store a non-http(s)/data: URL', () => {
+    cacheFilePart('part-1', {
+      url: 'ftp://example.com/report.pdf',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+
+    expect(fileInstances).toHaveLength(0);
+    expect(getFilePartCacheEntry('part-1')).toBeUndefined();
+  });
 });
 
 describe('isUsableFilePartUrl', () => {

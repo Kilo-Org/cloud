@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  redeployLatest,
   resolveVault,
   resolveVercelContexts,
   setVaultValue,
@@ -68,6 +69,24 @@ process.stderr.write('You are not currently signed in to a 1Password account.\\n
 process.exitCode = 1;
 `;
 
+const FAKE_PNPM_REDEPLOY = `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FAKE_VERCEL_LOG, JSON.stringify(args) + '\\n');
+if (args[2] === 'list') {
+  process.stdout.write(JSON.stringify({
+    deployments: [
+      { url: 'latest-staging.example.vercel.app', state: 'READY' },
+      { url: 'older-staging.example.vercel.app', state: 'READY' }
+    ]
+  }));
+} else if (args[2] === 'redeploy') {
+  process.stdout.write('https://new-staging.example.vercel.app');
+} else {
+  process.exitCode = 1;
+}
+`;
+
 async function captureOpInvocations(existing: boolean): Promise<Invocation[]> {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-op-test-'));
   const logFile = path.join(directory, 'op.jsonl');
@@ -112,6 +131,54 @@ void test('stripSurroundingQuotes removes one matching outer quote pair', () => 
   assert.equal(stripSurroundingQuotes(`"line\nwith\nnewlines"`), 'line\nwith\nnewlines');
   assert.equal(stripSurroundingQuotes(`'keeps "inner" double'`), 'keeps "inner" double');
   assert.equal(stripSurroundingQuotes(`"mismatched'`), `"mismatched'`);
+});
+
+void test('redeployLatest redeploys the latest ready deployment for the target environment', async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
+  const logFile = path.join(directory, 'vercel.jsonl');
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_REDEPLOY, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_VERCEL_LOG;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_VERCEL_LOG = logFile;
+
+  try {
+    assert.equal(
+      await redeployLatest({ project: 'kilocode-app', orgId: 'org-id', cwd: directory }, 'staging'),
+      'https://new-staging.example.vercel.app'
+    );
+    const invocations = readFileSync(logFile, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as string[]);
+    assert.deepEqual(invocations[0]?.slice(0, 10), [
+      'dlx',
+      'vercel@53.3.1',
+      'list',
+      'kilocode-app',
+      '--environment',
+      'staging',
+      '--status',
+      'READY',
+      '--format=json',
+      '--scope',
+    ]);
+    assert.deepEqual(invocations[1]?.slice(0, 7), [
+      'dlx',
+      'vercel@53.3.1',
+      'redeploy',
+      'latest-staging.example.vercel.app',
+      '--target',
+      'staging',
+      '--scope',
+    ]);
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_VERCEL_LOG;
+    else process.env.FAKE_VERCEL_LOG = originalLog;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 void test('setVaultValue creates an item from a template without sending the secret through stdin', async () => {

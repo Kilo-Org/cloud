@@ -170,7 +170,9 @@ Answer no for public or otherwise non-secret configuration. `NEXT_PUBLIC_*` vari
 
 The command prompts for single-line values without echoing them, then asks for a default value for each tracked root and `apps/web` dotenv file. Enter the raw secret without surrounding quotes (a matching outer `"` or `'` pair is stripped if present, because quoted values break `vercel env pull`). Enter a value directly, or press Return to skip that file. If every file is skipped, the command warns that the application must work without the variable so external contributors can still run it. A tracked default cannot match a remote value; use a non-secret local default instead. Invalid yes/no answers and empty remote values are prompted again instead of terminating the command. For multiline values, use `--development-file`, `--staging-file`, and `--production-file`. Use `--dry-run` to preview the redacted plan.
 
-Remote updates are sequential rather than transactional. If a provider fails partway through, fix the problem and rerun the same command; it safely upserts every target. The workflow does not deploy, so trigger the appropriate deployment separately.
+Use `pnpm web:env set EXAMPLE_API_TOKEN --only staging` to rotate just one Vercel environment in both projects. `development`, `staging`, and `production` are supported. A single-environment rotation skips tracked dotenv defaults because they are shared, and skips the Production 1Password copy unless Production is selected.
+
+Remote updates are sequential rather than transactional. If a provider fails partway through, fix the problem and rerun the same command; it safely upserts every target. After updating Staging or Production, the command explains that existing deployments retain the old value and asks whether to redeploy the latest ready deployment in each affected Vercel project.
 
 ### 4. Start the database
 

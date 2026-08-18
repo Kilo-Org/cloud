@@ -62,19 +62,6 @@ export async function hasClipboardImage(): Promise<boolean> {
 }
 
 /**
- * Check whether the clipboard holds text of any type.
- * Uses `hasStringAsync`, which inspects only the content type and raises
- * no iOS paste-permission prompt. Returns `false` on any error.
- */
-export async function hasClipboardText(): Promise<boolean> {
-  try {
-    return await Clipboard.hasStringAsync();
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Check whether the clipboard holds a URL.
  * Uses `hasUrlAsync`, which is iOS/macOS only and raises no iOS paste
  * prompt. Returns `false` on any error (including the Android

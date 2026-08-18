@@ -4,7 +4,6 @@ import { AppState, type AppStateStatus } from 'react-native';
 import {
   type ClipboardImageFile,
   hasClipboardImage,
-  hasClipboardText,
   hasClipboardUrl,
   readClipboardImageFile,
   readClipboardText,
@@ -26,9 +25,11 @@ type UseClipboardPasteOptions = {
    *  wrong there. Omit it to keep the image-only behavior. */
   addText?: (text: string) => void;
   /** Called when neither an image nor text could be used. `'empty'` means no
-   *  image, no string, and no URL on the clipboard. `'unreadable'` means
-   *  content was present but the read failed or was denied. The caller supplies
-   *  its own toast copy to match that composer's existing pick-path message. */
+   *  image, no readable text, and no URL on the clipboard. `'unreadable'` means
+   *  an image or URL was present but the read failed or was denied. A denied
+   *  text read is indistinguishable from empty and reports 'empty'. The caller
+   *  supplies its own toast copy to match that composer's existing pick-path
+   *  message. */
   onFailure: (reason: 'empty' | 'unreadable') => void;
 };
 
@@ -162,7 +163,7 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
             return;
           }
           if (addText) {
-            const present = (await hasClipboardText()) || (await hasClipboardUrl());
+            const present = await hasClipboardUrl();
             if (present) {
               onFailureRef.current('unreadable');
               return;

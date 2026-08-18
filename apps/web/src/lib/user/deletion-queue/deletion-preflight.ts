@@ -73,22 +73,9 @@ async function evaluateDeletionPreflight(
   }
 
   const adoptedUser = currentUser;
-  const [requester] = request.requested_by_kilo_user_id
-    ? await tx
-        .select({
-          id: kilocode_users.id,
-          email: kilocode_users.google_user_email,
-        })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, request.requested_by_kilo_user_id))
-        .limit(1)
-    : [];
   const refusal = classifyProtectedIdentity({
     email,
     user: adoptedUser,
-    actor: requester
-      ? { id: requester.id, email: requester.email }
-      : { id: request.requested_by_kilo_user_id, email: null },
   });
   if (refusal) {
     return { kind: 'needs_attention', errorCode: refusal };

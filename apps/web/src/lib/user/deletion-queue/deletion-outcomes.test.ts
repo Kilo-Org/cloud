@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import {
+  kilocode_users,
   user_deletion_activity,
   user_deletion_audit_events,
   user_deletion_requests,
@@ -147,6 +148,33 @@ describe('markTaskManuallyVerified', () => {
 describe('shared preflight outcomes', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
+  });
+
+  it('promotes a self-service request instead of parking it as protected_self', async () => {
+    const user = await insertTestUser({
+      google_user_email: `self-service-${crypto.randomUUID()}@example.com`,
+    });
+    const [result] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: user.id, email: user.google_user_email },
+      targets: [{ email: user.google_user_email, trustedUserId: user.id, allowSelf: true }],
+    });
+    expect(result.status).toBe('enqueued');
+    if (result.status !== 'enqueued') throw new Error('expected enqueued');
+
+    const preflight = await runDeletionPreflight(result.requestId);
+
+    expect(preflight).toEqual({ kind: 'promoted', userId: user.id });
+    const [request] = await db
+      .select()
+      .from(user_deletion_requests)
+      .where(eq(user_deletion_requests.id, result.requestId));
+    expect(request?.status).toBe(UserDeletionRequestStatus.InProgress);
+    expect(request?.preflight_attention_code).toBeNull();
+    const [after] = await db
+      .select({ blockedReason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(after?.blockedReason).toMatch(/^deletion-in-progress at /);
   });
 
   it('writes attention code, one preflight_disposition audit, and request-level activity', async () => {

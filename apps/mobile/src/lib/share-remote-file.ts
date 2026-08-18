@@ -30,7 +30,7 @@ export function getShareRemoteFileReason(error: unknown): ShareRemoteFileReason 
   return null;
 }
 
-async function materializeRemoteFile({
+export async function downloadRemoteFile({
   url,
   cacheDirectoryName,
   cacheFilename,
@@ -57,19 +57,6 @@ async function materializeRemoteFile({
     }
     throw new ShareRemoteFileError('download-failed');
   }
-}
-
-export async function downloadRemoteFile({
-  url,
-  cacheDirectoryName,
-  cacheFilename,
-}: {
-  url: string;
-  cacheDirectoryName: string;
-  cacheFilename: string;
-}): Promise<MaterializedRemoteFile> {
-  const materialized = await materializeRemoteFile({ url, cacheDirectoryName, cacheFilename });
-  return materialized;
 }
 
 export async function shareLocalFile(
@@ -113,7 +100,7 @@ export async function shareRemoteFile({
   cacheKey: string;
   filename: string;
 }): Promise<void> {
-  const materialized = await materializeRemoteFile({
+  const materialized = await downloadRemoteFile({
     url,
     cacheDirectoryName,
     cacheFilename: getSafeCacheFilename({ id: cacheKey, filename }),

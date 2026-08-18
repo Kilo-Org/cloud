@@ -72,6 +72,79 @@ describe('active-sessions-router', () => {
     jest.restoreAllMocks();
   });
 
+  describe('getToken', () => {
+    it('mints a one-use ticket and returns { token, expiresAt }', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ticket: 'ticket-abc', expiresAt: 1_700_000_060 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.getToken();
+
+      expect(result).toEqual({ token: 'ticket-abc', expiresAt: 1_700_000_060 });
+
+      const [calledUrl, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+      expect(calledUrl).toBe('https://test-ingest.example.com/api/user/web-ticket');
+      expect(init.method).toBe('POST');
+      expect((init.headers as Record<string, string>).Authorization).toContain('Bearer ');
+    });
+
+    it('throws PRECONDITION_FAILED when the worker returns a non-2xx response', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response('upstream failed', { status: 502 }));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.getToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('PRECONDITION_FAILED');
+        expect(err.message).toBe('Session ingest is not configured');
+      }
+    });
+
+    it('throws PRECONDITION_FAILED when fetch itself fails (network error)', async () => {
+      jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.getToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('PRECONDITION_FAILED');
+        expect(err.message).toBe('Session ingest is not configured');
+      }
+    });
+
+    it('throws PRECONDITION_FAILED when the worker returns a malformed 200 body', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ticket: '', expiresAt: 'not-a-number' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.getToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('PRECONDITION_FAILED');
+        expect(err.message).toBe('Invalid ticket response from session ingest');
+      }
+    });
+  });
+
   describe('listInstances', () => {
     it('returns the instances from the worker when the upstream call succeeds', async () => {
       const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(

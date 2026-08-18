@@ -416,7 +416,7 @@ function createUserWebConnection(
 
   function buildUrl(): string {
     const url = new URL(config.websocketUrl);
-    url.searchParams.set('token', token);
+    url.searchParams.set('ticket', token);
     url.searchParams.set('connectionId', connectionId);
     return url.toString();
   }

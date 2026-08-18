@@ -519,7 +519,9 @@ export const mockAgentsApi = async (
       }
 
       if (proc === 'activeSessions.getToken') {
-        return { result: { data: { token: 'mock-ingest-token' } } };
+        return {
+          result: { data: { token: 'mock-ingest-token', expiresAt: 1_700_000_000 } },
+        };
       }
 
       if (

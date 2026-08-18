@@ -66,6 +66,15 @@ const connectedInstancesResponseSchema = z.object({
 });
 
 /**
+ * Session Ingest `/api/user/web-ticket` mint response. Parsed at runtime so a
+ * malformed 200 fails the mutation instead of returning undefined fields.
+ */
+const webTicketResponseSchema = z.object({
+  ticket: z.string().min(1),
+  expiresAt: z.number(),
+});
+
+/**
  * A live session as this router returns it: the worker's wire row plus the
  * fields enriched from `cli_sessions_v2`.
  */
@@ -220,9 +229,54 @@ function throwOrgContextFailure(error: unknown): never {
 }
 
 export const activeSessionsRouter = createTRPCRouter({
-  getToken: baseProcedure.query(async ({ ctx }) => {
+  /**
+   * Mint a one-use web ticket from Session Ingest for the authenticated user.
+   * The returned `token` is the opaque ticket; `expiresAt` is the Unix-seconds
+   * expiry from the worker body. A missing worker URL or a non-2xx mint
+   * response fails fast with PRECONDITION_FAILED rather than hanging.
+   */
+  getToken: baseProcedure.mutation(async ({ ctx }) => {
+    if (!SESSION_INGEST_WORKER_URL) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Session ingest is not configured',
+      });
+    }
+
     const token = generateInternalServiceToken(ctx.user.id);
-    return { token };
+    const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Session ingest is not configured',
+        cause: error,
+      });
+    }
+
+    if (!response.ok) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Session ingest is not configured',
+      });
+    }
+
+    const raw = await response.json();
+    const parsed = webTicketResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Invalid ticket response from session ingest',
+        cause: parsed.error,
+      });
+    }
+    return { token: parsed.data.ticket, expiresAt: parsed.data.expiresAt };
   }),
 
   list: baseProcedure.input(listInputSchema).query(async ({ ctx, input }) => {

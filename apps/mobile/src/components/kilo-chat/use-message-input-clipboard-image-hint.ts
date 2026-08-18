@@ -1,6 +1,9 @@
 import { toast } from 'sonner-native';
 
-import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
+import {
+  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  useClipboardPaste,
+} from '@/lib/agent-attachments/use-clipboard-paste';
 import { buildAttachmentUnreadableToast } from './message-attachment-state';
 import { type ComposerAttachmentQueue } from './message-input-types';
 
@@ -22,8 +25,12 @@ export function useMessageInputClipboardImageHint({
     addFile: async file => {
       await attachmentQueue?.addClipboardImage(file);
     },
-    onUnreadable: () => {
-      toast.error(buildAttachmentUnreadableToast('the pasted image'));
+    onFailure: reason => {
+      toast.error(
+        reason === 'empty'
+          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          : buildAttachmentUnreadableToast('the pasted image')
+      );
     },
   });
 }

@@ -4,9 +4,13 @@ import { AppState, type AppStateStatus } from 'react-native';
 import {
   type ClipboardImageFile,
   hasClipboardImage,
+  hasClipboardText,
+  hasClipboardUrl,
   readClipboardImageFile,
   readClipboardText,
 } from './clipboard-image';
+
+export const CLIPBOARD_PASTE_EMPTY_MESSAGE = 'Nothing to paste';
 
 type UseClipboardPasteOptions = {
   /** Gates `visible` only — `paste` always works. Defaults to true. Pass each
@@ -21,10 +25,11 @@ type UseClipboardPasteOptions = {
    *  paste with text on the clipboard, and an unreadable-image toast would be
    *  wrong there. Omit it to keep the image-only behavior. */
   addText?: (text: string) => void;
-  /** Called when neither an image nor text could be read (empty, denied, or
-   *  unsupported type). The caller supplies its own unreadable-toast copy to
-   *  match that composer's existing pick-path message. */
-  onUnreadable: () => void;
+  /** Called when neither an image nor text could be used. `'empty'` means no
+   *  image, no string, and no URL on the clipboard. `'unreadable'` means
+   *  content was present but the read failed or was denied. The caller supplies
+   *  its own toast copy to match that composer's existing pick-path message. */
+  onFailure: (reason: 'empty' | 'unreadable') => void;
 };
 
 type UseClipboardPasteReturn = {
@@ -63,11 +68,11 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
   // effect re-subscribes when a parent re-renders.
   const addFileRef = useRef(options.addFile);
   const addTextRef = useRef(options.addText);
-  const onUnreadableRef = useRef(options.onUnreadable);
+  const onFailureRef = useRef(options.onFailure);
   useEffect(() => {
     addFileRef.current = options.addFile;
     addTextRef.current = options.addText;
-    onUnreadableRef.current = options.onUnreadable;
+    onFailureRef.current = options.onFailure;
   });
 
   const inFlightRef = useRef(false);
@@ -134,7 +139,8 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
         // inspects only the content type, so a text clipboard reaches the text
         // path without the image read that would raise a second iOS 16 paste
         // prompt for content that is not there.
-        const file = (await hasClipboardImage()) ? await readClipboardImageFile() : null;
+        const clipboardHasImage = await hasClipboardImage();
+        const file = clipboardHasImage ? await readClipboardImageFile() : null;
         if (!file) {
           // No readable image. A caller with an always-present paste control
           // accepts text, so a text clipboard pastes instead of toasting.
@@ -144,12 +150,25 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
           // image must stay retryable: the user can grant the permission or
           // copy the image again.
           const addText = addTextRef.current;
-          const text = addText ? await readClipboardText() : '';
-          if (addText && text !== '') {
-            addText(text);
+          if (addText) {
+            const text = await readClipboardText();
+            if (text !== '') {
+              addText(text);
+              return;
+            }
+          }
+          if (clipboardHasImage) {
+            onFailureRef.current('unreadable');
             return;
           }
-          onUnreadableRef.current();
+          if (addText) {
+            const present = (await hasClipboardText()) || (await hasClipboardUrl());
+            if (present) {
+              onFailureRef.current('unreadable');
+              return;
+            }
+          }
+          onFailureRef.current('empty');
           return;
         }
         // The clipboard image was read: mark it consumed so a later

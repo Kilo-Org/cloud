@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the paste hook classifies empty vs unreadable across image, text, and URL states; one cohesive suite pins each reason. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useClipboardPaste } from './use-clipboard-paste';
@@ -5,6 +6,8 @@ import { useClipboardPaste } from './use-clipboard-paste';
 // ── Hoisted mocks ─────────────────────────────────────────────────────────
 
 const hasClipboardImageMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+const hasClipboardTextMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+const hasClipboardUrlMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const readClipboardImageFileMock = vi.hoisted(() =>
   vi.fn<() => Promise<{ uri: string; name: string; mimeType: string } | null>>()
 );
@@ -13,6 +16,8 @@ const setHasImageMock = vi.hoisted(() => vi.fn<(value: boolean) => void>());
 
 vi.mock('./clipboard-image', () => ({
   hasClipboardImage: hasClipboardImageMock,
+  hasClipboardText: hasClipboardTextMock,
+  hasClipboardUrl: hasClipboardUrlMock,
   readClipboardImageFile: readClipboardImageFileMock,
   readClipboardText: readClipboardTextMock,
 }));
@@ -42,19 +47,30 @@ function makeOptions(overrides?: {
   enabled?: boolean;
   addFile?: () => Promise<void>;
   addText?: (text: string) => void;
-  onUnreadable?: () => void;
+  onFailure?: (reason: 'empty' | 'unreadable') => void;
 }) {
   return {
     enabled: overrides?.enabled ?? true,
     addFile: overrides?.addFile ?? vi.fn().mockResolvedValue(undefined),
     addText: overrides?.addText,
-    onUnreadable: overrides?.onUnreadable ?? vi.fn<() => void>(),
+    onFailure: overrides?.onFailure ?? vi.fn<(reason: 'empty' | 'unreadable') => void>(),
   };
 }
 
 /** Wait for the hook's async refresh/paste callbacks to settle. */
 async function flushMicrotasks() {
   await Promise.resolve();
+}
+
+/** Flush microtasks until `fn` has been called, up to `max` flushes. */
+async function flushUntilCalled(fn: { mock: { calls: unknown[] } }, max = 8) {
+  for (let i = 0; i < max; i += 1) {
+    if (fn.mock.calls.length > 0) {
+      return;
+    }
+    // eslint-disable-next-line no-await-in-loop -- flush one microtask at a time until the mock is called.
+    await Promise.resolve();
+  }
 }
 
 /** Extract the last boolean argument passed to setHasImage. */
@@ -180,8 +196,8 @@ describe('useClipboardPaste', () => {
     hasClipboardImageMock.mockResolvedValue(true);
     readClipboardImageFileMock.mockResolvedValue(null);
 
-    const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardPaste(makeOptions({ onUnreadable }));
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ onFailure }));
 
     // Refresh shows the image.
     hook.refresh();
@@ -190,9 +206,10 @@ describe('useClipboardPaste', () => {
 
     // Paste fails — readClipboardImageFile returns null.
     hook.paste();
-    await flushMicrotasks();
+    await flushUntilCalled(onFailure);
 
-    expect(onUnreadable).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('unreadable');
 
     // Subsequent refresh can still show the image (not consumed).
     hook.refresh();
@@ -208,18 +225,21 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('https://example.com/spec');
 
     const addText = vi.fn<(text: string) => void>();
-    const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardPaste(makeOptions({ addText, onUnreadable }));
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
     await flushMicrotasks();
     await flushMicrotasks();
 
     expect(addText).toHaveBeenCalledWith('https://example.com/spec');
-    expect(onUnreadable).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
     // The image read raises the iOS 16 paste prompt; a text clipboard must
     // never reach it.
     expect(readClipboardImageFileMock).not.toHaveBeenCalled();
+    // Success returns before the empty probes run.
+    expect(hasClipboardTextMock).not.toHaveBeenCalled();
+    expect(hasClipboardUrlMock).not.toHaveBeenCalled();
   });
 
   it('pastes the text when the clipboard holds an image it cannot read', async () => {
@@ -228,8 +248,8 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('fallback text');
 
     const addText = vi.fn<(text: string) => void>();
-    const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardPaste(makeOptions({ addText, onUnreadable }));
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
     await flushMicrotasks();
@@ -238,24 +258,28 @@ describe('useClipboardPaste', () => {
 
     expect(readClipboardImageFileMock).toHaveBeenCalledOnce();
     expect(addText).toHaveBeenCalledWith('fallback text');
-    expect(onUnreadable).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
   });
 
-  it('toasts unreadable when neither an image nor text is on the clipboard', async () => {
+  it('toasts empty when neither an image nor text is on the clipboard', async () => {
     hasClipboardImageMock.mockResolvedValue(false);
+    hasClipboardTextMock.mockResolvedValue(false);
+    hasClipboardUrlMock.mockResolvedValue(false);
     readClipboardImageFileMock.mockResolvedValue(null);
     readClipboardTextMock.mockResolvedValue('');
 
     const addText = vi.fn<(text: string) => void>();
-    const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardPaste(makeOptions({ addText, onUnreadable }));
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
-    await flushMicrotasks();
-    await flushMicrotasks();
+    await flushUntilCalled(onFailure);
 
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('empty');
     expect(addText).not.toHaveBeenCalled();
-    expect(onUnreadable).toHaveBeenCalledOnce();
+    expect(readClipboardImageFileMock).not.toHaveBeenCalled();
+    expect(readClipboardTextMock).toHaveBeenCalledOnce();
   });
 
   it('keeps the image-only behavior when the caller omits addText', async () => {
@@ -263,16 +287,90 @@ describe('useClipboardPaste', () => {
     readClipboardImageFileMock.mockResolvedValue(null);
     readClipboardTextMock.mockResolvedValue('some text');
 
-    const onUnreadable = vi.fn<() => void>();
-    const hook = useClipboardPaste(makeOptions({ onUnreadable }));
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ onFailure }));
 
     hook.paste();
-    await flushMicrotasks();
-    await flushMicrotasks();
-    await flushMicrotasks();
+    await flushUntilCalled(onFailure);
 
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('unreadable');
     expect(readClipboardTextMock).not.toHaveBeenCalled();
-    expect(onUnreadable).toHaveBeenCalledOnce();
+    expect(hasClipboardTextMock).not.toHaveBeenCalled();
+    expect(hasClipboardUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts empty when an image-only caller finds no image', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    readClipboardImageFileMock.mockResolvedValue(null);
+
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ onFailure }));
+
+    hook.paste();
+    await flushUntilCalled(onFailure);
+
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('empty');
+    expect(readClipboardImageFileMock).not.toHaveBeenCalled();
+    expect(readClipboardTextMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts unreadable when text read returns empty but a string is present', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    hasClipboardTextMock.mockResolvedValue(true);
+    hasClipboardUrlMock.mockResolvedValue(false);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('');
+
+    const addText = vi.fn<(text: string) => void>();
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
+
+    hook.paste();
+    await flushUntilCalled(onFailure);
+
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('unreadable');
+    expect(addText).not.toHaveBeenCalled();
+    expect(readClipboardTextMock).toHaveBeenCalledOnce();
+  });
+
+  it('toasts unreadable when text read returns empty but a URL is present', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    hasClipboardTextMock.mockResolvedValue(false);
+    hasClipboardUrlMock.mockResolvedValue(true);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('');
+
+    const addText = vi.fn<(text: string) => void>();
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
+
+    hook.paste();
+    await flushUntilCalled(onFailure);
+
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('unreadable');
+    expect(addText).not.toHaveBeenCalled();
+  });
+
+  it('toasts unreadable when an image is present but unreadable and no text is present', async () => {
+    hasClipboardImageMock.mockResolvedValue(true);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('');
+
+    const addText = vi.fn<(text: string) => void>();
+    const onFailure = vi.fn<(reason: 'empty' | 'unreadable') => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
+
+    hook.paste();
+    await flushUntilCalled(onFailure);
+
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('unreadable');
+    // The stored hasImage result is enough; no text probe runs.
+    expect(hasClipboardTextMock).not.toHaveBeenCalled();
   });
 
   // ── Non-retryable unhappy: addFile rejection still consumes ─────────────

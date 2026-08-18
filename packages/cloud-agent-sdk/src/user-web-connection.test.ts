@@ -944,7 +944,7 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
-  it('resubscribes retained sessions and calls reconnect listeners', () => {
+  it('resubscribes retained sessions and calls reconnect listeners', async () => {
     jest.useFakeTimers();
     try {
       const onReconnect = jest.fn();
@@ -962,6 +962,9 @@ describe('createUserWebConnection', () => {
       });
       sockets[0].onclose?.({ code: 1006 } as CloseEvent);
       jest.advanceTimersByTime(60_000);
+      // The reconnect now refreshes auth before opening the new socket.
+      await Promise.resolve();
+      await Promise.resolve();
       open(sockets[1]);
       inbound(
         { type: 'system', event: 'sessions.list', data: { connectionId: 'c2', sessions: [] } },
@@ -972,6 +975,34 @@ describe('createUserWebConnection', () => {
         JSON.stringify({ type: 'subscribe', sessionId: 'ses-1' })
       );
       expect(onReconnect).toHaveBeenCalledTimes(1);
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('mints a fresh ticket on a non-auth-failure (1006) reconnect', async () => {
+    jest.useFakeTimers();
+    try {
+      const getAuthToken = jest.fn().mockReturnValueOnce('old-token').mockReturnValue('new-token');
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+      client.subscribeToCliSession('ses-1');
+      open();
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+      expect(webSocketConstructor).toHaveBeenLastCalledWith(
+        `${WS_URL}?ticket=old-token&connectionId=uuid-1`
+      );
+
+      sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(webSocketConstructor).toHaveBeenLastCalledWith(
+        `${WS_URL}?ticket=new-token&connectionId=uuid-1`
+      );
       client.destroy();
     } finally {
       jest.useRealTimers();

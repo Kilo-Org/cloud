@@ -1,4 +1,4 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, it, expect, jest } from '@jest/globals';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getCachedVercelInferenceProviderIdsForModel: jest.fn(),
@@ -16,10 +16,12 @@ import {
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getCachedVercelInferenceProviderIdsForModel } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+const { getCachedVercelInferenceProviderIdsForModel } = jest.requireMock<
+  typeof import('@/lib/ai-gateway/providers/gateway-models-cache')
+>('@/lib/ai-gateway/providers/gateway-models-cache');
 const getVercelInferenceProvidersMock = jest.mocked(getCachedVercelInferenceProviderIdsForModel);
 
 beforeEach(() => {

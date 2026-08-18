@@ -20,8 +20,10 @@ import {
 } from '@/lib/cloud-agent-next/websocket-manager';
 import type { CloudAgentEvent, StreamError } from '@/lib/cloud-agent-next/event-types';
 import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
+import { isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
 import { fetchStreamTicket } from './fetch-stream-ticket';
+import { toCodeReviewDisplayEvent, type CodeReviewDisplayEvent } from './code-review-stream-events';
 
 type CodeReviewStreamViewProps = {
   reviewId: string;
@@ -40,107 +42,7 @@ type CodeReviewAttemptSummary = {
   terminal_reason: string | null;
 };
 
-/** Simplified event for display in the code review log */
-type DisplayEvent = {
-  timestamp: string;
-  message: string;
-  content?: string;
-  eventType: string;
-};
-
-// ---------------------------------------------------------------------------
-// cloud-agent-next event conversion (WebSocket flow)
-// ---------------------------------------------------------------------------
-
-function toDisplayEvent(event: CloudAgentEvent): DisplayEvent | null {
-  const { streamEventType, timestamp, data } = event;
-  const payload = data as Record<string, unknown> | undefined;
-
-  if (streamEventType === 'started') {
-    return { timestamp, message: 'Execution started', eventType: streamEventType };
-  }
-  if (streamEventType === 'complete') {
-    return { timestamp, message: 'Review completed', eventType: streamEventType };
-  }
-  if (streamEventType === 'interrupted') {
-    return { timestamp, message: 'Review interrupted', eventType: streamEventType };
-  }
-  if (streamEventType === 'error') {
-    const errorMsg = typeof payload?.message === 'string' ? payload.message : 'An error occurred';
-    return { timestamp, message: `Error: ${errorMsg}`, eventType: streamEventType };
-  }
-  if (streamEventType === 'kilocode' && payload) {
-    return toDisplayEventFromKilocode(timestamp, payload);
-  }
-  if (streamEventType === 'status') {
-    const status = typeof payload?.status === 'string' ? payload.status : '';
-    if (status) {
-      return { timestamp, message: `Status: ${status}`, eventType: streamEventType };
-    }
-  }
-  return null;
-}
-
-function toDisplayEventFromKilocode(
-  timestamp: string,
-  payload: Record<string, unknown>
-): DisplayEvent | null {
-  const type = payload.type as string | undefined;
-  const properties = payload.properties as Record<string, unknown> | undefined;
-  if (!type || !properties) return null;
-
-  if (type === 'message.part.updated') {
-    const part = properties.part as Record<string, unknown> | undefined;
-    if (!part) return null;
-    const partType = part.type as string | undefined;
-
-    if (partType === 'tool') {
-      const toolName = part.name as string | undefined;
-      const state = part.state as string | undefined;
-      if (toolName && state === 'running') {
-        const input = part.input as Record<string, unknown> | undefined;
-        let detail: string | undefined;
-        if (input) {
-          const filePath = input.filePath ?? input.file_path ?? input.path;
-          const command = input.command;
-          const query = input.query ?? input.pattern;
-          if (typeof filePath === 'string') detail = filePath;
-          else if (typeof command === 'string')
-            detail = command.length > 100 ? command.slice(0, 100) + '...' : command;
-          else if (typeof query === 'string') detail = query;
-        }
-        return { timestamp, message: `Tool: ${toolName}`, content: detail, eventType: 'tool' };
-      }
-      return null;
-    }
-
-    if (partType === 'text') {
-      const state = part.state as string | undefined;
-      if (state && state !== 'complete') return null;
-      const text = part.text as string | undefined;
-      if (text && text.trim()) {
-        const truncated = text.length > 200 ? text.slice(0, 200) + '...' : text;
-        return { timestamp, message: truncated, eventType: 'text' };
-      }
-      return null;
-    }
-    return null;
-  }
-
-  if (type === 'session.status') {
-    const status = properties.status as string | undefined;
-    if (status === 'idle') return { timestamp, message: 'Agent idle', eventType: 'status' };
-    if (status === 'busy') return { timestamp, message: 'Agent working...', eventType: 'status' };
-    return null;
-  }
-
-  if (type === 'session.error') {
-    const error = properties.error as string | undefined;
-    return { timestamp, message: `Session error: ${error ?? 'Unknown error'}`, eventType: 'error' };
-  }
-
-  return null;
-}
+type DisplayEvent = CodeReviewDisplayEvent;
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -202,7 +104,10 @@ export function CodeReviewStreamView({
   const latestCompletedAttempt = [...orderedAttempts]
     .reverse()
     .find(attempt => attempt.status === 'completed');
-  const defaultAttemptId = latestCompletedAttempt?.id ?? latestAttempt?.id;
+  const defaultAttemptId =
+    latestAttempt && isInFlightReviewStatus(latestAttempt.status)
+      ? latestAttempt.id
+      : (latestCompletedAttempt?.id ?? latestAttempt?.id);
   const queryAttemptId = searchParams.get('attemptId');
   const queryAttemptExists = orderedAttempts.some(attempt => attempt.id === queryAttemptId);
   const effectiveAttemptId = queryAttemptExists ? (queryAttemptId ?? undefined) : defaultAttemptId;
@@ -312,7 +217,7 @@ export function CodeReviewStreamView({
 
   const handleEvent = useCallback(
     (event: CloudAgentEvent) => {
-      const displayEvent = toDisplayEvent(event);
+      const displayEvent = toCodeReviewDisplayEvent(event);
       if (displayEvent) {
         setEvents(prev => [...prev, displayEvent]);
       }
@@ -458,7 +363,7 @@ export function CodeReviewStreamView({
             <CardTitle className="shrink-0 text-sm font-medium">
               {shouldLoadHistory ? 'Session Log' : 'Code Review Progress'}
             </CardTitle>
-            {shouldLoadHistory && cloudAgentSessionId && (
+            {cloudAgentSessionId && (
               <span
                 title={cloudAgentSessionId}
                 className="bg-muted text-muted-foreground max-w-[min(20rem,50vw)] truncate rounded px-2 py-0.5 font-mono text-xs font-normal"

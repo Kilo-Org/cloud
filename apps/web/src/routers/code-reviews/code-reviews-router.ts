@@ -50,6 +50,8 @@ import {
   type ListCodeReviewsResponse,
 } from '@/lib/code-reviews/core';
 import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
+import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
+import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
@@ -377,7 +379,32 @@ export const codeReviewRouter = createTRPCRouter({
             cached: 0,
           };
 
-      return successResult({ review: { ...review, council_result }, attempts, tokenUsage });
+      let selectedModel = selectedModelFromReviewSources({
+        persistedModel: review.model,
+        repoFullName: review.repo_full_name,
+        config: getManualCodeReviewConfig(review)?.agentConfig ?? null,
+      });
+      if (!selectedModel) {
+        const owner = review.owned_by_organization_id
+          ? { type: 'org' as const, id: review.owned_by_organization_id }
+          : review.owned_by_user_id
+            ? { type: 'user' as const, id: review.owned_by_user_id }
+            : null;
+        if (owner) {
+          const agentConfig = await getAgentConfigForOwner(owner, 'code_review', review.platform);
+          selectedModel = selectedModelFromReviewSources({
+            persistedModel: null,
+            repoFullName: review.repo_full_name,
+            config: (agentConfig?.config as CodeReviewAgentConfig | undefined) ?? null,
+          });
+        }
+      }
+
+      return successResult({
+        review: { ...review, council_result, model: selectedModel ?? review.model },
+        attempts,
+        tokenUsage,
+      });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;

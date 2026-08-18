@@ -13,6 +13,7 @@
  */
 
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
+import { DEFAULT_CODE_REVIEW_MODEL } from './constants';
 
 export type EffectiveModelSelection = {
   modelSlug: string;
@@ -58,4 +59,18 @@ export function resolveEffectiveModel(
     thinkingEffort: override.thinking_effort ?? null,
     source: 'repository_override',
   };
+}
+
+export function selectedModelFromReviewSources(params: {
+  persistedModel: string | null | undefined;
+  repoFullName: string | null | undefined;
+  config:
+    | Pick<CodeReviewAgentConfig, 'model_slug' | 'thinking_effort' | 'repository_model_overrides'>
+    | null
+    | undefined;
+}): string | null {
+  if (params.persistedModel) return params.persistedModel;
+  if (!params.config) return null;
+  return resolveEffectiveModel(params.config, params.repoFullName, DEFAULT_CODE_REVIEW_MODEL)
+    .modelSlug;
 }

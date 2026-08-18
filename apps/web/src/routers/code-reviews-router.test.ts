@@ -1856,6 +1856,41 @@ describe('codeReviewRouter attempts', () => {
     );
   });
 
+  it('returns the selected model for an in-flight review before usage is persisted', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { model_slug: 'openai/gpt-5' },
+      is_enabled: true,
+      runtime_state: {},
+      created_by: testUser.id,
+    });
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'running', {
+          session_id: 'agent-running',
+          cli_session_id: 'ses_running',
+          model: null,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.get({ reviewId: review.id });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        review: expect.objectContaining({
+          model: 'openai/gpt-5',
+          session_id: 'agent-running',
+        }),
+      })
+    );
+  });
+
   it('retrigger dispatches using the newly created attempt id', async () => {
     await insertEnabledAgentConfig();
     const [review] = await db

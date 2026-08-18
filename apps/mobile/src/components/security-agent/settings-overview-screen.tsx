@@ -89,9 +89,9 @@ export function SettingsOverviewScreen({
   const data = config.data;
   // Distinguish a settled-empty repo set from a still-loading or failed one:
   // a loading or failed query must not read as "zero repositories".
-  const repositoriesEmpty = repositories.data != null && repositories.data.length === 0;
-  const repositoriesLoading = repositories.isLoading && repositories.data == null;
-  const repositoriesError = repositories.isError && repositories.data == null;
+  const repositoriesEmpty = repositories.data?.length === 0;
+  const repositoriesLoading = repositories.isLoading;
+  const repositoriesError = repositories.isError;
   // An enable attempt with no effective repository would be refused by the
   // server, so the switch is disabled up front under the same rule: `selected`
   // mode with zero selected ids, or `all` mode with zero integration repos.
@@ -157,6 +157,34 @@ export function SettingsOverviewScreen({
   // needs to be reachable here too.
   const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
 
+  // Render the disabled-agent copy in three states: a still-loading repo set
+  // (skeleton), a failed repo set (error + Retry), or a settled set (copy).
+  const renderRepositoryStatus = () => {
+    if (data.repositorySelectionMode === 'all' && repositoriesLoading) {
+      return <Skeleton className="h-4 w-56 rounded" />;
+    }
+    if (data.repositorySelectionMode === 'all' && repositoriesError) {
+      return (
+        <View className="flex-row items-center gap-2">
+          <Text variant="muted" className="text-xs">
+            Could not load repositories
+          </Text>
+          <Text
+            className="text-xs font-medium text-primary"
+            onPress={() => void repositories.refetch()}
+          >
+            Retry
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <Text variant="muted" className="text-xs">
+        {getDisabledCopy(canManage, hasEffectiveRepo)}
+      </Text>
+    );
+  };
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Settings" headerRight={auditAction} />
@@ -184,25 +212,7 @@ export function SettingsOverviewScreen({
 
         {!data.isEnabled && (
           <View className="gap-3">
-            {data.repositorySelectionMode === 'all' && repositoriesLoading ? (
-              <Skeleton className="h-4 w-56 rounded" />
-            ) : data.repositorySelectionMode === 'all' && repositoriesError ? (
-              <View className="flex-row items-center gap-2">
-                <Text variant="muted" className="text-xs">
-                  Could not load repositories
-                </Text>
-                <Text
-                  className="text-xs font-medium text-primary"
-                  onPress={() => void repositories.refetch()}
-                >
-                  Retry
-                </Text>
-              </View>
-            ) : (
-              <Text variant="muted" className="text-xs">
-                {getDisabledCopy(canManage, hasEffectiveRepo)}
-              </Text>
-            )}
+            {renderRepositoryStatus()}
             {showRepoCta ? (
               <ConfigureRow
                 icon={FolderGit2}

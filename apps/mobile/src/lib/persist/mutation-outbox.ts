@@ -28,7 +28,7 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * mutation it protects.
  */
 
-export type OutboxTaxonomy = 'safe-retry' | 'reconcile-first';
+type OutboxTaxonomy = 'safe-retry' | 'reconcile-first';
 
 export type OutboxRow = {
   taxonomy: OutboxTaxonomy;

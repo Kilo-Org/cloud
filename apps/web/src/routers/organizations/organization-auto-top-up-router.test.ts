@@ -2,7 +2,6 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import {
   auto_top_up_configs,
-  organization_service_fee_exemption_history,
   organization_service_fee_exemptions,
   organizations,
   stripe_service_fee_assessments,
@@ -78,9 +77,6 @@ describe('organization auto-top-up router', () => {
     await db
       .delete(organization_service_fee_exemptions)
       .where(eq(organization_service_fee_exemptions.organization_id, testOrg.id));
-    await db
-      .delete(organization_service_fee_exemption_history)
-      .where(eq(organization_service_fee_exemption_history.organization_id, testOrg.id));
     await db.delete(organizations).where(eq(organizations.id, testOrg.id));
   });
 

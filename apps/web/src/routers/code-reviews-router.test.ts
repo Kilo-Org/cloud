@@ -1891,6 +1891,63 @@ describe('codeReviewRouter attempts', () => {
     );
   });
 
+  it('does not replace a historical review model with the current config', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { model_slug: 'openai/gpt-5' },
+      is_enabled: true,
+      runtime_state: {},
+      created_by: testUser.id,
+    });
+    const sessionId = `ses_router_model_${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
+    usageIds.push(usageId);
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'completed', {
+          cli_session_id: sessionId,
+          model: null,
+          created_at: '2026-06-18T09:00:00.000Z',
+          started_at: '2026-06-18T09:10:00.000Z',
+          completed_at: '2026-06-18T11:00:00.000Z',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: testUser.id,
+      cost: 100,
+      input_tokens: 1000,
+      output_tokens: 200,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-18T10:00:00.000Z',
+      model: 'anthropic/claude-sonnet-4.6',
+    });
+    await db.insert(microdollar_usage_metadata).values({
+      id: usageId,
+      message_id: `msg_${usageId}`,
+      session_id: sessionId,
+      created_at: '2026-06-18T10:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.get({ reviewId: review.id });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        review: expect.objectContaining({
+          model: 'anthropic/claude-sonnet-4.6',
+        }),
+      })
+    );
+  });
+
   it('retrigger dispatches using the newly created attempt id', async () => {
     await insertEnabledAgentConfig();
     const [review] = await db

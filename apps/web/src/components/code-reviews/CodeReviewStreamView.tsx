@@ -23,7 +23,11 @@ import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
 import { isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
 import { fetchStreamTicket } from './fetch-stream-ticket';
-import { toCodeReviewDisplayEvent, type CodeReviewDisplayEvent } from './code-review-stream-events';
+import {
+  appendCodeReviewDisplayEvent,
+  toCodeReviewDisplayEvent,
+  type CodeReviewDisplayEvent,
+} from './code-review-stream-events';
 
 type CodeReviewStreamViewProps = {
   reviewId: string;
@@ -219,7 +223,7 @@ export function CodeReviewStreamView({
     (event: CloudAgentEvent) => {
       const displayEvent = toCodeReviewDisplayEvent(event);
       if (displayEvent) {
-        setEvents(prev => [...prev, displayEvent]);
+        setEvents(prev => appendCodeReviewDisplayEvent(prev, displayEvent));
       }
       if (event.streamEventType === 'complete' || event.streamEventType === 'interrupted') {
         setIsComplete(true);
@@ -462,7 +466,7 @@ export function CodeReviewStreamView({
             <div className="space-y-1">
               {events.map((event, index) => (
                 <div
-                  key={index}
+                  key={event.key ?? index}
                   className="rounded px-2 py-1 transition-colors hover:bg-slate-900/50"
                 >
                   <div className="flex gap-3 text-slate-300">

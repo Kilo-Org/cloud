@@ -5,6 +5,7 @@ export type CodeReviewDisplayEvent = {
   message: string;
   content?: string;
   eventType: string;
+  key?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -41,6 +42,26 @@ function sessionStatusLabel(status: unknown): string | undefined {
   return undefined;
 }
 
+function partKey(part: Record<string, unknown>): string | undefined {
+  return typeof part.id === 'string' && part.id ? part.id : undefined;
+}
+
+function isCompletedStatus(status: string | undefined): boolean {
+  return status === 'complete' || status === 'completed';
+}
+
+export function appendCodeReviewDisplayEvent(
+  events: CodeReviewDisplayEvent[],
+  next: CodeReviewDisplayEvent
+): CodeReviewDisplayEvent[] {
+  if (!next.key) return [...events, next];
+  const index = events.findIndex(event => event.key === next.key);
+  if (index < 0) return [...events, next];
+  const updated = events.slice();
+  updated[index] = next;
+  return updated;
+}
+
 function toDisplayEventFromKilocode(
   timestamp: string,
   payload: Record<string, unknown>
@@ -60,7 +81,12 @@ function toDisplayEventFromKilocode(
         (typeof part.name === 'string' && part.name) ||
         undefined;
       const status = partStateStatus(part.state);
+      const key = partKey(part);
       if (!toolName || !status || status === 'pending') return null;
+      const isRunning = status === 'running';
+      const isTerminal = isCompletedStatus(status) || status === 'error';
+      if (!isRunning && !isTerminal) return null;
+      if (isRunning && !key) return null;
       const detail = toolDetail(
         partStateInput(part.state) ?? (isRecord(part.input) ? part.input : undefined)
       );
@@ -70,18 +96,19 @@ function toDisplayEventFromKilocode(
           message: `Tool: ${toolName} — error`,
           content: detail,
           eventType: 'error',
+          key,
         };
       }
-      return { timestamp, message: `Tool: ${toolName}`, content: detail, eventType: 'tool' };
+      return { timestamp, message: `Tool: ${toolName}`, content: detail, eventType: 'tool', key };
     }
 
     if (partType === 'text') {
       const status = partStateStatus(part.state);
-      if (status && status !== 'complete' && status !== 'completed') return null;
+      if (!isCompletedStatus(status)) return null;
       const text = typeof part.text === 'string' ? part.text : undefined;
       if (text && text.trim()) {
         const truncated = text.length > 200 ? `${text.slice(0, 200)}...` : text;
-        return { timestamp, message: truncated, eventType: 'text' };
+        return { timestamp, message: truncated, eventType: 'text', key: partKey(part) };
       }
       return null;
     }

@@ -1,4 +1,7 @@
-import { toCodeReviewDisplayEvent } from './code-review-stream-events';
+import {
+  appendCodeReviewDisplayEvent,
+  toCodeReviewDisplayEvent,
+} from './code-review-stream-events';
 import type { CloudAgentEvent } from '@/lib/cloud-agent-next/event-types';
 
 function event(streamEventType: string, data: unknown): CloudAgentEvent {
@@ -35,6 +38,7 @@ describe('toCodeReviewDisplayEvent', () => {
       toCodeReviewDisplayEvent(
         kilocode('message.part.updated', {
           part: {
+            id: 'prt_read',
             type: 'tool',
             tool: 'read',
             state: { status: 'running', input: { path: '/src/bug.ts' } },
@@ -46,6 +50,7 @@ describe('toCodeReviewDisplayEvent', () => {
       message: 'Tool: read',
       content: '/src/bug.ts',
       eventType: 'tool',
+      key: 'prt_read',
     });
   });
 
@@ -54,6 +59,7 @@ describe('toCodeReviewDisplayEvent', () => {
       toCodeReviewDisplayEvent(
         kilocode('message.part.updated', {
           part: {
+            id: 'prt_bash',
             type: 'tool',
             name: 'bash',
             state: { status: 'completed', input: { command: 'ls src' } },
@@ -65,7 +71,22 @@ describe('toCodeReviewDisplayEvent', () => {
       message: 'Tool: bash',
       content: 'ls src',
       eventType: 'tool',
+      key: 'prt_bash',
     });
+  });
+
+  it('drops running tool ticks that have no part id', () => {
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: {
+            type: 'tool',
+            tool: 'bash',
+            state: { status: 'running', input: { command: 'sleep 10' } },
+          },
+        })
+      )
+    ).toBeNull();
   });
 
   it('skips pending tool parts', () => {
@@ -82,18 +103,14 @@ describe('toCodeReviewDisplayEvent', () => {
     ).toBeNull();
   });
 
-  it('shows text parts that omit a string state', () => {
+  it('skips streaming text parts until they complete', () => {
     expect(
       toCodeReviewDisplayEvent(
         kilocode('message.part.updated', {
           part: { type: 'text', text: 'Looking at the diff now.' },
         })
       )
-    ).toEqual({
-      timestamp: '2026-08-18T12:00:00.000Z',
-      message: 'Looking at the diff now.',
-      eventType: 'text',
-    });
+    ).toBeNull();
   });
 
   it('does not drop completed text parts whose state is an object', () => {
@@ -101,6 +118,7 @@ describe('toCodeReviewDisplayEvent', () => {
       toCodeReviewDisplayEvent(
         kilocode('message.part.updated', {
           part: {
+            id: 'prt_text',
             type: 'text',
             text: 'Review summary',
             state: { status: 'completed' },
@@ -111,6 +129,7 @@ describe('toCodeReviewDisplayEvent', () => {
       timestamp: '2026-08-18T12:00:00.000Z',
       message: 'Review summary',
       eventType: 'text',
+      key: 'prt_text',
     });
   });
 
@@ -130,7 +149,13 @@ describe('toCodeReviewDisplayEvent', () => {
     expect(
       toCodeReviewDisplayEvent(
         kilocode('message.part.updated', {
-          part: { type: 'tool', name: 'grep', state: 'running', input: { query: 'TODO' } },
+          part: {
+            id: 'prt_grep',
+            type: 'tool',
+            name: 'grep',
+            state: 'running',
+            input: { query: 'TODO' },
+          },
         })
       )
     ).toEqual({
@@ -138,11 +163,39 @@ describe('toCodeReviewDisplayEvent', () => {
       message: 'Tool: grep',
       content: 'TODO',
       eventType: 'tool',
+      key: 'prt_grep',
     });
     expect(toCodeReviewDisplayEvent(kilocode('session.status', { status: 'idle' }))).toEqual({
       timestamp: '2026-08-18T12:00:00.000Z',
       message: 'Agent idle',
       eventType: 'status',
     });
+  });
+
+  it('replaces a keyed live event instead of appending another row', () => {
+    const running = toCodeReviewDisplayEvent(
+      kilocode('message.part.updated', {
+        part: {
+          id: 'prt_bash',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'running', input: { command: 'sleep 10' } },
+        },
+      })
+    );
+    const completed = toCodeReviewDisplayEvent(
+      kilocode('message.part.updated', {
+        part: {
+          id: 'prt_bash',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'completed', input: { command: 'sleep 10' } },
+        },
+      })
+    );
+    expect(running).not.toBeNull();
+    expect(completed).not.toBeNull();
+    if (!running || !completed) return;
+    expect(appendCodeReviewDisplayEvent([running], completed)).toEqual([completed]);
   });
 });

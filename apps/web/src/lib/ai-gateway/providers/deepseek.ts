@@ -15,17 +15,19 @@ export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   max_completion_tokens: 384000,
   gateway: 'openrouter',
   flags: ['reasoning', 'requires-data-collection', 'vercel-routing'],
-  pricing: [
-    {
-      start_context_length: 0,
-      pricing: {
-        prompt_per_million: 0.435,
-        completion_per_million: 0.87,
-        input_cache_read_per_million: 0.003625,
-        input_cache_write_per_million: null,
+  pricing: {
+    tiers: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 0.435,
+          completion_per_million: 0.87,
+          input_cache_read_per_million: 0.003625,
+          input_cache_write_per_million: null,
+        },
       },
-    },
-  ],
+    ],
+  },
   inference_provider_restriction: ['deepseek'],
 };
 
@@ -40,17 +42,19 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   max_completion_tokens: 384000,
   gateway: 'openrouter',
   flags: ['reasoning', 'requires-data-collection', 'vercel-routing'],
-  pricing: [
-    {
-      start_context_length: 0,
-      pricing: {
-        prompt_per_million: 0.14,
-        completion_per_million: 0.28,
-        input_cache_read_per_million: 0.0028,
-        input_cache_write_per_million: null,
+  pricing: {
+    tiers: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 0.14,
+          completion_per_million: 0.28,
+          input_cache_read_per_million: 0.0028,
+          input_cache_write_per_million: null,
+        },
       },
-    },
-  ],
+    ],
+  },
   inference_provider_restriction: ['deepseek'],
 };
 

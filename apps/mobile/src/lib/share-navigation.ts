@@ -1,6 +1,17 @@
 import { SHARE_PAYLOAD_MAX_ENTRIES, type ShareId } from '@/lib/share-payload';
 
-export type PendingShareNavigation = { href: string; shareId: ShareId };
+export type PendingShareNavigation = { href: string; shareId: ShareId | null };
+
+/**
+ * Narrow a pending navigation to the delivery case: `shareId` is a string.
+ * A null `shareId` means the gate dismissed to a non-share destination (e.g.
+ * Review PR) that must push `href` without delivering a payload.
+ */
+export function shareDeliveryShareId(
+  pending: PendingShareNavigation
+): pending is PendingShareNavigation & { shareId: ShareId } {
+  return pending.shareId !== null;
+}
 
 /** FIFO of committed share destinations waiting for gate dismiss + delivery. */
 const pendingQueue: PendingShareNavigation[] = [];

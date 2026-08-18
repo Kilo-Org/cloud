@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
+import jwt from 'jsonwebtoken';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
@@ -30,6 +31,8 @@ import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-
 // `require()`.
 process.env.SESSION_INGEST_WORKER_URL = 'https://test-ingest.example.com';
 let createCallerForUser: typeof CreateCallerForUser;
+let JWT_TOKEN_VERSION: number;
+let TOKEN_EXPIRY: { oneHour: number };
 
 let regularUser: User;
 let testOrganization: Organization;
@@ -37,6 +40,7 @@ let testOrganization: Organization;
 describe('active-sessions-router', () => {
   beforeAll(async () => {
     ({ createCallerForUser } = await import('@/routers/test-utils'));
+    ({ JWT_TOKEN_VERSION, TOKEN_EXPIRY } = await import('@/lib/tokens'));
 
     regularUser = await insertTestUser({
       google_user_email: 'active-sessions-user@example.com',
@@ -70,6 +74,32 @@ describe('active-sessions-router', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  describe('getToken', () => {
+    it('returns a one-hour pepper-bearing API token for the caller', async () => {
+      const knownPepper = 'active-sessions-get-token-pepper';
+      const tokenUser = await insertTestUser({
+        google_user_email: `active-sessions-token-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'Active Sessions Token User',
+        api_token_pepper: knownPepper,
+      });
+
+      const caller = await createCallerForUser(tokenUser.id);
+      const result = await caller.activeSessions.getToken();
+      const payload = jwt.decode(result.token) as jwt.JwtPayload & {
+        kiloUserId: string;
+        apiTokenPepper: string;
+        version: number;
+      };
+
+      expect(payload.kiloUserId).toBe(tokenUser.id);
+      expect(payload.apiTokenPepper).toBe(knownPepper);
+      expect(payload.version).toBe(JWT_TOKEN_VERSION);
+      expect(payload.exp).toBeDefined();
+      expect(payload.iat).toBeDefined();
+      expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(TOKEN_EXPIRY.oneHour);
+    });
   });
 
   describe('listInstances', () => {

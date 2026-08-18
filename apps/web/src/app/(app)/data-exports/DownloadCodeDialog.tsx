@@ -15,20 +15,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTRPC } from '@/lib/trpc/utils';
-import { DOWNLOAD_CODE_LENGTH } from './data-export-contract';
+import { DOWNLOAD_CODE_LENGTH, type DownloadCodeChallenge } from './data-export-contract';
 
 const CODE_INPUT_ID = 'data-export-download-code';
 const CODE_HINT_ID = 'data-export-download-code-hint';
 const CODE_ERROR_ID = 'data-export-download-code-error';
 
-export type DownloadCodeChallenge = {
-  exportId: string;
-  challengeId: string;
-  expiresInMinutes: number;
-};
-
 type DownloadCodeDialogProps = {
   challenge: DownloadCodeChallenge | null;
+  open: boolean;
   isResending: boolean;
   onResend: () => void;
   onClose: () => void;
@@ -53,6 +48,7 @@ function describeError(code: string | undefined, message: string): string {
 
 export function DownloadCodeDialog({
   challenge,
+  open,
   isResending,
   onResend,
   onClose,
@@ -80,10 +76,13 @@ export function DownloadCodeDialog({
   const errorMessage = createDownload.error
     ? describeError(createDownload.error.data?.code, createDownload.error.message)
     : null;
+  const expiresInMinutes = challenge
+    ? Math.max(1, Math.ceil((challenge.expiresAt - Date.now()) / 60_000))
+    : 10;
 
   return (
     <Dialog
-      open={challenge !== null}
+      open={open && challenge !== null}
       onOpenChange={open => {
         if (!open) onClose();
       }}
@@ -93,7 +92,7 @@ export function DownloadCodeDialog({
           <DialogTitle>Enter your download code</DialogTitle>
           <DialogDescription>
             We emailed a {DOWNLOAD_CODE_LENGTH}-digit code to your account address. It authorizes
-            one download and expires in {challenge?.expiresInMinutes ?? 10} minutes.
+            one download and expires in {expiresInMinutes} minutes.
           </DialogDescription>
         </DialogHeader>
 
@@ -130,7 +129,7 @@ export function DownloadCodeDialog({
             </p>
           ) : (
             <p id={CODE_HINT_ID} className="text-muted-foreground text-sm">
-              Do not share this code. It unlocks a copy of your account data.
+              Do not share this code. It unlocks a copy of your data export.
             </p>
           )}
 

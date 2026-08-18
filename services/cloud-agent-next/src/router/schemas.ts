@@ -97,6 +97,28 @@ function rejectAmbiguousAttachments(
 }
 
 /**
+ * Reject a prompt that is empty or whitespace-only when there are no
+ * `attachments.files` and no `images.files`. Command turns have no prompt and
+ * must skip this rule at the call site.
+ */
+function rejectEmptyPromptWithoutAttachments(
+  data: {
+    prompt?: unknown;
+    attachments?: { files?: unknown[] } | undefined;
+    images?: { files?: unknown[] } | undefined;
+  },
+  ctx: z.RefinementCtx,
+  path: (string | number)[] = ['prompt']
+): void {
+  const prompt = typeof data.prompt === 'string' ? data.prompt : '';
+  if (prompt.trim().length > 0) return;
+  const hasFiles =
+    (data.attachments?.files?.length ?? 0) > 0 || (data.images?.files?.length ?? 0) > 0;
+  if (hasFiles) return;
+  ctx.addIssue({ code: 'custom', path, message: 'Prompt is required' });
+}
+
+/**
  * Base prompt payload schema used by all execution endpoints.
  * Contains the essential fields for Kilocode execution.
  */
@@ -128,6 +150,19 @@ export const PromptSendPayload = z.object({
     .regex(/^[a-zA-Z]+$/)
     .optional(),
 });
+
+/**
+ * Send-only flat prompt payload. Allows an empty prompt when attachments are
+ * present; the empty-prompt refine runs on the input, not on this field.
+ * Used only by `SendMessageV2FlatInput`.
+ */
+export const FollowUpPromptPayload = PromptPayload.extend({ prompt: z.string() });
+
+/**
+ * Send-only discriminated prompt payload clone. Allows an empty prompt when
+ * attachments are present. Used only by `SendMessageV2PromptPayloadInput`.
+ */
+export const FollowUpPromptSendPayload = PromptSendPayload.extend({ prompt: z.string() });
 
 export const CommandSendPayload = z.object({
   type: z.literal('command'),
@@ -264,9 +299,9 @@ const SendMessageV2Options = z.object({
   messageId: MessageIdSchema.nullish().describe('Optional message ID for correlating the request'),
 });
 
-const SendMessageV2FlatInput = SendMessageV2Options.extend(PromptPayload.shape);
+const SendMessageV2FlatInput = SendMessageV2Options.extend(FollowUpPromptPayload.shape);
 const SendMessageV2PromptPayloadInput = SendMessageV2Options.extend({
-  payload: PromptSendPayload,
+  payload: FollowUpPromptSendPayload,
 });
 const SendMessageV2CommandPayloadInput = SendMessageV2Options.extend({
   payload: CommandSendPayload,
@@ -280,15 +315,29 @@ export const SendMessageV2Input = z
   ])
   .superRefine((input, ctx) => {
     rejectAmbiguousAttachments(input, ctx);
-    if ('payload' in input && input.payload.type === 'command') {
-      if (input.attachments !== undefined || input.images !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['attachments'],
-          message: 'Attachments cannot be attached to slash commands',
-        });
+    if ('payload' in input) {
+      if (input.payload.type === 'command') {
+        if (input.attachments !== undefined || input.images !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['attachments'],
+            message: 'Attachments cannot be attached to slash commands',
+          });
+        }
+        return;
       }
+      rejectEmptyPromptWithoutAttachments(
+        { prompt: input.payload.prompt, attachments: input.attachments, images: input.images },
+        ctx,
+        ['payload', 'prompt']
+      );
+      return;
     }
+    rejectEmptyPromptWithoutAttachments(
+      { prompt: input.prompt, attachments: input.attachments, images: input.images },
+      ctx,
+      ['prompt']
+    );
   })
   .transform(input => {
     if ('payload' in input && input.payload.type === 'prompt') {
@@ -544,6 +593,13 @@ export const PrepareSessionInput = z
     initialPayload: SendMessageV2Payload.optional().describe(
       'Discriminated initial execution payload - command variant allows starting a session with a slash command instead of a free-text prompt'
     ),
+    operationKey: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'Client-generated UUID, stable across retries of one user intent. Admitted into the operation ledger only when autoInitiate is also true; otherwise ignored.'
+      ),
   })
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
@@ -642,6 +698,12 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  replayed: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when this response is a ledger replay of an already-settled create with the same operationKey'
+    ),
 });
 
 /**
@@ -801,11 +863,17 @@ export const SendMessageInput = z
     cloudAgentSessionId: sessionIdSchema,
     message: z
       .object({
-        prompt: z.string().min(1, 'Prompt is required'),
+        prompt: z.string(),
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.nullish(),
       })
-      .superRefine(rejectAmbiguousAttachments),
+      .superRefine(rejectAmbiguousAttachments)
+      .superRefine((message, ctx) =>
+        rejectEmptyPromptWithoutAttachments(
+          { prompt: message.prompt, attachments: message.attachments, images: message.images },
+          ctx
+        )
+      ),
     agent: z
       .object({
         mode: ModeSlugSchema,

@@ -1,9 +1,10 @@
-import { Check, X } from 'lucide-react-native';
+import { Check, X } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -228,17 +229,19 @@ export function SessionFilterModal({
                 <Text variant="eyebrow" className="px-3">
                   Sort by
                 </Text>
-                {SORT_OPTIONS.map(option => (
-                  <ChoiceRow
-                    key={option.value}
-                    label={option.label}
-                    selected={draftSortBy === option.value}
-                    onPress={() => {
-                      setDraftSortBy(option.value);
-                    }}
-                    className="rounded-lg px-3"
-                  />
-                ))}
+                <RadioGroup label="Sort by">
+                  {SORT_OPTIONS.map(option => (
+                    <ChoiceRow
+                      key={option.value}
+                      label={option.label}
+                      selected={draftSortBy === option.value}
+                      onPress={() => {
+                        setDraftSortBy(option.value);
+                      }}
+                      className="rounded-lg px-3"
+                    />
+                  ))}
+                </RadioGroup>
               </View>
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">

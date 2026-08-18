@@ -101,11 +101,7 @@ async function sweepCancelAtPeriodEnd(
   summary: CodingPlanCronSummary
 ): Promise<void> {
   const rows = await database
-    .select({
-      id: coding_plan_subscriptions.id,
-      installed_byok_key_id: coding_plan_subscriptions.installed_byok_key_id,
-      key_inventory_id: coding_plan_subscriptions.key_inventory_id,
-    })
+    .select({ id: coding_plan_subscriptions.id })
     .from(coding_plan_subscriptions)
     .where(
       and(
@@ -119,44 +115,8 @@ async function sweepCancelAtPeriodEnd(
 
   for (const row of rows) {
     try {
-      await database.transaction(async tx => {
-        await tx
-          .update(coding_plan_subscriptions)
-          .set({
-            status: 'canceled',
-            canceled_at: nowIso,
-            cancellation_reason: 'user_canceled',
-            cancel_at_period_end: false,
-            installed_byok_key_id: null,
-          })
-          .where(
-            and(
-              eq(coding_plan_subscriptions.id, row.id),
-              eq(coding_plan_subscriptions.status, 'active')
-            )
-          );
-        if (row.installed_byok_key_id) {
-          await tx
-            .delete(byok_api_keys)
-            .where(
-              and(
-                eq(byok_api_keys.id, row.installed_byok_key_id),
-                eq(byok_api_keys.management_source, 'coding_plan')
-              )
-            );
-        }
-        if (row.key_inventory_id) {
-          await tx
-            .update(coding_plan_key_inventory)
-            .set({
-              status: 'revocation_pending',
-              encrypted_api_key: null,
-              revocation_requested_at: nowIso,
-            })
-            .where(eq(coding_plan_key_inventory.id, row.key_inventory_id));
-        }
-      });
-      summary.canceled_at_period_end++;
+      const processed = await processCodingPlanCancellationAtPeriodEnd(database, row.id, nowIso);
+      if (processed) summary.canceled_at_period_end++;
     } catch (error) {
       summary.errors++;
       logError('Failed to end canceled coding plan access', {
@@ -165,6 +125,70 @@ async function sweepCancelAtPeriodEnd(
       });
     }
   }
+}
+
+export async function processCodingPlanCancellationAtPeriodEnd(
+  database: PostgresJsDatabase<typeof schema>,
+  subscriptionId: string,
+  nowIso: string
+): Promise<boolean> {
+  return database.transaction(async tx => {
+    const { rows: lockedRows } = await tx.execute<{
+      installed_byok_key_id: string | null;
+      key_inventory_id: string | null;
+    }>(sql`
+      SELECT installed_byok_key_id, key_inventory_id
+      FROM coding_plan_subscriptions
+      WHERE id = ${subscriptionId}
+        AND status = 'active'
+        AND cancel_at_period_end = true
+        AND current_period_end <= ${nowIso}
+      FOR UPDATE
+    `);
+    const locked = lockedRows[0];
+    if (!locked) return false;
+
+    const result = await tx
+      .update(coding_plan_subscriptions)
+      .set({
+        status: 'canceled',
+        canceled_at: nowIso,
+        cancellation_reason: 'user_canceled',
+        cancel_at_period_end: false,
+        installed_byok_key_id: null,
+      })
+      .where(
+        and(
+          eq(coding_plan_subscriptions.id, subscriptionId),
+          eq(coding_plan_subscriptions.status, 'active'),
+          eq(coding_plan_subscriptions.cancel_at_period_end, true),
+          lte(coding_plan_subscriptions.current_period_end, nowIso)
+        )
+      );
+    if ((result.rowCount ?? 0) === 0) return false;
+
+    if (locked.installed_byok_key_id) {
+      await tx
+        .delete(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.id, locked.installed_byok_key_id),
+            eq(byok_api_keys.management_source, 'coding_plan')
+          )
+        );
+    }
+    if (locked.key_inventory_id) {
+      await tx
+        .update(coding_plan_key_inventory)
+        .set({
+          status: 'revocation_pending',
+          encrypted_api_key: null,
+          revocation_requested_at: nowIso,
+        })
+        .where(eq(coding_plan_key_inventory.id, locked.key_inventory_id));
+    }
+    return true;
+  });
 }
 
 async function sweepRenewals(
@@ -211,7 +235,7 @@ async function sweepRenewals(
       status: selectedRow.status === 'past_due' ? 'past_due' : 'active',
     };
     try {
-      const result = await processRenewal(database, row, nowIso);
+      const result = await processCodingPlanRenewal(database, row.id, row.user_id, nowIso);
       if (result === 'renewed') {
         summary.renewals++;
         try {
@@ -262,9 +286,10 @@ async function sweepRenewals(
   }
 }
 
-async function processRenewal(
+export async function processCodingPlanRenewal(
   database: PostgresJsDatabase<typeof schema>,
-  selectedRow: RenewalRow,
+  subscriptionId: string,
+  userId: string,
   nowIso: string
 ): Promise<RenewalResult> {
   // Renewal processing has one durable outcome per due term, guarded by row locks
@@ -272,11 +297,9 @@ async function processRenewal(
   // window, wait for in-flight grace recovery, or terminate and queue revocation.
   const result = await database.transaction(async tx => {
     await tx.execute(
-      sql`SELECT id FROM coding_plan_subscriptions WHERE id = ${selectedRow.id} FOR UPDATE`
+      sql`SELECT id FROM coding_plan_subscriptions WHERE id = ${subscriptionId} FOR UPDATE`
     );
-    await tx.execute(
-      sql`SELECT id FROM kilocode_users WHERE id = ${selectedRow.user_id} FOR UPDATE`
-    );
+    await tx.execute(sql`SELECT id FROM kilocode_users WHERE id = ${userId} FOR UPDATE`);
     const [row] = await tx
       .select({
         id: coding_plan_subscriptions.id,
@@ -296,9 +319,14 @@ async function processRenewal(
       })
       .from(coding_plan_subscriptions)
       .innerJoin(kilocode_users, eq(coding_plan_subscriptions.user_id, kilocode_users.id))
-      .where(eq(coding_plan_subscriptions.id, selectedRow.id))
+      .where(eq(coding_plan_subscriptions.id, subscriptionId))
       .limit(1);
-    if (!row || row.status === 'canceled' || row.cancel_at_period_end) {
+    if (
+      !row ||
+      row.status === 'canceled' ||
+      row.cancel_at_period_end ||
+      new Date(row.credit_renewal_at) > new Date(nowIso)
+    ) {
       return 'waiting';
     }
 

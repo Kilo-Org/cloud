@@ -18,7 +18,7 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
   LinearTransition: { duration: () => ({}) },
 }));
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   ChevronRight: 'ChevronRight',
   Loader2: 'Loader2',

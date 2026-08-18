@@ -110,14 +110,17 @@ describe('useThemePreference store', () => {
     const { setThemePreference } = await import('./use-theme-preference');
 
     setThemePreference('dark');
+    await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'dark');
     expect(setColorScheme).toHaveBeenCalledWith('dark');
 
     setThemePreference('light');
+    await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'light');
     expect(setColorScheme).toHaveBeenCalledWith('light');
 
     setThemePreference('system');
+    await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'system');
     expect(setColorScheme).toHaveBeenCalledWith('unspecified');
   });

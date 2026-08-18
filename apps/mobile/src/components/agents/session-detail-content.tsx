@@ -4,9 +4,9 @@ import {
   type KiloSessionId,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { type Href, useIsFocused, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
-import { MessageSquare } from 'lucide-react-native';
+import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
@@ -30,9 +30,11 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import {
@@ -93,8 +95,11 @@ import {
 } from '@/lib/analytics/posthog';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
@@ -109,6 +114,7 @@ import {
   type ModelPickerSelection,
   type ModelPickerSelectionScope,
 } from '@/lib/picker-bridge';
+import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 type SessionDetailContentProps = {
@@ -190,6 +196,39 @@ export function SessionDetailContent({
   const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
   const { bottom } = useSafeAreaInsets();
+
+  // Durable composer draft. The composer renders immediately — typing must
+  // never wait on the `user.getMe` query — and the draft load settles behind
+  // it: `initialDraft` stays undefined until then, and the composer applies a
+  // restored draft only into an untouched input. Identity still gates the data
+  // itself: drafts neither save nor restore while the user id is unknown, the
+  // shared fence resets on identity or session changes, and only the newest
+  // generation's load publishes, so an old account's draft can never restore
+  // into the current composer.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const sessionComposerDraftKey = agentComposerDraftKey(sessionId);
+  const composerDraft = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: sessionComposerDraftKey,
+  });
+
+  // Composer remount identity. An account CHANGE must remount the composer, so
+  // one account's typed text never surfaces under another. Identity RESOLVING
+  // must not: the composer already renders while `userId` is undefined, so a
+  // key flipping from anonymous to the real id would remount and destroy what
+  // the user typed on a cold start. The epoch therefore bumps only between two
+  // known ids.
+  const [composerAccount, setComposerAccount] = useState<{ id?: string; epoch: number }>({
+    id: userId,
+    epoch: 0,
+  });
+  if (userId !== undefined && composerAccount.id !== userId) {
+    setComposerAccount(current => ({
+      id: userId,
+      epoch: current.id === undefined ? current.epoch : current.epoch + 1,
+    }));
+  }
 
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
@@ -329,6 +368,46 @@ export function SessionDetailContent({
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  // Refetch the linked PR on every focus so a link, unlink, or mid-session
+  // decision change surfaces without reopening the session. A pending review
+  // decision gets one 4s follow-up refetch — no polling loop.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const refetch = async (scheduleFollowUp: boolean) => {
+        try {
+          const result = await trpcClient.cliSessionsV2.getWithRuntimeState.query({
+            session_id: sessionId,
+          });
+          if (cancelled) {
+            return;
+          }
+          manager.updateFetchedAssociatedPr(result.associatedPr);
+          if (scheduleFollowUp && result.associatedPr?.reviewDecisionPending) {
+            pendingTimeout = setTimeout(() => {
+              pendingTimeout = null;
+              void refetch(false);
+            }, 4000);
+          }
+        } catch {
+          // Ignore a failed refetch: the badge keeps its current state and a
+          // later focus refetches again.
+        }
+      };
+
+      void refetch(true);
+
+      return () => {
+        cancelled = true;
+        if (pendingTimeout !== null) {
+          clearTimeout(pendingTimeout);
+        }
+      };
+    }, [manager, sessionId])
+  );
 
   useEffect(() => {
     setOpenContextSheetIdentity(openIdentity => {
@@ -563,23 +642,26 @@ export function SessionDetailContent({
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <SessionContextMetrics
-      info={contextInfo}
-      totalCostMicrodollars={totalMicrodollars}
-      hasMessages={messages.length > 0}
-      loading={shouldShowLoading}
-      onPress={
-        contextInfo
-          ? () => {
-              setOpenContextSheetIdentity({
-                sessionId,
-                providerID: contextInfo.providerID,
-                modelID: contextInfo.modelID,
-              });
-            }
-          : undefined
-      }
-    />
+    <View className="flex-row items-center gap-2">
+      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+      <SessionContextMetrics
+        info={contextInfo}
+        totalCostMicrodollars={totalMicrodollars}
+        hasMessages={messages.length > 0}
+        loading={shouldShowLoading}
+        onPress={
+          contextInfo
+            ? () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo.providerID,
+                  modelID: contextInfo.modelID,
+                });
+              }
+            : undefined
+        }
+      />
+    </View>
   );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -612,15 +694,19 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
+  // One condition for the composer and for the bottom BlurBar that reserves
+  // its space: if the bar claimed the space on a condition the composer does
+  // not share, the composer pops in and the layout jumps on every open.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
-  const isComposerDisabled =
-    isReadOnly ||
-    !canSend ||
-    shouldShowLoading ||
-    Boolean(error) ||
-    hasBlockingInteraction ||
-    (requiresModel && !currentModel);
+  const isComposerDisabled = resolveSessionComposerDisabled({
+    isReadOnly,
+    canSend,
+    shouldShowLoading,
+    hasBlockingInteraction,
+    requiresModel,
+    hasModel: Boolean(currentModel),
+  });
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
@@ -979,6 +1065,7 @@ export function SessionDetailContent({
               isSelectionCurrent={isModelPickerSelectionCurrent}
             >
               <ChatComposer
+                key={`${composerAccount.epoch}:${sessionId}`}
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
@@ -1001,6 +1088,8 @@ export function SessionDetailContent({
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}
+                draftKey={userId ? sessionComposerDraftKey : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

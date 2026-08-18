@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- fetchSession NOT_FOUND retry helpers stay with the manager (M1). */
-import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 import {
   type CloudAgentSessionId,
@@ -21,9 +20,10 @@ import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-sessi
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
+import { cacheFilePart } from '@/components/agents/file-part-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 type SessionWithRuntimeState =
@@ -63,6 +63,38 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
     return top;
   }
   return undefined;
+}
+
+/**
+ * tRPC codes transient enough to keep the same cloud-prepare `operationKey`
+ * across a retry. Any other typed code is a terminal rejection and rotates it.
+ */
+const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
+  'INTERNAL_SERVER_ERROR',
+  'BAD_GATEWAY',
+  'SERVICE_UNAVAILABLE',
+  'GATEWAY_TIMEOUT',
+  'TIMEOUT',
+  'TOO_MANY_REQUESTS',
+]);
+
+/** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
+const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
+
+/**
+ * True when a `prepareSession` failure may be retried with the SAME
+ * `operationKey`: `creation_in_progress`, a transient 5xx, or a codeless
+ * transport failure (the ledger reconciles the ambiguous prior attempt).
+ */
+export function isCloudPrepareRetryableError(error: unknown): boolean {
+  const code = readFetchSessionErrorCode(error);
+  if (code === undefined) {
+    return true;
+  }
+  if (code === 'CONFLICT') {
+    return error instanceof Error && error.message === CLOUD_PREPARE_IN_PROGRESS_MESSAGE;
+  }
+  return CLOUD_PREPARE_TRANSIENT_CODES.has(code);
 }
 
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
@@ -146,6 +178,9 @@ export function createMobileAgentSessionManager({
     onToolAttachment: (partId, attachment) => {
       cacheToolAttachment(partId, attachment);
     },
+    onFilePart: (partId, file) => {
+      cacheFilePart(partId, file);
+    },
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       // Read-only is only ever returned once we have successful evidence the
       // session isn't cloud-agent or remote. A failed query here must
@@ -178,7 +213,7 @@ export function createMobileAgentSessionManager({
     },
     getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
       const ticket = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
-        const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+        const token = await getAuthTokenForRequest();
         const body: Record<string, string> = { cloudAgentSessionId: sessionId };
         if (organizationId) {
           body.organizationId = organizationId;

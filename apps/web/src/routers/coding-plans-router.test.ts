@@ -1,11 +1,13 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { generateText } from 'ai';
 import { eq } from 'drizzle-orm';
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
 import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
+import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
 import { redisClient } from '@/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -54,6 +56,65 @@ const mockedRedisDel = jest.mocked(redisClient.del);
 
 function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.randomUUID()}`) {
   return `${key}::${upstreamPlanId}`;
+}
+
+async function insertInventory(
+  overrides: Partial<typeof coding_plan_key_inventory.$inferInsert> = {}
+) {
+  const [row] = await db
+    .insert(coding_plan_key_inventory)
+    .values({
+      plan_id: PLAN_ID,
+      provider_id: 'minimax',
+      upstream_plan_id: `minimax-plan-${crypto.randomUUID()}`,
+      encrypted_api_key: encryptApiKey('old-secret', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: crypto.randomUUID(),
+      status: 'available',
+      ...overrides,
+    })
+    .returning();
+  return row;
+}
+
+function emptyInsightPlan(planId: string) {
+  return {
+    planId,
+    liveSubscriptions: 0,
+    monthlyRecurringValueKiloCredits: 0,
+    createdInRange: 0,
+    canceledInRange: 0,
+    currentWaitersJoinedInRange: 0,
+    currentWaitlistTotal: 0,
+  };
+}
+
+function catalogInsightPlans(
+  overrides: Partial<
+    Record<(typeof CODING_PLAN_IDS)[number], Partial<ReturnType<typeof emptyInsightPlan>>>
+  > = {}
+) {
+  return CODING_PLAN_IDS.map(planId => ({
+    ...emptyInsightPlan(planId),
+    ...overrides[planId],
+  }));
+}
+
+function subscriptionValues(
+  userId: string,
+  overrides: Partial<typeof coding_plan_subscriptions.$inferInsert> = {}
+) {
+  return {
+    user_id: userId,
+    plan_id: PLAN_ID,
+    provider_id: 'minimax',
+    status: 'canceled' as const,
+    cost_microdollars: COST_MICRODOLLARS,
+    billing_period_days: 30,
+    current_period_start: '2026-06-20T12:00:00.000Z',
+    current_period_end: '2026-07-20T12:00:00.000Z',
+    credit_renewal_at: '2026-07-20T12:00:00.000Z',
+    ...overrides,
+  };
 }
 
 function usageResponse() {
@@ -989,5 +1050,607 @@ describe('coding plans router', () => {
         subscriptionExpiresAt: '2026-08-15T12:00:00.000Z',
       }),
     ]);
+  });
+
+  it('paginates admin subscriptions 20 per page with totals', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const users = await Promise.all(Array.from({ length: 23 }, () => insertTestUser()));
+    await db.insert(coding_plan_subscriptions).values(
+      users.map((user, index) =>
+        subscriptionValues(user.id, {
+          created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+        })
+      )
+    );
+    const caller = await createCallerForUser(admin.id);
+
+    const firstPage = await caller.codingPlans.adminListSubscriptions({ page: 1 });
+    expect(firstPage.items).toHaveLength(20);
+    expect(firstPage.pagination).toEqual({ page: 1, total: 23, totalPages: 2 });
+
+    const secondPage = await caller.codingPlans.adminListSubscriptions({ page: 2 });
+    expect(secondPage.items).toHaveLength(3);
+    expect(secondPage.pagination).toEqual({ page: 2, total: 23, totalPages: 2 });
+  });
+
+  it('includes inventory and upstream plan identifiers in admin subscriptions', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const inventory = await insertInventory({
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+      upstream_plan_id: 'upstream-plan-admin-display',
+    });
+    await db.insert(coding_plan_subscriptions).values(
+      subscriptionValues(user.id, {
+        key_inventory_id: inventory.id,
+      })
+    );
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.codingPlans.adminListSubscriptions({});
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        inventoryKeyId: inventory.id,
+        upstreamPlanId: 'upstream-plan-admin-display',
+      }),
+    ]);
+  });
+
+  it('searches admin subscriptions by user id and email substring', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const emailUser = await insertTestUser({
+      google_user_email: 'unique-search-target@example.com',
+      normalized_email: 'unique-search-target@example.com',
+    });
+    const idUser = await insertTestUser({ id: 'searchable-user-id-42' });
+    const otherUser = await insertTestUser();
+    await db
+      .insert(coding_plan_subscriptions)
+      .values([
+        subscriptionValues(emailUser.id),
+        subscriptionValues(idUser.id),
+        subscriptionValues(otherUser.id),
+      ]);
+    const caller = await createCallerForUser(admin.id);
+
+    const emailMatches = await caller.codingPlans.adminListSubscriptions({
+      search: 'unique-search-target',
+    });
+    expect(emailMatches.items).toEqual([
+      expect.objectContaining({
+        userId: emailUser.id,
+        userEmail: 'unique-search-target@example.com',
+      }),
+    ]);
+
+    const idMatches = await caller.codingPlans.adminListSubscriptions({
+      search: 'searchable-user-id',
+    });
+    expect(idMatches.items).toEqual([expect.objectContaining({ userId: idUser.id })]);
+  });
+
+  it('filters admin subscriptions by display status', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const activeUser = await insertTestUser();
+    const pendingUser = await insertTestUser();
+    const activeInventory = await insertInventory({ status: 'assigned' });
+    const pendingInventory = await insertInventory({ status: 'assigned' });
+    await db.insert(coding_plan_subscriptions).values([
+      subscriptionValues(activeUser.id, {
+        key_inventory_id: activeInventory.id,
+        status: 'active',
+        cancel_at_period_end: false,
+      }),
+      subscriptionValues(pendingUser.id, {
+        key_inventory_id: pendingInventory.id,
+        status: 'active',
+        cancel_at_period_end: true,
+      }),
+    ]);
+    const caller = await createCallerForUser(admin.id);
+
+    const active = await caller.codingPlans.adminListSubscriptions({ status: 'active' });
+    expect(active.items).toEqual([expect.objectContaining({ userId: activeUser.id })]);
+
+    const pending = await caller.codingPlans.adminListSubscriptions({
+      status: 'pending_cancellation',
+    });
+    expect(pending.items).toEqual([expect.objectContaining({ userId: pendingUser.id })]);
+  });
+
+  it('schedules admin cancellation at period end and rejects canceled subscriptions', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const inventory = await insertInventory({ status: 'assigned' });
+    const [active] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          key_inventory_id: inventory.id,
+          status: 'active',
+        })
+      )
+      .returning();
+    const [canceled] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          plan_id: MAX_PLAN_ID,
+          status: 'canceled',
+          canceled_at: '2026-07-20T12:00:00.000Z',
+          cancellation_reason: 'user_cancelled',
+        })
+      )
+      .returning();
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.codingPlans.adminCancelSubscription({ subscriptionId: active.id });
+    const [updated] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, active.id));
+    expect(updated.cancel_at_period_end).toBe(true);
+    expect(updated.status).toBe('active');
+
+    await expect(
+      caller.codingPlans.adminCancelSubscription({ subscriptionId: canceled.id })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'No active subscription found.',
+    });
+  });
+
+  it('extends an active subscription period and rejects canceled or invalid days', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const inventory = await insertInventory({ status: 'assigned' });
+    const [active] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          key_inventory_id: inventory.id,
+          status: 'active',
+          current_period_end: '2026-07-20T12:00:00.000Z',
+          credit_renewal_at: '2026-07-20T12:00:00.000Z',
+        })
+      )
+      .returning();
+    const [canceled] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          plan_id: MAX_PLAN_ID,
+          status: 'canceled',
+          canceled_at: '2026-07-20T12:00:00.000Z',
+          cancellation_reason: 'user_cancelled',
+        })
+      )
+      .returning();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.codingPlans.adminExtendSubscriptionPeriod({
+        subscriptionId: active.id,
+        days: 7,
+      })
+    ).resolves.toEqual({
+      currentPeriodEnd: '2026-07-27T12:00:00.000Z',
+      creditRenewalAt: '2026-07-27T12:00:00.000Z',
+    });
+
+    const [extensionTerm] = await db
+      .select()
+      .from(coding_plan_terms)
+      .where(eq(coding_plan_terms.subscription_id, active.id));
+    expect(extensionTerm).toMatchObject({
+      user_id: user.id,
+      plan_id: PLAN_ID,
+      kind: 'extension',
+      cost_microdollars: 0,
+    });
+    expect(new Date(extensionTerm.period_start).toISOString()).toBe('2026-07-20T12:00:00.000Z');
+    expect(new Date(extensionTerm.period_end).toISOString()).toBe('2026-07-27T12:00:00.000Z');
+    const [extensionTransaction] = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.id, extensionTerm.credit_transaction_id));
+    expect(extensionTransaction).toMatchObject({
+      kilo_user_id: user.id,
+      amount_microdollars: 0,
+      is_free: true,
+      created_by_kilo_user_id: admin.id,
+      description: 'Coding plan extension: 7 additional days',
+    });
+
+    await expect(
+      caller.codingPlans.adminExtendSubscriptionPeriod({
+        subscriptionId: canceled.id,
+        days: 7,
+      })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'No active subscription found.',
+    });
+    await expect(
+      caller.codingPlans.adminExtendSubscriptionPeriod({
+        subscriptionId: active.id,
+        days: 0,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.codingPlans.adminExtendSubscriptionPeriod({
+        subscriptionId: active.id,
+        days: 91,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('replaces available and assigned inventory credentials and rejects ineligible keys', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const available = await insertInventory({
+      encrypted_api_key: encryptApiKey('old-secret', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: codingPlanCredentialFingerprint('old-secret'),
+    });
+    const assigned = await insertInventory({
+      encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: codingPlanCredentialFingerprint('assigned-old-secret'),
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+    });
+    const [installedByok] = await db
+      .insert(byok_api_keys)
+      .values({
+        kilo_user_id: user.id,
+        organization_id: null,
+        provider_id: 'minimax',
+        encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+        management_source: 'coding_plan',
+        created_by: user.id,
+      })
+      .returning();
+    await db.insert(coding_plan_subscriptions).values(
+      subscriptionValues(user.id, {
+        key_inventory_id: assigned.id,
+        installed_byok_key_id: installedByok.id,
+        status: 'active',
+      })
+    );
+    const duplicate = await insertInventory({
+      encrypted_api_key: encryptApiKey('already-present-key', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: codingPlanCredentialFingerprint('already-present-key'),
+    });
+    const pending = await insertInventory({ status: 'revocation_pending' });
+    const caller = await createCallerForUser(admin.id);
+
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+    await caller.codingPlans.adminReplaceInventoryCredential({
+      inventoryKeyId: available.id,
+      apiKey: 'available-replacement-key',
+    });
+    const [replacedAvailable] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, available.id));
+    expect(replacedAvailable.status).toBe('available');
+    expect(replacedAvailable.credential_fingerprint).toBe(
+      codingPlanCredentialFingerprint('available-replacement-key')
+    );
+    expect(replacedAvailable.encrypted_api_key).not.toBeNull();
+    expect(decryptApiKey(replacedAvailable.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe(
+      'available-replacement-key'
+    );
+
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+    await caller.codingPlans.adminReplaceInventoryCredential({
+      inventoryKeyId: assigned.id,
+      apiKey: 'assigned-replacement-key',
+    });
+    const [replacedAssigned] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, assigned.id));
+    const [replacedByok] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.id, installedByok.id));
+    expect(replacedAssigned.status).toBe('assigned');
+    expect(replacedAssigned.encrypted_api_key).not.toBeNull();
+    expect(decryptApiKey(replacedAssigned.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe(
+      'assigned-replacement-key'
+    );
+    expect(decryptApiKey(replacedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
+      'assigned-replacement-key'
+    );
+
+    await expect(
+      caller.codingPlans.adminReplaceInventoryCredential({
+        inventoryKeyId: available.id,
+        apiKey: 'available-replacement-key',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: expect.stringContaining('must be different from the current credential'),
+    });
+    await expect(
+      caller.codingPlans.adminReplaceInventoryCredential({
+        inventoryKeyId: available.id,
+        apiKey: 'already-present-key',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: expect.stringContaining('already present in inventory'),
+    });
+    await expect(
+      caller.codingPlans.adminReplaceInventoryCredential({
+        inventoryKeyId: pending.id,
+        apiKey: 'pending-replacement-key',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Credential is not eligible for replacement.',
+    });
+    const [unchangedDuplicate] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, duplicate.id));
+    expect(unchangedDuplicate).toMatchObject({
+      status: 'available',
+      credential_fingerprint: codingPlanCredentialFingerprint('already-present-key'),
+    });
+  });
+
+  it('rejects inventory replacement after the stored credential identity changes', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const available = await insertInventory({
+      encrypted_api_key: encryptApiKey('first-secret', BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: codingPlanCredentialFingerprint('first-secret'),
+    });
+    const caller = await createCallerForUser(admin.id);
+    let resolveValidation: (() => void) | undefined;
+    const validationGate = new Promise<void>(resolve => {
+      resolveValidation = resolve;
+    });
+    mockedGenerateText.mockImplementationOnce(async () => {
+      await db
+        .update(coding_plan_key_inventory)
+        .set({
+          credential_fingerprint: codingPlanCredentialFingerprint('changed-secret'),
+          encrypted_api_key: encryptApiKey('changed-secret', BYOK_ENCRYPTION_KEY),
+        })
+        .where(eq(coding_plan_key_inventory.id, available.id));
+      resolveValidation?.();
+      return { finishReason: 'stop' } as never;
+    });
+
+    const replacement = caller.codingPlans.adminReplaceInventoryCredential({
+      inventoryKeyId: available.id,
+      apiKey: 'next-secret',
+    });
+    await validationGate;
+    await expect(replacement).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Credential changed during replacement. Refresh and try again.',
+    });
+    const [unchanged] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, available.id));
+    expect(unchanged.credential_fingerprint).toBe(
+      codingPlanCredentialFingerprint('changed-secret')
+    );
+    expect(decryptApiKey(unchanged.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe('changed-secret');
+  });
+
+  it('returns bounded subscription summary and selectable-range insight aggregates', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const activeUser = await insertTestUser();
+    const retainedUser = await insertTestUser();
+    const pendingUser = await insertTestUser();
+    const pastDueUser = await insertTestUser();
+    const canceledUser = await insertTestUser();
+    const resolvedUser = await insertTestUser();
+    const byteplusUser = await insertTestUser();
+    const byteplusWaiter = await insertTestUser();
+    const historicalUser = await insertTestUser();
+    const daysAgo = (days: number) =>
+      new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const activeInventory = await insertInventory();
+    const retainedInventory = await insertInventory();
+    const pendingInventory = await insertInventory();
+    const pastDueInventory = await insertInventory();
+    const byteplusInventory = await insertInventory({
+      plan_id: BYTEPLUS_PLAN_ID,
+      provider_id: 'byteplus-coding',
+    });
+    await db.insert(coding_plan_subscriptions).values([
+      subscriptionValues(activeUser.id, {
+        status: 'active',
+        key_inventory_id: activeInventory.id,
+        created_at: daysAgo(3),
+      }),
+      subscriptionValues(retainedUser.id, {
+        status: 'active',
+        key_inventory_id: retainedInventory.id,
+        created_at: daysAgo(15),
+      }),
+      subscriptionValues(pendingUser.id, {
+        status: 'active',
+        cancel_at_period_end: true,
+        key_inventory_id: pendingInventory.id,
+        created_at: daysAgo(10),
+      }),
+      subscriptionValues(pastDueUser.id, {
+        status: 'past_due',
+        key_inventory_id: pastDueInventory.id,
+        created_at: daysAgo(40),
+      }),
+      subscriptionValues(canceledUser.id, {
+        created_at: daysAgo(45),
+        canceled_at: daysAgo(5),
+        cancellation_reason: 'user_cancelled',
+      }),
+      subscriptionValues(byteplusUser.id, {
+        plan_id: BYTEPLUS_PLAN_ID,
+        provider_id: 'byteplus-coding',
+        status: 'active',
+        key_inventory_id: byteplusInventory.id,
+        created_at: daysAgo(2),
+      }),
+      subscriptionValues(historicalUser.id, {
+        plan_id: 'legacy-unknown-plan',
+        provider_id: 'legacy-provider',
+        created_at: daysAgo(3),
+        canceled_at: daysAgo(2),
+        cancellation_reason: 'user_cancelled',
+      }),
+    ]);
+    await db.insert(coding_plan_availability_intents).values([
+      {
+        user_id: canceledUser.id,
+        plan_id: PLAN_ID,
+        created_at: daysAgo(4),
+      },
+      {
+        user_id: pendingUser.id,
+        plan_id: PLAN_ID,
+        created_at: daysAgo(10),
+      },
+      {
+        user_id: resolvedUser.id,
+        plan_id: PLAN_ID,
+        created_at: daysAgo(12),
+      },
+      {
+        user_id: byteplusWaiter.id,
+        plan_id: BYTEPLUS_PLAN_ID,
+        created_at: daysAgo(1),
+      },
+      {
+        user_id: historicalUser.id,
+        plan_id: 'legacy-unknown-plan',
+        created_at: daysAgo(1),
+      },
+    ]);
+    await db.insert(credit_transactions).values({
+      kilo_user_id: resolvedUser.id,
+      amount_microdollars: -COST_MICRODOLLARS,
+      is_free: false,
+      description: 'Coding plan activation',
+    });
+    const [activationTransaction] = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, resolvedUser.id));
+    const [resolvedSubscription] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(resolvedUser.id, {
+          created_at: daysAgo(11),
+          canceled_at: daysAgo(11),
+          cancellation_reason: 'user_cancelled',
+        })
+      )
+      .returning();
+    await db.insert(coding_plan_terms).values({
+      subscription_id: resolvedSubscription.id,
+      user_id: resolvedUser.id,
+      plan_id: PLAN_ID,
+      kind: 'activation',
+      idempotency_key: `activation:${resolvedUser.id}`,
+      period_start: daysAgo(11),
+      period_end: daysAgo(-19),
+      cost_microdollars: COST_MICRODOLLARS,
+      credit_transaction_id: activationTransaction.id,
+      created_at: daysAgo(11),
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.codingPlans.adminSubscriptionOverview()).resolves.toEqual({
+      total: 8,
+      active: 3,
+      pendingCancellation: 1,
+      pastDue: 1,
+    });
+    const sevenDayInsights = await caller.codingPlans.adminInsights({ rangeDays: 7 });
+    expect(sevenDayInsights.plans).toHaveLength(CODING_PLAN_IDS.length);
+    expect(sevenDayInsights.plans.map(plan => plan.planId)).toEqual([...CODING_PLAN_IDS]);
+    expect(sevenDayInsights).toEqual({
+      rangeDays: 7,
+      totals: {
+        liveSubscriptions: 5,
+        pendingCancellation: 1,
+        pastDue: 1,
+        mrrKiloCredits: 100,
+        revenueAtRiskKiloCredits: 40,
+        pastDueMrrKiloCredits: 20,
+        createdInRange: 2,
+        createdInPriorRange: 2,
+        canceledInRange: 1,
+        liveAtRangeStart: 4,
+        retainedFromRangeStart: 3,
+        currentWaitersJoinedInRange: 2,
+        currentWaitersJoinedInPriorRange: 1,
+        currentWaitlistTotal: 3,
+      },
+      plans: catalogInsightPlans({
+        [PLAN_ID]: {
+          liveSubscriptions: 4,
+          monthlyRecurringValueKiloCredits: 80,
+          createdInRange: 1,
+          canceledInRange: 1,
+          currentWaitersJoinedInRange: 1,
+          currentWaitlistTotal: 2,
+        },
+        [BYTEPLUS_PLAN_ID]: {
+          liveSubscriptions: 1,
+          monthlyRecurringValueKiloCredits: 20,
+          createdInRange: 1,
+          currentWaitersJoinedInRange: 1,
+          currentWaitlistTotal: 1,
+        },
+      }),
+    });
+    await expect(caller.codingPlans.adminInsights({ rangeDays: 14 })).resolves.toMatchObject({
+      rangeDays: 14,
+      totals: {
+        createdInRange: 4,
+        createdInPriorRange: 1,
+        canceledInRange: 2,
+        currentWaitersJoinedInRange: 3,
+        currentWaitersJoinedInPriorRange: 0,
+        currentWaitlistTotal: 3,
+      },
+      plans: catalogInsightPlans({
+        [PLAN_ID]: {
+          liveSubscriptions: 4,
+          monthlyRecurringValueKiloCredits: 80,
+          createdInRange: 3,
+          canceledInRange: 2,
+          currentWaitersJoinedInRange: 2,
+          currentWaitlistTotal: 2,
+        },
+        [BYTEPLUS_PLAN_ID]: {
+          liveSubscriptions: 1,
+          monthlyRecurringValueKiloCredits: 20,
+          createdInRange: 1,
+          currentWaitersJoinedInRange: 1,
+          currentWaitlistTotal: 1,
+        },
+      }),
+    });
+    await expect(caller.codingPlans.adminInsights({ rangeDays: 30 })).resolves.toMatchObject({
+      rangeDays: 30,
+      totals: {
+        createdInRange: 5,
+        createdInPriorRange: 2,
+        canceledInRange: 2,
+        currentWaitersJoinedInRange: 3,
+        currentWaitersJoinedInPriorRange: 0,
+        currentWaitlistTotal: 3,
+      },
+    });
   });
 });

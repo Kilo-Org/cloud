@@ -12,6 +12,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 
 const STATUS_OPTIONS: { value: SecurityFindingStatusFilter; label: string }[] = [
@@ -97,16 +98,18 @@ function FilterSection<T>({
       <Text variant="eyebrow" className="px-3">
         {title}
       </Text>
-      {options.map(option => (
-        <FilterOptionRow
-          key={String(option.value)}
-          label={option.label}
-          isSelected={option.value === selected}
-          onPress={() => {
-            onSelect(option.value);
-          }}
-        />
-      ))}
+      <RadioGroup label={title}>
+        {options.map(option => (
+          <FilterOptionRow
+            key={String(option.value)}
+            label={option.label}
+            isSelected={option.value === selected}
+            onPress={() => {
+              onSelect(option.value);
+            }}
+          />
+        ))}
+      </RadioGroup>
     </View>
   );
 }

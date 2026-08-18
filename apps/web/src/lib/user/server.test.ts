@@ -5,6 +5,14 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
 
+const mockGetServerSession = jest.fn();
+
+jest.mock('next-auth', () => ({
+  __esModule: true,
+  ...jest.requireActual('next-auth'),
+  getServerSession: () => mockGetServerSession(),
+}));
+
 import { afterEach, beforeAll, beforeEach, describe, test, expect } from '@jest/globals';
 import {
   isEmailBlacklistedByDomain,
@@ -35,6 +43,7 @@ const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 beforeEach(() => {
   mockHeaders.mockReset();
+  mockGetServerSession.mockReset();
 });
 
 describe('isEmailBlacklistedByDomain', () => {
@@ -575,6 +584,65 @@ describe('getUserFromAuth', () => {
     const afterGrant = await getUserFromAuth({ adminOnly: true });
     expect(afterGrant.authFailedResponse).not.toBeNull();
     expect(afterGrant.user).toBeNull();
+  });
+
+  test('Authorization branch threads deviceSessionId from the bearer token', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-device-session-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'device-session-pepper',
+    });
+    const deviceSessionId = crypto.randomUUID();
+    const token = generateApiToken(user, { deviceSessionId });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBe(deviceSessionId);
+  });
+
+  test('web-session branch leaves deviceSessionId undefined', async () => {
+    const user = await insertTestUser({
+      google_user_email: `web-session-claim-${crypto.randomUUID()}@example.com`,
+      web_session_pepper: 'web-session-pepper',
+    });
+    // No Authorization header: auth must come from the web session.
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'web-session-pepper',
+      isNewUser: false,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBeUndefined();
+  });
+
+  test('failure paths leave deviceSessionId undefined even when the token carried the claim', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-failure-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'pre-rotation-pepper',
+    });
+    const deviceSessionId = crypto.randomUUID();
+    const token = generateApiToken(user, { deviceSessionId });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    // Rotate the pepper so the bearer token passes JWT verification but fails
+    // the pepper comparison — a post-validation failure path.
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: 'rotated-pepper' })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).not.toBeNull();
+    expect(result.user).toBeNull();
+    expect(result.deviceSessionId).toBeUndefined();
   });
 });
 

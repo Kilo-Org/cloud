@@ -21,6 +21,9 @@ import {
   getSandboxRecoveryState,
   getWrapperLease,
   getWrapperRuntimeState,
+  putWrapperLease,
+  WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+  WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS,
 } from './wrapper-runtime-state.js';
 import type { LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
@@ -123,6 +126,7 @@ function createHarness(
       wrapperRunId: string
     ) => Promise<void>;
     recordSharedSandboxFailover?: (routeKey: SandboxId) => Promise<void>;
+    isSessionDeletionInProgress?: () => Promise<boolean>;
   }
 ) {
   const getAssistantMessageForUserMessage =
@@ -134,6 +138,7 @@ function createHarness(
   const sentPings: string[] = [];
   const stops: string[] = [];
   const stopWrappers = vi.fn().mockResolvedValue({ status: 'absent' });
+  const observeWrappers = vi.fn().mockResolvedValue({ status: 'absent' });
   const requestedAlarms: number[] = [];
   const currentMetadata = options?.metadata ?? createMetadata();
   const settlementOutbox = createMessageSettlementOutbox({
@@ -179,10 +184,12 @@ function createHarness(
     ensureAcceptedMessageBeforeTerminal:
       options?.ensureAcceptedMessageBeforeTerminal ?? (async () => {}),
     stopWrappers,
+    observeWrappers,
     recordSharedSandboxFailover: routeKey => recordSharedSandboxFailover(routeKey),
     requestAlarmAtOrBefore: async deadline => {
       requestedAlarms.push(deadline);
     },
+    isSessionDeletionInProgress: options?.isSessionDeletionInProgress,
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
   });
 
@@ -194,12 +201,33 @@ function createHarness(
     sentPings,
     stops,
     stopWrappers,
+    observeWrappers,
     requestedAlarms,
     requestPendingDrainIfNeeded,
     recordSharedSandboxFailover,
     settlementOutbox,
     supervisor,
   };
+}
+
+function exhaustedLease(overrides: {
+  exhaustedAt: number;
+  nextRecheckAt?: number;
+}): [string, unknown] {
+  return [
+    'wrapper_lease',
+    {
+      state: 'stop_needed',
+      nextInstanceGeneration: 2,
+      target: { kind: 'session' },
+      reason: 'unhealthy-wrapper',
+      requestedAt: 1_000,
+      nextAttemptAt: Number.MAX_SAFE_INTEGER,
+      attempts: 5,
+      lastError: 'Wrapper process discovery timed out',
+      ...overrides,
+    },
+  ];
 }
 
 function liveRuntimeState(overrides?: Record<string, unknown>): [string, unknown] {
@@ -2620,7 +2648,11 @@ describe('WrapperSupervisor', () => {
     });
     await harness.supervisor.runMaintenance(25_000);
     expect(publish).toHaveBeenCalledTimes(4);
-    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([]);
+    // Exhausted cleanup still carries its recheck deadline (exhaustedAt: 1 has
+    // no persisted nextRecheckAt, so the fallback interval applies).
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([
+      1 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+    ]);
   });
 
   it('quarantines cleanup after five failed attempts', async () => {
@@ -2670,10 +2702,11 @@ describe('WrapperSupervisor', () => {
     });
     expect(harness.stopWrappers).toHaveBeenCalledTimes(5);
     await harness.supervisor.runMaintenance(now + 60_000);
+    // Still inside the recheck interval: no extra stop is attempted.
     expect(harness.stopWrappers).toHaveBeenCalledTimes(5);
-    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.not.toContainEqual(
-      expect.any(Number)
-    );
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([
+      now + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+    ]);
   });
 
   it('quarantines the fifth cleanup attempt when its watchdog expires', async () => {
@@ -2703,7 +2736,356 @@ describe('WrapperSupervisor', () => {
       exhaustedAt: 47_000,
       lastError: 'Stop attempt deadline expired',
     });
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([
+      47_000 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+    ]);
+  });
+
+  it('releases an exhausted cleanup once a recheck confirms wrapper absence', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          lastError: 'Wrapper process discovery timed out',
+          exhaustedAt,
+          nextRecheckAt: exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'absent' });
+
+    await harness.supervisor.runMaintenance(exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS);
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    // The attempt budget is spent and the rollback fence stands: recovery may
+    // observe the sandbox but must never issue another stop.
+    expect(harness.stopWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
+    });
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('does not recheck an exhausted cleanup before its recheck deadline', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          exhaustedAt,
+          nextRecheckAt: exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+        },
+      ],
+    ]);
+
+    await harness.supervisor.runMaintenance(exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS - 1);
+
+    expect(harness.observeWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      exhaustedAt,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('falls back to one interval for exhausted leases without a persisted recheck deadline', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          exhaustedAt,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'absent' });
+
+    await harness.supervisor.runMaintenance(exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS - 1);
+    expect(harness.observeWrappers).not.toHaveBeenCalled();
+
+    await harness.supervisor.runMaintenance(exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS);
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({ state: 'none' });
+  });
+
+  it('keeps an exhausted cleanup fenced when the recheck still observes the wrapper', async () => {
+    const exhaustedAt = 10_000;
+    const recheckAt = exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          exhaustedAt,
+          nextRecheckAt: recheckAt,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'present', observed: [] });
+
+    await harness.supervisor.runMaintenance(recheckAt);
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    expect(harness.stopWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      exhaustedAt,
+      nextRecheckAt: recheckAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('records sandbox inspection failures from an exhausted recheck without releasing', async () => {
+    const exhaustedAt = 10_000;
+    const recheckAt = exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          exhaustedAt,
+          nextRecheckAt: recheckAt,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({
+      status: 'inspection-failed',
+      error: 'Wrapper process discovery timed out',
+      reason: 'wrapper_discovery_list_processes_timeout',
+    });
+
+    await harness.supervisor.runMaintenance(recheckAt);
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      exhaustedAt,
+      nextRecheckAt: recheckAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      listProcessesTimeouts: 1,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('releases a legacy exhausted cleanup quarantined without a recheck deadline', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1,
+          nextAttemptAt: 3_153_600_000_001,
+          attempts: 5,
+          lastError: 'inspection failed',
+          exhaustedAt: 1,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'absent' });
+
+    await harness.supervisor.runMaintenance(1 + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS);
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({ state: 'none' });
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('forces an exhausted cleanup recheck on demand even inside the cadence window', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          exhaustedAt,
+          nextRecheckAt: exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'absent' });
+
+    await harness.supervisor.recheckExhaustedCleanup();
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    expect(harness.stopWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({ state: 'none' });
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the lease fenced when the forced recheck still observes the wrapper', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unhealthy-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: Number.MAX_SAFE_INTEGER,
+          attempts: 5,
+          exhaustedAt,
+          nextRecheckAt: exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+        },
+      ],
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'present', observed: [] });
+
+    await harness.supervisor.recheckExhaustedCleanup();
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      exhaustedAt,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('does not force a recheck when the lease is not exhausted', async () => {
+    const harness = createHarness([OWNED_WRAPPER_LEASE]);
+
+    await harness.supervisor.recheckExhaustedCleanup();
+
+    expect(harness.observeWrappers).not.toHaveBeenCalled();
+  });
+
+  it('stops background rechecks once the recovery window closes', async () => {
+    const exhaustedAt = 10_000;
+    const closedAt = exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS;
+    const harness = createHarness([exhaustedLease({ exhaustedAt, nextRecheckAt: closedAt + 1 })]);
+    harness.observeWrappers.mockResolvedValue({ status: 'absent' });
+
+    await harness.supervisor.runMaintenance(closedAt + 60_000);
+
+    expect(harness.observeWrappers).not.toHaveBeenCalled();
+    // No deadline left means the DO stops waking for this lease, which is the
+    // behaviour exhaustion had before rechecks re-armed the alarm.
     await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([]);
+  });
+
+  it('still forces a recheck after the recovery window closes', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      exhaustedLease({
+        exhaustedAt,
+        nextRecheckAt: exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS + 1,
+      }),
+    ]);
+    harness.observeWrappers.mockResolvedValue({ status: 'absent' });
+
+    await harness.supervisor.recheckExhaustedCleanup();
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({ state: 'none' });
+  });
+
+  it('does not recheck while session deletion owns physical teardown', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([exhaustedLease({ exhaustedAt })], {
+      isSessionDeletionInProgress: async () => true,
+    });
+
+    await harness.supervisor.recheckExhaustedCleanup();
+
+    expect(harness.observeWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      exhaustedAt,
+    });
+  });
+
+  it('does not release a lease that changed while the recheck was in flight', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([exhaustedLease({ exhaustedAt })]);
+    harness.observeWrappers.mockImplementation(async () => {
+      // A concurrent path released the lease and allocated a fresh wrapper.
+      await putWrapperLease(harness.storage, {
+        state: 'none',
+        nextInstanceGeneration: 3,
+      });
+      return { status: 'absent' };
+    });
+
+    await harness.supervisor.recheckExhaustedCleanup();
+
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 3,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('runs one shared probe when maintenance and a forced recheck overlap', async () => {
+    const exhaustedAt = 10_000;
+    const harness = createHarness([
+      exhaustedLease({
+        exhaustedAt,
+        nextRecheckAt: exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
+      }),
+    ]);
+    let releaseProbe: () => void = () => {};
+    harness.observeWrappers.mockImplementation(async () => {
+      await new Promise<void>(resolve => {
+        releaseProbe = resolve;
+      });
+      return { status: 'present', observed: [] };
+    });
+
+    const maintenance = harness.supervisor.runMaintenance(
+      exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS
+    );
+    await vi.waitFor(() => expect(harness.observeWrappers).toHaveBeenCalledOnce());
+    const forced = harness.supervisor.recheckExhaustedCleanup();
+    releaseProbe();
+    await Promise.all([maintenance, forced]);
+
+    expect(harness.observeWrappers).toHaveBeenCalledOnce();
   });
 
   it('retries thrown cleanup and does not issue a parallel stop during a valid watchdog', async () => {

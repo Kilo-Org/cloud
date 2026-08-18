@@ -7,6 +7,42 @@ const splitLinkMock = vi.hoisted(() =>
   vi.fn((opts: { condition: unknown; true: unknown; false: unknown }) => [opts.true, opts.false])
 );
 
+const secureStoreMock = vi.hoisted(() => {
+  const store = new Map<string, string>();
+  let heldExpiryRead: Promise<void> | null = null;
+  let releaseExpiryRead: (() => void) | null = null;
+  return {
+    store,
+    // Holds the TOKEN_EXPIRES_AT_KEY read open so a test can publish a newer
+    // owner while the cold expiry read is in flight.
+    holdExpiryRead(): void {
+      heldExpiryRead = new Promise<void>(resolve => {
+        releaseExpiryRead = resolve;
+      });
+    },
+    releaseHeldExpiryRead(): void {
+      releaseExpiryRead?.();
+      heldExpiryRead = null;
+      releaseExpiryRead = null;
+    },
+    getItemAsync: vi.fn(async (key: string) => {
+      if (key === 'token-expires-at' && heldExpiryRead) {
+        await heldExpiryRead;
+      }
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    }),
+    setItemAsync: vi.fn(async (key: string, value: string) => {
+      await Promise.resolve();
+      store.set(key, value);
+    }),
+    deleteItemAsync: vi.fn(async (key: string) => {
+      await Promise.resolve();
+      store.delete(key);
+    }),
+  };
+});
+
 vi.mock('@trpc/client', () => ({
   createTRPCClient: createTRPCClientMock,
   httpLink: httpLinkMock,
@@ -22,10 +58,9 @@ vi.mock('@trpc/tanstack-react-query', () => ({
 }));
 
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(async () => {
-    await Promise.resolve();
-    return null;
-  }),
+  getItemAsync: secureStoreMock.getItemAsync,
+  setItemAsync: secureStoreMock.setItemAsync,
+  deleteItemAsync: secureStoreMock.deleteItemAsync,
 }));
 
 vi.mock('@/lib/config', () => ({
@@ -76,6 +111,74 @@ describe('tRPC client link options', () => {
     expect(httpBatchLinkMock).toHaveBeenCalledTimes(1);
     const httpBatchLinkOpts = httpBatchLinkMock.mock.calls[0]?.[0];
     expect(httpBatchLinkOpts).toHaveProperty('methodOverride', 'POST');
+  });
+});
+
+type AuthHeadersFn = () => Promise<Record<string, string>>;
+
+describe('getAuthHeaders', () => {
+  beforeEach(() => {
+    secureStoreMock.store.clear();
+    secureStoreMock.getItemAsync.mockClear();
+    httpLinkMock.mockClear();
+    httpBatchLinkMock.mockClear();
+    createTRPCClientMock.mockClear();
+  });
+
+  afterEach(() => {
+    secureStoreMock.getItemAsync.mockRestore();
+    secureStoreMock.releaseHeldExpiryRead();
+  });
+
+  async function loadHeaders(): Promise<AuthHeadersFn> {
+    httpLinkMock.mockReturnValue({});
+    httpBatchLinkMock.mockReturnValue({});
+    createTRPCClientMock.mockReturnValue({});
+
+    await import('./trpc');
+
+    const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0] as { headers?: AuthHeadersFn } | undefined;
+    if (!httpLinkOpts?.headers) {
+      throw new Error('headers option was not captured from httpLink');
+    }
+    return httpLinkOpts.headers;
+  }
+
+  it('reads TOKEN_EXPIRES_AT_KEY once on the cold path and reuses the owner expiry', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toEqual({ Authorization: 'Bearer stored-token' });
+    // Cold path: one token read plus one expiry read.
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+
+    // The resolved expiry was published into the owner: a normal request
+    // rereads neither key.
+    await expect(headers()).resolves.toEqual({ Authorization: 'Bearer stored-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the newest owner token published while the cold expiry was read', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() - 1000));
+    const headers = await loadHeaders();
+
+    // The token read completes first and warms the owner with a null expiry;
+    // the held TOKEN_EXPIRES_AT_KEY read is where the race lands.
+    secureStoreMock.holdExpiryRead();
+    const pending = headers();
+    await vi.waitFor(() => {
+      expect(vi.mocked(secureStoreMock.getItemAsync)).toHaveBeenCalledWith('token-expires-at');
+    });
+    // Publish a newer owner while the cold expiry read is still in flight.
+    const { setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('newer-token', Date.now() + 3_600_000);
+    secureStoreMock.releaseHeldExpiryRead();
+
+    // The request uses the newest owner token, not the cold-read token, and
+    // the newer owner's expiry is not overwritten by the stale read.
+    await expect(pending).resolves.toEqual({ Authorization: 'Bearer newer-token' });
   });
 });
 

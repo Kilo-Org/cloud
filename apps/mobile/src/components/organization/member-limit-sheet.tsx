@@ -7,6 +7,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { limitError, parseLimit } from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,7 +57,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
     <>
       <FormField
         label="Limit (USD per day)"
-        accessibilityLabel="Daily usage limit"
+        required
         placeholder="No limit"
         keyboardType="decimal-pad"
         defaultValue={currentLimit != null ? String(currentLimit) : undefined}
@@ -67,9 +68,13 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         }}
       />
 
-      {mutations.updateMember.isError && (
-        <Text className="text-sm text-destructive">{mutations.updateMember.error.message}</Text>
-      )}
+      {/* updateMember's toast is silenced for this caller, so AccessibleStatus
+          is the single announcement owner: one announcement per platform,
+          visuals preserved (tone error). */}
+      <AccessibleStatus
+        message={mutations.updateMember.isError ? mutations.updateMember.error.message : null}
+        className="text-sm"
+      />
 
       <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
         <Text className="text-primary-foreground">Save</Text>

@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
+import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
@@ -44,6 +45,9 @@ type ExportRow = {
   kilo_user_id: string;
   user_email: string;
   user_name: string | null;
+  subject_type: 'user' | 'organization';
+  organization_id: string | null;
+  organization_name: string | null;
   status: ExportStatus;
   schema_version: number;
   snapshot_at: string;
@@ -101,6 +105,8 @@ type OutboxRow = {
 type RecoveryTarget = {
   id: string;
   kilo_user_id: string;
+  subject_type: 'user' | 'organization';
+  organization_id: string | null;
   status: ExportStatus;
   schema_version: number;
   snapshot_at: string;
@@ -139,13 +145,24 @@ async function lockRecoveryTarget(
   tx: DbTransaction,
   input: z.infer<typeof RecoveryInputSchema>
 ): Promise<RecoveryTarget> {
-  const initial = await tx.execute<{ kilo_user_id: string }>(sql`
-    SELECT kilo_user_id FROM user_data_exports WHERE id = ${input.exportId} LIMIT 1
+  const initial = await tx.execute<{
+    kilo_user_id: string;
+    organization_id: string | null;
+  }>(sql`
+    SELECT kilo_user_id, organization_id
+    FROM user_data_exports
+    WHERE id = ${input.exportId}
+    LIMIT 1
   `);
-  const ownerId = initial.rows[0]?.kilo_user_id;
-  if (!ownerId) throw new TRPCError({ code: 'NOT_FOUND', message: 'Data export not found' });
+  const initialRow = initial.rows[0];
+  if (!initialRow) throw new TRPCError({ code: 'NOT_FOUND', message: 'Data export not found' });
 
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerId}, 0))`);
+  const ownerId = initialRow.kilo_user_id;
+  const subjectLockKey = initialRow.organization_id ?? ownerId;
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${subjectLockKey}, 0))`);
+  if (subjectLockKey !== ownerId) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerId}, 0))`);
+  }
   const owner = await tx.execute<{ id: string; blocked_reason: string | null }>(sql`
     SELECT id, blocked_reason FROM kilocode_users WHERE id = ${ownerId} FOR UPDATE
   `);
@@ -158,7 +175,8 @@ async function lockRecoveryTarget(
   }
 
   const target = await tx.execute<RecoveryTarget>(sql`
-    SELECT id, kilo_user_id, status, schema_version, snapshot_at, requested_at,
+    SELECT id, kilo_user_id, subject_type, organization_id, status, schema_version,
+      snapshot_at, requested_at,
       dispatch_generation, lease_expires_at, multipart_upload_id, r2_object_key
     FROM user_data_exports
     WHERE id = ${input.exportId}
@@ -245,10 +263,20 @@ function healthInput(row: ExportRow): ExportHealthInput {
   };
 }
 
+function serializeSubject(row: ExportRow) {
+  if (row.subject_type === 'user') return { type: 'user' as const, organization: null };
+  if (!row.organization_id) throw new Error('Organization export is missing its subject ID');
+  return {
+    type: 'organization' as const,
+    organization: { id: row.organization_id, name: row.organization_name },
+  };
+}
+
 function serialize(row: ExportRow, asOf: string) {
   return {
     id: row.id,
     user: { id: row.kilo_user_id, email: row.user_email, name: row.user_name },
+    subject: serializeSubject(row),
     status: row.status,
     schemaVersion: row.schema_version,
     currentSource: row.current_source,
@@ -322,7 +350,8 @@ function listConditions(input: z.infer<typeof ListInputSchema>) {
 const baseSelect = sql`
   SELECT
     e.id, e.kilo_user_id, u.google_user_email AS user_email,
-    u.google_user_name AS user_name, e.status, e.schema_version, e.snapshot_at,
+    u.google_user_name AS user_name, e.subject_type, e.organization_id,
+    org.name AS organization_name, e.status, e.schema_version, e.snapshot_at,
     e.current_source, e.source_cursor IS NOT NULL AS has_source_cursor,
     EXISTS (
       SELECT 1 FROM user_data_export_parts persisted_parts WHERE persisted_parts.export_id = e.id
@@ -337,7 +366,15 @@ const baseSelect = sql`
     e.r2_object_key IS NOT NULL AS has_r2_object,
     EXISTS (
       SELECT 1 FROM user_data_exports other
-      WHERE other.kilo_user_id = e.kilo_user_id AND other.id <> e.id
+      WHERE other.id <> e.id
+        AND other.subject_type = e.subject_type
+        AND (
+          (e.subject_type = 'user' AND other.kilo_user_id = e.kilo_user_id)
+          OR (
+            e.subject_type = 'organization'
+            AND other.organization_id = e.organization_id
+          )
+        )
         AND (
           other.status IN ('queued', 'processing', 'finalizing')
           OR (other.status = 'ready' AND other.expires_at > now())
@@ -347,6 +384,7 @@ const baseSelect = sql`
     o.attempt_count AS current_outbox_attempt_count, o.sent_at AS current_outbox_sent_at
   FROM user_data_exports e
   INNER JOIN kilocode_users u ON u.id = e.kilo_user_id
+  LEFT JOIN organizations org ON org.id = e.organization_id
   LEFT JOIN user_data_export_outbox o
     ON o.export_id = e.id
     AND o.generation = e.dispatch_generation
@@ -533,7 +571,7 @@ export const adminUserDataExportsRouter = createTRPCRouter({
       cancelAndRetry: {
         eligible: !row.has_other_usable_export,
         disabledReason: row.has_other_usable_export
-          ? 'This user already has another active or downloadable export.'
+          ? `This ${row.subject_type === 'organization' ? 'organization' : 'user'} already has another active or downloadable export.`
           : null,
       },
     };
@@ -670,7 +708,15 @@ export const adminUserDataExportsRouter = createTRPCRouter({
       const target = await lockRecoveryTarget(tx, input);
       const blocker = await tx.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
-        WHERE kilo_user_id = ${target.kilo_user_id} AND id <> ${target.id}
+        WHERE id <> ${target.id}
+          AND subject_type = ${target.subject_type}
+          AND (
+            (subject_type = 'user' AND kilo_user_id = ${target.kilo_user_id})
+            OR (
+              subject_type = 'organization'
+              AND organization_id = ${target.organization_id}::uuid
+            )
+          )
           AND (
             status IN ('queued', 'processing', 'finalizing')
             OR (status = 'ready' AND expires_at > now())
@@ -678,7 +724,9 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         LIMIT 1
       `);
       if (blocker.rows[0]) {
-        conflict('This user already has another active or downloadable export');
+        conflict(
+          `This ${target.subject_type === 'organization' ? 'organization' : 'user'} already has another active or downloadable export`
+        );
       }
       const cleanupQueued = await scheduleCleanup(tx, target, 'admin_replace');
       const deleted = await tx.execute<{ id: string }>(sql`
@@ -692,9 +740,19 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         kilo_user_id: string;
         dispatch_generation: number;
       }>(sql`
-        INSERT INTO user_data_exports (kilo_user_id, schema_version, snapshot_at, requested_at)
+        INSERT INTO user_data_exports (
+          kilo_user_id, subject_type, organization_id, schema_version, snapshot_at, requested_at
+        )
         VALUES (
-          ${target.kilo_user_id}, ${target.schema_version},
+          ${target.kilo_user_id},
+          -- Carried, not defaulted. Without these an organization export retried here came
+          -- back as a personal export for whoever originally requested it, because the
+          -- column defaults are 'user' and NULL.
+          ${target.subject_type},
+          ${target.organization_id}::uuid,
+          -- The current format, not the original's: a retry regenerates the file with
+          -- today's code, so copying the old value would describe a file that never existed.
+          ${EXPORT_FILE_SCHEMA_VERSION},
           ${target.snapshot_at}::timestamptz, ${target.requested_at}::timestamptz
         )
         RETURNING id, kilo_user_id, dispatch_generation

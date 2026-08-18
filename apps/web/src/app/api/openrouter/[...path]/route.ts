@@ -15,16 +15,20 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import {
+  getProvider,
+  type GetProviderProviderResult,
+} from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
+import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isDeadFreeModel, isKiloExclusiveRateLimitedModel } from '@/lib/ai-gateway/models';
+import {
+  isDisabledKiloExclusiveModel,
+  isKiloExclusiveRateLimitedModel,
+} from '@/lib/ai-gateway/models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -41,6 +45,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
+  efficientPoolBlockedResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
@@ -59,6 +64,7 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -82,11 +88,7 @@ import {
   resolveAbuseClassificationCacheIdentityKey,
   sleepForRulesEngineAction,
 } from '@/lib/ai-gateway/abuse-service';
-import {
-  emitApiMetricsForResponse,
-  getToolsAvailable,
-  getToolsUsed,
-} from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
@@ -109,14 +111,13 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export const maxDuration = 800;
 
@@ -318,11 +319,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
+  // Efficient/balanced requests resolve through the auto-routing pool. Kept for
+  // the org policy check below so a team that blocks every pool model gets
+  // guidance to configure a custom Efficient model pool instead of the generic
+  // model-not-allowed error.
+  let isAutoEfficientRequest = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
+    isAutoEfficientRequest = isAutoEfficientId;
     const efficientDecision = isAutoEfficientId
       ? async () => {
           const { user, authFailedResponse, organizationId } = await authPromise;
@@ -638,8 +645,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
-
   // Start classification early, but do not await it unless the last cached
   // rules-engine result says this identity is already under enforcement.
   const classifyPromise = classifyAbuse(request, requestBodyParsed, {
@@ -671,7 +676,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    isDeadFreeModel(effectiveModelIdLowerCased) ||
+    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
     (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
@@ -773,42 +778,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Extract properties for usage context
-  const promptInfo = extractPromptInfo(requestBodyParsed);
-
-  const usageContext: MicrodollarUsageContext = {
-    api_kind: requestBodyParsed.kind,
-    kiloUserId: user.id,
-    provider: effectiveProviderContext.provider.id,
-    requested_model: effectiveModelIdLowerCased,
-    promptInfo,
-    max_tokens: getMaxTokens(requestBodyParsed),
-    has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
-    fraudHeaders,
-    isStreaming: requestBodyParsed.body.stream === true,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: machineIdHeader,
-    user_byok: !!effectiveProviderContext.userByok,
-    has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
-    botId,
-    tokenSource,
-    feature,
-    session_id: taskId ?? sessionHeader ?? null,
-    mode: modeHeader,
-    auto_model: autoModel,
-    ttfb_ms: null,
-    abuse_delay: rulesEngineDecision.delayMs > 0 ? rulesEngineDecision.delayMs : null,
-    abuse_downgraded_from: abuseDowngradedFrom,
-    clientRequestId,
-  };
-
-  setTag('ui.ai_model', requestBodyParsed.body.model);
-
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
@@ -828,7 +797,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       settings,
       organizationPlan: plan,
     });
-    if (modelRestrictionError) return modelRestrictionError;
+    if (modelRestrictionError) {
+      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError;
+    }
 
     let effectiveProviderConfig = providerConfig;
     const groupPolicy = await organizationGroupPolicyPromise;
@@ -839,7 +810,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         groupPolicy,
         effectiveModelIdLowerCased
       );
-      if (!groupDecision.allowed) return modelNotAllowedResponse();
+      if (!groupDecision.allowed) {
+        return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      }
       if (groupDecision.eligibleProviderRoutes) {
         const currentOnly = providerConfig?.only;
         const only = currentOnly
@@ -875,6 +848,66 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
+  const partnerProvider = await getPercentageRoutedPartnerProvider({
+    requestedModel: effectiveModelIdLowerCased,
+    request: requestBodyParsed,
+    randomSeed: taskId || user.id,
+    sourceProviderId: effectiveProviderContext.provider.id,
+    hasUserByok: effectiveProviderContext.userByok !== null,
+  });
+  let partnerFallback:
+    | { providerContext: GetProviderProviderResult; request: GatewayRequest }
+    | undefined;
+  if (partnerProvider) {
+    partnerFallback = {
+      providerContext: effectiveProviderContext,
+      request: structuredClone(requestBodyParsed),
+    };
+    effectiveProviderContext = {
+      kind: 'provider',
+      provider: partnerProvider,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
+  }
+
+  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
+
+  // Extract properties for usage context after final provider selection.
+  const promptInfo = extractPromptInfo(requestBodyParsed);
+  const usageContext: MicrodollarUsageContext = {
+    api_kind: requestBodyParsed.kind,
+    kiloUserId: user.id,
+    provider: effectiveProviderContext.provider.id,
+    requested_model: effectiveModelIdLowerCased,
+    promptInfo,
+    max_tokens: getMaxTokens(requestBodyParsed),
+    has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
+    fraudHeaders,
+    isStreaming: requestBodyParsed.body.stream === true,
+    organizationId,
+    prior_microdollar_usage: user.microdollars_used,
+    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
+    project_id: projectId,
+    status_code: null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: machineIdHeader,
+    user_byok: !!effectiveProviderContext.userByok,
+    has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
+    botId,
+    tokenSource,
+    feature,
+    session_id: taskId ?? sessionHeader ?? null,
+    mode: modeHeader,
+    auto_model: autoModel,
+    ttfb_ms: null,
+    abuse_delay: rulesEngineDecision.delayMs > 0 ? rulesEngineDecision.delayMs : null,
+    abuse_downgraded_from: abuseDowngradedFrom,
+    clientRequestId,
+  };
+
+  setTag('ui.ai_model', requestBodyParsed.body.model);
+
   if (
     (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
@@ -907,57 +940,77 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     op: 'http.client',
   });
 
-  const extraHeaders: Record<string, string> = {};
-  await applyProviderSpecificLogic(
-    effectiveProviderContext.provider,
-    effectiveModelIdLowerCased,
-    requestBodyParsed,
-    extraHeaders,
-    effectiveProviderContext.userByok,
+  const upstreamAttemptOptions = {
+    requestedModel: effectiveModelIdLowerCased,
     fraudHeaders,
-    user.id,
-    organizationId ?? null,
-    usageContext.session_id,
-    taskId ?? null
-  );
-
-  if (
-    effectiveProviderContext.provider.id === 'openrouter' &&
-    !(await isValidOpenRouterModelId(requestBodyParsed.body.model))
-  ) {
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
-  }
-
-  const toolsAvailable = getToolsAvailable(requestBodyParsed);
-  const toolsUsed = getToolsUsed(requestBodyParsed);
-
-  // Capture the bounded prompt for experimented requests AFTER provider
-  // transforms have produced the canonical upstream body. Stored on the
-  // usage context so the async `after()` hook can persist it without
-  // retaining a reference to the full uncapped body.
-  if (effectiveProviderContext.experiment) {
-    usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed);
-  }
-
-  if (rulesEngineDecision.delayMs > 0) {
-    await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-  }
-
-  const upstreamResult = await upstreamRequest({
-    chatApi: requestBodyParsed.kind,
-    path,
+    userId: user.id,
+    organizationId: organizationId ?? null,
+    sessionId: usageContext.session_id,
+    taskId: taskId ?? null,
     search: url.search,
     method: request.method,
-    body: requestBodyParsed.body,
-    extraHeaders,
-    provider: effectiveProviderContext.provider,
     signal: request.signal,
     vercelRequestId,
+  };
+  let attempt = await sendUpstreamAttempt({
+    ...upstreamAttemptOptions,
+    providerContext: effectiveProviderContext,
+    request: requestBodyParsed,
+    delayMs: rulesEngineDecision.delayMs,
   });
-  if (upstreamResult.type === 'error') {
-    return upstreamResult.response;
+  if (attempt.type === 'invalid-openrouter-model') {
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
-  const response = upstreamResult.response;
+  if (attempt.type === 'error') return attempt.response;
+
+  if (partnerFallback && attempt.response.status >= 400) {
+    const partnerFailureLog = {
+      partner_provider: effectiveProviderContext.provider.id,
+      fallback_provider: partnerFallback.providerContext.provider.id,
+      status_code: attempt.response.status,
+    };
+    const responseForLogging = attempt.response.clone();
+    after(
+      (async () => {
+        try {
+          warnExceptInTest('Partner request failed before managed fallback', {
+            ...partnerFailureLog,
+            body: await responseForLogging.text(),
+          });
+        } catch (error) {
+          warnExceptInTest('Partner request failed before managed fallback', {
+            ...partnerFailureLog,
+            response_body_read_error: String(error),
+          });
+        }
+      })()
+    );
+    try {
+      await attempt.response.body?.cancel();
+    } catch {
+      warnExceptInTest('Failed to cancel discarded partner response body');
+    }
+
+    effectiveProviderContext = partnerFallback.providerContext;
+    requestBodyParsed = partnerFallback.request;
+    usageContext.provider = effectiveProviderContext.provider.id;
+    usageContext.user_byok = !!effectiveProviderContext.userByok;
+
+    attempt = await sendUpstreamAttempt({
+      ...upstreamAttemptOptions,
+      providerContext: effectiveProviderContext,
+      request: requestBodyParsed,
+      delayMs: 0,
+    });
+    if (attempt.type === 'invalid-openrouter-model') {
+      return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+    }
+    if (attempt.type === 'error') return attempt.response;
+  }
+
+  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
+  if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
+  const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',
     response.status,
@@ -997,7 +1050,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed.body,
       response,
       organizationId,
-      model: requestBodyParsed.body.model,
+      model: finalUpstreamModel,
       errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
       trackInSentry: true,
     });
@@ -1012,7 +1065,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed.body,
       response,
       organizationId,
-      model: requestBodyParsed.body.model,
+      model: finalUpstreamModel,
       errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
       trackInSentry: response.status >= 500,
     });

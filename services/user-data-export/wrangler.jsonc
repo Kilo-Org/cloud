@@ -87,16 +87,10 @@
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
-    {
-      "binding": "EXPORT_REPLICA_DB",
-      "id": "bcc8d2f3a24f4929b5ee91cf77b1c5fa",
-      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
-    },
-    // Export warehouse: read-only, frozen at its load cutoff. Holds the five
-    // per-user sources, plus the profile fields it actually carries — email and
-    // name — which the identity section prefers over the live primary so the
-    // whole export reads as of one moment. The remaining profile columns exist
-    // only on the primary and still come from EXPORT_REPLICA_DB.
+    // Export warehouse: read-only, frozen at its load cutoff. Every source an
+    // export reads comes from here, including the identity section, so the whole
+    // file reads as of one moment. PRIMARY_STATE_DB above is the job's own state
+    // and is never a source.
     // kilo-supabase-snowflake-export, us-east-2. Caching is disabled on the config:
     // every query returns one user's personal data and each row is read once.
     {

@@ -7,7 +7,7 @@ import {
   Loader2,
   MinusCircle,
   XCircle,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 

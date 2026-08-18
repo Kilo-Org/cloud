@@ -29,6 +29,12 @@ const WORKSPACE_CAPACITY_RETRY_DELAYS_MS = [10_000, 30_000, 60_000] as const;
 // minute — give it a short backed-off budget instead of one generic
 // redelivery.
 const GIT_RATE_LIMIT_RETRY_DELAYS_MS = [15_000, 45_000] as const;
+// Wrapper cleanup exhaustion fences delivery, but it is recoverable: the lease
+// releases once the wedged wrapper is observably gone, and every flush attempt
+// forces one observation. Give the message a few spaced attempts so a container
+// reaped moments after exhaustion still delivers, then fail closed rather than
+// leaving it queued for the whole background recheck window.
+const CLEANUP_EXHAUSTED_RETRY_DELAYS_MS = [30_000, 60_000, 120_000] as const;
 // Other pending delivery failures currently get one redelivery after the initial failed attempt.
 const WARM_FOLLOWUP_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
 const COLD_INIT_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
@@ -86,6 +92,7 @@ const PendingFlushFailureCodeSchema = z.enum([
   'KILO_SERVER_FAILED',
   'WRAPPER_START_FAILED',
   'WRAPPER_FINALIZING',
+  'WRAPPER_CLEANUP_EXHAUSTED',
   'SANDBOX_CAPABILITY_UNAVAILABLE',
   'NOT_FOUND',
   'BAD_REQUEST',
@@ -498,7 +505,8 @@ export function shouldSkipPendingFlush(message: PendingSessionMessage, now: numb
 /**
  * Reset-eligible modes each start a fresh retry budget on entry (sandbox-connect
  * has a short reconnect budget; sandbox-capacity and git-rate-limit each have a
- * longer backed-off budget for transient, self-clearing conditions).
+ * longer backed-off budget for transient, self-clearing conditions; cleanup-
+ * exhausted has its own recovery budget).
  * Alternating between them must NOT keep resetting, so callers only reset when
  * entering one of these from a non-reset-eligible state.
  */
@@ -508,6 +516,7 @@ function isResetEligibleFailure(
 ): boolean {
   return (
     code === 'SANDBOX_CONNECT_FAILED' ||
+    code === 'WRAPPER_CLEANUP_EXHAUSTED' ||
     (code === 'WORKSPACE_SETUP_FAILED' &&
       (subtype === 'sandbox_storage_full' || subtype === 'git_rate_limited'))
   );
@@ -523,6 +532,7 @@ export async function recordPendingFlushFailure(
     code?:
       | RetryableResultCode
       | PermanentDeliveryResultCode
+      | 'WRAPPER_CLEANUP_EXHAUSTED'
       | 'NOT_FOUND'
       | 'BAD_REQUEST'
       | 'INTERNAL'
@@ -564,11 +574,11 @@ export async function recordPendingFlushFailure(
       ? options.safeFailureMessage
       : undefined;
   // Reset the attempt counter only when a message ENTERS a reset-eligible
-  // transient mode (sandbox-connect, sandbox-capacity, or git-rate-limit) from a
-  // state that is not itself reset-eligible, so each fresh sequence gets its
-  // full backoff budget. When failures alternate between reset-eligible modes
-  // the counter is NOT reset, so attempts accumulate and the message still
-  // exhausts instead of flapping between modes forever.
+  // transient mode (sandbox-connect, sandbox-capacity, git-rate-limit, or
+  // cleanup-exhausted) from a state that is not itself reset-eligible, so each
+  // fresh sequence gets its full backoff budget. When failures alternate between
+  // reset-eligible modes the counter is NOT reset, so attempts accumulate and
+  // the message still exhausts instead of flapping between modes forever.
   const attempts =
     isResetEligibleFailure(flushFailureCode, failureSubtype) &&
     !isResetEligibleFailure(message.lastFlushFailureCode, message.lastFlushFailureSubtype)
@@ -577,13 +587,15 @@ export async function recordPendingFlushFailure(
   const retryDelays =
     flushFailureCode === 'SANDBOX_CONNECT_FAILED'
       ? SANDBOX_CONNECT_RETRY_DELAYS_MS
-      : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'sandbox_storage_full'
-        ? WORKSPACE_CAPACITY_RETRY_DELAYS_MS
-        : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'git_rate_limited'
-          ? GIT_RATE_LIMIT_RETRY_DELAYS_MS
-          : options.policy === 'cold-init'
-            ? COLD_INIT_RETRY_DELAYS_MS
-            : WARM_FOLLOWUP_RETRY_DELAYS_MS;
+      : flushFailureCode === 'WRAPPER_CLEANUP_EXHAUSTED'
+        ? CLEANUP_EXHAUSTED_RETRY_DELAYS_MS
+        : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'sandbox_storage_full'
+          ? WORKSPACE_CAPACITY_RETRY_DELAYS_MS
+          : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'git_rate_limited'
+            ? GIT_RATE_LIMIT_RETRY_DELAYS_MS
+            : options.policy === 'cold-init'
+              ? COLD_INIT_RETRY_DELAYS_MS
+              : WARM_FOLLOWUP_RETRY_DELAYS_MS;
   const retryable = options.retryable ?? isRetryableFlushCode(flushFailureCode);
   const exhausted = !retryable || attempts > retryDelays.length;
   const retryDelay = retryDelays[attempts - 1];
@@ -615,6 +627,7 @@ function isRetryableFlushCode(
   code:
     | RetryableResultCode
     | PermanentDeliveryResultCode
+    | 'WRAPPER_CLEANUP_EXHAUSTED'
     | 'NOT_FOUND'
     | 'BAD_REQUEST'
     | 'INTERNAL'
@@ -629,7 +642,8 @@ function isRetryableFlushCode(
     code === 'SANDBOX_CONNECT_FAILED' ||
     code === 'WORKSPACE_SETUP_FAILED' ||
     code === 'KILO_SERVER_FAILED' ||
-    code === 'WRAPPER_START_FAILED'
+    code === 'WRAPPER_START_FAILED' ||
+    code === 'WRAPPER_CLEANUP_EXHAUSTED'
   );
 }
 export async function deletePendingSessionMessageByMessageId(

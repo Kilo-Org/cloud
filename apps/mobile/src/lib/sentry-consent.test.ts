@@ -17,13 +17,13 @@ describe('sentryOptionsForConsent', () => {
     });
   });
 
-  it('disables replay, screenshots, and view-hierarchy even when consent is accepted', () => {
+  it('enables masked replay and screenshots, never view-hierarchy, when consent is accepted', () => {
     const options = sentryOptionsForConsent(true);
 
-    expect(options.attachScreenshot).toBe(false);
+    expect(options.attachScreenshot).toBe(true);
     expect(options.attachViewHierarchy).toBe(false);
-    expect(options.replaysSessionSampleRate).toBe(0);
-    expect(options.replaysOnErrorSampleRate).toBe(0);
+    expect(options.replaysSessionSampleRate).toBe(0.1);
+    expect(options.replaysOnErrorSampleRate).toBe(1);
     expect(options.tracesSampleRate).toBe(0.1);
   });
 

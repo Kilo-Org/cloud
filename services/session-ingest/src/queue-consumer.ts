@@ -216,6 +216,7 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
     case 'session_close':
     case 'session_status':
     case 'kilo_meta':
+    case 'session_pr_link':
       return item;
   }
 }

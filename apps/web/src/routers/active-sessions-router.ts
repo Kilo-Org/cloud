@@ -3,7 +3,7 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateApiToken, generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
 import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
@@ -221,7 +221,9 @@ function throwOrgContextFailure(error: unknown): never {
 
 export const activeSessionsRouter = createTRPCRouter({
   getToken: baseProcedure.query(async ({ ctx }) => {
-    const token = generateInternalServiceToken(ctx.user.id);
+    const token = generateApiToken(ctx.user, undefined, {
+      expiresIn: TOKEN_EXPIRY.oneHour,
+    });
     return { token };
   }),
 

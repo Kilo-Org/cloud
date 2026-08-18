@@ -39,6 +39,17 @@ export default function PostHogClient(): Pick<
   return instance;
 }
 
+/**
+ * Flushes buffered events. A no-op outside production, where no shared
+ * instance exists, so callers can always await it.
+ */
+export async function flushPostHog(): Promise<void> {
+  if (!instance) {
+    return;
+  }
+  await instance.flush();
+}
+
 export async function shutdownPosthog(): Promise<void> {
   if (instance) {
     await instance.shutdown();

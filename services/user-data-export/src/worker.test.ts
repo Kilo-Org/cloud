@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   consumeDeadLetterBatch,
   consumeExportBatch,
+  closeReplicaDatabase,
   deletePendingObjects,
   exportHeader,
+  exportTrailer,
+  nextReadableAdapter,
   exportArtifact,
   exportSubject,
   handleFencedCompletion,
@@ -16,7 +19,7 @@ import {
   resolveSourceAdapter,
   type ExportEnv,
 } from './worker';
-import { TerminalExportError } from './errors';
+import { SourceReadError, TerminalExportError } from './errors';
 import type { ExportJob } from './databases';
 import type { SourceAdapter } from './source-adapters';
 
@@ -209,6 +212,31 @@ describe('source availability', () => {
     expect(sources.available.map(adapter => adapter.name)).not.toContain('kilocode_users');
     expect(sources.unavailable).not.toContain('kilocode_users');
   });
+
+  // Same reasoning, second case: the enrichment table carries no organization column at
+  // all. Present and loaded, but not a question this subject can ask, so it belongs in
+  // neither list rather than being reported missing on every organization export.
+  //
+  // Its own fixture rather than the shared one, so the source lists the tests above pin
+  // exactly stay pinned to what they were written for.
+  const USER_ONLY_ADAPTERS = [
+    sourceAdapter('app_builder_projects', 'app_builder_projects'),
+    sourceAdapter('enrichment_data', 'enrichment_data'),
+  ];
+  const USER_ONLY_TABLES = new Set(['app_builder_projects', 'enrichment_data']);
+
+  it('drops a user-only source from an organization export without calling it absent', () => {
+    const sources = partitionSources(USER_ONLY_ADAPTERS, 'organization', USER_ONLY_TABLES);
+
+    expect(sources.available.map(adapter => adapter.name)).toEqual(['app_builder_projects']);
+    expect(sources.unavailable).toEqual([]);
+  });
+
+  it('keeps a user-only source in a personal export', () => {
+    const sources = partitionSources(USER_ONLY_ADAPTERS, 'user', USER_ONLY_TABLES);
+
+    expect(sources.available.map(adapter => adapter.name)).toContain('enrichment_data');
+  });
 });
 
 describe('export subject', () => {
@@ -295,6 +323,53 @@ describe('one-shot generator state', () => {
         next_part_number: 2,
       })
     ).toBe(true);
+  });
+});
+
+describe('replica database cleanup', () => {
+  it('closes the invocation-owned database exactly once', async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+
+    await closeReplicaDatabase({
+      database: { query: vi.fn(), close },
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 2,
+    });
+
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('does not replace a completed generation outcome when close fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(
+      closeReplicaDatabase({
+        database: {
+          query: vi.fn(),
+          close: vi.fn().mockRejectedValue(new Error('connection shutdown failed')),
+        },
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 2,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(parsedLog(warn)).toEqual({
+      event: 'export_warehouse_close_failed',
+      service: 'user-data-export',
+      exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+      generation: 2,
+      errorName: 'Error',
+    });
+  });
+
+  it('does nothing when generation exits before opening the database', async () => {
+    await expect(
+      closeReplicaDatabase({
+        database: undefined,
+        exportId: 'f6ba5ce5-9061-4f7f-9ec6-76f047573f1c',
+        generation: 2,
+      })
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -667,5 +742,125 @@ describe('scheduled export maintenance isolation', () => {
     expect(state.recordOutboxFailure).toHaveBeenCalledWith('outbox-1');
     expect(state.markOutboxSent).toHaveBeenCalledWith('outbox-2');
     warn.mockRestore();
+  });
+});
+
+// A read failure takes one source out of an export; it does not take the export down.
+// The file has to say so, and the header cannot: it is written before the first source is
+// read and cannot be amended once a part is uploaded.
+describe('export trailer', () => {
+  it('marks a clean run complete and names nothing', () => {
+    const trailer = JSON.parse(exportTrailer([]).trim()) as {
+      type: string;
+      complete: boolean;
+      failedSources: string[];
+    };
+
+    expect(trailer).toEqual({ type: 'trailer', complete: true, failedSources: [] });
+  });
+
+  // The consumer's question is "is anything missing", so the answer is a field rather than
+  // something to be inferred from an empty array.
+  it('names a failed source and marks the run incomplete', () => {
+    const trailer = JSON.parse(exportTrailer(['audiences']).trim()) as {
+      complete: boolean;
+      failedSources: string[];
+    };
+
+    expect(trailer.complete).toBe(false);
+    expect(trailer.failedSources).toEqual(['audiences']);
+  });
+
+  // The underlying error is logged, never exported: a driver message can carry a table
+  // name, a column, or a fragment of a query, none of which belongs in a file handed to
+  // the person the export is about.
+  it('carries no detail about why a source failed', () => {
+    const line = exportTrailer(['orb_customer']);
+
+    expect(line).not.toMatch(/error|reason|message|stack/i);
+  });
+
+  // Every file ends with one, so a file that lacks it was truncated. That distinction did
+  // not exist before: a died-midway export and a complete one looked the same.
+  it('ends the file with a single newline-terminated line', () => {
+    expect(exportTrailer([]).endsWith('\n')).toBe(true);
+    expect(exportTrailer([]).trimEnd().includes('\n')).toBe(false);
+  });
+});
+
+describe('source read failures', () => {
+  // The read and the write share a span, so an error escaping it could be either a bad
+  // table or a broken output stream. Only the read is wrapped, and only the wrapped kind
+  // is survivable.
+  it('distinguishes a source read failure from any other', () => {
+    const readFailure = new SourceReadError('audiences', new Error('relation does not exist'));
+
+    expect(readFailure).toBeInstanceOf(SourceReadError);
+    expect(readFailure.source).toBe('audiences');
+    expect(new Error('stream closed')).not.toBeInstanceOf(SourceReadError);
+  });
+
+  // The cause is kept for the log line and deliberately not folded into the message that
+  // could reach a file or a user-facing failure.
+  it('keeps the underlying cause off its own message', () => {
+    const readFailure = new SourceReadError('orb_customer', new Error('column c.foo missing'));
+
+    expect(readFailure.message).not.toContain('column');
+    expect((readFailure.cause as Error).message).toBe('column c.foo missing');
+  });
+});
+
+// Containing source failures must not contain the failures an adapter raises deliberately.
+// `kilocode_users` throws TerminalExportError when the subject is absent from the snapshot,
+// carrying the message the requester is meant to read. Absorbing that would complete the
+// export without an identity section and never say why.
+describe('terminal errors are not source failures', () => {
+  it('keeps a terminal error distinguishable from a wrapped read failure', () => {
+    const terminal = new TerminalExportError(
+      'export_identity_row_missing',
+      'Your account was not found in the data snapshot this export reads from.',
+      'Identity row was not present in the export warehouse'
+    );
+
+    expect(terminal).not.toBeInstanceOf(SourceReadError);
+    expect(terminal).toBeInstanceOf(TerminalExportError);
+    // The redacted message is the point: it survives to the requester only by propagating.
+    expect(terminal.redactedMessage).toContain('not found in the data snapshot');
+  });
+
+  it('wraps an ordinary read failure and leaves the cause reachable', () => {
+    const wrapped = new SourceReadError('audiences', new Error('connection reset'));
+
+    expect(wrapped).toBeInstanceOf(SourceReadError);
+    expect(wrapped).not.toBeInstanceOf(TerminalExportError);
+  });
+});
+
+// Both the failure path and the completion path advance through the sources, and they have
+// to agree. Split across two copies of the rule, a change to either was a change to half
+// the loop.
+describe('source advance', () => {
+  const withReader = (name: string): SourceAdapter => sourceAdapter(name, name);
+  const withoutReader = (name: string): SourceAdapter => ({ name, warehouseTable: name });
+
+  it('returns the next source that can actually be read', () => {
+    const list = [withReader('a'), withReader('b'), withReader('c')];
+
+    expect(nextReadableAdapter(list, list[0]!)?.name).toBe('b');
+    expect(nextReadableAdapter(list, list[1]!)?.name).toBe('c');
+  });
+
+  // `readPage` is optional on the type, and an adapter without one is not a source that
+  // failed — it is a source that was never attemptable.
+  it('skips an adapter with no reader rather than stopping on it', () => {
+    const list = [withReader('a'), withoutReader('stub'), withReader('c')];
+
+    expect(nextReadableAdapter(list, list[0]!)?.name).toBe('c');
+  });
+
+  it('returns null at the end rather than wrapping around', () => {
+    const list = [withReader('a'), withReader('b')];
+
+    expect(nextReadableAdapter(list, list[1]!)).toBeNull();
   });
 });

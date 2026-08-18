@@ -74,7 +74,7 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.error?.status).toBe(404);
     });
 
-    it('excludes latest aliases from model deny lists while retaining provider config', () => {
+    it('applies model deny lists to latest aliases', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: CLAUDE_SONNET_LATEST_MODEL_ALIAS,
         settings: {
@@ -84,7 +84,8 @@ describe('checkOrganizationModelRestrictions', () => {
         organizationPlan: 'enterprise',
       });
 
-      expect(result).toEqual({ error: null, providerConfig: { only: ['anthropic'] } });
+      expect(result.error).not.toBeNull();
+      expect(result.error?.status).toBe(404);
     });
 
     it('should allow any model when deny list is empty on enterprise plan', () => {

@@ -928,6 +928,105 @@ describe('computeSessionMetadataUpdates', () => {
   });
 });
 
+describe('queue session_pr_link', () => {
+  function runPrLinkQueue(params: {
+    stagedItem: unknown;
+    ingestChanges: Array<{ name: string; value: string | null }>;
+  }) {
+    const ingest = vi.fn(async () => ({ changes: params.ingestChanges }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_prlink' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    const body = JSON.stringify({ data: [params.stagedItem] });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    return { ingest, transaction, deleteObject, ack, retry, env };
+  }
+
+  async function executePrLinkQueue(setup: ReturnType<typeof runPrLinkQueue>) {
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/prlink',
+              kiloUserId: 'usr_prlink',
+              sessionId: 'ses_prlink',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack: setup.ack,
+            retry: setup.retry,
+          },
+        ],
+      } as never,
+      setup.env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+  }
+
+  it('passes a set item through unchanged and flushes its metadata', async () => {
+    const item = {
+      type: 'session_pr_link',
+      data: { platform: 'github', prUrl: 'https://github.com/acme/widgets/pull/42', prNumber: 42 },
+    };
+    const setup = runPrLinkQueue({
+      stagedItem: item,
+      ingestChanges: [
+        { name: 'prPlatform', value: 'github' },
+        { name: 'prUrl', value: 'https://github.com/acme/widgets/pull/42' },
+        { name: 'prNumber', value: '42' },
+      ],
+    });
+
+    await executePrLinkQueue(setup);
+
+    expect(setup.ingest).toHaveBeenCalledWith([item], 'usr_prlink', 'ses_prlink', 1, 1, undefined);
+    expect(setup.transaction).toHaveBeenCalledTimes(1);
+    expect(setup.deleteObject).toHaveBeenCalledWith('staging/prlink');
+    expect(setup.ack).toHaveBeenCalledTimes(1);
+    expect(setup.retry).not.toHaveBeenCalled();
+  });
+
+  it('passes a clear item through unchanged and flushes its metadata', async () => {
+    const item = {
+      type: 'session_pr_link',
+      data: { platform: null, prUrl: null, prNumber: null },
+    };
+    const setup = runPrLinkQueue({
+      stagedItem: item,
+      ingestChanges: [
+        { name: 'prPlatform', value: null },
+        { name: 'prUrl', value: null },
+        { name: 'prNumber', value: null },
+      ],
+    });
+
+    await executePrLinkQueue(setup);
+
+    expect(setup.ingest).toHaveBeenCalledWith([item], 'usr_prlink', 'ses_prlink', 1, 1, undefined);
+    expect(setup.transaction).toHaveBeenCalledTimes(1);
+    expect(setup.deleteObject).toHaveBeenCalledWith('staging/prlink');
+    expect(setup.ack).toHaveBeenCalledTimes(1);
+    expect(setup.retry).not.toHaveBeenCalled();
+  });
+});
+
 describe('queue organization changes', () => {
   it('invalidates cached session access after persisting organization scope', async () => {
     const sessionId = 'ses_12345678901234567890123456';

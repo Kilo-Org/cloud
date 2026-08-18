@@ -1146,6 +1146,7 @@ export class WrapperClient {
         // body, which is parsed without runtime schema validation, so an
         // unexpected key must not be able to overwrite the trusted fields above.
         clone: telemetry.clone,
+        restore: telemetry.restore,
       });
     }
     return response;

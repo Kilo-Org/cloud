@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
+import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_RECENTS_KEY } from '@/lib/storage-keys';
 
 export type RecentPr = {
@@ -11,27 +12,6 @@ export type RecentPr = {
 };
 
 const RECENT_PR_LIMIT = 10;
-
-// Same serialized write-queue pattern as last-active-instance: a sign-out
-// clear must never be overtaken by an in-flight upsert, which would leak the
-// previous account's recents into the next cold start.
-let writeQueue: Promise<void> | null = null;
-
-async function enqueueWrite(op: () => Promise<void>): Promise<void> {
-  const previous = writeQueue;
-  const next = (async () => {
-    if (previous) {
-      try {
-        await previous;
-      } catch {
-        // An earlier failed write must not block the queue.
-      }
-    }
-    await op();
-  })();
-  writeQueue = next;
-  await next;
-}
 
 function recentPrKey(item: RecentPr): string {
   return `${item.owner.toLowerCase()}/${item.repo.toLowerCase()}#${item.number}`;
@@ -84,7 +64,7 @@ export async function getRecentPrs(): Promise<RecentPr[]> {
  * reads or overwrites the title from disk on its own.
  */
 export async function upsertRecentPr(entry: RecentPr): Promise<void> {
-  await enqueueWrite(async () => {
+  await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
     const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
     const existing = parseRecents(existingRaw);
     const incomingKey = recentPrKey(entry);
@@ -95,7 +75,5 @@ export async function upsertRecentPr(entry: RecentPr): Promise<void> {
 }
 
 export async function clearRecentPrs(): Promise<void> {
-  await enqueueWrite(async () => {
-    await SecureStore.deleteItemAsync(PR_REVIEW_RECENTS_KEY);
-  });
+  await deleteAccountMetadata(PR_REVIEW_RECENTS_KEY);
 }

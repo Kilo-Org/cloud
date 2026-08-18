@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ChevronDown, ChevronLeft } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft } from '@/components/ui/icons';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

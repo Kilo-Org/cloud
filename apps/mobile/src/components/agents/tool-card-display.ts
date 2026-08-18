@@ -8,6 +8,7 @@ import {
   truncateText,
 } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
+import { buildResultRowsModel } from './tool-list-model';
 
 export type ToolDisplay = {
   title: string;
@@ -15,11 +16,8 @@ export type ToolDisplay = {
   badge?: string;
 };
 
-function countOutputLines(output: string): number {
-  if (output.length === 0) {
-    return 0;
-  }
-  return output.split('\n').filter(line => line.trim().length > 0).length;
+function countResultRows(output: string, kind: 'grep' | 'glob'): number {
+  return buildResultRowsModel(output, kind).rows.length;
 }
 
 /**
@@ -65,8 +63,8 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     case 'glob': {
       const pattern = typeof input.pattern === 'string' ? input.pattern : '';
       const output = status === 'completed' ? part.state.output : undefined;
-      const matchCount = output ? countOutputLines(output) : undefined;
-      const badge = matchCount !== undefined ? `${matchCount} files` : undefined;
+      const matchCount = output ? countResultRows(output, 'glob') : undefined;
+      const badge = matchCount !== undefined && matchCount > 0 ? `${matchCount} files` : undefined;
       return { title: 'glob', subtitle: pattern || 'glob', badge };
     }
     case 'grep': {
@@ -77,8 +75,9 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         subtitle += ` (${include})`;
       }
       const output = status === 'completed' ? part.state.output : undefined;
-      const matchCount = output ? countOutputLines(output) : undefined;
-      const badge = matchCount !== undefined ? `${matchCount} matches` : undefined;
+      const matchCount = output ? countResultRows(output, 'grep') : undefined;
+      const badge =
+        matchCount !== undefined && matchCount > 0 ? `${matchCount} matches` : undefined;
       return { title: 'grep', subtitle, badge };
     }
     case 'list': {

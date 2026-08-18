@@ -1,6 +1,24 @@
+/* eslint-disable max-lines -- one cohesive auth-context suite: refresh, sign-in, and epoch-fence cases share the SecureStore mock and the serialized-write seam */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+
+// Lets tests hold credential writes open at the SecureStore boundary so the
+// epoch fence can be exercised both while a write is queued and mid-write.
+let heldWrites: Promise<void> | null = null;
+let releaseHeldWrites: (() => void) | null = null;
+
+function holdCredentialWrites(): void {
+  heldWrites = new Promise<void>(resolve => {
+    releaseHeldWrites = resolve;
+  });
+}
+
+function releaseCredentialWrites(): void {
+  releaseHeldWrites?.();
+  heldWrites = null;
+  releaseHeldWrites = null;
+}
 
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
@@ -11,6 +29,9 @@ vi.mock('expo-secure-store', () => ({
   }),
   setItemAsync: vi.fn(async (key: string, value: string) => {
     await Promise.resolve();
+    if (heldWrites) {
+      await heldWrites;
+    }
     store.set(key, value);
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
@@ -63,31 +84,46 @@ vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn(), invalidateQueries: vi.fn() },
 }));
 
+vi.mock('@/lib/auth/logout-cleanup', () => ({
+  runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('react-native', () => ({
   AppState: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
 }));
 
-import {
-  exchangeLegacyToken,
-  invalidateRefreshSession,
-  persistSignInCredentials,
-  performRefresh,
-} from '@/lib/auth/auth-context';
+import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
+import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   REFRESH_TOKEN_KEY,
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
+import { clearActiveToken, getActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import * as SecureStore from 'expo-secure-store';
 /* eslint-enable import/first */
+
+async function flushMicrotasks(): Promise<void> {
+  await new Promise(resolve => {
+    setImmediate(resolve);
+  });
+}
+
+// Suppress Node.js 24 unhandledRejection from AbortController.abort() with a
+// non-DOMException reason during fake-timer tests.
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+function swallowUnhandledRejection(): void {}
 
 describe('performRefresh', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
-    invalidateRefreshSession();
+    bumpAuthEpoch();
+    setSignOutTeardownActive(false);
   });
 
   it('returns refused when no refresh token is stored', async () => {
@@ -216,7 +252,7 @@ describe('performRefresh', () => {
     await vi.waitFor(() => {
       expect(resolveResponse).toBeTypeOf('function');
     });
-    invalidateRefreshSession();
+    bumpAuthEpoch();
     resolveResponse?.(
       Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
     );
@@ -242,7 +278,7 @@ describe('performRefresh', () => {
     await vi.waitFor(() => {
       expect(resolveResponse).toBeTypeOf('function');
     });
-    invalidateRefreshSession();
+    bumpAuthEpoch();
     store.set(AUTH_TOKEN_KEY, 'newer-token');
     store.set(REFRESH_TOKEN_KEY, 'newer-refresh');
     resolveResponse?.(
@@ -270,30 +306,219 @@ describe('performRefresh', () => {
     await vi.waitFor(() => {
       expect(resolveResponse).toBeTypeOf('function');
     });
-    invalidateRefreshSession();
+    bumpAuthEpoch();
     store.set(REFRESH_TOKEN_KEY, 'newer-refresh');
     resolveResponse?.(Response.json({ error: 'expired' }, { status: 401 }));
 
     expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('newer-refresh');
   });
+
+  it('does not read the old refresh token when a refresh starts after sign-out begins', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    setSignOutTeardownActive(true);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('must not be called'));
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('does not read the old refresh token after the epoch bump while the deletion is still queued', async () => {
+    // Post-cleanup teardown: the epoch has moved but the queued deletion has
+    // not yet removed the old refresh token.
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    bumpAuthEpoch();
+    setSignOutTeardownActive(true);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('must not be called'));
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+    fetchSpy.mockRestore();
+  });
+
+  it('does not publish a pair when sign-out begins while the refresh fetch is in flight', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    let resolveResponse = undefined as ((response: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => {
+        resolve();
+      });
+      return new Promise<Response>(resolve => {
+        resolveResponse = resolve;
+      });
+    });
+
+    const refresh = performRefresh();
+    await vi.waitFor(() => {
+      expect(resolveResponse).toBeTypeOf('function');
+    });
+    // Sign-out begins while the fetch is in flight: the epoch has not bumped
+    // yet (remote cleanup still runs), so only the teardown guard can stop
+    // the stale pair from being published.
+    setSignOutTeardownActive(true);
+    resolveResponse?.(
+      Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
+    );
+
+    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+    expect(getActiveToken()).toBeNull();
+  });
+
+  it('times out the refresh fetch at the control-plane deadline and returns transient', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    // The backend hangs unless the deadline signal aborts it.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async
+      (_url, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (signal?.aborted) {
+            reject(signal.reason as Error);
+            return;
+          }
+          const id = setTimeout(() => {
+            reject(new Error('never'));
+          }, 60_000);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(id);
+            reject(signal.reason as Error);
+          });
+        })
+    );
+    // Suppress Node.js 24 unhandledRejection from AbortController.abort()
+    // with a non-DOMException reason during fake-timer tests.
+    process.on('unhandledRejection', swallowUnhandledRejection);
+    vi.useFakeTimers();
+    try {
+      const promise = performRefresh();
+      // Let the SecureStore read resolve so the deadline timer registers.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(15_001);
+
+      // A timed-out refresh is transient: the old credentials stay untouched.
+      await expect(promise).resolves.toEqual({ ok: false, refused: false });
+      expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeDefined();
+    } finally {
+      process.off('unhandledRejection', swallowUnhandledRejection);
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
 });
 
-describe('persistSignInCredentials', () => {
+describe('persistSignInCredentialsAtEpoch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
+    releaseCredentialWrites();
+    clearActiveToken();
+    setSignOutTeardownActive(false);
   });
 
   it('clears a prior refresh pair for a token-only sign-in', async () => {
     store.set(REFRESH_TOKEN_KEY, 'old-refresh');
     store.set(TOKEN_EXPIRES_AT_KEY, '999999');
 
-    await persistSignInCredentials('token-only');
+    const published = await persistSignInCredentialsAtEpoch('token-only', undefined, {});
 
+    expect(published).toBe(true);
     expect(store.get(AUTH_TOKEN_KEY)).toBe('token-only');
     expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
+  });
+
+  it('returns true and publishes the pair when the epoch is unchanged', async () => {
+    const published = await persistSignInCredentialsAtEpoch('new-token', 'new-refresh', {
+      expiresIn: 3600,
+    });
+
+    expect(published).toBe(true);
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('new-token');
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('new-refresh');
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(true);
+    expect(getActiveToken()).toEqual({ token: 'new-token', expiresAtMs: expect.any(Number) });
+  });
+
+  it('does not publish a sign-in queued behind a write when the epoch moves', async () => {
+    // Hold the serialized credential write open at the SecureStore boundary.
+    holdCredentialWrites();
+
+    const first = persistSignInCredentialsAtEpoch('first-token', 'first-refresh', {
+      expiresIn: 3600,
+    });
+    // Queued behind the first write; both captured the still-current epoch.
+    const stale = persistSignInCredentialsAtEpoch('stale-token', 'stale-refresh', {
+      expiresIn: 3600,
+    });
+
+    // A concurrent sign-in or sign-out bumps the epoch before either write ran.
+    bumpAuthEpoch();
+
+    releaseCredentialWrites();
+    const [firstResult, staleResult] = await Promise.all([first, stale]);
+
+    // Neither superseded write published anything.
+    expect(firstResult).toBe(false);
+    expect(staleResult).toBe(false);
+    expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
+    expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
+    expect(getActiveToken()).toBeNull();
+  });
+
+  it('does not publish the refresh pair or an active token when the epoch moves mid-write', async () => {
+    holdCredentialWrites();
+
+    const pending = persistSignInCredentialsAtEpoch('mid-token', 'mid-refresh', {
+      expiresIn: 3600,
+    });
+    // Let the write start and block at the SecureStore boundary, then bump.
+    await flushMicrotasks();
+    bumpAuthEpoch();
+    releaseCredentialWrites();
+    const published = await pending;
+
+    // The in-flight AUTH_TOKEN write had already committed, but the stale
+    // write cleared the partial pair it left behind and published nothing.
+    expect(published).toBe(false);
+    expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
+    expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
+    expect(getActiveToken()).toBeNull();
+  });
+
+  it('does not publish a refresh pair when the epoch moves during refresh persistence', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'old-refresh');
+    holdCredentialWrites();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({ token: 'refreshed', refreshToken: 'new-refresh', expiresIn: 3600 })
+    );
+
+    const refresh = performRefresh();
+    await flushMicrotasks();
+    bumpAuthEpoch();
+    releaseCredentialWrites();
+
+    const result = await refresh;
+    expect(result).toEqual({ ok: false, refused: false, superseded: true });
+    expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
+    expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
+    expect(getActiveToken()).toBeNull();
   });
 });
 
@@ -301,6 +526,7 @@ describe('exchangeLegacyToken', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
+    releaseCredentialWrites();
   });
 
   it('returns null when the exchange marker is already set', async () => {
@@ -356,6 +582,107 @@ describe('exchangeLegacyToken', () => {
     expect(store.get(AUTH_TOKEN_KEY)).toBe('exchanged');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('exchanged-ref');
     expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBe('1');
+  });
+
+  it('returns null and does not set the done marker when the exchange write is fenced', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json(
+        { token: 'exchanged', refreshToken: 'exchanged-ref', expiresIn: 7200 },
+        { status: 200 }
+      )
+    );
+    // Hold the serialized credential write open at the SecureStore boundary.
+    holdCredentialWrites();
+
+    const exchange = exchangeLegacyToken();
+    // Let the exchange pass its pre-persist epoch check and block at the
+    // fenced AUTH_TOKEN write, then supersede it.
+    await vi.waitFor(() => {
+      expect(vi.mocked(SecureStore.setItemAsync)).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'exchanged');
+    });
+    bumpAuthEpoch();
+    releaseCredentialWrites();
+
+    const result = await exchange;
+    // The stale exchange stops before the completion marker and the success
+    // result, and the fenced persist cleared the partial pair it committed.
+    expect(result).toBeNull();
+    expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+    expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
+    expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+  });
+
+  it('does not send a stale pre-sign-out token or persist its result when the epoch moves during the bootstrap reads', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    // A persistent rejection (not a one-shot mock) so an unconsumed
+    // implementation cannot leak into the next test when the epoch fence
+    // correctly prevents the fetch.
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('fetch must not be called'));
+
+    // Hold the legacy-token read open with a pre-sign-out snapshot so a
+    // sign-out can land before the read completes.
+    let releaseRead = undefined as (() => void) | undefined;
+    const readGate = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    vi.mocked(SecureStore.getItemAsync)
+      .mockImplementationOnce(async (key: string) => {
+        // Marker read: completes normally.
+        await Promise.resolve();
+        return store.get(key) ?? null;
+      })
+      .mockImplementationOnce(async (key: string) => {
+        // Legacy-token read: snapshot the token, then hold open.
+        const snapshot = store.get(key) ?? null;
+        await readGate;
+        await Promise.resolve();
+        return snapshot;
+      });
+
+    const exchange = exchangeLegacyToken();
+    // Let the exchange pass the marker read and block on the held token read.
+    await flushMicrotasks();
+    // Sign out while the read is in flight: the epoch bumps and every
+    // credential key is cleared.
+    bumpAuthEpoch();
+    store.delete(AUTH_TOKEN_KEY);
+    store.delete(REFRESH_TOKEN_KEY);
+    store.delete(TOKEN_EXPIRES_AT_KEY);
+    releaseRead?.();
+
+    const result = await exchange;
+    // The stale pre-sign-out token was never sent and nothing was persisted.
+    expect(result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
+    expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);
+    expect(store.has(LEGACY_EXCHANGE_DONE_KEY)).toBe(false);
+  });
+
+  it('clears the done marker when the epoch moves during marker persistence', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({ token: 'exchanged', refreshToken: 'exchanged-ref', expiresIn: 7200 })
+    );
+    for (let index = 0; index < 3; index += 1) {
+      vi.mocked(SecureStore.setItemAsync).mockImplementationOnce(async (key, value) => {
+        store.set(key, value);
+        await Promise.resolve();
+      });
+    }
+    vi.mocked(SecureStore.setItemAsync).mockImplementationOnce(async (key, value) => {
+      store.set(key, value);
+      bumpAuthEpoch();
+      await Promise.resolve();
+    });
+
+    const result = await exchangeLegacyToken();
+    expect(result).toBeNull();
+    expect(store.has(LEGACY_EXCHANGE_DONE_KEY)).toBe(false);
   });
 
   it('returns null on network error and does not set the done marker', async () => {

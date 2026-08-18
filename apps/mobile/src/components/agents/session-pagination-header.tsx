@@ -2,6 +2,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import {
   selectSessionPaginationHeaderRenderModel,
   type SessionPaginationHeaderRenderModel,
@@ -34,12 +35,8 @@ export function SessionPaginationHeader({
 
   if (model.kind === 'retryable') {
     return (
-      <View
-        testID={model.testID}
-        className="flex-row items-center justify-between gap-3 px-4 py-2"
-        accessibilityLiveRegion="polite"
-      >
-        <Text className="flex-1 text-sm text-muted-foreground">{model.text}</Text>
+      <View testID={model.testID} className="flex-row items-center justify-between gap-3 px-4 py-2">
+        <AccessibleStatus message={model.text} tone="status" className="flex-1 text-sm" />
         <Button
           variant="outline"
           size="sm"
@@ -56,8 +53,8 @@ export function SessionPaginationHeader({
   }
 
   return (
-    <View testID={model.testID} className="px-4 py-2" accessibilityLiveRegion="polite">
-      <Text className="text-sm text-muted-foreground">{model.text}</Text>
+    <View testID={model.testID} className="px-4 py-2">
+      <AccessibleStatus message={model.text} tone="status" className="text-sm" />
     </View>
   );
 }

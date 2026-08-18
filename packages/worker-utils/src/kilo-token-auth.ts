@@ -61,6 +61,9 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
       return null;
     }
 
+    // This shared helper intentionally normalizes legacy tokens without a
+    // pepper to null. Session-ingest has a separate internal-token class and
+    // must not reuse this normalization for its admission boundary.
     const tokenPepper = payload.apiTokenPepper ?? null;
     if (result.pepper !== tokenPepper) {
       return null;

@@ -15,7 +15,7 @@ import {
   resolveContinuationDestinations,
 } from './continuation-seed';
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Bug: 'Bug',
   Code: 'Code',
   HelpCircle: 'HelpCircle',

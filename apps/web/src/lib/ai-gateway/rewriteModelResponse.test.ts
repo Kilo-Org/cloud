@@ -278,6 +278,100 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(result.status).toBe(502);
       expect(await result.text()).toBe('not-json{');
     });
+
+    test('maps message reasoning_content to reasoning_details', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning_content: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'answer',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'full thought', index: 0, format: 'unknown' },
+        ],
+      });
+    });
+
+    test('leaves reasoning_content alone when reasoning_details are already present', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'answer',
+              reasoning_content: 'full thought',
+              reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        { type: 'reasoning.text', text: 'full thought', index: 0 },
+      ]);
+    });
+
+    test('leaves reasoning_content alone when the transform is disabled', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning_content: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toBeUndefined();
+    });
   });
 
   describe('streaming responses', () => {
@@ -386,6 +480,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         vercelRequestId: null,
         responseTransforms: {
           mapGeminiThoughtContent: true,
+          mapReasoningContentToDetails: false,
         },
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -398,6 +493,39 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       });
       expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
       expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });
+    });
+
+    test('maps delta reasoning_content to reasoning_details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"reasoning_content":"first "}},{"index":0,"delta":{"reasoning_content":"thought"}},{"index":0,"delta":{"content":"answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'first ', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[1].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'thought', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
     });
 
     test('does not treat a null error field as terminal', async () => {
@@ -1053,6 +1181,25 @@ describe('rewriteModelResponse', () => {
     expect(await result.json()).toEqual({
       model: QWEN37_PLUS_MODEL_ID,
       usage: {},
+    });
+  });
+
+  test('preserves cost for models with fallback-only custom pricing', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'moonshotai/kimi-k3',
+        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+      }),
+      model: 'moonshotai/kimi-k3',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({
+      model: 'moonshotai/kimi-k3',
+      usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
     });
   });
 

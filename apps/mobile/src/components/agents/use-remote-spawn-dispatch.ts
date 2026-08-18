@@ -9,9 +9,11 @@ import {
   buildCreateRemoteSessionInput,
   type CreateRemoteSessionInput,
   type CreateSessionOutcome,
+  type CreateSessionSpawnOptions,
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
   REMOTE_SPAWN_NON_RETRYABLE_TOAST,
   REMOTE_SPAWN_RETRYABLE_TOAST,
@@ -65,6 +67,16 @@ type UseRemoteSpawnDispatchArgs = {
    * once. Optional: a caller with no composer omits it.
    */
   getSubmitPayload?: () => SharePayload | null;
+  /**
+   * Invoked when `onStart` admits the press-time snapshot and commits to a
+   * spawn attempt: the caller already passed voice settlement (it only calls
+   * `onStart` after the voice input settled) and `resolveRemoteSpawnAdmission`
+   * allowed the payload. A tap that never reaches a spawn — blocked
+   * admission, cancelled voice submit, or a `null` selection — never fires
+   * this, so callers can arm draft clearing on exactly the attempts that
+   * happened.
+   */
+  onSpawnAdmitted?: () => void;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -85,7 +97,9 @@ type UseRemoteSpawnDispatchResult = {
    * `onStart` for the route's "Start session" CTA when a remote
    * target is selected. No-op when the selection is `null` (the
    * route should have routed the cloud-agent path through
-   * `submitCreate` instead, but the guard is defensive).
+   * `submitCreate` instead, but the guard is defensive). Fires
+   * `onSpawnAdmitted` only once a spawn attempt is actually
+   * committed to (voice settlement + admission passed).
    */
   onStart: () => void;
   /**
@@ -121,6 +135,7 @@ export function useRemoteSpawnDispatch({
   refetchInstances,
   instanceList,
   getSubmitPayload,
+  onSpawnAdmitted,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
   // Route param is frozen at navigation: missing param means personal, not
@@ -129,9 +144,16 @@ export function useRemoteSpawnDispatch({
   // inherit by calling `useRemoteInstanceSpawn()` with no arg).
   const remoteSpawn: {
     status: RemoteInstanceSpawnStatus;
-    spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+    spawn: (
+      connectionId: string,
+      opts?: CreateRemoteSessionInput,
+      options?: CreateSessionSpawnOptions
+    ) => Promise<CreateSessionOutcome>;
   } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
+  // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
+  // the key and the relay dedupes the retry.
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)
   // outlives a single render; a plain closure over `runOnInstance` would
@@ -147,12 +169,16 @@ export function useRemoteSpawnDispatch({
     runOnInstanceRef.current = runOnInstance;
   }, [runOnInstance]);
 
+  // Read the press-time inputs through refs so `onStart` stays stable across
+  // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useRef(getSubmitPayload);
   const spawnFieldsRef = useRef({ mode, selection, organizationId });
+  const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
     spawnFieldsRef.current = { mode, selection, organizationId };
-  }, [getSubmitPayload, mode, selection, organizationId]);
+    onSpawnAdmittedRef.current = onSpawnAdmitted;
+  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -170,14 +196,28 @@ export function useRemoteSpawnDispatch({
       toast.error(admission.toast);
       return;
     }
+    // Admission passed and voice settlement already happened at the caller:
+    // commit to the spawn attempt. The route arms its draft-clearing marker
+    // here, so a tap that stops at admission can never clear the draft.
+    onSpawnAdmittedRef.current?.();
     const createInput = buildCreateRemoteSessionInput({
       mode: fields.mode,
       selection: fields.selection,
       organizationId: fields.organizationId,
     });
+    const operationKey = getKey(
+      JSON.stringify({
+        connectionId: selectedConnectionId,
+        mode: fields.mode,
+        selection: fields.selection,
+        organizationId: fields.organizationId,
+      })
+    );
     void (async () => {
-      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput);
+      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, { operationKey });
       if (outcome.status === 'ready') {
+        // The spawn settled; the next submit is a fresh intent.
+        rotateKey();
         const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
         if (submitPayload === null) {
           router.replace(spawnedPath);
@@ -190,6 +230,8 @@ export function useRemoteSpawnDispatch({
         return;
       }
       if (outcome.status === 'nonRetryable') {
+        // A typed non-retryable rejection ends the intent.
+        rotateKey();
         toast.error(REMOTE_SPAWN_NON_RETRYABLE_TOAST);
         return;
       }
@@ -237,6 +279,8 @@ export function useRemoteSpawnDispatch({
     router,
     runOnInstance,
     setRunOnInstance,
+    getKey,
+    rotateKey,
   ]);
 
   const onChangeRunOnInstance = useCallback(

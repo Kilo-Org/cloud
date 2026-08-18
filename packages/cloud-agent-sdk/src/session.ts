@@ -101,6 +101,15 @@ type CloudAgentSessionConfig = {
   onToolAttachment?:
     | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
     | undefined;
+  /**
+   * Optional sink for top-level file part URLs, called just before the chat
+   * processor strips a file part's `url` and `source.text` for storage.
+   * Receives the raw URL exactly once per processor pass; consumers use it to
+   * preview the file later (e.g. mobile). Web never passes it.
+   */
+  onFilePart?:
+    | ((partId: string, file: { mime: string; filename?: string; url: string }) => void)
+    | undefined;
 };
 
 type CloudAgentSessionSendInput = {
@@ -214,6 +223,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   const chatProcessor = createChatProcessor(storage, {
     onToolAttachment: config.onToolAttachment,
+    onFilePart: config.onFilePart,
   });
 
   const serviceState = createServiceState({

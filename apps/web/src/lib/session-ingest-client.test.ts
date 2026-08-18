@@ -7,6 +7,8 @@ import {
   fetchSessionMessagesPage,
   deleteSession,
   shareSession,
+  unshareSession,
+  fetchSharedSessionMetadata,
   invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
 
@@ -307,23 +309,23 @@ describe('shareSession', () => {
     mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
-  it('returns public_id on success', async () => {
+  it('returns share_token on success', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ success: true, public_id: 'pub_abc123' }),
+      json: () => Promise.resolve({ success: true, share_token: 'share.jwt.token' }),
     });
 
     const result = await shareSession('ses_abc123', 'user_123');
 
-    expect(result).toEqual({ public_id: 'pub_abc123' });
+    expect(result).toEqual({ share_token: 'share.jwt.token' });
   });
 
   it('calls POST on the correct URL', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ success: true, public_id: 'pub_abc123' }),
+      json: () => Promise.resolve({ success: true, share_token: 'share.jwt.token' }),
     });
 
     await shareSession('ses_abc123', 'user_123');
@@ -338,7 +340,7 @@ describe('shareSession', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ success: true, public_id: 'pub_abc123' }),
+      json: () => Promise.resolve({ success: true, share_token: 'share.jwt.token' }),
     });
 
     await shareSession('ses_abc123', 'user_123');
@@ -353,7 +355,7 @@ describe('shareSession', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ success: true, public_id: 'pub_abc123' }),
+      json: () => Promise.resolve({ success: true, share_token: 'share.jwt.token' }),
     });
 
     await shareSession('ses_abc123', 'user_test_456');
@@ -397,7 +399,7 @@ describe('shareSession', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ success: true, public_id: 'pub_abc123' }),
+      json: () => Promise.resolve({ success: true, share_token: 'share.jwt.token' }),
     });
 
     await shareSession('ses_with spaces&special', 'user_123');
@@ -406,6 +408,160 @@ describe('shareSession', () => {
       'https://ingest.test.example.com/api/session/ses_with%20spaces%26special/share',
       expect.any(Object)
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unshareSession
+// ---------------------------------------------------------------------------
+
+describe('unshareSession', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+  });
+
+  it('resolves on success', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true }),
+    });
+
+    await expect(unshareSession('ses_abc123', 'user_123')).resolves.toBeUndefined();
+  });
+
+  it('calls POST on the worker unshare path', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true }),
+    });
+
+    await unshareSession('ses_abc123', 'user_123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/api/session/ses_abc123/unshare',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('throws on 404 without capturing', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+
+    await expect(unshareSession('ses_nonexistent', 'user_123')).rejects.toThrow(
+      'Session not found'
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('throws and calls captureException on 500', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('something broke'),
+    });
+
+    await expect(unshareSession('ses_abc123', 'user_123')).rejects.toThrow(
+      'Session ingest unshare failed: 500 Internal Server Error - something broke'
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'unshare' },
+        extra: { sessionId: 'ses_abc123', status: 500 },
+      })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSharedSessionMetadata
+// ---------------------------------------------------------------------------
+
+describe('fetchSharedSessionMetadata', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  it('returns parsed metadata and avoids caching', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          title: 'Shared session',
+          owner_name: 'Session owner',
+        }),
+    });
+
+    await expect(fetchSharedSessionMetadata('share.jwt.token')).resolves.toEqual({
+      title: 'Shared session',
+      ownerName: 'Session owner',
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/session/share.jwt.token/metadata',
+      { cache: 'no-store' }
+    );
+  });
+
+  it('returns null on 404', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' });
+
+    await expect(fetchSharedSessionMetadata('share.jwt.token')).resolves.toBeNull();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('throws on an operational response without capturing the token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+
+    await expect(fetchSharedSessionMetadata('secret.share.jwt.token')).rejects.toThrow(
+      'Session ingest metadata failed: 503 Service Unavailable'
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'metadata' },
+        extra: { status: 503 },
+      })
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
+  });
+
+  it('throws on a malformed successful response without capturing the token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true, title: 42, owner_name: null }),
+    });
+
+    await expect(fetchSharedSessionMetadata('secret.share.jwt.token')).rejects.toThrow(
+      'Session ingest metadata response was malformed'
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
+  });
+
+  it('rejects old public_id share responses after cutover', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true, public_id: 'old-public-id' }),
+    });
+
+    await expect(shareSession('ses_abc123', 'user_123')).rejects.toThrow();
   });
 });
 

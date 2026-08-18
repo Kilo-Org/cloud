@@ -37,6 +37,7 @@ import type { TerminalizeParams } from '../session/session-message-state.js';
 import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
+  isAssistantInterrupt,
 } from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 import {
@@ -794,7 +795,20 @@ export function createIngestHandler(
                 : undefined;
             if (parentMessageId !== undefined) {
               await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
-              if (assistantError !== undefined) {
+              if (info?.error !== undefined && isAssistantInterrupt(info.error)) {
+                await doContext.terminalizeSessionMessageOnce(
+                  parentMessageId,
+                  {
+                    kind: 'interrupted',
+                    assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
+                    error: assistantError ?? 'The message was interrupted by the user',
+                    failureStage: 'interruption',
+                    failureCode: 'user_interrupt',
+                    completionSource: 'interrupt',
+                  },
+                  wrapperRunId
+                );
+              } else if (assistantError !== undefined) {
                 const assistantFailure = classifyAssistantFailure(assistantError);
                 await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,

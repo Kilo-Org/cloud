@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
-import { Bot, House, MessageSquare, UserRound } from 'lucide-react-native';
+import { Bot, House, MessageSquare, UserRound } from '@/components/ui/icons';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

@@ -33,3 +33,12 @@ export function getPartDetailTitle(part: Part): string {
   }
   return 'Details';
 }
+
+/**
+ * Auto-follow is only for a streaming reasoning part: the "Thinking" sheet
+ * follows the growing text. Tool parts and finished parts keep the static
+ * top-anchored sheet.
+ */
+export function shouldAutoFollowPartDetail(part: Part | null): boolean {
+  return part !== null && isReasoningPart(part) && isPartStreaming(part);
+}

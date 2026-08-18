@@ -1,17 +1,21 @@
 import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import {
+  createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,
   isTerminalSecurityAgentCommandTransitionOutcome,
   markSecurityAgentCommandQueueAdmissionFailed,
   markSecurityAgentCommandRetriesExhausted,
   requireSecurityAgentCommandTransitionOrTerminal,
   transitionSecurityAgentCommandWithCurrentState,
+  type CreateSecurityAgentCommandInput,
+  type SecurityAgentCommand,
   type SecurityAgentCommandOwner,
   type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { agent_configs } from '@kilocode/db/schema';
+import { agent_configs, operation_ledgers } from '@kilocode/db/schema';
+import { settleOperation } from '@kilocode/db/operation-ledger';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -36,10 +40,6 @@ const SecuritySyncActorSchema = z.object({
   id: z.string().min(1),
   email: z.string().email().nullable().optional(),
   name: z.string().min(1).nullable().optional(),
-});
-
-const SecuritySyncActorIdSchema = z.object({
-  id: z.string().min(1),
 });
 
 const SecuritySyncMessageSchema = z
@@ -68,6 +68,8 @@ const ManualSecuritySyncCommandSchema = z.object({
   actor: SecuritySyncActorSchema,
   origin: z.enum(['manual', 'dashboard_refresh', 'enable_initial_sync']).default('manual'),
   repoFullName: z.string().min(1).optional(),
+  /** Stable web operation key (P1-A-08e); same-key retries reuse the original command. */
+  operationKey: z.string().min(1).max(128).optional(),
 });
 
 const DependabotDismissReasonSchema = z.enum([
@@ -81,11 +83,13 @@ const DependabotDismissReasonSchema = z.enum([
 const ManualFindingDismissalCommandSchema = z.object({
   schemaVersion: z.literal(1),
   owner: SecuritySyncOwnerSchema,
-  actor: SecuritySyncActorIdSchema,
+  actor: SecuritySyncActorSchema,
   findingId: z.string().uuid(),
   installationId: z.string().min(1),
   reason: DependabotDismissReasonSchema,
   comment: z.string().optional(),
+  /** Stable web operation key (P1-A-08e); same-key retries reuse the original command. */
+  operationKey: z.string().min(1).max(128).optional(),
 });
 
 const SecurityDismissMessageSchema = ManualFindingDismissalCommandSchema.extend({
@@ -202,91 +206,158 @@ async function timingSafeEqual(left: string, right: string): Promise<boolean> {
   return nodeTimingSafeEqual(new Uint8Array(leftDigest), new Uint8Array(rightDigest));
 }
 
+// ----- same-key command dedupe (P1-A-08e) ------------------------------------
+//
+// A command carrying the web's stable `operationKey` is created-or-found by
+// that key on `security_agent_commands`, whose partial unique index on
+// (owner, operation_key) arbitrates the race. A same-key request resolves to
+// the existing command and sends no second queue message, so the effect runs
+// once. Scheduled syncs and keyless commands carry no key and always create.
+
+type KeyedEnqueueIds = { commandId: string; runId: string; messageId: string };
+
+function buildManualSyncQueueMessage(
+  command: z.infer<typeof ManualSecuritySyncCommandSchema>,
+  ids: KeyedEnqueueIds,
+  ownerKey: string
+): MessageSendRequest<SecuritySyncQueueMessage> {
+  return {
+    body: {
+      schemaVersion: 1,
+      commandId: ids.commandId,
+      runId: ids.runId,
+      messageId: ids.messageId,
+      trigger: 'manual',
+      owner: command.owner,
+      ownerKey,
+      chunkIndex: 0,
+      chunkCount: 1,
+      dispatchedAt: new Date().toISOString(),
+      actor: command.actor,
+      repoFullName: command.repoFullName,
+    },
+    contentType: 'json',
+  };
+}
+
+function buildDismissQueueMessage(
+  command: z.infer<typeof ManualFindingDismissalCommandSchema>,
+  ids: KeyedEnqueueIds
+): MessageSendRequest<SecuritySyncQueueMessage> {
+  return {
+    body: {
+      ...command,
+      kind: 'dismiss',
+      commandId: ids.commandId,
+      runId: ids.runId,
+      messageId: ids.messageId,
+      dispatchedAt: new Date().toISOString(),
+    },
+    contentType: 'json',
+  };
+}
+
+/**
+ * Creates the command row and sends its queue message. With an `operationKey`
+ * the row is created-or-found by that key (P1-A-08e): a same-key retry returns
+ * the original command. A command whose first queue admission failed is reset
+ * and enqueued again; every other existing command sends no second message.
+ * A queue-send failure marks the command failed before rethrowing, so no
+ * command is left waiting for a message that was never sent.
+ */
+async function enqueueSecurityCommand(
+  db: WorkerDb,
+  queue: Queue<SecuritySyncQueueMessage>,
+  params: {
+    operationKey?: string;
+    create: CreateSecurityAgentCommandInput;
+    runId: string;
+    messageId: string;
+    buildMessage: (ids: KeyedEnqueueIds) => MessageSendRequest<SecuritySyncQueueMessage>;
+  }
+): Promise<KeyedEnqueueIds> {
+  const { command, created } =
+    params.operationKey === undefined
+      ? { command: await createSecurityAgentCommand(db, params.create), created: true }
+      : await createOrFindSecurityAgentCommandByOperationKey(db, {
+          ...params.create,
+          operationKey: params.operationKey,
+        });
+
+  const ids = { commandId: command.id, runId: params.runId, messageId: params.messageId };
+
+  let shouldEnqueue = created;
+  if (!created && command.status === 'failed' && command.result_code === 'QUEUE_ADMISSION_FAILED') {
+    const retry = await transitionSecurityAgentCommandWithCurrentState(db, {
+      commandId: command.id,
+      fromStatuses: ['failed'],
+      status: 'accepted',
+      resultCode: null,
+      lastErrorRedacted: null,
+    });
+    shouldEnqueue = retry.transitioned;
+  }
+
+  if (!shouldEnqueue) {
+    console.info('Security command reused for an existing operation key', {
+      command_type: params.create.commandType,
+      operation_key: params.operationKey,
+      command_id: command.id,
+    });
+    return ids;
+  }
+
+  try {
+    await queue.sendBatch([params.buildMessage(ids)]);
+  } catch (error) {
+    await markSecurityAgentCommandQueueAdmissionFailed(db, command.id, 'Queue admission failed');
+    throw error;
+  }
+
+  return ids;
+}
+
 async function enqueueManualSyncCommand(
   db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   command: z.infer<typeof ManualSecuritySyncCommandSchema>
-): Promise<{ commandId: string; runId: string; messageId: string }> {
+): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
   const ownerKey = createOwnerKey(command.owner);
-  const messageId = `${runId}:${ownerKey}:manual`;
-  const ledgerCommand = await createSecurityAgentCommand(db, {
-    commandType: 'sync',
-    origin: command.origin,
-    owner: toCommandOwner(command.owner),
-    repoFullName: command.repoFullName,
+
+  return enqueueSecurityCommand(db, queue, {
+    operationKey: command.operationKey,
+    create: {
+      commandType: 'sync',
+      origin: command.origin,
+      owner: toCommandOwner(command.owner),
+      repoFullName: command.repoFullName,
+    },
+    runId,
+    messageId: `${runId}:${ownerKey}:manual`,
+    buildMessage: ids => buildManualSyncQueueMessage(command, ids, ownerKey),
   });
-
-  try {
-    await queue.sendBatch([
-      {
-        body: {
-          schemaVersion: 1,
-          commandId: ledgerCommand.id,
-          runId,
-          messageId,
-          trigger: 'manual',
-          owner: command.owner,
-          ownerKey,
-          chunkIndex: 0,
-          chunkCount: 1,
-          dispatchedAt: new Date().toISOString(),
-          actor: command.actor,
-          repoFullName: command.repoFullName,
-        },
-        contentType: 'json',
-      },
-    ]);
-  } catch (error) {
-    await markSecurityAgentCommandQueueAdmissionFailed(
-      db,
-      ledgerCommand.id,
-      'Queue admission failed'
-    );
-    throw error;
-  }
-
-  return { commandId: ledgerCommand.id, runId, messageId };
 }
 
 async function enqueueDismissFindingCommand(
   db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   command: z.infer<typeof ManualFindingDismissalCommandSchema>
-): Promise<{ commandId: string; runId: string; messageId: string }> {
+): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
-  const messageId = `${runId}:${command.findingId}:dismiss`;
-  const ledgerCommand = await createSecurityAgentCommand(db, {
-    commandType: 'dismiss_finding',
-    origin: 'manual',
-    owner: toCommandOwner(command.owner),
-    findingId: command.findingId,
+
+  return enqueueSecurityCommand(db, queue, {
+    operationKey: command.operationKey,
+    create: {
+      commandType: 'dismiss_finding',
+      origin: 'manual',
+      owner: toCommandOwner(command.owner),
+      findingId: command.findingId,
+    },
+    runId,
+    messageId: `${runId}:${command.findingId}:dismiss`,
+    buildMessage: ids => buildDismissQueueMessage(command, ids),
   });
-
-  try {
-    await queue.sendBatch([
-      {
-        body: {
-          ...command,
-          kind: 'dismiss',
-          commandId: ledgerCommand.id,
-          runId,
-          messageId,
-          dispatchedAt: new Date().toISOString(),
-        },
-        contentType: 'json',
-      },
-    ]);
-  } catch (error) {
-    await markSecurityAgentCommandQueueAdmissionFailed(
-      db,
-      ledgerCommand.id,
-      'Queue admission failed'
-    );
-    throw error;
-  }
-
-  return { commandId: ledgerCommand.id, runId, messageId };
 }
 
 async function enqueueOwners(
@@ -329,26 +400,46 @@ function resolveOwner(
   return null;
 }
 
-function commandCorrelation(body: unknown): {
+type CommandCorrelation = {
   commandId?: string;
   commandType?: 'sync' | 'dismiss_finding';
   ownerType?: 'org' | 'user';
-} {
+  ledger?: {
+    actor: { id: string; email?: string | null };
+    intent: 'manual_sync' | 'dismiss_finding';
+    dispatchedAt: string;
+  };
+};
+
+function commandCorrelation(body: unknown): CommandCorrelation {
   const dismiss = SecurityDismissMessageSchema.safeParse(body);
   if (dismiss.success) {
     return {
       commandId: dismiss.data.commandId,
       commandType: 'dismiss_finding',
       ownerType: dismiss.data.owner.organizationId ? 'org' : 'user',
+      ledger: {
+        actor: dismiss.data.actor,
+        intent: 'dismiss_finding',
+        dispatchedAt: dismiss.data.dispatchedAt,
+      },
     };
   }
   const sync = SecuritySyncMessageSchema.safeParse(body);
   if (!sync.success || !sync.data.commandId) return {};
-  return {
+  const correlation: CommandCorrelation = {
     commandId: sync.data.commandId,
     commandType: 'sync',
     ownerType: sync.data.owner.organizationId ? 'org' : 'user',
   };
+  if (sync.data.trigger === 'manual' && sync.data.actor) {
+    correlation.ledger = {
+      actor: sync.data.actor,
+      intent: 'manual_sync',
+      dispatchedAt: sync.data.dispatchedAt,
+    };
+  }
+  return correlation;
 }
 
 function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>): {
@@ -368,6 +459,75 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
     return { status: 'failed', resultCode: 'SYNC_PARTIAL_FAILURE' };
   }
   return { status: 'succeeded', resultCode: 'SYNC_COMPLETED' };
+}
+
+function securityLedgerTerminalStatus(status: SecurityAgentCommand['status']) {
+  switch (status) {
+    case 'succeeded':
+      return 'completed' as const;
+    case 'failed':
+      return 'failed' as const;
+    case 'no_op':
+      return 'no_op' as const;
+    default:
+      return null;
+  }
+}
+
+async function settleSecurityLedgerForTerminalCommand(
+  db: WorkerDb,
+  command: SecurityAgentCommand | null,
+  params: {
+    actor: { id: string; email?: string | null };
+    intent: 'manual_sync' | 'dismiss_finding';
+    dispatchedAt: string;
+    counts?: { repo_count: number; error_count: number };
+  }
+): Promise<void> {
+  if (!command) throw new Error('Security Agent terminal transition has no command');
+  if (!command.operation_key) return;
+
+  const status = securityLedgerTerminalStatus(command.status);
+  if (!status) throw new Error(`Security Agent command ${command.id} is not terminal`);
+
+  const [row] = await db
+    .select({ id: operation_ledgers.id })
+    .from(operation_ledgers)
+    .where(
+      and(
+        eq(operation_ledgers.domain, 'security'),
+        eq(operation_ledgers.kilo_user_id, params.actor.id),
+        eq(operation_ledgers.intent, params.intent),
+        eq(operation_ledgers.provider_ref, command.id)
+      )
+    )
+    .limit(1);
+  if (!row) {
+    throw new Error(`Security operation ledger row is not ready for command ${command.id}`);
+  }
+
+  const settled = await settleOperation(db, {
+    rowId: row.id,
+    status,
+    outcomeCode: command.result_code,
+    canonicalResult: params.counts,
+    outboxEvent: {
+      eventName: 'security_command_settled',
+      distinctId: params.actor.email ?? params.actor.id,
+      properties: {
+        source: 'server',
+        surface: 'security',
+        phase: 'terminal',
+        intent: params.intent,
+        outcome: status,
+        ...params.counts,
+        duration_ms: Math.max(0, Date.now() - new Date(params.dispatchedAt).getTime()),
+      },
+    },
+  });
+  if (!settled.row) {
+    throw new Error(`Security operation ledger row vanished for command ${command.id}`);
+  }
 }
 
 async function processSecurityDismissMessage(
@@ -391,6 +551,11 @@ async function processSecurityDismissMessage(
       result_code: running.command?.result_code,
       attempts: message.attempts,
     });
+    await settleSecurityLedgerForTerminalCommand(db, running.command, {
+      actor: parsed.data.actor,
+      intent: 'dismiss_finding',
+      dispatchedAt: parsed.data.dispatchedAt,
+    });
     message.ack();
     return true;
   }
@@ -406,6 +571,11 @@ async function processSecurityDismissMessage(
     resultCode: result.resultCode,
   });
   requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
+  await settleSecurityLedgerForTerminalCommand(db, terminal.command, {
+    actor: parsed.data.actor,
+    intent: 'dismiss_finding',
+    dispatchedAt: parsed.data.dispatchedAt,
+  });
   console.info('Security Agent dismissal command completed', {
     command_id: parsed.data.commandId,
     command_type: 'dismiss_finding',
@@ -459,6 +629,12 @@ async function processSecuritySyncMessage(
         result_code: running.command?.result_code,
         attempts: message.attempts,
       });
+      if (!body.actor) throw new Error('Manual security sync command has no actor');
+      await settleSecurityLedgerForTerminalCommand(db, running.command, {
+        actor: body.actor,
+        intent: 'manual_sync',
+        dispatchedAt: body.dispatchedAt,
+      });
       message.ack();
       return;
     }
@@ -487,6 +663,13 @@ async function processSecuritySyncMessage(
       resultCode: terminal.resultCode,
     });
     requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
+    if (!body.actor) throw new Error('Manual security sync command has no actor');
+    await settleSecurityLedgerForTerminalCommand(db, terminalTransition.command, {
+      actor: body.actor,
+      intent: 'manual_sync',
+      dispatchedAt: body.dispatchedAt,
+      counts: { repo_count: result.synced, error_count: result.errors },
+    });
   }
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
@@ -718,6 +901,13 @@ export default {
               db,
               correlation.commandId
             );
+            if (exhaustionOutcome.command && correlation.ledger) {
+              await settleSecurityLedgerForTerminalCommand(
+                db,
+                exhaustionOutcome.command,
+                correlation.ledger
+              );
+            }
             if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
               console.info('Security Agent command delivery already terminal after failure', {
                 command_id: correlation.commandId,

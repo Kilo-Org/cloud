@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ShieldOff } from 'lucide-react-native';
+import { ShieldOff } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 
@@ -11,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import {
+  isSecurityConfigurationError,
+  isSecuritySyncRetryable,
+  SECURITY_CONFIGURATION_COPY,
+} from '@/lib/hooks/use-security-agent-mutations';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -152,6 +157,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
+  // A terminal rejection ended the intent, so disable the CTA and let the
+  // inline copy explain the outcome.
+  const dismissBlocked = dismissFinding.isError && !isSecuritySyncRetryable(dismissFinding.error);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Dismiss finding" modal />
@@ -187,10 +196,14 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         </View>
 
         {dismissFinding.isError && (
-          <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
+          <Text className="text-sm text-destructive">
+            {isSecurityConfigurationError(dismissFinding.error)
+              ? SECURITY_CONFIGURATION_COPY
+              : dismissFinding.error.message}
+          </Text>
         )}
 
-        <Button disabled={!reason || dismissFinding.isPending} onPress={onSubmit}>
+        <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}

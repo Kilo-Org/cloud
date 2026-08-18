@@ -1,6 +1,6 @@
 // Hunk / expand / pagination / empty-state rows for the PR diff FlashList.
 
-import { Check, ChevronDown, File, GitCommit, X } from 'lucide-react-native';
+import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';

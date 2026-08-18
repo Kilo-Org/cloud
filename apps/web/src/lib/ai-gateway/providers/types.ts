@@ -11,6 +11,8 @@ export type ProviderId =
   | 'longcat'
   | 'martian'
   | 'mistral'
+  | 'friendli'
+  | 'perplexity'
   | 'streamlake'
   | 'vercel'
   | 'custom'
@@ -40,6 +42,7 @@ export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind
 
 export type ProviderResponseTransforms = {
   mapGeminiThoughtContent: boolean;
+  mapReasoningContentToDetails: boolean;
 };
 
 export type Provider = {

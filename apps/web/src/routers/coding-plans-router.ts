@@ -1,14 +1,18 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 import {
+  adminCancelCodingPlanSubscription,
   cancelCodingPlanSubscription,
+  CodingPlanInventoryReplacementError,
   CodingPlanInventoryUploadError,
+  extendCodingPlanSubscriptionPeriod,
   getAvailableCodingPlanIds,
   getCodingPlanAvailabilityIntentCounts,
   getCodingPlanAvailabilityIntentPlanIds,
   getKeyInventoryCounts,
+  replaceInventoryCredential,
   requestCodingPlanAvailabilityNotification,
   subscribeToCodingPlan,
   terminateCodingPlanImmediately,
@@ -55,6 +59,28 @@ const BillingHistoryInputSchema = z.object({
   subscriptionId: SubscriptionIdSchema,
   cursor: z.string().optional(),
 });
+const ADMIN_SUBSCRIPTION_PAGE_SIZE = 20;
+const AdminSubscriptionDisplayStatusSchema = z.enum([
+  'active',
+  'pending_cancellation',
+  'past_due',
+  'canceled',
+]);
+const AdminListSubscriptionsInputSchema = z.object({
+  page: z.number().int().min(1).max(10_000).default(1),
+  search: z
+    .string()
+    .trim()
+    .max(200)
+    .optional()
+    .transform(value => (value && value.length > 0 ? value : undefined)),
+  status: AdminSubscriptionDisplayStatusSchema.optional(),
+});
+const AdminInsightsRangeDaysSchema = z.union([z.literal(7), z.literal(14), z.literal(30)]);
+const AdminInsightsInputSchema = z.object({
+  rangeDays: AdminInsightsRangeDaysSchema.default(7),
+});
+
 const CodingPlanUsageOutputSchema = z.object({
   schemaVersion: z.literal(1),
   fetchedAt: z.iso.datetime(),
@@ -177,6 +203,359 @@ function toCodingPlanSubscriptionView(subscription: CodingPlanSubscriptionRow) {
   };
 }
 
+function adminSubscriptionSearchFilter(search: string | undefined): SQL | undefined {
+  if (!search) return undefined;
+  const pattern = `%${search}%`;
+  return or(
+    ilike(kilocode_users.id, pattern),
+    ilike(kilocode_users.google_user_email, pattern),
+    ilike(kilocode_users.normalized_email, pattern)
+  );
+}
+
+function toNumericCount(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number.parseInt(value, 10) || 0;
+  return 0;
+}
+
+function toNumericCredits(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number.parseFloat(value) || 0;
+  return 0;
+}
+
+async function getAdminSubscriptionSummary() {
+  const { rows } = await db.execute<{
+    total: string;
+    active: string;
+    pending_cancellation: string;
+    past_due: string;
+  }>(sql`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (
+        WHERE status = 'active' AND cancel_at_period_end = false
+      )::int AS active,
+      COUNT(*) FILTER (
+        WHERE status = 'active' AND cancel_at_period_end = true
+      )::int AS pending_cancellation,
+      COUNT(*) FILTER (WHERE status = 'past_due')::int AS past_due
+    FROM coding_plan_subscriptions
+  `);
+  const summary = rows[0];
+  return {
+    total: toNumericCount(summary?.total),
+    active: toNumericCount(summary?.active),
+    pendingCancellation: toNumericCount(summary?.pending_cancellation),
+    pastDue: toNumericCount(summary?.past_due),
+  };
+}
+
+type AdminInsightPlanRow = {
+  planId: (typeof CODING_PLAN_IDS)[number];
+  liveSubscriptions: number;
+  pendingCancellation: number;
+  pastDue: number;
+  monthlyRecurringValueKiloCredits: number;
+  revenueAtRiskKiloCredits: number;
+  pastDueMrrKiloCredits: number;
+  createdInRange: number;
+  createdInPriorRange: number;
+  canceledInRange: number;
+  liveAtRangeStart: number;
+  retainedFromRangeStart: number;
+  currentWaitersJoinedInRange: number;
+  currentWaitersJoinedInPriorRange: number;
+  currentWaitlistTotal: number;
+};
+
+function emptyAdminInsightPlanRow(planId: (typeof CODING_PLAN_IDS)[number]): AdminInsightPlanRow {
+  return {
+    planId,
+    liveSubscriptions: 0,
+    pendingCancellation: 0,
+    pastDue: 0,
+    monthlyRecurringValueKiloCredits: 0,
+    revenueAtRiskKiloCredits: 0,
+    pastDueMrrKiloCredits: 0,
+    createdInRange: 0,
+    createdInPriorRange: 0,
+    canceledInRange: 0,
+    liveAtRangeStart: 0,
+    retainedFromRangeStart: 0,
+    currentWaitersJoinedInRange: 0,
+    currentWaitersJoinedInPriorRange: 0,
+    currentWaitlistTotal: 0,
+  };
+}
+
+function toPublicAdminInsightPlan(plan: AdminInsightPlanRow) {
+  return {
+    planId: plan.planId,
+    liveSubscriptions: plan.liveSubscriptions,
+    monthlyRecurringValueKiloCredits: plan.monthlyRecurringValueKiloCredits,
+    createdInRange: plan.createdInRange,
+    canceledInRange: plan.canceledInRange,
+    currentWaitersJoinedInRange: plan.currentWaitersJoinedInRange,
+    currentWaitlistTotal: plan.currentWaitlistTotal,
+  };
+}
+
+function sumAdminInsightTotals(plans: readonly AdminInsightPlanRow[]) {
+  return plans.reduce(
+    (totals, plan) => ({
+      liveSubscriptions: totals.liveSubscriptions + plan.liveSubscriptions,
+      pendingCancellation: totals.pendingCancellation + plan.pendingCancellation,
+      pastDue: totals.pastDue + plan.pastDue,
+      mrrKiloCredits: totals.mrrKiloCredits + plan.monthlyRecurringValueKiloCredits,
+      revenueAtRiskKiloCredits: totals.revenueAtRiskKiloCredits + plan.revenueAtRiskKiloCredits,
+      pastDueMrrKiloCredits: totals.pastDueMrrKiloCredits + plan.pastDueMrrKiloCredits,
+      createdInRange: totals.createdInRange + plan.createdInRange,
+      createdInPriorRange: totals.createdInPriorRange + plan.createdInPriorRange,
+      canceledInRange: totals.canceledInRange + plan.canceledInRange,
+      liveAtRangeStart: totals.liveAtRangeStart + plan.liveAtRangeStart,
+      retainedFromRangeStart: totals.retainedFromRangeStart + plan.retainedFromRangeStart,
+      currentWaitersJoinedInRange:
+        totals.currentWaitersJoinedInRange + plan.currentWaitersJoinedInRange,
+      currentWaitersJoinedInPriorRange:
+        totals.currentWaitersJoinedInPriorRange + plan.currentWaitersJoinedInPriorRange,
+      currentWaitlistTotal: totals.currentWaitlistTotal + plan.currentWaitlistTotal,
+    }),
+    {
+      liveSubscriptions: 0,
+      pendingCancellation: 0,
+      pastDue: 0,
+      mrrKiloCredits: 0,
+      revenueAtRiskKiloCredits: 0,
+      pastDueMrrKiloCredits: 0,
+      createdInRange: 0,
+      createdInPriorRange: 0,
+      canceledInRange: 0,
+      liveAtRangeStart: 0,
+      retainedFromRangeStart: 0,
+      currentWaitersJoinedInRange: 0,
+      currentWaitersJoinedInPriorRange: 0,
+      currentWaitlistTotal: 0,
+    }
+  );
+}
+
+async function getAdminInsights(rangeDays: 7 | 14 | 30) {
+  const catalogPlanValues = sql.join(
+    CODING_PLAN_IDS.map((planId, index) => sql`(${planId}, ${index + 1})`),
+    sql`, `
+  );
+  const catalogPlanIds = sql.join(
+    CODING_PLAN_IDS.map(planId => sql`${planId}`),
+    sql`, `
+  );
+  const { rows } = await db.execute<{
+    plan_id: string;
+    live_subscriptions: string;
+    pending_cancellation: string;
+    past_due: string;
+    monthly_recurring_value_kilo_credits: string;
+    revenue_at_risk_kilo_credits: string;
+    past_due_mrr_kilo_credits: string;
+    created_in_range: string;
+    created_in_prior_range: string;
+    canceled_in_range: string;
+    live_at_range_start: string;
+    retained_from_range_start: string;
+    current_waiters_joined_in_range: string;
+    current_waiters_joined_in_prior_range: string;
+    current_waitlist_total: string;
+  }>(sql`
+    WITH catalog_plans(plan_id, sort_order) AS (
+      SELECT * FROM (VALUES ${catalogPlanValues}) AS catalog(plan_id, sort_order)
+    ),
+    bounds AS (
+      SELECT
+        NOW() AS now_at,
+        NOW() - make_interval(days => ${rangeDays}) AS range_start,
+        NOW() - make_interval(days => ${rangeDays * 2}) AS prior_range_start
+    ),
+    subscription_metrics AS (
+      SELECT
+        subscriptions.plan_id,
+        COUNT(*) FILTER (
+          WHERE subscriptions.status IN ('active', 'past_due')
+        )::int AS live_subscriptions,
+        COUNT(*) FILTER (
+          WHERE subscriptions.status = 'active'
+            AND subscriptions.cancel_at_period_end = true
+        )::int AS pending_cancellation,
+        COUNT(*) FILTER (
+          WHERE subscriptions.status = 'past_due'
+        )::int AS past_due,
+        COALESCE(
+          SUM(
+            (subscriptions.cost_microdollars::numeric / 1000000)
+            * (30.0 / NULLIF(subscriptions.billing_period_days, 0))
+          ) FILTER (WHERE subscriptions.status IN ('active', 'past_due')),
+          0
+        ) AS monthly_recurring_value_kilo_credits,
+        COALESCE(
+          SUM(
+            (subscriptions.cost_microdollars::numeric / 1000000)
+            * (30.0 / NULLIF(subscriptions.billing_period_days, 0))
+          ) FILTER (
+            WHERE subscriptions.status = 'past_due'
+               OR (
+                 subscriptions.status = 'active'
+                 AND subscriptions.cancel_at_period_end = true
+               )
+          ),
+          0
+        ) AS revenue_at_risk_kilo_credits,
+        COALESCE(
+          SUM(
+            (subscriptions.cost_microdollars::numeric / 1000000)
+            * (30.0 / NULLIF(subscriptions.billing_period_days, 0))
+          ) FILTER (WHERE subscriptions.status = 'past_due'),
+          0
+        ) AS past_due_mrr_kilo_credits,
+        COUNT(*) FILTER (
+          WHERE subscriptions.created_at >= (SELECT range_start FROM bounds)
+            AND subscriptions.created_at < (SELECT now_at FROM bounds)
+        )::int AS created_in_range,
+        COUNT(*) FILTER (
+          WHERE subscriptions.created_at >= (SELECT prior_range_start FROM bounds)
+            AND subscriptions.created_at < (SELECT range_start FROM bounds)
+        )::int AS created_in_prior_range,
+        COUNT(*) FILTER (
+          WHERE subscriptions.status = 'canceled'
+            AND subscriptions.canceled_at IS NOT NULL
+            AND subscriptions.canceled_at >= (SELECT range_start FROM bounds)
+            AND subscriptions.canceled_at < (SELECT now_at FROM bounds)
+        )::int AS canceled_in_range,
+        COUNT(*) FILTER (
+          WHERE subscriptions.created_at < (SELECT range_start FROM bounds)
+            AND (
+              subscriptions.canceled_at IS NULL
+              OR subscriptions.canceled_at >= (SELECT range_start FROM bounds)
+            )
+        )::int AS live_at_range_start,
+        COUNT(*) FILTER (
+          WHERE subscriptions.created_at < (SELECT range_start FROM bounds)
+            AND (
+              subscriptions.canceled_at IS NULL
+              OR subscriptions.canceled_at >= (SELECT range_start FROM bounds)
+            )
+            AND subscriptions.status <> 'canceled'
+        )::int AS retained_from_range_start
+      FROM coding_plan_subscriptions AS subscriptions
+      WHERE subscriptions.plan_id IN (${catalogPlanIds})
+      GROUP BY subscriptions.plan_id
+    ),
+    current_waiters AS (
+      SELECT intents.plan_id, intents.created_at
+      FROM coding_plan_availability_intents AS intents
+      WHERE intents.plan_id IN (${catalogPlanIds})
+        AND NOT EXISTS (
+          SELECT 1
+          FROM coding_plan_terms AS terms
+          WHERE terms.user_id = intents.user_id
+            AND terms.plan_id = intents.plan_id
+            AND terms.kind = 'activation'
+            AND terms.created_at >= intents.created_at
+        )
+    ),
+    waiter_metrics AS (
+      SELECT
+        waiters.plan_id,
+        COUNT(*)::int AS current_waitlist_total,
+        COUNT(*) FILTER (
+          WHERE waiters.created_at >= (SELECT range_start FROM bounds)
+            AND waiters.created_at < (SELECT now_at FROM bounds)
+        )::int AS current_waiters_joined_in_range,
+        COUNT(*) FILTER (
+          WHERE waiters.created_at >= (SELECT prior_range_start FROM bounds)
+            AND waiters.created_at < (SELECT range_start FROM bounds)
+        )::int AS current_waiters_joined_in_prior_range
+      FROM current_waiters AS waiters
+      GROUP BY waiters.plan_id
+    )
+    SELECT
+      catalog.plan_id,
+      COALESCE(subscriptions.live_subscriptions, 0) AS live_subscriptions,
+      COALESCE(subscriptions.pending_cancellation, 0) AS pending_cancellation,
+      COALESCE(subscriptions.past_due, 0) AS past_due,
+      COALESCE(
+        subscriptions.monthly_recurring_value_kilo_credits,
+        0
+      ) AS monthly_recurring_value_kilo_credits,
+      COALESCE(subscriptions.revenue_at_risk_kilo_credits, 0) AS revenue_at_risk_kilo_credits,
+      COALESCE(subscriptions.past_due_mrr_kilo_credits, 0) AS past_due_mrr_kilo_credits,
+      COALESCE(subscriptions.created_in_range, 0) AS created_in_range,
+      COALESCE(subscriptions.created_in_prior_range, 0) AS created_in_prior_range,
+      COALESCE(subscriptions.canceled_in_range, 0) AS canceled_in_range,
+      COALESCE(subscriptions.live_at_range_start, 0) AS live_at_range_start,
+      COALESCE(subscriptions.retained_from_range_start, 0) AS retained_from_range_start,
+      COALESCE(waiters.current_waiters_joined_in_range, 0) AS current_waiters_joined_in_range,
+      COALESCE(
+        waiters.current_waiters_joined_in_prior_range,
+        0
+      ) AS current_waiters_joined_in_prior_range,
+      COALESCE(waiters.current_waitlist_total, 0) AS current_waitlist_total
+    FROM catalog_plans AS catalog
+    LEFT JOIN subscription_metrics AS subscriptions
+      ON subscriptions.plan_id = catalog.plan_id
+    LEFT JOIN waiter_metrics AS waiters
+      ON waiters.plan_id = catalog.plan_id
+    ORDER BY catalog.sort_order
+  `);
+
+  const plansById = new Map(rows.map(row => [row.plan_id, row]));
+  const plans = CODING_PLAN_IDS.map(planId => {
+    const row = plansById.get(planId);
+    if (!row) return emptyAdminInsightPlanRow(planId);
+    return {
+      planId,
+      liveSubscriptions: toNumericCount(row.live_subscriptions),
+      pendingCancellation: toNumericCount(row.pending_cancellation),
+      pastDue: toNumericCount(row.past_due),
+      monthlyRecurringValueKiloCredits: toNumericCredits(row.monthly_recurring_value_kilo_credits),
+      revenueAtRiskKiloCredits: toNumericCredits(row.revenue_at_risk_kilo_credits),
+      pastDueMrrKiloCredits: toNumericCredits(row.past_due_mrr_kilo_credits),
+      createdInRange: toNumericCount(row.created_in_range),
+      createdInPriorRange: toNumericCount(row.created_in_prior_range),
+      canceledInRange: toNumericCount(row.canceled_in_range),
+      liveAtRangeStart: toNumericCount(row.live_at_range_start),
+      retainedFromRangeStart: toNumericCount(row.retained_from_range_start),
+      currentWaitersJoinedInRange: toNumericCount(row.current_waiters_joined_in_range),
+      currentWaitersJoinedInPriorRange: toNumericCount(row.current_waiters_joined_in_prior_range),
+      currentWaitlistTotal: toNumericCount(row.current_waitlist_total),
+    };
+  });
+
+  return {
+    rangeDays,
+    totals: sumAdminInsightTotals(plans),
+    plans: plans.map(toPublicAdminInsightPlan),
+  };
+}
+
+function adminSubscriptionStatusFilter(
+  status: z.infer<typeof AdminSubscriptionDisplayStatusSchema> | undefined
+): SQL | undefined {
+  if (!status) return undefined;
+  if (status === 'active') {
+    return and(
+      eq(coding_plan_subscriptions.status, 'active'),
+      eq(coding_plan_subscriptions.cancel_at_period_end, false)
+    );
+  }
+  if (status === 'pending_cancellation') {
+    return and(
+      eq(coding_plan_subscriptions.status, 'active'),
+      eq(coding_plan_subscriptions.cancel_at_period_end, true)
+    );
+  }
+  return eq(coding_plan_subscriptions.status, status);
+}
+
 export const codingPlansRouter = createTRPCRouter({
   catalog: baseProcedure.query(async ({ ctx }) => {
     const [availablePlanIds, notificationIntentPlanIds] = await Promise.all([
@@ -204,29 +583,65 @@ export const codingPlansRouter = createTRPCRouter({
     return subscriptions.map(toCodingPlanSubscriptionView);
   }),
 
-  adminListSubscriptions: adminProcedure.input(z.object({})).query(async () => {
-    const subscriptions = await db
-      .select({
-        ...codingPlanSubscriptionColumns,
-        userName: kilocode_users.google_user_name,
-      })
-      .from(coding_plan_subscriptions)
-      .innerJoin(kilocode_users, eq(kilocode_users.id, coding_plan_subscriptions.user_id))
-      .leftJoin(
-        coding_plan_key_inventory,
-        eq(coding_plan_key_inventory.id, coding_plan_subscriptions.key_inventory_id)
-      )
-      .orderBy(desc(coding_plan_subscriptions.created_at));
+  adminListSubscriptions: adminProcedure
+    .input(AdminListSubscriptionsInputSchema)
+    .query(async ({ input }) => {
+      const filters = and(
+        adminSubscriptionSearchFilter(input.search),
+        adminSubscriptionStatusFilter(input.status)
+      );
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(coding_plan_subscriptions)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, coding_plan_subscriptions.user_id))
+        .leftJoin(
+          coding_plan_key_inventory,
+          eq(coding_plan_key_inventory.id, coding_plan_subscriptions.key_inventory_id)
+        )
+        .where(filters);
+      const totalPages = Math.ceil(total / ADMIN_SUBSCRIPTION_PAGE_SIZE);
+      const page = totalPages === 0 || input.page > totalPages ? 1 : input.page;
+      const subscriptions = await db
+        .select({
+          ...codingPlanSubscriptionColumns,
+          upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
+          userName: kilocode_users.google_user_name,
+          userEmail: kilocode_users.google_user_email,
+        })
+        .from(coding_plan_subscriptions)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, coding_plan_subscriptions.user_id))
+        .leftJoin(
+          coding_plan_key_inventory,
+          eq(coding_plan_key_inventory.id, coding_plan_subscriptions.key_inventory_id)
+        )
+        .where(filters)
+        .orderBy(desc(coding_plan_subscriptions.created_at), desc(coding_plan_subscriptions.id))
+        .limit(ADMIN_SUBSCRIPTION_PAGE_SIZE)
+        .offset((page - 1) * ADMIN_SUBSCRIPTION_PAGE_SIZE);
 
-    return subscriptions.map(subscription => ({
-      ...toCodingPlanSubscriptionView(subscription),
-      userId: subscription.userId,
-      userName: subscription.userName,
-    }));
+      return {
+        items: subscriptions.map(subscription => ({
+          ...toCodingPlanSubscriptionView(subscription),
+          userId: subscription.userId,
+          userName: subscription.userName,
+          userEmail: subscription.userEmail,
+          inventoryKeyId: subscription.keyInventoryId,
+          upstreamPlanId: subscription.upstreamPlanId,
+        })),
+        pagination: { page, total, totalPages },
+      };
+    }),
+
+  adminSubscriptionOverview: adminProcedure.query(async () => {
+    return getAdminSubscriptionSummary();
   }),
 
   adminAvailabilityIntentCounts: adminProcedure.input(z.object({})).query(async () => {
     return getCodingPlanAvailabilityIntentCounts();
+  }),
+
+  adminInsights: adminProcedure.input(AdminInsightsInputSchema).query(async ({ input }) => {
+    return getAdminInsights(input.rangeDays);
   }),
 
   getSubscriptionDetail: baseProcedure
@@ -407,6 +822,61 @@ export const codingPlansRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message });
         }
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+    }),
+
+  adminCancelSubscription: adminProcedure
+    .input(z.object({ subscriptionId: SubscriptionIdSchema }))
+    .mutation(async ({ input }) => {
+      try {
+        await adminCancelCodingPlanSubscription(input.subscriptionId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('No active subscription')) {
+          throw new TRPCError({ code: 'NOT_FOUND', message });
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+    }),
+
+  adminExtendSubscriptionPeriod: adminProcedure
+    .input(
+      z.object({
+        subscriptionId: SubscriptionIdSchema,
+        days: z.number().int().min(1).max(90),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await extendCodingPlanSubscriptionPeriod(
+          input.subscriptionId,
+          input.days,
+          ctx.user.id
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('No active subscription')) {
+          throw new TRPCError({ code: 'NOT_FOUND', message });
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+    }),
+
+  adminReplaceInventoryCredential: adminProcedure
+    .input(
+      z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        await replaceInventoryCredential(input.inventoryKeyId, input.apiKey);
+      } catch (error) {
+        if (error instanceof CodingPlanInventoryReplacementError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Unable to replace the inventory credential.',
+        });
       }
     }),
 

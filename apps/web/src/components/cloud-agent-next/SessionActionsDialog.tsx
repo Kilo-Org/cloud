@@ -49,7 +49,7 @@ export function SessionActionsDialog({
         session_id: kiloSessionId,
       });
 
-      const url = new URL(`/s/${result.public_id}`, window.location.origin).toString();
+      const url = new URL(`/s/${result.share_token}`, window.location.origin).toString();
       setShareUrl(url);
       toast.success('Session shared successfully');
     } catch (error) {
@@ -127,7 +127,7 @@ export function SessionActionsDialog({
 
             {shareUrl ? (
               <div className="space-y-2">
-                <div className="overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
+                <div className="ph-no-capture overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
                   <a
                     href={shareUrl}
                     target="_blank"

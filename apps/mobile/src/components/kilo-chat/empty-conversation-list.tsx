@@ -1,4 +1,4 @@
-import { MessageSquarePlus } from 'lucide-react-native';
+import { MessageSquarePlus } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';

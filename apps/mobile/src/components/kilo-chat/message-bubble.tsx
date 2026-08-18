@@ -1,5 +1,5 @@
 import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
-import { Reply } from 'lucide-react-native';
+import { Reply } from '@/components/ui/icons';
 import { memo } from 'react';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';

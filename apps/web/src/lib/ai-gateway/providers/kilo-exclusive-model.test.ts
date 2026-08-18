@@ -93,10 +93,24 @@ describe('convertFromKiloExclusiveModel', () => {
   it('only exposes the cheapest pricing tier in model metadata', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
-      pricing: [
-        { start_context_length: 0, pricing: pricing(1) },
-        { start_context_length: 100, pricing: pricing(2) },
-      ],
+      pricing: {
+        tiers: [
+          { start_context_length: 0, pricing: pricing(1) },
+          { start_context_length: 100, pricing: pricing(2) },
+        ],
+      },
+    });
+
+    expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');
+  });
+
+  it('exposes fallback-only pricing in model metadata', () => {
+    const model = makeModel({
+      internal_id: 'vendor/x',
+      pricing: {
+        fallbackOnly: true,
+        tiers: [{ start_context_length: 0, pricing: pricing(1) }],
+      },
     });
 
     expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');

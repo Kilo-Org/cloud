@@ -17,7 +17,7 @@ import {
   ShieldAlert,
   Sparkles,
   Wallet,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -48,6 +48,7 @@ import {
   registerForPushNotifications,
 } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
 const deviceTokenQueryKey = ['devicePushToken'] as const;
@@ -162,12 +163,15 @@ function CategoryRow({
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   const isDisabled = disabled || !editable;
   return (
-    <View
-      className={`min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${isDisabled ? 'opacity-40' : ''}`}
-    >
+    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
-        <Text className="text-sm font-medium">{meta.title}</Text>
+        {/* Disabled cue is the muted title, not row opacity: blanket opacity
+            drops every label below the 4.5:1 text minimum. The Switch renders
+            its own disabled appearance. */}
+        <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
+          {meta.title}
+        </Text>
         <Text variant="muted" className="mt-0.5 text-xs">
           {meta.subtitle}
         </Text>
@@ -448,9 +452,7 @@ export function NotificationsScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Push
           </Text>
-          <View
-            className={`flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${masterLeading === 'off' ? 'opacity-50' : ''}`}
-          >
+          <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
             {masterLeading === 'neutral' && <Skeleton className="h-[18px] w-[18px] rounded" />}
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
@@ -490,6 +492,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
+                  accessibilityLabel="Notifications enabled"
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {

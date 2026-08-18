@@ -1,4 +1,4 @@
-import { ChevronRight, type LucideIcon, XCircle } from 'lucide-react-native';
+import { ChevronRight, type LucideIcon, XCircle } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -44,7 +44,7 @@ export function FixedPartRow({
     <View
       className={
         variant === 'dashed'
-          ? 'rounded-xl border-[1.5px] border-dashed border-border'
+          ? 'overflow-hidden rounded-lg border border-dashed border-border'
           : 'overflow-hidden rounded-lg border border-border'
       }
     >

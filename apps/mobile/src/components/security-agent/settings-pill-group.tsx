@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
-import { Check } from 'lucide-react-native';
+import { Check } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -33,7 +34,7 @@ export function PillGroup<T extends string>({
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
         {label}
       </Text>
-      <View className="overflow-hidden rounded-lg bg-secondary">
+      <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
         {options.map((option, index) => {
           const active = value === option.value;
           return (
@@ -49,8 +50,7 @@ export function PillGroup<T extends string>({
                 void Haptics.selectionAsync();
                 onChange(option.value);
               }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active, disabled }}
+              {...radioItemA11y({ label: option.label, checked: active, disabled })}
             >
               <Text
                 className={cn(
@@ -64,7 +64,7 @@ export function PillGroup<T extends string>({
             </Pressable>
           );
         })}
-      </View>
+      </RadioGroup>
     </View>
   );
 }

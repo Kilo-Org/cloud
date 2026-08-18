@@ -16,7 +16,7 @@
 //     error), empty (0 listed files), happy
 
 import { useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { Search } from '@/components/ui/icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 

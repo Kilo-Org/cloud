@@ -5,6 +5,8 @@ import {
   type WrapperCloneTelemetry,
   type WrapperPromptRequest,
   type WrapperPromptPart,
+  type WrapperRestoreTelemetry,
+  type WrapperBootstrapTelemetry,
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
@@ -150,12 +152,7 @@ export type BootstrapProgress = {
   (step: BootstrapProgressStep, message: string): void;
 };
 
-export type WrapperBootstrapResult = {
-  workspaceWasWarm: boolean;
-  restoredFromBackup: boolean;
-  /** Absent when the workspace was warm and no clone ran. */
-  clone?: WrapperCloneTelemetry;
-};
+export type WrapperBootstrapResult = WrapperBootstrapTelemetry;
 
 type GitRunner = (args: string[], opts?: ProcessOptions) => Promise<ExecResult>;
 type ProcessRunner = (
@@ -821,8 +818,9 @@ async function bootstrapEmptyKiloSession(
 
 async function restoreOrBootstrapKiloSession(
   request: WrapperSessionReadyRequest,
-  restore: typeof restoreSession
-): Promise<void> {
+  restore: typeof restoreSession,
+  restorePath: Exclude<WrapperRestoreTelemetry['path'], 'warm'>
+): Promise<WrapperRestoreTelemetry | undefined> {
   if (request.workspace.preferSnapshot) {
     logToFile(
       `bootstrap snapshot restore starting kiloSessionId=${request.kiloSessionId} workspacePath=${request.workspace.workspacePath}`
@@ -832,7 +830,7 @@ async function restoreOrBootstrapKiloSession(
       logToFile(
         `bootstrap snapshot restore ready kiloSessionId=${request.kiloSessionId} downloaded=${result.downloaded} diffsApplied=${result.diffs.applied} diffsSkipped=${result.diffs.skipped} diffsTotal=${result.diffs.total}`
       );
-      return;
+      return { path: restorePath, diffs: result.diffs };
     }
     logToFile(
       `bootstrap snapshot restore failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} subtype=${result.subtype ?? '(none)'}`
@@ -853,6 +851,7 @@ async function restoreOrBootstrapKiloSession(
     logToFile(`bootstrap fresh session using empty import kiloSessionId=${request.kiloSessionId}`);
   }
   await bootstrapEmptyKiloSession(request, restore);
+  return { path: restorePath };
 }
 
 async function reconcileRestoredWorkspace(
@@ -1180,6 +1179,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;
   let cloneTelemetry: WrapperCloneTelemetry | undefined;
+  let restoreTelemetry: WrapperRestoreTelemetry | undefined;
   const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
@@ -1249,7 +1249,20 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         'kilo_session',
         request.workspace.preferSnapshot ? 'Restoring session...' : 'Importing session...'
       );
-      await restoreOrBootstrapKiloSession(request, restore);
+      restoreTelemetry = await restoreOrBootstrapKiloSession(
+        request,
+        restore,
+        restoredFromBackup ? 'backup' : 'cold'
+      );
+      if (restoreTelemetry?.diffs) {
+        const restoreLabel = restoreTelemetry.path === 'backup' ? 'Resume restore' : 'Cold restore';
+        progress?.(
+          'kilo_session',
+          restoreTelemetry.diffs.skipped > 0
+            ? `${restoreLabel} incomplete, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+            : `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+        );
+      }
 
       if (request.materialized.setupCommands?.length) {
         progress?.('setup_commands', 'Running setup commands...');
@@ -1261,14 +1274,19 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     signal.throwIfAborted();
+    if (!workspaceNeedsBootstrap && workspaceWasWarm) {
+      restoreTelemetry = { path: 'warm' };
+      progress?.('kilo_session', 'Warm workspace reused');
+    }
     logToFile(
-      `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap}`
+      `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} restorePath=${restoreTelemetry?.path ?? '(none)'}`
     );
     progress?.('kilo_server', 'Starting Kilo...');
     return {
       workspaceWasWarm,
       restoredFromBackup,
       ...(cloneTelemetry ? { clone: cloneTelemetry } : {}),
+      ...(restoreTelemetry ? { restore: restoreTelemetry } : {}),
     };
   } catch (error) {
     if (error instanceof RestoredWorkspaceReconciliationError) {

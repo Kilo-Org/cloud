@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Bell, Clock, Cpu, FolderGit2, Zap } from 'lucide-react-native';
+import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { Switch, View } from 'react-native';
 

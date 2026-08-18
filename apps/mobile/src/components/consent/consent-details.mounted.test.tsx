@@ -121,6 +121,7 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Kilo Gateway (our backend)');
     expect(titles).toContain('Crash reporting');
     expect(titles).toContain('Product analytics');
+    expect(titles).toContain('Error screenshots and session replay');
     expect(titles).toContain('Install attribution');
   });
 
@@ -165,9 +166,24 @@ describe('ConsentDetails copy', () => {
     expect(footer).toBeDefined();
 
     const texts = collectTextStrings(footer);
-    // Must contain the session-replay callout (still in crash section).
-    expect(texts.some((t: string) => t.includes('session replay'))).toBe(true);
+    // Must state that screen capture is gated on optional sharing.
+    expect(
+      texts.some((t: string) => t.includes('no screen capture unless optional sharing is on'))
+    ).toBe(true);
     // Must NOT contain the analytics callout — it moved to Product analytics.
     expect(texts.some((t: string) => t.includes('No prompt or conversation content'))).toBe(false);
+  });
+
+  it('replay section discloses on-device masking', () => {
+    const renderer = mount();
+    const sections = findAllSectionProps(renderer.root);
+    const replay = sections.find(s => s.title === 'Error screenshots and session replay');
+    expect(replay).toBeDefined();
+
+    const footer = replay?.footer;
+    expect(footer).toBeDefined();
+
+    const texts = collectTextStrings(footer);
+    expect(texts.some((t: string) => t.includes('masked on your device'))).toBe(true);
   });
 });

@@ -62,5 +62,7 @@ export type SessionCreateRequest = {
     kilocodeOrganizationId?: string;
     createdOnPlatform?: string;
     shallow?: boolean;
+    /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
+    operationKey?: string;
   };
 };

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Lock } from 'lucide-react-native';
+import { Lock } from '@/components/ui/icons';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';

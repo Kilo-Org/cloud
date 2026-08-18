@@ -1,4 +1,4 @@
-import { type LucideIcon } from 'lucide-react-native';
+import { type LucideIcon } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -51,6 +51,7 @@ export function ActionButton({
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       className={cn(
         'flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 active:opacity-70',

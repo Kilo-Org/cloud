@@ -11,25 +11,27 @@ export const gpt_5_6_sol_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  pricing: [
-    {
-      start_context_length: 0,
-      pricing: {
-        prompt_per_million: 4,
-        completion_per_million: 24,
-        input_cache_read_per_million: 0.4,
-        input_cache_write_per_million: 5,
+  pricing: {
+    tiers: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 4,
+          completion_per_million: 24,
+          input_cache_read_per_million: 0.4,
+          input_cache_write_per_million: 5,
+        },
       },
-    },
-    {
-      start_context_length: 272_000,
-      pricing: {
-        prompt_per_million: 8,
-        completion_per_million: 36,
-        input_cache_read_per_million: 0.8,
-        input_cache_write_per_million: 10,
+      {
+        start_context_length: 272_000,
+        pricing: {
+          prompt_per_million: 8,
+          completion_per_million: 36,
+          input_cache_read_per_million: 0.8,
+          input_cache_write_per_million: 10,
+        },
       },
-    },
-  ],
+    ],
+  },
   inference_provider_restriction: [],
 };

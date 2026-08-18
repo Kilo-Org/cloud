@@ -226,6 +226,15 @@ describe('deliberately unmapped paths', () => {
   });
 });
 
+describe('commerce paths are not universal links', () => {
+  it.each(['/kilo-pass', '/credits', '/subscriptions/kilo-pass'])(
+    'webPathToAppPath(%s) → null',
+    path => {
+      expect(webPathToAppPath(path)).toBeNull();
+    }
+  );
+});
+
 describe('foreign / garbage input', () => {
   const garbage = [
     'https://kilo.ai/profile',

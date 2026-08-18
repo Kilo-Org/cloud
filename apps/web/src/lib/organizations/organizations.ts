@@ -21,6 +21,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organizations,
+  external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
@@ -404,9 +405,10 @@ export async function addSsoUserToOrganization(
 export async function removeUserFromOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
-  removedBy?: User['id']
+  removedBy?: User['id'],
+  txn?: DrizzleTransaction
 ): Promise<{ rowCount: number | null }> {
-  const result = await db.transaction(async tx => {
+  const run = async (tx: DrizzleTransaction) => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
     await bumpOrganizationGroupPolicyRevision(tx, organizationId, removedBy ?? userId);
     // Look up the user's current role before deleting
@@ -466,9 +468,13 @@ export async function removeUserFromOrganization(
     }
 
     return result;
-  });
+  };
 
-  if ((result.rowCount ?? 0) > 0) {
+  const result = txn ? await run(txn) : await db.transaction(run);
+
+  // Session access invalidation is a best-effort network call and must not run
+  // inside a caller-provided transaction; the caller handles it after commit.
+  if (!txn && (result.rowCount ?? 0) > 0) {
     await invalidateRemovedMemberSessionAccess(organizationId, userId);
   }
 
@@ -512,9 +518,12 @@ async function invalidateRemovedMemberSessionAccess(
 export async function updateUserRoleInOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
-  role: OrganizationRole
+  role: OrganizationRole,
+  txn?: DrizzleTransaction
 ): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> {
-  return await db.transaction(async tx => {
+  const run = async (
+    tx: DrizzleTransaction
+  ): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> => {
     // First, try to update existing membership
     const membershipUpdateResult = await tx
       .update(organization_memberships)
@@ -527,7 +536,7 @@ export async function updateUserRoleInOrganization(
       );
 
     if (membershipUpdateResult.rowCount && membershipUpdateResult.rowCount > 0) {
-      return successResult({ updated: 'membership' });
+      return successResult({ updated: 'membership' as const });
     }
 
     // If no membership was updated, check for pending invitations
@@ -554,20 +563,23 @@ export async function updateUserRoleInOrganization(
       );
 
     if (invitationUpdateResult.rowCount && invitationUpdateResult.rowCount > 0) {
-      return successResult({ updated: 'invitation' });
+      return successResult({ updated: 'invitation' as const });
     }
 
     return { success: false, updated: 'none' };
-  });
+  };
+
+  return txn ? run(txn) : db.transaction(run);
 }
 
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
   email: string,
-  role: OrganizationRole
+  role: OrganizationRole,
+  txn?: DrizzleTransaction
 ): Promise<OrganizationInvitation> {
-  return db.transaction(async tx => {
+  const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const [organization] = await tx
       .select({ parentOrganizationId: organizations.parent_organization_id })
       .from(organizations)
@@ -646,7 +658,9 @@ export async function inviteUserToOrganization(
       .returning();
 
     return invitation;
-  });
+  };
+
+  return txn ? run(txn) : db.transaction(run);
 }
 
 export async function getOrganizationMembers(
@@ -696,8 +710,13 @@ export async function getOrganizationMembers(
         role: organization_invitations.role,
         inviteDate: organization_invitations.created_at,
         token: organization_invitations.token,
+        emailStatus: external_side_effect_outbox.status,
       })
       .from(organization_invitations)
+      .leftJoin(
+        external_side_effect_outbox,
+        eq(external_side_effect_outbox.invitation_id, organization_invitations.id)
+      )
       .where(
         and(
           eq(organization_invitations.organization_id, organizationId),
@@ -731,6 +750,7 @@ export async function getOrganizationMembers(
       inviteToken: invitation.token,
       inviteId: invitation.id,
       inviteUrl: getAcceptInviteUrl(invitation.token),
+      emailStatus: invitation.emailStatus,
       dailyUsageLimitUsd: null, // Invited members don't have limits yet
       currentDailyUsageUsd: null, // Invited members don't have usage yet
     })),

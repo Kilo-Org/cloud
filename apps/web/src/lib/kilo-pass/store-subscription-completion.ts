@@ -4,10 +4,20 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
+  type OperationLedgerRow,
   type User,
 } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 
+import { PURCHASE_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
+import {
+  admitOperation,
+  markReconcilePending,
+  settleOperation,
+  type OutboxEventInput,
+} from '@kilocode/db/operation-ledger';
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { toMicrodollars } from '@/lib/utils';
@@ -436,12 +446,110 @@ async function applyStoreUpgradeCreditAdjustments(
   }
 }
 
+// ----- purchase ledger (P1-A-08d) -------------------------------------------
+
+const PURCHASE_LEDGER_DOMAIN = 'purchase' as const;
+const PURCHASE_LEDGER_INTENT = 'complete_store_purchase' as const;
+const PURCHASE_LEDGER_LEASE_SECONDS = 120;
+const OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
+const OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
+
+/** Provider/user mismatch messages that settle `failed` and never retry. */
+const STORE_PURCHASE_MISMATCH_MESSAGES = [
+  'Store transaction already belongs to another user',
+  'Store subscription already belongs to another user',
+  'You already have an active Kilo Pass subscription',
+] as const;
+
+export function isStorePurchaseMismatchMessage(message: string): boolean {
+  return (STORE_PURCHASE_MISMATCH_MESSAGES as readonly string[]).includes(message);
+}
+
+export function isStorePurchaseMismatchError(error: unknown): boolean {
+  return error instanceof Error && isStorePurchaseMismatchMessage(error.message);
+}
+
+/** `purchase_settled` outbox payload (DEC-05): no free text, no resource keys. */
+function purchaseSettledOutboxEvent(params: {
+  distinctId: string;
+  outcome: 'completed' | 'failed';
+  startedAt: number;
+}): OutboxEventInput {
+  return {
+    eventName: PURCHASE_SETTLED_EVENT,
+    distinctId: params.distinctId,
+    properties: {
+      source: 'server',
+      surface: 'purchase',
+      phase: 'terminal',
+      outcome: params.outcome,
+      intent: PURCHASE_LEDGER_INTENT,
+      duration_ms: Math.max(0, Date.now() - params.startedAt),
+    },
+  };
+}
+
+/**
+ * Replays a terminal purchase row. `completed`/`no_op` replay the stored
+ * canonical result with `alreadyProcessed: true` (no `purchaseKind`). A
+ * `failed` row surfaces the stored domain mismatch error; it never re-runs and
+ * never returns success.
+ */
+function replaySettledPurchase(row: OperationLedgerRow): CompleteStoreKiloPassPurchaseResult {
+  if (row.status === 'completed' || row.status === 'no_op') {
+    const canonical = row.canonical_result ?? {};
+    return {
+      subscriptionId: canonical.subscriptionId as string,
+      tier: canonical.tier as KiloPassTier,
+      cadence: canonical.cadence as KiloPassCadence,
+      alreadyProcessed: true,
+    };
+  }
+  const stored = row.outcome_code;
+  if (stored && isStorePurchaseMismatchMessage(stored)) {
+    throw new Error(stored);
+  }
+  throw new TRPCError({ code: 'CONFLICT', message: OPERATION_IN_PROGRESS_MESSAGE });
+}
+
 export async function completeStoreKiloPassPurchase(params: {
   dbOrTx?: DrizzleTransaction;
   user: User;
   purchase: ValidatedStoreKiloPassPurchase;
 }): Promise<CompleteStoreKiloPassPurchaseResult> {
   const { user, purchase } = params;
+  const ledgerHandle = params.dbOrTx ?? db;
+  const startedAt = Date.now();
+  const resourceKey = `${purchase.paymentProvider}:${purchase.providerTransactionId}`;
+
+  const admission = await admitOperation(ledgerHandle, {
+    userId: user.id,
+    domain: PURCHASE_LEDGER_DOMAIN,
+    intent: PURCHASE_LEDGER_INTENT,
+    operationKey: purchase.providerTransactionId,
+    resourceKey,
+    taxonomy: 'reconcile-first',
+    leaseSeconds: PURCHASE_LEDGER_LEASE_SECONDS,
+  });
+
+  if (
+    admission.row.intent !== PURCHASE_LEDGER_INTENT ||
+    admission.row.resource_key !== resourceKey
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
+
+  switch (admission.admission) {
+    case 'duplicate_settled':
+      return replaySettledPurchase(admission.row);
+    case 'duplicate_in_flight':
+    case 'duplicate_reconcile_in_progress':
+      throw new TRPCError({ code: 'CONFLICT', message: OPERATION_IN_PROGRESS_MESSAGE });
+    case 'admitted':
+    case 'takeover':
+    case 'duplicate_reconcile_pending':
+      break;
+  }
 
   const run = async (tx: DrizzleTransaction): Promise<CompleteStoreKiloPassPurchaseResult> => {
     await lockUserForStoreCompletion(tx, user.id);
@@ -691,8 +799,45 @@ export async function completeStoreKiloPassPurchase(params: {
     };
   };
 
-  if (params.dbOrTx !== undefined) {
-    return run(params.dbOrTx);
+  const distinctId = user.google_user_email || user.id;
+  let result: CompleteStoreKiloPassPurchaseResult;
+  try {
+    result = params.dbOrTx !== undefined ? await run(params.dbOrTx) : await db.transaction(run);
+  } catch (error) {
+    if (isStorePurchaseMismatchError(error)) {
+      try {
+        await settleOperation(ledgerHandle, {
+          rowId: admission.row.id,
+          status: 'failed',
+          outcomeCode: error instanceof Error ? error.message : 'store_purchase_mismatch',
+          outboxEvent: purchaseSettledOutboxEvent({ distinctId, outcome: 'failed', startedAt }),
+        });
+      } catch (settleError) {
+        console.error('Failed to settle failed purchase operation ledger row', settleError);
+      }
+    } else {
+      try {
+        await markReconcilePending(ledgerHandle, { rowId: admission.row.id });
+      } catch (markError) {
+        console.error('Failed to mark purchase operation ledger row reconcile-pending', markError);
+      }
+    }
+    throw error;
   }
-  return db.transaction(run);
+
+  try {
+    await settleOperation(ledgerHandle, {
+      rowId: admission.row.id,
+      status: 'completed',
+      outcomeCode: 'ok',
+      canonicalResult: result as unknown as Record<string, unknown>,
+      outboxEvent: purchaseSettledOutboxEvent({ distinctId, outcome: 'completed', startedAt }),
+    });
+  } catch (settleError) {
+    captureException(settleError, {
+      tags: { area: 'kilo-pass', operation: 'complete-store-purchase-settle' },
+    });
+  }
+
+  return result;
 }

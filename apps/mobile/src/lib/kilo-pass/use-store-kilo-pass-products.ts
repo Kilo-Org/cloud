@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchProducts as fetchIapProducts, type ProductOrSubscription, useIAP } from 'expo-iap';
 
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
 import { getStoreKiloPassProductsState } from './store-products-state';
@@ -15,52 +15,24 @@ const APP_STORE_CONNECTION_TIMEOUT_MS = 8000;
 const APP_STORE_CONNECTION_TIMEOUT_MESSAGE =
   'Could not connect to the App Store. Check your connection and try again.';
 
-function toStoreKiloPassProduct(product: ProductOrSubscription): StoreKiloPassProduct | null {
-  if (product.type !== 'subs') {
-    return null;
-  }
+export type StoreKiloPassProductsOptions = {
+  /** Whether the App Store connection (from the IAP owner) is established. */
+  connected: boolean;
+  /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
+  fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
+};
 
-  return {
-    id: product.id,
-    displayPrice: product.displayPrice,
-    title: product.title,
-    description: product.description,
-  };
-}
-
-async function fetchAppStoreSubscriptions(productSkus: string[]): Promise<StoreKiloPassProduct[]> {
-  const products = await fetchIapProducts({
-    skus: productSkus,
-    type: 'subs',
-  });
-
-  const storeProducts: StoreKiloPassProduct[] = [];
-  for (const product of products ?? []) {
-    const storeProduct = toStoreKiloPassProduct(product);
-    if (storeProduct) {
-      storeProducts.push(storeProduct);
-    }
-  }
-
-  return storeProducts;
-}
-
-export function useStoreKiloPassProducts() {
+export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { userId } = useCurrentUserId();
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
-
-  const { connected } = useIAP({
-    onError: error => {
-      setStoreErrorMessage(error.message);
-    },
-  });
 
   // Bounded wait for the StoreKit connection — without this, a stuck
   // connection leaves the screen showing loading skeletons forever.
   useEffect(() => {
-    if (Platform.OS !== 'ios' || connected) {
+    if (Platform.OS !== 'ios' || options.connected) {
       return undefined;
     }
     const timer = setTimeout(() => {
@@ -69,13 +41,13 @@ export function useStoreKiloPassProducts() {
     return () => {
       clearTimeout(timer);
     };
-  }, [connected, connectionAttempt]);
+  }, [options.connected, connectionAttempt]);
 
   const productsQuery = useQuery({
-    queryKey: ['kilo-pass', 'app-store-products'],
+    queryKey: ['kilo-pass', 'app-store-products', userId],
     queryFn: async () => {
       const loadedProducts = await loadAppStoreKiloPassProducts({
-        fetchStoreProducts: fetchAppStoreSubscriptions,
+        fetchStoreProducts: options.fetchStoreProducts,
         loadBackendProducts: async () => {
           const backendResponse = await queryClient.fetchQuery(
             trpc.kiloPass.getMobileStoreProducts.queryOptions()
@@ -85,7 +57,7 @@ export function useStoreKiloPassProducts() {
       });
       return loadedProducts;
     },
-    enabled: Platform.OS === 'ios' && connected,
+    enabled: Platform.OS === 'ios' && options.connected && userId != null,
     staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
   });
 
@@ -116,7 +88,7 @@ export function useStoreKiloPassProducts() {
     products: productsState.products,
     isLoading:
       storeErrorMessage === null &&
-      (productsQuery.isLoading || (Platform.OS === 'ios' && !connected)),
+      (productsQuery.isLoading || (Platform.OS === 'ios' && !options.connected)),
     isRefetching: productsQuery.isRefetching,
     isError: productsState.isError,
     errorMessage: productsState.errorMessage,

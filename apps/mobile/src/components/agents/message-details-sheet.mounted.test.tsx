@@ -12,10 +12,24 @@ import { describe, expect, it, vi } from 'vitest';
 import { MessageDetailsSheet } from './message-details-sheet';
 
 vi.mock('react-native', () => ({
+  Alert: { alert: vi.fn() },
   Modal: 'Modal',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
+}));
+vi.mock('@tanstack/react-query', () => ({
+  useMutation: () => ({ mutate: vi.fn() }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    moderation: {
+      reportContent: { mutationOptions: (options: unknown) => options },
+    },
+  }),
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),

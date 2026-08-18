@@ -63,14 +63,19 @@ vi.mock('@/components/agents/file-part-cache', () => ({
 
 const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();
+const sendMessageMutate = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate },
       prepareSession: { mutate: prepareSessionMutate },
+      sendMessage: { mutate: sendMessageMutate },
     },
     organizations: {
-      cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } },
+      cloudAgentNext: {
+        prepareSession: { mutate: prepareSessionMutate },
+        sendMessage: { mutate: sendMessageMutate },
+      },
     },
   },
 }));
@@ -428,5 +433,41 @@ describe('getTicket', () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe('createMobileAgentSessionManager api.send', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('omits autoCommit from the send payload', async () => {
+    sendMessageMutate.mockReset();
+    sendMessageMutate.mockResolvedValue(undefined);
+    const config = setup();
+    await config.api.send({ sessionId: 'c-1', payload: 'hi', messageId: 'm-1' });
+
+    expect(sendMessageMutate).toHaveBeenCalledTimes(1);
+    const payload = sendMessageMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('autoCommit');
+    expect(payload).toMatchObject({
+      cloudAgentSessionId: 'c-1',
+      payload: 'hi',
+      messageId: 'm-1',
+    });
   });
 });

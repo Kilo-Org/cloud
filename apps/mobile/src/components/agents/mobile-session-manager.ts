@@ -17,6 +17,7 @@ import {
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
+import { type AgentMode } from '@/components/agents/mode-normalize';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
@@ -160,8 +161,6 @@ type CreateMobileAgentSessionManagerOptions = {
   organizationId?: string;
 };
 
-type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
-
 const skipBatchOptions = { context: { skipBatch: true } };
 
 export function createMobileAgentSessionManager({
@@ -271,7 +270,6 @@ export function createMobileAgentSessionManager({
           const baseInput = {
             cloudAgentSessionId: input.sessionId as string,
             payload: input.payload,
-            autoCommit: true,
             messageId: input.messageId,
             ...(input.attachments ? { attachments: input.attachments } : {}),
           };

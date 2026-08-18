@@ -1,4 +1,5 @@
 /* eslint-disable import/first -- mocks must be defined before the module under test is imported */
+/* eslint-disable require-await, typescript-eslint/require-await -- the fake outbox mocks settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the suite pins both key families (cloud prepare + remote spawn) through one fake-dispatcher runner. */
 import * as React from 'react';
 import { atom, type createStore } from 'jotai';
@@ -130,15 +131,19 @@ vi.mock('@/components/agents/mobile-session-manager', () => ({
     return record.data?.code === 'CONFLICT' && record.message === 'creation_in_progress';
   },
 }));
-vi.mock('@/components/agents/mode-options', () => ({
-  normalizeAgentMode: (mode: string | null | undefined) =>
-    mode === 'code' ||
-    mode === 'plan' ||
-    mode === 'debug' ||
-    mode === 'orchestrator' ||
-    mode === 'ask'
-      ? mode
-      : 'code',
+vi.mock('@/components/agents/mode-normalize', () => ({
+  normalizeAgentMode: (mode: string | null | undefined) => {
+    if (mode === 'build') {
+      return 'code';
+    }
+    if (mode === 'architect') {
+      return 'plan';
+    }
+    if (!mode) {
+      return 'code';
+    }
+    return mode;
+  },
 }));
 vi.mock('@/components/agents/new-session-prefill', () => ({
   appendNewSessionPrefill: (base: string) => base,
@@ -171,6 +176,20 @@ vi.mock('expo-crypto', () => {
     },
   };
 });
+
+// P1-E-40c: the continue path persists a safe-retry row and reuses a stored
+// key on relaunch; the outbox is mocked so the fake dispatcher never runs its
+// `useEffect` load.
+const outboxMock = vi.hoisted(() => ({
+  getStoredOperationKey: vi.fn(),
+  writeSafeRetry: vi.fn(),
+  remove: vi.fn(),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
 
 // The pure input builder must be imported BEFORE the module under test: the
 // mocked `use-remote-instance-spawn` factory reads this binding when
@@ -360,6 +379,7 @@ describe('useContinueSession cloud operationKey', () => {
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
       prompt: 'seed-text',
       githubRepo: 'owner/repo',
+      autoCommit: false,
       autoInitiate: true,
       operationKey: expect.any(String),
     });
@@ -554,5 +574,105 @@ describe('useContinueSession key separation', () => {
     expect(cloudKey).toBeDefined();
     expect(remoteKey).toBeDefined();
     expect(remoteKey).not.toBe(cloudKey);
+  });
+});
+
+describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
+  beforeEach(() => {
+    prepareSessionMutate.mockReset();
+    remoteSpawnMock.mockReset();
+    routerPush.mockClear();
+    queryClientFetchQuery.mockReset();
+    toastError.mockClear();
+    invalidateAgentSessionQueriesMock.mockReset();
+    hapticsMock.calls = 0;
+    hapticsMock.rejectWith = undefined;
+    destinationsRef.value = [CLOUD_DESTINATION];
+    outboxMock.getStoredOperationKey.mockReturnValue(null);
+    outboxMock.writeSafeRetry.mockReset();
+    outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+    outboxMock.remove.mockReset();
+    outboxMock.remove.mockResolvedValue(undefined);
+    outboxMock.whenLoaded.mockReset();
+    outboxMock.whenLoaded.mockResolvedValue(true);
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    queryClientFetchQuery.mockImplementation((options: { queryKey?: string[] }) => {
+      if (options.queryKey?.[0] === 'instances') {
+        return Promise.resolve({ instances: [] });
+      }
+      return Promise.resolve({ repositories: [] });
+    });
+  });
+
+  it('writes a safe-retry row before mutate and removes it on success', async () => {
+    prepareSessionMutate.mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
+    const hook = runContinueSession({ organizationId: 'org-1' });
+
+    await hook.continueSession(FIELDS);
+
+    expect(outboxMock.writeSafeRetry).toHaveBeenCalledTimes(1);
+    expect(outboxMock.writeSafeRetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: expect.any(String),
+        fingerprint: expect.any(String),
+      })
+    );
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+    // The row is written before the mutate fires.
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      prepareSessionMutate.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('reuses a stored operationKey instead of minting a new UUID', async () => {
+    outboxMock.getStoredOperationKey.mockReturnValue('stored-op-key');
+    prepareSessionMutate.mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
+    const hook = runContinueSession({ organizationId: 'org-1' });
+
+    await hook.continueSession(FIELDS);
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      operationKey: 'stored-op-key',
+    });
+  });
+
+  it('awaits the outbox load before reading the stored key (no key-reuse race)', async () => {
+    const order: string[] = [];
+    outboxMock.whenLoaded.mockImplementation(async () => {
+      order.push('whenLoaded');
+      await Promise.resolve();
+      return true;
+    });
+    outboxMock.getStoredOperationKey.mockImplementation(() => {
+      order.push('getStoredOperationKey');
+      return 'stored-op-key';
+    });
+    prepareSessionMutate.mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
+    const hook = runContinueSession({ organizationId: 'org-1' });
+
+    await hook.continueSession(FIELDS);
+
+    expect(order).toEqual(['whenLoaded', 'getStoredOperationKey']);
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      operationKey: 'stored-op-key',
+    });
+  });
+
+  it('keeps the row on a retryable failure so a relaunch reuses the key', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(creationInProgressError());
+    const hook = runContinueSession({ organizationId: 'org-1' });
+
+    await hook.continueSession(FIELDS);
+
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes the row on a terminal failure', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(badRequestError());
+    const hook = runContinueSession({ organizationId: 'org-1' });
+
+    await hook.continueSession(FIELDS);
+
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
   });
 });

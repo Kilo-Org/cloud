@@ -19,7 +19,8 @@
     "./user-data-export-file": "./src/user-data-export-file.ts",
     "./user-soft-delete": "./src/user-soft-delete.ts",
     "./operation-ledger": "./src/operation-ledger.ts",
-    "./analytics-outbox": "./src/analytics-outbox.ts"
+    "./analytics-outbox": "./src/analytics-outbox.ts",
+    "./external-side-effect-outbox": "./src/external-side-effect-outbox.ts"
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",

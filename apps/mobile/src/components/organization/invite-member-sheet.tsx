@@ -1,10 +1,10 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { ROLE_LABEL } from '@/components/organization/member-row';
+import { INVITE_SUCCESS_MESSAGE } from '@/components/organization/invited-member-row-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -13,6 +13,7 @@ import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
@@ -56,7 +57,7 @@ export function InviteMemberSheet() {
           captureEvent(ORGANIZATION_MEMBER_INVITED_EVENT, {
             role: isBillingManager ? 'member' : role,
           });
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          announcingToast.success(INVITE_SUCCESS_MESSAGE);
           router.back();
         },
       }

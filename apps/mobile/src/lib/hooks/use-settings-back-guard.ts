@@ -17,14 +17,23 @@ const BUTTON_LABEL = {
  * own, so these screens shouldn't stay reachable while disabled — only the
  * overview screen (`getSecurityAgentPath(scope, 'settings')`) can turn
  * enablement back on.
+ *
+ * The repositories screen is the one exception: a disabled agent with
+ * integration repos but no effective selection must stay reachable so the
+ * user can pick repos and then enable. Pass `skipRedirect` to opt that screen
+ * out of the bounce.
  */
-export function useSecurityAgentSettingsRedirect(scope: string, isEnabled: boolean | undefined) {
+export function useSecurityAgentSettingsRedirect(
+  scope: string,
+  isEnabled: boolean | undefined,
+  skipRedirect = false
+) {
   const router = useRouter();
   useEffect(() => {
-    if (isEnabled === false) {
+    if (isEnabled === false && !skipRedirect) {
       router.replace(getSecurityAgentPath(scope, 'settings'));
     }
-  }, [isEnabled, router, scope]);
+  }, [isEnabled, router, scope, skipRedirect]);
 }
 
 /**

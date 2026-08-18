@@ -114,7 +114,12 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
 
   const view = selectPrReviewGateView({
     isError: authorization.isError,
-    isLoading: authorization.isLoading,
+    // `isPending` (no data yet) rather than `isLoading` (isPending &&
+    // isFetching): a paused query (offline/unknown connectivity, empty cache)
+    // is pending but not fetching, so isLoading is false and the gate would
+    // otherwise fall through to Connect on a cold launch before NetInfo
+    // settles.
+    isLoading: authorization.isPending,
     connected: authorization.data?.connected === true,
     revoked: authorization.data?.revoked === true,
   });

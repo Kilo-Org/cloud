@@ -4531,6 +4531,9 @@ export const agent_configs = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+
+    // Optimistic concurrency revision for compare-and-set config saves.
+    config_revision: integer().notNull().default(1),
   },
   table => [
     // Unique constraints for org and user ownership
@@ -4561,6 +4564,7 @@ export const agent_configs = pgTable(
       'agent_configs_agent_type_check',
       sql`${table.agent_type} IN ('code_review', 'auto_triage', 'auto_fix', 'security_scan')`
     ),
+    check('agent_configs_config_revision_check', sql`${table.config_revision} >= 1`),
   ]
 );
 
@@ -6358,6 +6362,7 @@ export const security_analysis_queue = pgTable(
     }),
     queue_status: text().notNull(),
     severity_rank: smallint().notNull(),
+    admitted_config_revision: integer(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_by_job_id: text(),
@@ -10481,6 +10486,56 @@ export const analytics_event_outbox = pgTable(
 export type AnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferSelect;
 export type NewAnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferInsert;
 
+/**
+ * Durable outbox for live side effects that must be written atomically with
+ * the primary write (P2-B-11). The only operation today is the organization
+ * invite email, which the invite mutation enqueues instead of sending inline.
+ * The cron drainer claims due `pending` rows, sends the mail, and marks
+ * `delivered`; on error it backs off and retries, failing a row after 8
+ * attempts. `sending` claims older than 5 minutes are reclaimed. A unique
+ * `invitation_id` prevents a retry from enqueueing the same invite twice.
+ */
+export type ExternalSideEffectOutboxPayload = {
+  invitationId: string;
+  to: string;
+  organizationName: string;
+  inviterName: string;
+  acceptInviteUrl: string;
+};
+
+export const external_side_effect_outbox = pgTable(
+  'external_side_effect_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    operation: text().$type<'send_org_invite_email'>().notNull().default('send_org_invite_email'),
+    invitation_id: uuid().notNull(),
+    payload: jsonb().$type<ExternalSideEffectOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_external_side_effect_outbox_invitation_id').on(table.invitation_id),
+    index('IDX_external_side_effect_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+  ]
+);
+
+export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
+export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
+
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 
 // Immutable metered-infrastructure debit ledger, partitioned monthly on the
@@ -10525,3 +10580,108 @@ export const compute_usage_charge = pgTable(
 
 export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
 export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
+
+// Content moderation reports. `context_json` holds only minimized metadata
+// (surface, ids, model id, platform) — never a message or comment body.
+export const content_moderation_reports = pgTable(
+  'content_moderation_reports',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text().notNull(),
+    surface: text().notNull(),
+    target_kind: text().notNull(),
+    target_id: text().notNull(),
+    model_id: text(),
+    session_id: text(),
+    reason: text().notNull(),
+    context_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    receipt_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .notNull()
+      .unique(),
+    triage_status: text().notNull().default('received'),
+    appeal_status: text().notNull().default('none'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_content_moderation_reports_user_created').on(table.kilo_user_id, table.created_at),
+    index('IDX_content_moderation_reports_target').on(table.target_kind, table.target_id),
+  ]
+);
+
+export type ContentModerationReport = typeof content_moderation_reports.$inferSelect;
+export type NewContentModerationReport = typeof content_moderation_reports.$inferInsert;
+
+export const user_moderation_blocks = pgTable(
+  'user_moderation_blocks',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    blocker_user_id: text().notNull(),
+    blocked_github_login: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_moderation_blocks_blocker_login').on(
+      table.blocker_user_id,
+      table.blocked_github_login
+    ),
+  ]
+);
+
+export type UserModerationBlock = typeof user_moderation_blocks.$inferSelect;
+export type NewUserModerationBlock = typeof user_moderation_blocks.$inferInsert;
+
+export const user_moderation_mutes = pgTable(
+  'user_moderation_mutes',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    blocker_user_id: text().notNull(),
+    muted_github_login: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_moderation_mutes_blocker_login').on(
+      table.blocker_user_id,
+      table.muted_github_login
+    ),
+  ]
+);
+
+export type UserModerationMute = typeof user_moderation_mutes.$inferSelect;
+export type NewUserModerationMute = typeof user_moderation_mutes.$inferInsert;
+
+export const user_terms_acceptances = pgTable(
+  'user_terms_acceptances',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text().notNull(),
+    terms_version: text().notNull(),
+    age_posture: text().notNull().default('13_plus'),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_terms_acceptances_user_version').on(
+      table.kilo_user_id,
+      table.terms_version
+    ),
+  ]
+);
+
+export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
+export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;

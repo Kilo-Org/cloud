@@ -15,10 +15,9 @@ import {
   Smartphone,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -291,13 +290,6 @@ export function ProfileScreen() {
             }}
           />
         </View>
-
-        {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}
-        {Platform.OS === 'ios' && isAuthenticated && !organizationId ? (
-          <View className="mt-6">
-            <RestorePurchasesButton />
-          </View>
-        ) : null}
 
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">

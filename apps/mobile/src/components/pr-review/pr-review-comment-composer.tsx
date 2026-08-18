@@ -14,19 +14,23 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import {
+  ComposerInlineError,
+  useComposerInlineError,
+} from '@/components/pr-review/composer-inline-error';
+import {
   CommentBodyField,
   ComposerFooter,
   composerRangeLabel,
   ContextPreview,
 } from '@/components/pr-review/pr-review-comment-composer-parts';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import {
+  ensureTermsAcceptedOutcome,
+  TERMS_OUTDATED_COPY,
+} from '@/components/pr-review/discussion/reply-input';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useCreateReviewCommentMutation } from '@/lib/pr-review/use-pr-review-mutations';
 
@@ -78,28 +82,18 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const bodyInputRef = useRef<TextInput | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const [hasBody, setHasBody] = useState(() => initialBody.trim().length > 0);
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
-  // True when `inlineError` is a local empty-body validation error (no
-  // mutation toast owns it), so it must announce through AccessibleStatus;
-  // mutation-classified errors are toast-owned and stay visual-only.
-  const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
+  const {
+    inlineError,
+    inlineErrorKind,
+    inlineErrorIsLocal,
+    setInlineError,
+    setInlineErrorKind,
+    setInlineErrorIsLocal,
+    clearBadRequestOnBodyEdit,
+  } = useComposerInlineError(createComment.error, isEdit);
 
   const isSubmitting = !isEdit && createComment.isPending;
   const lineRangeLabel = composerRangeLabel(line, startLine);
-
-  useEffect(() => {
-    if (isEdit || !createComment.error) {
-      return;
-    }
-    const classification = classifyPrReviewMutationError(createComment.error);
-    const display = mutationErrorDisplay('composer', classification, createComment.error);
-    setInlineError(display.message);
-    setInlineErrorKind(display.kind);
-    setInlineErrorIsLocal(false);
-  }, [createComment.error, isEdit]);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
   // pinned header. Compact kb layout fits at offset 0 — snap back so body +
@@ -114,15 +108,6 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       sub.remove();
     };
   }, []);
-
-  function clearBadRequestOnBodyEdit() {
-    // bad-request clears on body change; forbidden stays for the session.
-    if (inlineErrorKind === 'bad-request') {
-      setInlineError(null);
-      setInlineErrorKind(null);
-      setInlineErrorIsLocal(false);
-    }
-  }
 
   function handleBodyChange(value: string) {
     bodyRef.current = value;
@@ -170,6 +155,16 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setInlineError(null);
     setInlineErrorKind(null);
     setInlineErrorIsLocal(false);
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      setInlineErrorIsLocal(false);
+      return;
+    }
+    if (outcome.kind === 'dismissed') {
+      return;
+    }
     try {
       await createComment.mutateAsync({
         owner,
@@ -302,21 +297,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
               </Button>
             ) : null}
           </View>
-          {inlineError && inlineErrorKind !== 'reconnect' ? (
-            <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
-              {/* Local empty-body validation has no toast owner, so
-                  AccessibleStatus announces it on both platforms.
-                  Mutation-classified errors are toast-owned
-                  (announcingToast), so the inline text stays visual-only
-                  and never double-announces. */}
-              {inlineErrorIsLocal ? (
-                <AccessibleStatus message={inlineError} tone="error" className="text-xs" />
-              ) : (
-                <Text className="text-xs text-destructive">{inlineError}</Text>
-              )}
-            </View>
-          ) : null}
-          {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+          <ComposerInlineError
+            inlineError={inlineError}
+            inlineErrorKind={inlineErrorKind}
+            inlineErrorIsLocal={inlineErrorIsLocal}
+          />
         </View>
 
         <ComposerFooter

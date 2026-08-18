@@ -24,6 +24,7 @@ import {
   PROVISION_FAILED_EVENT,
   PROVISION_REQUESTED_EVENT,
   PROVISION_SUCCEEDED_EVENT,
+  PURCHASE_SETTLED_EVENT,
   QUESTION_ANSWERED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
   SESSION_CREATED_EVENT,
@@ -61,6 +62,7 @@ const ALL_EVENT_CONSTANTS = [
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  PURCHASE_SETTLED_EVENT,
 ];
 
 type ZodDefProbe = {
@@ -171,7 +173,7 @@ describe('phase classification', () => {
       KILO_PASS_PURCHASE_COMPLETED_EVENT,
       APP_STARTUP_EVENT,
     ];
-    expect(terminal).toHaveLength(3);
+    expect(terminal).toHaveLength(4);
     for (const name of TERMINAL_PHASE_EVENTS) {
       expect(ANALYTICS_EVENT_SCHEMAS).toHaveProperty(name);
     }

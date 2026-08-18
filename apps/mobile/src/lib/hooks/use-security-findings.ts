@@ -157,10 +157,11 @@ export function useStartSecurityAnalysis(scope: string) {
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startAnalysis.mutate>[0]) =>
       isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.startAnalysis.mutate(vars)
+        ? trpcClient.securityAgent.startAnalysis.mutate({ ...vars, forceSandbox: true })
         : trpcClient.organizations.securityAgent.startAnalysis.mutate({
             organizationId: scope,
             ...vars,
+            forceSandbox: true,
           }),
     onError: error => {
       toast.error(error.message);

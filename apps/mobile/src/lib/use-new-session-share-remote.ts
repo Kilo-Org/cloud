@@ -29,6 +29,12 @@ type UseNewSessionShareRemoteArgs = {
    * route uses it to arm draft clearing.
    */
   onSpawnAdmitted?: () => void;
+  /**
+   * Invoked when a committed spawn settles without navigating (retryable or
+   * non-retryable); forwarded to `useRemoteSpawnDispatch`. The route uses it
+   * to re-arm the discard confirm after a failed spawn.
+   */
+  onSpawnFailed?: () => void;
 };
 
 /**
@@ -47,6 +53,7 @@ export function useNewSessionShareRemote({
   attachments,
   selection,
   onSpawnAdmitted,
+  onSpawnFailed,
 }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
@@ -73,6 +80,7 @@ export function useNewSessionShareRemote({
     instanceList,
     getSubmitPayload,
     onSpawnAdmitted,
+    onSpawnFailed,
   });
 
   return { remoteSpawn, handleRunOnInstanceChange: remoteSpawn.onChangeRunOnInstance };

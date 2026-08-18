@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   security_findings,
   security_analysis_queue,
@@ -491,14 +491,19 @@ export async function countSecurityFindingsWithAnalysis(
   }
 }
 
-export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwner): Promise<void> {
+export async function setOwnerAutoAnalysisEnabledAtNow(
+  owner: SecurityReviewOwner,
+  /** Run inside the caller's transaction; defaults to the primary db. */
+  tx?: DrizzleTransaction
+): Promise<void> {
   const ownerConverted = toOwner(owner);
   const ownerCondition =
     ownerConverted.type === 'org'
       ? eq(security_analysis_owner_state.owned_by_organization_id, ownerConverted.id)
       : eq(security_analysis_owner_state.owned_by_user_id, ownerConverted.id);
+  const executor = tx ?? db;
 
-  await db
+  await executor
     .insert(security_analysis_owner_state)
     .values({
       owned_by_organization_id: ownerConverted.type === 'org' ? ownerConverted.id : null,
@@ -508,7 +513,7 @@ export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwne
     })
     .onConflictDoNothing();
 
-  await db
+  await executor
     .update(security_analysis_owner_state)
     .set({ auto_analysis_enabled_at: sql`now()`, updated_at: sql`now()` })
     .where(and(ownerCondition, isNull(security_analysis_owner_state.auto_analysis_enabled_at)));
@@ -519,15 +524,20 @@ export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwne
  * Used when auto-analysis is re-enabled (toggled OFF then ON) so the time
  * boundary reflects the latest activation, not the original one.
  */
-export async function resetOwnerAutoAnalysisEnabledAt(owner: SecurityReviewOwner): Promise<void> {
+export async function resetOwnerAutoAnalysisEnabledAt(
+  owner: SecurityReviewOwner,
+  /** Run inside the caller's transaction; defaults to the primary db. */
+  tx?: DrizzleTransaction
+): Promise<void> {
   const ownerConverted = toOwner(owner);
   const ownerCondition =
     ownerConverted.type === 'org'
       ? eq(security_analysis_owner_state.owned_by_organization_id, ownerConverted.id)
       : eq(security_analysis_owner_state.owned_by_user_id, ownerConverted.id);
+  const executor = tx ?? db;
 
   // Upsert: insert if missing, update unconditionally if present
-  await db
+  await executor
     .insert(security_analysis_owner_state)
     .values({
       owned_by_organization_id: ownerConverted.type === 'org' ? ownerConverted.id : null,
@@ -537,7 +547,7 @@ export async function resetOwnerAutoAnalysisEnabledAt(owner: SecurityReviewOwner
     })
     .onConflictDoNothing();
 
-  await db
+  await executor
     .update(security_analysis_owner_state)
     .set({ auto_analysis_enabled_at: sql`now()`, updated_at: sql`now()` })
     .where(ownerCondition);
@@ -582,6 +592,10 @@ export async function tryAcquireAnalysisStartLease(findingId: string): Promise<b
 export async function enqueueBacklogFindings(params: {
   owner: SecurityReviewOwner;
   autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
+  /** Run inside the caller's transaction; defaults to the primary db. */
+  tx?: DrizzleTransaction;
+  /** The config revision that admitted these queue rows. */
+  admittedConfigRevision: number;
 }): Promise<number> {
   const ownerConverted = toOwner(params.owner);
   const maxRank = minSeverityToMaxRank(params.autoAnalysisMinSeverity);
@@ -591,15 +605,18 @@ export async function enqueueBacklogFindings(params: {
       ? sql`${security_findings.owned_by_organization_id} = ${ownerConverted.id}`
       : sql`${security_findings.owned_by_user_id} = ${ownerConverted.id}`;
 
+  const executor = params.tx ?? db;
+
   // Use a single INSERT ... SELECT to bulk-enqueue eligible findings.
   // severity_rank maps null severity to low (3).
-  const result = await db.execute<{ id: string }>(sql`
+  const result = await executor.execute<{ id: string }>(sql`
     INSERT INTO ${security_analysis_queue} (
       finding_id,
       owned_by_organization_id,
       owned_by_user_id,
       queue_status,
       severity_rank,
+      admitted_config_revision,
       queued_at,
       updated_at
     )
@@ -615,6 +632,7 @@ export async function enqueueBacklogFindings(params: {
         WHEN 'low' THEN 3
         ELSE 3
       END,
+      ${params.admittedConfigRevision},
       now(),
       now()
     FROM ${security_findings}

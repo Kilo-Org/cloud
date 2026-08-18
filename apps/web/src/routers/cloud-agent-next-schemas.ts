@@ -328,22 +328,8 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
  */
 export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('prompt'),
-    prompt: z.string(),
-    mode: agentModeSendMessageSchema,
-    model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
-  }),
-  z.object({
-    type: z.literal('command'),
-    command: z.string().min(1),
-    arguments: z.string().default(''),
-  }),
+  sendMessageNextPayloadSchema.options[0].extend({ prompt: z.string() }),
+  sendMessageNextPayloadSchema.options[1],
 ]);
 
 // Schema for preparing a session

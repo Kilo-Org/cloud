@@ -156,32 +156,13 @@ export const PromptSendPayload = z.object({
  * present; the empty-prompt refine runs on the input, not on this field.
  * Used only by `SendMessageV2FlatInput`.
  */
-export const FollowUpPromptPayload = z.object({
-  prompt: z.string(),
-  mode: ModeSlugSchema,
-  model: modelIdSchema,
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
-});
+export const FollowUpPromptPayload = PromptPayload.extend({ prompt: z.string() });
 
 /**
  * Send-only discriminated prompt payload clone. Allows an empty prompt when
  * attachments are present. Used only by `SendMessageV2PromptPayloadInput`.
  */
-export const FollowUpPromptSendPayload = z.object({
-  type: z.literal('prompt'),
-  prompt: z.string(),
-  mode: ModeSlugSchema,
-  model: modelIdSchema,
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
-});
+export const FollowUpPromptSendPayload = PromptSendPayload.extend({ prompt: z.string() });
 
 export const CommandSendPayload = z.object({
   type: z.literal('command'),

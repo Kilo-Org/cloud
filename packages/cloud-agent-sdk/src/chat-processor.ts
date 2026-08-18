@@ -34,6 +34,17 @@ type ChatProcessorOptions = {
   onToolAttachment?:
     | ((partId: string, attachment: { mime: string; filename?: string; dataUrl: string }) => void)
     | undefined;
+  /**
+   * Optional sink for top-level file part URLs, called just before the chat
+   * processor strips a file part's `url` and `source.text` for storage.
+   * Receives the raw URL exactly once per processor pass; consumers use it to
+   * preview the file later (e.g. mobile). Web never passes it, so web
+   * behaviour is unchanged. Sink failures are caught and must not interrupt
+   * processing.
+   */
+  onFilePart?:
+    | ((partId: string, file: { mime: string; filename?: string; url: string }) => void)
+    | undefined;
 };
 
 function hasTextField(part: { text?: string } | unknown): part is { text: string } {
@@ -70,6 +81,23 @@ function emitToolAttachmentsBeforeStrip(
   }
 }
 
+function emitFilePartBeforeStrip(
+  part: Part,
+  onFilePart: NonNullable<ChatProcessorOptions['onFilePart']>
+): void {
+  if (part.type !== 'file') return;
+  if (part.url === '') return;
+  try {
+    onFilePart(part.id, {
+      mime: part.mime,
+      ...(part.filename ? { filename: part.filename } : {}),
+      url: part.url,
+    });
+  } catch {
+    // Sink failures must not break chat processing.
+  }
+}
+
 function createChatProcessor(
   sessionStorage: SessionStorage,
   options?: ChatProcessorOptions
@@ -83,6 +111,9 @@ function createChatProcessor(
         case 'message.part.updated': {
           if (options?.onToolAttachment) {
             emitToolAttachmentsBeforeStrip(event.part, options.onToolAttachment);
+          }
+          if (options?.onFilePart) {
+            emitFilePartBeforeStrip(event.part, options.onFilePart);
           }
           const stripped = stripPartContentIfFile(event.part);
           if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {

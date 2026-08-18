@@ -3,9 +3,11 @@
  *
  * This module must stay free of Lucide and React Native imports so the
  * send-path callers and the Node-based unit tests can import it without
- * pulling in the React Native tree. `mode-options.ts` (Lucide-only) re-exports
- * `normalizeAgentMode` and `ModeOption` from here.
+ * pulling in the React Native tree. `mode-options.ts` (Lucide-only) imports
+ * from here for its own use.
  */
+
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 /** The built-in agent mode slugs. */
 export type BuiltinAgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
@@ -170,14 +172,10 @@ export function resolvePinnedAgentModel(input: {
  * Build a `SessionModelOption`-compatible option for a pinned model so the
  * model chip can show the locked model id even when it is not in the catalog.
  */
-export function lockedModelOption(pinned: { model?: string; variant?: string }): {
-  id: string;
-  name: string;
-  displayId: string;
-  variants: string[];
-  isPreferred: false;
-  showGatewayMetadata: true;
-} {
+export function lockedModelOption(pinned: {
+  model?: string;
+  variant?: string;
+}): SessionModelOption {
   const model = pinned.model ?? '';
   return {
     id: model,

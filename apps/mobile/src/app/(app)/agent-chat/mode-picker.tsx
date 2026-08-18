@@ -4,11 +4,12 @@ import { Check } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 
-import { getModeIcon, MODE_OPTIONS, type ModeOption } from '@/components/agents/mode-options';
+import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import {
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
+  type ModeOption,
 } from '@/components/agents/mode-normalize';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';

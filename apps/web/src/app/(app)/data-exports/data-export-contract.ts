@@ -12,6 +12,23 @@
  * sign-in code uses: those are spent in one sitting, this one is not.
  */
 export const DOWNLOAD_CODE_LENGTH = 8;
+const DOWNLOAD_CODE_REUSE_MARGIN_MS = 30_000;
+
+export type DownloadCodeChallenge = {
+  exportId: string;
+  challengeId: string;
+  expiresAt: number;
+};
+
+export function canReuseDownloadCodeChallenge(
+  challenge: DownloadCodeChallenge | null,
+  exportId: string,
+  now = Date.now()
+): challenge is DownloadCodeChallenge {
+  return (
+    challenge?.exportId === exportId && challenge.expiresAt > now + DOWNLOAD_CODE_REUSE_MARGIN_MS
+  );
+}
 
 export const USER_EXPORT_STATUSES = [
   'queued',

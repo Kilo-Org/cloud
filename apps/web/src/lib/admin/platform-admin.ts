@@ -2,12 +2,17 @@ import 'server-only';
 
 import { hosted_domain_specials } from '@/lib/auth/constants';
 
+export const platformAdminDomains = [
+  hosted_domain_specials.kilocode_admin,
+  'anaconda.com',
+] as const;
+
 /**
- * Exact eligibility rule for the Kilo production platform-admin domain.
+ * Exact eligibility rule for Kilo production platform-admin domains.
  *
  * This intentionally preserves current case-sensitive behavior: the hosted
- * domain must equal `kilocode.ai` exactly and the email must end with
- * `@kilocode.ai` exactly. It does not broaden matching to uppercase
+ * domain must equal an allowed corporate domain exactly and the email must
+ * end with that same domain exactly. It does not broaden matching to uppercase
  * variants, subdomains, or registrable parent domains.
  *
  * Used both to gate the production auto-provisioning rule (historically)
@@ -17,9 +22,8 @@ import { hosted_domain_specials } from '@/lib/auth/constants';
  * against freshly loaded rows.
  */
 export function isEligibleForPlatformAdmin(email: string, hostedDomain: string | null): boolean {
-  return (
-    hostedDomain === hosted_domain_specials.kilocode_admin &&
-    email.endsWith('@' + hosted_domain_specials.kilocode_admin)
+  return platformAdminDomains.some(
+    domain => hostedDomain === domain && email.endsWith(`@${domain}`)
   );
 }
 

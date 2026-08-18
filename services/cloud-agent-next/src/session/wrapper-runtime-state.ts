@@ -15,6 +15,26 @@ const WRAPPER_LEASE_KEY = 'wrapper_lease';
 const SANDBOX_RECOVERY_STATE_KEY = 'sandbox_recovery_state';
 const CLEANUP_EXHAUSTED_ROLLBACK_FENCE_MS = 100 * 365 * 24 * 60 * 60 * 1_000;
 export const WRAPPER_STOP_MAX_ATTEMPTS = 5;
+/**
+ * How long an exhausted cleanup waits before re-observing the sandbox once.
+ * Exhaustion usually means the sandbox was too wedged to answer listProcesses;
+ * the container runtime later reaps it (e.g. activity_expired), after which a
+ * single re-observation sees `absent` and the lease can be released instead
+ * of fencing delivery forever. The cadence only bounds background churn from
+ * maintenance alarms — a flush blocked on an exhausted lease forces an
+ * immediate recheck because a user is actively waiting on it.
+ */
+export const WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS = 10 * 60 * 1_000;
+/**
+ * How long after exhaustion background rechecks keep running. Exhaustion used
+ * to end all maintenance deadlines for the lease; rechecks re-arm the alarm, so
+ * they need their own horizon or every exhausted session wakes its DO every ten
+ * minutes for the rest of the session TTL. A wedged container that has not been
+ * reaped within the window is not going to be, and explicit sends still force a
+ * recheck afterwards. Leases exhausted before the window elapsed (including
+ * ones persisted before rechecks existed) get one recheck and then stop.
+ */
+export const WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS = 60 * 60 * 1_000;
 
 const wrapperInstanceLeaseSchema = z.object({
   instanceId: z.string().min(1),
@@ -103,6 +123,7 @@ const wrapperLeaseSchema = z
       attempts: z.number().int().nonnegative(),
       lastError: z.string().optional(),
       exhaustedAt: z.number().int().nonnegative().optional(),
+      nextRecheckAt: z.number().int().nonnegative().optional(),
     }),
     z.object({
       state: z.literal('stopping'),
@@ -167,7 +188,9 @@ export type WrapperLeaseEvent =
   | { type: 'stop_absent'; attemptId: string }
   | { type: 'stop_not_confirmed'; attemptId: string; retryAt: number; error: string }
   | { type: 'stop_attempt_expired'; attemptId: string; retryAt: number }
-  | { type: 'cleanup_exhausted'; attemptId?: string; now: number; error: string };
+  | { type: 'cleanup_exhausted'; attemptId?: string; now: number; error: string }
+  | { type: 'exhausted_recheck_scheduled'; now: number }
+  | { type: 'release_exhausted' };
 
 export const emptyWrapperLease = (): WrapperLease => ({
   state: 'none',
@@ -441,7 +464,14 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
         attempts: state.attempts,
         lastError: event.error,
         exhaustedAt: event.now,
+        nextRecheckAt: event.now + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
       };
+    case 'exhausted_recheck_scheduled':
+      if (!isWrapperCleanupExhausted(state)) return state;
+      return { ...state, nextRecheckAt: event.now + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS };
+    case 'release_exhausted':
+      if (!isWrapperCleanupExhausted(state)) return state;
+      return { state: 'none', nextInstanceGeneration: state.nextInstanceGeneration };
   }
 }
 
@@ -451,8 +481,23 @@ export function isWrapperCleanupExhausted(
   return lease.state === 'stop_needed' && lease.exhaustedAt !== undefined;
 }
 
+/**
+ * When the next background recheck of an exhausted cleanup is due, or undefined
+ * once the recovery window has closed. Single source of truth for both the
+ * maintenance alarm deadline and the supervisor's cadence gate.
+ */
+export function nextExhaustedWrapperRecheckAt(
+  lease: Extract<WrapperLease, { state: 'stop_needed' }> & { exhaustedAt: number }
+): number | undefined {
+  // Leases persisted before rechecks existed have no nextRecheckAt; fall back
+  // to one interval after exhaustion so they still get a recovery observation.
+  const recheckAt = lease.nextRecheckAt ?? lease.exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS;
+  if (recheckAt > lease.exhaustedAt + WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS) return undefined;
+  return recheckAt;
+}
+
 export function nextWrapperCleanupDeadline(lease: WrapperLease): number | undefined {
-  if (isWrapperCleanupExhausted(lease)) return undefined;
+  if (isWrapperCleanupExhausted(lease)) return nextExhaustedWrapperRecheckAt(lease);
   if (lease.state === 'stop_needed') return lease.nextAttemptAt;
   if (lease.state === 'stopping') return lease.attemptDeadlineAt;
   return undefined;

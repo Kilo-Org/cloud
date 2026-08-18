@@ -278,6 +278,13 @@ type SessionManagerConfig = {
     partId: string,
     attachment: { mime: string; filename?: string; dataUrl: string }
   ) => void;
+  /**
+   * Optional sink for top-level file part URLs, called just before the chat
+   * processor strips a file part's `url` and `source.text` for storage.
+   * Receives the raw URL exactly once per processor pass; consumers use it to
+   * preview the file later (e.g. mobile). Web never passes it.
+   */
+  onFilePart?: (partId: string, file: { mime: string; filename?: string; url: string }) => void;
   onRemoteSessionOpened?: (data: { kiloSessionId: KiloSessionId }) => void;
   onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
@@ -460,7 +467,8 @@ function formatError(err: unknown): string {
 // ---------------------------------------------------------------------------
 
 function isMessageStreaming(msg: StoredMessage): boolean {
-  if (msg.info.role === 'assistant' && !msg.info.time.completed && !msg.info.error) return true;
+  if (msg.info.role === 'assistant' && msg.info.error) return false;
+  if (msg.info.role === 'assistant' && !msg.info.time.completed) return true;
   return msg.parts.some(part => {
     if (part.type === 'text') return part.time !== undefined && part.time.end === undefined;
     if (part.type === 'reasoning') return part.time.end === undefined;
@@ -821,6 +829,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
         const chatProcessor = createChatProcessor(storage, {
           onToolAttachment: config.onToolAttachment,
+          onFilePart: config.onFilePart,
         });
         for (const message of snapshot.messages) {
           chatProcessor.process({ type: 'message.updated', info: message.info });
@@ -1097,6 +1106,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const chatProcessor = createChatProcessor(storage, {
       onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
     });
     for (const message of outcome.messages) {
       chatProcessor.process({ type: 'message.updated', info: message.info });
@@ -1274,6 +1284,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       ...(config.websocketBaseUrl ? { websocketBaseUrl: config.websocketBaseUrl } : {}),
       storage: jotaiStorage,
       onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message

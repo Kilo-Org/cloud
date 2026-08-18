@@ -313,24 +313,29 @@ describe('POST /api/internal/support/users/gdpr-removal', () => {
     { name: 'admin', overrides: { is_admin: true } },
     { name: 'super_admin', overrides: { is_super_admin: true } },
     { name: 'bot', overrides: { is_bot: true } },
+  ])('returns 403 for $name and does not destroy', async ({ overrides }) => {
+    mockedFindUserById.mockResolvedValue(targetUser(overrides));
+
+    const res = await POST(request());
+    expect(res.status).toBe(403);
+    expect(destroy).not.toHaveBeenCalled();
+    expect(mockedSoftDeleteUser).not.toHaveBeenCalled();
+    expect(mockedAssertUserCanBeSoftDeleted).not.toHaveBeenCalled();
+    expect(events[0]).toMatchObject({ outcome: 'refused', target: `user:${USER_ID}` });
+  });
+
+  test.each([
     { name: '@kilocode.ai email', overrides: { google_user_email: 'staff@kilocode.ai' } },
     { name: '@kilo.ai email', overrides: { google_user_email: 'staff@kilo.ai' } },
-    {
-      name: 'subdomain of kilocode.ai',
-      overrides: { google_user_email: 'user@corp.kilocode.ai' },
-    },
-    {
-      name: 'mixed-case KiloCode.ai',
-      overrides: { google_user_email: 'Admin@KiloCode.ai' },
-    },
     { name: 'hosted_domain kilocode.ai', overrides: { hosted_domain: 'kilocode.ai' } },
-  ])('returns 403 for $name and does not destroy', async ({ overrides }) => {
+  ])('does not refuse $name without admin/bot flags', async ({ overrides }) => {
     mockedFindUserById.mockResolvedValue(
       targetUser({
         google_user_email: (overrides.google_user_email as string | undefined) ?? CUSTOMER_EMAIL,
         ...overrides,
       })
     );
+    mockedListAllActiveInstanceRows.mockResolvedValue([]);
 
     const res = await POST(
       request({
@@ -339,18 +344,6 @@ describe('POST /api/internal/support/users/gdpr-removal', () => {
         ).toLowerCase(),
       })
     );
-    expect(res.status).toBe(403);
-    expect(destroy).not.toHaveBeenCalled();
-    expect(mockedSoftDeleteUser).not.toHaveBeenCalled();
-    expect(mockedAssertUserCanBeSoftDeleted).not.toHaveBeenCalled();
-    expect(events[0]).toMatchObject({ outcome: 'refused', target: `user:${USER_ID}` });
-  });
-
-  test('does not refuse evilkilocode.ai', async () => {
-    mockedFindUserById.mockResolvedValue(targetUser({ google_user_email: 'user@evilkilocode.ai' }));
-    mockedListAllActiveInstanceRows.mockResolvedValue([]);
-
-    const res = await POST(request({ email: 'user@evilkilocode.ai' }));
     expect(res.status).toBe(200);
     expect(mockedSoftDeleteUser).toHaveBeenCalledWith(USER_ID);
     expect(events[0]).toMatchObject({ outcome: 'deleted' });

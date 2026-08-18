@@ -37,6 +37,7 @@ import {
   sanitizePublicErrorMessage,
 } from '@/lib/auto-fix/github/handle-comment-reply';
 import { handleCreateIssuePR } from '@/lib/auto-fix/github/handle-create-issue-pr';
+import { formatAutoFixErrorMessage } from '@/lib/auto-fix/core/format-error-message';
 import { z } from 'zod';
 
 const callbackStatusEnum = z.enum(['completed', 'failed', 'interrupted']);
@@ -167,6 +168,10 @@ export async function POST(req: NextRequest) {
 
     // Handle failure/interruption
     if (status === 'failed' || status === 'interrupted') {
+      const failureMessage = formatAutoFixErrorMessage(
+        errorMessage || `Auto-fix execution ${status}`
+      );
+
       logExceptInTest('[auto-fix-pr-callback] Auto-fix execution failed', {
         ticketId,
         sessionId,
@@ -179,7 +184,7 @@ export async function POST(req: NextRequest) {
           ticketId,
           sessionId,
           outcome: 'failed',
-          errorMessage: errorMessage || `Auto-fix execution ${status}`,
+          errorMessage: failureMessage,
         });
 
         if (!replyResult.ok) {
@@ -192,7 +197,7 @@ export async function POST(req: NextRequest) {
       } else {
         // Update ticket to failed
         await updateFixTicketStatus(ticketId, 'failed', {
-          errorMessage: errorMessage || `Auto-fix execution ${status}`,
+          errorMessage: failureMessage,
           completedAt: new Date(),
         });
       }
@@ -212,7 +217,7 @@ export async function POST(req: NextRequest) {
               await postIssueComment({
                 repoFullName: ticket.repo_full_name,
                 issueNumber: ticket.issue_number,
-                body: `🤖 **Auto-Fix Update**\n\nI attempted to create a pull request to fix this issue, but encountered an error:\n\n\`\`\`\n${sanitizePublicErrorMessage(errorMessage || 'Unknown error')}\n\`\`\`\n\nThis issue may require manual attention.`,
+                body: `🤖 **Auto-Fix Update**\n\nI attempted to create a pull request to fix this issue, but encountered an error:\n\n\`\`\`\n${sanitizePublicErrorMessage(failureMessage)}\n\`\`\`\n\nThis issue may require manual attention.`,
                 githubToken: tokenData.token,
               });
 

@@ -264,7 +264,7 @@ export function WebhookRequestsContent({
   const { mutate: shareV2Session } = useMutation(
     trpc.cliSessionsV2.shareForWebhookTrigger.mutationOptions({
       onSuccess: data => {
-        const shareUrl = `${window.location.origin}/s/${data.share_id}`;
+        const shareUrl = `${window.location.origin}/s/${data.share_token}`;
         window.open(shareUrl, '_blank');
         toast.success('Session shared successfully');
         setSharingSessionId(null);

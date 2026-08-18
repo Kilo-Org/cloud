@@ -26,6 +26,7 @@ export { createNotFoundHandler } from './not-found-handler.js';
 export type { Owner, MCPServerConfig } from './types.js';
 
 export {
+  AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE,
   CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
   createCloudAgentNextFetchClient,
   isCloudAgentNextBillingErrorBody,

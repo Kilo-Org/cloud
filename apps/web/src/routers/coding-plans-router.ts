@@ -604,6 +604,7 @@ export const codingPlansRouter = createTRPCRouter({
       const subscriptions = await db
         .select({
           ...codingPlanSubscriptionColumns,
+          upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
           userName: kilocode_users.google_user_name,
           userEmail: kilocode_users.google_user_email,
         })
@@ -624,6 +625,8 @@ export const codingPlansRouter = createTRPCRouter({
           userId: subscription.userId,
           userName: subscription.userName,
           userEmail: subscription.userEmail,
+          inventoryKeyId: subscription.keyInventoryId,
+          upstreamPlanId: subscription.upstreamPlanId,
         })),
         pagination: { page, total, totalPages },
       };

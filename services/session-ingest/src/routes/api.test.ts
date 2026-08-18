@@ -36,6 +36,7 @@ import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { applyMetadataChanges } from '../ingest/metadata';
 import { notifyUserSessionEvent } from '../session-events';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { verifySessionShareToken } from '../services/session-share-token';
 import type * as SessionEvents from '../session-events';
 
 vi.mock('../session-events', async importOriginal => {
@@ -59,6 +60,8 @@ type TestBindings = {
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
   DIRECT_INGEST_MAX_BYTES: string;
+  SESSION_SHARE_JWT_SECRET_PROD: { get(): Promise<string> };
+  SESSION_SHARE_TOKEN_MIN_IAT: string;
 };
 
 function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
@@ -76,6 +79,10 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
     DIRECT_INGEST_MAX_BYTES: '4194304',
+    SESSION_SHARE_JWT_SECRET_PROD: {
+      get: vi.fn(async () => 'session-share-secret-for-tests-32-bytes'),
+    },
+    SESSION_SHARE_TOKEN_MIN_IAT: '0',
     ...overrides,
   };
 }
@@ -283,6 +290,7 @@ describe('api routes', () => {
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -320,7 +328,6 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       expect.anything(),
       'usr_test',
@@ -334,6 +341,7 @@ describe('api routes', () => {
   it('POST /session does not emit created when row already exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
 
     const sessionCache = {
@@ -357,7 +365,6 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     expect(env.NOTIFICATIONS.sendSessionReadyNotification).not.toHaveBeenCalled();
   });
@@ -365,6 +372,7 @@ describe('api routes', () => {
   it('POST /session caches a newly created personal session', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -416,6 +424,7 @@ describe('api routes', () => {
   it('POST /session succeeds when cache warming is unavailable during rollout', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -451,6 +460,46 @@ describe('api routes', () => {
     expect(putValidated).toHaveBeenCalled();
     consoleWarn.mockRestore();
     consoleError.mockRestore();
+  });
+
+  it('POST /session returns 403 and does not insert when blocked_reason is set', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: 'tos' }]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('POST /session returns 403 and does not insert when the user is missing', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
   });
 
   it('POST /session/:sessionId/ingest streams to R2 after access is resolved', async () => {
@@ -1480,11 +1529,11 @@ describe('api routes', () => {
     expect(fns.transaction).not.toHaveBeenCalled();
   });
 
-  it('POST /session/:sessionId/share returns existing public_id when already shared', async () => {
+  it('POST /session/:sessionId/share returns a JWT for an existing generation', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     fns.executeResult.mockResolvedValueOnce({
-      rows: [{ public_id: '11111111-1111-1111-1111-111111111111' }],
+      rows: [{ public_id: '11111111-1111-4111-8111-111111111111' }],
     });
 
     const app = makeApiApp();
@@ -1496,13 +1545,67 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      success: true,
-      public_id: '11111111-1111-1111-1111-111111111111',
+    const body = (await res.json()) as { share_token: string };
+    expect(body).toMatchObject({ success: true });
+    expect(body).toHaveProperty('share_token', expect.any(String));
+    expect(body).not.toHaveProperty('public_id');
+    await expect(verifySessionShareToken(makeTestEnv(), body.share_token)).resolves.toMatchObject({
+      sub: 'ses_12345678901234567890123456',
+      jti: '11111111-1111-4111-8111-111111111111',
     });
   });
 
-  it('POST /session/:sessionId/share sets public_id when missing', async () => {
+  it('POST /session/:sessionId/share reuses the generation while minting a current token', async () => {
+    vi.useFakeTimers();
+    try {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.executeResult.mockResolvedValue({
+        rows: [{ public_id: '11111111-1111-4111-8111-111111111111' }],
+      });
+
+      const app = makeApiApp();
+      const firstIssuedAt = new Date('2026-08-17T12:00:00.000Z');
+      vi.setSystemTime(firstIssuedAt);
+      const firstResponse = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/share', {
+          method: 'POST',
+        }),
+        makeTestEnv()
+      );
+      const first = (await firstResponse.json()) as { share_token: string };
+
+      vi.setSystemTime(new Date(firstIssuedAt.getTime() + 1000));
+      const secondResponse = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/share', {
+          method: 'POST',
+        }),
+        makeTestEnv()
+      );
+      const second = (await secondResponse.json()) as { share_token: string };
+
+      expect(first.share_token).not.toBe(second.share_token);
+      await expect(
+        verifySessionShareToken(makeTestEnv(), first.share_token)
+      ).resolves.toMatchObject({
+        sub: 'ses_12345678901234567890123456',
+        jti: '11111111-1111-4111-8111-111111111111',
+        iat: Math.floor(firstIssuedAt.getTime() / 1000),
+      });
+      await expect(
+        verifySessionShareToken(makeTestEnv(), second.share_token)
+      ).resolves.toMatchObject({
+        sub: 'ses_12345678901234567890123456',
+        jti: '11111111-1111-4111-8111-111111111111',
+        iat: Math.floor(firstIssuedAt.getTime() / 1000) + 1,
+      });
+      expect(fns.executeResult).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('POST /session/:sessionId/share sets public_id when missing and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     fns.executeResult.mockImplementationOnce(async query => {
@@ -1527,9 +1630,8 @@ describe('api routes', () => {
     expect(res.status).toBe(200);
     const json: unknown = await res.json();
     expect(json).toMatchObject({ success: true });
-    const publicId = (json as { public_id?: unknown }).public_id;
-    expect(typeof publicId).toBe('string');
-    expect((publicId as string).length).toBeGreaterThan(0);
+    expect(json).toHaveProperty('share_token', expect.any(String));
+    expect(json).not.toHaveProperty('public_id');
   });
 
   it('POST /session/:sessionId/share rejects an authoritative access failure', async () => {

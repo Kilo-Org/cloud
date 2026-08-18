@@ -373,6 +373,77 @@ describe('sendMessageV2 input compatibility', () => {
   });
 });
 
+describe('attachment-only follow-up send', () => {
+  it('accepts an empty prompt with document attachments on send and sendMessageV2', () => {
+    expect(
+      SendMessageInput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        message: { prompt: '', attachments: validAttachments },
+      }).success
+    ).toBe(true);
+    expect(
+      SendMessageV2Input.safeParse({
+        ...baseSendMessageInput,
+        prompt: '',
+        attachments: validAttachments,
+      }).success
+    ).toBe(true);
+    expect(
+      SendMessageV2Input.safeParse({
+        cloudAgentSessionId: validSessionId,
+        payload: { type: 'prompt', ...basePromptInput, prompt: '' },
+        attachments: validAttachments,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects an empty or whitespace-only prompt with no attachments', () => {
+    for (const prompt of ['', '   ']) {
+      expect(
+        SendMessageInput.safeParse({
+          cloudAgentSessionId: validSessionId,
+          message: { prompt },
+        }).success
+      ).toBe(false);
+      expect(
+        SendMessageV2Input.safeParse({ ...baseSendMessageInput, prompt: prompt }).success
+      ).toBe(false);
+      expect(
+        SendMessageV2Input.safeParse({
+          cloudAgentSessionId: validSessionId,
+          payload: { type: 'prompt', ...basePromptInput, prompt },
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it('still accepts a command payload with no prompt and no attachments', () => {
+    expect(
+      SendMessageV2Input.safeParse({
+        cloudAgentSessionId: validSessionId,
+        payload: { type: 'command', command: 'compact', arguments: '--aggressive' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('still rejects an empty prompt on prepareSession initialPayload', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Review the current branch',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        initialPayload: {
+          type: 'prompt',
+          prompt: '',
+          mode: 'code',
+          model: 'claude-sonnet-4-5-20250929',
+        },
+      }).success
+    ).toBe(false);
+  });
+});
+
 describe('Bitbucket clone URL parsing', () => {
   it('keeps canonical Bitbucket repository identity limited to HTTPS clone URLs', () => {
     expect(parseCanonicalBitbucketCloneUrl('https://bitbucket.org/acme/repo.git')).toEqual({

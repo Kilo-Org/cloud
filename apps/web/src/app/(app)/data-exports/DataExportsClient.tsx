@@ -15,16 +15,18 @@ import { LANDING_URL } from '@/lib/constants';
 import { formatBytes } from '@/lib/kiloclaw/instance-display';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
+  canReuseDownloadCodeChallenge,
   findActiveExport,
   findReadyExport,
   getDisplayStatus,
   getRefetchInterval,
   USER_EXPORT_STATUS_COPY,
+  type DownloadCodeChallenge,
   type ExportableOrganization,
   type UserExport,
   type UserExportDisplayStatus,
 } from './data-export-contract';
-import { DownloadCodeDialog, type DownloadCodeChallenge } from './DownloadCodeDialog';
+import { DownloadCodeDialog } from './DownloadCodeDialog';
 
 type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
 
@@ -155,14 +157,16 @@ export function DataExportsClient() {
   // Downloading is a two-step step-up: mail a single-use code, then redeem it for
   // one signed URL. A held session alone cannot reach the artifact.
   const [challenge, setChallenge] = useState<DownloadCodeChallenge | null>(null);
+  const [isDownloadCodeDialogOpen, setIsDownloadCodeDialogOpen] = useState(false);
   const requestCodeMutation = useMutation(
     trpc.userExports.requestDownloadCode.mutationOptions({
       onSuccess: (result, variables) => {
         setChallenge({
           exportId: variables.exportId,
           challengeId: result.challengeId,
-          expiresInMinutes: result.expiresInMinutes,
+          expiresAt: Date.now() + result.expiresInMinutes * 60_000,
         });
+        setIsDownloadCodeDialogOpen(true);
       },
       onError: error => {
         toast.error('Download code could not be sent', {
@@ -187,6 +191,14 @@ export function DataExportsClient() {
   // generating. The re-request throttle is enforced server-side.
   const requestDisabled =
     requestMutation.isPending || listQuery.isRefetching || Boolean(personalActiveExport);
+
+  function startDownload(exportId: string) {
+    if (canReuseDownloadCodeChallenge(challenge, exportId)) {
+      setIsDownloadCodeDialogOpen(true);
+      return;
+    }
+    requestCodeMutation.mutate({ exportId });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -343,7 +355,7 @@ export function DataExportsClient() {
                     requestCodeMutation.isPending &&
                     requestCodeMutation.variables?.exportId === record.id
                   }
-                  onDownload={() => requestCodeMutation.mutate({ exportId: record.id })}
+                  onDownload={() => startDownload(record.id)}
                 />
               ))}
             </ul>
@@ -371,12 +383,16 @@ export function DataExportsClient() {
 
       <DownloadCodeDialog
         challenge={challenge}
+        open={isDownloadCodeDialogOpen}
         isResending={requestCodeMutation.isPending}
         onResend={() => {
           if (challenge) requestCodeMutation.mutate({ exportId: challenge.exportId });
         }}
-        onClose={() => setChallenge(null)}
-        onVerified={triggerBrowserDownload}
+        onClose={() => setIsDownloadCodeDialogOpen(false)}
+        onVerified={downloadUrl => {
+          setChallenge(null);
+          triggerBrowserDownload(downloadUrl);
+        }}
       />
     </div>
   );

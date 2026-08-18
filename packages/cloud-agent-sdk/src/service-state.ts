@@ -74,6 +74,8 @@ type ServiceState = {
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
+  /** Remove one failed delivery entry (called after a successful retry). */
+  clearFailedMessage(messageId: string): void;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
   setActivity(activity: SessionActivity): void;
@@ -575,7 +577,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       reason: event.reason,
       ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
-    pendingMessages.delete(event.messageId);
+    pendingMessages.set(event.messageId, deliveryState);
     if (event.reason === 'interrupted') {
       activity = { type: 'idle' };
       status = { type: 'interrupted' };
@@ -603,7 +605,15 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     if (!isRootSession(event.sessionId)) return;
     if (event.queued.length === 0) {
       if (pendingMessages.size === 0) return;
+      // Preserve failed entries — a failed delivery row must survive a
+      // reconciliation so its recovery affordance stays visible.
+      const failed = [...pendingMessages.entries()].filter(
+        ([, state]) => state.status === 'failed'
+      );
       pendingMessages.clear();
+      for (const [messageId, state] of failed) {
+        pendingMessages.set(messageId, state);
+      }
       notify();
       return;
     }
@@ -611,10 +621,16 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     for (const messageId of event.queued) {
       next.set(messageId, { status: 'queued' });
     }
+    // Preserve failed entries before the wholesale replace, then re-insert
+    // them after the queued entries are written.
+    const failed = [...pendingMessages.entries()].filter(([, state]) => state.status === 'failed');
     // Reuse the same Map identity where possible to avoid invalidating
     // existing subscribers that hold onto the previous reference.
     pendingMessages.clear();
     for (const [messageId, state] of next) {
+      pendingMessages.set(messageId, state);
+    }
+    for (const [messageId, state] of failed) {
       pendingMessages.set(messageId, state);
     }
     notify();
@@ -679,7 +695,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear pending-message delivery state — replayed cloud.message.queued
     // events following the snapshot will repopulate it with the current truth.
+    // Failed entries survive the reconnect: replayed cloud.message.queued events
+    // repopulate the queued half, and the failed half must survive a reconnect
+    // so the row keeps its recovery affordance.
+    const failed = [...pendingMessages.entries()].filter(([, state]) => state.status === 'failed');
     pendingMessages.clear();
+    for (const [messageId, state] of failed) {
+      pendingMessages.set(messageId, state);
+    }
 
     notify();
   }
@@ -780,6 +803,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
+
+    clearFailedMessage(messageId: string): void {
+      pendingMessages.delete(messageId);
+      notify();
+    },
 
     snapshot: () => ({
       activity,

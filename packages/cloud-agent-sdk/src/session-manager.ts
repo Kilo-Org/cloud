@@ -410,6 +410,11 @@ type SessionManager = {
   respondToPermission(requestId: string, response: 'once' | 'always' | 'reject'): Promise<void>;
   acceptSuggestion(requestId: string, index: number): Promise<void>;
   dismissSuggestion(requestId: string): Promise<void>;
+  /**
+   * Remove one failed delivery entry after a successful retry so its row
+   * stops showing.
+   */
+  clearFailedMessage(messageId: string): void;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -1755,6 +1760,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (currentSession) await currentSession.dismissSuggestion({ requestId });
   }
 
+  function clearFailedMessage(messageId: string): void {
+    currentSession?.state.clearFailedMessage(messageId);
+    const next = new Map(store.get(pendingMessagesAtom));
+    next.delete(messageId);
+    store.set(pendingMessagesAtom, next);
+  }
+
   async function createAndStart(input: PrepareInput): Promise<void> {
     try {
       const initialMessageId = input.initialMessageId ?? generateMessageId();
@@ -1855,6 +1867,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     respondToPermission,
     acceptSuggestion,
     dismissSuggestion,
+    clearFailedMessage,
     createAndStart,
     clearError: () => {
       store.set(errorAtom, null);

@@ -99,6 +99,7 @@ const mockSession = {
     getPermission: jest.fn(() => null),
     getSuggestion: jest.fn(() => null),
     getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
+    clearFailedMessage: jest.fn(),
   },
   storage: null as JotaiSessionStorage | null,
 } as unknown as MockSession;
@@ -3774,6 +3775,31 @@ describe('createSessionManager', () => {
         mgr.atoms.pendingMessages
       );
       expect(pending.size).toBe(0);
+    });
+
+    it('clearFailedMessage removes one id from the atom and service state', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map<string, MessageDeliveryState>([
+          ['m1', { status: 'failed', error: 'x', reason: 'exhausted', attempts: 5 }],
+          ['m2', { status: 'failed', error: 'y', reason: 'execution' }],
+        ])
+      );
+      triggerSubscriber();
+
+      mgr.clearFailedMessage('m1');
+
+      const pending = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+        config.store,
+        mgr.atoms.pendingMessages
+      );
+      expect(pending.has('m1')).toBe(false);
+      expect(pending.get('m2')).toEqual({ status: 'failed', error: 'y', reason: 'execution' });
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m1');
     });
   });
 

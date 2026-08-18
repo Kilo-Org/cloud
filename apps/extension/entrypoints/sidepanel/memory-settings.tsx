@@ -1,11 +1,12 @@
 import { storage } from '#imports';
 import { Trash2 } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteAgentMemory } from '@/src/shared/agent-memories-storage';
 import { loadMemorySettings, saveMemorySettings } from '@/src/shared/agent-memory-settings';
 import { deriveMemoriesSettingsView } from './memory-settings-state';
 import { useAgentMemories } from './use-agent-memories';
+import { createSerialAsyncChain } from './model-preferences-state';
 import { SettingsToggle } from './workflow-settings';
 
 const EMPTY_MESSAGE =
@@ -26,6 +27,10 @@ export const MemorySettings = (): JSX.Element => {
      read never presents the default as the stored value. */
   const [autoApprove, setAutoApprove] = useState<boolean | undefined>();
   const [saveError, setSaveError] = useState(false);
+  /* Rapid toggles each write the whole settings record. Without ordering, an
+     earlier write can land after a later one and store the value the user just
+     turned off. One chain per mount keeps the last click authoritative. */
+  const saveChainRef = useRef(createSerialAsyncChain());
 
   useEffect(() => {
     void (async () => {
@@ -45,7 +50,7 @@ export const MemorySettings = (): JSX.Element => {
     const next = !autoApprove;
     setSaveError(false);
     setAutoApprove(next);
-    void (async () => {
+    void saveChainRef.current.enqueue(async () => {
       try {
         await saveMemorySettings(storage, { autoApproveMemorySaves: next });
       } catch {
@@ -53,7 +58,7 @@ export const MemorySettings = (): JSX.Element => {
         setAutoApprove(!next);
         setSaveError(true);
       }
-    })();
+    });
   }, [autoApprove]);
 
   return (

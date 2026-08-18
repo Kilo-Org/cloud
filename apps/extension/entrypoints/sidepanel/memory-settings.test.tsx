@@ -1,4 +1,4 @@
-/* eslint-disable import/first, jest/no-conditional-expect, jest/no-hooks, jest/no-untyped-mock-factory, no-unsafe-type-assertion, vitest/prefer-import-in-mock -- test fixture constraints */
+/* eslint-disable import/first, jest/no-conditional-expect, jest/no-hooks, jest/no-untyped-mock-factory, no-unsafe-type-assertion, promise/avoid-new, vitest/prefer-import-in-mock -- test fixture constraints */
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -71,6 +71,46 @@ describe('memory settings auto-approve toggle', () => {
       expect(mockLoad).toHaveBeenCalledOnce();
     });
     expect(toggle.disabled).toBe(true);
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('stores the last toggle when saves overlap', async () => {
+    mockLoad.mockResolvedValue({ autoApproveMemorySaves: false });
+    /* The first write resolves only after the second one is requested, so an
+       unordered implementation would store `true` while the toggle reads off. */
+    const settleFirstSave: (() => void)[] = [];
+    const firstSave = new Promise<void>(resolve => {
+      settleFirstSave.push(resolve);
+    });
+    mockSave.mockReturnValueOnce(firstSave);
+    mockSave.mockResolvedValueOnce();
+
+    const { getByLabelText } = render(<MemorySettings />);
+    const toggle = getByLabelText(TOGGLE_LABEL) as HTMLButtonElement;
+
+    await waitFor(() => {
+      expect(toggle.disabled).toBe(false);
+    });
+
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+
+    // Only the first save has started; the second waits its turn.
+    await waitFor(() => {
+      expect(settleFirstSave).toHaveLength(1);
+    });
+    // eslint-disable-next-line vitest/prefer-called-times -- current linter requires CalledOnce; avoiding contradiction
+    expect(mockSave).toHaveBeenCalledOnce();
+
+    settleFirstSave[0]?.();
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledTimes(2);
+    });
+    expect(mockSave).toHaveBeenLastCalledWith(expect.anything(), {
+      autoApproveMemorySaves: false,
+    });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
 

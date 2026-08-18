@@ -257,9 +257,8 @@ export async function applyVercelSettings(
       },
     };
   } else {
-    const vercelInferenceProviders = requestToMutate.body.provider?.ignore?.length
-      ? await getCachedVercelInferenceProviderIdsForModel(vercelModelId)
-      : null;
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
     requestToMutate.body.providerOptions = convertProviderOptions(
       requestToMutate,
       vercelInferenceProviders
@@ -270,6 +269,7 @@ export async function applyVercelSettings(
     if (
       gatewayOptions &&
       openAiApiKey &&
+      vercelInferenceProviders?.includes('openai') &&
       (!gatewayOptions.only || gatewayOptions.only.includes('openai'))
     ) {
       gatewayOptions.byok = {

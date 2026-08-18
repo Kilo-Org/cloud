@@ -158,26 +158,31 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
-  it('opens the child sheet with the copyable body when Select text is pressed', async () => {
+  it('swaps the details Modal content to the select view when Select text is pressed', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
     const modals = () =>
       renderer.root.findAll(
         node => typeof node.type === 'string' && (node.type as string) === 'Modal'
       );
-    const visibleModals = () => modals().filter(node => node.props.visible === true);
+    const sheetHeaderTitles = () =>
+      renderer.root
+        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'SheetHeader')
+        .map(node => node.props.title as string | undefined);
 
-    // Before press: only the details sheet Modal is visible; the child Modal is hidden.
-    expect(modals()).toHaveLength(2);
-    expect(visibleModals()).toHaveLength(1);
+    // Before press: a single Modal shows the details content.
+    expect(modals()).toHaveLength(1);
+    expect(sheetHeaderTitles()).toContain('Message details');
 
     await act(async () => {
       await Promise.resolve();
       press(findByTestID(renderer.root, 'message-details-select-text')[0]);
     });
 
-    // After press: the child Modal flips to visible and shows the copyable body.
-    expect(visibleModals()).toHaveLength(2);
+    // After press: the same single Modal swaps to the Select text view.
+    expect(modals()).toHaveLength(1);
+    expect(sheetHeaderTitles()).toContain('Select text');
+    expect(sheetHeaderTitles()).not.toContain('Message details');
 
     const selectable = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'SelectableText'

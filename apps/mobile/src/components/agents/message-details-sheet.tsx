@@ -43,13 +43,20 @@ export function MessageDetailsSheet({
   };
 
   return (
-    <>
-      <Modal
-        visible={visible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={onClose}
-      >
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      {selectVisible ? (
+        <MessageTextSelectSheet
+          text={content?.copyableText ?? ''}
+          onClose={() => {
+            setSelectVisible(false);
+          }}
+        />
+      ) : (
         <View className="flex-1 bg-background">
           <SheetHeader title="Message details" onDone={onClose} doneLabel="Done" />
 
@@ -129,16 +136,8 @@ export function MessageDetailsSheet({
 
           <View style={{ height: insets.bottom }} className="bg-background" />
         </View>
-      </Modal>
-
-      <MessageTextSelectSheet
-        visible={selectVisible}
-        text={content?.copyableText ?? ''}
-        onClose={() => {
-          setSelectVisible(false);
-        }}
-      />
-    </>
+      )}
+    </Modal>
   );
 }
 

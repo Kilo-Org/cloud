@@ -101,6 +101,16 @@ describe('convertFromKiloExclusiveModel', () => {
 
     expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');
   });
+
+  it('exposes fallback-only pricing in model metadata', () => {
+    const model = makeModel({
+      internal_id: 'vendor/x',
+      fallbackOnly: true,
+      pricing: [{ start_context_length: 0, pricing: pricing(1) }],
+    });
+
+    expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');
+  });
 });
 
 describe('applyKiloExclusiveModelSettings', () => {

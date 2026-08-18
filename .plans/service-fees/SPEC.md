@@ -15,7 +15,7 @@ Before changing a scoped area, read its nearest `AGENTS.md`. Database changes mu
 Resolved during spec review on 2026-08-08. Each entry supersedes earlier drafts of this document.
 
 | ID | Decision | Rationale |
-| --- | --- | --- |
+|---|---|---|
 | D1 | The fee base follows **recognized product value**. Discounts reduce it; prepaid credit-balance consumption does not. | Preserves the invariant that collected fee equals 5% of product revenue, which is what makes the assessment table reconcilable. Kilo does not use Stripe Billing credit grants today, so this is a forward-looking guard. |
 | D2 | **Keep hosted promotion-code entry** for Personal Kilo Pass. Compute the fee from list price and accept that the fee line is discounted along with the product. | Proportional allocation makes the result arithmetically exact for unrestricted coupons, so `GOAL.md`'s proportional-reduction requirement is met without server-side discount knowledge. Avoids private-preview dependencies and avoids rewriting a live payments path. Cost: product-restricted coupons must be prevented operationally. |
 | D3 | Chargebacks **reverse the fee** on `charge.dispute.funds_withdrawn`, tracked in dedicated non-monotonic dispute columns. | The money left the account, so leaving it in collected revenue overstates the one number this subsystem exists to produce. Separate columns keep refund monotonicity intact, since a won dispute restores funds. |
@@ -102,19 +102,19 @@ The outcome is the fee decision, not payment state. Settlement and refunds have 
 
 Create a server-only service-fee module under `apps/web/src/lib/service-fees/`:
 
-| File                         | Responsibility                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------- |
-| `constants.ts`               | Activation, rate, label, metadata keys, version                                     |
-| `types.ts`                   | Closed flow/outcome/owner types and result contracts                                |
-| `calculation.ts`             | Pure integer fee and refund calculations                                            |
-| `stripe-lines.ts`            | Stripe line pagination, classification, net eligible subtotal, tax input extraction |
-| `assessments.ts`             | Assessment create/upsert/link/settle/refund persistence                             |
-| `checkout.ts`                | Checkout assessment preparation and positive fee line construction                  |
-| `invoice-created.ts`         | Draft invoice assessment and fee-line attachment                                    |
-| `settlement.ts`              | Resolve assessment from invoice, PaymentIntent, or charge and mark settlement       |
-| `refunds.ts`                 | Observe cumulative Stripe refunds and update assessment state                       |
-| `alerts.ts`                  | Best-effort Admin Slack notification for missed fees                                |
-| `organization-exemptions.ts` | Exact-organization exemption read and mutation support                              |
+| File | Responsibility |
+|---|---|
+| `constants.ts` | Activation, rate, label, metadata keys, version |
+| `types.ts` | Closed flow/outcome/owner types and result contracts |
+| `calculation.ts` | Pure integer fee and refund calculations |
+| `stripe-lines.ts` | Stripe line pagination, classification, net eligible subtotal, tax input extraction |
+| `assessments.ts` | Assessment create/upsert/link/settle/refund persistence |
+| `checkout.ts` | Checkout assessment preparation and positive fee line construction |
+| `invoice-created.ts` | Draft invoice assessment and fee-line attachment |
+| `settlement.ts` | Resolve assessment from invoice, PaymentIntent, or charge and mark settlement |
+| `refunds.ts` | Observe cumulative Stripe refunds and update assessment state |
+| `alerts.ts` | Best-effort Admin Slack notification for missed fees |
+| `organization-exemptions.ts` | Exact-organization exemption read and mutation support |
 
 Keep pure arithmetic and line classification free of database and Stripe clients. Pass Stripe and database dependencies into integration helpers where practical so tests do not replace the behavior under test with mocks.
 
@@ -139,7 +139,7 @@ Subscription-mode Checkout supports neither `add_invoice_items` nor a `discounta
 Worked example, $49.00 Kilo Pass with a 20% promotion code and the fee computed from list price:
 
 | Line | Amount |
-| --- | ---: |
+|---|---:|
 | Kilo Pass | $49.00 |
 | Service fee (5%) | $2.45 |
 | Subtotal | $51.45 |
@@ -197,14 +197,14 @@ These tables store no user or account PII — only actor foreign keys — so `so
 
 Append-only internal exemption log. The newest row is current state; a false row records revocation:
 
-| Column                    | Type               | Rules                                                    |
-| ------------------------- | ------------------ | -------------------------------------------------------- |
-| `id`                      | UUID               | Primary key                                              |
-| `organization_id`         | UUID               | Not null; FK to `organizations.id`; `onDelete: restrict` |
-| `is_exempt`               | boolean            | Not null                                                 |
-| `reason`                  | text               | Not null; trimmed non-empty                              |
-| `changed_by_kilo_user_id` | text nullable      | FK to `kilocode_users.id`, `onDelete: set null`          |
-| `created_at`              | timestamptz string | Not null, default now                                    |
+| Column | Type | Rules |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `organization_id` | UUID | Not null; FK to `organizations.id`; `onDelete: restrict` |
+| `is_exempt` | boolean | Not null |
+| `reason` | text | Not null; trimmed non-empty |
+| `changed_by_kilo_user_id` | text nullable | FK to `kilocode_users.id`, `onDelete: set null` |
+| `created_at` | timestamptz string | Not null, default now |
 
 Index `(organization_id, created_at desc)`. Resolve current state and historical state with the same deterministic order: `created_at desc, id desc`. Keep the organization-scoped advisory lock around each append. Assessments point directly to the exact exemption row used for their decision.
 
@@ -214,40 +214,40 @@ This table is not `organization_audit_logs`; it must be returned only by `adminP
 
 One row per commercial billing event:
 
-| Column                             | Type                        | Rules                                                           |
-| ---------------------------------- | --------------------------- | --------------------------------------------------------------- |
-| `assessment_key`                   | text                        | Primary key; not null and immutable                             |
-| `version`                          | text                        | Not null; initial value `2026-09-01-v1`                         |
-| `flow`                             | text                        | Not null; checked against flow values                           |
-| `outcome`                          | text                        | Not null; `enumCheck` against outcome values                    |
-| `currency`                         | text                        | Not null, lowercase ISO code                                    |
-| `kilo_user_id`                     | text nullable               | FK to `kilocode_users.id`, `onDelete: set null`                 |
-| `organization_id`                  | UUID nullable               | FK to `organizations.id`, `onDelete: restrict`                  |
-| `stripe_customer_id`               | text nullable               | Indexed                                                         |
-| `stripe_checkout_session_id`       | text nullable               | Partial unique index                                            |
-| `stripe_invoice_id`                | text nullable               | Partial unique index                                            |
-| `stripe_payment_intent_id`         | text nullable               | Partial unique index                                            |
-| `stripe_charge_id`                 | text nullable               | Partial unique index                                            |
-| `stripe_fee_price_id`              | text nullable               | Checkout-generated fee Price identity                           |
-| `stripe_checkout_fee_line_item_id` | text nullable               | Partial unique index                                            |
-| `stripe_invoice_fee_line_item_id`  | text nullable               | Partial unique index                                            |
-| `eligibility_created_at`           | timestamptz string          | Not null; Checkout or invoice creation instant used for cutoff  |
-| `eligible_subtotal_minor`          | integer                     | Not null, non-negative                                          |
-| `expected_fee_minor`               | integer                     | Not null, non-negative; provisional for Checkout flows          |
-| `charged_fee_minor`                | integer                     | Not null, default 0, non-negative; from the settled fee line    |
-| `gross_paid_minor`                 | integer                     | Not null, default 0, non-negative                               |
-| `settled_product_minor`            | integer                     | Not null, default 0, non-negative                               |
-| `settled_at`                       | timestamptz string nullable | Set only after positive/zero successful settlement              |
-| `refunded_product_minor`           | integer                     | Not null, default 0, non-negative; monotonic                     |
-| `refunded_fee_minor`               | integer                     | Not null, default 0, non-negative; monotonic                     |
-| `refunded_gross_minor`             | integer                     | Not null, default 0, non-negative; monotonic                     |
-| `disputed_product_minor`           | integer                     | Not null, default 0, non-negative; not monotonic                |
-| `disputed_fee_minor`               | integer                     | Not null, default 0, non-negative; not monotonic                |
-| `exemption_id`                     | UUID nullable               | FK to the exact exemption log row, `onDelete: restrict`         |
-| `failure_code`                     | text nullable               | Stable internal reason code, no secret or raw provider payload  |
-| `metadata`                         | JSONB                       | Not null, default `{}`; only non-sensitive reconciliation facts |
-| `created_at`                       | timestamptz string          | Not null, default now                                           |
-| `updated_at`                       | timestamptz string          | Not null, default now, update hook                              |
+| Column | Type | Rules |
+|---|---|---|
+| `assessment_key` | text | Primary key; not null and immutable |
+| `version` | text | Not null; initial value `2026-09-01-v1` |
+| `flow` | text | Not null; checked against flow values |
+| `outcome` | text | Not null; `enumCheck` against outcome values |
+| `currency` | text | Not null, lowercase ISO code |
+| `kilo_user_id` | text nullable | FK to `kilocode_users.id`, `onDelete: set null` |
+| `organization_id` | UUID nullable | FK to `organizations.id`, `onDelete: restrict` |
+| `stripe_customer_id` | text nullable | Indexed |
+| `stripe_checkout_session_id` | text nullable | Partial unique index |
+| `stripe_invoice_id` | text nullable | Partial unique index |
+| `stripe_payment_intent_id` | text nullable | Partial unique index |
+| `stripe_charge_id` | text nullable | Partial unique index |
+| `stripe_fee_price_id` | text nullable | Checkout-generated fee Price identity |
+| `stripe_checkout_fee_line_item_id` | text nullable | Partial unique index |
+| `stripe_invoice_fee_line_item_id` | text nullable | Partial unique index |
+| `eligibility_created_at` | timestamptz string | Not null; Checkout or invoice creation instant used for cutoff |
+| `eligible_subtotal_minor` | integer | Not null, non-negative |
+| `expected_fee_minor` | integer | Not null, non-negative; provisional for Checkout flows |
+| `charged_fee_minor` | integer | Not null, default 0, non-negative; from the settled fee line |
+| `gross_paid_minor` | integer | Not null, default 0, non-negative |
+| `settled_product_minor` | integer | Not null, default 0, non-negative |
+| `settled_at` | timestamptz string nullable | Set only after positive/zero successful settlement |
+| `refunded_product_minor` | integer | Not null, default 0, non-negative; monotonic |
+| `refunded_fee_minor` | integer | Not null, default 0, non-negative; monotonic |
+| `refunded_gross_minor` | integer | Not null, default 0, non-negative; monotonic |
+| `disputed_product_minor` | integer | Not null, default 0, non-negative; not monotonic |
+| `disputed_fee_minor` | integer | Not null, default 0, non-negative; not monotonic |
+| `exemption_id` | UUID nullable | FK to the exact exemption log row, `onDelete: restrict` |
+| `failure_code` | text nullable | Stable internal reason code, no secret or raw provider payload |
+| `metadata` | JSONB | Not null, default `{}`; only non-sensitive reconciliation facts |
+| `created_at` | timestamptz string | Not null, default now |
+| `updated_at` | timestamptz string | Not null, default now, update hook |
 
 Owner check:
 
@@ -257,7 +257,7 @@ Owner check:
 `outcome` is the single decision-state column. Both the earlier `application_state` design and the separate `eligibility` column were removed because they were derivable from `outcome`, expected amount, and attachment success. Outcome values:
 
 | Outcome | Meaning |
-| --- | --- |
+|---|---|
 | `pending` | Decision made, provider attachment not yet confirmed |
 | `charged` | A fee line was accepted by Stripe |
 | `exempt` | Suppressed by an exact-organization exemption |
@@ -1137,7 +1137,7 @@ Mocks cannot establish Stripe's discount, tax, draft-finalization, or line-alloc
 **Coupon allocation matrix — run this before writing Phase 4 code.** The discountable-fee-line design depends on Stripe allocating a coupon proportionally across the product and fee lines. That is standard behavior and consistent with per-line `discount_amounts`, but it is inferred from the API surface and is not provable from this repository. Prove each case against a real Kilo Pass Checkout carrying a fee line:
 
 | Coupon | Expected result |
-| --- | --- |
+|---|---|
 | 20% off, unrestricted | Fee discounted proportionally; effective rate exactly 5% of net product |
 | Fixed $10 off, unrestricted | Allocated across both lines; effective rate exactly 5% of net product |
 | Percent off restricted via `applies_to.products` | Product discounted, fee not; effective rate above 5% and deviation alert fires |

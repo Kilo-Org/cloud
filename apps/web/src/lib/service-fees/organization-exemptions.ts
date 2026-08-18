@@ -150,7 +150,8 @@ export async function setOrganizationServiceFeeExemption(params: {
   history: OrganizationServiceFeeExemptionRecord;
 }> {
   const reason = normalizeOrganizationServiceFeeExemptionReason(params.reason);
-  const nowIso = normalizeOrganizationExemptionTimestamp(params.now ?? new Date());
+  const requestedAt = params.now ?? new Date();
+  const requestedAtIso = normalizeOrganizationExemptionTimestamp(requestedAt);
 
   return params.store.transact(async store => {
     await store.lockOrganization(params.organizationId);
@@ -163,6 +164,11 @@ export async function setOrganizationServiceFeeExemption(params: {
       );
     }
 
+    const current = await store.getCurrent(params.organizationId);
+    const currentAt = current ? new Date(current.createdAt).getTime() : Number.NEGATIVE_INFINITY;
+    const createdAt =
+      requestedAt.getTime() > currentAt ? requestedAtIso : new Date(currentAt + 1).toISOString();
+
     const exemption = withNormalizedTimestamp(
       await store.insert({
         id: randomUUID(),
@@ -170,7 +176,7 @@ export async function setOrganizationServiceFeeExemption(params: {
         isExempt: params.isExempt,
         reason,
         changedByKiloUserId: params.changedByKiloUserId,
-        createdAt: nowIso,
+        createdAt,
       })
     );
 

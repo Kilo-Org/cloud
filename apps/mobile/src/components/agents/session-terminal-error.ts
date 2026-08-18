@@ -46,13 +46,14 @@ function titleForClass(cls: TerminalErrorClass): string {
   return "Couldn't load this session";
 }
 
-/** The terminal error a session must surface, taking precedence over the skeleton. */
+/**
+ * The terminal error a session must surface, taking precedence over the
+ * skeleton. Copy is always offered for a terminal error, regardless of class.
+ */
 export type SessionTerminalError = {
   variant: QueryErrorVariant;
   title: string;
   message: string;
-  /** Copy is always offered for a terminal error, regardless of class. */
-  copyable: boolean;
   retryable: boolean;
 };
 
@@ -77,7 +78,6 @@ export function resolveSessionTerminalError(input: {
       variant: 'server',
       title: "Couldn't load this session",
       message: input.error,
-      copyable: true,
       retryable: true,
     };
   }
@@ -88,7 +88,6 @@ export function resolveSessionTerminalError(input: {
       variant: variantForClass(cls),
       title: titleForClass(cls),
       message,
-      copyable: true,
       retryable: cls === 'transient',
     };
   }

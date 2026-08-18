@@ -1131,17 +1131,15 @@ export function SessionDetailContent({
             isRetrying={isLoading}
           />
           <View className="flex-row gap-3">
-            {terminalError.copyable ? (
-              <Button
-                variant="ghost"
-                accessibilityLabel="Copy error details"
-                onPress={() => {
-                  void performCopy(copyText);
-                }}
-              >
-                <Text>Copy</Text>
-              </Button>
-            ) : null}
+            <Button
+              variant="ghost"
+              accessibilityLabel="Copy error details"
+              onPress={() => {
+                void performCopy(copyText);
+              }}
+            >
+              <Text>Copy</Text>
+            </Button>
             <Button variant="ghost" onPress={handleBackToSessions}>
               <Text>Back to sessions</Text>
             </Button>

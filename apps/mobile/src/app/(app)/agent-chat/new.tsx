@@ -399,7 +399,6 @@ function NewSessionScreenBody() {
         model,
         selectedRepo,
         isProfileLoading,
-        isProfileError,
       });
 
   const handleStartSession = useCallback(() => {

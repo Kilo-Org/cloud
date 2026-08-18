@@ -71,11 +71,11 @@ export function resolveNewSessionSubmitDisabled(input: {
 
 /**
  * Whether the cloud-target "Start session" button is disabled, including the
- * effective-profile gate. `isProfileError` is deliberately NOT a disable
- * reason: on a failed profile query the form shows an inline error + Retry and
- * Start stays enabled, submitting with no effective profile id (the default is
- * omitted). Only a still-loading profile blocks Start, so an unsettled default
- * is never silently dropped.
+ * effective-profile gate. A failed profile query is deliberately NOT a disable
+ * reason: the form shows an inline error + Retry and Start stays enabled,
+ * submitting with no effective profile id (the default is omitted). Only a
+ * still-loading profile blocks Start, so an unsettled default is never
+ * silently dropped.
  */
 export function resolveNewSessionStartDisabled(input: {
   attachmentsHasFailed: boolean;
@@ -87,7 +87,6 @@ export function resolveNewSessionStartDisabled(input: {
   model: string;
   selectedRepo: string;
   isProfileLoading: boolean;
-  isProfileError: boolean;
 }): boolean {
   return (
     resolveNewSessionSubmitDisabled({

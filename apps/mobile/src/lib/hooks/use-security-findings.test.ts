@@ -64,12 +64,21 @@ vi.mock('sonner-native', () => ({
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => ({
     getStoredOperationKey: vi.fn(() => null),
-    writeSafeRetry: vi.fn(async () => undefined),
-    writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => row.operationKey),
-    remove: vi.fn(async () => undefined),
+    writeSafeRetry: vi.fn(async () => {
+      await Promise.resolve();
+    }),
+    writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => {
+      await Promise.resolve();
+      return row.operationKey;
+    }),
+    remove: vi.fn(async () => {
+      await Promise.resolve();
+    }),
     needsReconcile: [],
     loaded: true,
-    whenLoaded: vi.fn(async () => undefined),
+    whenLoaded: vi.fn(async () => {
+      await Promise.resolve();
+    }),
     refresh: vi.fn(),
   }),
 }));

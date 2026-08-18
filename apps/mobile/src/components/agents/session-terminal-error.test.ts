@@ -80,7 +80,6 @@ describe('resolveSessionTerminalError', () => {
       variant: 'server',
       title: "Couldn't load this session",
       message: 'boom',
-      copyable: true,
       retryable: true,
     });
   });
@@ -99,7 +98,6 @@ describe('resolveSessionTerminalError', () => {
       variant: 'permission',
       title: 'Access denied',
       message: 'You are not authorized to use the Cloud Agent.',
-      copyable: true,
       retryable: false,
     });
   });
@@ -118,7 +116,6 @@ describe('resolveSessionTerminalError', () => {
       variant: 'not-found',
       title: 'Not found',
       message: 'Service is unavailable right now. Please try again.',
-      copyable: true,
       retryable: false,
     });
   });
@@ -137,7 +134,6 @@ describe('resolveSessionTerminalError', () => {
       variant: 'server',
       title: "Couldn't load this session",
       message: 'Connection lost. Please retry in a moment.',
-      copyable: true,
       retryable: true,
     });
   });
@@ -153,7 +149,6 @@ describe('resolveSessionTerminalError', () => {
       variant: 'server',
       title: "Couldn't load this session",
       message: 'some unexpected failure',
-      copyable: true,
       retryable: false,
     });
   });
@@ -166,16 +161,6 @@ const indicatorFor = (message: string) => ({
 });
 
 describe('resolveSessionTerminalError Copy / Retry presence', () => {
-  it.each([
-    ['not-found', 'Service is unavailable right now. Please try again.'],
-    ['permission', 'You are not authorized to use the Cloud Agent.'],
-    ['transient', 'Connection lost. Please retry in a moment.'],
-    ['unknown', 'some unexpected failure'],
-  ] as const)('offers Copy for the %s class', (_cls, message) => {
-    const resolved = resolveSessionTerminalError(indicatorFor(message));
-    expect(resolved?.copyable).toBe(true);
-  });
-
   it('offers Retry only for the transient class', () => {
     expect(
       resolveSessionTerminalError(indicatorFor('Connection lost. Please retry in a moment.'))

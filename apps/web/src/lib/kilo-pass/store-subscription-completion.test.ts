@@ -1029,7 +1029,9 @@ describe('completeStoreKiloPassPurchase', () => {
     const captureExceptionMock = jest.fn();
     jest.doMock('@kilocode/db/operation-ledger', () => ({
       ...(jest.requireActual('@kilocode/db/operation-ledger') as object),
-      settleOperation: jest.fn<() => Promise<void>>().mockRejectedValue(new Error('settle failure')),
+      settleOperation: jest
+        .fn<() => Promise<void>>()
+        .mockRejectedValue(new Error('settle failure')),
     }));
     jest.doMock('@sentry/nextjs', () => ({
       ...(jest.requireActual('@sentry/nextjs') as object),

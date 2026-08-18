@@ -1571,6 +1571,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                       />
                     </button>
                   </div>
+<<<<<<< ours
                   {(bitbucketRepoData?.status === 'reconnect_required' ||
                     bitbucketRepoData?.status === 'insufficient_permissions') &&
                     bitbucketIntegrationHref && (
@@ -1581,6 +1582,30 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                         >
                           Replace the Bitbucket token to list repositories
                         </Link>
+=======
+                  {organizationId &&
+                    bitbucketIntegrationHref &&
+                    bitbucketRepoData?.status &&
+                    bitbucketRepoData.status !== 'available' &&
+                    bitbucketRepoData.status !== 'not_connected' &&
+                    bitbucketRepoData.status !== 'workspace_selection_required' && (
+                      <div className="border-b px-3 py-2 text-xs">
+                        {bitbucketRepoData.status === 'temporarily_unavailable' ? (
+                          <span className="text-muted-foreground">
+                            Bitbucket is temporarily unavailable. Refresh repositories to try again.
+                          </span>
+                        ) : (
+                          <Link
+                            href={bitbucketIntegrationHref}
+                            className="text-link hover:text-link-hover underline underline-offset-4"
+                          >
+                            {bitbucketRepoData.status === 'reconnect_required' ||
+                            bitbucketRepoData.status === 'insufficient_permissions'
+                              ? 'Replace the Bitbucket token to list repositories'
+                              : 'Review the Bitbucket connection'}
+                          </Link>
+                        )}
+>>>>>>> theirs
                       </div>
                     )}
                   <CommandEmpty>No repositories match your search</CommandEmpty>

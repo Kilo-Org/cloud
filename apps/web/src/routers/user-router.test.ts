@@ -1134,6 +1134,79 @@ describe('user router - account deletion', () => {
     });
   });
 
+  it('rejects an expired code without deleting', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await db
+      .update(magic_link_tokens)
+      .set({
+        // Shift both timestamps into the past so the code is expired while
+        // still satisfying the `expires_at > created_at` check constraint.
+        created_at: new Date(Date.now() - 2 * 60_000).toISOString(),
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+      })
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('wrong code increments attempts and does not delete', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+    const wrongCode = devCode === '000000' ? '111111' : '000000';
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: wrongCode })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+
+    const [row] = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(row?.attempts).toBe(1);
+  });
+
+  it('maps too_many_attempts to TOO_MANY_REQUESTS', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await db
+      .update(magic_link_tokens)
+      .set({ attempts: 5 })
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('production provider_not_configured does not stamp and throws INTERNAL_SERVER_ERROR', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const restoreNodeEnv = jest.replaceProperty(process.env, 'NODE_ENV', 'production');
+    try {
+      await expect(caller.user.requestAccountDeletionChallenge()).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+
+      const [user] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, deletionUser.id));
+      expect(user?.account_deletion_requested_at).toBeNull();
+    } finally {
+      restoreNodeEnv.restore();
+    }
+  });
+
   it('precondition error maps to PRECONDITION_FAILED without deleting', async () => {
     mockAssertUserCanBeSoftDeleted.mockRejectedValue(
       new SoftDeletePreconditionError('active subscription')

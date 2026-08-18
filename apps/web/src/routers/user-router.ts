@@ -10,6 +10,7 @@ import {
   consumeSignInCode,
   createSignInCode,
   deleteSignInCode,
+  reserveSignInCode,
 } from '@/lib/auth/magic-link-tokens';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
@@ -916,12 +917,21 @@ export const userRouter = createTRPCRouter({
 
       if (sendResult.reason === 'provider_not_configured') {
         // Local/dev has no mail provider. Keep the code row so the caller can
-        // still complete the flow with the returned dev code.
+        // still complete the flow with the returned dev code. In production,
+        // treat this like any other send failure: discard the code and fail so
+        // the user is not left stuck with a cooldown and no code.
+        if (!includeDevCode) {
+          await deleteSignInCode(userEmail, code);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to send confirmation code. Please try again.',
+          });
+        }
         await db
           .update(kilocode_users)
           .set({ account_deletion_requested_at: new Date().toISOString() })
           .where(eq(kilocode_users.id, userId));
-        return includeDevCode ? { challengeId, devCode: code } : { challengeId };
+        return { challengeId, devCode: code };
       }
 
       // neverbounce_rejected: discard the code and leave the stamp untouched so
@@ -946,6 +956,23 @@ export const userRouter = createTRPCRouter({
           throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
         }
         throw error;
+      }
+
+      const reserveResult = await reserveSignInCode(userEmail, input.code, input.challengeId);
+      if (reserveResult === 'invalid') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid confirmation code' });
+      }
+      if (reserveResult === 'too_many_attempts') {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many attempts. Please request a new confirmation code.',
+        });
+      }
+      if (reserveResult === 'in_progress') {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Confirmation code is already being verified. Please wait.',
+        });
       }
 
       const consumed = await consumeSignInCode(userEmail, input.code, input.challengeId);

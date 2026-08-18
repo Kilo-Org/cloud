@@ -2082,7 +2082,7 @@ describe('organization Kilo Pass service-fee attachment', () => {
     );
     expect(result.assessment).toMatchObject({
       outcome: 'exempt',
-      exemptionHistoryId: 'hist_exempt',
+      exemptionId: 'hist_exempt',
       chargedFeeMinor: 0,
       expectedFeeMinor: 245,
     });

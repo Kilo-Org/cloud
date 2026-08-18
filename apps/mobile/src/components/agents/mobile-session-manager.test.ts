@@ -459,7 +459,8 @@ describe('createMobileAgentSessionManager api.send', () => {
     sendMessageMutate.mockReset();
     sendMessageMutate.mockResolvedValue(undefined);
     const config = setup();
-    await config.api.send({ sessionId: 'c-1', payload: 'hi', messageId: 'm-1' });
+    const input = { sessionId: 'c-1', payload: 'hi', messageId: 'm-1' };
+    await config.api.send(input as never);
 
     expect(sendMessageMutate).toHaveBeenCalledTimes(1);
     const payload = sendMessageMutate.mock.calls[0]?.[0] as Record<string, unknown>;

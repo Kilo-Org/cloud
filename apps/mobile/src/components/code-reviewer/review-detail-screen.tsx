@@ -112,7 +112,12 @@ export function ReviewDetailScreen({
   const allFindings = flattenCouncilFindings(review.council_result);
   const visibleFindings = allFindings.slice(0, visibleCount);
   const hasMoreFindings = visibleCount < allFindings.length;
-  const gateThreshold = review.manual_config?.agentConfig.gate_threshold;
+  // Legacy rows may carry a `manual_config` without `agentConfig` (the strict
+  // `ManualCodeReviewConfigSchema` documents this malformed shape), so read the
+  // threshold defensively instead of crashing on the missing inner object.
+  const gateThreshold = (
+    review.manual_config as { agentConfig?: { gate_threshold?: string } } | null
+  )?.agentConfig?.gate_threshold;
 
   return (
     <View className="flex-1 bg-background">

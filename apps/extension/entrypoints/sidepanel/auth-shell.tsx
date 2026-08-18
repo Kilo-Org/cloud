@@ -28,6 +28,7 @@ import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
 import { settingsDialogOpenAtom } from './settings-dialog-state';
+import { WebMcpSettings } from './web-mcp-settings';
 import { WorkflowSettings } from './workflow-settings';
 
 const emptyOrganizationOptions: KiloOrganizationOption[] = [];
@@ -207,6 +208,7 @@ const HeaderActions = ({
               organizationOptions={organizationOptions}
               selectedOrganizationId={selectedOrganizationId}
             />
+            <WebMcpSettings />
             <RemoteMcpSettings />
             <AnalyticsSettingsRow userEmail={auth.userEmail} />
             <button

@@ -38,6 +38,7 @@ import {
   resetDraftTimersForTests,
   resolvePrefillOverDraft,
   saveDraft,
+  securityDismissDraftKey,
 } from './drafts';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
@@ -116,6 +117,9 @@ describe('draft scope and entity keys', () => {
     expect(agentComposerDraftKey('sess-1')).toBe('agent-composer:sess-1');
     expect(NEW_SESSION_DRAFT_KEY).toBe('agent-composer:new');
     expect(prReviewDraftKey('acme', 'kilo', 42)).toBe('pr-review:acme/kilo#42');
+    expect(securityDismissDraftKey('personal', 'finding-1')).toBe(
+      'security-dismiss:personal:finding-1'
+    );
   });
 
   it('resolvePrefillOverDraft lets a non-empty prefill beat the stored draft', () => {
@@ -427,10 +431,10 @@ describe('write rejection boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('clearDraft reports and resolves when the remove fails', async () => {
+  it('clearDraft reports and returns false when the remove fails', async () => {
     kvMock.removeItem.mockRejectedValueOnce(new Error('kv down'));
     seedStoredValue('draft:u1', 'k', '"old"');
-    await expect(clearDraft('u1', 'k')).resolves.toBeUndefined();
+    await expect(clearDraft('u1', 'k')).resolves.toBe(false);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 

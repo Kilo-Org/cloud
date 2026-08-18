@@ -81,6 +81,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/dispatch-invite-email-outbox",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/dispatch-pending-code-reviews",
       "schedule": "*/10 * * * *"
     },

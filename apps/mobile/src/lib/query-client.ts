@@ -1,4 +1,4 @@
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { MutationCache, type Query, QueryCache, QueryClient } from '@tanstack/react-query';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 
@@ -12,8 +12,80 @@ const PERMANENT_CODES = new Set([
   'CONFLICT',
 ]);
 
+type TrpcErrorData = {
+  code?: string;
+  authRequired?: boolean;
+};
+
+/** The serialized tRPC error data, from either the direct or shaped variant. */
+function trpcErrorData(error: unknown): TrpcErrorData | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+  const direct = (error as { data?: unknown }).data;
+  if (typeof direct === 'object' && direct !== null) {
+    return direct as TrpcErrorData;
+  }
+  const shaped = (error as { shape?: { data?: unknown } }).shape?.data;
+  if (typeof shaped === 'object' && shaped !== null) {
+    return shaped as TrpcErrorData;
+  }
+  return undefined;
+}
+
+/**
+ * True when the error is a permission loss: a `FORBIDDEN`, or a procedure-level
+ * `UNAUTHORIZED` without the context-level `authRequired` flag (which the
+ * unauthorized handler signs the user out on). Permission loss must drop the
+ * affected cache, not the session.
+ */
+function isPermissionDeniedError(error: unknown): boolean {
+  const data = trpcErrorData(error);
+  if (data?.code === 'FORBIDDEN') {
+    return true;
+  }
+  return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
+}
+
+/** The `input` field of a tRPC query key's meta segment, or undefined. */
+function queryKeyInput(queryKey: unknown): unknown {
+  if (!Array.isArray(queryKey) || queryKey.length < 2) {
+    return undefined;
+  }
+  const meta = queryKey[1];
+  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) {
+    return undefined;
+  }
+  return (meta as { input?: unknown }).input;
+}
+
+/**
+ * Drops a permission-denied query from the cache so the next persister save
+ * omits it. An org-scoped query is removed by its org prefix (procedure path +
+ * `input.organizationId`), which also covers every sibling variant of that
+ * procedure for the same org; a non-org query is removed by its exact key.
+ */
+function removePermissionDeniedQueries(
+  queryClient: QueryClient,
+  error: unknown,
+  query: Query<unknown, unknown, unknown>
+): void {
+  if (!isPermissionDeniedError(error)) {
+    return;
+  }
+  const input = queryKeyInput(query.queryKey);
+  const organizationId = (input as { organizationId?: unknown } | undefined)?.organizationId;
+  if (organizationId !== undefined && organizationId !== null) {
+    queryClient.removeQueries({
+      queryKey: [query.queryKey[0], { input: { organizationId } }],
+    });
+    return;
+  }
+  queryClient.removeQueries({ queryKey: query.queryKey });
+}
+
 export function createKiloAppQueryClient(): QueryClient {
-  return new QueryClient({
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: (failureCount, error) => {
@@ -27,8 +99,14 @@ export function createKiloAppQueryClient(): QueryClient {
       },
     },
     queryCache: new QueryCache({
-      onError: error => {
+      onError: (error, query) => {
         void handleTrpcQueryError(error);
+        // Removing a still-observed query rebuilds it on the next render and
+        // refetches, which fails FORBIDDEN again and loops for as long as the
+        // error screen stays mounted. Only drop queries nothing is observing.
+        if (!query.isActive()) {
+          removePermissionDeniedQueries(queryClient, error, query);
+        }
       },
     }),
     mutationCache: new MutationCache({
@@ -37,6 +115,7 @@ export function createKiloAppQueryClient(): QueryClient {
       },
     }),
   });
+  return queryClient;
 }
 
 export const queryClient = createKiloAppQueryClient();

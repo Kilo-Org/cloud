@@ -11,6 +11,7 @@ import {
 
 const offlineState: ConnectivityState = { isConnected: false, isInternetReachable: false };
 const onlineState: ConnectivityState = { isConnected: true, isInternetReachable: true };
+const unknownState: ConnectivityState = { isConnected: null, isInternetReachable: null };
 
 function createFakeSource() {
   const listeners = new Set<(state: ConnectivityState) => void>();
@@ -85,10 +86,34 @@ function createStore(
 }
 
 describe('createOfflineBannerStore', () => {
-  it('starts online', () => {
+  it('starts unknown, not offline', () => {
     const { store } = createStore();
 
     expect(store.isOffline()).toBe(false);
+  });
+
+  it('does not show the offline banner while connectivity is unknown', () => {
+    const { store, source, timer } = createStore();
+    const listener = vi.fn(() => undefined);
+    store.subscribe(listener);
+
+    source.emit(unknownState);
+    timer.firePending();
+
+    expect(store.isOffline()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('does not notify on unknown → online (the banner stays hidden)', () => {
+    const { store, source } = createStore();
+    const listener = vi.fn(() => undefined);
+    store.subscribe(listener);
+
+    source.emit(unknownState);
+    source.emit(onlineState);
+
+    expect(store.isOffline()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('commits offline only after the show delay and notifies once', () => {

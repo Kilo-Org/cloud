@@ -9,13 +9,13 @@ import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
-import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
+import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
@@ -33,13 +33,13 @@ const mobileRouter = createTRPCRouter({
   personalReviewAgent: personalReviewAgentRouter,
   securityAgent: securityAgentRouter,
   kiloPass: kiloPassRouter,
-  agentProfiles: agentProfilesRouter,
   kiloclaw: kiloclawRouter,
   models: modelsRouter,
   activeSessions: activeSessionsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
   kiloChat: kiloChatRouter,
+  agentProfiles: agentProfilesMobileRouter,
 });
 
 export type MobileRouter = typeof mobileRouter;

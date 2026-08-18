@@ -293,6 +293,26 @@ describe('CachePersistenceMount', () => {
     });
   });
 
+  it('clears the previous account cache scope when the user changes', async () => {
+    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
+    const renderer = mount();
+    await flushMicrotasks();
+    expect(kvMock.clearScopePrefix).not.toHaveBeenCalled();
+
+    // A direct account switch (no sign-out): the mount must drop the old
+    // account's read-cache scope before subscribing for the new account.
+    identityMock.value = { userId: 'u2', isLoading: false, isError: false };
+    act(() => {
+      renderer.update(createElement(CachePersistenceMount));
+    });
+    await flushMicrotasks();
+
+    expect(kvMock.clearScopePrefix).toHaveBeenCalledWith('cache:u1:');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('unsubscribes the persister on unmount', async () => {
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     const renderer = mount();

@@ -112,6 +112,18 @@ export function FindingAnalysisPanel({
   // — server owns eligibility, this just reads the already-fetched state.
   const findingOpen = analysis.findingState.status === 'open';
   const analysisState = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
+  // Sandbox/triage evidence is authoritative only once the analysis reached a
+  // terminal sandbox/triage state. A stale result left behind by a failed
+  // retry must not read as "Analyzed" (completion copy) in queued/running/failed.
+  const sandboxState =
+    analysisState === 'extraction-failed' ||
+    analysisState === 'exploitable' ||
+    analysisState === 'not-exploitable' ||
+    analysisState === 'unknown';
+  const triageState =
+    analysisState === 'safe-to-dismiss' ||
+    analysisState === 'manual-review' ||
+    analysisState === 'analysis-required';
   const canStartAnalysis =
     findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
   const canRestartAnalysis = findingOpen && analysis.status === 'running';
@@ -223,7 +235,7 @@ export function FindingAnalysisPanel({
         </Pressable>
       ) : null}
 
-      {triage ? (
+      {triageState && triage ? (
         <View className="gap-2">
           <View className="rounded-lg bg-secondary px-3">
             <KvRow label="Triage confidence" value={humanize(triage.confidence)} />
@@ -242,7 +254,7 @@ export function FindingAnalysisPanel({
         </View>
       ) : null}
 
-      {sandbox ? (
+      {sandboxState && sandbox ? (
         <View className="gap-2">
           <View className="rounded-lg bg-secondary px-3">
             <KvRow label="Exploitable" value={formatExploitable(sandbox.isExploitable)} />

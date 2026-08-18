@@ -44,6 +44,13 @@ const mockTrackSecurityAgentRemediationAction = jest.fn();
 const mockLogSecurityAudit = jest.fn();
 const mockCreateSecurityAuditLog = jest.fn();
 const mockUpsertSecurityAgentConfig = jest.fn();
+const mockSaveSecurityAgentConfigWithRevision = jest.fn<
+  (params: unknown) => Promise<{
+    newRevision: number;
+    existingFindingsQueuedCount?: number;
+    existingRemediationCommandId?: string;
+  }>
+>();
 const mockSetSecurityAgentEnabled = jest.fn();
 const mockCheckDependabotAlertsAvailability =
   jest.fn<
@@ -113,6 +120,7 @@ jest.mock('../services/audit-log-service', () => ({
 jest.mock('../db/security-config', () => ({
   getSecurityAgentConfigWithStatus: mockGetSecurityAgentConfigWithStatus,
   upsertSecurityAgentConfig: mockUpsertSecurityAgentConfig,
+  saveSecurityAgentConfigWithRevision: mockSaveSecurityAgentConfigWithRevision,
   setSecurityAgentEnabled: mockSetSecurityAgentEnabled,
 }));
 jest.mock('../db/security-findings', () => ({
@@ -159,6 +167,7 @@ beforeEach(() => {
   mockGetSecurityAgentConfigWithStatus.mockResolvedValue(null);
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
+  mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 1 });
   mockCheckDependabotAlertsAvailability.mockResolvedValue([]);
   mockRecordOperationAcceptance.mockResolvedValue({ status: 'admitted' });
   mockMarkReconcilePending.mockResolvedValue({ status: 'reconcile_pending' });
@@ -419,32 +428,76 @@ describe('setEnabled', () => {
       initialSyncAdmissionFailed: true,
     });
   });
+
+  it('refuses enabling with an empty selected repo set', async () => {
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+
+  it('refuses enabling with all mode and zero integration repos', async () => {
+    await expect(
+      createPersonalHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
 });
 
 describe('saveConfig', () => {
-  it('awaits existing-finding backlog admission and returns queued count', async () => {
-    mockEnqueueBacklogFindings.mockResolvedValue(4);
+  it('delegates to the CAS save and returns the queued count', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({
+      newRevision: 2,
+      existingFindingsQueuedCount: 4,
+    });
 
     await expect(
       createHandlers().saveConfig.handler({
         ctx: context,
-        input: { autoAnalysisEnabled: true, autoAnalysisIncludeExisting: true },
+        input: {
+          expectedRevision: 1,
+          autoAnalysisEnabled: true,
+          autoAnalysisIncludeExisting: true,
+        },
       })
     ).resolves.toMatchObject({ success: true, existingFindingsQueuedCount: 4 });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedRevision: 1,
+        enqueueAnalysis: {
+          owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+          minSeverity: 'high',
+        },
+      })
+    );
   });
 
-  it('keeps saved settings authoritative when backlog admission fails', async () => {
-    mockEnqueueBacklogFindings.mockRejectedValue(new Error('database unavailable'));
+  it('propagates a stale-revision CONFLICT without a success receipt', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockRejectedValue(
+      new TRPCError({ code: 'CONFLICT', message: 'stale revision' })
+    );
 
     await expect(
       createHandlers().saveConfig.handler({
         ctx: context,
-        input: { autoAnalysisEnabled: true, autoAnalysisIncludeExisting: true },
+        input: { expectedRevision: 1 },
       })
-    ).resolves.toMatchObject({
-      success: true,
-      backlogAdmissionWarning: expect.stringContaining('Settings saved'),
-    });
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 });
 

@@ -15,6 +15,7 @@ import type * as OperationKeyModule from '@/lib/operation-key';
 import {
   dismissFindingIntentFingerprint,
   useDismissSecurityFinding,
+  useStartSecurityAnalysis,
 } from './use-security-findings';
 
 const hoistedKeys = vi.hoisted(() => ({
@@ -57,6 +58,32 @@ vi.mock('sonner-native', () => ({
   toast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
+// `use-security-agent-mutations` imports the outbox (P1-E-40c), which pulls in
+// `@sentry/react-native` (Flow) transitively; mock it so this pure-logic test
+// never loads react-native's index.js.
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => ({
+    getStoredOperationKey: vi.fn(() => null),
+    writeSafeRetry: vi.fn(async () => {
+      await Promise.resolve();
+    }),
+    writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => {
+      await Promise.resolve();
+      return row.operationKey;
+    }),
+    remove: vi.fn(async () => {
+      await Promise.resolve();
+    }),
+    needsReconcile: [],
+    loaded: true,
+    whenLoaded: vi.fn(async () => {
+      await Promise.resolve();
+      return true;
+    }),
+    refresh: vi.fn(),
+  }),
+}));
+
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onError?: (error: unknown) => void;
@@ -68,6 +95,8 @@ type MutationOptions = {
 let lastCapturedOptions: MutationOptions | null = null;
 const personalDismissMutateMock = vi.fn();
 const orgDismissMutateMock = vi.fn();
+const personalStartAnalysisMutateMock = vi.fn();
+const orgStartAnalysisMutateMock = vi.fn();
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
@@ -104,10 +133,12 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     securityAgent: {
       dismissFinding: { mutate: (vars: unknown) => personalDismissMutateMock(vars) },
+      startAnalysis: { mutate: (vars: unknown) => personalStartAnalysisMutateMock(vars) },
     },
     organizations: {
       securityAgent: {
         dismissFinding: { mutate: (vars: unknown) => orgDismissMutateMock(vars) },
+        startAnalysis: { mutate: (vars: unknown) => orgStartAnalysisMutateMock(vars) },
       },
     },
   },
@@ -207,6 +238,40 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     useDismissSecurityFinding('personal');
     lastCapturedOptions?.onSuccess?.({ success: true, commandId: 'cmd-9' }, DISMISS_VARS);
     expect(trackCommandMock).toHaveBeenCalled();
+  });
+});
+
+describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    personalStartAnalysisMutateMock.mockReset();
+    orgStartAnalysisMutateMock.mockReset();
+  });
+
+  it('always sends forceSandbox: true on a personal analysis start', async () => {
+    personalStartAnalysisMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useStartSecurityAnalysis('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ findingId: FINDING_ID });
+
+    expect(personalStartAnalysisMutateMock).toHaveBeenCalledWith({
+      findingId: FINDING_ID,
+      forceSandbox: true,
+    });
+  });
+
+  it('always sends forceSandbox: true on an org analysis start', async () => {
+    orgStartAnalysisMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-2' });
+    useStartSecurityAnalysis(ORG_ID);
+
+    await lastCapturedOptions?.mutationFn?.({ findingId: FINDING_ID, retrySandboxOnly: true });
+
+    expect(orgStartAnalysisMutateMock).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      findingId: FINDING_ID,
+      retrySandboxOnly: true,
+      forceSandbox: true,
+    });
   });
 });
 

@@ -14,6 +14,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
+  useSecurityAgentRepositories,
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
@@ -35,6 +36,16 @@ function SettingsOverviewSkeleton() {
 
 type SettingsOverviewPresentation = 'inline' | 'route';
 
+function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
+  if (!canManage) {
+    return 'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
+  }
+  if (!hasEffectiveRepo) {
+    return 'Select at least one repository before enabling Security Agent.';
+  }
+  return 'Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation.';
+}
+
 export function SettingsOverviewScreen({
   scope,
   presentation = 'inline',
@@ -44,6 +55,7 @@ export function SettingsOverviewScreen({
   const canManage = useSecurityAgentCapability(scope).canManage;
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const repositories = useSecurityAgentRepositories(scope);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -75,6 +87,25 @@ export function SettingsOverviewScreen({
   }
 
   const data = config.data;
+  // Distinguish a settled-empty repo set from a still-loading or failed one:
+  // a loading or failed query must not read as "zero repositories".
+  const repositoriesEmpty = repositories.data?.length === 0;
+  const repositoriesLoading = repositories.isLoading;
+  const repositoriesError = repositories.isError;
+  // An enable attempt with no effective repository would be refused by the
+  // server, so the switch is disabled up front under the same rule: `selected`
+  // mode with zero selected ids, or `all` mode with zero integration repos.
+  const hasEffectiveRepo =
+    data.repositorySelectionMode === 'all'
+      ? (repositories.data?.length ?? 0) > 0
+      : data.selectedRepositoryIds.length > 0;
+  // A disabled agent with integration repos but no effective selection is the
+  // first-enable deadlock: the switch is disabled (the server would refuse an
+  // empty effective set) and the Repositories row only renders when enabled, so
+  // offer a direct path to the repo picker. Hide the CTA only when the repo set
+  // is settled and empty (nothing to select); a loading or failed repo query
+  // keeps the CTA reachable.
+  const showRepoCta = !data.isEnabled && canManage && !hasEffectiveRepo && !repositoriesEmpty;
   const repoCountLabel =
     data.repositorySelectionMode === 'all'
       ? 'All repositories'
@@ -126,6 +157,34 @@ export function SettingsOverviewScreen({
   // needs to be reachable here too.
   const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
 
+  // Render the disabled-agent copy in three states: a still-loading repo set
+  // (skeleton), a failed repo set (error + Retry), or a settled set (copy).
+  const renderRepositoryStatus = () => {
+    if (data.repositorySelectionMode === 'all' && repositoriesLoading) {
+      return <Skeleton className="h-4 w-56 rounded" />;
+    }
+    if (data.repositorySelectionMode === 'all' && repositoriesError) {
+      return (
+        <View className="flex-row items-center gap-2">
+          <Text variant="muted" className="text-xs">
+            Could not load repositories
+          </Text>
+          <Text
+            className="text-xs font-medium text-primary"
+            onPress={() => void repositories.refetch()}
+          >
+            Retry
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <Text variant="muted" className="text-xs">
+        {getDisabledCopy(canManage, hasEffectiveRepo)}
+      </Text>
+    );
+  };
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Settings" headerRight={auditAction} />
@@ -141,7 +200,7 @@ export function SettingsOverviewScreen({
             <Switch
               accessibilityLabel="Security Agent"
               value={data.isEnabled}
-              disabled={setEnabled.isPending}
+              disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
               onValueChange={handleToggle}
             />
           ) : (
@@ -152,11 +211,19 @@ export function SettingsOverviewScreen({
         </View>
 
         {!data.isEnabled && (
-          <Text variant="muted" className="text-xs">
-            {canManage
-              ? 'Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation.'
-              : 'Security Agent is disabled. Only organization owners and billing managers can turn it on.'}
-          </Text>
+          <View className="gap-3">
+            {renderRepositoryStatus()}
+            {showRepoCta ? (
+              <ConfigureRow
+                icon={FolderGit2}
+                title="Select repositories"
+                subtitle="Choose which repositories Security Agent monitors"
+                onPress={() => {
+                  router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                }}
+              />
+            ) : null}
+          </View>
         )}
 
         {data.isEnabled && (

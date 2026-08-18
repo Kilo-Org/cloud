@@ -4531,6 +4531,9 @@ export const agent_configs = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+
+    // Optimistic concurrency revision for compare-and-set config saves.
+    config_revision: integer().notNull().default(1),
   },
   table => [
     // Unique constraints for org and user ownership
@@ -4561,6 +4564,7 @@ export const agent_configs = pgTable(
       'agent_configs_agent_type_check',
       sql`${table.agent_type} IN ('code_review', 'auto_triage', 'auto_fix', 'security_scan')`
     ),
+    check('agent_configs_config_revision_check', sql`${table.config_revision} >= 1`),
   ]
 );
 
@@ -6358,6 +6362,7 @@ export const security_analysis_queue = pgTable(
     }),
     queue_status: text().notNull(),
     severity_rank: smallint().notNull(),
+    admitted_config_revision: integer(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_by_job_id: text(),
@@ -10480,6 +10485,56 @@ export const analytics_event_outbox = pgTable(
 
 export type AnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferSelect;
 export type NewAnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferInsert;
+
+/**
+ * Durable outbox for live side effects that must be written atomically with
+ * the primary write (P2-B-11). The only operation today is the organization
+ * invite email, which the invite mutation enqueues instead of sending inline.
+ * The cron drainer claims due `pending` rows, sends the mail, and marks
+ * `delivered`; on error it backs off and retries, failing a row after 8
+ * attempts. `sending` claims older than 5 minutes are reclaimed. A unique
+ * `invitation_id` prevents a retry from enqueueing the same invite twice.
+ */
+export type ExternalSideEffectOutboxPayload = {
+  invitationId: string;
+  to: string;
+  organizationName: string;
+  inviterName: string;
+  acceptInviteUrl: string;
+};
+
+export const external_side_effect_outbox = pgTable(
+  'external_side_effect_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    operation: text().$type<'send_org_invite_email'>().notNull().default('send_org_invite_email'),
+    invitation_id: uuid().notNull(),
+    payload: jsonb().$type<ExternalSideEffectOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_external_side_effect_outbox_invitation_id').on(table.invitation_id),
+    index('IDX_external_side_effect_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+  ]
+);
+
+export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
+export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
 
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 

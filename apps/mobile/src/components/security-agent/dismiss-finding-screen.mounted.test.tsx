@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
+/* eslint-disable max-lines -- the CTA terminal-state and draft-on-type suites share one screen harness. */
 
 // Dismiss-screen terminal-state contract: a persistence failure (the ledger
 // could not record the outcome, so a same-key retry guarantee does not hold)
@@ -47,6 +48,12 @@ const finding = vi.hoisted(() => ({
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
 }));
+const dismissDraft = vi.hoisted(() => ({
+  draft: null as unknown,
+  hydrated: true,
+  persist: vi.fn(),
+  clear: vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -67,6 +74,9 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
   useDismissSecurityFinding: () => dismiss,
+}));
+vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
+  useSecurityDismissDraft: () => dismissDraft,
 }));
 // Faithful-enough mirror of the real classifier (covered by its own suite):
 // the persistence-failure and replay-failed markers and the
@@ -149,6 +159,15 @@ function renderedTexts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+function findCommentInput(root: I): I {
+  const nodes = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'TextInput');
+  const n = nodes[0];
+  if (!n) {
+    throw new Error('comment TextInput not found');
+  }
+  return n;
+}
+
 describe('DismissFindingScreen dismissal CTA states', () => {
   beforeEach(() => {
     dismiss.mutate.mockClear();
@@ -161,6 +180,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.isLoading = false;
     finding.isError = false;
     finding.data = { status: 'open' };
+    dismissDraft.draft = null;
+    dismissDraft.hydrated = true;
+    dismissDraft.persist.mockClear();
+    dismissDraft.clear.mockClear();
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {
@@ -220,7 +243,130 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
     expect(dismiss.mutate).toHaveBeenCalledWith(
       expect.objectContaining({ findingId: 'finding-1', reason: 'not_used' }),
-      expect.objectContaining({ onSuccess: expect.any(Function) })
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) })
+    );
+  });
+
+  it('records the intent as a draft before submitting', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    expect(dismissDraft.persist).toHaveBeenCalledWith({
+      reason: 'not_used',
+      comment: '',
+      lastError: null,
+      retryable: null,
+    });
+  });
+
+  it('clears the draft and pops on authoritative accept', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    const options = dismiss.mutate.mock.calls[0]?.[1] as {
+      onSuccess?: () => void;
+    };
+    act(() => {
+      options.onSuccess?.();
+    });
+
+    expect(dismissDraft.clear).toHaveBeenCalledTimes(1);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists lastError and retryable on a retryable failure', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    const options = dismiss.mutate.mock.calls[0]?.[1] as {
+      onError?: (error: Error) => void;
+    };
+    act(() => {
+      options.onError?.(new Error(IN_PROGRESS_COPY));
+    });
+
+    expect(dismissDraft.persist).toHaveBeenLastCalledWith({
+      reason: 'not_used',
+      comment: '',
+      lastError: IN_PROGRESS_COPY,
+      retryable: true,
+    });
+  });
+
+  it('persists the configuration copy and non-retryable on a missing-configuration failure', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    const options = dismiss.mutate.mock.calls[0]?.[1] as {
+      onError?: (error: Error) => void;
+    };
+    act(() => {
+      options.onError?.(new Error(CONFIGURATION_ERROR_MESSAGE));
+    });
+
+    expect(dismissDraft.persist).toHaveBeenLastCalledWith({
+      reason: 'not_used',
+      comment: '',
+      lastError: CONFIGURATION_COPY,
+      retryable: false,
+    });
+  });
+});
+
+describe('DismissFindingScreen draft persistence on type', () => {
+  it('persists the reason as a draft on selection', () => {
+    renderScreen();
+    selectReason();
+
+    expect(dismissDraft.persist).toHaveBeenCalledWith({
+      reason: 'not_used',
+      comment: '',
+      lastError: null,
+      retryable: null,
+    });
+  });
+
+  it('persists the comment as a draft on typing', () => {
+    const root = renderScreen();
+
+    act(() => {
+      (findCommentInput(root.root).props.onChangeText as (value: string) => void)('some context');
+    });
+
+    expect(dismissDraft.persist).toHaveBeenCalledWith({
+      reason: '',
+      comment: 'some context',
+      lastError: null,
+      retryable: null,
+    });
+  });
+
+  it('preserves the last failure when typing after a failure', () => {
+    dismissDraft.draft = { reason: 'not_used', comment: '', lastError: 'boom', retryable: true };
+    const root = renderScreen();
+
+    act(() => {
+      (findCommentInput(root.root).props.onChangeText as (value: string) => void)('edited');
+    });
+
+    expect(dismissDraft.persist).toHaveBeenCalledWith(
+      expect.objectContaining({ comment: 'edited', lastError: 'boom', retryable: true })
     );
   });
 });

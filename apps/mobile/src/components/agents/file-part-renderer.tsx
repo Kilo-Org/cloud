@@ -27,12 +27,12 @@ import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
 const CACHE_DIR_NAME = 'session-file-parts';
 
-function cacheFilenameForPart(part: FilePart): string {
+function cacheFilenameForPart(part: Pick<FilePart, 'id' | 'mime' | 'filename'>): string {
   return getSafeCacheFilename({ id: part.id, filename: part.filename ?? 'file' });
 }
 
 /** Write a base64 `data:` payload to the cache and return the file. */
-function writeDataUrlToCache(url: string, part: FilePart): File {
+function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>): File {
   const payload = stripDataUrlBase64Prefix(url, part.mime);
   if (payload === undefined) {
     throw new Error('decode-failed');
@@ -45,7 +45,7 @@ function writeDataUrlToCache(url: string, part: FilePart): File {
 }
 
 /** Resolve the file text for a preview, keeping the file for a later share. */
-async function resolveFileText(url: string, part: FilePart): Promise<string> {
+async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>) {
   if (url.startsWith('data:')) {
     const file = writeDataUrlToCache(url, part);
     return file.text();
@@ -257,6 +257,7 @@ type FilePreviewModalProps = {
 };
 
 function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModalProps>) {
+  const { id, mime, filename } = part;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -266,7 +267,7 @@ function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModa
     setStatus('loading');
     async function load() {
       try {
-        const resolved = await resolveFileText(url, part);
+        const resolved = await resolveFileText(url, { id, mime, filename });
         if (cancelled) {
           return;
         }
@@ -283,7 +284,7 @@ function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModa
     return () => {
       cancelled = true;
     };
-  }, [url, part, attempt]);
+  }, [url, id, mime, filename, attempt]);
 
   function renderBody() {
     if (status === 'loading') {

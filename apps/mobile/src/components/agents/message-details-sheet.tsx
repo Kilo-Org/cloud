@@ -1,8 +1,11 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { useTRPC } from '@/lib/trpc';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -11,6 +14,13 @@ import { formatExactTokens } from './context-usage-display';
 import { handleMessageDetailsCopy } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
+import {
+  buildReportAiResponseErrorToast,
+  buildReportAiResponseInput,
+  classifyReportAiResponseFailure,
+  reportAiResponseSubmittedToast,
+  shouldShowReportAiResponse,
+} from './report-ai-response';
 
 type MessageDetailsSheetProps = {
   visible: boolean;
@@ -26,11 +36,37 @@ export function MessageDetailsSheet({
   onClose,
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
+  const trpc = useTRPC();
+  const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
     () => (message ? getMessageDetailsContent(message, modelOptions) : null),
     [message, modelOptions]
   );
+
+  const reportMutation = useMutation(
+    trpc.moderation.reportContent.mutationOptions({
+      onSuccess: (result, input) => {
+        setReportedMessageId(input.targetId);
+        announcingToast.success(reportAiResponseSubmittedToast(result.receiptId));
+      },
+      onError: (error, input) => {
+        const failure = classifyReportAiResponseFailure(error);
+        const errorToast = buildReportAiResponseErrorToast(failure, () => {
+          reportMutation.mutate(input);
+        });
+        announcingToast.error(
+          errorToast.message,
+          errorToast.action ? { action: errorToast.action } : undefined
+        );
+      },
+    })
+  );
+
+  const showReport =
+    message !== null &&
+    shouldShowReportAiResponse(message) &&
+    message.info.id !== reportedMessageId;
 
   useEffect(() => {
     if (!visible) {
@@ -40,6 +76,26 @@ export function MessageDetailsSheet({
 
   const handleCopy = () => {
     handleMessageDetailsCopy(content?.copyableText);
+  };
+
+  const handleReport = () => {
+    if (!message) {
+      return;
+    }
+    const input = buildReportAiResponseInput(message);
+    if (!input) {
+      return;
+    }
+    Alert.alert('Report AI response', 'Report this response for review?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Report',
+        style: 'destructive',
+        onPress: () => {
+          reportMutation.mutate(input);
+        },
+      },
+    ]);
   };
 
   return (
@@ -98,6 +154,20 @@ export function MessageDetailsSheet({
                     </Pressable>
                   ) : null}
                 </View>
+              ) : null}
+
+              {showReport ? (
+                <Pressable
+                  onPress={handleReport}
+                  accessibilityRole="button"
+                  accessibilityLabel="Report AI response"
+                  className="mb-6 rounded-md border border-border px-4 py-3 active:opacity-70"
+                  testID="message-details-report"
+                >
+                  <Text className="text-center text-base font-medium text-foreground">
+                    Report AI response
+                  </Text>
+                </Pressable>
               ) : null}
 
               <View className="gap-4">

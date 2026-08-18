@@ -850,6 +850,51 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(ownerCreditTransactionsAfter).toHaveLength(ownerCreditTransactionsBefore.length);
   });
 
+  it('marks the event processed and returns no subscription when the store purchase mismatches', async () => {
+    const user = await insertTestUser();
+    const existingSubscriptionId = `orig-${crypto.randomUUID()}`;
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'mismatch-active-sub-initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'mismatch-active-sub-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: existingSubscriptionId,
+          appAccountToken: user.app_store_account_token,
+        }),
+    });
+
+    // A renewal for a different provider subscription resolves to the same user,
+    // whose active subscription makes the completion settle a permanent mismatch.
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'mismatch-active-sub-renewal',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'mismatch-active-sub-renewal',
+          notificationType: NotificationTypeV2.DID_RENEW,
+          signedTransactionInfo: 'mismatch-active-sub-renewal-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: `orig-${crypto.randomUUID()}`,
+          transactionId: `tx-${crypto.randomUUID()}`,
+          appAccountToken: user.app_store_account_token,
+        }),
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(result).not.toHaveProperty('subscriptionId');
+
+    const mismatchEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, 'mismatch-active-sub-renewal'),
+    });
+    expect(mismatchEvent?.processed_at).not.toBeNull();
+  });
+
   it('applies App Store upgrade renewal preference notifications immediately', async () => {
     const user = await insertTestUser();
     const providerSubscriptionId = `orig-${crypto.randomUUID()}`;

@@ -118,6 +118,7 @@ export const LOGIN_EVENT = 'login';
 export const SESSION_CREATE_SETTLED_EVENT = 'session_create_settled';
 export const PR_OPERATION_SETTLED_EVENT = 'pr_operation_settled';
 export const SECURITY_COMMAND_SETTLED_EVENT = 'security_command_settled';
+export const PURCHASE_SETTLED_EVENT = 'purchase_settled';
 
 /**
  * Grandfathered event names that are exempt from the snake_case rule. Frozen:
@@ -142,6 +143,7 @@ export const TERMINAL_PHASE_EVENTS = [
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  PURCHASE_SETTLED_EVENT,
 ] as const;
 
 // ----- schemas -------------------------------------------------------------
@@ -274,6 +276,14 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       intent: z.enum(SECURITY_INTENTS),
       repo_count: metric.optional(),
       error_count: metric.optional(),
+      duration_ms: metric,
+    })
+    .strict(),
+  [PURCHASE_SETTLED_EVENT]: z
+    .object({
+      ...terminalBase,
+      surface: z.literal('purchase'),
+      intent: z.literal('complete_store_purchase'),
       duration_ms: metric,
     })
     .strict(),

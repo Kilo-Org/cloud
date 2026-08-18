@@ -1,35 +1,34 @@
-import { beginRefundRequestIOS, showManageSubscriptionsIOS } from 'expo-iap';
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useTRPC } from '@/lib/trpc';
-import {
-  getDevStoreKitRefundAppleProductId,
-  requestDevStoreKitRefund,
-} from '@/lib/kilo-pass/dev-storekit-refund';
+import { getDevStoreKitRefundAppleProductId } from '@/lib/kilo-pass/dev-storekit-refund';
 import {
   getKiloPassSubscriptionCardAccessibility,
   getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
-import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
-
-const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
 
 export function KiloPassSubscriptionCard() {
   const colors = useThemeColors();
   const router = useRouter();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
+  const presentationQuery = useQuery(
+    trpc.kiloPass.getPurchasePresentation.queryOptions({
+      platform,
+      storefront,
+      product: 'kilo_pass',
+    })
+  );
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
-  const { appStoreOwnershipPreflight } = useStoreKiloPassPurchase();
   const mobileStoreProductsQuery = useQuery({
     ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
     // Dev-only: the profile card needs App Store product IDs only to expose the
@@ -38,15 +37,14 @@ export function KiloPassSubscriptionCard() {
   });
   const subscription = stateQuery.data?.subscription;
   const contentState = getKiloPassSubscriptionCardContentState({
-    appStoreOwnershipPreflight,
-    data: stateQuery.data,
-    isError: stateQuery.isError,
-    isPending: stateQuery.isPending,
+    presentation: presentationQuery.data,
+    presentationIsError: presentationQuery.isError,
+    presentationIsPending: presentationQuery.isPending,
+    subscription,
+    stateIsError: stateQuery.isError,
+    stateIsPending: stateQuery.isPending,
     platformOS: Platform.OS,
   });
-  if (contentState.kind === 'hidden') {
-    return null;
-  }
 
   const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({
     products: mobileStoreProductsQuery.data?.products ?? [],
@@ -60,19 +58,6 @@ export function KiloPassSubscriptionCard() {
       queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
     ]);
   };
-  const openAppStoreManagement = async () => {
-    try {
-      await showManageSubscriptionsIOS();
-      await invalidateKiloPassState();
-      setTimeout(() => {
-        void invalidateKiloPassState();
-      }, 2000);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to open App Store subscription management.'
-      );
-    }
-  };
   const handlePress = () => {
     if (contentState.kind !== 'card') {
       return;
@@ -84,15 +69,21 @@ export function KiloPassSubscriptionCard() {
     }
 
     void Haptics.selectionAsync();
-    if (cardState.action === 'open-web-management') {
-      void Linking.openURL(KILO_PASS_MANAGE_URL);
+    if (cardState.action === 'open-web') {
+      const webUrl = presentationQuery.data?.webUrl;
+      if (webUrl) {
+        void Linking.openURL(webUrl);
+      }
       return;
     }
     if (cardState.action === 'open-store-management') {
       if (Platform.OS !== 'ios') {
         return;
       }
-      void openAppStoreManagement();
+      void (async () => {
+        const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
+        await openAppStoreManagement({ invalidateAfter: invalidateKiloPassState });
+      })();
       return;
     }
     router.push('/(app)/kilo-pass' as Href);
@@ -100,6 +91,7 @@ export function KiloPassSubscriptionCard() {
   const handleRetryPress = () => {
     void Haptics.selectionAsync();
     void stateQuery.refetch();
+    void presentationQuery.refetch();
   };
   const handleDevRefundPress = () => {
     if (!devRefundAppleProductId) {
@@ -107,18 +99,16 @@ export function KiloPassSubscriptionCard() {
     }
 
     void Haptics.selectionAsync();
-    void requestDevStoreKitRefund({
-      appleProductId: devRefundAppleProductId,
-      beginRefundRequest: beginRefundRequestIOS,
-      invalidateAfterRefund: invalidateKiloPassState,
-      showError: message => {
-        toast.error(message);
-      },
-      showSuccess: message => {
-        toast.success(message);
-      },
-    });
+    void (async () => {
+      const { requestDevAppStoreRefund } = await import('./kilo-pass-ios-manage');
+      requestDevAppStoreRefund({
+        appleProductId: devRefundAppleProductId,
+        invalidateAfterRefund: invalidateKiloPassState,
+      });
+    })();
   };
+
+  const isUnavailable = presentationQuery.data?.kind === 'unavailable';
 
   return (
     <View className="gap-2">
@@ -188,6 +178,7 @@ export function KiloPassSubscriptionCard() {
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
+          testID={isUnavailable ? 'kilo-pass-unavailable-card' : undefined}
         >
           <View className="flex-row items-center gap-3">
             <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">

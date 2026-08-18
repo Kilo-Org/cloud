@@ -108,6 +108,10 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
   user_data_exports,
+  content_moderation_reports,
+  user_moderation_blocks,
+  user_moderation_mutes,
+  user_terms_acceptances,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -1424,6 +1428,17 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(github_branch_pull_requests)
       .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
+
+    // Moderation data. Blocks/mutes key on the blocker's Kilo user id; the
+    // other column is a GitHub login, so only the blocker side is deleted.
+    await tx
+      .delete(content_moderation_reports)
+      .where(eq(content_moderation_reports.kilo_user_id, userId));
+    await tx
+      .delete(user_moderation_blocks)
+      .where(eq(user_moderation_blocks.blocker_user_id, userId));
+    await tx.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, userId));
+    await tx.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, userId));
 
     // Code indexing data
     await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

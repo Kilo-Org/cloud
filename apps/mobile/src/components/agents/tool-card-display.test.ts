@@ -320,6 +320,40 @@ describe('getToolDisplay badge rules', () => {
     ).toBeUndefined();
     expect(getDisplay(makeToolPart('grep', running({ pattern: 'foo' }))).badge).toBeUndefined();
   });
+
+  it('counts grep sheet rows, not the Found caption', () => {
+    expect(
+      getDisplay(
+        makeToolPart('grep', completed({ pattern: 'x' }, 'Found 1 match\nsrc/a.ts:\n  Line 1: x'))
+      ).badge
+    ).toBe('2 matches');
+  });
+
+  it('omits the grep badge when only a Found caption exists', () => {
+    expect(
+      getDisplay(makeToolPart('grep', completed({ pattern: 'x' }, 'Found 1 match'))).badge
+    ).toBeUndefined();
+  });
+
+  it('counts glob sheet rows, not the Found caption', () => {
+    expect(
+      getDisplay(
+        makeToolPart(
+          'glob',
+          completed(
+            { pattern: 'src/**/*.ts' },
+            'Found 2 file(s) matching "src/**/*.ts":\nsrc/a.ts\nsrc/b.ts'
+          )
+        )
+      ).badge
+    ).toBe('2 files');
+  });
+
+  it('omits the glob badge when only a Found caption exists', () => {
+    expect(
+      getDisplay(makeToolPart('glob', completed({ pattern: 'src/**/*.ts' }, 'Found 1 file'))).badge
+    ).toBeUndefined();
+  });
 });
 
 describe('toolPartHasDetails', () => {

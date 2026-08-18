@@ -1134,6 +1134,48 @@ describe('user router - account deletion', () => {
     });
   });
 
+  it('keeps the code usable when performGdprRemoval fails, so a retry succeeds', async () => {
+    mockPerformGdprRemoval.mockRejectedValueOnce(new Error('kiloclaw destroy failed'));
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toThrow();
+
+    const [afterFailure] = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(afterFailure?.consumed_at).toBeNull();
+    expect(afterFailure?.reserved_until).toBeNull();
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).resolves.toEqual({ status: 'deleted' });
+
+    expect(mockPerformGdprRemoval).toHaveBeenCalledTimes(2);
+
+    const [afterRetry] = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(afterRetry?.consumed_at).not.toBeNull();
+  });
+
+  it('rejects a replay of the code after a successful deletion', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await caller.user.requestAccountDeletion({ challengeId, code: devCode as string });
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects an expired code without deleting', async () => {
     const caller = await createCallerForUser(deletionUser.id);
     const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();

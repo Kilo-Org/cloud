@@ -10,6 +10,7 @@ import {
   consumeSignInCode,
   createSignInCode,
   deleteSignInCode,
+  releaseSignInCode,
   reserveSignInCode,
 } from '@/lib/auth/magic-link-tokens';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
@@ -975,11 +976,9 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      const consumed = await consumeSignInCode(userEmail, input.code, input.challengeId);
-      if (!consumed) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid confirmation code' });
-      }
-
+      // The code is consumed only after removal succeeds. Burning it first
+      // stranded the caller: a failed removal left no usable code and the
+      // 1 h request cooldown blocked a new one.
       try {
         await performGdprRemoval(userId, {
           destroyReason: 'admin_request',
@@ -990,6 +989,7 @@ export const userRouter = createTRPCRouter({
           },
         });
       } catch (error) {
+        await releaseSignInCode(userEmail, input.code, input.challengeId);
         // A precondition race inside performGdprRemoval (re-asserted there) maps
         // to the same PRECONDITION_FAILED surface.
         if (error instanceof SoftDeletePreconditionError) {
@@ -997,6 +997,8 @@ export const userRouter = createTRPCRouter({
         }
         throw error;
       }
+
+      await consumeSignInCode(userEmail, input.code, input.challengeId);
 
       return { status: 'deleted' as const };
     }),
